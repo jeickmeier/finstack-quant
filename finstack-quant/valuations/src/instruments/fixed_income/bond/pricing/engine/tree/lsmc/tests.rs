@@ -3,7 +3,7 @@ use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::bond::{CallPutSchedule, CashflowSpec};
 use crate::instruments::InstrumentPricingOverrides;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Tenor;
+use finstack_quant_core::dates::{BusinessDayConvention, Tenor};
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
@@ -12,6 +12,28 @@ use finstack_quant_models::trees::two_factor_rates_credit::{
     RatesCreditCalibrationTargets, RatesCreditConfig,
 };
 use rust_decimal::Decimal;
+
+#[test]
+fn bond_lsmc_requires_two_independent_pricing_estimators() {
+    for antithetic in [false, true] {
+        for paths in [0, 1, 2] {
+            let config = BondLsmcConfig {
+                paths,
+                antithetic,
+                seed: 1,
+                oas_bp: 0.0,
+                target_ci_half_width: None,
+            };
+            match config.validate() {
+                Ok(()) => assert_eq!(paths, 2),
+                Err(error) => {
+                    assert!(paths < 2);
+                    assert!(error.to_string().contains("independent pricing estimators"));
+                }
+            }
+        }
+    }
+}
 
 fn synthetic_daily_template(days: usize, with_daily_make_whole: bool) -> ReplayTemplate {
     let states = days + 1;
@@ -42,8 +64,10 @@ fn synthetic_daily_template(days: usize, with_daily_make_whole: bool) -> ReplayT
         floating_reset_ids: vec![Vec::new(); states],
         floating_accrual_start_ids: vec![Vec::new(); states],
         floating_payment_ids: vec![Vec::new(); states],
+        floating_balance_ids: vec![Vec::new(); states],
         static_accruals: Vec::new(),
         static_distributions: vec![Vec::new(); states],
+        static_redemption_pik: 0.0,
         exercise: vec![Vec::new(); states],
         decision_steps: (0..=days).collect(),
         initial_outstanding: 100.0,
@@ -151,6 +175,649 @@ fn overnight_pik_test_bond(as_of: Date, maturity: Date) -> Bond {
     spec.rate_spec.index_cap_bp = Some(Decimal::from(300));
     spec.rate_spec.fallback = FloatingRateFallback::FixedRate(Decimal::new(4, 2));
     bond
+}
+
+#[test]
+fn overnight_replay_preserves_index_rates_across_curve_clocks() {
+    let as_of = time::macros::date!(2024 - 03 - 01);
+    let maturity = time::macros::date!(2024 - 03 - 31);
+    let tree = stochastic_test_tree(31);
+    let bond = overnight_pik_test_bond(as_of, maturity);
+    for (day_count, curve_rate) in [
+        (DayCount::Act360, 0.04),
+        (DayCount::Act365F, 0.04 * 365.0 / 360.0),
+    ] {
+        let forward = ForwardCurve::builder("USD-SOFR", 1.0 / 360.0)
+            .base_date(as_of)
+            .day_count(day_count)
+            .knots([(0.0, curve_rate), (2.0, curve_rate)])
+            .build()
+            .expect("equivalent forward curve");
+        let market = stochastic_test_market(as_of).insert(forward);
+        let template =
+            ReplayTemplate::new(&tree, &bond, &market, as_of).expect("overnight replay template");
+        let FloatingRateModel::Overnight(model) = &template.floating[0].rate_model else {
+            unreachable!("overnight coupon");
+        };
+        let mut projected = 0;
+        for source in model.sources.values() {
+            if let OvernightRateSource::Conditional(source) = source {
+                projected += 1;
+                assert!(
+                    (source.base_index_rate - 0.04).abs() < 1e-12,
+                    "{day_count:?} must preserve the ACT/360 index rate"
+                );
+            }
+        }
+        assert!(projected > 0, "regression requires projected observations");
+    }
+}
+
+#[test]
+fn early_overnight_payment_finishes_known_weekend_carry() {
+    let as_of = time::macros::date!(2024 - 03 - 01);
+    let maturity = time::macros::date!(2024 - 03 - 31);
+    let market = stochastic_test_market(as_of);
+    let tree = stochastic_test_tree(31);
+    let mut bond = overnight_pik_test_bond(as_of, maturity);
+    let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
+        unreachable!("floating coupon");
+    };
+    spec.coupon_type = CouponType::Cash;
+    spec.schedule.business_day_convention = BusinessDayConvention::Preceding;
+    spec.schedule.calendar_id = "weekends_only".into();
+    let template =
+        ReplayTemplate::new(&tree, &bond, &market, as_of).expect("early-payment template");
+    let coupon = &template.floating[0];
+    assert_eq!(
+        coupon.compiled.period().payment_date,
+        time::macros::date!(2024 - 03 - 29)
+    );
+    assert!(coupon.compiled.period().payment_date < coupon.compiled.period().accrual_end);
+    let mut path = Vec::new();
+    tree.sample_path_into(41, 0, false, &mut path)
+        .expect("path");
+    let FloatingRateObservation::Overnight {
+        schedule,
+        day_count_basis,
+        constraints,
+    } = coupon.compiled.observation()
+    else {
+        unreachable!("overnight observation");
+    };
+    let FloatingRateModel::Overnight(model) = &coupon.rate_model else {
+        unreachable!("overnight model");
+    };
+    let full = schedule
+        .replay(maturity, *day_count_basis, *constraints, |slice| {
+            model.sources[&(slice.observation_date, slice.rate_tenor_days)].rate(&path)
+        })
+        .expect("full known observations");
+    let expected = coupon
+        .compiled
+        .settle_index_rate(100.0, full.constrained_rate, full.projected_rate)
+        .expect("full coupon")
+        .cash_amount;
+    let config = BondLsmcConfig {
+        paths: 2,
+        antithetic: false,
+        seed: 41,
+        oas_bp: 0.0,
+        target_ci_half_width: None,
+    };
+    let mut cursor = ReplayCursor::new(&template).expect("cursor");
+    let mut payment = StepReplay::default();
+    for step in 0..=coupon.payment_step {
+        payment = cursor
+            .advance_step(&template, &bond, &path, &config, step)
+            .expect("coupon replay");
+    }
+    let static_cash: f64 = template.static_cash[coupon.payment_step]
+        .iter()
+        .map(|event| event.amount_at_step)
+        .sum();
+    assert!((payment.current_cash - static_cash - expected).abs() < 1e-10);
+}
+
+#[test]
+fn early_overnight_payment_rejects_unknown_fixings_after_payment() {
+    let as_of = time::macros::date!(2024 - 03 - 01);
+    let market = stochastic_test_market(as_of);
+    let tree = stochastic_test_tree(31);
+    let mut bond = overnight_pik_test_bond(as_of, time::macros::date!(2024 - 03 - 31));
+    let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
+        unreachable!("floating coupon");
+    };
+    // TARGET closes on Good Friday, so the payment rolls to Thursday while
+    // the explicitly weekends-only fixing calendar still requires Friday.
+    spec.schedule.calendar_id = "target2".into();
+    spec.schedule.business_day_convention = BusinessDayConvention::Preceding;
+    let schedule = bond
+        .full_cashflow_schedule(&market)
+        .expect("preceding payment schedule");
+    let pik = schedule
+        .get_flows()
+        .iter()
+        .find(|flow| flow.kind == CFKind::Pik)
+        .expect("PIK coupon");
+    assert_eq!(pik.date, time::macros::date!(2024 - 03 - 28));
+    assert_eq!(pik.get_balance_date(), time::macros::date!(2024 - 03 - 31));
+    let error = ReplayTemplate::new(&tree, &bond, &market, as_of)
+        .err()
+        .expect("unknown Friday fixing must reject early payment");
+    assert!(
+        error.to_string().contains("observation after payment"),
+        "{error}"
+    );
+}
+
+#[test]
+fn past_overnight_payment_retains_only_fully_determined_pending_pik() {
+    let issue = time::macros::date!(2024 - 03 - 01);
+    let maturity = time::macros::date!(2024 - 03 - 31);
+    let tree = stochastic_test_tree(4);
+    let mut bond = overnight_pik_test_bond(issue, maturity);
+    let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
+        unreachable!("floating coupon");
+    };
+    // TARGET pays on Thursday; the weekends-only index still needs a Friday
+    // fixing that is unpublished at either the Thursday payment origin or
+    // the Friday origin after payment.
+    spec.schedule.calendar_id = "target2".into();
+    spec.schedule.business_day_convention = BusinessDayConvention::Preceding;
+    for as_of in [
+        time::macros::date!(2024 - 03 - 28),
+        time::macros::date!(2024 - 03 - 29),
+    ] {
+        let market = stochastic_test_market(as_of);
+        let schedule = bond
+            .full_cashflow_schedule(&market)
+            .expect("preceding payment schedule");
+        let pik = schedule
+            .get_flows()
+            .iter()
+            .find(|flow| flow.kind == CFKind::Pik)
+            .expect("PIK coupon");
+        assert_eq!(pik.date, time::macros::date!(2024 - 03 - 28));
+        assert_eq!(pik.get_balance_date(), maturity);
+        let error = ReplayTemplate::new(&tree, &bond, &market, as_of)
+            .err()
+            .expect("pending PIK must not freeze an unobserved rate after cash payment");
+        assert!(
+            error
+                .to_string()
+                .contains("unobserved fixings after payment"),
+            "{error}"
+        );
+    }
+
+    let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
+        unreachable!("floating coupon");
+    };
+    // Friday payment followed by a Saturday origin has only fully observed
+    // Friday carry remaining before Sunday's economic capitalization.
+    spec.schedule.calendar_id = "weekends_only".into();
+    spec.rate_spec.fallback = FloatingRateFallback::Error;
+    let as_of = time::macros::date!(2024 - 03 - 30);
+    let fixings = (0..29)
+        .map(|day| issue + time::Duration::days(day))
+        .filter(|date| {
+            !matches!(
+                date.weekday(),
+                time::Weekday::Saturday | time::Weekday::Sunday
+            )
+        })
+        .map(|date| (date, 0.04))
+        .collect();
+    let market = stochastic_test_market(as_of).insert_series(
+        finstack_quant_core::market_data::scalars::ScalarTimeSeries::new(
+            "FIXING:USD-SOFR",
+            fixings,
+            None,
+        )
+        .expect("published business-day fixings"),
+    );
+    let template = ReplayTemplate::new(&tree, &bond, &market, as_of)
+        .expect("fully determined weekend carry stays static pending PIK");
+    assert!(template.floating.is_empty());
+    let pik: f64 = template
+        .balance_events
+        .iter()
+        .flatten()
+        .map(|event| event.delta)
+        .sum();
+    // Sixteen one-day weekday weights, four full Friday weekends, and the
+    // last Friday's two-day carry, daily capped at 3%, plus a 2% spread.
+    let growth = (1.0_f64 + 0.03 / 360.0).powi(16)
+        * (1.0_f64 + 0.03 * 3.0 / 360.0).powi(4)
+        * (1.0 + 0.03 * 2.0 / 360.0);
+    assert!((pik - 100.0 * (growth - 1.0 + 0.02 * 30.0 / 360.0)).abs() < 1e-10);
+}
+
+#[test]
+fn term_act365l_balance_segments_replay_the_full_coupon_leap_denominator() {
+    use crate::cashflow::builder::AmortizationSpec;
+    let as_of = time::macros::date!(2023 - 12 - 01);
+    let maturity = time::macros::date!(2024 - 03 - 01);
+    let market = stochastic_test_market(as_of);
+    let tree = stochastic_test_tree(92);
+    let mut bond = stochastic_test_bond(as_of, maturity);
+    bond.cashflow_spec = CashflowSpec::floating_with_reset_lag(
+        CurveId::new("USD-SOFR-3M"),
+        200.0,
+        Tenor::quarterly(),
+        DayCount::Act365L,
+        0,
+    )
+    .expect("term floating specification");
+    bond.cashflow_spec = CashflowSpec::amortizing(
+        bond.cashflow_spec,
+        AmortizationSpec::StepRemaining {
+            schedule: vec![
+                (
+                    time::macros::date!(2023 - 12 - 15),
+                    Money::from((50_i64, Currency::USD)),
+                ),
+                (maturity, Money::from((0_i64, Currency::USD))),
+            ],
+        },
+    );
+    let template = ReplayTemplate::new(&tree, &bond, &market, as_of)
+        .expect("term segments retain the original ACT/365L denominator");
+    assert_eq!(template.floating.len(), 2);
+    assert!((template.floating[0].compiled.period().accrual_factor - 14.0 / 366.0).abs() < 1e-12);
+    assert!((template.floating[1].compiled.period().accrual_factor - 77.0 / 366.0).abs() < 1e-12);
+    let mut path = Vec::new();
+    tree.sample_path_into(41, 0, false, &mut path)
+        .expect("path");
+    let mut expected = 0.0;
+    for (coupon, notional) in template.floating.iter().zip([100.0, 50.0]) {
+        let FloatingRateModel::Term(source) = &coupon.rate_model else {
+            unreachable!("term observation");
+        };
+        let index_rate = source.rate(&path).expect("term fixing");
+        expected += coupon
+            .compiled
+            .settle_index_rate(notional, index_rate, index_rate)
+            .expect("segment coupon")
+            .cash_amount;
+    }
+    let config = BondLsmcConfig {
+        paths: 2,
+        antithetic: false,
+        seed: 41,
+        oas_bp: 0.0,
+        target_ci_half_width: None,
+    };
+    let payment_step = template.floating[0].payment_step;
+    let mut cursor = ReplayCursor::new(&template).expect("cursor");
+    let mut payment = StepReplay::default();
+    for step in 0..=payment_step {
+        payment = cursor
+            .advance_step(&template, &bond, &path, &config, step)
+            .expect("replay");
+    }
+    let static_cash: f64 = template.static_cash[payment_step]
+        .iter()
+        .map(|event| event.amount_at_step)
+        .sum();
+    assert!((payment.current_cash - static_cash - expected).abs() < 1e-10);
+}
+
+#[test]
+fn segmented_overnight_templates_reject_loss_of_full_coupon_scope() {
+    use crate::cashflow::builder::{AmortizationSpec, OvernightIndexConstraintApplication};
+    let as_of = time::macros::date!(2025 - 01 - 01);
+    let maturity = time::macros::date!(2025 - 04 - 01);
+    let market = stochastic_test_market(as_of);
+    let tree = stochastic_test_tree(90);
+    for application in [
+        OvernightIndexConstraintApplication::Daily,
+        OvernightIndexConstraintApplication::Period,
+    ] {
+        let mut bond = overnight_pik_test_bond(as_of, maturity);
+        let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
+            unreachable!("floating coupon");
+        };
+        spec.coupon_type = CouponType::Cash;
+        spec.rate_spec.overnight_index_constraints = application;
+        bond.cashflow_spec = CashflowSpec::amortizing(
+            bond.cashflow_spec,
+            AmortizationSpec::StepRemaining {
+                schedule: vec![
+                    (
+                        time::macros::date!(2025 - 02 - 01),
+                        Money::from((50_i64, Currency::USD)),
+                    ),
+                    (maturity, Money::from((0_i64, Currency::USD))),
+                ],
+            },
+        );
+        let error = ReplayTemplate::new(&tree, &bond, &market, as_of)
+            .err()
+            .expect("segmented overnight coupon needs original contract metadata");
+        assert!(
+            error.to_string().contains("segmented overnight coupon"),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn floating_pik_uses_accrual_boundaries_with_lagged_and_early_cash_dates() {
+    use finstack_quant_core::dates::BusinessDayConvention;
+    for (as_of, maturity, frequency, payment_lag_days, convention, days) in [
+        (
+            time::macros::date!(2025 - 01 - 15),
+            time::macros::date!(2026 - 01 - 15),
+            Tenor::semi_annual(),
+            2,
+            BusinessDayConvention::Unadjusted,
+            369,
+        ),
+        (
+            time::macros::date!(2024 - 03 - 01),
+            time::macros::date!(2024 - 09 - 01),
+            Tenor::quarterly(),
+            0,
+            BusinessDayConvention::Preceding,
+            186,
+        ),
+    ] {
+        let market = stochastic_test_market(as_of);
+        let tree = stochastic_test_tree(days);
+        let mut bond = term_pik_test_bond(as_of, maturity);
+        let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec else {
+            unreachable!("floating coupon");
+        };
+        spec.coupon_type = CouponType::Split {
+            cash_fraction: Decimal::new(4, 1),
+            pik_fraction: Decimal::new(6, 1),
+        };
+        spec.schedule.frequency = frequency;
+        spec.schedule.calendar_id = "weekends_only".into();
+        spec.schedule.business_day_convention = convention;
+        spec.schedule.adjust_accrual_dates = false;
+        spec.schedule.payment_lag_days = payment_lag_days;
+        let template = ReplayTemplate::new(&tree, &bond, &market, as_of).expect("template");
+        let first = &template.floating[0];
+        let next = &template.floating[1];
+        assert_ne!(first.payment_step, first.effective_end_step);
+        assert_eq!(first.effective_end_step, next.accrual_start_step);
+        let schedule = bond.full_cashflow_schedule(&market).expect("schedule");
+        let first_pik = schedule
+            .get_flows()
+            .iter()
+            .find(|flow| {
+                flow.kind == CFKind::Pik
+                    && flow.get_balance_date() == first.compiled.period().accrual_end
+            })
+            .expect("first PIK")
+            .amount
+            .amount();
+        let first_cash = schedule
+            .get_flows()
+            .iter()
+            .find(|flow| {
+                flow.kind == CFKind::FloatReset && flow.date == first.compiled.period().payment_date
+            })
+            .expect("first cash coupon")
+            .amount
+            .amount();
+        let mut path = Vec::new();
+        tree.sample_path_into(57, 0, false, &mut path)
+            .expect("path");
+        let config = BondLsmcConfig {
+            paths: 2,
+            antithetic: false,
+            seed: 57,
+            oas_bp: 0.0,
+            target_ci_half_width: None,
+        };
+        let mut cursor = ReplayCursor::new(&template).expect("cursor");
+        for step in 0..=first.effective_end_step {
+            let state = cursor
+                .advance_step(&template, &bond, &path, &config, step)
+                .expect("replay");
+            if step == first.payment_step {
+                assert!((state.current_cash - first_cash).abs() < 1e-10);
+            }
+            if step < first.effective_end_step {
+                assert!((cursor.outstanding - 100.0).abs() < 1e-10);
+            }
+            if first.payment_step <= step && step < first.effective_end_step {
+                let date = template.step_dates[step].expect("daily date");
+                assert!(
+                    template
+                        .accrued_state(date, &cursor.floating)
+                        .expect("pending accrued PIK")
+                        .1
+                        > 0.0
+                );
+            }
+        }
+        let captured = next
+            .compiled
+            .captured_notional(&cursor.floating[1])
+            .expect("capture");
+        assert!((captured - 100.0 - first_pik).abs() < 1e-10);
+        assert_eq!(
+            template
+                .accrued_state(first.compiled.period().accrual_end, &cursor.floating)
+                .expect("capitalized PIK")
+                .1,
+            0.0
+        );
+        if first.payment_step > first.effective_end_step {
+            let accrued = template
+                .accrued_state(first.compiled.period().accrual_end, &cursor.floating)
+                .expect("cash pending after PIK capitalization");
+            assert!((accrued.0 - first_cash).abs() < 1e-10);
+            for step in first.effective_end_step + 1..=first.payment_step {
+                let state = cursor
+                    .advance_step(&template, &bond, &path, &config, step)
+                    .expect("lagged cash replay");
+                if step == first.payment_step {
+                    assert!((state.current_cash - first_cash).abs() < 1e-10);
+                }
+            }
+        }
+        if payment_lag_days == 0 {
+            let redemption_step = template.redemption_step.expect("redemption");
+            let mut terminal = StepReplay::default();
+            for step in first.effective_end_step + 1..=redemption_step {
+                terminal = cursor
+                    .advance_step(&template, &bond, &path, &config, step)
+                    .expect("replay");
+            }
+            let last_id = template.floating.len() - 1;
+            let last = &template.floating[last_id];
+            assert!(redemption_step < last.effective_end_step);
+            let pending = last
+                .compiled
+                .settle(&cursor.floating[last_id])
+                .expect("locked PIK")
+                .pik_amount;
+            let snapshot = template
+                .decision_snapshot(
+                    &bond,
+                    redemption_step,
+                    &path,
+                    terminal,
+                    &cursor.floating,
+                    None,
+                )
+                .expect("redemption snapshot");
+            assert!((snapshot.hold_redemption - cursor.outstanding - pending).abs() < 1e-10);
+            assert_eq!(
+                template
+                    .accrued_state(last.compiled.period().payment_date, &cursor.floating)
+                    .expect("accrued")
+                    .1,
+                0.0
+            );
+        }
+    }
+}
+
+#[test]
+fn scheduled_amortization_reduces_balance_before_lagged_cash_settlement() {
+    use crate::cashflow::builder::AmortizationSpec;
+    use finstack_quant_core::dates::BusinessDayConvention;
+    let as_of = time::macros::date!(2025 - 01 - 15);
+    let maturity = time::macros::date!(2026 - 01 - 15);
+    let market = stochastic_test_market(as_of);
+    let tree = stochastic_test_tree(369);
+    let mut bond = stochastic_test_bond(as_of, maturity);
+    let CashflowSpec::Fixed(spec) = &mut bond.cashflow_spec else {
+        unreachable!("fixed coupon");
+    };
+    spec.schedule.calendar_id = "weekends_only".into();
+    spec.schedule.business_day_convention = BusinessDayConvention::Unadjusted;
+    spec.schedule.adjust_accrual_dates = false;
+    spec.schedule.payment_lag_days = 2;
+    bond.cashflow_spec = CashflowSpec::amortizing(
+        bond.cashflow_spec,
+        AmortizationSpec::PercentOfOriginalPerPeriod { pct: 0.25 },
+    );
+    let template = ReplayTemplate::new(&tree, &bond, &market, as_of).expect("template");
+    let effective = time::macros::date!(2025 - 04 - 15);
+    let schedule = bond.full_cashflow_schedule(&market).expect("schedule");
+    let repayment = schedule
+        .get_flows()
+        .iter()
+        .find(|flow| flow.kind == CFKind::Amortization && flow.get_balance_date() == effective)
+        .expect("first repayment");
+    assert!(repayment.date > effective);
+    let effective_step =
+        exact_grid_step(&template.times, as_of, effective).expect("effective step");
+    let cash_step = exact_grid_step(&template.times, as_of, repayment.date).expect("cash step");
+    assert_eq!(template.balance_events[effective_step][0].delta, -25.0);
+    assert!(template.balance_events[cash_step].is_empty());
+    let mut path = Vec::new();
+    tree.sample_path_into(59, 0, false, &mut path)
+        .expect("path");
+    let config = BondLsmcConfig {
+        paths: 2,
+        antithetic: false,
+        seed: 59,
+        oas_bp: 0.0,
+        target_ci_half_width: None,
+    };
+    let mut cursor = ReplayCursor::new(&template).expect("cursor");
+    for step in 0..=effective_step {
+        cursor
+            .advance_step(&template, &bond, &path, &config, step)
+            .expect("replay");
+    }
+    assert_eq!(cursor.outstanding, 75.0);
+}
+
+#[test]
+fn explicit_principal_delta_preserves_movements_paid_on_redemption_date() {
+    let issue = time::macros::date!(2025 - 01 - 01);
+    let effective = time::macros::date!(2025 - 04 - 15);
+    let payment = time::macros::date!(2025 - 04 - 17);
+    let bond = stochastic_test_bond(issue, payment);
+    let draw = CashFlow::new(
+        payment,
+        None,
+        Money::from((-10_i64, Currency::USD)),
+        CFKind::Notional,
+        0.0,
+        None,
+    )
+    .with_principal_delta(Money::from((25_i64, Currency::USD)))
+    .with_principal_date(effective);
+    let redemption = CashFlow::new(
+        payment,
+        None,
+        Money::from((125_i64, Currency::USD)),
+        CFKind::Notional,
+        0.0,
+        None,
+    );
+    assert!(!is_terminal_redemption(&draw, Some(payment)));
+    assert!(is_terminal_redemption(&redemption, Some(payment)));
+    assert_eq!(static_balance_delta(&draw, false), Some(25.0));
+    assert_eq!(
+        scheduled_outstanding_after(&bond, &[draw.clone(), redemption], effective, Some(payment))
+            .expect("balance"),
+        125.0
+    );
+    let issue_draw = CashFlow {
+        date: issue,
+        principal_date: Some(issue),
+        ..draw
+    };
+    assert_eq!(
+        scheduled_outstanding_after(&bond, &[issue_draw], issue, Some(payment))
+            .expect("issue draw"),
+        125.0
+    );
+}
+
+#[test]
+fn stochastic_floating_pik_with_amortization_rejects_projected_balance_targets() {
+    use crate::cashflow::builder::AmortizationSpec;
+    let as_of = time::macros::date!(2025 - 01 - 01);
+    let maturity = time::macros::date!(2026 - 01 - 01);
+    let market = stochastic_test_market(as_of);
+    let tree = stochastic_test_tree(366);
+    let mut bond = term_pik_test_bond(as_of, maturity);
+    bond.cashflow_spec = CashflowSpec::amortizing(
+        bond.cashflow_spec,
+        AmortizationSpec::StepRemaining {
+            schedule: vec![(
+                time::macros::date!(2025 - 07 - 01),
+                Money::from((80_i64, Currency::USD)),
+            )],
+        },
+    );
+    let error = ReplayTemplate::new(&tree, &bond, &market, as_of)
+        .err()
+        .expect("unsupported dynamic target");
+    assert!(
+        error
+            .to_string()
+            .contains("stochastic floating PIK with amortization"),
+        "{error}"
+    );
+}
+
+#[test]
+fn fixed_accrued_act365l_retains_the_full_coupon_leap_year_denominator() {
+    let start = time::macros::date!(2023 - 12 - 01);
+    let end = time::macros::date!(2024 - 03 - 01);
+    let query = time::macros::date!(2023 - 12 - 15);
+    let context = DayCountContext {
+        frequency: Some(Tenor::quarterly()),
+        coupon_period: Some((start, end)),
+        ..DayCountContext::default()
+    };
+    let full = DayCount::Act365L
+        .year_fraction(start, end, context)
+        .expect("full coupon");
+    let partial = DayCount::Act365L
+        .year_fraction(start, query, context)
+        .expect("partial coupon");
+    assert!((full - 91.0 / 366.0).abs() < 1e-14);
+    assert!((partial - 14.0 / 366.0).abs() < 1e-14);
+    let mut template = synthetic_daily_template(1, false);
+    template.static_accruals.push(AccrualClaim {
+        start,
+        end,
+        payment: end,
+        day_count: DayCount::Act365L,
+        day_count_context: context,
+        amount: 100.0 * 0.1 * full,
+        pik: false,
+    });
+    let accrued = template
+        .accrued_state(query, &[])
+        .expect("fixed accrued claim");
+    assert!((accrued.0 - 100.0 * 0.1 * 14.0 / 366.0).abs() < 1e-14);
+    assert_eq!(accrued.1, 0.0);
 }
 
 fn stochastic_test_tree(days: usize) -> RatesCreditTree {

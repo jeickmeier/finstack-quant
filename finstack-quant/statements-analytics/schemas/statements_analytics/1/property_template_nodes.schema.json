@@ -1,0 +1,86 @@
+{
+  "$defs": {
+    "RentRollOutputNodes": {
+      "additionalProperties": false,
+      "description": "Standard output node ids for a rent roll.\n\nThe richer rent-roll helper also emits fixed transparency nodes\n`vacancy_loss_physical` and `renewal_prob_loss` in addition to these\nconfigurable aggregate outputs.",
+      "properties": {
+        "free_rent_node": {
+          "description": "Total free rent concessions.",
+          "type": "string"
+        },
+        "rent_effective_node": {
+          "description": "Total effective rent (EGI rent component): `rent_pgi - free_rent - vacancy_loss`.",
+          "type": "string"
+        },
+        "rent_pgi_node": {
+          "description": "Total contractual rent (PGI) from all leases.",
+          "type": "string"
+        },
+        "vacancy_loss_node": {
+          "description": "Total vacancy loss (includes occupancy and renewal probability effects).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "rent_pgi_node",
+        "free_rent_node",
+        "vacancy_loss_node",
+        "rent_effective_node"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/property_template_nodes.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Standard node ids for a full property operating statement template.",
+  "properties": {
+    "capex_total_node": {
+      "default": "capex_total",
+      "description": "Total CapEx node id.",
+      "type": "string"
+    },
+    "egi_node": {
+      "default": "egi",
+      "description": "Effective gross income (EGI) node id.",
+      "type": "string"
+    },
+    "management_fee_node": {
+      "default": "management_fee",
+      "description": "Management fee node id (if configured).",
+      "type": "string"
+    },
+    "ncf_node": {
+      "default": "ncf",
+      "description": "Net cash flow (NCF) node id: `noi - capex_total`.",
+      "type": "string"
+    },
+    "noi_node": {
+      "default": "noi",
+      "description": "Net operating income (NOI) node id.",
+      "type": "string"
+    },
+    "opex_total_node": {
+      "default": "opex_total",
+      "description": "Total operating expenses node id (includes management fee if enabled).",
+      "type": "string"
+    },
+    "other_income_total_node": {
+      "default": "other_income_total",
+      "description": "Total other income node id.",
+      "type": "string"
+    },
+    "rent_roll": {
+      "$ref": "#/$defs/RentRollOutputNodes",
+      "default": {
+        "free_rent_node": "free_rent",
+        "rent_effective_node": "rent_effective",
+        "rent_pgi_node": "rent_pgi",
+        "vacancy_loss_node": "vacancy_loss"
+      },
+      "description": "Rent roll output nodes (PGI/free rent/vacancy/effective rent)."
+    }
+  },
+  "title": "PropertyTemplateNodes",
+  "type": "object"
+}

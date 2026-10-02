@@ -15,14 +15,14 @@ Examples
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import date
 from typing import Any, Literal
 
 import pandas as pd
 
 from finstack_quant.core.currency import Currency
-from finstack_quant.core.dates import BusinessDayConvention, DayCount, Tenor
+from finstack_quant.core.dates import BusinessDayConvention, DayCount, Period, Tenor
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.table import ArrowTable
@@ -113,9 +113,12 @@ class MonteCarloConfig:
             same seed reproduces the run exactly, in serial and in parallel.
         percentiles : list[float] or None, default None
             Percentiles to compute, each a **decimal fraction in [0, 1]** —
-            ``0.05`` is the 5th percentile, not ``5``. Values are sorted and
-            deduplicated; out-of-range values raise. ``None`` uses the engine
-            default ``[0.05, 0.5, 0.95]``.
+            ``0.05`` is the 5th percentile, not ``5``. Stored as given; the
+            engine sorts, deduplicates and range-checks them when
+            ``Evaluator.evaluate_monte_carlo`` starts, which raises
+            ``ValueError`` for a value that is not finite or lies outside
+            [0, 1]. ``None`` or an empty list uses the engine default
+            ``[0.05, 0.5, 0.95]``.
         include_path_data : bool, default False
             Whether to retain the full per-path long table. Off by default
             because it grows as ``n_paths * metrics * forecast periods``.
@@ -217,8 +220,10 @@ class MonteCarloConfig:
         Returns
         -------
         list[float]
-            Sorted, deduplicated quantile levels — ``0.05`` is the 5th
-            percentile, not ``5``.
+            Quantile levels exactly as supplied (not yet normalized) —
+            ``0.05`` is the 5th percentile, not ``5``. See
+            ``MonteCarloResults.percentiles`` for the sorted, deduplicated
+            levels a run computed.
 
         Notes
         -----
@@ -358,6 +363,75 @@ class MonteCarloResults:
         """
         ...
 
+    @property
+    def metrics(self) -> list[str]:
+        """
+        Metric (node) identifiers that were simulated, in model order.
+
+        Returns
+        -------
+        list[str]
+            Node identifiers with percentile summaries.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def warnings(self) -> list[dict[str, Any]]:
+        """
+        Warnings raised while evaluating paths, in their serde form.
+
+        One dict per ``EvalWarning`` with a single snake_case variant key
+        (``"division_by_zero"``, ``"non_finite_value"``, ...) whose value holds
+        the variant fields (periods as ``"2025Q1"``-style ids, non-finite
+        numbers as ``"nan"`` / ``"inf"`` / ``"-inf"``), identical to the WASM
+        ``Evaluator.evaluateMonteCarlo`` result.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One dict per recorded warning; empty when every path evaluated
+            cleanly.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def breach_probability(self, metric: str, threshold: float) -> float | None:
+        """
+        Probability that ``metric`` exceeds ``threshold`` in any forecast period.
+
+        Counts upside breaches only (``value > threshold``) across the
+        simulated paths; for a downside test simulate a negated metric or a
+        derived node that flips the sign.
+
+        Parameters
+        ----------
+        metric : str
+            Simulated node identifier.
+        threshold : float
+            Breach level in the metric's own units.
+
+        Returns
+        -------
+        float | None
+            Fraction of paths in ``[0, 1]`` with at least one breach, or
+            ``None`` when the metric was not simulated, there are no forecast
+            periods, the path buffer is incomplete, or the result was
+            reconstructed from JSON / pickle (the per-path buffer is not
+            serialized).
+
+        Notes
+        -----
+        This method reads already-computed state and does not raise.
+        """
+        ...
+
     def percentile_by_period(self, metric: str, percentile: float) -> dict[str, float] | None:
         """
         Look up one percentile of one metric as a period-keyed dict.
@@ -438,6 +512,57 @@ class MonteCarloResults:
         Notes
         -----
         This accessor does not raise; it returns the stored or derived value.
+        """
+        ...
+
+    @property
+    def metrics(self) -> list[str]:
+        """Return simulated metric identifiers in model order.
+
+        Returns
+        -------
+        list[str]
+            Node identifiers represented by percentile summaries.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def warnings(self) -> list[str]:
+        """Return warnings encountered during path evaluation.
+
+        Returns
+        -------
+        list[str]
+            Human-readable Rust evaluation warnings; empty when every path evaluated cleanly.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    def breach_probability(self, metric: str, threshold: float) -> float | None:
+        """Estimate the probability of exceeding a level in any forecast period.
+
+        Parameters
+        ----------
+        metric:
+            Simulated node identifier.
+        threshold:
+            Upper breach level in the metric's own units; breaches use strict value > threshold.
+
+        Returns
+        -------
+        float | None
+            Fraction of paths with at least one upside breach. None means an unknown metric, absent forecast data, incomplete paths, or reconstruction from JSON/pickle: the internal path buffer is not serialized, even with include_path_data=True.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
         """
         ...
 
@@ -568,12 +693,12 @@ class ForecastMethod:
         Multiplicative log-normal path:
         ``v[t] = v[t-1] * exp(mean - 0.5 * std_dev**2 + std_dev * z[t])``.
 
-        ``mean`` and ``std_dev`` are the per-period log-return drift and
-        volatility as decimal fractions (0.02 = 2% log drift per period). The
-        ``-0.5 * std_dev**2`` term is the standard log-normal drift adjustment,
-        so ``mean`` is the expected *log*-return, not the expected simple
-        return. When the base value is zero the path falls back to independent
-        ``exp(mean + std_dev * z[t])`` draws.
+        ``mean`` is the per-period continuously compounded expected-growth
+        drift: the expected growth factor is ``exp(mean)``, while the expected
+        log increment is ``mean - 0.5 * std_dev**2``. ``std_dev`` is log-return
+        volatility, expressed as a decimal fraction per period. Evaluation
+        requires a finite, strictly positive base; zero and negative bases
+        raise ``ValueError``. Use an additive normal forecast for those series.
 
         Returns
         -------
@@ -774,6 +899,21 @@ class ForecastMethod:
         """
         ...
 
+    @property
+    def kind(self) -> str:
+        """Return the canonical snake_case forecast discriminant.
+
+        Returns
+        -------
+        str
+            Wire method name, such as "growth_pct" or "log_normal".
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
 class ForecastSpec:
     """
     Forecast configuration for a statement node.
@@ -934,7 +1074,7 @@ class ForecastSpec:
         ...
 
     @staticmethod
-    def lognormal(mean: float, std_dev: float, seed: int) -> ForecastSpec:
+    def log_normal(mean: float, std_dev: float, seed: int) -> ForecastSpec:
         """
         Multiplicative log-normal spec:
         ``v[t] = v[t-1] * exp(mean - 0.5 * std_dev**2 + std_dev * z[t])``.
@@ -942,9 +1082,10 @@ class ForecastSpec:
         Parameters
         ----------
         mean:
-            Per-period **log-return** drift as a decimal fraction (0.02 = 2%
-            log drift per period). The ``-0.5 * std_dev**2`` convexity term is
-            applied by the engine, so this is not the expected simple return.
+            Per-period continuously compounded expected-growth drift. The
+            expected growth factor is ``exp(mean)`` and expected log increment
+            is ``mean - 0.5 * std_dev**2``. For example, ``mean=0.02`` gives
+            expected simple growth ``exp(0.02) - 1``, approximately 2.0201%.
         std_dev:
             Per-period log-return volatility as a decimal fraction; must be
             non-negative.
@@ -958,7 +1099,10 @@ class ForecastSpec:
 
         Notes
         -----
-        This method does not raise; it returns a fixed instance.
+        This constructor does not raise; it only stores the supplied parameters.
+        Evaluation requires a finite, strictly positive base value and finite
+        parameters; invalid inputs raise ``ValueError`` when the model is
+        validated or evaluated.
 
         Examples
         --------
@@ -1134,6 +1278,124 @@ class ForecastSpec:
         Returns
         -------
         str
+        """
+        ...
+
+    @property
+    def method(self) -> ForecastMethod:
+        """Return the projection rule used by this specification.
+
+        Returns
+        -------
+        ForecastMethod
+            Forecast method applied to non-actual model periods.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def params(self) -> dict[str, Any]:
+        """Return method-specific forecast parameters as plain containers.
+
+        Returns
+        -------
+        dict[str, Any]
+            Parameter mapping in insertion order; rates are decimal fractions per model period and levels use the node's units.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @staticmethod
+    def override(overrides: Mapping[str, float] | Sequence[tuple[str, float]] | pd.Series) -> ForecastSpec:
+        """Pin selected forecast periods and forward-fill the periods between them.
+
+        Parameters
+        ----------
+        overrides:
+            Period identifier to value in the node's units; identifiers must belong to the eventual model timeline.
+
+        Returns
+        -------
+        ForecastSpec
+            Per-period override specification.
+
+        Raises
+        ------
+        ValueError
+            If a period identifier cannot be parsed.
+        TypeError
+            If a supplied cell cannot be converted to a float.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastSpec
+        >>> ForecastSpec.override({"2025Q2": 120.0}).method.kind
+        'override'
+        """
+        ...
+
+    @staticmethod
+    def seasonal(historical: list[float], season_length: int, mode: str = "additive") -> ForecastSpec:
+        """Forecast an external history using seasonal decomposition.
+
+        Parameters
+        ----------
+        historical:
+            Oldest-first levels in the node's units; eventual evaluation requires at least two complete seasons.
+        season_length:
+            Positive number of model periods per seasonal cycle, such as 4 for quarterly observations.
+        mode:
+            "additive" for constant absolute swings or "multiplicative" for swings scaling with the level.
+
+        Returns
+        -------
+        ForecastSpec
+            Seasonal specification validated with its eventual model.
+
+        Raises
+        ------
+        ValueError
+            If mode is not additive or multiplicative.
+        OverflowError
+            If season_length cannot be represented as a non-negative machine integer.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastSpec
+        >>> ForecastSpec.seasonal([10.0, 12.0, 11.0, 13.0], 2).method.kind
+        'seasonal'
+        """
+        ...
+
+    @staticmethod
+    def time_series(historical: list[float]) -> ForecastSpec:
+        """Forecast an external historical series using its estimated linear trend.
+
+        Parameters
+        ----------
+        historical:
+            Oldest-first levels in the node's units; eventual evaluation requires at least two observations.
+
+        Returns
+        -------
+        ForecastSpec
+            Linear time-series forecast configuration.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ForecastSpec
+        >>> ForecastSpec.time_series([100.0, 105.0, 110.0]).method.kind
+        'time_series'
         """
         ...
 
@@ -1479,6 +1741,35 @@ class FinancialModelSpec:
         """
         ...
 
+    def content_hash(self) -> str:
+        """
+        Versioned SHA-256 content hash of the canonical model JSON.
+
+        Mirrors Rust ``FinancialModelSpec::content_hash`` (WASM
+        ``statements.financialModelContentHash``). The hash is taken over the
+        canonical JSON, so it does not depend on key order or on how typed
+        numbers were spelled in the source document.
+
+        Returns
+        -------
+        str
+            ``"sha256:<hex>"`` content hash.
+
+        Raises
+        ------
+        ValueError
+            If the model contains a non-finite number.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import ModelBuilder
+        >>> builder = ModelBuilder("demo")
+        >>> _ = builder.periods("2025Q1..Q1")
+        >>> builder.build().content_hash().startswith("sha256:")
+        True
+        """
+        ...
+
     @property
     def id(self) -> str:
         """
@@ -1600,6 +1891,147 @@ class FinancialModelSpec:
         Returns
         -------
         str
+        """
+        ...
+
+    @property
+    def periods(self) -> list[str]:
+        """Return periods from the model timeline.
+
+        Returns
+        -------
+        list[str]
+            All model period identifiers in timeline order.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def actual_periods(self) -> list[str]:
+        """Return actual periods from the model timeline.
+
+        Returns
+        -------
+        list[str]
+            Period identifiers in the historical prefix, in timeline order.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def forecast_periods(self) -> list[str]:
+        """Return forecast periods from the model timeline.
+
+        Returns
+        -------
+        list[str]
+            Non-actual period identifiers in evaluation order.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def nodes(self) -> list[NodeSpec]:
+        """Return copies of all node specifications in declaration order.
+
+        Returns
+        -------
+        list[NodeSpec]
+            Configured node specifications; changing a returned copy does not mutate the model.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def meta(self) -> dict[str, Any]:
+        """Return model metadata as plain Python containers.
+
+        Returns
+        -------
+        dict[str, Any]
+            Metadata in its JSON shape, including any reporting-currency hint.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def capital_structure(self) -> dict[str, Any] | None:
+        """Return the capital-structure specification in its canonical JSON shape.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            Debt instruments, reporting currency, FX policy, waterfall, and metadata; None when the model has no capital structure.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    def get_node(self, node_id: str) -> NodeSpec | None:
+        """Look up a configured statement node.
+
+        Parameters
+        ----------
+        node_id:
+            Exact node identifier declared in this model.
+
+        Returns
+        -------
+        NodeSpec | None
+            A copy of the node configuration, or None if the identifier is absent.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    def content_hash(self) -> str:
+        """Compute the versioned SHA-256 hash of canonical model JSON.
+
+        Returns
+        -------
+        str
+            Stable model content hash, independent of JSON object key order.
+
+        Raises
+        ------
+        ValueError
+            If a model value cannot be represented by the canonical hash contract.
+        """
+        ...
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """Export one descriptive row for each configured model node.
+
+        Returns
+        -------
+        pd.DataFrame
+            Rows in declaration order with node_id, node_type, name, formula_text, forecast_method, value_type, currency, and where_text columns; optional fields are null.
+
+        Raises
+        ------
+        ImportError
+            If pandas is unavailable.
+        ValueError
+            If a node description cannot be converted to the documented column schema.
         """
         ...
 
@@ -1987,12 +2419,15 @@ class ModelBuilder:
         id: str,
         notional: Money,
         coupon_rate: float,
-        issue_date: date,
-        maturity_date: date,
+        issue_date: date | str,
+        maturity_date: date | str,
         discount_curve_id: str,
     ) -> ModelBuilder:
         """
+
         Add a fixed-rate bond to the capital structure (US 30/360 semi-annual).
+
+        Rejected inputs leave this builder usable with its accumulated model intact.
 
         For non-USD conventions, use :meth:`add_debt` with a pre-built
         ``Bond`` JSON specification.
@@ -2006,9 +2441,11 @@ class ModelBuilder:
         coupon_rate:
             Annual coupon rate as a decimal (e.g. ``0.05`` for 5%).
         issue_date:
-            Bond issue date.
+            Contractual issue and accrual start as datetime.date or ISO YYYY-MM-DD;
+            must precede maturity.
         maturity_date:
-            Bond maturity date.
+            Final contractual repayment as datetime.date or ISO YYYY-MM-DD;
+            must follow the issue date.
         discount_curve_id:
             Curve ID for discounting (e.g. ``"USD-OIS"``).
 
@@ -2020,9 +2457,8 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If a date is invalid or the builder has already been consumed.
-        RuntimeError
-            If the bond cannot be added to the model capital structure.
+            If the bond constructor rejects its rate, notional, curve configuration,
+            or dates, or the builder has already been consumed.
 
         """
         ...
@@ -2032,13 +2468,16 @@ class ModelBuilder:
         id: str,
         notional: Money,
         fixed_rate: float,
-        start_date: date,
-        maturity_date: date,
+        start_date: date | str,
+        maturity_date: date | str,
         discount_curve_id: str,
         forward_curve_id: str,
     ) -> ModelBuilder:
         """
+
         Add an interest rate swap to the capital structure (US conventions).
+
+        Rejected inputs leave this builder usable with its accumulated model intact.
 
         Parameters
         ----------
@@ -2049,9 +2488,11 @@ class ModelBuilder:
         fixed_rate:
             Fixed leg rate as a decimal (e.g. ``0.04`` for 4%).
         start_date:
-            Swap start date.
+            Contractual accrual start for both legs as datetime.date or ISO
+            YYYY-MM-DD; must precede maturity.
         maturity_date:
-            Swap maturity date.
+            Final contractual accrual end as datetime.date or ISO YYYY-MM-DD;
+            must follow the start date.
         discount_curve_id:
             Curve ID for discounting.
         forward_curve_id:
@@ -2065,9 +2506,8 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If a date is invalid or the builder has already been consumed.
-        RuntimeError
-            If the swap cannot be added to the model capital structure.
+            If the swap constructor rejects its rate, notional, curve configuration,
+            or dates, or the builder has already been consumed.
 
         """
         ...
@@ -2077,13 +2517,16 @@ class ModelBuilder:
         id: str,
         notional: Money,
         coupon_rate: float,
-        issue_date: date,
-        maturity_date: date,
+        issue_date: date | str,
+        maturity_date: date | str,
         convention: str,
         discount_curve_id: str,
     ) -> ModelBuilder:
         """
+
         Add a fixed-rate bond with a market convention preset.
+
+        Rejected inputs leave this builder usable with its accumulated model intact.
 
         Applies regional day-count, coupon-frequency, and calendar
         conventions automatically; :meth:`add_bond` uses US corporate
@@ -2098,9 +2541,11 @@ class ModelBuilder:
         coupon_rate:
             Annual coupon rate as a decimal (e.g. ``0.03`` for 3%).
         issue_date:
-            Bond issue date.
+            Contractual issue and accrual start as datetime.date or ISO YYYY-MM-DD;
+            must precede maturity.
         maturity_date:
-            Bond maturity date.
+            Final contractual repayment as datetime.date or ISO YYYY-MM-DD;
+            must follow the issue date.
         convention:
             Regional preset as the canonical snake_case identifier:
             ``"us_treasury"``, ``"us_agency"``, ``"german_bund"``,
@@ -2117,10 +2562,8 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If the convention is unknown, a date is invalid, or the builder
-            has already been consumed.
-        RuntimeError
-            If the bond cannot be added to the model capital structure.
+            If the convention is unknown, the bond constructor rejects its rate,
+            notional, curve configuration, or dates, or the builder was consumed.
 
         Examples
         --------
@@ -2146,8 +2589,8 @@ class ModelBuilder:
         id: str,
         notional: Money,
         fixed_rate: float,
-        start_date: date,
-        maturity_date: date,
+        start_date: date | str,
+        maturity_date: date | str,
         discount_curve_id: str,
         forward_curve_id: str,
         fixed_frequency: Tenor | str,
@@ -2157,7 +2600,10 @@ class ModelBuilder:
         business_day_convention: BusinessDayConvention | str | None = None,
     ) -> ModelBuilder:
         """
+
         Add an interest rate swap with custom leg conventions.
+
+        Rejected inputs leave this builder usable with its accumulated model intact.
 
         Exposes day-count, frequency, and business-day-convention parameters
         for non-USD swaps (e.g. EUR annual ACT/360 fixed legs);
@@ -2172,9 +2618,11 @@ class ModelBuilder:
         fixed_rate:
             Fixed leg rate as a decimal (e.g. ``0.04`` for 4%).
         start_date:
-            Swap start date.
+            Contractual accrual start for both legs as datetime.date or ISO
+            YYYY-MM-DD; must precede maturity.
         maturity_date:
-            Swap maturity date.
+            Final contractual accrual end as datetime.date or ISO YYYY-MM-DD;
+            must follow the start date.
         discount_curve_id:
             Curve ID for discounting.
         forward_curve_id:
@@ -2198,10 +2646,8 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If a tenor, day count, convention, or date is invalid, or the
-            builder has already been consumed.
-        RuntimeError
-            If the swap cannot be added to the model capital structure.
+            If a tenor, day count, convention, rate, notional, curve configuration,
+            or date is rejected, or the builder has already been consumed.
 
         Examples
         --------
@@ -2330,6 +2776,10 @@ class ModelBuilder:
         """
         Materialize the ``FinancialModelSpec`` and consume the builder.
 
+        Validates node identities, explicit-value periods, forecasts, formula
+        dimensions and timeline intervals. ``period_id`` is reserved for the
+        timeline column in result exports.
+
         Returns
         -------
         FinancialModelSpec
@@ -2338,8 +2788,76 @@ class ModelBuilder:
         Raises
         ------
         ValueError
-            If the builder is not ready or was already consumed.
+            If the builder is not ready, was already consumed, or the model violates its semantic invariants.
 
+        """
+        ...
+
+    def periods_explicit(self, periods: list[Period]) -> ModelBuilder:
+        """Set the model timeline from explicit calendar periods.
+
+        Parameters
+        ----------
+        periods:
+            Non-empty ordered Period objects with positive, nonoverlapping intervals; gaps are allowed. Build rejects a non-increasing timeline or actuals that do not form a prefix.
+
+        Returns
+        -------
+        ModelBuilder
+            This builder with its timeline configured.
+
+        Raises
+        ------
+        ValueError
+            If periods is empty, the timeline was already set, or this builder was consumed.
+        """
+        ...
+
+    def from_dataframe(
+        self, df: pd.DataFrame, actuals_until: str | None = None, node_id_column: str | None = None
+    ) -> ModelBuilder:
+        """Load scalar value nodes from a wide pandas DataFrame.
+
+        Parameters
+        ----------
+        df:
+            Node rows with period-identifier columns; every label must belong to the model timeline, including all-null columns. Numeric cells use the node's own units and NaN/None cells are skipped.
+        actuals_until:
+            Inclusive actuals cutoff used when deriving an unset timeline from the first and last period columns; ignored if periods are already set.
+        node_id_column:
+            Column containing node identifiers; None takes identifiers from the frame index.
+
+        Returns
+        -------
+        ModelBuilder
+            This builder populated with one value node per row.
+
+        Raises
+        ------
+        ValueError
+            If any period label is invalid or outside the model timeline, a node identifier is reserved, numeric cells are invalid, or the builder was consumed. Rejected input leaves the builder unchanged.
+        KeyError
+            If node_id_column names an absent frame column.
+        """
+        ...
+
+    def insert_node(self, node: NodeSpec) -> ModelBuilder:
+        """Insert a complete node specification, replacing a node with the same identifier.
+
+        Parameters
+        ----------
+        node:
+            Fully configured node; semantic validity is checked together with the model at build.
+
+        Returns
+        -------
+        ModelBuilder
+            This builder with the supplied node inserted.
+
+        Raises
+        ------
+        ValueError
+            If this builder has already been consumed.
         """
         ...
 
@@ -2603,6 +3121,62 @@ class Registry:
         """
         ...
 
+    def metric_ids(self) -> list[str]:
+        """List every registered metric in load order.
+
+        Returns
+        -------
+        list[str]
+            Fully qualified metric identifiers such as "fin.gross_profit".
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    def get(self, qualified_id: str) -> MetricDefinition:
+        """Look up a registered metric definition.
+
+        Parameters
+        ----------
+        qualified_id:
+            Exact namespace.metric identifier, such as "fin.gross_margin".
+
+        Returns
+        -------
+        MetricDefinition
+            A copy of the stored metric definition.
+
+        Raises
+        ------
+        KeyError
+            If the identifier is not registered.
+        """
+        ...
+
+    def dependencies(self, qualified_id: str) -> list[str]:
+        """List transitive registry dependencies in construction order.
+
+        Parameters
+        ----------
+        qualified_id:
+            Fully qualified identifier of the metric whose registry dependencies to resolve.
+
+        Returns
+        -------
+        list[str]
+            Dependencies first, excluding the requested metric and ordinary model input nodes.
+
+        Raises
+        ------
+        KeyError
+            If the metric or a required registry dependency is absent.
+        ValueError
+            If registry dependencies are cyclic or malformed.
+        """
+        ...
+
 class StatementResult:
     """
     Per-node, per-period numeric results from evaluating a model.
@@ -2820,6 +3394,55 @@ class StatementResult:
         """
         ...
 
+    def to_dated_schedule(
+        self,
+        model: FinancialModelSpec | str,
+        node_id: str,
+        convention: Literal["end", "start"] | None = None,
+    ) -> list[tuple[date, float]]:
+        """
+        Export one node as a dated cashflow schedule.
+
+        Mirrors Rust ``evaluator::node_to_dated_schedule`` (WASM
+        ``statements.nodeToDatedSchedule``). Periods are taken in ``model``
+        timeline order; periods without a value are skipped.
+
+        Parameters
+        ----------
+        model : FinancialModelSpec | str
+            The model that produced this result (its periods supply the
+            dates); a typed model or its JSON.
+        node_id : str
+            Node identifier to export.
+        convention : {"end", "start"}, optional
+            ``"end"`` (the Rust default when omitted) dates each period on its
+            last inclusive day (``end - 1 day``, since periods are half-open
+            ``[start, end)``); ``"start"`` uses the period start date.
+
+        Returns
+        -------
+        list[tuple[datetime.date, float]]
+            ``(date, value)`` pairs in timeline order, in the node's own units.
+
+        Raises
+        ------
+        KeyError
+            If ``node_id`` has no values in the result.
+        ValueError
+            If ``convention`` is not ``"end"`` or ``"start"``.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import Evaluator, ModelBuilder
+        >>> builder = ModelBuilder("demo")
+        >>> _ = builder.periods("2025Q1..Q1")
+        >>> _ = builder.value("revenue", [("2025Q1", 100.0)])
+        >>> model = builder.build()
+        >>> Evaluator().evaluate(model).to_dated_schedule(model, "revenue")
+        [(datetime.date(2025, 3, 31), 100.0)]
+        """
+        ...
+
     @property
     def check_report(self) -> CheckReport | None:
         """
@@ -2947,19 +3570,21 @@ class StatementResult:
         ...
 
     @property
-    def warnings(self) -> list[str]:
+    def warnings(self) -> list[dict[str, Any]]:
         """
-        Evaluation warnings as human-readable strings.
+        Evaluation warnings in their serde form, one dict per ``EvalWarning``.
 
-        Each entry is the debug form of an ``EvalWarning`` (division by zero,
-        non-finite value, skipped non-finite aggregate input, ignored
-        capital-structure cashflow, ...), so audit tooling can see *what* was
-        flagged rather than only a count.
+        Each dict has a single snake_case variant key (``"division_by_zero"``,
+        ``"non_finite_value"``, ``"non_finite_aggregate_input"``, ...) whose
+        value holds the variant fields: node ids as strings, periods as
+        ``"2025Q1"``-style ids and non-finite numbers as ``"nan"`` / ``"inf"``
+        / ``"-inf"``. The same objects appear in ``to_json()["meta"]`` and in
+        the WASM ``Evaluator.evaluate`` result.
 
         Returns
         -------
-        list[str]
-            One string per recorded warning.
+        list[dict[str, Any]]
+            One dict per recorded warning.
 
         Notes
         -----
@@ -3083,6 +3708,71 @@ class StatementResult:
         """
         ...
 
+    @property
+    def cs_cashflows(self) -> CapitalStructureCashflows | None:
+        """Return evaluated capital-structure cashflows when present.
+
+        Returns
+        -------
+        CapitalStructureCashflows | None
+            Per-instrument and reporting-currency totals, or None when capital structure was absent.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    def to_series(self, node_id: str) -> pd.Series:
+        """Export one evaluated node as an ordered pandas Series.
+
+        Parameters
+        ----------
+        node_id:
+            Evaluated node identifier.
+
+        Returns
+        -------
+        pd.Series
+            Float64 node values indexed by period identifier, in the node's own units; use get_money for currency and fixed-point precision.
+
+        Raises
+        ------
+        KeyError
+            If the node is absent from the result.
+        ImportError
+            If pandas is unavailable.
+        """
+        ...
+
+    def to_dated_schedule(
+        self, model: FinancialModelSpec | str, node_id: str, convention: str = "end"
+    ) -> list[tuple[date, float]]:
+        """Export a node into a dated cashflow schedule using its model timeline.
+
+        Parameters
+        ----------
+        model:
+            The producing model or its canonical JSON; its period boundaries determine cashflow dates.
+        node_id:
+            Evaluated node identifier to export.
+        convention:
+            "end" uses each period's last inclusive day (exclusive end minus one day); "start" uses the start date.
+
+        Returns
+        -------
+        list[tuple[date, float]]
+            Timeline-ordered date/value pairs in the node's own units; periods without values are skipped.
+
+        Raises
+        ------
+        KeyError
+            If the node is absent from the result.
+        ValueError
+            If convention is invalid or model JSON/semantics are invalid.
+        """
+        ...
+
 class Evaluator:
     """
     Evaluates a ``FinancialModelSpec`` into a ``StatementResult``.
@@ -3166,7 +3856,12 @@ class Evaluator:
         Raises
         ------
         ValueError
-            If evaluation fails (for example cyclic dependencies or bad formulas).
+            If a formula is invalid or references an unknown identifier.
+        KeyError
+            If a referenced node or required input data is missing.
+        RuntimeError
+            If the dependency graph has a cycle or a capital-structure
+            computation fails.
 
         """
         ...
@@ -3190,7 +3885,10 @@ class Evaluator:
         market:
             A :class:`MarketContext` with curves, FX, and vol surfaces.
         as_of:
-            Valuation date for discounting and period filtering.
+            Valuation date for pricing, and the cutoff for explicit-value
+            visibility: an actual whose availability date falls after
+            ``as_of`` is hidden, so the node falls back to its forecast or
+            formula (a value-only node then raises).
 
         Returns
         -------
@@ -3200,7 +3898,12 @@ class Evaluator:
         Raises
         ------
         ValueError
-            If evaluation fails or required market data is missing.
+            If ``as_of`` or a formula is invalid.
+        KeyError
+            If a referenced node, input data or required market data is missing.
+        RuntimeError
+            If the dependency graph has a cycle or a capital-structure
+            computation fails.
 
         """
         ...
@@ -3386,6 +4089,49 @@ class AppliedAdjustment:
         """
         ...
     def __repr__(self) -> str: ...
+    @staticmethod
+    def from_json(json: str, /) -> AppliedAdjustment:
+        """Reconstruct an applied adjustment from its canonical JSON.
+
+        Parameters
+        ----------
+        json:
+            Serialized adjustment_id, name, raw_amount, capped_amount, and is_capped fields; amounts use the normalized metric's units.
+
+        Returns
+        -------
+        AppliedAdjustment
+            Reconstructed applied adjustment.
+
+        Raises
+        ------
+        ValueError
+            If JSON or the canonical adjustment shape is malformed.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import AppliedAdjustment
+        >>> AppliedAdjustment.from_json(
+        ...     '{"adjustment_id":"a","name":"A","raw_amount":2.0,"capped_amount":1.0,"is_capped":true}'
+        ... ).capped_amount
+        1.0
+        """
+        ...
+
+    def to_json(self) -> str:
+        """Serialize this applied adjustment to canonical JSON.
+
+        Returns
+        -------
+        str
+            JSON accepted by AppliedAdjustment.from_json, with amounts in the normalized metric's units.
+
+        Raises
+        ------
+        ValueError
+            If a numeric result is non-finite or serialization fails.
+        """
+        ...
 
 class NormalizationConfig:
     """
@@ -3512,6 +4258,51 @@ class NormalizationConfig:
         Returns
         -------
         str
+        """
+        ...
+
+    @property
+    def adjustments(self) -> list[Adjustment]:
+        """Return configured add-backs and deductions in application order.
+
+        Returns
+        -------
+        list[Adjustment]
+            Copies of the adjustment specifications; caps may depend on earlier adjustments.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    def add_adjustment(self, adjustment: Adjustment) -> NormalizationConfig:
+        """Append an add-back or deduction to this normalization policy.
+
+        Parameters
+        ----------
+        adjustment:
+            Adjustment with an identifier unique within this configuration; values use the target metric's units.
+
+        Returns
+        -------
+        NormalizationConfig
+            This configuration, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If another configured adjustment has the same identifier.
+        """
+        ...
+
+    def validate(self) -> None:
+        """Validate adjustment identifiers, finite values, and cap configuration.
+
+        Raises
+        ------
+        ValueError
+            If adjustment identifiers repeat, a numeric assumption is invalid, or a cap is misconfigured.
         """
         ...
 
@@ -3741,6 +4532,52 @@ class CheckSuiteSpec:
 
     """
 
+    def __init__(
+        self,
+        name: str,
+        builtin_checks: list[dict[str, Any]] | None = None,
+        formula_checks: list[FormulaCheckSpec] | None = None,
+        config: CheckConfig | None = None,
+        description: str | None = None,
+    ) -> None:
+        """Compose a check policy with validated default configuration thresholds.
+
+        Parameters
+        ----------
+        name : str
+            Suite label used in display and logging.
+        builtin_checks : list[dict] | None
+            Ordered built-in specifications, each the Rust ``BuiltinCheckSpec``
+            serde form: a dict with the check's canonical ``type`` tag plus its
+            node fields, e.g. ``{"type": "non_finite"}`` or ``{"type":
+            "balance_sheet_articulation", "assets_nodes": ["assets"],
+            "liabilities_nodes": ["liabilities"], "equity_nodes":
+            ["equity"]}``. None means no built-in checks.
+        formula_checks : list[FormulaCheckSpec] | None
+            Ordered DSL predicate or tolerance-based residual checks. None means no
+            formula checks; syntax, node references, and per-check tolerances are
+            validated when the suite executes against a model.
+        config : CheckConfig | None
+            Tolerance and reporting policy with finite, non-negative numeric
+            thresholds. None uses the Rust ``CheckConfig`` defaults.
+        description : str | None
+            Optional human-readable explanation of the policy.
+
+        Raises
+        ------
+        ValueError
+            If a built-in check ``type`` is unknown, a dict lacks a required
+            field, an entry is not a ``dict``, or a configuration threshold is
+            negative or non-finite.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import CheckSuiteSpec
+        >>> CheckSuiteSpec("quality", builtin_checks=[{"type": "non_finite"}]).builtin_check_count
+        1
+        """
+        ...
+
     @staticmethod
     def from_json(json: str) -> CheckSuiteSpec:
         """
@@ -3759,7 +4596,13 @@ class CheckSuiteSpec:
         Raises
         ------
         ValueError
-            If ``json`` is not valid or fails schema validation.
+            If ``json`` is malformed, fails schema validation, or a default
+            configuration tolerance/materiality threshold is negative or non-finite.
+
+        Notes
+        -----
+        Formula syntax, node references, and per-check tolerances are validated
+        when the suite executes against a model.
 
         Examples
         --------
@@ -3773,7 +4616,7 @@ class CheckSuiteSpec:
 
     def to_json(self) -> str:
         """
-        Serialize this specification to pretty-printed JSON.
+        Serialize this specification to compact canonical JSON.
 
         Returns
         -------
@@ -3810,7 +4653,7 @@ class CheckSuiteSpec:
         Number of built-in checks the spec will materialize.
 
         Built-ins are the crate-provided accounting-identity, reconciliation,
-        and data-quality checks, selected by name in the spec.
+        and data-quality checks, selected by their ``type`` tag in the spec.
 
         Returns
         -------
@@ -3847,6 +4690,87 @@ class CheckSuiteSpec:
         Returns
         -------
         str
+        """
+        ...
+
+    @property
+    def description(self) -> str | None:
+        """Return the optional human-readable check-policy description.
+
+        Returns
+        -------
+        str | None
+            Stored description, or None when omitted.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def builtin_checks(self) -> list[dict[str, Any]]:
+        """Return built-in check specifications as canonical Python containers.
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            Tagged built-in policies in suite order; their amounts and tolerances use the referenced nodes' units.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def formula_checks(self) -> list[FormulaCheckSpec]:
+        """Return configured formula checks in execution order.
+
+        Returns
+        -------
+        list[FormulaCheckSpec]
+            Copies of predicate or tolerance-based residual specifications.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def config(self) -> CheckConfig:
+        """Return the tolerances and severity policy used by this suite.
+
+        Returns
+        -------
+        CheckConfig
+            A copy of the suite's check configuration.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @staticmethod
+    def builtin_check_names() -> list[str]:
+        """List the canonical built-in check discriminants.
+
+        Returns
+        -------
+        list[str]
+            Names accepted in built-in policy JSON, including "balance_sheet_articulation" and "non_finite".
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+
+        Examples
+        --------
+        >>> from finstack_quant.statements import CheckSuiteSpec
+        >>> "balance_sheet_articulation" in CheckSuiteSpec.builtin_check_names()
+        True
         """
         ...
 
@@ -4052,7 +4976,8 @@ class CheckReport:
         Counts what survived the suite's ``min_severity`` and
         ``materiality_threshold`` reporting filters, not every raw diagnostic
         the checks produced — it matches the row count of
-        :meth:`to_findings_dataframe`.
+        :meth:`to_findings_dataframe`. Delegates to the Rust
+        ``CheckReport::total_findings``.
 
         Returns
         -------
@@ -4169,6 +5094,21 @@ class CheckReport:
         """
         ...
 
+    @property
+    def findings(self) -> list[CheckFinding]:
+        """Return retained findings flattened across executed checks.
+
+        Returns
+        -------
+        list[CheckFinding]
+            Findings in check execution order after severity and materiality filtering.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
 class EcfSweepSpec:
     """
     Excess Cash Flow sweep specification.
@@ -4250,6 +5190,21 @@ class EcfSweepSpec:
 
         """
         ...
+    def validate(self) -> None:
+        """
+        Validate the sweep on its own (the Rust ``EcfSweepSpec::validate``).
+
+        The waterfall-level rule that a positive sweep needs a prepayment
+        priority is checked by :meth:`WaterfallSpec.validate`. Twin of the WASM
+        ``statements.validateEcfSweepSpecJson``.
+
+        Raises
+        ------
+        ValueError
+            If ``sweep_percentage`` is outside ``[0.0, 1.0]`` or not finite.
+        """
+        ...
+
     def to_json(self) -> str:
         """
         Serialize `EcfSweepSpec` to canonical JSON.
@@ -4320,6 +5275,65 @@ class EcfSweepSpec:
         ...
 
     def __repr__(self) -> str: ...
+    @property
+    def taxes_node(self) -> str | None:
+        """Return the optional taxes node reference.
+
+        Returns
+        -------
+        str | None
+            Cash-tax node deducted from EBITDA. None means omitted.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def capex_node(self) -> str | None:
+        """Return the optional capex node reference.
+
+        Returns
+        -------
+        str | None
+            Capital-expenditure node deducted from EBITDA. None means omitted.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def working_capital_node(self) -> str | None:
+        """Return the optional working capital node reference.
+
+        Returns
+        -------
+        str | None
+            Working-capital movement node deducted from EBITDA. None means omitted.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def cash_interest_node(self) -> str | None:
+        """Return the optional cash interest node reference.
+
+        Returns
+        -------
+        str | None
+            Cash-interest node deducted from EBITDA; None uses contractual period debt-service interest. None means omitted.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
 
 class PikToggleSpec:
     """
@@ -4331,7 +5345,7 @@ class PikToggleSpec:
     Examples
     --------
     >>> from finstack_quant.statements import PikToggleSpec
-    >>> toggle = PikToggleSpec("cash", 100.0)
+    >>> toggle = PikToggleSpec("cash", 100.0, ["TL"])
     >>> (toggle.liquidity_metric, toggle.min_periods_in_pik)
     ('cash', 0)
 
@@ -4354,8 +5368,12 @@ class PikToggleSpec:
         threshold : float
             Liquidity threshold in the metric's units that activates PIK logic.
         target_instrument_ids : list[str] or None, default None
-            Optional debt instruments subject to the toggle; ``None`` targets
-            all eligible instruments in the waterfall.
+            Explicit nonempty borrowing-debt identifiers whose cash coupons may
+            capitalize into principal. Instrument-level PIK capability is not
+            modeled, so ``None`` or an empty list is rejected by
+            :meth:`validate` and :meth:`WaterfallSpec.validate` (it does not
+            mean "every instrument"); model validation also rejects hedge or
+            option targets. Construction stores the specification unvalidated.
         min_periods_in_pik : int, default 0
             Hysteresis floor counted in **periods** on the model's own cadence
             (not months): once triggered, PIK stays on for at least this many
@@ -4379,7 +5397,8 @@ class PikToggleSpec:
         Returns
         -------
         PikToggleSpec
-            Validated `PikToggleSpec` instance reconstructed from the canonical JSON payload.
+            Parsed specification; waterfall/model validation subsequently checks
+            that targets are an explicit nonempty list of borrowing debt.
 
         Raises
         ------
@@ -4395,6 +5414,19 @@ class PikToggleSpec:
 
         """
         ...
+    def validate(self) -> None:
+        """
+        Validate the toggle on its own (the Rust ``PikToggleSpec::validate``).
+
+        Twin of the WASM ``statements.validatePikToggleSpecJson``.
+
+        Raises
+        ------
+        ValueError
+            If ``target_instrument_ids`` is ``None`` or empty.
+        """
+        ...
+
     def to_json(self) -> str:
         """
         Serialize `PikToggleSpec` to canonical JSON.
@@ -4468,6 +5500,22 @@ class PikToggleSpec:
         ...
 
     def __repr__(self) -> str: ...
+    @property
+    def target_instrument_ids(self) -> list[str] | None:
+        """Return explicit borrowing-debt targets for coupon capitalization.
+
+        Returns
+        -------
+        list[str] | None
+            Stored identifiers, or None in an incomplete specification. None and
+            empty lists fail waterfall validation; swaps and options fail model
+            validation because they cannot capitalize into borrowing principal.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
 
 class PaymentClassSpec:
     """
@@ -4713,7 +5761,8 @@ class WaterfallSpec:
 
         Rejects duplicate priorities, a non-terminal ``equity`` entry, a
         sweep percentage outside [0, 1], an empty PIK target list, a positive
-        ECF sweep with no prepayment priority, and — when
+        ECF sweep without the ``sweep`` priority, mismatched prepayment
+        node/priority pairs in either direction, and — when
         ``available_cash_node`` is set — a stack missing ``fees``,
         ``interest`` or ``amortization``. It does not confirm that referenced
         nodes or instruments exist; that needs the enclosing model.
@@ -4844,6 +5893,35 @@ class WaterfallSpec:
         ...
 
     def __repr__(self) -> str: ...
+    @property
+    def ecf_sweep(self) -> EcfSweepSpec | None:
+        """Return the configured excess-cash-flow sweep.
+
+        Returns
+        -------
+        EcfSweepSpec | None
+            Sweep configuration, or None when no ECF sweep was configured; a positive percentage requires the sweep priority.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
+
+    @property
+    def pik_toggle(self) -> PikToggleSpec | None:
+        """Return the configured liquidity-based PIK toggle.
+
+        Returns
+        -------
+        PikToggleSpec | None
+            PIK signal, threshold, eligible instruments, and hysteresis, or None when omitted.
+
+        Notes
+        -----
+        This accessor does not raise; it returns stored or derived model data.
+        """
+        ...
 
 class NodeSpec:
     """One node of a :class:`FinancialModelSpec`: type, values, formula, forecast.
@@ -4873,7 +5951,7 @@ class NodeSpec:
         Parameters
         ----------
         node_id : str
-            Node identifier; must not use a reserved prefix or DSL keyword.
+            Node identifier; must not use a reserved prefix, DSL keyword, or the export timeline name ``period_id``.
         node_type : NodeType
             ``value``, ``calculated`` or ``mixed``.
         name : str, optional
@@ -5603,28 +6681,37 @@ class CheckConfig:
 
     def __init__(
         self,
-        default_tolerance: float = 0.01,
-        default_relative_tolerance: float = 1e-9,
-        materiality_threshold: float = 0.0,
-        min_severity: str = "info",
+        default_tolerance: float | None = None,
+        default_relative_tolerance: float | None = None,
+        materiality_threshold: float | None = None,
+        min_severity: str | None = None,
     ) -> None:
         """Configure check tolerances.
 
+        Every parameter defaults to the Rust ``CheckConfig::default()`` value
+        when omitted or ``None``.
+
         Parameters
         ----------
-        default_tolerance : float
-            Absolute tolerance in the checked node's units.
-        default_relative_tolerance : float
-            Relative tolerance as a decimal fraction of the reference value.
-        materiality_threshold : float
-            Absolute magnitude below which a breach is not reported.
-        min_severity : str
-            Lowest severity retained: ``"info"``, ``"warning"`` or ``"error"``.
+        default_tolerance : float | None
+            Finite, non-negative absolute tolerance in the checked node's units
+            (Rust default ``0.01``).
+        default_relative_tolerance : float | None
+            Finite, non-negative relative tolerance as a decimal fraction of
+            the reference magnitude; zero disables relative tolerance (Rust
+            default ``1e-9``).
+        materiality_threshold : float | None
+            Finite, non-negative absolute magnitude below which advisory
+            findings are suppressed; error findings are retained (Rust default
+            ``0.0``).
+        min_severity : str | None
+            Lowest severity retained: ``"info"`` (Rust default), ``"warning"``
+            or ``"error"``.
 
         Raises
         ------
         ValueError
-            If ``min_severity`` is not a recognized severity.
+            If ``min_severity`` is unknown or a tolerance/materiality threshold is negative or non-finite.
 
         """
         ...
@@ -5660,14 +6747,15 @@ class CheckConfig:
     @property
     def materiality_threshold(self) -> float:
         """
-        Absolute magnitude below which breaches are suppressed.
+        Absolute magnitude below which advisory findings are suppressed.
 
         This property does not raise.
 
         Returns
         -------
         float
-            Absolute magnitude below which breaches are suppressed.
+            Absolute advisory-reporting threshold in the checked nodes' units;
+            error findings are always retained.
         """
         ...
 
@@ -5719,7 +6807,7 @@ class CheckConfig:
         Raises
         ------
         ValueError
-            If the payload is malformed.
+            If the payload is malformed or a tolerance/materiality threshold is negative or non-finite.
 
         Examples
         --------
@@ -5731,6 +6819,15 @@ class CheckConfig:
         ...
 
     def __repr__(self) -> str: ...
+    def validate(self) -> None:
+        """Validate finite, non-negative check tolerances and materiality thresholds.
+
+        Raises
+        ------
+        ValueError
+            If a tolerance or the materiality threshold is negative or non-finite.
+        """
+        ...
 
 class FormulaCheckSpec:
     """A user-defined check expressed as a statements DSL predicate.
@@ -5738,7 +6835,9 @@ class FormulaCheckSpec:
     Examples
     --------
     >>> from finstack_quant.statements import FormulaCheckSpec
-    >>> FormulaCheckSpec("c1", "Positive revenue", "revenue > 0", "revenue <= 0").severity
+    >>> FormulaCheckSpec(
+    ...     "c1", "Positive revenue", "revenue > 0", "revenue <= 0", "internal_consistency", "error"
+    ... ).severity
     'error'
 
     """
@@ -5749,8 +6848,8 @@ class FormulaCheckSpec:
         name: str,
         formula: str,
         message_template: str,
-        category: str = "internal_consistency",
-        severity: str = "error",
+        category: str,
+        severity: str,
         tolerance: float | None = None,
     ) -> None:
         """Define a formula check.
@@ -5766,17 +6865,24 @@ class FormulaCheckSpec:
         message_template : str
             Message emitted when the predicate fails.
         category : str
-            Classification bucket, e.g. ``"internal_consistency"``.
+            Classification bucket: ``"accounting_identity"``,
+            ``"cross_statement_reconciliation"``, ``"internal_consistency"``,
+            ``"credit_reasonableness"`` or ``"data_quality"``. Required, as in
+            the Rust/JSON form.
         severity : str
-            ``"info"``, ``"warning"`` or ``"error"``.
+            ``"info"``, ``"warning"`` or ``"error"``. Required, as in the
+            Rust/JSON form.
         tolerance : float, optional
-            Absolute tolerance overriding the suite default.
+            Finite, non-negative absolute residual bound in the formula's result
+            units. When supplied, a period passes if the formula result's absolute
+            value is at most this bound. None treats the formula as a predicate
+            whose nonzero result passes. Validated when the suite executes.
 
         Raises
         ------
         ValueError
-            If ``formula`` does not compile, or ``category`` / ``severity`` are
-            not recognized.
+            If ``category`` or ``severity`` is not recognized. Formula compilation,
+            node references, and tolerance validation occur when the suite executes.
 
         """
         ...
@@ -5868,14 +6974,15 @@ class FormulaCheckSpec:
     @property
     def tolerance(self) -> float | None:
         """
-        Absolute tolerance override, or ``None`` to use the suite default.
+        Absolute residual bound, or ``None`` to interpret the formula as a predicate.
 
         This property does not raise.
 
         Returns
         -------
         float | None
-            Absolute tolerance override, or ``None`` to use the suite default.
+            Bound in the formula result's units; None makes any finite nonzero
+            result pass. A configured bound makes absolute results at or below it pass.
         """
         ...
 
@@ -6281,12 +7388,12 @@ class CapitalStructureCashflows:
         ...
 
     def get_debt_balance(self, instrument_id: str, period: str) -> float:
-        """Closing debt balance for one instrument in one period.
+        """Return borrowing principal at the inclusive reporting-period end.
 
         Parameters
         ----------
         instrument_id : str
-            Debt instrument identifier.
+            Capital-structure identifier of the debt or rate hedge to inspect.
         period : str
             Period identifier such as ``"2025Q1"``, matching the labels of
             the projection the cashflows were built from.
@@ -6294,12 +7401,16 @@ class CapitalStructureCashflows:
         Returns
         -------
         float
-            Closing balance in the reporting currency.
+            Closing borrowing principal in the instrument's native currency.
+            Rate hedges, including interest-rate swaps, return zero; their trade
+            notional is not borrowing principal.
 
         Raises
         ------
-        KeyError
-            If the instrument or period is unknown.
+        ValueError
+            If period is not a valid reporting-period label.
+        RuntimeError
+            If the instrument-period breakdown is absent.
 
         """
         ...
@@ -6329,12 +7440,12 @@ class CapitalStructureCashflows:
         ...
 
     def get_accrued_interest(self, instrument_id: str, period: str) -> float:
-        """Interest accrued but unpaid at the end of one period.
+        """Return debt interest accrued but unpaid at the inclusive period end.
 
         Parameters
         ----------
         instrument_id : str
-            Debt instrument identifier.
+            Capital-structure identifier of the debt or rate hedge to inspect.
         period : str
             Period identifier such as ``"2025Q1"``, matching the labels of
             the projection the cashflows were built from.
@@ -6342,12 +7453,16 @@ class CapitalStructureCashflows:
         Returns
         -------
         float
-            Accrued interest in the reporting currency.
+            Unpaid debt coupon accrual in the instrument's native currency.
+            Rate hedges, including interest-rate swaps, return zero; this debt
+            accrual accessor does not report hedge mark-to-market or leg accruals.
 
         Raises
         ------
-        KeyError
-            If the instrument or period is unknown.
+        ValueError
+            If period is not a valid reporting-period label.
+        RuntimeError
+            If the instrument-period breakdown is absent.
 
         """
         ...

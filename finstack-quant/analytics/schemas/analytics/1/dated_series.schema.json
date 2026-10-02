@@ -1,0 +1,99 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "NonFiniteF64Wire": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NonFiniteSentinel",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+    },
+    "NonFiniteSentinel": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
+    },
+    "RollingMetric": {
+      "description": "The metric a rolling [`DatedSeries`] carries.\n\nSerialized as its lowercase name (`\"volatility\"`, `\"sortino\"`,\n`\"sharpe\"`, `\"return\"`), which hosts also use as the value-column label.",
+      "oneOf": [
+        {
+          "const": "volatility",
+          "description": "Annualized sample volatility (`Performance::rolling_volatility`).",
+          "type": "string"
+        },
+        {
+          "const": "sortino",
+          "description": "Annualized Sortino ratio (`Performance::rolling_sortino`).",
+          "type": "string"
+        },
+        {
+          "const": "sharpe",
+          "description": "Annualized Sharpe ratio (`Performance::rolling_sharpe`).",
+          "type": "string"
+        },
+        {
+          "const": "return",
+          "description": "Compounded simple return over the window (`Performance::rolling_returns`).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/dated_series.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A dated time-series column: scalar values aligned with window-end dates.",
+  "properties": {
+    "dates": {
+      "description": "Window-end dates aligned 1:1 with `values`.",
+      "items": {
+        "$ref": "#/$defs/DateWire"
+      },
+      "type": "array"
+    },
+    "value_column": {
+      "$ref": "#/$defs/RollingMetric",
+      "description": "Metric carried by `values`; hosts use its name as the value-column label."
+    },
+    "values": {
+      "description": "Computed metric values, one per completed rolling window. An undefined\nwindow (e.g. a zero-volatility Sharpe) is `NaN`; JSON carries it as the\n`\"nan\"` sentinel so the series round-trips.",
+      "items": {
+        "$ref": "#/$defs/NonFiniteF64Wire"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "values",
+    "dates",
+    "value_column"
+  ],
+  "title": "DatedSeries",
+  "type": "object"
+}

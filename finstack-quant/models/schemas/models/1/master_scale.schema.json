@@ -1,0 +1,46 @@
+{
+  "$defs": {
+    "MasterScaleGrade": {
+      "description": "A single grade in a master scale.",
+      "properties": {
+        "central_pd": {
+          "description": "Central (representative) PD for the grade.\n\nTypically the geometric mean of the grade's PD range.",
+          "format": "double",
+          "type": "number"
+        },
+        "label": {
+          "description": "Grade label (e.g., \"AAA\", \"Aaa\", \"1\", etc.).",
+          "type": "string"
+        },
+        "upper_pd": {
+          "description": "Upper PD boundary for this grade (**inclusive**).\n\nA PD <= this value maps to this grade (checked in order), so a PD\nexactly on the boundary maps to the better grade.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "upper_pd",
+        "central_pd"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/master_scale.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A master scale mapping continuous PDs to discrete rating grades.",
+  "properties": {
+    "grades": {
+      "items": {
+        "$ref": "#/$defs/MasterScaleGrade"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "grades"
+  ],
+  "title": "MasterScale",
+  "type": "object"
+}

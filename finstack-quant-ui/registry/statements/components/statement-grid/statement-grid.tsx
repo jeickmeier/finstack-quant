@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
-import type { StatementResultJson } from "finstack-quant-wasm";
+import type { StatementResult } from "finstack-quant-wasm";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
 import type { LinkedSelection } from "@/hooks/shared/use-linked-selection/use-linked-selection";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
@@ -28,7 +28,7 @@ export function StatementGrid({
   onEditValue,
 }: {
   model: FinancialModelSpecWire;
-  result: StatementResultJson;
+  result: StatementResult;
   link?: LinkedSelection;
   /** Supplied line IDs in display order. Omit to show every returned line. */
   nodeIds?: string[];

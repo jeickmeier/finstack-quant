@@ -124,54 +124,59 @@ pub fn calculate_forward_swap_rate(inputs: ForwardSwapRateInputs<'_>) -> Result<
         )));
     }
 
-    if inputs.forward_curve_id == inputs.discount_curve_id {
-        let df_start = relative_df_discount_curve(disc.as_ref(), inputs.as_of, inputs.start)?;
-        let df_end = relative_df_discount_curve(disc.as_ref(), inputs.as_of, inputs.end)?;
-        let rate = (df_start - df_end) / annuity;
-        Ok((rate, annuity))
+    let fwd_curve = if inputs.forward_curve_id == inputs.discount_curve_id {
+        None
     } else {
-        let fwd_curve = inputs
+        let curve = inputs
             .market
             .get_forward(inputs.forward_curve_id.as_ref())?;
         if inputs.enforce_forward_tenor {
             validate_term_curve_tenor(
-                fwd_curve.as_ref(),
+                curve.as_ref(),
                 inputs.float_frequency,
                 "CMS reference swap",
             )?;
         }
-        let sched_float = crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: inputs.start,
-                end: inputs.end,
-                frequency: inputs.float_frequency,
-                stub: inputs.stub,
-                business_day_convention: inputs.business_day_convention,
-                calendar_id: inputs.calendar_id,
-                end_of_month: inputs.end_of_month,
-                day_count: inputs.float_day_count,
-                payment_lag_days: inputs.payment_lag_days,
-                reset_lag_days: None,
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        )?;
+        Some(curve)
+    };
+    let sched_float = crate::cashflow::builder::periods::build_periods(
+        crate::cashflow::builder::periods::BuildPeriodsParams {
+            start: inputs.start,
+            end: inputs.end,
+            frequency: inputs.float_frequency,
+            stub: inputs.stub,
+            business_day_convention: inputs.business_day_convention,
+            calendar_id: inputs.calendar_id,
+            end_of_month: inputs.end_of_month,
+            day_count: inputs.float_day_count,
+            payment_lag_days: inputs.payment_lag_days,
+            reset_lag_days: None,
+            adjust_accrual_dates: false,
+            roll_rule: crate::cashflow::builder::specs::RollRule::None,
+        },
+    )?;
 
-        let mut pv_float = 0.0;
-        for period in &sched_float {
-            let accrual = period.accrual_year_fraction;
-            let fwd_rate = rate_between_on_dates(
-                fwd_curve.as_ref(),
+    let mut pv_float = 0.0;
+    for period in &sched_float {
+        let accrual = period.accrual_year_fraction;
+        let coupon = if let Some(curve) = &fwd_curve {
+            rate_between_on_dates(
+                curve.as_ref(),
                 period.accrual_start,
                 period.accrual_end,
-            )?;
-            let df = relative_df_discount_curve(disc.as_ref(), inputs.as_of, period.payment_date)?;
-            pv_float += fwd_rate * accrual * df;
-        }
-
-        let rate = pv_float / annuity;
-        Ok((rate, annuity))
+                accrual,
+            )? * accrual
+        } else {
+            disc.df_on_date_curve(period.accrual_start)?
+                / disc.df_on_date_curve(period.accrual_end)?
+                - 1.0
+        };
+        let df = relative_df_discount_curve(disc.as_ref(), inputs.as_of, period.payment_date)?;
+        pv_float += coupon * df;
     }
+
+    let rate = pv_float / annuity;
+    Ok((rate, annuity))
 }
 
 #[cfg(test)]
@@ -221,5 +226,73 @@ mod tests {
 
         assert!(annuity > 0.0);
         assert!((rate - 0.051271096).abs() < 1e-3, "rate={rate}");
+    }
+    #[test]
+    fn single_curve_forward_prices_actual_adjusted_and_lagged_payments() {
+        use finstack_quant_core::dates::{adjust, calendar_by_id, DateExt};
+        let as_of = Date::from_calendar_date(2025, Month::January, 2).expect("date");
+        let start = Date::from_calendar_date(2025, Month::January, 31).expect("date");
+        let end = Date::from_calendar_date(2027, Month::January, 31).expect("date");
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, 0.97), (2.0, 0.89), (3.0, 0.83)])
+            .build()
+            .expect("curve");
+        let market = MarketContext::new().insert(curve);
+        let disc = market.get_discount("USD-OIS").expect("curve");
+        let calendar_id = crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID;
+        let calendar = calendar_by_id(calendar_id).expect("calendar");
+        for business_day_convention in [
+            BusinessDayConvention::Unadjusted,
+            BusinessDayConvention::Following,
+            BusinessDayConvention::ModifiedFollowing,
+        ] {
+            for lag in [0, 2, 20] {
+                let (rate, annuity) = calculate_forward_swap_rate(ForwardSwapRateInputs {
+                    market: &market,
+                    discount_curve_id: &CurveId::from("USD-OIS"),
+                    forward_curve_id: &CurveId::from("USD-OIS"),
+                    as_of,
+                    start,
+                    end,
+                    fixed_frequency: Tenor::quarterly(),
+                    fixed_day_count: DayCount::Thirty360,
+                    float_frequency: Tenor::semi_annual(),
+                    float_day_count: DayCount::Act360,
+                    calendar_id,
+                    business_day_convention,
+                    stub: StubKind::None,
+                    end_of_month: true,
+                    payment_lag_days: lag,
+                    enforce_forward_tenor: false,
+                })
+                .expect("forward swap rate");
+                let mut expected = 0.0;
+                for month in [0, 6, 12, 18] {
+                    let a = start.add_months(month).expect("start");
+                    let b = start.add_months(month + 6).expect("end");
+                    let payment = adjust(b, business_day_convention, calendar)
+                        .expect("adjusted payment")
+                        .add_business_days(lag, calendar)
+                        .expect("lagged payment");
+                    expected += (disc.df_on_date_curve(a).expect("df")
+                        / disc.df_on_date_curve(b).expect("df")
+                        - 1.0)
+                        * relative_df_discount_curve(disc.as_ref(), as_of, payment)
+                            .expect("payment df");
+                }
+                assert!(
+                    (rate * annuity - expected).abs() < 1e-12,
+                    "business_day_convention={business_day_convention:?}, lag={lag}"
+                );
+                if business_day_convention == BusinessDayConvention::Unadjusted && lag == 0 {
+                    let telescope = relative_df_discount_curve(disc.as_ref(), as_of, start)
+                        .expect("df")
+                        - relative_df_discount_curve(disc.as_ref(), as_of, end).expect("df");
+                    assert!((expected - telescope).abs() < 1e-12);
+                }
+            }
+        }
     }
 }

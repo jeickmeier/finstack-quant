@@ -12,9 +12,10 @@
 //! * **`actuals_until` interaction** — the evaluator only invokes forecasts for
 //!   periods *after* the model's last `is_actual` period. If you update
 //!   `actuals_until` to include a new quarter, that quarter's value is taken
-//!   from the explicit node values and the seasonal forecast simply starts one
-//!   period later. This means the historical window used by the decomposition
-//!   grows automatically as you roll forward.
+//!   from the explicit node values and the seasonal forecast starts one
+//!   period later. Update the external `historical` array at the same time:
+//!   the evaluator does not append model actuals, and stale history retains
+//!   its old level and seasonal phase.
 //!
 //! * **Additive vs. multiplicative** — use `additive` when seasonal swings are
 //!   roughly constant in absolute terms (e.g., a retailer's Q4 EBITDA uplift
@@ -227,7 +228,9 @@ pub(super) fn timeseries_forecast(
                      Must be less than the number of historical periods. \
                      Example: window = 3 for 3-period moving average.",
                     )
-                })? as usize;
+                })?;
+            let window = usize::try_from(window)
+                .map_err(|_| Error::forecast("window exceeds the supported platform size"))?;
 
             if window == 0 {
                 return Err(Error::forecast("window must be greater than 0"));
@@ -241,6 +244,11 @@ pub(super) fn timeseries_forecast(
             }
 
             let ma: f64 = hist_data.iter().rev().take(window).sum::<f64>() / window as f64;
+            if !ma.is_finite() {
+                return Err(Error::forecast(
+                    "Moving average forecast produced a non-finite historical average",
+                ));
+            }
 
             if hist_data.len() > window {
                 let prev_ma: f64 = hist_data[..hist_data.len() - 1]
@@ -448,19 +456,24 @@ fn seasonal_forecast_with_decomposition(
              Common values: 4 (quarterly), 12 (monthly). \
              Must match the cyclical pattern in your data.",
             )
-        })? as usize;
+        })?;
+    let season_length = usize::try_from(season_length)
+        .map_err(|_| Error::forecast("season_length exceeds the supported platform size"))?;
 
     if season_length == 0 {
         return Err(Error::forecast("season_length must be greater than 0"));
     }
 
-    if hist_data.len() < season_length * 2 {
+    let minimum_history = season_length.checked_mul(2).ok_or_else(|| {
+        Error::forecast("season_length is too large to represent two full seasons")
+    })?;
+    if hist_data.len() < minimum_history {
         return Err(Error::forecast(format!(
             "Need at least 2 full seasons of historical data for seasonal decomposition. \
              Season length: {}, need {} periods, got {}. \
              Provide more historical data or reduce season_length.",
             season_length,
-            season_length * 2,
+            minimum_history,
             hist_data.len()
         )));
     }
@@ -679,7 +692,16 @@ fn decompose_multiplicative(
     // A multiplicative decomposition divides by the trend, so it is undefined
     // where the trend crosses or touches zero. Substituting an identity ratio
     // there would silently bias every seasonal factor, so fail loudly instead.
-    if trend.iter().any(|t| t.abs() < ZERO_TOLERANCE) {
+    if trend.iter().any(|t| !t.is_finite()) {
+        return Err(Error::forecast(
+            "Multiplicative seasonal decomposition produced a non-finite trend",
+        ));
+    }
+    if trend.iter().any(|t| t.abs() < ZERO_TOLERANCE)
+        || trend
+            .windows(2)
+            .any(|pair| pair[0].is_sign_negative() != pair[1].is_sign_negative())
+    {
         return Err(Error::forecast(
             "Multiplicative seasonal decomposition is undefined for series whose trend \
              crosses or touches zero (the seasonal ratio divides by the trend). \

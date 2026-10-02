@@ -1,7 +1,6 @@
 use finstack_quant_calibration::api::{
     engine, market_datum::MarketDatum, prior_market::PriorMarketObject, schema::*,
 };
-use finstack_quant_calibration::hull_white::SwapFrequency;
 use finstack_quant_calibration::quotes::{ids::QuoteId, vol::VolQuote};
 use finstack_quant_core::{
     currency::Currency,
@@ -36,7 +35,7 @@ fn cap_envelope(prior_market: Vec<PriorMarketObject>, dual_curve: bool) -> Calib
                     fixed_kappa: Some(0.0342),
                     initial_kappa: None,
                     initial_sigma: None,
-                    payment_frequency: SwapFrequency::Quarterly,
+                    index_id: "USD-SOFR-3M".into(),
                     volatility_mode: HullWhiteVolatilityMode::Scalar,
                 }),
             }],
@@ -98,7 +97,7 @@ fn projection(dc: DayCount, shift_years: u32) -> ForwardCurve {
 }
 
 fn fitted_sigma(envelope: &CalibrationEnvelope) -> f64 {
-    let result = engine::execute(envelope).expect("calibration");
+    let result = engine::calibrate(envelope).expect("calibration");
     assert!(result.result.report.success);
     let MarketScalar::Unitless(sigma) = result.result.final_market.prices["D_CAPFLOOR_HW1F_SIGMA"]
     else {
@@ -186,11 +185,11 @@ fn cap_floor_plan_rejects_conflicting_quotes_in_any_order() {
             (0..3).map(|i| QuoteId::new(format!("cap-{i}"))).collect(),
         );
         assert!(
-            engine::execute(&env).is_err(),
+            engine::calibrate(&env).is_err(),
             "strict acceptance must reject conflicting quotes"
         );
         env.plan.settings.fail_on_bad_fit = false;
-        let result = engine::execute(&env).expect("diagnostic result");
+        let result = engine::calibrate(&env).expect("diagnostic result");
         assert!(!result.result.report.success);
         assert_eq!(result.result.step_reports["hw"].residuals.len(), 3);
     }

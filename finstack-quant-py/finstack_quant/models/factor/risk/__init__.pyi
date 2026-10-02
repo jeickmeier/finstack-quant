@@ -50,8 +50,7 @@ def parametric_var_decomposition(
     weights: list[float],
     covariance: list[list[float]] | npt.NDArray[np.float64] | pd.DataFrame,
     confidence: float | None = None,
-    compute_incremental: bool | None = None,
-    config: DecompositionConfig | None = None,
+    compute_incremental: bool = False,
 ) -> PositionRiskDecomposition:
     """
     Decompose portfolio parametric VaR across positions.
@@ -67,13 +66,12 @@ def parametric_var_decomposition(
         Square covariance matrix aligned with ``position_ids``. C-contiguous
         ``float64`` arrays use the direct buffer path.
     confidence : float | None
-        VaR confidence strictly inside ``(0.5, 1)``; overrides
-        ``config.confidence``. Defaults to ``0.95`` when neither is given.
-    compute_incremental : bool | None
-        Whether to calculate leave-one-out incremental VaR; overrides
-        ``config.compute_incremental``. Defaults to ``False``.
-    config : DecompositionConfig | None
-        Supplies the defaults for the two scalars above.
+        VaR confidence strictly inside ``(0.5, 1)``. ``None`` uses the Rust
+        :meth:`DecompositionConfig.parametric_95` preset (``0.95``), as the
+        WASM ``parametricVarDecomposition`` does.
+    compute_incremental : bool, default False
+        Whether to calculate leave-one-out incremental VaR (one full repricing
+        per position).
 
     Returns
     -------
@@ -100,7 +98,6 @@ def parametric_es_decomposition(
     weights: list[float],
     covariance: list[list[float]] | npt.NDArray[np.float64] | pd.DataFrame,
     confidence: float | None = None,
-    config: DecompositionConfig | None = None,
 ) -> ParametricEsDecompositionView:
     """
     Decompose portfolio parametric expected shortfall across positions.
@@ -119,10 +116,8 @@ def parametric_es_decomposition(
     covariance : list[list[float]] | numpy.ndarray | pd.DataFrame
         Square covariance matrix aligned with ``position_ids``.
     confidence : float | None
-        ES confidence strictly inside ``(0.5, 1)``; overrides
-        ``config.confidence``. Defaults to ``0.95``.
-    config : DecompositionConfig | None
-        Supplies the default confidence.
+        ES confidence strictly inside ``(0.5, 1)``. ``None`` uses the Rust
+        :meth:`DecompositionConfig.parametric_95` preset (``0.95``).
 
     Returns
     -------
@@ -149,7 +144,6 @@ def historical_var_decomposition(
     position_ids: list[str] | None,
     position_pnls: list[list[float]] | npt.NDArray[np.float64] | pd.DataFrame,
     confidence: float | None = None,
-    config: DecompositionConfig | None = None,
 ) -> PositionRiskDecomposition:
     """
     Decompose historical VaR from scenario or realized position P&Ls.
@@ -162,14 +156,11 @@ def historical_var_decomposition(
     position_pnls : list[list[float]] | numpy.ndarray | pd.DataFrame
         P&L matrix, losses negative. A ``pandas.DataFrame`` is read as rows =
         scenarios, columns = positions. A nested list or 2-D array is read as
-        ``n_positions x n_scenarios`` (position-major); a
-        ``n_scenarios x n_positions`` layout is accepted when the two
-        dimensions differ.
+        ``n_positions x n_scenarios`` (position-major, one row per position),
+        the layout the WASM ``historicalVarDecomposition`` also takes.
     confidence : float | None
-        Historical VaR confidence strictly inside ``(0.5, 1)``; overrides
-        ``config.confidence``. Defaults to ``0.95``.
-    config : DecompositionConfig | None
-        Supplies the default confidence.
+        Historical VaR confidence strictly inside ``(0.5, 1)``. ``None`` uses
+        the Rust :meth:`DecompositionConfig.historical_95` preset (``0.95``).
 
     Returns
     -------
@@ -180,9 +171,9 @@ def historical_var_decomposition(
     Raises
     ------
     ValueError
-        If the P&L matrix is empty, ragged, its orientation cannot be resolved
-        against ``position_ids``, too few scenarios resolve the tail, or the
-        confidence level is invalid.
+        If the P&L matrix is empty, ragged, does not have one row per
+        position id, too few scenarios resolve the tail, or the confidence
+        level is invalid.
 
     Examples
     --------
@@ -209,14 +200,15 @@ def evaluate_risk_budget(
         Position identifiers aligned with ``actual_var`` and
         ``target_var_pct``.
     actual_var : list[float]
-        Position component VaR amounts.
+        Finite position component VaR amounts.
     target_var_pct : list[float]
-        Target share of total portfolio VaR per position.
+        Finite target share in ``[0, 1]`` per position; shares must sum to one
+        within an absolute tolerance of ``0.05``.
     portfolio_var : float
-        Total portfolio VaR used to convert target percentages
+        Finite total portfolio VaR used to convert target percentages
         into target VaR amounts.
     utilization_threshold : float, default 1.2
-        Breach threshold for actual / target utilization. The default is
+        Positive finite breach threshold for actual / target utilization. The default is
         :data:`DEFAULT_UTILIZATION_THRESHOLD`, the Rust constant shared with
         the WASM binding.
 
@@ -864,9 +856,7 @@ class RiskDecomposition:
         Export factor contributions as a pandas DataFrame.
 
         Columns: ``factor_id``, ``absolute_risk``, ``relative_risk``,
-        ``marginal_risk`` — identical to
-        :meth:`FactorRiskDecomposition.to_factor_dataframe`, which renders the
-        same Rust type reached through the sensitivity engine.
+        ``marginal_risk``.
 
         Returns
         -------
@@ -884,9 +874,7 @@ class RiskDecomposition:
         """
         Export position x factor contributions as a pandas DataFrame.
 
-        Columns: ``position_id``, ``factor_id``, ``risk_contribution`` —
-        identical to
-        :meth:`FactorRiskDecomposition.to_position_factor_dataframe`.
+        Columns: ``position_id``, ``factor_id``, ``risk_contribution``.
 
         Returns
         -------
@@ -2275,10 +2263,10 @@ class DecompositionConfig:
 
     Holds the tail ``confidence`` (decimal probability in ``(0.5, 1)``), the
     ``method`` (``"parametric"`` or ``"historical"``) and whether leave-one-out
-    incremental VaR is computed. Pass an instance as ``config=`` to
-    :func:`parametric_var_decomposition` / :func:`historical_var_decomposition`;
-    any scalar keyword given alongside overrides the matching field. Instances
-    compare equal field-wise and pickle through JSON.
+    incremental VaR is computed. The decomposition functions take
+    ``confidence`` / ``compute_incremental`` directly and resolve an omitted
+    confidence to the :meth:`parametric_95` / :meth:`historical_95` presets.
+    Instances compare equal field-wise and pickle through JSON.
 
     Examples
     --------
@@ -2387,6 +2375,31 @@ class DecompositionConfig:
         >>> from finstack_quant.models.factor.risk import DecompositionConfig
         >>> DecompositionConfig.historical(0.975).method
         'historical'
+        """
+        ...
+
+    @classmethod
+    def historical_95(cls) -> DecompositionConfig:
+        """
+        Default 95% historical VaR decomposition config.
+
+        The preset :func:`historical_var_decomposition` and
+        :func:`build_stress_attribution` use when ``confidence`` is omitted.
+
+        Returns
+        -------
+        DecompositionConfig
+            Historical 95% config with incremental VaR disabled.
+
+        Notes
+        -----
+        This method does not raise; it returns a fixed instance.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.factor.risk import DecompositionConfig
+        >>> (DecompositionConfig.historical_95().method, DecompositionConfig.historical_95().confidence)
+        ('historical', 0.95)
         """
         ...
 
@@ -2830,7 +2843,7 @@ class ParametricEsDecompositionView:
 def build_stress_attribution(
     position_ids: list[str] | None,
     position_pnls: list[list[float]] | npt.NDArray[np.float64] | pd.DataFrame,
-    confidence: float = 0.95,
+    confidence: float | None = None,
 ) -> StressAttribution:
     """
     Build tail-scenario stress attribution from position P&Ls.
@@ -2843,13 +2856,13 @@ def build_stress_attribution(
     position_pnls : list[list[float]] | numpy.ndarray | pd.DataFrame
         P&L matrix, losses negative. A ``pandas.DataFrame`` is read as rows =
         scenarios, columns = positions. A nested list or 2-D array is read as
-        ``n_positions x n_scenarios`` (position-major); a
-        ``n_scenarios x n_positions`` layout is accepted when the two
-        dimensions differ. C-contiguous ``float64`` arrays use the direct
-        buffer path.
-    confidence : float, default 0.95
+        ``n_positions x n_scenarios`` (position-major, one row per position).
+        C-contiguous ``float64`` arrays use the direct buffer path.
+    confidence : float | None
         Tail confidence level in ``(0.5, 1)``. The Rust engine selects
-        ``floor((1 - confidence) * n_scenarios)`` tail scenarios.
+        ``floor((1 - confidence) * n_scenarios)`` tail scenarios. ``None``
+        uses the confidence of the Rust
+        :meth:`DecompositionConfig.historical_95` preset (``0.95``).
 
     Returns
     -------
@@ -2860,9 +2873,9 @@ def build_stress_attribution(
     Raises
     ------
     ValueError
-        If dimensions are inconsistent or the orientation cannot be resolved,
-        confidence is outside ``(0.5, 1)``, the requested tail has zero
-        scenarios, or any P&L is non-finite.
+        If dimensions are inconsistent or the matrix does not have one row per
+        position id, confidence is outside ``(0.5, 1)``, the requested tail
+        has zero scenarios, or any P&L is non-finite.
 
     Examples
     --------

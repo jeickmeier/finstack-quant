@@ -11,20 +11,23 @@ from .common import SCHEMA, flat_forward_curve
 from .generate import generate
 
 
-def test_flat_forward_curve_records_contractual_projection_dates() -> None:
+@pytest.mark.parametrize(("day_count", "year_days"), [("act_360", 360.0), ("act_365f", 365.0)])
+def test_flat_forward_curve_records_contractual_projection_dates(day_count: str, year_days: float) -> None:
     """Term-forward fixtures preserve their contractual reset grid."""
     curve = flat_forward_curve(
         "USD-SOFR-3M",
         0.043,
+        day_count=day_count,
         projection_dates=["2026-08-03", "2026-11-03"],
     )
 
     assert curve["projection_grid"] == [
         0.0,
-        95.0 / 360.0,
-        187.0 / 360.0,
+        95.0 / year_days,
+        187.0 / year_days,
         30.0,
     ]
+    assert curve["day_count"] == day_count
 
 
 def test_generate_fra_is_deterministic_and_complete(tmp_path) -> None:
@@ -143,6 +146,16 @@ def test_analytical_rate_tolerances_are_numerically_tight(tmp_path, product: str
         tolerance = fixture["tolerances"][metric]
         assert tolerance["abs"] == 1e-7
         assert "rel" not in tolerance
+
+
+@pytest.mark.parametrize("product", ["black_swaption", "bachelier_swaption"])
+def test_swaption_forward_quotes_use_the_quantlib_index_day_count(tmp_path, product: str) -> None:
+    """The oracle's ACT/365F index quotes must retain their annualization."""
+    [path] = generate(product, tmp_path)
+    fixture = json.loads(path.read_text(encoding="utf-8"))
+    forward = next(curve for curve in fixture["market"]["data"]["curves"] if curve["type"] == "forward")
+    floating_leg = fixture["instrument"]["instrument"]["spec"]["underlying_float_leg"]
+    assert forward["day_count"] == floating_leg["day_count"] == "act_365f"
 
 
 @pytest.mark.parametrize(

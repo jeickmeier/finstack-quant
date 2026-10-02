@@ -566,6 +566,34 @@ fn test_pool_diversity_score_multiple_obligors() {
 }
 
 #[test]
+fn test_pool_diversity_score_is_independent_of_asset_order() {
+    // The score sums per-obligor balances in obligor-id order, so the same
+    // pool in any asset order gives the same bits (and the same bits on
+    // native and wasm32, whose hash iteration orders differ).
+    let asset = |i: usize| {
+        PoolAsset::floating_rate_loan(
+            format!("L{i}").as_str(),
+            Money::new(1_000_000.0 + 12_345.67 * (i * i) as f64, Currency::USD)
+                .expect("valid money fixture"),
+            "SOFR-3M",
+            400.0,
+            maturity_date(),
+            finstack_quant_core::dates::DayCount::Act360,
+        )
+        .with_obligor_id(format!("OB{i:02}").as_str())
+    };
+    let mut forward = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+    let mut reverse = AssetPool::new("POOL", DealType::Clo, Currency::USD);
+    for i in 0..40 {
+        forward.assets.push(asset(i));
+        reverse.assets.push(asset(39 - i));
+    }
+    let score = forward.diversity_score();
+    assert!(score > 1.0 && score < 40.0);
+    assert_eq!(score.to_bits(), reverse.diversity_score().to_bits());
+}
+
+#[test]
 fn test_pool_diversity_score_empty_pool() {
     // Arrange
     let pool = AssetPool::new("EMPTY", DealType::Clo, Currency::USD);

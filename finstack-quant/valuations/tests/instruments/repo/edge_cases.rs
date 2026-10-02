@@ -210,11 +210,18 @@ fn test_valuation_after_maturity() {
     )
     .expect("Repo construction should succeed");
 
-    // Value after maturity
-    let pv = repo.value(&context, date(2025, 5, 1)).unwrap();
-
-    // Past maturity, cashflows are in the past
-    assert_eq!(pv.currency(), Currency::USD);
+    // Maturity and later dates share the settled-instrument boundary.
+    for as_of in [date(2025, 4, 15), date(2025, 5, 1)] {
+        assert_eq!(
+            repo.value(&context, as_of).unwrap(),
+            Money::from((0_i64, Currency::USD))
+        );
+        assert_eq!(repo.value_raw(&context, as_of).unwrap(), 0.0);
+        assert_eq!(
+            repo.value_raw_with_currency(&context, as_of).unwrap(),
+            (0.0, Currency::USD)
+        );
+    }
 }
 
 #[test]

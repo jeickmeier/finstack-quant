@@ -18,12 +18,12 @@ use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_margin::regulatory::{
     frtb::{
-        CorrelationScenario, DrcAssetType, DrcPosition, DrcSector, DrcSeniority, FrtbRiskClass,
-        FrtbSbaEngine, FrtbSbaResult, FrtbSensitivities,
+        frtb_sba_charge as frtb_sba_charge_rs, CorrelationScenario, DrcAssetType, DrcPosition,
+        DrcSector, DrcSeniority, FrtbRiskClass, FrtbSbaEngine, FrtbSbaResult, FrtbSensitivities,
     },
     sa_ccr::{
-        EadResult, SaCcrAssetClass, SaCcrEngine, SaCcrNettingSetConfig, SaCcrOptionType,
-        SaCcrSupervisoryCategory, SaCcrTrade,
+        saccr_ead as saccr_ead_rs, EadResult, SaCcrAssetClass, SaCcrEngine, SaCcrNettingSetConfig,
+        SaCcrOptionType, SaCcrSupervisoryCategory, SaCcrTrade,
     },
 };
 use pyo3::prelude::*;
@@ -751,21 +751,23 @@ impl PyFrtbSbaEngine {
     #[new]
     #[pyo3(signature = (scenarios = None, risk_classes = None))]
     fn new(scenarios: Option<Vec<String>>, risk_classes: Option<Vec<String>>) -> PyResult<Self> {
-        let scenarios = match scenarios {
-            Some(labels) => labels
-                .iter()
-                .map(|s| parse_correlation_scenario(s))
-                .collect::<PyResult<Vec<_>>>()?,
-            None => CorrelationScenario::ALL.to_vec(),
-        };
-        let risk_classes = match risk_classes {
-            Some(labels) => labels
-                .iter()
-                .map(|s| parse_label::<FrtbRiskClass>(s))
-                .collect::<PyResult<Vec<_>>>()?,
-            None => FrtbRiskClass::ALL.to_vec(),
-        };
-        let inner = FrtbSbaEngine::new(scenarios, risk_classes).map_err(core_to_py)?;
+        let scenarios = scenarios
+            .map(|labels| {
+                labels
+                    .iter()
+                    .map(|s| parse_correlation_scenario(s))
+                    .collect::<PyResult<Vec<_>>>()
+            })
+            .transpose()?;
+        let risk_classes = risk_classes
+            .map(|labels| {
+                labels
+                    .iter()
+                    .map(|s| parse_label::<FrtbRiskClass>(s))
+                    .collect::<PyResult<Vec<_>>>()
+            })
+            .transpose()?;
+        let inner = FrtbSbaEngine::with_selection(scenarios, risk_classes).map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -1831,15 +1833,11 @@ pub fn frtb_sba_charge(
     sensitivities: &PyFrtbSensitivities,
     correlation_scenario: Option<&str>,
 ) -> PyResult<PyFrtbSbaResult> {
-    let engine = match correlation_scenario {
-        Some(s) => {
-            let scenario = parse_correlation_scenario(s)?;
-            FrtbSbaEngine::new(vec![scenario], FrtbRiskClass::ALL.to_vec()).map_err(core_to_py)?
-        }
-        None => FrtbSbaEngine::default(),
-    };
+    let scenario = correlation_scenario
+        .map(parse_correlation_scenario)
+        .transpose()?;
     let result = py
-        .detach(|| engine.calculate(&sensitivities.inner))
+        .detach(|| frtb_sba_charge_rs(&sensitivities.inner, scenario))
         .map_err(core_to_py)?;
 
     Ok(PyFrtbSbaResult::from_inner(result))
@@ -1871,10 +1869,9 @@ pub fn saccr_ead(
     config: &PySaCcrNettingSetConfig,
     alpha: Option<f64>,
 ) -> PyResult<PyEadResult> {
-    let engine = build_engine(alpha)?;
     let trade_vec: Vec<SaCcrTrade> = trades.iter().map(|t| t.inner.clone()).collect();
     let result = py
-        .detach(|| engine.calculate_ead(&config.inner, &trade_vec))
+        .detach(|| saccr_ead_rs(&trade_vec, &config.inner, alpha))
         .map_err(core_to_py)?;
     Ok(PyEadResult::from_inner(result))
 }

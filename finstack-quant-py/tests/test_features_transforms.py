@@ -225,12 +225,26 @@ def test_op_enums_and_key_coercion() -> None:
         TimeSeriesOp("bogus")
     out = transform_timeseries(
         [100.0, 102.0],
-        [1, 1],
+        ["A", "A"],
         [datetime.date(2026, 1, 1), datetime.date(2026, 1, 2)],
         TimeSeriesOp("returns"),
     )
     assert out[0] is None
     assert out[1] == pytest.approx(0.02)
+
+
+@pytest.mark.parametrize("bad_key", [9, 1.5, True, object()])
+def test_non_string_non_date_keys_are_rejected(bad_key: object) -> None:
+    """Keys are strings (as in WASM); the binding does not invent a str() coercion."""
+    from finstack_quant.features import PanelTransformSpec, transform_panel
+
+    with pytest.raises(TypeError, match="order entries must be str or date-like"):
+        transform_timeseries([1.0, 2.0], ["A", "A"], ["x", bad_key], "diff")
+    ops = [{"name": "d", "family": "timeseries", "op": "diff"}]
+    with pytest.raises(TypeError, match="order entries must be str or date-like"):
+        transform_panel({"values": [1.0, 2.0], "operations": ops, "entity": ["A", "A"], "order": ["x", bad_key]})
+    with pytest.raises(TypeError, match="order entries must be str or date-like"):
+        PanelTransformSpec([1.0, 2.0], ops, entity=["A", "A"], order=["x", bad_key])
 
 
 def test_transform_panel_typed_twin() -> None:
@@ -254,3 +268,25 @@ def test_transform_panel_typed_twin() -> None:
     pd = pytest.importorskip("pandas")
     frame = result.to_dataframe(index=pd.Index([10, 11, 12, 13]))
     assert list(frame.index) == [10, 11, 12, 13]
+
+
+def test_transform_panel_dict_and_json_share_rust_validation() -> None:
+    from finstack_quant.features import transform_panel
+
+    ops = [{"name": "r", "family": "cross_sectional", "op": "rank"}]
+    bad = {"values": [1.0, 3.0], "time_key": ["d", "d"], "operations": ops, "bogus": 1}
+    with pytest.raises(ValueError, match="unknown field `bogus`") as from_dict:
+        transform_panel(bad)
+    with pytest.raises(ValueError, match="unknown field `bogus`") as from_json:
+        transform_panel(json.dumps(bad))
+    # Same serde message; the JSON-text path adds the parse position.
+    assert str(from_json.value).startswith(str(from_dict.value))
+    with pytest.raises(ValueError, match="missing field `values`"):
+        transform_panel({"time_key": ["d"], "operations": ops})
+    # NaN still marks a missing value on the dict path.
+    assert (
+        transform_panel({"values": [1.0, float("nan"), 3.0], "time_key": ["d"] * 3, "operations": ops}).get_column("r")[
+            1
+        ]
+        is None
+    )

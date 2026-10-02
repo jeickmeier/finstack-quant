@@ -36,8 +36,8 @@ export function groupDecimal(value: string): string {
     (fraction === undefined ? "" : `.${fraction}`)
   );
 }
-/** Native `core.Money` surface used for prepared display formatting; injected, never imported at render time. */
-export type MoneyApi = Pick<CoreNamespace, "Money">;
+/** Native `core.Currency` / `core.Money` surface used for prepared display formatting; injected, never imported at render time. */
+export type MoneyApi = Pick<CoreNamespace, "Currency" | "Money">;
 /**
  * Display supplied money with its exact amount text; no rounding is applied at this boundary.
  * @param money - Exact major-unit amount string and supplied currency; neither is mutated.
@@ -51,7 +51,7 @@ export function formatRawMoney(money: MoneyValue): string {
  * Format supplied money with its returned output scale and rounding mode through the native core.
  * @param money - Exact major-unit amount string and supplied currency; neither is mutated.
  * @param stamp - Returned Rust rounding snapshot. Without an explicit currency scale, all supplied digits are preserved — no ISO default is inferred at this boundary.
- * @param native - Initialized native `core.Money` constructor; callers prepare text inside a worker or test host, never during renderer execution.
+ * @param native - Initialized native `core` subset with the `Currency` and `Money` constructors; callers prepare text inside a worker or test host, never during renderer execution.
  * @returns Currency-prefixed display text, never a canonical JSON document.
  * @throws FinstackError for amount text that is not exactly representable as a Decimal or for invalid scale/rounding/grouping options.
  * @throws TypeError when a present stamp carries a non-number scale or non-string mode.
@@ -65,11 +65,16 @@ export function formatMoney(
   if (scale === undefined) return formatRawMoney(money);
   if (typeof scale !== "number" || typeof stamp?.mode !== "string")
     throw new TypeError("Invalid returned rounding stamp");
-  const value = native.Money.fromDecimalStr(money.amount, money.currency);
+  const currency = new native.Currency(money.currency);
   try {
-    return value.formatWith(scale, true, ",", stamp!.mode);
+    const value = native.Money.fromDecimalStr(money.amount, currency);
+    try {
+      return value.formatWith(scale, true, ",", stamp!.mode);
+    } finally {
+      value.free();
+    }
   } finally {
-    value.free();
+    currency.free();
   }
 }
 /**

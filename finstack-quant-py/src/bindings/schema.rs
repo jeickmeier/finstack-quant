@@ -19,7 +19,7 @@ list one crate each. This namespace merges all of them, so a service exposing
 these contracts does not have to hard-code the domain list.
 
 Each :func:`index` row carries ``domain`` alongside ``path``, ``$id``,
-``title``, ``summary``, ``bytes`` and ``kind``.
+``title``, ``type_name`` (the Rust root type), ``summary``, ``bytes`` and ``kind``.
 
 Examples
 --------
@@ -39,7 +39,7 @@ Examples
 /// str
 ///     Pretty-printed JSON with an ``artifacts`` array. Each row carries
 ///     ``domain`` (the owning crate namespace), ``path``, ``$id``, ``title``,
-///     ``summary``, ``bytes`` and ``kind`` (``input`` for documents you author,
+///     ``type_name`` (the Rust root type), ``summary``, ``bytes`` and ``kind`` (``input`` for documents you author,
 ///     ``output`` for documents the library emits, ``component`` for shared
 ///     definitions). Rows are sorted by ``domain`` then ``path``.
 ///
@@ -101,8 +101,7 @@ fn index() -> PyResult<String> {
 #[pyfunction]
 #[pyo3(signature = (selector, profile = "canonical"), text_signature = "(selector, profile='canonical')")]
 fn get(selector: &str, profile: &str) -> PyResult<String> {
-    let artifact = finstack_quant::schema::find(selector)
-        .map_err(|error| pyo3::exceptions::PyKeyError::new_err(error.to_string()))?;
+    let artifact = finstack_quant::schema::find(selector).map_err(crate::errors::core_to_py)?;
     let value = finstack_quant::schema::render_profile(artifact, profile)
         .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
     serde_json::to_string_pretty(&value).map_err(|error| {
@@ -145,8 +144,7 @@ fn get(selector: &str, profile: &str) -> PyResult<String> {
 #[pyfunction]
 #[pyo3(text_signature = "(selector, payload)")]
 fn validate(selector: &str, payload: &str) -> PyResult<String> {
-    let artifact = finstack_quant::schema::find(selector)
-        .map_err(|error| pyo3::exceptions::PyKeyError::new_err(error.to_string()))?;
+    let artifact = finstack_quant::schema::find(selector).map_err(crate::errors::core_to_py)?;
     let parsed: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
         pyo3::exceptions::PyValueError::new_err(format!("payload is not JSON: {error}"))
     })?;
@@ -165,10 +163,7 @@ fn validate(selector: &str, payload: &str) -> PyResult<String> {
 ///     Sorted domain names, each of which is also a ``domain`` value in
 ///     :func:`index` and a ``finstack_quant.<domain>.schema`` namespace.
 ///
-/// Raises
-/// ------
-/// ValueError
-///     If the registry cannot be read.
+///     This function does not raise; the domain list is compiled in.
 ///
 /// Examples
 /// --------
@@ -177,14 +172,8 @@ fn validate(selector: &str, payload: &str) -> PyResult<String> {
 /// True
 #[pyfunction]
 #[pyo3(text_signature = "()")]
-fn domains() -> PyResult<Vec<String>> {
-    let mut names: Vec<String> = finstack_quant::schema::artifacts_with_domain()
-        .into_iter()
-        .map(|(domain, _)| domain.to_string())
-        .collect();
-    names.sort_unstable();
-    names.dedup();
-    Ok(names)
+fn domains() -> Vec<&'static str> {
+    finstack_quant::schema::domains()
 }
 
 /// Register the `finstack_quant.schema` Python namespace.
@@ -193,7 +182,7 @@ fn domains() -> PyResult<Vec<String>> {
 ///
 /// Returns a `PyErr` if any function cannot be registered.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "schema")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "schema")?;
     m.setattr("__doc__", MODULE_DOC)?;
 
     m.add_function(wrap_pyfunction!(index, &m)?)?;
@@ -202,19 +191,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(domains, &m)?)?;
 
     let exports = ["domains", "get", "index", "validate"];
-    for name in exports {
-        m.getattr(name)?
-            .setattr("__module__", "finstack_quant.schema")?;
-    }
     m.setattr("__all__", PyList::new(py, exports)?)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    // `finstack_quant/schema.py` re-exports this module and owns its import path.
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "schema",
-        "finstack_quant",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
     Ok(())
 }

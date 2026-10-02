@@ -146,7 +146,7 @@ zero, one, or many effects. Inspect `changes` and `warnings` for coverage.
 Five historical stress templates are embedded as JSON from
 [`data/templates/`](data/templates): `gfc_2008`, `covid_2020`,
 `rate_shock_2022`, `svb_2023`, `ltcm_1998`. Each carries `TemplateMetadata`
-(event date, asset classes, tags, `Severity`) and named components, so a caller
+(event date, asset classes, tags, `TemplateSeverity`) and named components, so a caller
 can take the whole scenario or just one leg.
 
 ```rust
@@ -228,7 +228,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 + **Python:** `finstack_quant.scenarios` — `ScenarioSpec`, `TemplateMetadata`,
   `OperationSpec`, `CurveKind`, `TimeRollMode`, `TenorMatchMode`, `Compounding`, `RateBindingSpec`,
   `apply_scenario`, `apply_scenario_to_market`, `compose_scenarios`,
-  `validate_scenario_spec`, `parse_scenario_spec`, `build_scenario_spec`,
+  `validate_scenario_spec` (build a spec with `ScenarioSpec(...)` or
+  `ScenarioSpec.from_json(...)`),
   `compute_horizon_return`, the template helpers, and
   `finstack_quant.scenarios.schema`.
 + **WASM:** the `scenarios` namespace from `finstack-quant-wasm/index.js`

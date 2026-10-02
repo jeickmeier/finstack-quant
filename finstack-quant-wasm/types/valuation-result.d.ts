@@ -359,23 +359,6 @@ export type DecimalWire = string;
  * - Two `Id<T>` values are equal if their string values are equal
  * - IDs with different type tags (`Id<A>` vs `Id<B>`) cannot be compared
  *
- * # Examples
- *
- * ```rust
- * use finstack_quant_core::types::{CurveId, InstrumentId};
- *
- * // Create IDs with different type tags
- * let curve = CurveId::from("USD-SOFR");
- * let bond = InstrumentId::from("ISIN:US912828XG60");
- *
- * // Can compare IDs of the same type
- * assert_eq!(curve, CurveId::from("USD-SOFR"));
- * assert_ne!(curve, CurveId::from("EUR-ESTR"));
- *
- * // Cannot compare IDs of different types (compile error):
- * // let _ = curve == bond;  // Error: mismatched types
- * ```
- *
  * # Thread Safety
  *
  * `Id<T>` is `Send + Sync` as it wraps an `Arc<str>`. Multiple threads can
@@ -420,21 +403,6 @@ export type Id = string;
  * - [`BarrierBSContinuous`](Self::BarrierBSContinuous): Reiner-Rubinstein barriers
  * - [`AsianGeometricBS`](Self::AsianGeometricBS): Geometric Asian (exact)
  * - [`AsianTurnbullWakeman`](Self::AsianTurnbullWakeman): Arithmetic Asian (approx)
- *
- * # Examples
- *
- * ```rust
- * use finstack_quant_valuations::pricer::ModelKey;
- *
- * // Select appropriate model for instrument type
- * let model = ModelKey::Discounting;  // For bonds
- * let model = ModelKey::Black76;      // For caps/floors
- * let model = ModelKey::MonteCarloGBM; // For path-dependent exotics
- *
- * // Parse from string
- * let model: ModelKey = "black76".parse().unwrap();
- * assert_eq!(model, ModelKey::Black76);
- * ```
  *
  * This interface was referenced by `ValuationResult1`'s JSON-Schema
  * via the `definition` "ModelKey".
@@ -490,15 +458,6 @@ export type PositiveF64Wire = number;
  * Rounding modes supported by the library.
  *
  * The variants mirror the most common conventions found in pricing engines.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{FinstackConfig, RoundingMode};
- *
- * let mut cfg = FinstackConfig::default();
- * cfg.rounding.mode = RoundingMode::TowardZero;
- * assert!(matches!(cfg.rounding.mode, RoundingMode::TowardZero));
- * ```
  *
  * This interface was referenced by `ValuationResult1`'s JSON-Schema
  * via the `definition` "RoundingMode".
@@ -558,9 +517,11 @@ export type StructuredCreditPricingMode =
          */
         antithetic: boolean;
         /**
-         * Number of independent estimators. With `antithetic` each estimator
-         * simulates a `(Z, -Z)` pair, so the engine prices `2 × num_paths`
-         * scenario paths.
+         * Number of independent estimators; must be at least two to estimate
+         * sampling uncertainty. With `antithetic` each estimator averages a
+         * `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
+         * Sample standard error and the Student-t interval use this estimator
+         * count, with `num_paths - 1` degrees of freedom.
          */
         num_paths: bigint;
       };
@@ -729,7 +690,7 @@ export interface ResultsMeta {
  */
 export interface RoundingContext {
   /**
-   * Ingest scale map snapshot by currency code.
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
    */
   ingest_scale_by_currency: {
     [k: string]: number;
@@ -739,7 +700,7 @@ export interface RoundingContext {
    */
   mode: "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
   /**
-   * Output scale map snapshot by currency code.
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
    */
   output_scale_by_currency: {
     [k: string]: number;
@@ -2246,25 +2207,6 @@ export interface ResultsMeta1 {
  *
  * For cross-currency instruments, this may be in a different currency than
  * the base calculation currency.
- *
- * # Example
- * ```rust
- * # use finstack_quant_valuations::results::ValuationResult;
- * # use finstack_quant_core::currency::Currency;
- * # use finstack_quant_core::money::Money;
- * # use finstack_quant_core::dates::create_date;
- * # use time::Month;
- * # fn main() -> Result<(), Box<dyn std::error::Error>> {
- * # let as_of = create_date(2025, Month::January, 15)?;
- * # let pv = Money::from((1_000_000_i64, Currency::USD));
- * # let result = ValuationResult::stamped("BOND-001", as_of, pv);
- * // PV is always in result.value, not in measures
- * let pv_money = result.value;  // Money type
- * let pv_amount = result.value.amount();  // f64 value
- * let currency = result.value.currency();  // Currency type
- * # Ok(())
- * # }
- * ```
  */
 export interface Money5 {
   /**
@@ -2707,16 +2649,6 @@ export interface FxValuationDetails {
  * When you need configurable rounding during ingestion, use
  * [`Money::new_with_config`].
  *
- * # Examples
- * ```rust
- * use finstack_quant_core::money::Money;
- * use finstack_quant_core::currency::Currency;
- *
- * let notional = Money::from((1_000_000_i64, Currency::EUR));
- * assert_eq!(notional.currency(), Currency::EUR);
- * assert_eq!(notional.amount(), 1_000_000.0);
- * ```
- *
  * This interface was referenced by `ValuationResult1`'s JSON-Schema
  * via the `definition` "Money".
  *
@@ -3023,15 +2955,6 @@ export interface ResolvedCompositeLeg {
  * The metadata is intentionally small so it can be attached to reports and
  * downstream data stores for reproducibility and audit trails.
  *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::{results_meta, FinstackConfig, NUMERIC_MODE_F64};
- *
- * let meta = results_meta(&FinstackConfig::default());
- * assert_eq!(meta.numeric_mode, NUMERIC_MODE_F64);
- * assert!(meta.timestamp.is_none()); // deterministic by default
- * ```
- *
  * This interface was referenced by `ValuationResult1`'s JSON-Schema
  * via the `definition` "ResultsMeta".
  *
@@ -3083,7 +3006,7 @@ export interface ResultsMeta2 {
  */
 export interface RoundingContext1 {
   /**
-   * Ingest scale map snapshot by currency code.
+   * Validated ingest scale snapshot by currency code, with values in `0..=28`.
    */
   ingest_scale_by_currency: {
     [k: string]: number;
@@ -3093,7 +3016,7 @@ export interface RoundingContext1 {
    */
   mode: "bankers" | "away_from_zero" | "toward_zero" | "floor" | "ceil";
   /**
-   * Output scale map snapshot by currency code.
+   * Validated output scale snapshot by currency code, with values in `0..=28`.
    */
   output_scale_by_currency: {
     [k: string]: number;
@@ -3171,9 +3094,11 @@ export interface StochasticPricingResult {
            */
           antithetic: boolean;
           /**
-           * Number of independent estimators. With `antithetic` each estimator
-           * simulates a `(Z, -Z)` pair, so the engine prices `2 × num_paths`
-           * scenario paths.
+           * Number of independent estimators; must be at least two to estimate
+           * sampling uncertainty. With `antithetic` each estimator averages a
+           * `(Z, -Z)` pair, so the engine prices `2 × num_paths` scenario paths.
+           * Sample standard error and the Student-t interval use this estimator
+           * count, with `num_paths - 1` degrees of freedom.
            */
           num_paths: bigint;
         };
@@ -3191,14 +3116,19 @@ export interface StochasticPricingResult {
         };
       };
   /**
-   * 95% confidence interval for the mean PV
+   * Two-sided 95% Student-t confidence interval for the mean PV, in the
+   * NPV currency, using one fewer degree of freedom than the independent
+   * estimator count. Coverage is approximate for non-Gaussian payoffs.
    *
    * @minItems 2
    * @maxItems 2
    */
   pv_confidence_interval: [unknown, unknown];
   /**
-   * Standard error of the mean PV estimate
+   * Sample standard error of the mean PV estimate, in the NPV currency.
+   *
+   * Uses Bessel-corrected variance over independent estimators; each
+   * antithetic pair contributes one mean observation.
    */
   pv_std_error: number;
   /**
@@ -5207,17 +5137,6 @@ export interface Money17 {
  * Provides configurable epsilon values for zero-checks in rate calculations
  * and generic floating-point comparisons. These defaults are chosen to balance
  * numerical stability with practical precision requirements.
- *
- * # Examples
- * ```rust
- * use finstack_quant_core::config::ToleranceConfig;
- *
- * let mut tol = ToleranceConfig::default();
- * assert_eq!(tol.rate_epsilon, 1e-12);
- *
- * // Customize for stricter rate comparisons
- * tol.rate_epsilon = 1e-14;
- * ```
  *
  * This interface was referenced by `ValuationResult1`'s JSON-Schema
  * via the `definition` "ToleranceConfig".

@@ -230,16 +230,17 @@ Hosts reach attribution through string-dispatched and JSON entry points; the
 large typed decomposition API is deliberately Rust-only.
 
 - **Python** — `finstack_quant.attribution` binds `attribute_pnl`,
-  `attribute_pnl_envelope_json`, `validate_attribution_json`,
+  `attribute_pnl_envelope` (typed `AttributionResultEnvelope`) and its
+  `attribute_pnl_envelope_json` wire twin, `validate_attribution_json`,
   `attribute_return_contribution`, `validate_return_contribution_json`, the
   `default_waterfall_order` / `default_attribution_metrics` helpers, and the
   `PnlAttribution` / `ReturnContributionResult` wrappers. Detail structs are
   reachable as serde payloads on `PnlAttribution` detail getters.
   `finstack_quant.attribution.schema` exposes `index` / `get` / `validate`.
 - **WASM** — [`exports/attribution.js`](../../finstack-quant-wasm/exports/attribution.js)
-  exposes `attributePnl`, `attributePnlJson`, `attributePnlJson`,
-  `validateAttributionJson`, `defaultWaterfallOrder`,
-  `defaultAttributionMetrics`, and the `AttributionParams` helper class. There
+  exposes `attributePnl`, `attributePnlJson`, `attributePnlEnvelope`,
+  `attributePnlEnvelopeJson`, `validateAttributionJson`, `defaultWaterfallOrder`,
+  `defaultAttributionMetrics`, and the `AttributionJsonInputs` helper class. There
   is no WASM twin for the schema module or for return contribution.
 
 The authoritative contract, including the full Rust-only inventory, is

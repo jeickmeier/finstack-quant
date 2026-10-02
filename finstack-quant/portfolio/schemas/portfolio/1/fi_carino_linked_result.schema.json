@@ -1,0 +1,445 @@
+{
+  "$defs": {
+    "FiAttributionResult": {
+      "additionalProperties": false,
+      "description": "Single-period Campisi benchmark-relative attribution result.\n\nThis type is *input-reachable*: [`campisi_carino_link`] consumes a slice of\nthese, and the Python/WASM bindings deserialize them from JSON. It therefore\ndenies unknown fields like the other inbound types in this module, so a\nmisspelled or stale key fails closed instead of being silently dropped.",
+      "properties": {
+        "active_return": {
+          "description": "Active return `portfolio_return − benchmark_return`.",
+          "format": "double",
+          "type": "number"
+        },
+        "benchmark_components": {
+          "$ref": "#/$defs/FiComponents",
+          "description": "Benchmark-side absolute Campisi split."
+        },
+        "benchmark_return": {
+          "description": "Benchmark total return `Σ w_b,j r_b,j`.",
+          "format": "double",
+          "type": "number"
+        },
+        "portfolio_components": {
+          "$ref": "#/$defs/FiComponents",
+          "description": "Portfolio-side absolute Campisi split."
+        },
+        "portfolio_return": {
+          "description": "Portfolio total return `Σ w_p,j r_p,j`.",
+          "format": "double",
+          "type": "number"
+        },
+        "sectors": {
+          "description": "Per-sector effects, in first-seen order (portfolio first, then\nbenchmark-only sectors).",
+          "items": {
+            "$ref": "#/$defs/FiSectorEffect"
+          },
+          "type": "array"
+        },
+        "total_active_carry": {
+          "description": "Sum of sector active carry effects.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_active_spread": {
+          "description": "Sum of sector active spread effects.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_active_treasury": {
+          "description": "Sum of sector active treasury effects.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_allocation": {
+          "description": "Sum of sector allocation effects.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_selection": {
+          "description": "Sum of sector selection effects.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "sectors",
+        "portfolio_components",
+        "benchmark_components",
+        "portfolio_return",
+        "benchmark_return",
+        "active_return",
+        "total_allocation",
+        "total_active_carry",
+        "total_active_treasury",
+        "total_active_spread",
+        "total_selection"
+      ],
+      "type": "object"
+    },
+    "FiComponents": {
+      "additionalProperties": false,
+      "description": "Absolute Campisi component contributions for one side (portfolio or\nbenchmark), each `Σ_j w_j × component_j`.",
+      "properties": {
+        "carry": {
+          "description": "Income effect `Σ w · y · Δt`.",
+          "format": "double",
+          "type": "number"
+        },
+        "selection": {
+          "description": "Residual selection `Σ w · (r − explained)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "spread": {
+          "description": "Spread effect `Σ w · (−SD · Δs)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "total": {
+          "description": "Sum of the four components — equals the side's total return.",
+          "format": "double",
+          "type": "number"
+        },
+        "treasury": {
+          "description": "Treasury/duration effect `Σ w · (−MD · Δy)`.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "carry",
+        "treasury",
+        "spread",
+        "selection",
+        "total"
+      ],
+      "type": "object"
+    },
+    "FiLinkedSectorEffect": {
+      "description": "Carino-linked per-sector FI effects summed across periods.",
+      "properties": {
+        "active_carry": {
+          "description": "Linked active carry effect.",
+          "format": "double",
+          "type": "number"
+        },
+        "active_spread": {
+          "description": "Linked active spread effect.",
+          "format": "double",
+          "type": "number"
+        },
+        "active_treasury": {
+          "description": "Linked active treasury effect.",
+          "format": "double",
+          "type": "number"
+        },
+        "allocation": {
+          "description": "Linked allocation effect.",
+          "format": "double",
+          "type": "number"
+        },
+        "sector": {
+          "description": "Sector label.",
+          "type": "string"
+        },
+        "selection": {
+          "description": "Linked selection effect.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_active": {
+          "description": "Sum of the five linked effects.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "sector",
+        "allocation",
+        "active_carry",
+        "active_treasury",
+        "active_spread",
+        "selection",
+        "total_active"
+      ],
+      "type": "object"
+    },
+    "FiSectorEffect": {
+      "additionalProperties": false,
+      "description": "Per-sector benchmark-relative effects.",
+      "properties": {
+        "active_carry": {
+          "description": "Active income effect `w_p (carry_p,i − carry_b,i)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "active_spread": {
+          "description": "Active spread positioning `w_p (spread_p,i − spread_b,i)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "active_treasury": {
+          "description": "Active duration positioning `w_p (treasury_p,i − treasury_b,i)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "allocation": {
+          "description": "Brinson-Fachler allocation `(w_p − w_b)(r_b,i − r_b)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "benchmark_return": {
+          "description": "Benchmark sector return (weighted, per unit of sector weight).\n\nFor a sector absent from the benchmark this is the benchmark *total*\nreturn `R_b` (the off-benchmark convention; see \"Off-benchmark\nsectors\" in the module docs), so [`Self::allocation`] is identically\nzero for such sectors and their active contribution flows through the\ncomponent effects instead.",
+          "format": "double",
+          "type": "number"
+        },
+        "benchmark_weight": {
+          "description": "Benchmark weight in the sector.",
+          "format": "double",
+          "type": "number"
+        },
+        "portfolio_return": {
+          "description": "Portfolio sector return (weighted, per unit of sector weight).\n\nFor a sector absent from the portfolio this mirrors\n[`Self::benchmark_return`] (`r_p,i := r_b,i`) — reporting-only, since\nevery effect multiplies it by the zero portfolio weight.",
+          "format": "double",
+          "type": "number"
+        },
+        "portfolio_weight": {
+          "description": "Portfolio weight in the sector.",
+          "format": "double",
+          "type": "number"
+        },
+        "sector": {
+          "description": "Sector label (mirrors [`FiPositionSnapshot::sector`]).",
+          "type": "string"
+        },
+        "selection": {
+          "description": "Security selection residual `w_p (selection_p,i − selection_b,i)`.",
+          "format": "double",
+          "type": "number"
+        },
+        "total_active": {
+          "description": "Sum of the five effects — the sector's contribution to active return.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "sector",
+        "portfolio_weight",
+        "benchmark_weight",
+        "portfolio_return",
+        "benchmark_return",
+        "allocation",
+        "active_carry",
+        "active_treasury",
+        "active_spread",
+        "selection",
+        "total_active"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/fi_carino_linked_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Multi-period Carino-linked Campisi attribution.",
+  "examples": [
+    {
+      "benchmark_return_compounded": 0.018312161625,
+      "linked_active_carry": 0.000168249358012,
+      "linked_active_spread": 0.0000723588708098,
+      "linked_active_treasury": 0.001049875994,
+      "linked_allocation": 0.000247902916624,
+      "linked_sectors": [
+        {
+          "active_carry": 0.000100949614807,
+          "active_spread": 0.0000723588708098,
+          "active_treasury": 0.000726837226614,
+          "allocation": 0.000123951458312,
+          "sector": "Industrials",
+          "selection": 1.31486502141e-19,
+          "total_active": 0.00102409717054
+        },
+        {
+          "active_carry": 0.000067299743205,
+          "active_spread": 0.0,
+          "active_treasury": 0.000323038767384,
+          "allocation": 0.000123951458312,
+          "sector": "Financials",
+          "selection": -1.40095733358e-18,
+          "total_active": 0.000514289968901
+        }
+      ],
+      "linked_selection": -1.26947083144e-18,
+      "periods": [
+        {
+          "active_return": 0.00109833333333,
+          "benchmark_components": {
+            "carry": 0.004375,
+            "selection": 6.50521303491e-19,
+            "spread": 0.0012,
+            "total": 0.010075,
+            "treasury": 0.0045
+          },
+          "benchmark_return": 0.010075,
+          "portfolio_components": {
+            "carry": 0.00443333333333,
+            "selection": -8.67361737988e-20,
+            "spread": 0.00162,
+            "total": 0.0111733333333,
+            "treasury": 0.00512
+          },
+          "portfolio_return": 0.0111733333333,
+          "sectors": [
+            {
+              "active_carry": 0.00005,
+              "active_spread": 0.00018,
+              "active_treasury": 0.00036,
+              "allocation": 0.0001575,
+              "benchmark_return": 0.01165,
+              "benchmark_weight": 0.5,
+              "portfolio_return": 0.0126333333333,
+              "portfolio_weight": 0.6,
+              "sector": "Industrials",
+              "selection": 0.0,
+              "total_active": 0.0007475
+            },
+            {
+              "active_carry": 0.0000333333333333,
+              "active_spread": 0.0,
+              "active_treasury": 0.00016,
+              "allocation": 0.0001575,
+              "benchmark_return": 0.0085,
+              "benchmark_weight": 0.5,
+              "portfolio_return": 0.00898333333333,
+              "portfolio_weight": 0.4,
+              "sector": "Financials",
+              "selection": -6.93889390391e-19,
+              "total_active": 0.000350833333333
+            }
+          ],
+          "total_active_carry": 0.0000833333333333,
+          "total_active_spread": 0.00018,
+          "total_active_treasury": 0.00052,
+          "total_allocation": 0.000315,
+          "total_selection": -6.93889390391e-19
+        },
+        {
+          "active_return": 0.000426333333333,
+          "benchmark_components": {
+            "carry": 0.004375,
+            "selection": 6.50521303491e-19,
+            "spread": -0.00072,
+            "total": 0.008155,
+            "treasury": 0.0045
+          },
+          "benchmark_return": 0.008155,
+          "portfolio_components": {
+            "carry": 0.00443333333333,
+            "selection": 4.33680868994e-20,
+            "spread": -0.000972,
+            "total": 0.00858133333333,
+            "treasury": 0.00512
+          },
+          "portfolio_return": 0.00858133333333,
+          "sectors": [
+            {
+              "active_carry": 0.00005,
+              "active_spread": -0.000108,
+              "active_treasury": 0.00036,
+              "allocation": -0.0000345,
+              "benchmark_return": 0.00781,
+              "benchmark_weight": 0.5,
+              "portfolio_return": 0.00831333333333,
+              "portfolio_weight": 0.6,
+              "sector": "Industrials",
+              "selection": 1.30104260698e-19,
+              "total_active": 0.0002675
+            },
+            {
+              "active_carry": 0.0000333333333333,
+              "active_spread": 0.0,
+              "active_treasury": 0.00016,
+              "allocation": -0.0000345,
+              "benchmark_return": 0.0085,
+              "benchmark_weight": 0.5,
+              "portfolio_return": 0.00898333333333,
+              "portfolio_weight": 0.4,
+              "sector": "Financials",
+              "selection": -6.93889390391e-19,
+              "total_active": 0.000158833333333
+            }
+          ],
+          "total_active_carry": 0.0000833333333333,
+          "total_active_spread": -0.000108,
+          "total_active_treasury": 0.00052,
+          "total_allocation": -0.000069,
+          "total_selection": -5.63785129692e-19
+        }
+      ],
+      "portfolio_return_compounded": 0.0198505487644
+    }
+  ],
+  "properties": {
+    "benchmark_return_compounded": {
+      "description": "Geometrically compounded benchmark return.",
+      "format": "double",
+      "type": "number"
+    },
+    "linked_active_carry": {
+      "description": "Sum of linked active carry effects.",
+      "format": "double",
+      "type": "number"
+    },
+    "linked_active_spread": {
+      "description": "Sum of linked active spread effects.",
+      "format": "double",
+      "type": "number"
+    },
+    "linked_active_treasury": {
+      "description": "Sum of linked active treasury effects.",
+      "format": "double",
+      "type": "number"
+    },
+    "linked_allocation": {
+      "description": "Sum of linked allocation effects.",
+      "format": "double",
+      "type": "number"
+    },
+    "linked_sectors": {
+      "description": "Per-sector linked effects; their grand total reconstructs the\ncompounded active return exactly.",
+      "items": {
+        "$ref": "#/$defs/FiLinkedSectorEffect"
+      },
+      "type": "array"
+    },
+    "linked_selection": {
+      "description": "Sum of linked selection effects.",
+      "format": "double",
+      "type": "number"
+    },
+    "periods": {
+      "description": "Per-period single-period results, in chronological order.",
+      "items": {
+        "$ref": "#/$defs/FiAttributionResult"
+      },
+      "type": "array"
+    },
+    "portfolio_return_compounded": {
+      "description": "Geometrically compounded portfolio return `∏(1 + r_p,t) − 1`.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "periods",
+    "portfolio_return_compounded",
+    "benchmark_return_compounded",
+    "linked_sectors",
+    "linked_allocation",
+    "linked_active_carry",
+    "linked_active_treasury",
+    "linked_active_spread",
+    "linked_selection"
+  ],
+  "title": "FiCarinoLinkedResult",
+  "type": "object"
+}

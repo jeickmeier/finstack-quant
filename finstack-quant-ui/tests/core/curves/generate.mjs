@@ -98,7 +98,7 @@ market.curves.push(
     },
   },
 );
-const state = new native.Market(JSON.stringify(market));
+const state = native.MarketContext.fromJson(JSON.stringify(market));
 try {
   await writeFile(
     new URL(

@@ -1,0 +1,57 @@
+{
+  "$defs": {
+    "PositionId": {
+      "description": "Position identifier.",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/stress_pnl.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "P&L-only result of a factor-stress scenario.",
+  "examples": [
+    {
+      "position_pnl": [
+        [
+          "POS_001",
+          -4600.0
+        ],
+        [
+          "POS_002",
+          -7400.0
+        ]
+      ],
+      "total_pnl": -12000.0
+    }
+  ],
+  "properties": {
+    "position_pnl": {
+      "description": "Per-position P&L contributions.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "$ref": "#/$defs/PositionId"
+          },
+          {
+            "format": "double",
+            "type": "number"
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "total_pnl": {
+      "description": "Total portfolio P&L under the stressed market.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "total_pnl",
+    "position_pnl"
+  ],
+  "title": "StressPnl",
+  "type": "object"
+}

@@ -7,34 +7,26 @@ use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, display_to_py, value_error};
-use finstack_quant_covenants::{CovenantBreach, CovenantEngine, HashMapMetricSource};
+use finstack_quant_covenants::{CovenantBreach, CovenantEngine, DatedMetrics, HashMapMetricSource};
 use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Date-indexed metric rows: one `(date, [(metric_id, value)])` entry per row.
-type MetricFrameRows = Vec<(time::Date, Vec<(String, f64)>)>;
-
 /// Accept a ``dict[str, float]`` or a JSON-object string of metric values.
 ///
-/// Every value must be a real number; ``bool`` is rejected so a stray
-/// ``True`` cannot silently evaluate as ``1.0``.
-pub(crate) fn extract_metrics(obj: &Bound<'_, PyAny>) -> PyResult<Vec<(String, f64)>> {
+/// A string goes to the Rust metric-map parser
+/// ([`HashMapMetricSource::from_json`]); a dict is converted here. Every dict
+/// value must be a real number; ``bool`` is rejected so a stray ``True``
+/// cannot silently evaluate as ``1.0``.
+pub(crate) fn extract_metrics(obj: &Bound<'_, PyAny>) -> PyResult<HashMapMetricSource> {
     if let Ok(text) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        let map: serde_json::Map<String, serde_json::Value> = serde_json::from_str(&text)
-            .map_err(|e| value_error(format!("Invalid metric map JSON: {e}")))?;
-        return map
-            .into_iter()
-            .map(|(key, value)| {
-                value
-                    .as_f64()
-                    .map(|number| (key.clone(), number))
-                    .ok_or_else(|| {
-                        value_error(format!("Metric '{key}' must be a finite JSON number"))
-                    })
-            })
-            .collect();
+        return HashMapMetricSource::from_json(&text).map_err(core_to_py);
     }
+    extract_metric_dict(obj).map(HashMapMetricSource::from_pairs)
+}
+
+/// Convert a ``dict[str, float]`` of metric values into pairs.
+pub(crate) fn extract_metric_dict(obj: &Bound<'_, PyAny>) -> PyResult<Vec<(String, f64)>> {
     let dict = obj.cast::<PyDict>().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
             "metrics must be a dict[str, float] or a JSON object string, got {}",
@@ -86,11 +78,11 @@ const SERIES_COLUMNS: [ColumnSchema<'static>; 8] = [
     ("details", "str"),
 ];
 
-/// Read a date-indexed metrics frame into ``(date, [(metric, value)])`` rows.
+/// Read a date-indexed metrics frame into Rust `DatedMetrics` rows.
 ///
 /// Cells are preserved for canonical Rust validation. Duplicate metric
 /// columns are rejected rather than silently overwriting observations.
-pub(crate) fn extract_metric_frame(frame: &Bound<'_, PyAny>) -> PyResult<MetricFrameRows> {
+pub(crate) fn extract_metric_frame(frame: &Bound<'_, PyAny>) -> PyResult<Vec<DatedMetrics>> {
     let columns: Vec<String> = frame
         .getattr("columns")?
         .call_method0("tolist")?
@@ -121,13 +113,9 @@ pub(crate) fn extract_metric_frame(frame: &Bound<'_, PyAny>) -> PyResult<MetricF
     Ok(dates
         .into_iter()
         .zip(values)
-        .map(|(date, row)| {
-            let pairs = columns
-                .iter()
-                .zip(row)
-                .map(|(name, value)| (name.clone(), value))
-                .collect();
-            (date, pairs)
+        .map(|(date, row)| DatedMetrics {
+            date,
+            metrics: columns.iter().cloned().zip(row).collect(),
         })
         .collect())
 }
@@ -224,7 +212,7 @@ impl PyCovenantEngine {
         as_of: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyDict>> {
         let as_of = extract_date(as_of)?;
-        let source = HashMapMetricSource::from_pairs(extract_metrics(metrics)?);
+        let source = extract_metrics(metrics)?;
         let reports = py.detach(|| self.inner.evaluate(&source, as_of).map_err(core_to_py))?;
         reports_to_pydict(py, reports)
     }
@@ -248,7 +236,7 @@ impl PyCovenantEngine {
     ) -> PyResult<Bound<'py, PyDict>> {
         let scope = super::spec::parse_scope(scope)?;
         let as_of = extract_date(as_of)?;
-        let source = HashMapMetricSource::from_pairs(extract_metrics(metrics)?);
+        let source = extract_metrics(metrics)?;
         let reports = py.detach(|| {
             self.inner
                 .evaluate_and_track(&source, as_of, scope)
@@ -274,14 +262,14 @@ impl PyCovenantEngine {
         metrics: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let rows = extract_metric_frame(metrics)?;
-        let records = py.detach(|| {
-            let mut records = Vec::new();
-            for (as_of, pairs) in rows {
-                let source = HashMapMetricSource::from_pairs(pairs);
-                let reports = self.inner.evaluate(&source, as_of).map_err(core_to_py)?;
-                for (key, report) in reports {
-                    records.push(serde_json::json!({
-                        "as_of": as_of.to_string(),
+        let evaluated = py.detach(|| self.inner.evaluate_series(&rows).map_err(core_to_py))?;
+        let records: Vec<serde_json::Value> = evaluated
+            .into_iter()
+            .flat_map(|dated| {
+                let as_of = dated.as_of.to_string();
+                dated.reports.into_iter().map(move |(key, report)| {
+                    serde_json::json!({
+                        "as_of": as_of,
                         "covenant": key,
                         "covenant_type": report.covenant_type,
                         "passed": report.passed,
@@ -289,11 +277,10 @@ impl PyCovenantEngine {
                         "threshold": report.threshold,
                         "headroom": report.headroom,
                         "details": report.details,
-                    }));
-                }
-            }
-            Ok::<_, PyErr>(records)
-        })?;
+                    })
+                })
+            })
+            .collect();
         serde_rows_to_dataframe_with_schema(py, &records, &SERIES_COLUMNS)
     }
 

@@ -98,8 +98,16 @@ pub(super) fn fade_to_target(
     match shape {
         "linear" => {
             for (i, period_id) in forecast_periods.iter().enumerate() {
-                let t = (i + 1) as f64;
-                results.insert(*period_id, base_value + (target - base_value) * t / n);
+                let weight = (i + 1) as f64 / n;
+                // Convex weights avoid overflowing target - base for finite
+                // endpoints with opposite signs.
+                let value = (1.0 - weight) * base_value + weight * target;
+                if !value.is_finite() {
+                    return Err(Error::forecast(format!(
+                        "FadeToTarget linear forecast produced a non-finite value at period {period_id:?}"
+                    )));
+                }
+                results.insert(*period_id, value);
             }
         }
         "geometric" => {
@@ -140,7 +148,13 @@ pub(super) fn fade_to_target(
             }
             for (i, period_id) in forecast_periods.iter().enumerate() {
                 let t = (i + 1) as f64;
-                let value = target + (base_value - target) * (-t / half_life).exp2();
+                let weight = (-t / half_life).exp2();
+                let value = weight * base_value + (1.0 - weight) * target;
+                if !value.is_finite() {
+                    return Err(Error::forecast(format!(
+                        "FadeToTarget exponential forecast produced a non-finite value at period {period_id:?}"
+                    )));
+                }
                 results.insert(*period_id, value);
             }
         }

@@ -404,7 +404,7 @@ fn test_metrics_based_bond_attribution_without_carry_metrics_keeps_legacy_shape(
     );
 
     let mut scaled = attribution;
-    scaled.scale(0.5);
+    scaled.scale(0.5).expect("finite representable scale");
     let scaled_detail = scaled.carry_detail.expect("scaled carry detail");
     assert!((scaled_detail.total.amount() * 2.0 - detail.total.amount()).abs() < 1e-6);
 }

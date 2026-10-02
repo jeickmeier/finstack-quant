@@ -30,9 +30,7 @@ pub use types::{
 };
 pub use views::{
     flatten_position_pnls, flatten_square_matrix, parametric_es_decomposition_view,
-    parametric_var_decomposition_view, risk_budget_result_view, ParametricEsDecompositionView,
-    ParametricVarDecompositionView, PositionBudgetEntryView, PositionEsContributionView,
-    PositionVarContributionView, RiskBudgetResultView,
+    ParametricEsDecompositionView, PositionEsContributionView,
 };
 
 /// Snap tolerance used when deciding whether a floating-point tail-size

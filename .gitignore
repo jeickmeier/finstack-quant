@@ -61,9 +61,6 @@ pkg-node/
 node_modules/
 *.log
 
-# ts-rs default output (canonical location is finstack-quant-wasm/types/generated/)
-finstack-quant/**/bindings/
-
 # Jupyter
 .ipynb_checkpoints
 

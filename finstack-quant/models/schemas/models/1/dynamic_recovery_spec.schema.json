@@ -1,0 +1,121 @@
+{
+  "$defs": {
+    "RecoveryModel": {
+      "description": "Recovery model specification.",
+      "oneOf": [
+        {
+          "const": "constant",
+          "description": "Constant recovery (ignores notional changes).",
+          "type": "string"
+        },
+        {
+          "const": "inverse_linear",
+          "description": "`R(t) = R_0 * (N_0 / N(t))` -- direct proportional dilution.",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`R(t) = R_0 * (N_0 / N(t))^alpha`, `alpha in (0, 1]` -- softened decline.",
+          "properties": {
+            "inverse_power": {
+              "properties": {
+                "exponent": {
+                  "description": "Power exponent (`alpha`).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "exponent"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "inverse_power"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`R(t) = max(floor, R_0 * (N_0 / N(t)))`.",
+          "properties": {
+            "floored_inverse": {
+              "properties": {
+                "floor": {
+                  "description": "Minimum recovery rate floor.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "floor"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "floored_inverse"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "`R(t) = clamp(R_0 * (1 - beta * (N(t)/N_0 - 1)), floor, R_0)`.",
+          "properties": {
+            "linear_decline": {
+              "properties": {
+                "floor": {
+                  "description": "Minimum recovery rate floor.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "sensitivity": {
+                  "description": "Sensitivity of recovery to leverage increase (`beta`).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "sensitivity",
+                "floor"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "linear_decline"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/dynamic_recovery_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Specification for dynamic (notional-dependent) recovery rate.",
+  "properties": {
+    "base_notional": {
+      "description": "Base (reference) notional `N_0`.",
+      "format": "double",
+      "type": "number"
+    },
+    "base_recovery": {
+      "description": "Base (reference) recovery rate `R_0`.",
+      "format": "double",
+      "type": "number"
+    },
+    "model": {
+      "$ref": "#/$defs/RecoveryModel",
+      "description": "Recovery model governing the notional-to-recovery mapping."
+    }
+  },
+  "required": [
+    "base_recovery",
+    "base_notional",
+    "model"
+  ],
+  "title": "DynamicRecoverySpec",
+  "type": "object"
+}

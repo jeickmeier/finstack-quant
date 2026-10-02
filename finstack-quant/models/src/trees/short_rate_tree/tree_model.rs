@@ -27,7 +27,7 @@ impl ShortRateTree {
         oas: f64,
     ) -> Result<f64> {
         let steps = self.config.steps;
-        let dt = time_to_maturity / steps as f64;
+        let dt = self.time_steps[1] - self.time_steps[0];
         let comp = self.config.compounding;
         let oas_shift = oas / 10_000.0;
         let j_max = lattice.j_max;
@@ -66,7 +66,7 @@ impl ShortRateTree {
             } else {
                 usize::MAX
             };
-            let time_t = step as f64 * dt;
+            let time_t = self.time_steps[step];
 
             scratch.clear();
             for j in 0..num_nodes {
@@ -120,6 +120,7 @@ impl TreeModel for ShortRateTree {
             ));
         }
         self.validate_lattice_geometry()?;
+        let time_to_maturity = self.validate_pricing_horizon(time_to_maturity)?;
 
         if !initial_vars.contains_key(state_keys::INTEREST_RATE) {
             if let Some(&r0) = self.rates.first().and_then(|row| row.first()) {
@@ -161,7 +162,7 @@ impl TreeModel for ShortRateTree {
 
         let rates_clone2 = std::sync::Arc::clone(&self.rates);
         let compounding = self.config.compounding;
-        let dt_pricing = time_to_maturity / self.config.steps as f64;
+        let dt_pricing = self.time_steps[1] - self.time_steps[0];
         let rate_gen: Box<dyn Fn(usize, usize) -> f64> =
             Box::new(move |step: usize, node: usize| -> f64 {
                 let r = if step < rates_clone2.len() && node < rates_clone2[step].len() {

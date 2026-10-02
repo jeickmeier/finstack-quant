@@ -268,6 +268,49 @@ pub enum ErrorKind {
     Computation,
 }
 
+impl ErrorKind {
+    /// The host-facing label of this kind: `"not_found"`, `"validation"` or
+    /// `"computation"` (the same strings serde emits).
+    ///
+    /// Bindings expose it verbatim (the WASM error `kind` property); a host may
+    /// add its own labels for host-only failures, such as the WASM
+    /// `"invalid_type"` for a wrong JavaScript argument type, which never
+    /// reaches Rust and is not an `ErrorKind`.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            ErrorKind::NotFound => "not_found",
+            ErrorKind::Validation => "validation",
+            ErrorKind::Computation => "computation",
+        }
+    }
+}
+
+/// Format an error and its full `source()` chain as one message.
+///
+/// Levels are joined with `": "` (the `anyhow` convention); a cause whose text
+/// the previous level already ends with is skipped, so wrappers that embed
+/// their cause's message are not repeated. Bindings use this to carry the whole
+/// diagnostic context into host exceptions, which hold only a message.
+///
+/// # Arguments
+///
+/// * `err` - The outermost error; its `source()` chain is followed to the end.
+#[must_use]
+pub fn format_chain(err: &(dyn std::error::Error + 'static)) -> String {
+    let mut out = err.to_string();
+    let mut source = err.source();
+    while let Some(cause) = source {
+        let message = cause.to_string();
+        if !out.ends_with(&message) {
+            out.push_str(": ");
+            out.push_str(&message);
+        }
+        source = cause.source();
+    }
+    out
+}
+
 impl Error {
     /// Classify this error for host-language exception mapping.
     ///
@@ -445,6 +488,35 @@ impl Error {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn error_kind_labels_match_serde() {
+        for kind in [
+            ErrorKind::NotFound,
+            ErrorKind::Validation,
+            ErrorKind::Computation,
+        ] {
+            assert_eq!(
+                serde_json::to_value(kind).expect("kind serializes"),
+                serde_json::Value::String(kind.as_str().to_string())
+            );
+        }
+    }
+
+    #[test]
+    fn format_chain_joins_sources_without_repeating_embedded_text() {
+        #[derive(Debug, thiserror::Error)]
+        #[error("outer")]
+        struct Outer(#[source] Error);
+        let chain = format_chain(&Outer(Error::Validation("bad".to_string())));
+        assert_eq!(chain, "outer: Validation error: bad");
+
+        #[derive(Debug, thiserror::Error)]
+        #[error("wrapped: {0}")]
+        struct Embedding(#[source] Error);
+        let chain = format_chain(&Embedding(Error::Validation("bad".to_string())));
+        assert_eq!(chain, "wrapped: Validation error: bad");
+    }
 
     #[test]
     fn test_display() {

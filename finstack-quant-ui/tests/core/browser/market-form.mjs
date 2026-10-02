@@ -75,7 +75,7 @@ try {
     .getByRole("button", { name: "Original", exact: true })
     .click();
   const marketJson = await marketView.locator("pre").textContent();
-  const handle = new native.Market(marketJson);
+  const handle = native.MarketContext.fromJson(marketJson);
   try {
     assert.equal(handle.toJson(), marketJson);
   } finally {

@@ -81,7 +81,8 @@ fn delta_surface_5pt() -> FxDeltaVolSurface {
         ATM.to_vec(),
         RR25.to_vec(),
         BF25.to_vec(),
-        Some((RR10.to_vec(), BF10.to_vec())),
+        Some(RR10.to_vec()),
+        Some(BF10.to_vec()),
     )
     .expect("5-point delta surface should build")
 }

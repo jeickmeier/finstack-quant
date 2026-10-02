@@ -17,8 +17,8 @@
 //!
 //! let mut cfg = FinstackConfig::default();
 //! cfg.rounding.mode = RoundingMode::AwayFromZero;
-//! cfg.rounding.output_scale.overrides.insert(Currency::JPY, 0);
-//! cfg.rounding.ingest_scale.overrides.insert(Currency::JPY, 0);
+//! cfg.rounding.output_scale.set_scale(Currency::JPY, 0).expect("valid decimal scale");
+//! cfg.rounding.ingest_scale.set_scale(Currency::JPY, 0).expect("valid decimal scale");
 //!
 //! let usd_scale = cfg.output_scale(Currency::USD);
 //! let jpy_ingest = cfg.ingest_scale(Currency::JPY);
@@ -83,18 +83,17 @@ impl std::fmt::Display for RoundingMode {
     }
 }
 
+/// Parse the exact serde name (`"bankers"`, `"away_from_zero"`,
+/// `"toward_zero"`, `"floor"`, `"ceil"`; case-sensitive).
+///
+/// Delegates to [`crate::wire::serde_parse`], so the serde names are the only
+/// spelling table and a new variant is accepted by `FromStr`, serde and every
+/// host binding at once.
 impl std::str::FromStr for RoundingMode {
-    type Err = String;
+    type Err = crate::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "bankers" => Ok(Self::Bankers),
-            "away_from_zero" => Ok(Self::AwayFromZero),
-            "toward_zero" => Ok(Self::TowardZero),
-            "floor" => Ok(Self::Floor),
-            "ceil" => Ok(Self::Ceil),
-            _ => Err(format!("unknown rounding mode {s:?}")),
-        }
+    fn from_str(s: &str) -> crate::Result<Self> {
+        crate::wire::serde_parse(s)
     }
 }
 
@@ -111,7 +110,7 @@ impl std::str::FromStr for RoundingMode {
 ///
 /// let mut cfg = FinstackConfig::default();
 /// cfg.rounding.mode = RoundingMode::Bankers;
-/// cfg.rounding.output_scale.overrides.insert(Currency::CHF, 2);
+/// cfg.rounding.output_scale.set_scale(Currency::CHF, 2).expect("valid decimal scale");
 /// assert_eq!(cfg.output_scale(Currency::CHF), 2);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -248,17 +247,88 @@ impl ConfigExtensions {
 /// use std::collections::BTreeMap;
 ///
 /// let mut cfg = FinstackConfig::default();
-/// cfg.rounding.output_scale = CurrencyScalePolicy {
-///     overrides: BTreeMap::from([(Currency::KWD, 3)]),
-/// };
+/// cfg.rounding.output_scale = CurrencyScalePolicy::new(
+///     BTreeMap::from([(Currency::KWD, 3)]),
+/// ).expect("supported decimal scale");
 ///
 /// assert_eq!(cfg.output_scale(Currency::KWD), 3);
 /// ```
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CurrencyScalePolicy {
-    /// Explicit currency overrides for scale.
-    pub overrides: BTreeMap<crate::currency::Currency, u32>,
+    /// Explicit currency overrides, each within Decimal's supported 0..=28 scale.
+    #[serde(deserialize_with = "deserialize_currency_scales")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(extend("additionalProperties" = {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 28
+        }))
+    )]
+    overrides: BTreeMap<crate::currency::Currency, u32>,
+}
+
+impl CurrencyScalePolicy {
+    /// Create a policy from validated decimal-place overrides.
+    ///
+    /// # Arguments
+    ///
+    /// * `overrides` - Owned map of currency codes to decimal places in `0..=28`.
+    ///   Missing currencies retain the ingest or output policy's default scale.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when a scale exceeds Decimal's precision limit.
+    pub fn new(overrides: BTreeMap<crate::currency::Currency, u32>) -> crate::Result<Self> {
+        for (&ccy, &scale) in &overrides {
+            validate_currency_scale(ccy, scale)?;
+        }
+        Ok(Self { overrides })
+    }
+
+    /// Set a currency's decimal places, leaving the policy unchanged on error.
+    ///
+    /// # Arguments
+    ///
+    /// * `ccy` - Currency whose ingest or output decimal-place override is replaced.
+    /// * `scale` - Number of decimal places in `0..=28`, matching Decimal's range.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `scale` exceeds 28.
+    pub fn set_scale(&mut self, ccy: crate::currency::Currency, scale: u32) -> crate::Result<()> {
+        validate_currency_scale(ccy, scale)?;
+        self.overrides.insert(ccy, scale);
+        Ok(())
+    }
+
+    /// Borrow the validated overrides without allowing unvalidated mutation.
+    pub fn get_overrides(&self) -> &BTreeMap<crate::currency::Currency, u32> {
+        &self.overrides
+    }
+}
+
+fn validate_currency_scale(ccy: crate::currency::Currency, scale: u32) -> crate::Result<()> {
+    if scale > rust_decimal::Decimal::MAX_SCALE {
+        return Err(crate::Error::Validation(format!(
+            "decimal scale for {ccy} must be in 0..=28, got {scale}"
+        )));
+    }
+    Ok(())
+}
+
+fn deserialize_currency_scales<'de, D>(
+    deserializer: D,
+) -> Result<BTreeMap<crate::currency::Currency, u32>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let overrides = BTreeMap::deserialize(deserializer)?;
+    CurrencyScalePolicy::new(overrides)
+        .map(|policy| policy.overrides)
+        .map_err(serde::de::Error::custom)
 }
 
 /// Full rounding policy used at IO boundaries and normalization steps.
@@ -406,10 +476,28 @@ impl Default for ToleranceConfig {
 pub struct RoundingContext {
     /// Active rounding mode.
     pub mode: RoundingMode,
-    /// Ingest scale map snapshot by currency code.
-    pub ingest_scale_by_currency: BTreeMap<crate::currency::Currency, u32>,
-    /// Output scale map snapshot by currency code.
-    pub output_scale_by_currency: BTreeMap<crate::currency::Currency, u32>,
+    /// Validated ingest scale snapshot by currency code, with values in `0..=28`.
+    #[serde(deserialize_with = "deserialize_currency_scales")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(extend("additionalProperties" = {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 28
+        }))
+    )]
+    ingest_scale_by_currency: BTreeMap<crate::currency::Currency, u32>,
+    /// Validated output scale snapshot by currency code, with values in `0..=28`.
+    #[serde(deserialize_with = "deserialize_currency_scales")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(extend("additionalProperties" = {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 28
+        }))
+    )]
+    output_scale_by_currency: BTreeMap<crate::currency::Currency, u32>,
     /// Tolerance settings snapshot for floating-point comparisons.
     #[serde(default)]
     pub tolerances: ToleranceConfig,
@@ -437,6 +525,16 @@ impl Default for RoundingContext {
 }
 
 impl RoundingContext {
+    /// Borrow the validated ingest overrides captured by this rounding snapshot.
+    pub fn get_ingest_scale_by_currency(&self) -> &BTreeMap<crate::currency::Currency, u32> {
+        &self.ingest_scale_by_currency
+    }
+
+    /// Borrow the validated output overrides captured by this rounding snapshot.
+    pub fn get_output_scale_by_currency(&self) -> &BTreeMap<crate::currency::Currency, u32> {
+        &self.output_scale_by_currency
+    }
+
     /// Effective output scale for the provided currency within this context.
     #[inline]
     pub fn output_scale(&self, ccy: crate::currency::Currency) -> u32 {
@@ -787,7 +885,18 @@ mod tests {
                 matches!(label.parse::<RoundingMode>(), Ok(value) if value == *mode),
                 "roundtrip failed for {label}"
             );
+            // Display, FromStr and serde share one spelling table.
+            assert_eq!(crate::wire::serde_label(mode).expect("serde label"), label);
         }
+    }
+
+    #[test]
+    fn rounding_mode_from_str_error_names_the_input() {
+        let err = "BANKERS"
+            .parse::<RoundingMode>()
+            .expect_err("case-sensitive");
+        assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+        assert!(err.to_string().contains("\"BANKERS\""), "{err}");
     }
 
     #[test]

@@ -13,6 +13,7 @@ use super::metadata::ProcessMetadata;
 
 /// Parameters for a multi-dimensional Ornstein-Uhlenbeck process.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MultiOuParams {
     /// Mean-reversion speeds `κ_i` per year.
     pub kappas: Vec<f64>,

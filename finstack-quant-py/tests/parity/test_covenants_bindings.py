@@ -437,3 +437,26 @@ def test_forecast_scope_and_mc_boundaries() -> None:
         covenants.forecast_breaches(
             engine, frame, covenants.CovenantForecastConfig(stochastic=True, volatility=0.2, num_paths=1)
         )
+
+
+@pytest.mark.parametrize(
+    ("metrics", "message"),
+    [
+        ('{"debt_to_ebitda": true}', "Validation error: Metric 'debt_to_ebitda' must be a finite JSON number"),
+        ("[1,2]", "Validation error: Invalid metric map JSON: invalid type: sequence"),
+    ],
+)
+def test_json_metric_map_errors_come_from_the_rust_parser(metrics: str, message: str) -> None:
+    """A JSON metric map is parsed only by Rust ``HashMapMetricSource::from_json``.
+
+    The messages are the ones WASM ``evaluateEngine`` throws for the same input.
+    """
+    specs = json.loads(covenants.lbo_standard_json(5.0, 1.5, 1.2, 10_000_000.0))
+    engine_json = _engine_json(specs[0])
+    with pytest.raises(ValueError, match=r"^Validation error: ") as from_function:
+        covenants.evaluate_engine(engine_json, metrics, "2026-03-31")
+    assert str(from_function.value).startswith(message)
+    engine = covenants.CovenantEngine.from_json(engine_json)
+    with pytest.raises(ValueError, match=r"^Validation error: ") as from_method:
+        engine.evaluate(metrics, "2026-03-31")
+    assert str(from_method.value) == str(from_function.value)

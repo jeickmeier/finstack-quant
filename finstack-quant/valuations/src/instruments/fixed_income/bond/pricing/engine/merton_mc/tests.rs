@@ -140,7 +140,8 @@ fn toggle_price_between_cash_and_pik() {
         CreditStateVariable::HazardRate,
         0.10,
         ThresholdDirection::Above,
-    );
+    )
+    .expect("finite threshold");
     let config_cash =
         MertonMcConfig::new(test_merton(), 0.40).expect("0.40 recovery should be valid");
     let config_cash_run = MertonMcRun {
@@ -461,7 +462,8 @@ fn toggle_window_then_cash() {
         CreditStateVariable::HazardRate,
         0.10,
         ThresholdDirection::Above,
-    );
+    )
+    .expect("finite threshold");
     let config = MertonMcConfig::new(test_merton(), 0.40)
         .expect("0.40 recovery should be valid")
         .pik_schedule(PikSchedule::Stepped(vec![

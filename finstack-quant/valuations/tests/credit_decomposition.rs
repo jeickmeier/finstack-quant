@@ -10,9 +10,10 @@ use finstack_quant_models::factor::credit::decomposition::{
     decompose_levels, decompose_period, DecompositionError, LevelsAtDate,
 };
 use finstack_quant_models::factor::credit::hierarchy::{
-    AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
-    FactorCorrelationMatrix, FoldUpRecord, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
-    IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
+    AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec,
+    DateRange, FactorCorrelationMatrix, FoldUpRecord, GenericFactorSpec, HierarchyDimension,
+    IssuerBetaMode, IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor,
+    VolState,
 };
 use finstack_quant_models::factor::{
     FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
@@ -67,7 +68,7 @@ fn base_model(levels: Vec<HierarchyDimension>) -> CreditFactorModel {
             idiosyncratic: BTreeMap::new(),
         },
         factor_histories: None,
-        diagnostics: CalibrationDiagnostics {
+        diagnostics: CreditCalibrationDiagnostics {
             mode_counts: BTreeMap::new(),
             bucket_sizes_per_level: vec![],
             fold_ups: vec![],

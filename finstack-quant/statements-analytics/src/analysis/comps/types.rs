@@ -11,6 +11,7 @@ use std::str::FromStr;
 
 /// Opaque company identifier within a peer set.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CompanyId(pub String);
 
 impl CompanyId {
@@ -33,6 +34,7 @@ impl fmt::Display for CompanyId {
 
 /// Time basis for computing a valuation multiple.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum PeriodBasis {
     /// Last twelve months (trailing).
@@ -49,6 +51,7 @@ pub enum PeriodBasis {
 /// use market capitalization or share price. Credit multiples use spread
 /// or yield as the numerator and a fundamental metric as denominator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum Multiple {
     /// EV / EBITDA
@@ -151,6 +154,7 @@ impl FromStr for Multiple {
 /// a `PeerSet`. Currency normalization is the caller's responsibility.
 /// Ratios are plain scalars (e.g., `6.5` means 6.5x leverage).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CompanyMetrics {
     /// Company identifier.
     pub id: CompanyId,
@@ -263,6 +267,23 @@ impl CompanyMetrics {
         ebitda_margin,
     );
 
+    /// Look up a metric by name: a canonical named field first, then a custom metric.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - Exact snake_case canonical field name (for example
+    ///   `"ebitda"` or `"leverage"`) or the key of an entry in
+    ///   [`custom`](Self::custom).
+    ///
+    /// # Returns
+    ///
+    /// The metric value in its own units, or `None` when the name is neither
+    /// a populated canonical field nor a custom metric.
+    pub fn get(&self, name: &str) -> Option<f64> {
+        self.named_metric(name)
+            .or_else(|| self.custom.get(name).copied())
+    }
+
     /// Create a new `CompanyMetrics` with only the company ID set.
     /// All other fields default to `None` / empty.
     pub fn new(id: impl Into<String>) -> Self {
@@ -294,22 +315,46 @@ impl CompanyMetrics {
     /// Construct metrics from a flat host-language field map.
     ///
     /// Canonical named fields populate their dedicated slots. Unknown names
-    /// are retained in [`CompanyMetrics::custom`].
+    /// are retained in [`CompanyMetrics::custom`]. A `None` value means the
+    /// metric is missing and leaves its slot empty, exactly as if the name
+    /// were absent, so hosts can pass `null` / `None` for unknown figures.
     ///
     /// # Arguments
     ///
     /// * `id` - Company identifier stored on the resulting record.
-    /// * `values` - Flat snake_case metric names and finite or non-finite
-    ///   numeric values supplied by the caller. Numeric validation remains the
-    ///   responsibility of the consuming analysis.
+    /// * `values` - Flat snake_case metric names with `Some(value)` for a
+    ///   supplied figure (finite or non-finite; numeric validation remains the
+    ///   responsibility of the consuming analysis) or `None` for a missing
+    ///   one.
     pub fn from_flat_metrics(
         id: impl Into<String>,
-        values: impl IntoIterator<Item = (String, f64)>,
+        values: impl IntoIterator<Item = (String, Option<f64>)>,
     ) -> Self {
         let mut metrics = Self::new(id);
         for (name, value) in values {
-            metrics.insert_flat_metric(name, value);
+            if let Some(value) = value {
+                metrics.insert_flat_metric(name, value);
+            }
         }
         metrics
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_reads_named_fields_before_custom_metrics() {
+        let mut metrics = CompanyMetrics::new("ACME");
+        metrics.ebitda = Some(100.0);
+        metrics.custom.insert("rule_of_40".to_string(), 42.0);
+        // A custom entry never shadows a canonical field of the same name.
+        metrics.custom.insert("ebitda".to_string(), 1.0);
+
+        assert_eq!(metrics.get("ebitda"), Some(100.0));
+        assert_eq!(metrics.get("rule_of_40"), Some(42.0));
+        assert_eq!(metrics.get("leverage"), None);
+        assert_eq!(metrics.get("unknown"), None);
     }
 }

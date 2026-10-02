@@ -1,0 +1,33 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/liquidity_tier.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Liquidity tier classification based on days-to-liquidate.",
+  "oneOf": [
+    {
+      "const": "tier1",
+      "description": "Tier 1: < 1 day to liquidate (highly liquid).",
+      "type": "string"
+    },
+    {
+      "const": "tier2",
+      "description": "Tier 2: 1-5 days to liquidate.",
+      "type": "string"
+    },
+    {
+      "const": "tier3",
+      "description": "Tier 3: 5-20 days to liquidate.",
+      "type": "string"
+    },
+    {
+      "const": "tier4",
+      "description": "Tier 4: 20-60 days to liquidate.",
+      "type": "string"
+    },
+    {
+      "const": "tier5",
+      "description": "Tier 5: > 60 days to liquidate (illiquid).",
+      "type": "string"
+    }
+  ],
+  "title": "LiquidityTier"
+}

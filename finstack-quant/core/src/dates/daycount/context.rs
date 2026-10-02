@@ -9,20 +9,25 @@ use crate::dates::{calendar_by_id_strict, HolidayCalendar, Tenor};
 /// Certain conventions require additional information:
 /// - `Bus/252` requires a holiday `calendar`.
 /// - `Act/Act (ISMA)` requires the coupon `frequency`.
+/// - `Act/365L` requires `frequency` and the enclosing `coupon_period`.
 #[derive(Clone, Copy, Default)]
 pub struct DayCountContext<'a> {
     /// Holiday calendar for business day conventions
     pub calendar: Option<&'a dyn HolidayCalendar>,
-    /// Payment frequency (required for ACT/ACT ISMA)
+    /// Payment frequency (required for ACT/ACT ISMA and ACT/365L).
     pub frequency: Option<Tenor>,
     /// Business day convention (required for Bus/252)
     pub bus_basis: Option<u16>,
-    /// Reference coupon period `(start, end)` for ACT/ACT ISMA.
+    /// Unadjusted regular reference coupon period for ACT/ACT ISMA, or the
+    /// enclosing contractual coupon period for ACT/365L, as `(start, end)`.
     ///
     /// When set, the ISMA year fraction uses this explicit reference period
     /// instead of re-anchoring from the accrual start date. Required for
     /// correct accrued interest calculations on mid-coupon dates or
-    /// irregular first/last coupons.
+    /// irregular first/last coupons. Its endpoints must share the nominal
+    /// month grid; adjusted payment dates are not ICMA reference boundaries.
+    /// ACT/365L requires the actual enclosing coupon boundaries for both
+    /// full and partial accrual, keeping its 365/366 denominator constant.
     pub coupon_period: Option<(Date, Date)>,
     /// Whether `end` is the instrument termination date.
     ///
@@ -30,7 +35,7 @@ pub struct DayCountContext<'a> {
     pub end_is_termination_date: bool,
 }
 
-/// Reject an ACT/ACT ICMA reference coupon period unless `start < end`.
+/// Reject coupon boundaries unless `start < end`.
 fn validate_coupon_period(start: Date, end: Date) -> crate::Result<()> {
     if start >= end {
         return Err(crate::Error::Validation(format!(
@@ -41,13 +46,15 @@ fn validate_coupon_period(start: Date, end: Date) -> crate::Result<()> {
 }
 
 impl<'a> DayCountContext<'a> {
-    /// Return a copy with a validated ACT/ACT ICMA reference coupon period.
+    /// Return a copy with validated coupon boundaries for ACT/ACT ICMA or ACT/365L.
     ///
     /// # Arguments
     ///
-    /// * `start` - Inclusive start of the reference coupon period.
-    /// * `end` - Exclusive end of the reference coupon period; must be after
-    ///   `start`.
+    /// * `start` - Inclusive start: the unadjusted regular reference start for
+    ///   ICMA, or the actual contractual coupon start for ACT/365L.
+    /// * `end` - Exclusive end: the unadjusted regular reference end for ICMA,
+    ///   or the actual contractual coupon end for ACT/365L. Must be after
+    ///   `start`; ICMA reference endpoints must share one nominal month grid.
     ///
     /// # Errors
     ///
@@ -71,25 +78,28 @@ impl<'a> std::fmt::Debug for DayCountContext<'a> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 /// Serializable snapshot of [`DayCountContext`] state for persistence and interchange.
 ///
 /// This struct captures the optional context parameters (calendar, frequency, business-day basis)
 /// needed to reconstruct a [`DayCountContext`] at runtime using the built-in calendar lookup.
+/// `Default` is the empty context (no calendar, frequency, basis or coupon
+/// period; `end_is_termination_date = false`), the snapshot of
+/// [`DayCountContext::default`].
 pub struct DayCountContextState {
     /// Optional calendar code (e.g. "target2").
     pub calendar_id: Option<String>,
-    /// Optional coupon frequency for Act/Act ISMA.
+    /// Optional coupon frequency, required for ACT/ACT ISMA and ACT/365L.
     pub frequency: Option<Tenor>,
     /// Optional custom business-day divisor (defaults to 252 when `None`).
     pub bus_basis: Option<u16>,
-    /// Optional reference coupon period `(start, end)` for ACT/ACT ISMA,
-    /// serialized as two ISO dates.
+    /// Optional unadjusted regular ICMA reference period or ACT/365L enclosing
+    /// coupon `(start, end)`, serialized as two ISO dates.
     ///
     /// Required for exact ICMA accrual on round-trip. `None` selects the
-    /// frequency-only calculation path.
+    /// frequency-only ICMA calculation path; ACT/365L requires these dates.
     #[serde(default, with = "crate::wire::optional_date_pair")]
     #[cfg_attr(
         feature = "json-schema",
@@ -113,18 +123,19 @@ impl DayCountContextState {
     ///
     /// * `calendar_id` - Optional registered holiday-calendar id (for example
     ///   `"usny"`), required by `Bus/252`.
-    /// * `frequency` - Optional coupon frequency used by ACT/ACT ICMA.
-    /// * `bus_basis` - Optional business-day divisor for `Bus/252`; `None`
-    ///   selects 252.
-    /// * `coupon_period` - Optional `(start, end)` ACT/ACT ICMA reference
-    ///   period; `start` must precede `end`.
+    /// * `frequency` - Coupon frequency required by ACT/ACT ICMA and ACT/365L.
+    /// * `bus_basis` - Optional business-day divisor for `Bus/252`, a positive
+    ///   count of business days per year; `None` selects 252.
+    /// * `coupon_period` - Optional `(start, end)` unadjusted regular ACT/ACT ICMA
+    ///   reference period or ACT/365L enclosing coupon; `start` must precede
+    ///   `end`. ICMA validates the nominal month grid at calculation time.
     /// * `end_is_termination_date` - Whether the accrual end is the
     ///   instrument termination date (30E/360 ISDA February rule).
     ///
     /// # Errors
     ///
     /// Returns `Error::Validation` when `coupon_period` is not strictly
-    /// increasing.
+    /// increasing, and `InputError::InvalidBusBasis` when `bus_basis` is zero.
     pub fn try_new(
         calendar_id: Option<String>,
         frequency: Option<Tenor>,
@@ -134,6 +145,9 @@ impl DayCountContextState {
     ) -> crate::Result<Self> {
         if let Some((start, end)) = coupon_period {
             validate_coupon_period(start, end)?;
+        }
+        if bus_basis == Some(0) {
+            return Err(crate::error::InputError::InvalidBusBasis { basis: 0 }.into());
         }
         Ok(Self {
             calendar_id,
@@ -190,6 +204,14 @@ mod tests {
     use time::macros::date;
 
     #[test]
+    fn default_state_is_the_default_context_snapshot() {
+        assert_eq!(
+            DayCountContextState::default(),
+            DayCountContextState::from(DayCountContext::default())
+        );
+    }
+
+    #[test]
     fn try_new_rejects_inverted_coupon_period() {
         let err = DayCountContextState::try_new(
             None,
@@ -211,6 +233,14 @@ mod tests {
             false,
         )
         .is_ok());
+    }
+
+    #[test]
+    fn try_new_rejects_a_zero_bus_basis() {
+        let err = DayCountContextState::try_new(None, None, Some(0), None, false)
+            .expect_err("a zero Bus/252 divisor must be rejected at construction");
+        assert!(err.to_string().contains("Invalid Bus/252 basis"), "{err}");
+        assert!(DayCountContextState::try_new(None, None, Some(252), None, false).is_ok());
     }
 
     #[test]

@@ -10,7 +10,7 @@ use finstack_quant_statements_analytics::analysis::goal_seek::goal_seek;
 #[test]
 fn test_goal_seek_simple_linear() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let mut model = ModelBuilder::new("test")
+    let model = ModelBuilder::new("test")
         .periods("2025Q1..Q1", None)
         .expect("valid period")
         .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
@@ -22,7 +22,7 @@ fn test_goal_seek_simple_linear() {
         .expect("valid model");
 
     let solved = goal_seek(
-        &mut model,
+        &model,
         "net_income",
         period,
         20_000.0,
@@ -33,13 +33,17 @@ fn test_goal_seek_simple_linear() {
     )
     .expect("goal seek should succeed");
 
-    assert!((solved - 133_333.33).abs() < 1.0);
+    assert!((solved.solved_value - 133_333.33).abs() < 1.0);
+    assert!(
+        solved.model.is_none(),
+        "update_model=false returns no model"
+    );
 }
 
 #[test]
 fn test_goal_seek_with_update() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let mut model = ModelBuilder::new("test")
+    let model = ModelBuilder::new("test")
         .periods("2025Q1..Q1", None)
         .expect("valid period")
         .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
@@ -51,7 +55,7 @@ fn test_goal_seek_with_update() {
         .expect("valid model");
 
     let solved = goal_seek(
-        &mut model,
+        &model,
         "gross_profit",
         period,
         50_000.0,
@@ -62,8 +66,16 @@ fn test_goal_seek_with_update() {
     )
     .expect("goal seek should succeed");
 
-    assert!((solved - 125_000.0).abs() < 1.0);
+    assert!((solved.solved_value - 125_000.0).abs() < 1.0);
 
+    // The input model is untouched; the solved copy carries the new driver.
+    let original = model
+        .get_node("revenue")
+        .and_then(|node| node.values.as_ref())
+        .and_then(|values| values.get(&period))
+        .expect("original value");
+    assert!(matches!(original, AmountOrScalar::Scalar(s) if (*s - 100_000.0).abs() < 1e-9));
+    let model = solved.model.expect("update_model=true returns the model");
     let node = model.get_node("revenue").expect("node should exist");
     let value = node
         .values
@@ -84,7 +96,7 @@ fn test_goal_seek_interest_coverage() {
     let q1 = PeriodId::quarter(2025, 1).expect("valid period fixture");
     let q4 = PeriodId::quarter(2025, 4).expect("valid period fixture");
 
-    let mut model = ModelBuilder::new("test")
+    let model = ModelBuilder::new("test")
         .periods("2025Q1..Q4", None)
         .expect("valid period range")
         .value("revenue", &[(q1, AmountOrScalar::scalar(100_000.0))])
@@ -99,7 +111,7 @@ fn test_goal_seek_interest_coverage() {
         .expect("valid model");
 
     let solved = goal_seek(
-        &mut model,
+        &model,
         "interest_coverage",
         q4,
         2.0,
@@ -110,8 +122,9 @@ fn test_goal_seek_interest_coverage() {
     )
     .expect("goal seek should succeed");
 
-    assert!((solved - 66_666.67).abs() < 1.0);
+    assert!((solved.solved_value - 66_666.67).abs() < 1.0);
 
+    let model = solved.model.expect("update_model=true returns the model");
     let mut evaluator = Evaluator::new();
     let results = evaluator
         .evaluate(&model)
@@ -125,7 +138,7 @@ fn test_goal_seek_interest_coverage() {
 #[test]
 fn test_goal_seek_invalid_target_node() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let mut model = ModelBuilder::new("test")
+    let model = ModelBuilder::new("test")
         .periods("2025Q1..Q1", None)
         .expect("valid period")
         .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
@@ -133,7 +146,7 @@ fn test_goal_seek_invalid_target_node() {
         .expect("valid model");
 
     let result = goal_seek(
-        &mut model,
+        &model,
         "nonexistent",
         period,
         1000.0,
@@ -149,7 +162,7 @@ fn test_goal_seek_invalid_target_node() {
 #[test]
 fn test_goal_seek_invalid_driver_node() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let mut model = ModelBuilder::new("test")
+    let model = ModelBuilder::new("test")
         .periods("2025Q1..Q1", None)
         .expect("valid period")
         .value("revenue", &[(period, AmountOrScalar::scalar(100_000.0))])
@@ -157,7 +170,7 @@ fn test_goal_seek_invalid_driver_node() {
         .expect("valid model");
 
     let result = goal_seek(
-        &mut model,
+        &model,
         "revenue",
         period,
         1000.0,
@@ -173,7 +186,7 @@ fn test_goal_seek_invalid_driver_node() {
 #[test]
 fn test_goal_seek_with_explicit_bounds() {
     let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
-    let mut model = ModelBuilder::new("bounds")
+    let model = ModelBuilder::new("bounds")
         .periods("2025Q1..Q1", None)
         .expect("valid period")
         .value("driver", &[(period, AmountOrScalar::scalar(0.0))])
@@ -183,7 +196,7 @@ fn test_goal_seek_with_explicit_bounds() {
         .expect("valid model");
 
     let solution = goal_seek(
-        &mut model,
+        &model,
         "target",
         period,
         0.75,
@@ -194,5 +207,42 @@ fn test_goal_seek_with_explicit_bounds() {
     )
     .expect("goal seek should succeed");
 
-    assert!((solution - 0.75).abs() < 1e-9);
+    assert!((solution.solved_value - 0.75).abs() < 1e-9);
+}
+
+/// The result's wire form always carries `model` (`null` when the model was
+/// not requested) and round-trips through serde, which both hosts rely on.
+#[test]
+fn test_goal_seek_result_wire_form() {
+    use finstack_quant_statements_analytics::analysis::GoalSeekResult;
+
+    let period = PeriodId::quarter(2025, 1).expect("valid period fixture");
+    let model = ModelBuilder::new("wire")
+        .periods("2025Q1..Q1", None)
+        .expect("valid period")
+        .value("revenue", &[(period, AmountOrScalar::scalar(100.0))])
+        .compute("profit", "revenue * 0.5")
+        .expect("valid formula")
+        .build()
+        .expect("valid model");
+
+    let bare = goal_seek(
+        &model, "profit", period, 60.0, "revenue", period, false, None,
+    )
+    .expect("goal seek should succeed");
+    let json = serde_json::to_value(&bare).expect("serialize");
+    assert_eq!(json["model"], serde_json::Value::Null);
+    assert!((json["solved_value"].as_f64().expect("number") - 120.0).abs() < 1e-6);
+
+    let updated = goal_seek(
+        &model, "profit", period, 60.0, "revenue", period, true, None,
+    )
+    .expect("goal seek should succeed");
+    let text = serde_json::to_string(&updated).expect("serialize");
+    let back: GoalSeekResult = serde_json::from_str(&text).expect("round trip");
+    assert!(back.model.is_some());
+    assert!(
+        serde_json::from_str::<GoalSeekResult>(r#"{"solved_value":1.0,"model":null,"x":1}"#)
+            .is_err()
+    );
 }

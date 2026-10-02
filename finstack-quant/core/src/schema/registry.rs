@@ -177,6 +177,7 @@ pub struct SchemaArtifact {
     /// Whether callers author this document, read it, or only reference it.
     pub kind: SchemaKind,
     generator: fn(&SchemaArtifact) -> Result<Value>,
+    type_name: fn() -> std::borrow::Cow<'static, str>,
     examples: fn() -> Result<Vec<Value>>,
     packager: fn(&mut Value) -> Result<()>,
 }
@@ -205,6 +206,7 @@ impl SchemaArtifact {
             summary: "",
             kind: SchemaKind::Component,
             generator: generate_artifact::<T>,
+            type_name: <T as JsonSchema>::schema_name,
             examples: empty_examples,
             packager: no_op_packager,
         }
@@ -274,6 +276,17 @@ impl SchemaArtifact {
         self
     }
 
+    /// Return the Rust type name of the root contract type.
+    ///
+    /// This is the `schemars` schema name of `T`: the same name the type
+    /// carries in `$defs` wherever another contract embeds it. Generated host
+    /// declarations (the WASM package's TypeScript types) name the root with it,
+    /// so a document's type keeps its Rust name rather than its display title.
+    #[must_use]
+    pub fn type_name(&self) -> std::borrow::Cow<'static, str> {
+        (self.type_name)()
+    }
+
     /// Render this artifact exactly as the checked-in file is written.
     ///
     /// This is the single rendering path: registry metadata, the packager, the
@@ -292,6 +305,95 @@ impl SchemaArtifact {
 
 pub(super) fn empty_examples() -> Result<Vec<Value>> {
     Ok(Vec::new())
+}
+
+/// Serialize one Rust value into the example list of a schema artifact.
+///
+/// This is the body of most [`SchemaArtifact::with_examples`] functions: build
+/// a value through the type's public constructors, then publish its serde
+/// form, so the example is a payload the contract itself produced.
+///
+/// # Arguments
+///
+/// * `value` - Contract value to publish. Every float in it must be finite:
+///   serde renders NaN and infinities as `null`, which no numeric schema
+///   accepts. Floats are published to twelve significant digits so the
+///   example is identical on every target.
+///
+/// # Errors
+///
+/// Returns [`Error::Internal`] naming the Rust type if serialization fails.
+pub fn example<T: serde::Serialize>(value: &T) -> Result<Vec<Value>> {
+    let mut payload = serde_json::to_value(value).map_err(|error| {
+        Error::Internal(format!(
+            "serialize {} schema example: {error}",
+            std::any::type_name::<T>()
+        ))
+    })?;
+    stabilize_floats(&mut payload);
+    Ok(vec![payload])
+}
+
+/// Significant decimal digits kept in a published example float.
+///
+/// Twelve is well inside `f64` precision, so authored inputs such as `0.0425`
+/// are unchanged, and far above the last-place differences between platform
+/// math libraries.
+const EXAMPLE_SIGNIFICANT_DIGITS: usize = 12;
+
+/// Round every float in an example to [`EXAMPLE_SIGNIFICANT_DIGITS`].
+///
+/// Examples computed by running an analytic go through `exp`, `ln` and `powf`,
+/// which differ in the last place between native targets and `wasm32`. The
+/// checked-in artifact and the schema each host serves must be byte-identical,
+/// so that noise is rounded away. Negative zero is published as zero.
+fn stabilize_floats(value: &mut Value) {
+    match value {
+        Value::Number(number) if number.is_f64() => {
+            let Some(raw) = number.as_f64() else { return };
+            let rounded = if matches!(raw.classify(), std::num::FpCategory::Zero) {
+                0.0
+            } else {
+                format!("{raw:.*e}", EXAMPLE_SIGNIFICANT_DIGITS - 1)
+                    .parse()
+                    .unwrap_or(raw)
+            };
+            if let Some(stable) = serde_json::Number::from_f64(rounded) {
+                *number = stable;
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(stabilize_floats),
+        Value::Object(fields) => fields.values_mut().for_each(stabilize_floats),
+        _ => {}
+    }
+}
+
+/// Publish a literal JSON payload as an example after a serde round trip.
+///
+/// For contracts with no convenient public constructor - result rows a pricer
+/// would otherwise have to run to produce. Deserializing into `T` proves the
+/// payload is one the contract accepts; re-serializing publishes the canonical
+/// spelling, with defaulted fields filled in.
+///
+/// # Arguments
+///
+/// * `payload` - JSON literal in the serde shape of `T`, with finite numbers
+///   and ISO-8601 dates.
+///
+/// # Errors
+///
+/// Returns [`Error::Internal`] naming the Rust type if the payload does not
+/// deserialize into `T` or the value does not serialize back.
+pub fn example_from_json<T: serde::Serialize + serde::de::DeserializeOwned>(
+    payload: Value,
+) -> Result<Vec<Value>> {
+    let value: T = serde_json::from_value(payload).map_err(|error| {
+        Error::Internal(format!(
+            "deserialize {} schema example: {error}",
+            std::any::type_name::<T>()
+        ))
+    })?;
+    example(&value)
 }
 
 pub(super) fn no_op_packager(_: &mut Value) -> Result<()> {
@@ -399,7 +501,8 @@ pub(super) fn generate_artifact<T: SerdeSchema>(artifact: &SchemaArtifact) -> Re
 ///
 /// # Errors
 ///
-/// Returns an error when no entry matches the selector.
+/// Returns `InputError::NotFound` (a not-found error) when no entry matches
+/// the selector.
 pub fn find_schema_artifact<'a>(
     artifacts: impl IntoIterator<Item = &'a SchemaArtifact>,
     selector: &str,
@@ -413,8 +516,8 @@ pub fn find_schema_artifact<'a>(
                 || artifact.relative_path.ends_with(&anchored)
         })
         .ok_or_else(|| {
-            Error::Internal(format!(
-                "no schema matches {selector:?}; call index() for published artifacts"
-            ))
+            Error::Input(crate::error::InputError::NotFound {
+                id: format!("schema {selector:?} (call index() for published artifacts)"),
+            })
         })
 }

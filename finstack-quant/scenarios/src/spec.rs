@@ -154,9 +154,10 @@ impl ScenarioSpec {
     /// ascending priority, returning an error at compose time when the
     /// concatenated operations would be rejected at apply time.
     ///
-    /// Composition rejects scenarios with different [`HazardBumpMode`] values
-    /// and scenarios that together contain more than one
-    /// [`OperationSpec::TimeRollForward`].
+    /// Every input is validated first (see [`ScenarioSpec::validate`]), so
+    /// the composed spec is built only from valid scenarios. Composition then
+    /// rejects scenarios with different [`HazardBumpMode`] values and scenarios
+    /// that together contain more than one [`OperationSpec::TimeRollForward`].
     ///
     /// # Arguments
     ///
@@ -166,11 +167,20 @@ impl ScenarioSpec {
     ///
     /// # Errors
     ///
-    /// Returns a validation error if `scenarios` contain conflicting
-    /// `hazard_bump_mode` values or more than one time-roll operation. Other
-    /// conflicts remain in the composed spec and are validated when
-    /// [`crate::engine::ScenarioEngine::apply`] is called.
+    /// Returns a validation error, prefixed with the offending scenario id,
+    /// when any input fails [`ScenarioSpec::validate`] (blank id, invalid or
+    /// non-finite operation fields, more than one time roll), and a validation
+    /// error when `scenarios` contain conflicting `hazard_bump_mode` values or
+    /// together contain more than one time-roll operation.
     pub fn compose(mut scenarios: Vec<ScenarioSpec>) -> crate::Result<Self> {
+        for scenario in &scenarios {
+            scenario.validate().map_err(|error| {
+                crate::error::Error::validation(format!(
+                    "Cannot compose scenario '{}': {error}",
+                    scenario.id
+                ))
+            })?;
+        }
         if let Some(first) = scenarios.first() {
             if let Some(conflicting) = scenarios
                 .iter()
@@ -671,7 +681,8 @@ pub enum OperationSpec {
     StmtForecastAssign {
         /// Statement node identifier.
         node_id: NodeId,
-        /// Absolute value to assign.
+        /// Finite absolute value in the node's units; monetary nodes retain
+        /// their currency and interpret this as major currency units.
         value: f64,
     },
 
@@ -925,6 +936,49 @@ pub enum OperationSpec {
 }
 
 impl OperationSpec {
+    /// Build a [`OperationSpec::TimeRollForward`] with the wire defaults for
+    /// omitted fields.
+    ///
+    /// The host bindings call this so an omitted `apply_shocks` / `roll_mode`
+    /// resolves exactly as it does when the field is absent from JSON.
+    ///
+    /// # Arguments
+    ///
+    /// * `period` - Tenor-style roll period such as `"1D"`, `"1W"`, `"1M"` or
+    ///   `"1Y"`. Stored verbatim; [`OperationSpec::validate`] parses it.
+    /// * `apply_shocks` - Whether the engine applies the scenario's remaining
+    ///   operations after the roll. `None` uses the serde default, `true`.
+    /// * `roll_mode` - Calendar-vs-business-day semantics of the roll. `None`
+    ///   uses [`TimeRollMode::default`] ([`TimeRollMode::BusinessDays`]).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_scenarios::{OperationSpec, TimeRollMode};
+    ///
+    /// let op = OperationSpec::time_roll_forward("1M", None, None);
+    /// assert_eq!(
+    ///     op,
+    ///     OperationSpec::TimeRollForward {
+    ///         period: "1M".into(),
+    ///         apply_shocks: true,
+    ///         roll_mode: TimeRollMode::BusinessDays,
+    ///     }
+    /// );
+    /// ```
+    #[must_use]
+    pub fn time_roll_forward(
+        period: impl Into<String>,
+        apply_shocks: Option<bool>,
+        roll_mode: Option<TimeRollMode>,
+    ) -> Self {
+        Self::TimeRollForward {
+            period: period.into(),
+            apply_shocks: apply_shocks.unwrap_or_else(default_true),
+            roll_mode: roll_mode.unwrap_or_default(),
+        }
+    }
+
     /// Whether this operation needs instrument access during application.
     ///
     /// # Returns
@@ -1086,7 +1140,8 @@ pub enum TimeRollMode {
 /// The extracted rate is written into the statement model as a decimal scalar
 /// (for example `0.0525` for 5.25%). `compounding` controls the output quote
 /// convention, while `day_count` optionally overrides the curve's native day
-/// count when converting `tenor` into a year fraction.
+/// count when converting `tenor` into a year fraction. Monetary target nodes
+/// are rejected during application because a rate is dimensionless.
 ///
 /// Persisted `day_count` override values are the canonical snake_case
 /// [`DayCount`] labels: `act_360`, `act_365f`, `act_365l`, `nl_365`, `30_360`,
@@ -1162,6 +1217,38 @@ impl RateBindingSpec {
 pub use finstack_quant_core::math::Compounding;
 
 impl ScenarioSpec {
+    /// Parse a scenario specification from JSON and validate it.
+    ///
+    /// The single ingest path for host bindings: strict serde decoding
+    /// (unknown fields are rejected) followed by [`ScenarioSpec::validate`].
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Canonical `ScenarioSpec` JSON document.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`](crate::Error::Validation) prefixed with
+    /// `Failed to parse ScenarioSpec JSON:` when `json` does not decode, or
+    /// the error [`ScenarioSpec::validate`] returns for an inconsistent spec.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_scenarios::ScenarioSpec;
+    ///
+    /// let spec = ScenarioSpec::from_json(r#"{"id":"base","operations":[]}"#)?;
+    /// assert_eq!(spec.id, "base");
+    /// # Ok::<(), finstack_quant_scenarios::Error>(())
+    /// ```
+    pub fn from_json(json: &str) -> crate::error::Result<Self> {
+        let spec: Self = serde_json::from_str(json).map_err(|error| {
+            crate::error::Error::Validation(format!("Failed to parse ScenarioSpec JSON: {error}"))
+        })?;
+        spec.validate()?;
+        Ok(spec)
+    }
+
     /// Validate the scenario specification for consistency.
     ///
     /// Checks for:

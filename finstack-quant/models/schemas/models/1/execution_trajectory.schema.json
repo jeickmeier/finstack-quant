@@ -1,0 +1,50 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/execution_trajectory.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Optimal execution schedule for a trade.",
+  "properties": {
+    "cost_variance": {
+      "description": "Variance of the cost under the optimal trajectory.",
+      "format": "double",
+      "type": "number"
+    },
+    "expected_cost": {
+      "description": "Expected cost of the optimal trajectory.",
+      "format": "double",
+      "type": "number"
+    },
+    "quantities": {
+      "description": "Quantity to trade in each time bucket.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "remaining": {
+      "description": "Remaining position after each bucket.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "time_points": {
+      "description": "Time points (in trading days) for each bucket boundary.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "quantities",
+    "remaining",
+    "expected_cost",
+    "cost_variance",
+    "time_points"
+  ],
+  "title": "ExecutionTrajectory",
+  "type": "object"
+}

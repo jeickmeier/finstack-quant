@@ -472,12 +472,11 @@ fn rule_qing_ming() {
 fn rule_buddhas_birthday() {
     let rule = Rule::BuddhasBirthday;
 
-    // Buddha's Birthday is approximately CNY + 95 days
-    // 2024: CNY is Feb 10, so Buddha's Birthday ~ May 15
-    let bb_2024 = make_date(2024, 2, 10)
-        .checked_add(time::Duration::days(95))
-        .unwrap();
-    assert!(rule.applies(bb_2024));
+    // Eighth day of fourth lunar month; leap months break a fixed CNY offset.
+    assert!(rule.applies(make_date(2024, 5, 15)));
+    assert!(rule.applies(make_date(2025, 5, 5)));
+    assert!(rule.applies(make_date(2026, 5, 24)));
+    assert!(!rule.applies(make_date(2026, 5, 23)));
 }
 
 // Japanese Equinox Rules

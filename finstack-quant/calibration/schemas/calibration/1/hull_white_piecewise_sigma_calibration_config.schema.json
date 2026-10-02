@@ -1,0 +1,72 @@
+{
+  "$defs": {
+    "SwapFrequency": {
+      "description": "Number of coupon payments per year for the underlying swap in HW1F calibration.\n\nUSD swaps are semi-annual (2), EUR swaps are annual (1).",
+      "oneOf": [
+        {
+          "const": "annual",
+          "description": "1 payment per year (EUR, GBP standard).",
+          "type": "string"
+        },
+        {
+          "const": "semi_annual",
+          "description": "2 payments per year (USD standard).",
+          "type": "string"
+        },
+        {
+          "const": "quarterly",
+          "description": "4 payments per year.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/calibration/1/hull_white_piecewise_sigma_calibration_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Settings of the piecewise-constant Hull-White sigma bootstrap to cap/floor quotes.",
+  "examples": [
+    {
+      "fit_tolerance": 1e-6,
+      "fixed_kappa": 0.03,
+      "frequency": "quarterly",
+      "sigma_max": 0.05,
+      "sigma_min": 0.0001
+    }
+  ],
+  "properties": {
+    "fit_tolerance": {
+      "description": "Required positive maximum implied-normal-volatility error in decimal rate units.\nCap/floor quotes use the normal (Bachelier) convention only.\nThis acceptance budget is independent of the numerical solver tolerance.",
+      "format": "double",
+      "type": "number"
+    },
+    "fixed_kappa": {
+      "description": "Mean reversion held fixed while bootstrapping the volatility schedule.",
+      "format": "double",
+      "type": "number"
+    },
+    "frequency": {
+      "$ref": "#/$defs/SwapFrequency",
+      "default": "semi_annual",
+      "description": "Synthetic coupon frequency used only when contractual schedules are absent."
+    },
+    "sigma_max": {
+      "description": "Inclusive upper short-rate volatility search bound.",
+      "format": "double",
+      "type": "number"
+    },
+    "sigma_min": {
+      "description": "Inclusive lower short-rate volatility search bound.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "fit_tolerance",
+    "fixed_kappa",
+    "sigma_min",
+    "sigma_max"
+  ],
+  "title": "Hull-White Piecewise Sigma Calibration Config",
+  "type": "object"
+}

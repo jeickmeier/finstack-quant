@@ -1,0 +1,46 @@
+{
+  "$defs": {
+    "NodeId": {
+      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/working_capital_consistency.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Verifies that the change in working capital on the cash flow statement equals the negative delta of net working capital on the balance sheet.",
+  "properties": {
+    "current_assets_nodes": {
+      "description": "Current-asset nodes from the balance sheet.",
+      "items": {
+        "$ref": "#/$defs/NodeId"
+      },
+      "type": "array"
+    },
+    "current_liabilities_nodes": {
+      "description": "Current-liability nodes from the balance sheet.",
+      "items": {
+        "$ref": "#/$defs/NodeId"
+      },
+      "type": "array"
+    },
+    "tolerance": {
+      "description": "Tolerance override; falls back to\n[`finstack_quant_statements::checks::CheckConfig::default_tolerance`].",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "wc_change_cf_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "Working-capital change node from the cash flow statement."
+    }
+  },
+  "required": [
+    "wc_change_cf_node",
+    "current_assets_nodes",
+    "current_liabilities_nodes"
+  ],
+  "title": "WorkingCapitalConsistency",
+  "type": "object"
+}

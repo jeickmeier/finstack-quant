@@ -1,0 +1,29 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/workout_lgd_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Outcome of evaluating a `WorkoutLgd` model at one exposure at default.",
+  "properties": {
+    "lgd": {
+      "description": "Loss given default as a decimal fraction of EAD in `[0, 1]`.",
+      "format": "double",
+      "type": "number"
+    },
+    "net_recovery": {
+      "description": "Net recovery amount in the same monetary units as the EAD, after the\ncollateral cap, workout costs, and discounting to the default date.",
+      "format": "double",
+      "type": "number"
+    },
+    "recovery_rate": {
+      "description": "Recovery rate `1 - lgd` as a decimal fraction in `[0, 1]`.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "net_recovery",
+    "lgd",
+    "recovery_rate"
+  ],
+  "title": "WorkoutLgdResult",
+  "type": "object"
+}

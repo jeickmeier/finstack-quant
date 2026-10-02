@@ -79,8 +79,8 @@ impl MetricCalculator for SpreadDeltaCalculator {
 
 /// Vega calculator: combined sensitivity to both vol surfaces.
 ///
-/// Bumps both leg 1 and leg 2 vol surfaces simultaneously by the resolved vol
-/// bump (default 1 vol point) and reports the result per vol point.
+/// Bumps each distinct leg volatility surface once by the resolved vol bump
+/// (default 1 vol point) and reports the result per vol point.
 struct SpreadVegaCalculator {
     leg: Option<u8>,
 }
@@ -109,11 +109,15 @@ impl MetricCalculator for SpreadVegaCalculator {
                         inst.leg1_vol_surface_id.as_str(),
                         amount,
                     )?;
-                    crate::metrics::bump_surface_vol_absolute(
-                        &first,
-                        inst.leg2_vol_surface_id.as_str(),
-                        amount,
-                    )
+                    if inst.leg1_vol_surface_id == inst.leg2_vol_surface_id {
+                        Ok(first)
+                    } else {
+                        crate::metrics::bump_surface_vol_absolute(
+                            &first,
+                            inst.leg2_vol_surface_id.as_str(),
+                            amount,
+                        )
+                    }
                 }
                 Some(_) => Err(finstack_quant_core::Error::Validation(
                     "invalid spread-option vega leg".into(),

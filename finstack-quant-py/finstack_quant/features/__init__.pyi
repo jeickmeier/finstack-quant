@@ -8,6 +8,13 @@ weights) plus a general panel dispatcher :func:`transform_panel` (typed) /
 :func:`transform_panel_json` (JSON), and the operation selectors
 :class:`TimeSeriesOp`, :class:`CrossSectionalOp`, :class:`PairwiseOp`.
 
+Key columns (``entity``, ``order``, ``time_key``, ``groups``) accept strings
+and date-like objects. Datetimes are formatted by the Rust key policy
+(``datetime_order_key``: aware values normalize to UTC, naive values keep
+wall time, fixed nanosecond precision); dates use ``isoformat()``. Ints,
+floats, bools and other objects raise ``TypeError``, matching the WASM
+string-only key columns; convert integer period keys to zero-padded strings.
+
 Examples
 --------
 >>> from finstack_quant.features import transform_cross_sectional
@@ -25,7 +32,7 @@ from typing import Any
 import pandas as pd
 
 TransformParams = dict[str, Any]
-KeyColumn = Sequence[str | int | datetime.date | Any]
+KeyColumn = Sequence[str | datetime.date]
 
 __all__ = [
     "CrossSectionalOp",
@@ -442,8 +449,8 @@ class PanelTransformSpec:
             Ordered operations ``{"name", "family" ("timeseries" |
             "cross_sectional"), "op", "params"?, "input"?}``.
         entity : sequence, optional
-            Row-aligned entity keys (required for time-series ops; str, int
-            or date-like, coerced to str).
+            Row-aligned entity keys (required for time-series ops; str or
+            date-like; other types raise ``TypeError``).
         order : sequence, optional
             Row-aligned sort keys (required for time-series ops).
         time_key : sequence, optional

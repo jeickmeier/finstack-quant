@@ -44,7 +44,7 @@
 //! - Kahan, W. (1965). "Further Remarks on Reducing Truncation Errors."
 //!   *Communications of the ACM*, 8(1), 40. `docs/REFERENCES.md#kahan-1965`
 
-use super::special_functions::standard_normal_inv_cdf;
+use super::special_functions::{standard_normal_inv_cdf, student_t_inv_cdf};
 use super::summation::kahan_sum;
 
 /// Arithmetic mean.
@@ -339,6 +339,22 @@ impl RealizedVarMethod {
     pub fn requires_ohlc(self) -> bool {
         !matches!(self, Self::CloseToClose)
     }
+
+    /// Estimator [`realized_variance_ohlc`] uses when no method is given.
+    ///
+    /// Yang-Zhang (2000) is the minimum-variance OHLC estimator that is robust
+    /// to both drift and opening gaps, so it is the natural choice once all
+    /// four bar fields are supplied. The close-series entry point
+    /// [`realized_variance`] instead defaults to [`RealizedVarMethod::default`]
+    /// (`CloseToClose`), the only method it supports.
+    pub const OHLC_DEFAULT: Self = Self::YangZhang;
+}
+
+/// Annualization factor applied when a realized-variance caller passes none:
+/// [`PeriodKind::Daily`](crate::dates::PeriodKind::Daily) observations, i.e.
+/// 252 trading days per year.
+fn default_annualization_factor() -> f64 {
+    crate::dates::PeriodKind::Daily.annualization_factor()
 }
 
 impl std::fmt::Display for RealizedVarMethod {
@@ -472,21 +488,30 @@ pub fn quantile(data: &mut [f64], p: f64) -> f64 {
 /// convention explicitly.
 ///
 /// # Arguments
-/// * `prices` - Close price series ordered in time
-/// * `method` - Must be `CloseToClose`; OHLC-only methods return an error
-/// * `annualization_factor` - Factor to annualize variance (e.g., 252 for daily data)
+/// * `prices` - Close price series ordered in time; every price must be finite
+///   and strictly positive.
+/// * `method` - Estimator; must be `CloseToClose` (OHLC-only methods return an
+///   error). `None` selects [`RealizedVarMethod::default`] (`CloseToClose`).
+/// * `annualization_factor` - Observations per year used to annualize the
+///   per-period variance (for example `252.0` for daily closes); must be
+///   finite and positive. `None` selects the daily convention,
+///   `PeriodKind::Daily.annualization_factor()` (252).
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`](crate::Error::Validation) if `method` requires OHLC data.
+/// Returns [`Error::Validation`](crate::Error::Validation) if `method` requires
+/// OHLC data, the annualization factor is not finite and positive, or a price
+/// is not finite and positive.
 ///
 /// # Returns
 /// Annualized realized variance
 pub fn realized_variance(
     prices: &[f64],
-    method: RealizedVarMethod,
-    annualization_factor: f64,
+    method: Option<RealizedVarMethod>,
+    annualization_factor: Option<f64>,
 ) -> crate::Result<f64> {
+    let method = method.unwrap_or_default();
+    let annualization_factor = annualization_factor.unwrap_or_else(default_annualization_factor);
     if !annualization_factor.is_finite() || annualization_factor <= 0.0 {
         return Err(crate::Error::Validation(format!(
             "realized_variance: annualization_factor must be positive and finite, got {annualization_factor}"
@@ -537,23 +562,34 @@ pub fn realized_variance(
 /// * `high` - High prices (required for `Parkinson`, `GarmanKlass`, `RogersSatchell`, `YangZhang`)
 /// * `low` - Low prices (required for `Parkinson`, `GarmanKlass`, `RogersSatchell`, `YangZhang`)
 /// * `close` - Closing prices (required for all methods)
-/// * `method` - Method to use for calculation
-/// * `annualization_factor` - Factor to annualize variance
+/// * `method` - Estimator to use. `None` selects
+///   [`RealizedVarMethod::OHLC_DEFAULT`] (Yang-Zhang).
+/// * `annualization_factor` - Bars per year used to annualize the per-bar
+///   variance (for example `252.0` for daily bars); must be finite and
+///   positive. `None` selects the daily convention,
+///   `PeriodKind::Daily.annualization_factor()` (252).
 ///
 /// # Errors
 ///
-/// Returns [`Error::Validation`](crate::Error::Validation) if the four slices have different lengths.
+/// Returns [`Error::Validation`](crate::Error::Validation) if the four slices
+/// have different lengths, the annualization factor is not finite and
+/// positive, or a bar is not finite, positive and internally consistent.
 ///
 /// # Returns
-/// Annualized realized variance
+/// Annualized realized variance. Parkinson, Garman-Klass, and Rogers-Satchell
+/// use each complete OHLC bar, including a single bar. Close-to-close requires
+/// two closing levels, and Yang-Zhang requires three bars; shorter samples
+/// return zero.
 pub fn realized_variance_ohlc(
     open: &[f64],
     high: &[f64],
     low: &[f64],
     close: &[f64],
-    method: RealizedVarMethod,
-    annualization_factor: f64,
+    method: Option<RealizedVarMethod>,
+    annualization_factor: Option<f64>,
 ) -> crate::Result<f64> {
+    let method = method.unwrap_or(RealizedVarMethod::OHLC_DEFAULT);
+    let annualization_factor = annualization_factor.unwrap_or_else(default_annualization_factor);
     let n = close.len();
     if open.len() != n || high.len() != n || low.len() != n {
         return Err(crate::Error::Validation(format!(
@@ -591,12 +627,14 @@ pub fn realized_variance_ohlc(
             )));
         }
     }
-    if n < 2 {
+    if n == 0 {
         return Ok(0.0);
     }
 
     let result = match method {
-        RealizedVarMethod::CloseToClose => realized_variance(close, method, annualization_factor),
+        RealizedVarMethod::CloseToClose => {
+            realized_variance(close, Some(method), Some(annualization_factor))
+        }
         RealizedVarMethod::Parkinson => {
             // Parkinson (1980) high-low range estimator
             // More efficient than close-to-close, using intraday range information
@@ -840,24 +878,36 @@ impl OnlineStats {
         self.std_dev() / (self.count as f64).sqrt()
     }
 
-    /// Confidence interval at specified level.
+    /// Student-t confidence interval for the population mean.
     ///
-    /// Returns `(mean, mean)` when fewer than 2 samples are available
-    /// (standard error is undefined so no interval can be constructed).
+    /// Uses the sample standard deviation and `count - 1` degrees of freedom.
+    /// Coverage is exact for independent Gaussian observations and approximate
+    /// for other distributions when their sample means are approximately normal.
+    /// For randomized quasi-Monte Carlo, update this accumulator with independent
+    /// replicate means, not the dependent paths within each replicate.
+    ///
+    /// Returns `(NaN, NaN)` when fewer than two samples are available or `alpha`
+    /// is non-finite or outside `(0, 1)`, because no interval can be estimated.
     ///
     /// # Arguments
     ///
-    /// * `alpha` - Significance level (e.g., 0.05 for 95% CI)
+    /// * `alpha` - Finite significance probability strictly between zero and
+    ///   one; for example, `0.05` requests a two-sided 95% interval.
     ///
     /// # Returns
     ///
-    /// (lower, upper) bounds of the confidence interval.
+    /// Lower and upper bounds in the observations' units, or two `NaN` values
+    /// when the sample size or significance probability is invalid.
     pub fn confidence_interval(&self, alpha: f64) -> (f64, f64) {
-        if self.count <= 1 {
-            return (self.mean, self.mean);
+        if self.count <= 1 || !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+            return (f64::NAN, f64::NAN);
         }
-        let z = standard_normal_inv_cdf(1.0 - alpha / 2.0);
-        let margin = z * self.stderr();
+        // Use the lower tail and symmetry to avoid rounding 1 - alpha/2 to 1.
+        let critical = match student_t_inv_cdf(alpha / 2.0, (self.count - 1) as f64) {
+            Ok(value) => -value,
+            Err(_) => return (f64::NAN, f64::NAN),
+        };
+        let margin = critical * self.stderr();
         (self.mean - margin, self.mean + margin)
     }
 
@@ -1046,6 +1096,82 @@ mod tests {
     use super::*;
 
     #[test]
+    fn range_estimators_use_each_observed_bar_from_the_first() {
+        let open: [f64; 3] = [100.0, 101.0, 99.0];
+        let high: [f64; 3] = [103.0, 104.0, 102.0];
+        let low: [f64; 3] = [98.0, 97.0, 96.0];
+        let close: [f64; 3] = [102.0, 99.0, 100.0];
+        for method in [
+            RealizedVarMethod::Parkinson,
+            RealizedVarMethod::GarmanKlass,
+            RealizedVarMethod::RogersSatchell,
+        ] {
+            assert_eq!(
+                realized_variance_ohlc(&[], &[], &[], &[], Some(method), Some(252.0)).unwrap(),
+                0.0
+            );
+            for n in 1..=3 {
+                let sum: f64 = (0..n)
+                    .map(|i| {
+                        let hl = (high[i] / low[i]).ln();
+                        let co = (close[i] / open[i]).ln();
+                        match method {
+                            RealizedVarMethod::Parkinson => {
+                                hl * hl / (4.0 * std::f64::consts::LN_2)
+                            }
+                            RealizedVarMethod::GarmanKlass => {
+                                0.5 * hl * hl - (2.0 * std::f64::consts::LN_2 - 1.0) * co * co
+                            }
+                            RealizedVarMethod::RogersSatchell => {
+                                (high[i] / close[i]).ln() * (high[i] / open[i]).ln()
+                                    + (low[i] / close[i]).ln() * (low[i] / open[i]).ln()
+                            }
+                            _ => unreachable!(),
+                        }
+                    })
+                    .sum();
+                let actual = realized_variance_ohlc(
+                    &open[..n],
+                    &high[..n],
+                    &low[..n],
+                    &close[..n],
+                    Some(method),
+                    Some(252.0),
+                )
+                .unwrap();
+                assert!((actual - 252.0 * sum / n as f64).abs() < 1e-12);
+                assert!(actual > 0.0);
+            }
+        }
+        for n in 1..=2 {
+            assert_eq!(
+                realized_variance_ohlc(
+                    &open[..n],
+                    &high[..n],
+                    &low[..n],
+                    &close[..n],
+                    Some(RealizedVarMethod::YangZhang),
+                    Some(252.0),
+                )
+                .unwrap(),
+                0.0
+            );
+        }
+        assert_eq!(
+            realized_variance_ohlc(
+                &open[..1],
+                &high[..1],
+                &low[..1],
+                &close[..1],
+                Some(RealizedVarMethod::CloseToClose),
+                Some(252.0),
+            )
+            .unwrap(),
+            0.0
+        );
+    }
+
+    #[test]
     fn test_online_stats_basic() {
         let mut stats = OnlineStats::new();
         stats.update(1.0);
@@ -1103,6 +1229,46 @@ mod tests {
         assert!(lower < stats.mean());
         assert!(upper > stats.mean());
         assert!(lower < 50.5 && upper > 50.5);
+    }
+
+    #[test]
+    fn confidence_intervals_account_for_estimated_small_sample_variance() {
+        let mut pair = OnlineStats::new();
+        pair.update(0.0);
+        pair.update(2.0);
+        // With one degree of freedom Student-t is Cauchy, giving an
+        // independent analytic critical value cot(pi * alpha / 2).
+        let critical = 1.0 / (std::f64::consts::PI * 0.025).tan();
+        let (lower, upper) = pair.confidence_interval(0.05);
+        assert!((lower - (1.0 - critical)).abs() < 1e-10);
+        assert!((upper - (1.0 + critical)).abs() < 1e-10);
+
+        let mut replicates = OnlineStats::new();
+        for value in 1..=16 {
+            replicates.update(f64::from(value));
+        }
+        // Tabulated 97.5th percentile for 15 degrees of freedom, appropriate
+        // to the 16 independent replicate means used by the RQMC pricer.
+        let expected_half_width = 2.131_449_545_559_323 * replicates.stderr();
+        assert!((replicates.ci_half_width() - expected_half_width).abs() < 1e-10);
+    }
+
+    #[test]
+    fn confidence_intervals_reject_insufficient_samples_and_invalid_alpha() {
+        let mut stats = OnlineStats::new();
+        for count in 0..=1 {
+            if count == 1 {
+                stats.update(42.0);
+            }
+            let (lower, upper) = stats.confidence_interval(0.05);
+            assert!(lower.is_nan() && upper.is_nan());
+            assert!(stats.ci_half_width().is_nan());
+        }
+        stats.update(43.0);
+        for alpha in [0.0, 1.0, -0.1, 1.1, f64::NAN, f64::INFINITY] {
+            let (lower, upper) = stats.confidence_interval(alpha);
+            assert!(lower.is_nan() && upper.is_nan());
+        }
     }
 
     #[test]
@@ -1478,8 +1644,8 @@ mod tests {
             &high,
             &[0.0, 100.0],
             &close,
-            RealizedVarMethod::Parkinson,
-            252.0,
+            Some(RealizedVarMethod::Parkinson),
+            Some(252.0),
         )
         .is_err());
         assert!(realized_variance_ohlc(
@@ -1487,8 +1653,8 @@ mod tests {
             &high,
             &low,
             &close,
-            RealizedVarMethod::GarmanKlass,
-            252.0,
+            Some(RealizedVarMethod::GarmanKlass),
+            Some(252.0),
         )
         .is_err());
         assert!(realized_variance_ohlc(
@@ -1496,8 +1662,8 @@ mod tests {
             &[98.0, 103.0],
             &low,
             &close,
-            RealizedVarMethod::RogersSatchell,
-            252.0,
+            Some(RealizedVarMethod::RogersSatchell),
+            Some(252.0),
         )
         .is_err());
         assert!(realized_variance_ohlc(
@@ -1505,10 +1671,46 @@ mod tests {
             &high,
             &low,
             &close,
-            RealizedVarMethod::YangZhang,
-            f64::INFINITY,
+            Some(RealizedVarMethod::YangZhang),
+            Some(f64::INFINITY),
         )
         .is_err());
-        assert!(realized_variance(&close, RealizedVarMethod::CloseToClose, -1.0).is_err());
+        assert!(
+            realized_variance(&close, Some(RealizedVarMethod::CloseToClose), Some(-1.0)).is_err()
+        );
+    }
+
+    #[test]
+    fn realized_variance_defaults_are_rust_owned() {
+        use super::{realized_variance, realized_variance_ohlc, RealizedVarMethod};
+
+        let open = [100.0, 101.5, 100.8, 102.0];
+        let high = [102.0, 103.0, 102.5, 103.5];
+        let low = [99.0, 100.2, 99.9, 101.0];
+        let close = [101.0, 102.0, 101.5, 103.0];
+        let daily = crate::dates::PeriodKind::Daily.annualization_factor();
+        assert_eq!(daily, 252.0);
+
+        assert_eq!(
+            realized_variance(&close, None, None).expect("defaults"),
+            realized_variance(&close, Some(RealizedVarMethod::CloseToClose), Some(daily))
+                .expect("explicit"),
+        );
+        assert_eq!(
+            RealizedVarMethod::OHLC_DEFAULT,
+            RealizedVarMethod::YangZhang
+        );
+        assert_eq!(
+            realized_variance_ohlc(&open, &high, &low, &close, None, None).expect("defaults"),
+            realized_variance_ohlc(
+                &open,
+                &high,
+                &low,
+                &close,
+                Some(RealizedVarMethod::YangZhang),
+                Some(daily),
+            )
+            .expect("explicit"),
+        );
     }
 }

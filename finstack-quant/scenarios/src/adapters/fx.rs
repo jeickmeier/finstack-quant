@@ -16,7 +16,7 @@ fn post_shock_triangulation_warnings(
     let Some(fx) = market.fx() else {
         return Ok(Vec::new());
     };
-    let state = fx.get_serializable_state();
+    let state = fx.get_serializable_state()?;
     if !state.config.enable_triangulation {
         return Ok(Vec::new());
     }

@@ -837,35 +837,11 @@ impl PyLookbackReturns {
 
 /// Date-indexed numeric series returned by the rolling-window analytics.
 ///
-/// Rolling-window analytics share this carrier and attach a metric-specific
-/// DataFrame column name.
+/// Wraps Rust `DatedSeries`, whose `value_column` (a `RollingMetric`) names the
+/// metric and becomes the DataFrame column name.
 #[pyclass(name = "DatedSeries", module = "finstack_quant.analytics", frozen)]
 pub struct PyDatedSeries {
     pub(super) inner: fa::DatedSeries,
-    pub(super) value_column: String,
-}
-
-impl PyDatedSeries {
-    /// Construct from an analytics `DatedSeries` plus the desired column label.
-    pub(crate) fn new(inner: fa::DatedSeries, value_column: impl Into<String>) -> Self {
-        Self {
-            inner,
-            value_column: value_column.into(),
-        }
-    }
-}
-
-/// Wire shape for [`PyDatedSeries`].
-///
-/// The analytics `DatedSeries` carries only `values`/`dates`; the metric label
-/// lives on the Python wrapper. Serializing it alongside keeps `from_json` (and
-/// therefore `__reduce__`) exact — otherwise a round-trip would silently
-/// relabel a rolling-Sharpe series as something else.
-#[derive(serde::Serialize, serde::Deserialize)]
-struct DatedSeriesWire {
-    #[serde(flatten)]
-    series: fa::DatedSeries,
-    value_column: String,
 }
 
 #[pymethods]
@@ -881,28 +857,18 @@ impl PyDatedSeries {
 
     /// Deserialize from JSON.
     ///
-    /// Expects the `values` / `dates` / `value_column` shape emitted by
-    /// [`to_json`](Self::to_json).
+    /// Expects the Rust `DatedSeries` shape (`values` / `dates` /
+    /// `value_column`) emitted by [`to_json`](Self::to_json).
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        let wire: DatedSeriesWire = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self {
-            inner: wire.series,
-            value_column: wire.value_column,
-        })
+        let inner: fa::DatedSeries = serde_json::from_str(json).map_err(display_to_py)?;
+        Ok(Self { inner })
     }
 
-    /// Serialize to compact JSON.
-    ///
-    /// Emits the analytics `DatedSeries` fields (`values`, `dates`) plus the
-    /// `value_column` label this wrapper adds.
+    /// Serialize to compact JSON (the Rust `DatedSeries` serde form).
     fn to_json(&self) -> PyResult<String> {
-        let wire = DatedSeriesWire {
-            series: self.inner.clone(),
-            value_column: self.value_column.clone(),
-        };
-        serde_json::to_string(&wire).map_err(display_to_py)
+        serde_json::to_string(&self.inner).map_err(display_to_py)
     }
 
     /// Numeric values, one per window.
@@ -919,10 +885,11 @@ impl PyDatedSeries {
             .map(|&d| date_to_py(py, d))
             .collect()
     }
-    /// Column name used by [`to_dataframe`](Self::to_dataframe).
+    /// Metric name of the series (Rust `RollingMetric`), also the column name
+    /// used by [`to_dataframe`](Self::to_dataframe).
     #[getter]
-    fn value_column(&self) -> &str {
-        &self.value_column
+    fn value_column(&self) -> &'static str {
+        self.inner.value_column.as_str()
     }
 
     /// Convert to a pandas ``DataFrame`` with a ``DatetimeIndex`` and a
@@ -930,7 +897,7 @@ impl PyDatedSeries {
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         data.set_item(
-            self.value_column.as_str(),
+            self.inner.value_column.as_str(),
             slice_to_pyarray(py, &self.inner.values),
         )?;
         let idx = dates_to_datetime_index(py, &self.inner.dates)?;
@@ -940,7 +907,7 @@ impl PyDatedSeries {
     fn __repr__(&self) -> String {
         format!(
             "DatedSeries(name={:?}, len={})",
-            self.value_column,
+            self.inner.value_column.as_str(),
             self.inner.values.len()
         )
     }

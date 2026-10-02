@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 /// Sole supported portfolio-materialization contract marker.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
 pub enum PortfolioMaterializationSchema {
     /// Canonical v1 materialization contract.
     #[serde(rename = "finstack_quant.portfolio_materialization/1")]
@@ -32,7 +31,6 @@ impl PortfolioMaterializationSchema {
 /// reference the artifact by ID.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct PortfolioMaterializationEnvelope {
     /// Exact materialization contract marker.
@@ -51,7 +49,6 @@ pub struct PortfolioMaterializationEnvelope {
 /// Portfolio fields shared by every materialized position.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct PortfolioHeader {
     /// Stable portfolio identifier.
@@ -60,7 +57,6 @@ pub struct PortfolioHeader {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     /// Reporting currency used for portfolio aggregation.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_currency: Currency,
     /// Valuation date for the materialized portfolio.
     #[serde(with = "finstack_quant_core::wire::date")]
@@ -68,29 +64,23 @@ pub struct PortfolioHeader {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub as_of: Date,
     /// Entities keyed by their stable IDs in deterministic order.
-    #[cfg_attr(feature = "ts_export", ts(type = "Record<string, unknown>"))]
     pub entities: IndexMap<EntityId, Entity>,
     /// Optional book hierarchy keyed by stable book IDs.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    #[cfg_attr(feature = "ts_export", ts(type = "Record<string, unknown>"))]
     pub books: IndexMap<BookId, Book>,
     /// Portfolio-level grouping and classification tags.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    #[cfg_attr(feature = "ts_export", ts(type = "Record<string, string>"))]
     pub tags: IndexMap<String, String>,
     /// Extension metadata retained as part of the persisted bundle.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    #[cfg_attr(feature = "ts_export", ts(type = "Record<string, unknown>"))]
     pub meta: IndexMap<String, serde_json::Value>,
 }
 
 /// One unique, content-addressed instrument artifact.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct InstrumentArtifact {
     /// Immutable producer revision ID or content-addressed artifact ID.
@@ -99,11 +89,9 @@ pub struct InstrumentArtifact {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content_hash: Option<String>,
     /// Full typed, strict instrument envelope.
-    #[cfg_attr(feature = "ts_export", ts(type = "unknown"))]
     pub envelope: InstrumentEnvelope,
     /// Optional producer dependency claim, checked against runtime extraction.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "ts_export", ts(type = "Record<string, unknown>"))]
     pub dependencies: Option<MarketDependencies>,
 }
 
@@ -223,17 +211,14 @@ enum NonPercentagePositionUnitName {
 /// Lightweight position referencing a unique instrument artifact.
 #[derive(Clone, Debug, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
 #[serde(from = "MaterializedPositionWire")]
 #[cfg_attr(feature = "json-schema", schemars(with = "MaterializedPositionWire"))]
 pub struct MaterializedPosition {
     /// Stable position identifier.
     #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub id: PositionId,
     /// Stable ID of the entity that owns the position.
     #[cfg_attr(feature = "json-schema", schemars(with = "String"))]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub entity_id: EntityId,
     /// Instrument identifier exposed by portfolio lookup and reports.
     pub instrument_id: String,
@@ -243,15 +228,12 @@ pub struct MaterializedPosition {
     /// Signed holding quantity interpreted according to [`PositionUnit`].
     pub quantity: f64,
     /// Scaling convention applied to `quantity`.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub unit: PositionUnit,
     /// Position attributes used for grouping, filtering, and constraints.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    #[cfg_attr(feature = "ts_export", ts(type = "Record<string, unknown>"))]
     pub attributes: IndexMap<String, AttributeValue>,
     /// Extension metadata retained with the position.
     #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
-    #[cfg_attr(feature = "ts_export", ts(type = "Record<string, unknown>"))]
     pub meta: IndexMap<String, serde_json::Value>,
 }
 
@@ -375,7 +357,6 @@ impl Serialize for MaterializedPosition {
 /// Producer and compiler version stamps for reproducibility.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
 #[serde(deny_unknown_fields)]
 pub struct MaterializerInfo {
     /// Stable producer implementation name.

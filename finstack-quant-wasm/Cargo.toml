@@ -14,7 +14,7 @@ autotests = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-finstack-quant-analytics = { path = "../finstack-quant/analytics", version = "0.9.0" }
+finstack-quant-analytics = { path = "../finstack-quant/analytics", version = "0.9.0", default-features = false }
 finstack-quant-attribution = { path = "../finstack-quant/attribution", version = "0.9.0", default-features = false }
 finstack-quant-cashflows = { path = "../finstack-quant/cashflows", version = "0.9.0", default-features = false }
 finstack-quant-covenants = { path = "../finstack-quant/covenants", version = "0.9.0", default-features = false }
@@ -22,35 +22,46 @@ finstack-quant-core = { path = "../finstack-quant/core", version = "0.9.0", defa
 finstack-quant-features = { path = "../finstack-quant/features", version = "0.9.0", default-features = false }
 finstack-quant-margin = { path = "../finstack-quant/margin", version = "0.9.0", default-features = false }
 finstack-quant-statements = { path = "../finstack-quant/statements", version = "0.9.0", default-features = false }
-finstack-quant-statements-analytics = { path = "../finstack-quant/statements-analytics", version = "0.9.0" }
+finstack-quant-statements-analytics = { path = "../finstack-quant/statements-analytics", version = "0.9.0", default-features = false }
 finstack-quant-valuations = { path = "../finstack-quant/valuations", version = "0.9.0", default-features = false }
 finstack-quant-calibration = { path = "../finstack-quant/calibration", version = "0.9.0", default-features = false }
 finstack-quant-models = { path = "../finstack-quant/models", version = "0.9.0", default-features = false }
 finstack-quant-scenarios = { path = "../finstack-quant/scenarios", version = "0.9.0", default-features = false }
 finstack-quant-portfolio = { path = "../finstack-quant/portfolio", version = "0.9.0", default-features = false }
+# The umbrella crate owns the whole-workspace schema registry and the JSON Schema
+# validator behind every `*.schema` namespace. Its `jsonschema-validate` feature
+# also switches on `json-schema` (the per-crate schema registries) in each
+# domain crate above.
+finstack-quant = { path = "../finstack-quant", version = "0.9.0", default-features = false, features = ["jsonschema-validate"] }
 wasm-bindgen = "0.2.114"
 js-sys = "0.3"
 serde = { workspace = true }
 serde-wasm-bindgen = "0.6"
-strum = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true }
-console_error_panic_hook = { version = "0.1", optional = true }
+rust_decimal = { workspace = true }
+console_error_panic_hook = "0.1"
 
 # Month enum required by Date bindings
 time = { workspace = true }
 
+# `jsonschema` hashes with `ahash`, which seeds itself through `getrandom`. On
+# wasm32-unknown-unknown that needs the `wasm_js` backend (Web Crypto), selected
+# by this feature together with the `--cfg getrandom_backend="wasm_js"` that
+# `.cargo/config.toml` (and the CI WASM job) already pass.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+# `Currency::iter()` in the currency-statics coverage test
+strum = { workspace = true }
 
 # Features
 #
 # - `default`: No feature overrides.
-# - `ts_export`: Emit TypeScript type definitions at build time (opt-in, writes files to disk)
 [features]
 default = []
-console_panic_hook = ["dep:console_error_panic_hook"]
-ts_export = ["finstack-quant-valuations/ts_export"]
 contract-generation = ["finstack-quant-valuations/json-schema"]
 
 [[example]]

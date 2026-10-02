@@ -6,12 +6,12 @@ import math
 
 import pytest
 
-from finstack_quant.core.market_data import VolCube, VolSurface
+from finstack_quant.core.market_data import VolCube, VolCubeExpirySlice, VolSurface
 from finstack_quant.models.volatility import (
+    get_cube_expiry_slice_vol,
     get_cube_normal_vol,
     get_cube_normal_vol_clamped,
     get_cube_vol,
-    get_surface_vol,
     get_surface_vol_clamped,
     materialize_cube_expiry_slice,
     materialize_cube_expiry_slice_normal,
@@ -56,7 +56,7 @@ def test_vol_normal_clamped_finite_and_positive() -> None:
     assert v_extrap > 0.0
 
 
-def test_materialize_normal_slices_return_vol_surfaces() -> None:
+def test_materialize_normal_slices_preserve_their_axes() -> None:
     cube = _example_cube()
     strikes = [0.02, FORWARD, 0.04]
 
@@ -65,8 +65,13 @@ def test_materialize_normal_slices_return_vol_surfaces() -> None:
     assert tenor_slice.quote_type == "normal"
 
     expiry_slice = materialize_cube_expiry_slice_normal(cube, 1.0, strikes)
-    assert isinstance(expiry_slice, VolSurface)
-    assert expiry_slice.quote_type == "normal"
+    assert isinstance(expiry_slice, VolCubeExpirySlice)
+    assert expiry_slice.get_quote_type() == "normal"
+    assert expiry_slice.get_expiry() == 1.0
+    assert expiry_slice.get_tenors() == [2.0, 10.0]
+    assert get_cube_expiry_slice_vol(expiry_slice, 2.0, FORWARD) == pytest.approx(
+        get_cube_normal_vol(cube, 1.0, 2.0, FORWARD)
+    )
 
     # ATM node of the materialized slice matches the point query.
     assert get_surface_vol_clamped(tenor_slice, 1.0, FORWARD) == pytest.approx(
@@ -102,13 +107,13 @@ def test_materialized_expiry_slice_uses_direct_vol_tenor_interpolation() -> None
         [0.02, 0.05],
         "total_variance",
     )
-    surface = materialize_cube_expiry_slice(cube, 1.0, [FORWARD])
+    expiry_slice = materialize_cube_expiry_slice(cube, 1.0, [FORWARD])
     low = get_cube_vol(cube, 1.0, 1.0, FORWARD)
     high = get_cube_vol(cube, 1.0, 4.0, FORWARD)
 
-    assert get_surface_vol(surface, 1.0, FORWARD) == pytest.approx(low)
-    assert get_surface_vol(surface, 4.0, FORWARD) == pytest.approx(high)
-    assert get_surface_vol(surface, 2.5, FORWARD) == pytest.approx((low + high) / 2.0)
+    assert get_cube_expiry_slice_vol(expiry_slice, 1.0, FORWARD) == pytest.approx(low)
+    assert get_cube_expiry_slice_vol(expiry_slice, 4.0, FORWARD) == pytest.approx(high)
+    assert get_cube_expiry_slice_vol(expiry_slice, 2.5, FORWARD) == pytest.approx((low + high) / 2.0)
 
 
 def test_non_finite_sabr_shift_is_rejected() -> None:

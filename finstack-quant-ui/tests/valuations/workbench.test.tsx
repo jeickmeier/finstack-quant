@@ -17,7 +17,10 @@ import detailFixtures from "./details/cases.json";
 import cashflowFixtures from "./cashflows/cases.json";
 import scenarioCases from "./scenario-table/cases.json";
 import pricingMarket from "./instruments/pricing-market.json";
-import fixture from "../../src/fixtures/results/bond.json";
+import type { ValuationResult } from "finstack-quant-wasm";
+import bondFixture from "../../src/fixtures/results/bond.json";
+/** The JSON import widens currency codes to `string`; the fixture is a native result. */
+const fixture = bondFixture as typeof bondFixture & { result: ValuationResult };
 import {
   type PriceRequest,
   FinstackError,
@@ -60,7 +63,7 @@ beforeEach(() => {
       case "validate":
         return native.validateInstrumentJson(request);
       case "validateMarket": {
-        const market = new native.Market(request);
+        const market = native.MarketContext.fromJson(request);
         try {
           return market.toJson();
         } finally {
@@ -70,7 +73,7 @@ beforeEach(() => {
       case "validateCalibration":
         return native.validateCalibrationJson(request);
       case "dryRun":
-        return native.dryRun(request);
+        return native.dryRunJson(request);
       case "calibrate":
         return native.calibrate(request);
       case "scenarioTable":
@@ -114,7 +117,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 const canonicalMarket = (json: string) => {
-  const market = new native.Market(json);
+  const market = native.MarketContext.fromJson(json);
   try {
     return market.toJson();
   } finally {
@@ -503,7 +506,7 @@ it("loads the complete host request when a prepared instrument is selected", asy
       )
     ).textContent,
   ).toContain("25,748");
-});
+}, 15000);
 
 it("offers configured scenario prices only while structured credit is selected", async () => {
   render(

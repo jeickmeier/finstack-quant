@@ -114,11 +114,84 @@ fn ensure_finite(label: &str, value: f64) -> finstack_quant_core::Result<()> {
     }
 }
 
+/// Deserialize `json` as `T`, naming `type_name` in the validation error.
+fn parse_json<T: serde::de::DeserializeOwned>(
+    json: &str,
+    type_name: &str,
+) -> finstack_quant_core::Result<T> {
+    serde_json::from_str(json).map_err(|error| {
+        finstack_quant_core::Error::Validation(format!("invalid {type_name} JSON: {error}"))
+    })
+}
+
+/// Serialize `value` to compact JSON, naming `type_name` in the error.
+fn to_json_text<T: serde::Serialize>(
+    value: &T,
+    type_name: &str,
+) -> finstack_quant_core::Result<String> {
+    serde_json::to_string(value).map_err(|error| {
+        finstack_quant_core::Error::Validation(format!("cannot serialize {type_name}: {error}"))
+    })
+}
+
+fn level_out_of_range(level_index: usize, n_levels: usize) -> finstack_quant_core::Error {
+    finstack_quant_core::Error::Validation(format!(
+        "level_index {level_index} out of range (n_levels={n_levels})"
+    ))
+}
+
 impl LevelsAtDate {
+    /// Bucket values for one hierarchy level.
+    ///
+    /// # Arguments
+    ///
+    /// * `level_index` - Zero-based position in [`Self::by_level`], i.e. the
+    ///   hierarchy spec's level order; must be less than `by_level.len()`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `level_index`
+    /// is not a valid level position.
+    pub fn level(&self, level_index: usize) -> finstack_quant_core::Result<&LevelValuesAtDate> {
+        self.by_level
+            .get(level_index)
+            .ok_or_else(|| level_out_of_range(level_index, self.by_level.len()))
+    }
+
+    /// Load and validate a snapshot from its canonical JSON form.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - `LevelsAtDate` JSON as produced by [`Self::to_json`]:
+    ///   `date` (ISO-8601), `generic`, `by_level` and `adder`, all levels in
+    ///   basis points.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when the JSON is
+    /// malformed or does not match the snapshot shape, or when a numeric
+    /// field is non-finite (see [`Self::validate`]).
+    pub fn from_json(json: &str) -> finstack_quant_core::Result<Self> {
+        let levels: Self = parse_json(json, "LevelsAtDate")?;
+        levels.validate()?;
+        Ok(levels)
+    }
+
+    /// Serialize the snapshot to compact canonical JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when a numeric
+    /// field is non-finite, which JSON cannot represent.
+    pub fn to_json(&self) -> finstack_quant_core::Result<String> {
+        self.validate()?;
+        to_json_text(self, "LevelsAtDate")
+    }
+
     /// Reject any non-finite generic, bucket, or adder value.
     ///
-    /// `serde_json` encodes `NaN`/`±inf` as `null`, so hosts call this at the
-    /// wire boundary (both directions) instead of re-walking the snapshot.
+    /// `serde_json` encodes `NaN`/`±inf` as `null`, so [`Self::from_json`]
+    /// and [`Self::to_json`] call this on every round trip.
     ///
     /// # Errors
     ///
@@ -142,6 +215,53 @@ impl LevelsAtDate {
 }
 
 impl PeriodDecomposition {
+    /// Bucket deltas for one hierarchy level.
+    ///
+    /// # Arguments
+    ///
+    /// * `level_index` - Zero-based position in [`Self::by_level`], i.e. the
+    ///   hierarchy spec's level order; must be less than `by_level.len()`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `level_index`
+    /// is not a valid level position.
+    pub fn level(&self, level_index: usize) -> finstack_quant_core::Result<&LevelValuesDelta> {
+        self.by_level
+            .get(level_index)
+            .ok_or_else(|| level_out_of_range(level_index, self.by_level.len()))
+    }
+
+    /// Load and validate a period decomposition from its canonical JSON form.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - `PeriodDecomposition` JSON as produced by [`Self::to_json`]:
+    ///   `from` and `to` (ISO-8601), `d_generic`, `by_level` and `d_adder`,
+    ///   all deltas in basis points.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when the JSON is
+    /// malformed or does not match the decomposition shape, or when a numeric
+    /// field is non-finite (see [`Self::validate`]).
+    pub fn from_json(json: &str) -> finstack_quant_core::Result<Self> {
+        let period: Self = parse_json(json, "PeriodDecomposition")?;
+        period.validate()?;
+        Ok(period)
+    }
+
+    /// Serialize the decomposition to compact canonical JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when a numeric
+    /// field is non-finite, which JSON cannot represent.
+    pub fn to_json(&self) -> finstack_quant_core::Result<String> {
+        self.validate()?;
+        to_json_text(self, "PeriodDecomposition")
+    }
+
     /// Reject any non-finite generic, bucket, or adder delta.
     ///
     /// See [`LevelsAtDate::validate`] for the rationale.
@@ -237,6 +357,26 @@ pub enum DecompositionError {
         /// Why the DTS weight could not be formed.
         reason: String,
     },
+}
+
+impl DecompositionError {
+    /// Classify this error for host-language exception mapping: an issuer
+    /// with no model row or runtime tags is a not-found error, an internally
+    /// inconsistent model a computation error, and every other variant
+    /// rejects the input (validation).
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        use finstack_quant_core::error::ErrorKind;
+        match self {
+            Self::UnknownIssuer { .. } => ErrorKind::NotFound,
+            Self::ModelInconsistent { .. } => ErrorKind::Computation,
+            Self::MissingTag { .. }
+            | Self::SnapshotShapeMismatch { .. }
+            | Self::DateMismatchInPeriod { .. }
+            | Self::InvalidDecimalSpread { .. }
+            | Self::InvalidDtsWeight { .. } => ErrorKind::Validation,
+        }
+    }
 }
 
 /// Indexes every issuer beta row by `issuer_id` for O(log n) lookup.
@@ -560,4 +700,42 @@ pub fn decompose_period(
         by_level,
         d_adder,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use time::Month;
+
+    fn levels(day: u8, generic: f64) -> LevelsAtDate {
+        LevelsAtDate {
+            date: finstack_quant_core::dates::create_date(2024, Month::March, day).unwrap(),
+            generic,
+            by_level: vec![LevelValuesAtDate {
+                level_index: 0,
+                dimension: HierarchyDimension::Rating,
+                values: BTreeMap::from([("IG".to_owned(), 10.0)]),
+            }],
+            adder: BTreeMap::from([(IssuerId::new("A"), 1.5)]),
+        }
+    }
+
+    #[test]
+    fn json_round_trips_and_rejects_non_finite_values() {
+        let from = levels(28, 100.0);
+        let json = from.to_json().unwrap();
+        assert_eq!(LevelsAtDate::from_json(&json).unwrap(), from);
+
+        let period = decompose_period(&from, &levels(29, 101.0)).unwrap();
+        let json = period.to_json().unwrap();
+        assert_eq!(PeriodDecomposition::from_json(&json).unwrap(), period);
+
+        // NaN cannot be written, and the `null` serde_json would write for it
+        // cannot be read back.
+        assert!(levels(28, f64::NAN).to_json().is_err());
+        let null_generic = json.replace("\"d_generic\":1.0", "\"d_generic\":null");
+        assert_ne!(null_generic, json);
+        assert!(PeriodDecomposition::from_json(&null_generic).is_err());
+        assert!(LevelsAtDate::from_json("{").is_err());
+    }
 }

@@ -53,7 +53,8 @@ fn run_waterfall(
     pool: &AssetPool,
     market: &MarketContext,
 ) -> WaterfallDistribution {
-    let period_start = period_start_override.unwrap_or_else(|| payment_date.add_months(-3));
+    let period_start = period_start_override
+        .unwrap_or_else(|| payment_date.add_months(-3).expect("valid date shift"));
     // Tests treat everything above interest as principal proceeds.
     let principal_collections = available_cash
         .checked_sub(interest_collections)

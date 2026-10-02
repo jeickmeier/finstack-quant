@@ -219,8 +219,8 @@ pub fn instrument_types() -> finstack_quant_core::Result<Vec<String>> {
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation` if the embedded schema JSON is malformed or the
-/// requested instrument type is not supported.
+/// Returns `Error::Validation` if the embedded schema JSON is malformed, and
+/// `InputError::NotFound` if the requested instrument type is not registered.
 ///
 /// # Arguments
 ///
@@ -233,9 +233,17 @@ pub fn instrument_schema(instrument_type: &str) -> finstack_quant_core::Result<V
             .map_err(|e| finstack_quant_core::Error::Validation(e.clone()));
     }
 
-    Err(finstack_quant_core::Error::Validation(format!(
-        "unknown instrument type '{instrument_type}'"
-    )))
+    Err(unknown_instrument_type(instrument_type))
+}
+
+/// The lookup miss reported for a discriminator that is not in the registry.
+fn unknown_instrument_type(instrument_type: &str) -> finstack_quant_core::Error {
+    finstack_quant_core::InputError::NotFound {
+        id: format!(
+            "unknown instrument type '{instrument_type}'; call instrument_types() for the valid set"
+        ),
+    }
+    .into()
 }
 
 /// Get JSON-Schema for ValuationResult.
@@ -482,11 +490,7 @@ fn instrument_type_validator(
     let (tag, slot) = instrument_validator_cache()
         .get_key_value(instrument_type)
         .map(|(tag, slot)| (*tag, slot))
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "unknown instrument type '{instrument_type}'"
-            ))
-        })?;
+        .ok_or_else(|| unknown_instrument_type(instrument_type))?;
     slot.get_or_init(|| build_instrument_validator(&instrument_schema(tag)?, tag))
         .as_ref()
         .map_err(Clone::clone)
@@ -521,6 +525,9 @@ fn validate_with(
         )))
     }
 }
+
+#[cfg(feature = "json-schema")]
+mod examples;
 
 #[cfg(feature = "json-schema")]
 use crate::instruments::json_loader::instrument_registry;
@@ -876,6 +883,22 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
             "Parsed financial tenor.",
         )
         .with_examples(tenor_examples),
+        SchemaArtifact::new::<crate::instruments::InstrumentJson>(
+            "schemas/common/1/instrument_json.schema.json",
+            concat!(
+                "https://finstack_quant.dev/schemas/common/1/",
+                "instrument_json.schema.json"
+            ),
+            "InstrumentJson",
+            "Tagged `{type, spec}` payload for one instrument, without the envelope marker.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+        .with_summary(
+            "The instrument union embedded by portfolio positions and candidates; the same \
+             branches as the instrument envelope's `instrument` field.",
+        )
+    .with_examples(examples::instrument_json),
         SchemaArtifact::new::<InstrumentEnvelope>(
             "schemas/instruments/1/instrument.schema.json",
             concat!(
@@ -899,7 +922,8 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
             "Native cashflow rows, reporting-currency PV and reconciliation status.",
         )
         .with_packager(package_valuations_schema)
-        .with_kind(SchemaKind::Output),
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::instrument_cashflow),
         SchemaArtifact::new::<crate::results::ValuationResult>(
             "schemas/results/1/valuation_result.schema.json",
             "https://finstack_quant.dev/schemas/results/1/valuation_result.schema.json",
@@ -910,6 +934,235 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_kind(SchemaKind::Output)
         .with_summary("PV plus requested measures, with rounding and FX policy stamps.")
         .with_examples(valuation_result_examples),
+        SchemaArtifact::new::<crate::instruments::CompositeRebalanceResult>(
+            "schemas/results/1/composite_rebalance_result.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
+            "CompositeRebalanceResult",
+            "Result of resolving a new composite holdings state.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::composite_rebalance_result),
+        SchemaArtifact::new::<
+            crate::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult,
+        >(
+            "schemas/results/1/enhanced_monte_carlo_result.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/enhanced_monte_carlo_result.schema.json",
+            "EnhancedMonteCarloResult",
+            "Revolving-credit Monte Carlo value with per-path details.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::enhanced_monte_carlo_result),
+        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::OasResult>(
+            "schemas/results/1/oas_result.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/oas_result.schema.json",
+            "OasResult",
+            "Structured-credit option-adjusted spread and its solver diagnostics.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::oas_result),
+        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::ScenarioTable>(
+            "schemas/results/1/scenario_table.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
+            "ScenarioTable",
+            "Structured-credit scenario grid results for one tranche.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::scenario_table),
+        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::TrancheMetrics>(
+            "schemas/results/1/tranche_metrics.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/tranche_metrics.schema.json",
+            "TrancheMetrics",
+            "Per-tranche risk and spread metrics from the tranche's own projected cashflows.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::tranche_metrics),
+        SchemaArtifact::new::<
+            crate::instruments::fixed_income::structured_credit::BorrowingBaseReport,
+        >(
+            "schemas/results/1/borrowing_base_report.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/borrowing_base_report.schema.json",
+            "BorrowingBaseReport",
+            "Asset-backed facility borrowing base, availability and advance-rate test.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::borrowing_base_report),
+        SchemaArtifact::new::<crate::instruments::CompositeHistoryRow>(
+            "schemas/results/1/composite_history_row.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/composite_history_row.schema.json",
+            "CompositeHistoryRow",
+            "One dated composite holdings state and its accumulated trades.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::composite_history_row),
+        SchemaArtifact::new::<crate::market::listed::ListedProductCoverage>(
+            "schemas/results/1/listed_product_coverage.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",
+            "ListedProductCoverage",
+            "Listed-product catalog coverage for one exchange product.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::listed_product_coverage),
+        SchemaArtifact::new::<crate::pricer::MetricMetadata>(
+            "schemas/results/1/metric_metadata.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/metric_metadata.schema.json",
+            "MetricMetadata",
+            "Canonical per-key metric interpretation for host presentation.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::metric_metadata),
+        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::EquityMetrics>(
+            "schemas/results/1/equity_metrics.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/equity_metrics.schema.json",
+            "EquityMetrics",
+            "Equity-tranche return metrics: IRR, MOIC, NAV and cash-on-cash.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::equity_metrics),
+        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::TrancheCashflows>(
+            "schemas/results/1/tranche_cashflows.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/tranche_cashflows.schema.json",
+            "TrancheCashflows",
+            "Projected cashflows of one structured-credit tranche, by component.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::tranche_cashflows),
+        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::SimulationDiagnostics>(
+            "schemas/results/1/simulation_diagnostics.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/simulation_diagnostics.schema.json",
+            "SimulationDiagnostics",
+            "Deal-level accounting produced alongside the tranche cashflows.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::simulation_diagnostics),
+        SchemaArtifact::new::<crate::instruments::MarketDependencies>(
+            "schemas/results/1/market_dependencies.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/market_dependencies.schema.json",
+            "MarketDependencies",
+            "Market data an instrument needs to price: curves, spots, surfaces, FX pairs and fixings.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::market_dependencies),
+        SchemaArtifact::new::<crate::instruments::fixed_income::convertible::ConvertibleGreeks>(
+            "schemas/results/1/convertible_greeks.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/convertible_greeks.schema.json",
+            "ConvertibleGreeks",
+            "Tree price and Greeks of a convertible bond.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::convertible_greeks),
+        SchemaArtifact::new::<crate::instruments::fixed_income::asset_backed_facility::FacilityProjection>(
+            "schemas/results/1/facility_projection.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/facility_projection.schema.json",
+            "FacilityProjection",
+            "Projected cashflows of an asset-backed facility and its residual.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::facility_projection),
+        SchemaArtifact::new::<crate::instruments::fixed_income::bond::pricing::engine::merton_mc::MertonMcResult>(
+            "schemas/results/1/merton_mc_result.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/merton_mc_result.schema.json",
+            "MertonMcResult",
+            "Merton Monte Carlo price of a PIK or toggle bond with path statistics.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::merton_mc_result),
+        SchemaArtifact::new::<crate::instruments::credit_derivatives::cds_index::CdsIndexParams>(
+            "schemas/common/1/cds_index_params.schema.json",
+            "https://finstack_quant.dev/schemas/common/1/cds_index_params.schema.json",
+            "CdsIndexParams",
+            "Preset identity, coupon and convention of a standard CDS index series.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+    .with_examples(examples::cds_index_params),
+        SchemaArtifact::new::<crate::instruments::credit_derivatives::cds_tranche::CdsTrancheParams>(
+            "schemas/common/1/cds_tranche_params.schema.json",
+            "https://finstack_quant.dev/schemas/common/1/cds_tranche_params.schema.json",
+            "CdsTrancheParams",
+            "Attachment, detachment, notional and coupon of a CDS index tranche.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+    .with_examples(examples::cds_tranche_params),
+        SchemaArtifact::new::<crate::metrics::risk::MarketHistory>(
+            "schemas/common/1/market_history.schema.json",
+            "https://finstack_quant.dev/schemas/common/1/market_history.schema.json",
+            "MarketHistory",
+            "Historical market scenarios for historical VaR and expected shortfall.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+    .with_examples(examples::market_history),
+        SchemaArtifact::new::<crate::market::conventions::RateIndexConventions>(
+            "schemas/common/1/rate_index_conventions.schema.json",
+            "https://finstack_quant.dev/schemas/common/1/rate_index_conventions.schema.json",
+            "RateIndexConventions",
+            "Market conventions of one interest-rate index.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+    .with_examples(examples::rate_index_conventions),
+        SchemaArtifact::new::<crate::market::conventions::CdsConventionSpec>(
+            "schemas/common/1/cds_convention_spec.schema.json",
+            "https://finstack_quant.dev/schemas/common/1/cds_convention_spec.schema.json",
+            "CdsConventionSpec",
+            "Market conventions of one CDS currency and documentation clause.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+    .with_examples(examples::cds_convention_spec),
+        SchemaArtifact::new::<crate::market::conventions::SwaptionConventions>(
+            "schemas/common/1/swaption_conventions.schema.json",
+            "https://finstack_quant.dev/schemas/common/1/swaption_conventions.schema.json",
+            "SwaptionConventions",
+            "Market conventions of one swaption market.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+    .with_examples(examples::swaption_conventions),
+        SchemaArtifact::new::<crate::market::conventions::InflationSwapConventions>(
+            "schemas/common/1/inflation_swap_conventions.schema.json",
+            "https://finstack_quant.dev/schemas/common/1/inflation_swap_conventions.schema.json",
+            "InflationSwapConventions",
+            "Market conventions of one inflation-swap market.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+    .with_examples(examples::inflation_swap_conventions),
+        SchemaArtifact::new::<crate::market::conventions::XccyConventions>(
+            "schemas/common/1/xccy_conventions.schema.json",
+            "https://finstack_quant.dev/schemas/common/1/xccy_conventions.schema.json",
+            "XccyConventions",
+            "Market conventions of one cross-currency swap pair.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+    .with_examples(examples::xccy_conventions),
+        SchemaArtifact::new::<crate::market::conventions::IrFutureConventions>(
+            "schemas/common/1/ir_future_conventions.schema.json",
+            "https://finstack_quant.dev/schemas/common/1/ir_future_conventions.schema.json",
+            "IrFutureConventions",
+            "Contract conventions of one interest-rate future.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Component)
+    .with_examples(examples::ir_future_conventions),
     ];
 
     artifacts.extend(
@@ -1192,6 +1445,7 @@ mod tests {
     #[test]
     fn test_instrument_schema_rejects_unknown_discriminator() {
         let err = instrument_schema("not_a_supported_instrument_type").expect_err("unknown type");
+        assert_eq!(err.kind(), finstack_quant_core::error::ErrorKind::NotFound);
         let msg = err.to_string();
         assert!(
             msg.contains("unknown instrument type"),

@@ -101,7 +101,7 @@ def test_analysis_functions_accept_typed_configs_and_return_typed_results() -> N
     assert sensitivity.get_value(0, "profit", "2025Q2") == pytest.approx(35.0)
     entries = generate_tornado_entries(sensitivity, "profit", "2025Q2")
     assert isinstance(entries[0], TornadoEntry)
-    assert entries[0].parameter_id == "revenue"
+    assert entries[0].parameter_id == "revenue@2025Q2"
     assert TornadoEntry.from_json(entries[0].to_json()).swing == pytest.approx(entries[0].swing)
     assert SensitivityResult.from_json(sensitivity.to_json()).get_value(2, "profit", "2025Q2") == pytest.approx(55.0)
 
@@ -250,7 +250,7 @@ def test_monetary_goal_seek_round_trip_and_variance_currency_boundary() -> None:
         builder.compute("profit", "revenue * 0.5")
         models.append(builder.build())
 
-    outcome = goal_seek(models[0], "profit", "2025", 60.0, "revenue", "2025", bounds=(1.0, 200.0))
+    outcome = goal_seek(models[0], "profit", "2025", 60.0, "revenue", "2025", True, bounds=(1.0, 200.0))
     assert outcome.model is not None
     restored = FinancialModelSpec.from_json(outcome.model.to_json())
     revenue = Evaluator().evaluate(restored).get_money("revenue", "2025")

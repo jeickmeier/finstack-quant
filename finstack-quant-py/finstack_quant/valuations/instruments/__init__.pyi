@@ -124,8 +124,8 @@ class Bond:
     """
     Typed wrapper for the canonical Rust ``Bond`` instrument.
 
-    Construct via :meth:`Bond.fixed` (US-corporate or a named convention
-    preset), :meth:`Bond.with_convention`, :meth:`Bond.floating` /
+    Construct via :meth:`Bond.fixed` (US corporate), :meth:`Bond.with_convention`
+    (a named preset; override its stub with :meth:`Bond.with_stub`), :meth:`Bond.floating` /
     :meth:`Bond.floating_with_convention`, :meth:`Bond.zero_coupon`, the
     :meth:`Bond.builder` fluent builder (callable schedules, credit curve,
     custom cashflow specs and settlement conventions), the ``Bond.example*``
@@ -185,18 +185,14 @@ class Bond:
         stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"],
         discount_curve_id: str,
         *,
-        convention: Literal[
-            "us_treasury", "us_agency", "german_bund", "uk_gilt", "french_oat", "jgb", "us_corporate", "eur_corporate"
-        ]
-        | None = None,
         currency: str | None = None,
     ) -> Bond:
         """
-        Create a fixed-rate bond from a settlement/day-count convention preset.
+        Create a US corporate fixed-rate bond (semi-annual, 30/360, T+1).
 
-        Mirrors Rust ``Bond::fixed`` when ``convention`` is ``None`` (US corporate:
-        semi-annual, 30/360, T+1) and ``Bond::with_convention`` followed by
-        ``with_stub`` when a preset is named.
+        Mirrors Rust ``Bond::fixed``. For another market's conventions use
+        :meth:`Bond.with_convention` and, to override the preset's stub rule,
+        chain :meth:`Bond.with_stub`.
 
         Parameters
         ----------
@@ -215,10 +211,6 @@ class Bond:
             ``StubKind`` or its serde name (``"none"``, ``"short_front"``, ...).
         discount_curve_id : str
             Discount curve identifier used for pricing.
-        convention : str, optional
-            Bond convention preset controlling coupon frequency, day count,
-            calendar, business-day convention and settlement lag. ``None`` is
-            ``"us_corporate"``.
         currency : str, optional
             ISO-4217 code applied when ``notional`` is a bare number.
 
@@ -230,9 +222,9 @@ class Bond:
         Raises
         ------
         ValueError
-            If ``convention``/``stub`` is not a recognized name, a bare
-            ``notional`` has no ``currency``, or validation fails (e.g. maturity
-            not after issue_date).
+            If ``stub`` is not a recognized name, a bare ``notional`` has no
+            ``currency``, or validation fails (e.g. maturity not after
+            issue_date).
         TypeError
             If ``coupon_rate`` or ``notional`` has an unsupported type or a date
             cannot be interpreted.
@@ -240,19 +232,45 @@ class Bond:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import Bond
-        >>> bund = Bond.fixed(
-        ...     "BUND",
-        ...     1_000_000.0,
-        ...     0.025,
-        ...     "2024-01-15",
-        ...     "2034-01-15",
-        ...     "none",
-        ...     "EUR-OIS",
-        ...     convention="german_bund",
-        ...     currency="EUR",
+        >>> bond = Bond.fixed(
+        ...     "BOND-1", 1_000_000.0, 0.05, "2024-01-01", "2034-01-01", "none", "USD-OIS", currency="USD"
         ... )
-        >>> bund.settlement_days
-        2
+        >>> bond.settlement_days
+        1
+        """
+        ...
+    def with_stub(
+        self, stub: StubKind | Literal["none", "short_front", "long_front", "short_back", "long_back"]
+    ) -> Bond:
+        """
+        Return a copy of this bond with a different coupon-schedule stub rule.
+
+        Mirrors Rust ``Bond::with_stub``; the receiver is not modified.
+
+        Parameters
+        ----------
+        stub : StubKind | str
+            Placement and length policy for an irregular coupon period, as a
+            ``StubKind`` or its serde name (``"none"``, ``"short_front"``, ...).
+
+        Returns
+        -------
+        Bond
+            A new bond whose coupon schedule uses ``stub``.
+
+        Raises
+        ------
+        ValueError
+            If ``stub`` is not a recognized stub name.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import Bond
+        >>> bund = Bond.with_convention(
+        ...     "BUND", 1_000_000.0, 0.025, "2024-01-15", "2034-01-15", "german_bund", "EUR-OIS", currency="EUR"
+        ... ).with_stub("long_back")
+        >>> bund.to_dict()["cashflow_spec"]["fixed"]["stub"]
+        'long_back'
         """
         ...
     @staticmethod
@@ -273,7 +291,7 @@ class Bond:
         Create a fixed-rate bond from a named market convention.
 
         Mirrors Rust ``Bond::with_convention``; the stub rule is the preset's own
-        (use :meth:`Bond.fixed` with ``convention=`` to override it).
+        (chain :meth:`Bond.with_stub` to override it).
 
         Parameters
         ----------
@@ -359,7 +377,8 @@ class Bond:
         forward_curve_id : str
             Forward curve identifier (e.g. ``"USD-SOFR-3M"``).
         spread_bp : float | Bps
-            Spread over the index in whole basis points (fractions are rounded).
+            Spread over the index in whole basis points; fractional values raise
+            ``ValueError`` (use :meth:`Bond.from_json` for sub-bp margins).
         issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -382,8 +401,9 @@ class Bond:
         ------
         ValueError
             If the notional currency has no mapped settlement convention,
-            ``notional`` is not finite and positive, or ``issue_date`` is not strictly
-            before ``maturity``.
+            ``notional`` is not finite and positive, ``spread_bp`` is not a finite
+            whole number of basis points, or ``issue_date`` is not strictly before
+            ``maturity``.
         TypeError
             If ``spread_bp``/``notional`` has an unsupported type or a date cannot
             be interpreted.
@@ -439,7 +459,8 @@ class Bond:
         forward_curve_id : str
             Forward curve identifier (e.g. ``"EUR-EURIBOR-3M"``).
         spread_bp : float | Bps
-            Spread over the index in whole basis points (fractions are rounded).
+            Spread over the index in whole basis points; fractional values raise
+            ``ValueError`` (use :meth:`Bond.from_json` for sub-bp margins).
         issue_date : datetime.date | datetime.datetime | pd.Timestamp | str
             Issue date.
         maturity : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -464,7 +485,8 @@ class Bond:
         ------
         ValueError
             If ``convention`` is unknown, a bare ``notional`` has no ``currency``,
-            or validation fails.
+            ``spread_bp`` is not a finite whole number of basis points, or
+            validation fails.
         TypeError
             If ``spread_bp``/``notional`` has an unsupported type or a date cannot
             be interpreted.
@@ -12304,7 +12326,10 @@ class FxForward:
             T+N spot lag in business days (non-negative); ``None`` uses
             :meth:`FxForward.standard_settlement_days` for the pair.
         business_day_convention : BusinessDayConvention | str | None
-            Roll rule applied to the maturity; ``None`` means ``"modified_following"``.
+            Roll rule applied to the maturity: a ``BusinessDayConvention`` or a
+            name accepted by ``adjust`` (serde names or ``MF``/``F``/``P``/``MP``
+            short codes). ``None`` selects the Rust ``FxForward::from_trade_date``
+            default, Modified Following.
         end_of_month : bool, default False
             Apply the FX end-of-month rule when spot falls on month end.
 
@@ -17061,6 +17086,40 @@ class Tranche:
         """
         ...
 
+    @property
+    def oc_trigger(self) -> dict[str, Any] | None:
+        """
+        Per-tranche overcollateralization trigger as its ``CoverageTrigger`` serde ``dict``.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``None`` without a trigger.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    @property
+    def ic_trigger(self) -> dict[str, Any] | None:
+        """
+        Per-tranche interest-coverage trigger as its ``CoverageTrigger`` serde ``dict``.
+
+        Returns
+        -------
+        dict[str, Any] | None
+            ``None`` without a trigger.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
 class TrancheBuilder:
     """
     Fluent builder returned by :meth:`Tranche.builder`.
@@ -17481,40 +17540,6 @@ class TrancheBuilder:
         ValueError
             If ``value`` is invalid or this builder was already consumed by a
             prior call to :meth:`TrancheBuilder.build`.
-        """
-        ...
-
-    @property
-    def oc_trigger(self) -> dict[str, Any] | None:
-        """
-        Per-tranche overcollateralization trigger as its ``CoverageTrigger`` serde ``dict``.
-
-        Returns
-        -------
-        dict[str, Any] | None
-            ``None`` without a trigger.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized.
-        """
-        ...
-
-    @property
-    def ic_trigger(self) -> dict[str, Any] | None:
-        """
-        Per-tranche interest-coverage trigger as its ``CoverageTrigger`` serde ``dict``.
-
-        Returns
-        -------
-        dict[str, Any] | None
-            ``None`` without a trigger.
-
-        Raises
-        ------
-        ValueError
-            If the value cannot be serialized.
         """
         ...
 
@@ -20131,7 +20156,8 @@ class AdvanceRate:
         Raises
         ------
         ValueError
-            If ``rate`` is outside ``[0, 1]`` or not finite.
+            If ``asset_class`` is empty or ``rate`` is not a finite decimal in
+            ``[0, 1]`` (Rust ``AdvanceRate::validate``).
         """
         ...
 
@@ -20301,8 +20327,8 @@ class ConcentrationLimit:
         Raises
         ------
         ValueError
-            If ``scope`` is not one of the three names or ``max_pct`` is
-            outside ``[0, 100]``.
+            If ``scope`` is not one of the three names or ``max_pct`` is not a
+            finite percent in ``(0, 100]`` (Rust ``ConcentrationLimit::validate``).
         """
         ...
 
@@ -21950,7 +21976,7 @@ class StructuredCredit:
         Raises
         ------
         ValueError
-            If the deal fails pricing validation.
+            If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
 
         Examples
         --------
@@ -22055,7 +22081,7 @@ class StructuredCredit:
         Raises
         ------
         ValueError
-            If the deal fails pricing validation.
+            If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
 
         Examples
         --------
@@ -22128,7 +22154,7 @@ class StructuredCredit:
         Raises
         ------
         ValueError
-            If the deal fails pricing validation.
+            If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
 
         Examples
         --------
@@ -22201,7 +22227,7 @@ class StructuredCredit:
         Raises
         ------
         ValueError
-            If the deal fails pricing validation.
+            If the deal fails pricing validation or its first registry payment period exceeds the supported calendar range.
 
         Examples
         --------
@@ -23070,7 +23096,7 @@ class StructuredCredit:
         market: MarketContext | str,
         as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
         num_paths: int | None = None,
-        antithetic: bool = True,
+        antithetic: bool | None = None,
     ) -> StochasticPricingResult:
         """
         Price the deal with the scenario-waterfall Monte Carlo engine.
@@ -23087,23 +23113,28 @@ class StructuredCredit:
         as_of : datetime.date | datetime.datetime | pd.Timestamp | str
             Valuation date (ISO 8601 strings accepted).
         num_paths : int, optional
-            Number of independent Monte Carlo estimators; defaults to the
-            deal's configured ``mc_paths`` override or 5,000. With
-            ``antithetic`` each estimator simulates a mirrored pair, so
-            ``2 * num_paths`` paths run.
-        antithetic : bool, default True
-            Pair each estimator's path with its sign-flipped mirror.
+            Number of independent Monte Carlo estimators; must be at least
+            two. Defaults to the deal's configured ``mc_paths`` override or
+            5,000. With ``antithetic`` each estimator averages a mirrored pair,
+            so ``2 * num_paths`` physical paths run while the statistical
+            sample size remains ``num_paths``.
+        antithetic : bool, optional
+            Pair each estimator's path with its sign-flipped mirror; defaults
+            to the deal's configured ``mc_antithetic`` override or ``True``.
 
         Returns
         -------
         StochasticPricingResult
             Deal and tranche present values, loss statistics, Monte Carlo
-            error, draw diagnostics and the draw option cost.
+            error, draw diagnostics and the draw option cost. Sampling error
+            uses the sample standard deviation and a 95% Student-t confidence
+            interval with ``num_paths - 1`` degrees of freedom.
 
         Raises
         ------
         ValueError
-            If the deal fails validation or ``num_paths`` is zero.
+            If the deal fails validation or the resolved ``num_paths`` is less
+            than two independent estimators.
         KeyError
             If a required curve is missing from ``market``.
         RuntimeError
@@ -24137,6 +24168,8 @@ def validate_instrument_json(
         Metric-time overrides merged into
         ``instrument.spec.metric_pricing_overrides`` before instrument
         validation; ``None`` (the default) retains the envelope configuration.
+        Dict and JSON patches replace only supplied fields, including individual
+        ``bump_config`` fields; explicit ``None``/``null`` clears optional fields.
 
     Returns
     -------
@@ -24295,6 +24328,8 @@ def price_instrument(
         (``{"target": "z_spread", "mode": "linear"}``), ``bump_config``,
         ``bond_risk_basis``, ``theta_day_basis``, ``var_config``. A dict or
         JSON string is accepted in place of the typed object.
+        Dict and JSON patches retain omitted fields, including individual
+        ``bump_config`` fields; explicit ``None``/``null`` clears optional fields.
     market_history : MarketHistory or dict or str, optional
         Historical scenarios required by the ``"hvar"`` and
         ``"expected_shortfall"`` metrics; a dict or JSON string is accepted in
@@ -25490,9 +25525,10 @@ class AssetBackedFacility:
         datetime.date
             The repayment date.
 
-        Notes
-        -----
-        This accessor does not raise; it is derived from stored terms.
+        Raises
+        ------
+        ValueError
+            If the term-out window exceeds the supported calendar range.
         """
         ...
     @property
@@ -28549,7 +28585,11 @@ class StochasticPricingResult:
     @property
     def pv_std_error(self) -> float:
         """
-        Standard error of the mean present value, in currency units.
+        Sample standard error of the mean present value, in currency units.
+
+        Monte Carlo uses the sample standard deviation divided by the square
+        root of the independent-estimator count; each antithetic pair
+        contributes its average as one observation.
 
         Returns
         -------
@@ -28564,7 +28604,9 @@ class StochasticPricingResult:
     @property
     def pv_confidence_interval(self) -> tuple[float, float]:
         """
-        95% confidence interval of the mean present value, in currency units.
+        Two-sided 95% Student-t confidence interval of mean present value, in
+        currency units. Monte Carlo uses one fewer degree of freedom than the
+        independent-estimator count; each antithetic pair counts once.
 
         Returns
         -------
@@ -28580,6 +28622,9 @@ class StochasticPricingResult:
     def num_paths(self) -> int:
         """
         Number of simulated scenario paths (two per antithetic estimator).
+
+        Monte Carlo sampling uncertainty uses independent estimator counts,
+        which equal half this value when antithetic pairing is enabled.
 
         Returns
         -------

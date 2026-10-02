@@ -5,8 +5,6 @@ use super::validate;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations::market::conventions::ids::CdsConventionKey;
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 /// Standard fixed running coupons for ISDA-style upfront CDS quotes.
 ///
@@ -79,9 +77,6 @@ fn is_standard_upfront_running_coupon_bp(coupon_bp: f64) -> bool {
 /// # Ok(())
 /// # }
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[cfg_attr(feature = "ts_export", ts(rename_all = "snake_case"))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
@@ -89,15 +84,12 @@ pub enum CdsQuote {
     /// Credit Default Swap (par spread).
     CdsParSpread {
         /// Unique identifier for the quote.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         id: QuoteId,
         /// Reference entity name.
         entity: String,
         /// Convention key (currency + doc clause).
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         convention: CdsConventionKey,
         /// Maturity pillar.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         pillar: Pillar,
         /// Par spread in basis points (e.g. 100.0).
         spread_bp: f64,
@@ -107,15 +99,12 @@ pub enum CdsQuote {
     /// Credit Default Swap (upfront + running).
     CdsUpfront {
         /// Unique identifier for the quote.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         id: QuoteId,
         /// Reference entity name.
         entity: String,
         /// Convention key.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         convention: CdsConventionKey,
         /// Maturity pillar.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         pillar: Pillar,
         /// Contractual running coupon in basis points (25.0, 100.0, 500.0 or 1000.0).
         coupon_bp: f64,

@@ -8,7 +8,6 @@ use finstack_quant_core::market_data::scalars::{
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyModule};
-use rust_decimal::prelude::ToPrimitive;
 
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
 use crate::bindings::core::money::{decimal_from_py, is_python_decimal};
@@ -16,27 +15,11 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
 use crate::errors::core_to_py;
 
-/// Extract a finite `f64`, rejecting `Decimal` values that cannot round-trip exactly.
+/// Extract a finite `f64`, rejecting `Decimal` values without an exact binary representation.
 pub(super) fn extract_exact_f64(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64> {
     if is_python_decimal(value)? {
         let decimal = decimal_from_py(value)?;
-        let converted = decimal.to_f64().ok_or_else(|| {
-            crate::errors::value_error(format!("{field} must be finite and representable as float"))
-        })?;
-        if !converted.is_finite() {
-            return Err(crate::errors::value_error(format!(
-                "{field} must be finite"
-            )));
-        }
-        let roundtrip = rust_decimal::Decimal::from_f64_retain(converted).ok_or_else(|| {
-            crate::errors::value_error(format!("{field} must be representable as float"))
-        })?;
-        if roundtrip.normalize() != decimal.normalize() {
-            return Err(crate::errors::value_error(format!(
-                "{field} Decimal value must be exactly representable as float"
-            )));
-        }
-        return Ok(converted);
+        return finstack_quant_core::decimal::decimal_to_f64_exact(decimal).map_err(core_to_py);
     }
 
     let converted = value.extract::<f64>().map_err(|_| {
@@ -81,7 +64,7 @@ impl PyScalarTimeSeries {
     /// id : str
     ///     Series identifier.
     /// observations : list[tuple[datetime.date | str, float | int | decimal.Decimal]]
-    ///     Dated values; ``Decimal`` values must round-trip through ``float`` exactly.
+    ///     Dated values; ``Decimal`` values must be exactly representable as binary ``float``.
     ///     Dates must be unique; any order is accepted.
     /// currency : Currency | str, optional
     ///     Currency tag for monetary series; ``None`` for unitless values.
@@ -92,7 +75,8 @@ impl PyScalarTimeSeries {
     /// ------
     /// ValueError
     ///     If ``observations`` is empty or has duplicate dates, a value is
-    ///     non-finite, or ``interpolation`` is not a recognised label.
+    ///     non-finite or a ``Decimal`` cannot be represented exactly as ``float``,
+    ///     or ``interpolation`` is not a recognised label.
     ///
     /// Example
     /// -------
@@ -326,13 +310,13 @@ impl PyInflationIndex {
     /// id : str
     ///     Index identifier (e.g. ``"US-CPI-U"``).
     /// observations : list[tuple[datetime.date | str, float | int | decimal.Decimal]]
-    ///     Dated index levels; ``Decimal`` values must round-trip through ``float`` exactly.
+    ///     Dated index levels; ``Decimal`` values must be exactly representable as binary ``float``.
     /// currency : Currency | str
     ///     Currency of the index.
     /// interpolation : str, optional
     ///     ``"step"`` (default, last observation carried forward) or ``"linear"``.
     /// lag : str | int, optional
-    ///     Publication lag applied before lookups: ``"none"`` (default),
+    ///     Contractual observation lag applied before lookups: ``"none"`` (default),
     ///     ``"3M"``/``"90D"`` market strings, or an integer number of months.
     /// seasonality : list[float], optional
     ///     Twelve multiplicative factors, January through December.
@@ -341,7 +325,8 @@ impl PyInflationIndex {
     /// ------
     /// ValueError
     ///     If ``observations`` is empty or has duplicate dates, a label is
-    ///     unknown, or ``seasonality`` does not have exactly 12 entries.
+    ///     unknown, a value is non-finite or a ``Decimal`` cannot be represented
+    ///     exactly as ``float``, or ``seasonality`` does not have exactly 12 entries.
     ///
     /// Example
     /// -------
@@ -413,6 +398,102 @@ impl PyInflationIndex {
         Ok(Self {
             inner: Arc::new(inner),
         })
+    }
+
+    /// Return a new index with an explicit monthly publication schedule.
+    ///
+    /// Parameters
+    /// ----------
+    /// dates : list[tuple[datetime.date | str, datetime.date | str]]
+    ///     Pairs of first-of-month reference dates and inclusive publication
+    ///     dates. Replaces the existing schedule; publication must not precede
+    ///     its reference month. Contractual observation lag is independent.
+    ///     This declares monthly reference observations for valuation even
+    ///     with no lag or a day lag; raw observation label days are not fixing dates.
+    ///
+    /// Returns
+    /// -------
+    /// InflationIndex
+    ///     A new index preserving observations and other conventions.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If a date is malformed, a key is not month start, a month is
+    ///     duplicated, or publication precedes its reference month.
+    /// TypeError
+    ///     If an entry is not a pair of supported date-like values.
+    fn with_publication_dates(
+        &self,
+        dates: Vec<(Bound<'_, PyAny>, Bound<'_, PyAny>)>,
+    ) -> PyResult<Self> {
+        let dates = dates
+            .iter()
+            .map(|(reference_month, publication_date)| {
+                Ok((py_to_date(reference_month)?, py_to_date(publication_date)?))
+            })
+            .collect::<PyResult<Vec<_>>>()?;
+        let inner = self
+            .inner
+            .as_ref()
+            .clone()
+            .with_publication_dates(dates)
+            .map_err(core_to_py)?;
+        Ok(Self::from_inner(Arc::new(inner)))
+    }
+
+    /// Get the explicit publication date for a reference month.
+    ///
+    /// Parameters
+    /// ----------
+    /// reference_date : datetime.date | str
+    ///     Any date in the reference month; its day is ignored.
+    ///
+    /// Returns
+    /// -------
+    /// datetime.date | None
+    ///     Inclusive availability date, or ``None`` when unspecified. Missing
+    ///     metadata never authorizes projection of missing historical data.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``reference_date`` is malformed.
+    /// TypeError
+    ///     If ``reference_date`` is not date-like or an ISO date string.
+    fn get_publication_date(
+        &self,
+        py: Python<'_>,
+        reference_date: &Bound<'_, PyAny>,
+    ) -> PyResult<Option<Py<PyAny>>> {
+        self.inner
+            .get_publication_date(py_to_date(reference_date)?)
+            .map(|date| date_to_py(py, date).map(Bound::unbind))
+            .transpose()
+    }
+
+    /// Get the configured monthly publication schedule.
+    ///
+    /// Returns
+    /// -------
+    /// list[tuple[datetime.date, datetime.date]]
+    ///     Reference-month/publication pairs in ascending reference-month order.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If an internal date cannot be converted to a Python date.
+    fn get_publication_dates(&self, py: Python<'_>) -> PyResult<Vec<(Py<PyAny>, Py<PyAny>)>> {
+        self.inner
+            .get_publication_dates()
+            .into_iter()
+            .map(|(reference_month, publication_date)| {
+                Ok((
+                    date_to_py(py, reference_month)?.unbind(),
+                    date_to_py(py, publication_date)?.unbind(),
+                ))
+            })
+            .collect()
     }
 
     /// Indexation ratio ``value_on(settle_date) / value_on(base_date)`` with lag and seasonality applied.
@@ -574,7 +655,7 @@ pub(super) const EXPORTS: &[&str] = &["InflationIndex", "ScalarTimeSeries"];
 
 /// Register the `finstack_quant.core.market_data.scalars` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "scalars")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "scalars")?;
     m.setattr(
         "__doc__",
         "Scalar market time-series bindings (finstack-quant-core).",
@@ -583,12 +664,9 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyInflationIndex>()?;
     m.setattr("__all__", PyList::new(py, EXPORTS)?)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "scalars",
-        "finstack_quant.core.market_data",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )
 }

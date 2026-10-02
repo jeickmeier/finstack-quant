@@ -45,14 +45,20 @@
 /// assert!(cpr_to_smm(-0.05).is_err());
 /// ```
 pub fn cpr_to_smm(cpr: f64) -> finstack_quant_core::Result<f64> {
-    check_unit_interval("cpr", cpr)?;
-    if cpr == 0.0 {
+    annual_to_monthly("cpr", cpr)
+}
+
+/// Checked annual-to-monthly mortality kernel shared by
+/// [`cpr_to_smm`] and [`cdr_to_mdr`]; `name` labels the rate in errors.
+fn annual_to_monthly(name: &str, annual: f64) -> finstack_quant_core::Result<f64> {
+    check_unit_interval(name, annual)?;
+    if annual == 0.0 {
         return Ok(0.0);
     }
     // `expm1` retains precision for small mortality rates. This matters for
     // finite-difference risk measures, where rounding in two nearby PVs can be
     // amplified by the final subtraction.
-    Ok(-((1.0 - cpr).ln() / 12.0).exp_m1())
+    Ok(-((1.0 - annual).ln() / 12.0).exp_m1())
 }
 
 /// Length of the PSA benchmark seasoning ramp, in months.
@@ -133,11 +139,17 @@ pub fn psa_cpr(speed_multiplier: f64, seasoning_months: u32) -> f64 {
 /// assert!((cpr - cpr_back).abs() < 1e-10);
 /// ```
 pub fn smm_to_cpr(smm: f64) -> finstack_quant_core::Result<f64> {
-    check_unit_interval("smm", smm)?;
-    if smm == 0.0 {
+    monthly_to_annual("smm", smm)
+}
+
+/// Checked monthly-to-annual mortality kernel shared by
+/// [`smm_to_cpr`] and [`mdr_to_cdr`]; `name` labels the rate in errors.
+fn monthly_to_annual(name: &str, monthly: f64) -> finstack_quant_core::Result<f64> {
+    check_unit_interval(name, monthly)?;
+    if monthly == 0.0 {
         return Ok(0.0);
     }
-    Ok(1.0 - (1.0 - smm).powi(12))
+    Ok(1.0 - (1.0 - monthly).powi(12))
 }
 
 /// Reject non-finite or out-of-range mortality rates with a self-describing
@@ -167,9 +179,10 @@ fn check_unit_interval(name: &str, value: f64) -> finstack_quant_core::Result<()
 ///
 /// # Errors
 ///
-/// Returns an error if `cdr` is non-finite or outside `[0, 1]`.
+/// Returns `Error::Validation("cdr must be a decimal in [0,1]; got …")` if
+/// `cdr` is non-finite or outside `[0, 1]`.
 pub fn cdr_to_mdr(cdr: f64) -> finstack_quant_core::Result<f64> {
-    cpr_to_smm(cdr)
+    annual_to_monthly("cdr", cdr)
 }
 
 /// Convert monthly MDR to annual CDR.
@@ -188,9 +201,10 @@ pub fn cdr_to_mdr(cdr: f64) -> finstack_quant_core::Result<f64> {
 ///
 /// # Errors
 ///
-/// Returns an error if `mdr` is non-finite or outside `[0, 1]`.
+/// Returns `Error::Validation("mdr must be a decimal in [0,1]; got …")` if
+/// `mdr` is non-finite or outside `[0, 1]`.
 pub fn mdr_to_cdr(mdr: f64) -> finstack_quant_core::Result<f64> {
-    smm_to_cpr(mdr)
+    monthly_to_annual("mdr", mdr)
 }
 
 /// Convert an ABS speed to the single-month mortality for a seasoning month.
@@ -262,6 +276,22 @@ mod tests {
         assert_eq!(psa_cpr(1.0, 360), 0.06);
         assert!((psa_cpr(1.5, 20) - 0.06).abs() < 1e-15);
         assert_eq!(psa_cpr(0.0, 45), 0.0);
+    }
+
+    #[test]
+    fn rate_errors_name_the_rate_the_caller_passed() {
+        for (result, name) in [
+            (cdr_to_mdr(1.2), "cdr"),
+            (mdr_to_cdr(-0.1), "mdr"),
+            (cpr_to_smm(1.2), "cpr"),
+            (smm_to_cpr(f64::NAN), "smm"),
+        ] {
+            let message = result.expect_err("out-of-range rate").to_string();
+            assert!(
+                message.contains(&format!("{name} must be a decimal in [0,1]")),
+                "{name}: {message}"
+            );
+        }
     }
 
     #[test]

@@ -21,6 +21,7 @@ pub trait BasisFunctions: Send + Sync {
 
 /// Supported regression basis families for LSMC pricers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum BasisKind {
     /// Laguerre polynomials normalized by strike.

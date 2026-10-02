@@ -62,7 +62,7 @@ impl NettingSet {
     /// * `sensitivities` - Additional sensitivities to accumulate.
     pub(super) fn merge_sensitivities(&mut self, sensitivities: &SimmSensitivities) {
         if let Some(ref mut agg) = self.aggregated_sensitivities {
-            agg.merge(sensitivities);
+            agg.merge_unchecked(sensitivities);
         } else {
             self.aggregated_sensitivities = Some(sensitivities.clone());
         }

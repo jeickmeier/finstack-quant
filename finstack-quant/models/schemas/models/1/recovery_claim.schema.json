@@ -1,0 +1,60 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/recovery_claim.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "A claim participating in a recovery waterfall.",
+  "properties": {
+    "accrued": {
+      "description": "Accrued amount.",
+      "format": "double",
+      "type": "number"
+    },
+    "collateral_haircut": {
+      "description": "Collateral haircut in the inclusive range `[0, 1]`.",
+      "format": "double",
+      "type": "number"
+    },
+    "collateral_value": {
+      "description": "Gross value of collateral pledged exclusively to this claim.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "id": {
+      "description": "Stable claim identifier.",
+      "type": "string"
+    },
+    "penalties": {
+      "description": "Allowed penalties or fees.",
+      "format": "double",
+      "type": "number"
+    },
+    "principal": {
+      "description": "Principal amount.",
+      "format": "double",
+      "type": "number"
+    },
+    "priority": {
+      "description": "Absolute-priority rank; lower values recover before higher values.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "seniority": {
+      "description": "Caller-defined seniority label used for reporting.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "seniority",
+    "priority",
+    "principal",
+    "accrued",
+    "penalties",
+    "collateral_haircut"
+  ],
+  "title": "RecoveryClaim",
+  "type": "object"
+}

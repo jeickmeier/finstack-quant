@@ -18,9 +18,10 @@ pub mod frtb;
 pub mod sa_ccr;
 
 pub use frtb::{
-    CorrelationScenario, DrcAssetType, DrcPosition, DrcSector, DrcSeniority, FrtbRiskClass,
-    FrtbSbaEngine, FrtbSbaResult, FrtbSensitivities, RraoPosition,
+    frtb_sba_charge, CorrelationScenario, DrcAssetType, DrcPosition, DrcSector, DrcSeniority,
+    FrtbRiskClass, FrtbSbaEngine, FrtbSbaResult, FrtbSensitivities, RraoPosition,
 };
 pub use sa_ccr::{
-    EadResult, SaCcrAssetClass, SaCcrEngine, SaCcrNettingSetConfig, SaCcrOptionType, SaCcrTrade,
+    saccr_ead, EadResult, SaCcrAssetClass, SaCcrEngine, SaCcrNettingSetConfig, SaCcrOptionType,
+    SaCcrTrade,
 };

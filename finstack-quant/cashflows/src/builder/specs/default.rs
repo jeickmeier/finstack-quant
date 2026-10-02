@@ -25,7 +25,9 @@ pub enum DefaultCurve {
     /// constant loss severity. Defaults in month `t` are
     /// `Δloss_t / severity` of the original balance; see
     /// [`DefaultModelSpec::mdr_with_survival`] for the conversion to a
-    /// monthly rate on the surviving balance. The `cdr` field is ignored.
+    /// monthly rate on the surviving balance. Cumulative defaults may exceed
+    /// the original balance after replenishment or par build. The `cdr`
+    /// field is ignored.
     CumulativeLoss {
         /// Cumulative net loss in percent of the original balance per month
         /// of seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the
@@ -106,6 +108,8 @@ impl DefaultModelSpec {
     /// - the SDA `speed_multiplier` is non-finite (NaN/∞) or negative
     /// - the scaled annual CDR exceeds 1.0 (e.g. an over-unity multiplier)
     /// - a vector curve is empty or holds an invalid value
+    /// - cumulative-loss severity is outside `(0, 1]` or the implied defaults
+    ///   are non-finite
     ///
     /// Returns `InputError::NegativeValue`/`InputError::Invalid` if the
     /// constant `cdr` is negative or non-finite.
@@ -229,7 +233,9 @@ impl DefaultModelSpec {
     /// # Returns
     ///
     /// `Some(fraction)` for [`DefaultCurve::CumulativeLoss`] and
-    /// [`DefaultCurve::Timing`], `None` for rate-based curves.
+    /// [`DefaultCurve::Timing`], `None` for rate-based curves. A cumulative-loss
+    /// curve may return a fraction above 1.0 when replenishment or par build
+    /// makes cumulative defaults larger than the original balance.
     ///
     /// # Errors
     ///
@@ -240,9 +246,12 @@ impl DefaultModelSpec {
         seasoning_months: u32,
     ) -> finstack_quant_core::Result<Option<f64>> {
         match &self.curve {
-            Some(DefaultCurve::CumulativeLoss { .. } | DefaultCurve::Timing { .. }) => Ok(Some(
-                self.cumulative_default_fraction_checked(seasoning_months)?,
-            )),
+            Some(DefaultCurve::CumulativeLoss { .. } | DefaultCurve::Timing { .. }) => {
+                self.validate()?;
+                Ok(Some(
+                    self.cumulative_default_fraction_checked(seasoning_months)?,
+                ))
+            }
             _ => Ok(None),
         }
     }
@@ -270,7 +279,13 @@ impl DefaultModelSpec {
                     seasoning_months,
                     "cumulative_net_loss_pct",
                 )?;
-                Ok((loss_pct / 100.0 / severity).clamp(0.0, 1.0))
+                let defaults = loss_pct / 100.0 / severity;
+                if !defaults.is_finite() {
+                    return Err(invalid(
+                        "cumulative-loss defaults (loss / severity) must be finite".to_string(),
+                    ));
+                }
+                Ok(defaults)
             }
             Some(DefaultCurve::Timing {
                 cumulative_default_rate,
@@ -310,9 +325,10 @@ impl DefaultModelSpec {
     /// Returns `Error::Validation` for a non-finite or negative constant CDR,
     /// an invalid SDA multiplier, a vector curve that is empty or holds a
     /// value outside `[0, 1]`, a cumulative-loss curve that is empty,
-    /// decreasing, negative or paired with a severity outside `(0, 1]`, or a
-    /// timing curve whose `annual_pct` does not sum to 100 or whose
-    /// cumulative default rate is outside `[0, 1]`.
+    /// decreasing, negative, paired with a severity outside `(0, 1]`, or
+    /// producing non-finite defaults, or a timing curve whose `annual_pct`
+    /// does not sum to 100 or whose cumulative default rate is outside
+    /// `[0, 1]`.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
         match &self.curve {
@@ -482,7 +498,10 @@ impl DefaultModelSpec {
     ///   original balance per seasoning month (`1.5` = 1.5%), non-decreasing,
     ///   month 1 first; the last value is held.
     /// * `severity` - Loss severity as a decimal fraction of defaulted par in
-    ///   `(0, 1]`; defaults are `loss / severity`.
+    ///   `(0, 1]`; defaults are `loss / severity` and must remain finite.
+    ///   Cumulative defaults may exceed the original balance when assets are
+    ///   replenished or par is built; use [`Self::mdr_with_survival`] to size
+    ///   each month's defaults against the actual surviving balance.
     ///
     /// # Returns
     ///
@@ -540,5 +559,62 @@ impl DefaultModelSpec {
                 annual_pct,
             }),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DefaultModelSpec;
+
+    #[test]
+    fn cumulative_loss_preserves_defaults_after_par_build() {
+        let spec = DefaultModelSpec::cumulative_loss(vec![60.0, 70.0], 0.5);
+        spec.validate().expect("finite cumulative-loss curve");
+
+        let original_balance = 100.0;
+        let mut balance = 150.0;
+        let mut loss = 0.0;
+        for (month, expected_loss) in [(1, 60.0), (2, 70.0)] {
+            let rate = spec
+                .mdr_with_survival(month, balance / original_balance)
+                .expect("positive surviving balance");
+            let defaults = balance * rate;
+            balance -= defaults;
+            loss += defaults * 0.5;
+            assert!((loss - expected_loss).abs() < 1e-12);
+        }
+        assert!((balance - 10.0).abs() < 1e-12);
+        assert_eq!(
+            spec.cumulative_default_fraction(2)
+                .expect("valid cumulative-loss curve"),
+            Some(1.4)
+        );
+        assert_eq!(
+            spec.mdr_with_survival(1, 0.5)
+                .expect("positive surviving balance"),
+            1.0,
+            "monthly defaults cannot exceed available collateral"
+        );
+    }
+
+    #[test]
+    fn cumulative_default_fraction_checks_the_entire_curve() {
+        for spec in [
+            DefaultModelSpec::cumulative_loss(vec![1.0, 0.5], 0.5),
+            DefaultModelSpec::cumulative_loss(Vec::new(), 0.5),
+            DefaultModelSpec::timing(0.1, vec![50.0]),
+        ] {
+            for month in [0, 1, 12] {
+                assert!(spec.cumulative_default_fraction(month).is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn cumulative_loss_rejects_non_finite_implied_defaults() {
+        let spec = DefaultModelSpec::cumulative_loss(vec![100.0], f64::from_bits(1));
+        assert!(spec.validate().is_err());
+        assert!(spec.cumulative_default_fraction(1).is_err());
+        assert!(spec.mdr_with_survival(1, 1.5).is_err());
     }
 }

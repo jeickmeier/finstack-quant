@@ -8,7 +8,12 @@
 //!
 //! - **Principal**: Amount deposited at start
 //! - **Simple interest**: Accrues using day count convention
-//! - **Single payment**: Principal + interest at maturity
+//! - **Maturity payment**: Principal + interest on the same date
+//!
+//! The full contractual schedule contains three classified entries on two
+//! payment dates: an initial `Notional` outflow, a maturity `Notional`
+//! repayment, and maturity `Fixed` interest. Valuation-date filtering may
+//! omit settled entries.
 //!
 //! # Pricing
 //!

@@ -307,17 +307,18 @@ impl PyQualitativeFlags {
 /// IFRS 9 staging policy: SICR thresholds, days-past-due backstops, qualitative
 /// switches and curing windows.
 ///
-/// Every parameter defaults to the canonical Rust ``StagingConfig::default()``
-/// value, so ``StagingConfig()`` is the standard policy.
+/// Omitted parameters use the canonical Rust ``StagingConfig::default()``
+/// values, so ``StagingConfig()`` is the standard policy. Explicit ``None``
+/// disables the relative PD trigger.
 ///
 /// Parameters
 /// ----------
 /// pd_delta_absolute : float | None
-///     Absolute lifetime-PD increase (decimal, ``0.01`` = 1pp) that fires the
+///     Absolute remaining-window PD increase (decimal, ``0.01`` = 1pp) that fires the
 ///     Stage 2 SICR trigger.
 /// pd_delta_relative : float | None
-///     Relative lifetime-PD multiple (``2.0`` = PD doubled) that fires the
-///     Stage 2 SICR trigger; ``inf`` disables it.
+///     Finite non-negative relative remaining-window PD multiple that fires
+///     Stage 2. Omitted uses ``2.0`` (PD doubled); ``None`` disables the trigger.
 /// rating_downgrade_notches : int | None
 ///     Downgrade notches from origination that fire Stage 2; ``0`` disables
 ///     the trigger.
@@ -336,6 +337,11 @@ impl PyQualitativeFlags {
 ///     Consecutive performing periods required to cure Stage 2 to Stage 1.
 /// cure_periods_stage3_to_2 : int | None
 ///     Consecutive performing periods required to cure Stage 3 to Stage 2.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If the absolute or enabled relative threshold is negative or non-finite.
 ///
 /// Examples
 /// --------
@@ -357,7 +363,7 @@ impl PyStagingConfig {
     #[new]
     #[pyo3(signature = (
         pd_delta_absolute=None,
-        pd_delta_relative=None,
+        pd_delta_relative=rust_ecl::StagingConfig::default().pd_delta_relative,
         rating_downgrade_notches=None,
         rating_scale_labels=None,
         dpd_stage2_threshold=None,
@@ -379,38 +385,38 @@ impl PyStagingConfig {
         stage3_qualitative_triggers_enabled: Option<bool>,
         cure_periods_stage2_to_1: Option<u32>,
         cure_periods_stage3_to_2: Option<u32>,
-    ) -> Self {
+    ) -> PyResult<Self> {
         let defaults = rust_ecl::StagingConfig::default();
-        Self {
-            inner: rust_ecl::StagingConfig {
-                pd_delta_absolute: pd_delta_absolute.unwrap_or(defaults.pd_delta_absolute),
-                pd_delta_relative: pd_delta_relative.unwrap_or(defaults.pd_delta_relative),
-                rating_downgrade_notches: rating_downgrade_notches
-                    .unwrap_or(defaults.rating_downgrade_notches),
-                rating_scale_labels: rating_scale_labels.or(defaults.rating_scale_labels),
-                dpd_stage2_threshold: dpd_stage2_threshold.unwrap_or(defaults.dpd_stage2_threshold),
-                dpd_stage3_threshold: dpd_stage3_threshold.unwrap_or(defaults.dpd_stage3_threshold),
-                qualitative_triggers_enabled: qualitative_triggers_enabled
-                    .unwrap_or(defaults.qualitative_triggers_enabled),
-                stage3_qualitative_triggers_enabled: stage3_qualitative_triggers_enabled
-                    .unwrap_or(defaults.stage3_qualitative_triggers_enabled),
-                cure_periods_stage2_to_1: cure_periods_stage2_to_1
-                    .unwrap_or(defaults.cure_periods_stage2_to_1),
-                cure_periods_stage3_to_2: cure_periods_stage3_to_2
-                    .unwrap_or(defaults.cure_periods_stage3_to_2),
-            },
-        }
+        let inner = rust_ecl::StagingConfig {
+            pd_delta_absolute: pd_delta_absolute.unwrap_or(defaults.pd_delta_absolute),
+            pd_delta_relative,
+            rating_downgrade_notches: rating_downgrade_notches
+                .unwrap_or(defaults.rating_downgrade_notches),
+            rating_scale_labels: rating_scale_labels.or(defaults.rating_scale_labels),
+            dpd_stage2_threshold: dpd_stage2_threshold.unwrap_or(defaults.dpd_stage2_threshold),
+            dpd_stage3_threshold: dpd_stage3_threshold.unwrap_or(defaults.dpd_stage3_threshold),
+            qualitative_triggers_enabled: qualitative_triggers_enabled
+                .unwrap_or(defaults.qualitative_triggers_enabled),
+            stage3_qualitative_triggers_enabled: stage3_qualitative_triggers_enabled
+                .unwrap_or(defaults.stage3_qualitative_triggers_enabled),
+            cure_periods_stage2_to_1: cure_periods_stage2_to_1
+                .unwrap_or(defaults.cure_periods_stage2_to_1),
+            cure_periods_stage3_to_2: cure_periods_stage3_to_2
+                .unwrap_or(defaults.cure_periods_stage3_to_2),
+        };
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
-    /// Absolute lifetime-PD increase (decimal) that fires Stage 2.
+    /// Absolute remaining-window PD increase (decimal) that fires Stage 2.
     #[getter]
     fn pd_delta_absolute(&self) -> f64 {
         self.inner.pd_delta_absolute
     }
 
-    /// Relative lifetime-PD multiple that fires Stage 2 (``inf`` = disabled).
+    /// Relative remaining-window PD multiple that fires Stage 2; ``None`` disables it.
     #[getter]
-    fn pd_delta_relative(&self) -> f64 {
+    fn pd_delta_relative(&self) -> Option<f64> {
         self.inner.pd_delta_relative
     }
 
@@ -464,6 +470,7 @@ impl PyStagingConfig {
 
     /// Serialize to canonical JSON.
     fn to_json(&self) -> PyResult<String> {
+        self.inner.validate().map_err(core_to_py)?;
         serde_json::to_string(&self.inner)
             .map_err(|e| crate::errors::serde_json_to_py(e, "StagingConfig"))
     }
@@ -473,11 +480,12 @@ impl PyStagingConfig {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``json`` is not a valid ``StagingConfig`` document.
+    ///     If ``json`` is malformed or a threshold is negative/non-finite.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
+        let inner: rust_ecl::StagingConfig = serde_json::from_str(json)
             .map_err(|e| crate::errors::serde_json_to_py(e, "invalid StagingConfig JSON"))?;
+        inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
     }
 
@@ -572,7 +580,7 @@ impl PyStageResult {
 
 /// A single credit exposure at a reporting date.
 ///
-/// Wraps the Rust ``Exposure`` and carries the two lifetime PDs the
+/// Wraps the Rust ``Exposure`` and carries the two remaining-window PDs the
 /// simplified SICR test compares. ``classify_stage`` reads days past due,
 /// qualitative flags, rating labels, previous stage and performing periods
 /// (``ead``, ``lgd`` and ``eir`` do not affect staging); ``compute_ecl`` prices
@@ -595,9 +603,14 @@ impl PyStageResult {
 /// remaining_maturity : float
 ///     Remaining maturity in years.
 /// current_pd : float
-///     Current lifetime probability of default as a decimal in ``[0, 1]``.
+///     Current probability of default from reporting over
+///     ``h = min(remaining_maturity, 30.0)`` years, as a decimal in ``[0, 1]``.
 /// origination_pd : float
-///     Lifetime probability of default at initial recognition, decimal.
+///     Initial-recognition expected PD for that same remaining window,
+///     conditional on survival to the reporting date, as a decimal in ``[0, 1]``.
+///     For original cumulative curve ``F``, elapsed years ``a`` and the capped
+///     horizon ``h = min(remaining_maturity, 30.0)``, supply
+///     ``(F(a + h) - F(a)) / (1 - F(a))``.
 /// dpd : int
 ///     Days past due. Default ``0``.
 /// undrawn : float
@@ -614,13 +627,21 @@ impl PyStageResult {
 ///     SICR and default-evidence flags. Default: no flags.
 /// previous_stage : Stage | str | None
 ///     Stage assigned at the previous reporting date, enabling the curing
-///     rules. Default ``None``.
+///     rules. Accepts a ``Stage`` or ``"stage1"``, ``"stage2"``, or
+///     ``"stage3"``. Default ``None``.
 /// consecutive_performing_periods : int
 ///     Performing periods since the last trigger, for curing. Default ``0``.
 /// ead_schedule : list[tuple[float, float]] | None
 ///     Optional EAD amortisation profile as ``(time_years, ead)`` knots.
 /// segments : list[str] | None
 ///     Portfolio segment keys. Default ``[]``.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If a non-``None`` ``previous_stage`` is neither a ``Stage`` nor a
+///     recognized stage string. Financial inputs are validated by staging and
+///     ECL calculations.
 ///
 /// Examples
 /// --------
@@ -635,10 +656,12 @@ impl PyStageResult {
 #[derive(Clone)]
 pub struct PyExposure {
     pub(crate) inner: rust_ecl::Exposure,
-    /// Current lifetime PD (decimal) compared against ``origination_pd``.
+    /// Current reporting-date SICR PD over min(remaining maturity, 30 years),
+    /// decimal in [0, 1].
     #[pyo3(get, set)]
     pub current_pd: f64,
-    /// Lifetime PD at initial recognition (decimal).
+    /// Initial-recognition expected PD for the same capped remaining window,
+    /// conditional on survival to the reporting date, decimal in [0, 1].
     #[pyo3(get, set)]
     pub origination_pd: f64,
 }
@@ -1258,6 +1281,9 @@ fn staging_config(config: Option<&PyStagingConfig>) -> rust_ecl::StagingConfig {
 /// default-evidence flags, the absolute and relative PD-delta SICR tests
 /// (``current_pd`` versus ``origination_pd``), the rating-downgrade notch test,
 /// qualitative SICR flags, the Stage 2 days-past-due backstop and curing.
+/// Both supplied PDs must cover ``min(remaining_maturity, 30.0)`` years from
+/// reporting; the original PD must be conditional on survival to reporting.
+/// The caller aligns these scalar risks to that window before classification.
 ///
 /// Parameters
 /// ----------
@@ -1276,7 +1302,10 @@ fn staging_config(config: Option<&PyStagingConfig>) -> rust_ecl::StagingConfig {
 /// Raises
 /// ------
 /// ValueError
-///     If PDs are outside [0, 1], or maturity or staging thresholds are invalid.
+///     If PDs are non-finite or outside [0, 1], maturity or staging thresholds
+///     are invalid, or an enabled relative PD ratio is not finite. Zero
+///     origination PD with positive current PD raises when PD-delta testing
+///     runs; both zero PDs are stable. Stage 3 backstops skip PD-delta testing.
 ///
 /// Examples
 /// --------
@@ -1344,7 +1373,9 @@ fn resolve_stage(
 /// ------
 /// ValueError
 ///     If ``stage`` is unknown, the PD or EAD schedule is invalid, or an
-///     exposure input is outside its accepted range.
+///     exposure input is outside its accepted range. Automatic staging also
+///     rejects an unrepresentable enabled relative PD ratio, including zero
+///     origination PD with positive current PD, when PD-delta testing runs.
 ///
 /// Examples
 /// --------
@@ -1355,6 +1386,7 @@ fn resolve_stage(
 #[pyfunction]
 #[pyo3(signature = (exposure, pd_schedule, stage=None, bucket_width_years=None, stage3_time_to_recovery_years=None))]
 fn compute_ecl(
+    py: Python<'_>,
     exposure: &PyExposure,
     pd_schedule: Vec<(f64, f64)>,
     stage: Option<&Bound<'_, PyAny>>,
@@ -1362,14 +1394,18 @@ fn compute_ecl(
     stage3_time_to_recovery_years: Option<f64>,
 ) -> PyResult<PyWeightedEclResult> {
     let stage = resolve_stage(exposure, stage)?;
-    let inner = rust_ecl::compute_ecl_for_exposure(
-        &exposure.inner,
-        stage,
-        &[(1.0, pd_schedule)],
-        bucket_width_years,
-        stage3_time_to_recovery_years,
-    )
-    .map_err(core_to_py)?;
+    let exposure = exposure.inner.clone();
+    let inner = py
+        .detach(move || {
+            rust_ecl::compute_ecl_for_exposure(
+                &exposure,
+                stage,
+                &[(1.0, pd_schedule)],
+                bucket_width_years,
+                stage3_time_to_recovery_years,
+            )
+        })
+        .map_err(core_to_py)?;
     Ok(PyWeightedEclResult { inner })
 }
 
@@ -1401,6 +1437,9 @@ fn compute_ecl(
 /// ValueError
 ///     If ``scenarios`` is empty, weights do not sum to ``1.0``, ``stage`` is
 ///     unknown, a schedule is invalid, or an exposure input is out of range.
+///     Automatic staging also rejects an unrepresentable enabled relative PD
+///     ratio, including zero origination PD with positive current PD, when
+///     PD-delta testing runs.
 ///
 /// Examples
 /// --------
@@ -1412,6 +1451,7 @@ fn compute_ecl(
 #[pyfunction]
 #[pyo3(signature = (exposure, scenarios, stage=None, bucket_width_years=None, stage3_time_to_recovery_years=None))]
 fn compute_ecl_weighted(
+    py: Python<'_>,
     exposure: &PyExposure,
     scenarios: Vec<(f64, Vec<(f64, f64)>)>,
     stage: Option<&Bound<'_, PyAny>>,
@@ -1419,14 +1459,18 @@ fn compute_ecl_weighted(
     stage3_time_to_recovery_years: Option<f64>,
 ) -> PyResult<PyWeightedEclResult> {
     let stage = resolve_stage(exposure, stage)?;
-    let inner = rust_ecl::compute_ecl_for_exposure(
-        &exposure.inner,
-        stage,
-        &scenarios,
-        bucket_width_years,
-        stage3_time_to_recovery_years,
-    )
-    .map_err(core_to_py)?;
+    let exposure = exposure.inner.clone();
+    let inner = py
+        .detach(move || {
+            rust_ecl::compute_ecl_for_exposure(
+                &exposure,
+                stage,
+                &scenarios,
+                bucket_width_years,
+                stage3_time_to_recovery_years,
+            )
+        })
+        .map_err(core_to_py)?;
     Ok(PyWeightedEclResult { inner })
 }
 

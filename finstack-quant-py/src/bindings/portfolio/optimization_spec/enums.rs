@@ -101,6 +101,9 @@ impl PyMissingMetricPolicy {
         }
     }
 
+    /// Freeze existing quantities when an in-scope standard metric, custom key,
+    /// or numeric attribute is missing. Omit each missing input from the
+    /// expression's coefficients and value-weighted-average denominator.
     #[classmethod]
     fn exclude(_cls: &Bound<'_, PyType>) -> Self {
         Self {
@@ -202,7 +205,7 @@ impl PyInequality {
     }
 }
 
-/// Trade direction (buy / sell / hold).
+/// Trade direction from the signed quantity change (buy / sell / hold).
 #[pyclass(
     name = "TradeDirection",
     module = "finstack_quant.portfolio",
@@ -229,6 +232,7 @@ impl std::hash::Hash for PyTradeDirection {
 
 #[pymethods]
 impl PyTradeDirection {
+    /// Buy direction for a positive quantity change, including covering a short.
     #[classmethod]
     fn buy(_cls: &Bound<'_, PyType>) -> Self {
         Self {
@@ -236,6 +240,7 @@ impl PyTradeDirection {
         }
     }
 
+    /// Sell direction for a negative quantity change, including increasing a short.
     #[classmethod]
     fn sell(_cls: &Bound<'_, PyType>) -> Self {
         Self {
@@ -243,6 +248,7 @@ impl PyTradeDirection {
         }
     }
 
+    /// Hold direction for an unchanged instrument quantity.
     #[classmethod]
     fn hold(_cls: &Bound<'_, PyType>) -> Self {
         Self {

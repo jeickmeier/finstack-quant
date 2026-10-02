@@ -1,0 +1,23 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/pd_cycle_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Parameters for the Merton-Vasicek single-factor PiT/TtC conversion.",
+  "properties": {
+    "asset_correlation": {
+      "description": "Asset correlation rho in (0, 1).\n\nBasel II uses rho in [0.12, 0.24] for corporates.",
+      "format": "double",
+      "type": "number"
+    },
+    "cycle_index": {
+      "description": "Systematic risk factor (cycle index).\n\n- z = 0 corresponds to average conditions (PiT == TtC).\n- z < 0 corresponds to downturn (stressed PiT > TtC).\n- z > 0 corresponds to benign conditions (PiT < TtC).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "asset_correlation",
+    "cycle_index"
+  ],
+  "title": "PdCycleParams",
+  "type": "object"
+}

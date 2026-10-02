@@ -1,33 +1,34 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
+import { schema } from './portfolio/schema.js';
 
-const fromMaterializationWithCache = wasm.Portfolio.fromMaterialization.bind(wasm.Portfolio);
-const validateMaterializationWithCache = wasm.Portfolio.validateMaterialization.bind(
-  wasm.Portfolio
+// Rust `Portfolio::from_materialization` / `validate_materialization` borrow a
+// cache; the published statics make it optional. wasm-bindgen 0.2.126 cannot
+// express an optional borrowed handle (`Option<&T>`), and an owned
+// `Option<InstrumentArtifactCache>` would consume the caller's reusable JS
+// handle, so the omitted case lives here. Omitted, `undefined` or `null` means
+// a per-call cache with the Rust default bounds (the Python `cache=None`
+// twin). The statics are patched in place so the namespace keeps exporting
+// the one `Portfolio` class that wasm-bindgen instantiates. The `= undefined`
+// default keeps `Function.length` at the declared required arity (1).
+const withCache =
+  (call) =>
+  (bundle, cache = undefined) => {
+    if (cache != null) {
+      return call(bundle, cache);
+    }
+    const ephemeral = new wasm.InstrumentArtifactCache();
+    try {
+      return call(bundle, ephemeral);
+    } finally {
+      ephemeral.free();
+    }
+  };
+wasm.Portfolio.fromMaterialization = withCache(
+  wasm.Portfolio.fromMaterialization.bind(wasm.Portfolio)
 );
-
-wasm.Portfolio.fromMaterialization = (bundle, cache = undefined) => {
-  if (cache !== undefined) {
-    return fromMaterializationWithCache(bundle, cache);
-  }
-  const ephemeral = new wasm.InstrumentArtifactCache();
-  try {
-    return fromMaterializationWithCache(bundle, ephemeral);
-  } finally {
-    ephemeral.free();
-  }
-};
-
-wasm.Portfolio.validateMaterialization = (bundle, cache = undefined) => {
-  if (cache !== undefined) {
-    return validateMaterializationWithCache(bundle, cache);
-  }
-  const ephemeral = new wasm.InstrumentArtifactCache();
-  try {
-    return validateMaterializationWithCache(bundle, ephemeral);
-  } finally {
-    ephemeral.free();
-  }
-};
+wasm.Portfolio.validateMaterialization = withCache(
+  wasm.Portfolio.validateMaterialization.bind(wasm.Portfolio)
+);
 
 export const portfolio = {
   InstrumentArtifactCache: wasm.InstrumentArtifactCache,
@@ -35,6 +36,7 @@ export const portfolio = {
   parsePortfolioSpecJson: wasm.parsePortfolioSpecJson,
   brinsonFachler: wasm.brinsonFachler,
   carinoLink: wasm.carinoLink,
+  carinoLinkFromSectorPeriods: wasm.carinoLinkFromSectorPeriods,
   campisiAttribution: wasm.campisiAttribution,
   // ⚠️ campisiCarinoLink links precomputed results and carries no shared
   // period_years, so it is the correct entry point for unequal-length
@@ -53,26 +55,59 @@ export const portfolio = {
   twrrLinked: wasm.twrrLinked,
   mwrXirr: wasm.mwrXirr,
   buildPortfolioFromSpecJson: wasm.buildPortfolioFromSpecJson,
-  portfolioResultTotalValue: wasm.portfolioResultTotalValue,
-  portfolioResultGetMetric: wasm.portfolioResultGetMetric,
   aggregateMetrics: wasm.aggregateMetrics,
+  portfolioMetricsSeries: wasm.portfolioMetricsSeries,
   valuePortfolio: wasm.valuePortfolio,
   valuePortfolioBuilt: wasm.valuePortfolioBuilt,
   aggregateFullCashflows: wasm.aggregateFullCashflows,
   aggregateFullCashflowsBuilt: wasm.aggregateFullCashflowsBuilt,
+  netInCurrencyByDate: wasm.netInCurrencyByDate,
+  collapseToBaseByDateKind: wasm.collapseToBaseByDateKind,
   applyScenarioAndRevalue: wasm.applyScenarioAndRevalue,
   applyScenarioAndRevalueBuilt: wasm.applyScenarioAndRevalueBuilt,
   scenarioPnl: wasm.scenarioPnl,
   scenarioPnlBuilt: wasm.scenarioPnlBuilt,
   optimizePortfolio: wasm.optimizePortfolio,
+  rebalanceFromSpec: wasm.rebalanceFromSpec,
   replayPortfolio: wasm.replayPortfolio,
   // ⚠️ BLOCKING: prefer computeFactorSensitivitiesWithMarket for repeated calls
-  // so large MarketContext JSON is parsed once into Market.
+  // so large MarketContext JSON is parsed once into a core.MarketContext handle.
   computeFactorSensitivities: wasm.computeFactorSensitivities,
   computeFactorSensitivitiesWithMarket: wasm.computeFactorSensitivitiesWithMarket,
   computePnlProfiles: wasm.computePnlProfiles,
   computePnlProfilesWithMarket: wasm.computePnlProfilesWithMarket,
-  // ⚠️ BLOCKING: validate sensitivity/covariance dimensions before calling;
-  // malformed matrices throw instead of returning partial decompositions.
+  // Takes the computeFactorSensitivities wire object; malformed dimensions
+  // throw a validation Error.
   decomposeFactorRisk: wasm.decomposeFactorRisk,
+  PortfolioBuilder: wasm.PortfolioBuilder,
+  allocateWeights: wasm.allocateWeights,
+  allocateWeightsJson: wasm.allocateWeightsJson,
+  validateAllocationJson: wasm.validateAllocationJson,
+  factorStress: wasm.factorStress,
+  positionWhatIf: wasm.positionWhatIf,
+  buildCreditVolReport: wasm.buildCreditVolReport,
+  scenarioPnlBatch: wasm.scenarioPnlBatch,
+  attributePortfolioPnl: wasm.attributePortfolioPnl,
+  // Rust methods on result types; WASM results are plain objects, so each
+  // takes the object (or its JSON) as the first argument.
+  portfolioAttributionExplainText: wasm.portfolioAttributionExplainText,
+  portfolioAttributionReconciliationCheck: wasm.portfolioAttributionReconciliationCheck,
+  portfolioValuationGetPositionValue: wasm.portfolioValuationGetPositionValue,
+  portfolioValuationGetEntityValue: wasm.portfolioValuationGetEntityValue,
+  portfolioMetricsGetMetric: wasm.portfolioMetricsGetMetric,
+  portfolioMetricsGetPositionMetrics: wasm.portfolioMetricsGetPositionMetrics,
+  portfolioMetricsGetTotal: wasm.portfolioMetricsGetTotal,
+  portfolioOptimizationResultNewPositionTrades: wasm.portfolioOptimizationResultNewPositionTrades,
+  portfolioOptimizationResultBindingConstraints: wasm.portfolioOptimizationResultBindingConstraints,
+  portfolioOptimizationResultToTradeList: wasm.portfolioOptimizationResultToTradeList,
+  portfolioMetricsRequireTotal: wasm.portfolioMetricsRequireTotal,
+  sensitivityMatrixDelta: wasm.sensitivityMatrixDelta,
+  sensitivityMatrixPositionDeltas: wasm.sensitivityMatrixPositionDeltas,
+  sensitivityMatrixFactorDeltas: wasm.sensitivityMatrixFactorDeltas,
+  constraintBudget: wasm.constraintBudget,
+  constraintWeightBounds: wasm.constraintWeightBounds,
+  constraintMaxTurnover: wasm.constraintMaxTurnover,
+  constraintExposureLimit: wasm.constraintExposureLimit,
+  constraintExposureMinimum: wasm.constraintExposureMinimum,
+  schema,
 };

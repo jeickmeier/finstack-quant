@@ -16,7 +16,7 @@ mod json;
 mod metadata;
 mod registry;
 
-pub use metadata::{AssetClass, Severity, TemplateMetadata};
+pub use metadata::{AssetClass, TemplateMetadata, TemplateSeverity};
 pub use registry::{RegisteredTemplate, TemplateRegistry};
 
 /// Register built-in templates into a registry.

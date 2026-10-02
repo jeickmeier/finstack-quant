@@ -6,7 +6,7 @@
     "description": "Bloomberg SWPM USD 1Y into 5Y ATM receiver swaption captured from screens on 2026-05-02.",
     "valuation_date": "2026-05-02",
     "source": "bloomberg-screen",
-    "source_detail": "Bloomberg SWPM USD SOFR 1Y x 5Y long receiver swaption, curve 490 USD SOFR discount/projection, USD RFR BVOL Cube normal vols, trade date 2026-05-02, valuation date 2026-05-02. The legacy fixture filename is retained although the benchmarked screen is a 1Y into 5Y ATM receiver, not a 5Y into 5Y 25 OTM receiver. The canonical typed market inputs are supplied with no calibration steps, routing through engine::execute without changing pricing math. Bloomberg-parity contract (NPV abs 500) preserved.",
+    "source_detail": "Bloomberg SWPM USD SOFR 1Y x 5Y long receiver swaption, curve 490 USD SOFR discount/projection, USD RFR BVOL Cube normal vols, trade date 2026-05-02, valuation date 2026-05-02. The legacy fixture filename is retained although the benchmarked screen is a 1Y into 5Y ATM receiver, not a 5Y into 5Y 25 OTM receiver. The canonical typed market inputs are supplied with no calibration steps, routing through engine::calibrate without changing pricing math. Bloomberg-parity contract (NPV abs 500) preserved.",
     "captured_by": "jeickmeier",
     "captured_on": "2026-05-02",
     "last_reviewed_by": "jeickmeier",
@@ -72,7 +72,7 @@
       "schema": "finstack_quant.calibration/1",
       "plan": {
         "id": "swaption_5y5y_market",
-        "description": "Snapshot-only calibration envelope: the swaption is a Bloomberg-parity test where the screen NPV (155,363.65) is the assertion target with tight 0.15% tolerance. Calibrating USD-SOFR-DISC from synthetic or even Bloomberg-transcribed quotes introduces ~1bp curve drift that shifts the swaption's NPV by tens of thousands — well outside the parity tolerance. The envelope wrap routes the fixture through engine::execute without changing pricing math, preserving the Bloomberg-parity contract.",
+        "description": "Snapshot-only calibration envelope: the swaption is a Bloomberg-parity test where the screen NPV (155,363.65) is the assertion target with tight 0.15% tolerance. Calibrating USD-SOFR-DISC from synthetic or even Bloomberg-transcribed quotes introduces ~1bp curve drift that shifts the swaption's NPV by tens of thousands — well outside the parity tolerance. The envelope wrap routes the fixture through engine::calibrate without changing pricing math, preserving the Bloomberg-parity contract.",
         "quote_sets": {},
         "steps": [],
         "settings": {

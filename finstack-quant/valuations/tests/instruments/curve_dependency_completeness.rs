@@ -71,7 +71,7 @@ fn build_minimal_market(disc_ids: &[&str], hazard_ids: &[&str]) -> MarketContext
 fn test_bond_curve_dependencies_complete() {
     let as_of = date!(2025 - 01 - 01);
     let issue = as_of;
-    let maturity = as_of.add_months(60);
+    let maturity = as_of.add_months(60).expect("valid date shift");
 
     let bond = Bond::builder()
         .id("BOND-DEPS-TEST".into())
@@ -111,7 +111,7 @@ fn test_bond_curve_dependencies_complete() {
 #[test]
 fn test_cds_curve_dependencies_complete() {
     let as_of = date!(2025 - 01 - 01);
-    let maturity = as_of.add_months(60);
+    let maturity = as_of.add_months(60).expect("valid date shift");
 
     let cds = test_utils::cds_buy_protection(
         "CDS-DEPS-TEST",
@@ -153,7 +153,7 @@ fn test_cds_curve_dependencies_complete() {
 #[test]
 fn test_missing_dependency_fails() {
     let as_of = date!(2025 - 01 - 01);
-    let maturity = as_of.add_months(60);
+    let maturity = as_of.add_months(60).expect("valid date shift");
 
     let cds = test_utils::cds_buy_protection(
         "CDS-MISSING-TEST",
@@ -185,7 +185,7 @@ fn test_missing_dependency_fails() {
 #[test]
 fn test_dependency_count_reasonable() {
     let as_of = date!(2025 - 01 - 01);
-    let maturity = as_of.add_months(60);
+    let maturity = as_of.add_months(60).expect("valid date shift");
 
     // A simple fixed-rate bond should only need 1 discount curve
     let bond = Bond::builder()

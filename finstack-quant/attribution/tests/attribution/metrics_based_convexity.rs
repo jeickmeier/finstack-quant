@@ -32,6 +32,89 @@ fn build_flat_curve(curve_id: &str, as_of: time::Date, rate: f64) -> DiscountCur
         .unwrap()
 }
 
+#[test]
+fn test_default_metrics_attribute_long_bond_curve_twist() {
+    use finstack_quant_attribution::{AttributionMethod, AttributionSpec};
+    use finstack_quant_core::market_data::context::MarketContextState;
+    use finstack_quant_valuations::instruments::{Bond, InstrumentJson, PricingOptions};
+
+    let as_of = date!(2026 - 10 - 01);
+    let bond = Bond::fixed(
+        "DEFAULT-METRICS-LONG-BOND",
+        Money::from((1_000_000_i64, Currency::USD)),
+        finstack_quant_core::types::Rate::from_decimal(0.05).expect("decimal coupon rate"),
+        date!(2025 - 10 - 01),
+        date!(2056 - 09 - 30),
+        finstack_quant_core::dates::StubKind::ShortFront,
+        "USD-OIS",
+    )
+    .expect("long fixed-coupon bond");
+    let tenors = [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 30.0];
+    let curve = |rates: &[f64; 9]| {
+        let knots: Vec<_> = std::iter::once((0.0, 1.0))
+            .chain(
+                tenors
+                    .iter()
+                    .zip(rates)
+                    .map(|(&tenor, &rate)| (tenor, (-rate * tenor).exp())),
+            )
+            .collect();
+        DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots(knots)
+            .build()
+            .expect("discount curve")
+    };
+    let market_t0 = MarketContext::new().insert(curve(&[0.03; 9]));
+    // Short rates fall and long rates rise, with a zero average knot move.
+    // Aggregate DV01 times an average shift misses this long bond's loss.
+    let market_t1 = MarketContext::new().insert(curve(&[
+        0.029, 0.029, 0.029, 0.0295, 0.030, 0.0305, 0.031, 0.031, 0.031,
+    ]));
+    let opening = bond
+        .price_with_metrics(&market_t0, as_of, &[], PricingOptions::default())
+        .expect("opening price");
+    let closing = bond
+        .price_with_metrics(&market_t1, as_of, &[], PricingOptions::default())
+        .expect("closing price");
+    let actual_pnl = closing.value.checked_sub(opening.value).unwrap().amount();
+    assert!(
+        actual_pnl < -20_000.0,
+        "twist must materially hurt the long bond"
+    );
+
+    let attribution = AttributionSpec {
+        instrument: InstrumentJson::Bond(bond),
+        market_t0: MarketContextState::try_from(&market_t0).expect("coherent market snapshot"),
+        market_t1: MarketContextState::try_from(&market_t1).expect("coherent market snapshot"),
+        as_of_t0: as_of,
+        as_of_t1: as_of,
+        method: AttributionMethod::MetricsBased,
+        model_params_t0: None,
+        config: None,
+        credit_factor_model: None,
+        credit_factor_detail_options: Default::default(),
+        full_cross_attribution: false,
+    }
+    .execute()
+    .expect("metrics-based attribution with its default metric request")
+    .attribution;
+
+    assert!(!attribution.result_invalid);
+    assert!((attribution.total_pnl.amount() - actual_pnl).abs() < 1e-6);
+    assert_eq!(attribution.carry.amount(), 0.0);
+    assert_eq!(attribution.credit_curves_pnl.amount(), 0.0);
+    let rates_pnl = attribution.rates_curves_pnl.amount();
+    assert!(
+        rates_pnl < 0.0,
+        "defaults must capture negative key-rate P&L"
+    );
+    assert!(
+        (rates_pnl - actual_pnl).abs() < 0.05 * actual_pnl.abs(),
+        "default key-rate P&L {rates_pnl} must approximate repriced twist P&L {actual_pnl}"
+    );
+}
+
 /// Test that ValuationResult structure supports storing convexity metrics.
 ///
 /// NOTE: This test verifies structural support for second-order metrics,

@@ -447,9 +447,9 @@ impl TermLoanValuator {
         // - Hard/Soft: borrower exercises at `price_pct_of_par` × outstanding.
         //   Soft calls behave identically to Hard in pricing; the premium is
         //   already captured in `price_pct_of_par`.
-        // - MakeWhole: borrower pays PV of remaining flows at Treasury + spread,
-        //   which by design equals or exceeds the continuation value. The option
-        //   is therefore non-economic and skipped in the tree to avoid mispricing.
+        // - MakeWhole: reference-curve PV of remaining cashflows, floored at
+        //   the contractual clean call price, plus accrued once. Preparation
+        //   rejects stochastic rates because no reference-curve state is modeled.
         let mut call_vec: Vec<Option<f64>> = vec![None; num_steps];
         let mut call_time_offset_vec: Vec<Option<f64>> = vec![None; num_steps];
         let mut call_outstanding_vec: Vec<Option<f64>> = vec![None; num_steps];
@@ -472,8 +472,7 @@ impl TermLoanValuator {
 
             // Each call entry is an effective-dated provision. It remains active
             // at every subsequent exercise step until the next entry replaces it.
-            // Make-whole entries still act as boundaries, but are not represented
-            // as an economic option in this tree.
+            // Make-whole entries replace prior hard/soft provisions identically.
             let mut boundary_index = 0usize;
             let mut active_call = None;
             for step in 0..num_steps {
@@ -486,17 +485,12 @@ impl TermLoanValuator {
                 let Some(call) = active_call else {
                     continue;
                 };
-                if matches!(
-                    call.call_type,
-                    crate::instruments::fixed_income::term_loan::LoanCallType::MakeWhole { .. }
-                ) {
-                    continue;
-                }
-
                 let out = outstanding_vec[step].max(0.0);
                 let step_date = step_dates[step];
                 let accrued = accrual_index.accrued_at(step_date)?;
-                let clean = out * (call.price_pct_of_par / 100.0);
+                let clean = super::call::clean_call_price(
+                    call, &schedule, market, step_date, out, accrued,
+                )?;
                 let event_time =
                     dc_curve.year_fraction(origin, step_date, DayCountContext::default())?;
                 call_vec[step] = Some(value_at_step_time(
@@ -806,6 +800,30 @@ impl TermLoanTreePricer {
             .map(|id| market.get_hazard(id.as_str()))
             .transpose()?;
 
+        let effective_rate_volatility = if hazard_curve.is_some() {
+            resolve_rates_credit_config(&loan.instrument_pricing_overrides, steps)?.rate_vol
+        } else {
+            rate_volatility
+        };
+        let has_live_make_whole = loan.call_schedule.as_ref().is_some_and(|schedule| {
+            schedule.calls.iter().enumerate().any(|(index, call)| {
+                matches!(
+                    call.call_type,
+                    crate::instruments::fixed_income::term_loan::LoanCallType::MakeWhole(_)
+                ) && call.date < loan.maturity
+                    && schedule
+                        .calls
+                        .get(index + 1)
+                        .is_none_or(|next| next.date > origin)
+            })
+        });
+        if effective_rate_volatility > 0.0 && has_live_make_whole {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "TermLoan '{}' has a make-whole call, but stochastic-rate pricing does not model its exercise-date reference curve; set hw1f_sigma to zero for deterministic reference-curve pricing",
+                loan.id
+            )));
+        }
+
         if hazard_curve.is_none() {
             reject_inert_hazard_inputs(loan)?;
             reject_stochastic_short_rate_floating(loan, rate_volatility)?;
@@ -833,7 +851,7 @@ impl TermLoanTreePricer {
                 steps,
             )?;
             tree.calibrate(&targets)?;
-            let node_coupons = if tree.config.rate_vol > 0.0 {
+            let node_coupons = if tree.get_config().rate_vol > 0.0 {
                 let coupons = valuator.stochastic_node_coupons(market)?;
                 valuator.restrict_exercise_to_reset_boundaries(&coupons);
                 coupons

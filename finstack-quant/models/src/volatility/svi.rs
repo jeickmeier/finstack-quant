@@ -62,6 +62,7 @@
 /// assert!(vol > 0.0);
 /// ```
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "RawSviParams")]
 pub struct SviParams {
     /// Overall variance level.
@@ -82,6 +83,7 @@ pub struct SviParams {
 /// unchanged; conversion runs [`SviParams::validate`] (no-arbitrage and range
 /// checks) and rejects unknown fields.
 #[derive(Debug, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct RawSviParams {
     /// Overall variance level.

@@ -28,6 +28,7 @@ pub use finstack_quant_core::types::BarrierType;
 
 /// Vanilla option kind for barrier payoff evaluation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum OptionKind {
     /// Call option: max(S-K, 0)
@@ -227,6 +228,12 @@ impl BarrierOptionPayoff {
 }
 
 impl Payoff for BarrierOptionPayoff {
+    fn supports_lrm_greeks(&self) -> bool {
+        self.maturity_step > 0
+            && matches!(self.monitoring, BarrierMonitoring::Discrete { .. })
+            && !self.monitoring.observes(0)
+    }
+
     fn needs_uniform_random(&self) -> bool {
         matches!(self.monitoring, BarrierMonitoring::Continuous { .. })
     }

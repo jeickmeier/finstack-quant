@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 /// Descriptive statistics for a peer set metric.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PeerStats {
     /// Number of observations.
     pub count: usize,
@@ -36,7 +37,8 @@ pub struct PeerStats {
 /// single bad observation cannot poison the mean and standard deviation;
 /// `count` reflects the number of finite observations used.
 ///
-/// Returns `None` if no finite values remain. The slice is not modified;
+/// Returns `None` if no finite values remain or a computed statistic is
+/// non-finite. The slice is not modified;
 /// an internal sorted copy is used for percentile computations.
 ///
 /// # Arguments
@@ -62,7 +64,7 @@ pub fn peer_stats(values: &[f64]) -> Option<PeerStats> {
         os.update(v);
     }
 
-    Some(PeerStats {
+    let stats = PeerStats {
         count: n,
         mean: m,
         median,
@@ -72,7 +74,20 @@ pub fn peer_stats(values: &[f64]) -> Option<PeerStats> {
         q1,
         q3,
         iqr: q3 - q1,
-    })
+    };
+    [
+        stats.mean,
+        stats.median,
+        stats.std_dev,
+        stats.min,
+        stats.max,
+        stats.q1,
+        stats.q3,
+        stats.iqr,
+    ]
+    .iter()
+    .all(|value| value.is_finite())
+    .then_some(stats)
 }
 
 /// Percentile rank of `value` within a peer set (0.0 = lowest, 1.0 = highest).
@@ -111,7 +126,7 @@ pub fn percentile_rank(values: &[f64], value: f64) -> Option<f64> {
 /// and standard deviation.
 ///
 /// Returns `None` if fewer than 2 finite values, standard deviation is
-/// zero, or `value` is non-finite.
+/// zero, or an input subject/computed result is non-finite.
 ///
 /// # Arguments
 ///
@@ -132,14 +147,16 @@ pub fn z_score(values: &[f64], value: f64) -> Option<f64> {
         return None;
     }
     let sd = os.std_dev();
-    if sd < 1e-15 {
+    if !sd.is_finite() || sd < 1e-15 {
         return None;
     }
-    Some((value - os.mean()) / sd)
+    let score = (value - os.mean()) / sd;
+    score.is_finite().then_some(score)
 }
 
 /// OLS regression result for fair-value estimation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RegressionResult {
     /// Intercept (alpha).
     pub intercept: f64,
@@ -155,7 +172,7 @@ pub struct RegressionResult {
     pub n: usize,
 }
 
-/// Single-factor OLS regression of `y` on `x`, evaluated at `subject_x`.
+/// Single-factor OLS regression of `y_values` on `x_values`, evaluated at `subject_x`.
 ///
 /// Typical usage: regress OAS spread (y) against leverage (x) across
 /// peers, then evaluate the fitted spread for the subject's leverage to
@@ -169,24 +186,29 @@ pub struct RegressionResult {
 ///
 /// # Arguments
 ///
-/// * `x` - Peer explanatory-variable observations, aligned by index with `y`.
-/// * `y` - Peer dependent-variable observations, aligned by index with `x`.
+/// * `x_values` - Peer explanatory-variable observations, aligned by index
+///   with `y_values`.
+/// * `y_values` - Peer dependent-variable observations, aligned by index with
+///   `x_values`.
 /// * `subject_x` - Subject explanatory-variable value at which the fair value
 ///   is fitted.
 /// * `subject_y` - Observed subject dependent-variable value used to calculate
 ///   the rich/cheap residual.
 pub fn regression_fair_value(
-    x: &[f64],
-    y: &[f64],
+    x_values: &[f64],
+    y_values: &[f64],
     subject_x: f64,
     subject_y: f64,
 ) -> Option<RegressionResult> {
-    let n = x.len();
-    if n != y.len()
+    let n = x_values.len();
+    if n != y_values.len()
         || n < 3
         || !subject_x.is_finite()
         || !subject_y.is_finite()
-        || x.iter().chain(y).any(|value| !value.is_finite())
+        || x_values
+            .iter()
+            .chain(y_values)
+            .any(|value| !value.is_finite())
     {
         return None;
     }
@@ -194,8 +216,8 @@ pub fn regression_fair_value(
     // OnlineCovariance.optimal_beta() returns Cov(X,Y)/Var(Y), so pass
     // (y_i, x_i) to get slope = Cov(Y,X)/Var(X).
     let mut oc = OnlineCovariance::new();
-    for i in 0..n {
-        oc.update(y[i], x[i]);
+    for (x, y) in x_values.iter().zip(y_values) {
+        oc.update(*y, *x);
     }
 
     if !oc.variance_y().is_finite() || oc.variance_y() <= 0.0 {
@@ -243,5 +265,16 @@ fn percentile_sorted(sorted: &[f64], p: f64) -> f64 {
     } else {
         let frac = rank - lo as f64;
         sorted[lo] * (1.0 - frac) + sorted[hi] * frac
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finite_extreme_inputs_cannot_return_non_finite_statistics() {
+        assert!(peer_stats(&[-f64::MAX, f64::MAX]).is_none());
+        assert!(z_score(&[-f64::MAX, f64::MAX], 0.0).is_none());
     }
 }

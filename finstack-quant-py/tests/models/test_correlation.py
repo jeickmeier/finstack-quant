@@ -1,5 +1,8 @@
 """Tests for correlation types: copulas, Bernoulli, factor models, bounds."""
 
+from collections.abc import Callable
+import struct
+
 import pytest
 
 from finstack_quant.models.correlation import (
@@ -10,6 +13,7 @@ from finstack_quant.models.correlation import (
     cholesky_decompose,
     correlation_bounds,
     joint_probabilities,
+    nearest_correlation,
     validate_correlation_matrix,
 )
 
@@ -175,9 +179,9 @@ class TestLatentMultiFactor:
     def test_generate_correlated_factors_bad_length_raises_value_error(self) -> None:
         """Wrong-length input raises ValueError, not a Rust panic."""
         model = LatentMultiFactor.uncorrelated(2, [1.0, 1.0])
-        with pytest.raises(ValueError, match=r"(?i)exactly 2 draws"):
+        with pytest.raises(ValueError, match=r"(?i)expected 2 \(one per factor\)"):
             model.generate_correlated_factors([0.5])
-        with pytest.raises(ValueError, match=r"(?i)exactly 2 draws"):
+        with pytest.raises(ValueError, match=r"(?i)expected 2 \(one per factor\)"):
             model.generate_correlated_factors([0.5, 0.1, -0.7])
 
     def test_latent_factor_kind_is_rust_canonical_name(self) -> None:
@@ -241,10 +245,26 @@ def test_matrix_helpers_accept_two_dimensional_input() -> None:
     assert validate_correlation_matrix(rows, 2) is None
     assert cholesky_decompose(rows, 2) == cholesky_decompose([1.0, 0.3, 0.3, 1.0], 2)
     assert nearest_correlation(rows, 2) == pytest.approx([1.0, 0.3, 0.3, 1.0])
-    with pytest.raises(ValueError, match="got 2 rows with widths"):
+    # The Rust `flatten_square_matrix` owns the nested-shape check.
+    with pytest.raises(ValueError, match="matrix must have 3 rows, got 2"):
         validate_correlation_matrix(rows, 3)
-    with pytest.raises(ValueError, match="requires 9"):
+    with pytest.raises(ValueError, match="expected 3×3 entries, got 4"):
         validate_correlation_matrix([1.0, 0.0, 0.0, 1.0], 3)
+
+
+@pytest.mark.parametrize("operation", [validate_correlation_matrix, nearest_correlation, cholesky_decompose])
+@pytest.mark.parametrize("matrix", [[], [[]]])
+def test_matrix_helpers_reject_dimension_product_overflow(
+    operation: Callable[..., object], matrix: list[object]
+) -> None:
+    """Oversized dimensions raise ValueError before Rust can panic or allocate.
+
+    ``n * n`` overflows ``usize``; the Rust shape checks (``flatten_square_matrix``
+    and the flat-length checks) reject the input by naming the requested size.
+    """
+    n = 1 << (struct.calcsize("P") * 4)
+    with pytest.raises(ValueError, match=rf"matrix must have {n} rows, got 1|expected {n}[×x]{n}(?: entries)?, got 0"):
+        operation(matrix, n)
 
 
 def test_simulate_portfolio_loss_accepts_dataframe() -> None:

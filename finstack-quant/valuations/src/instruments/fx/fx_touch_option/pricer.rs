@@ -124,14 +124,7 @@ impl FxTouchOptionCalculator {
         let r_d = zero_rate_from_df(df_d, t_vol, "FxTouchOption domestic discount")?;
         let r_f = zero_rate_from_df(df_f, t_vol, "FxTouchOption foreign discount")?;
 
-        let fx_matrix = curves.fx().ok_or(finstack_quant_core::Error::from(
-            finstack_quant_core::InputError::NotFound {
-                id: "fx_matrix".to_string(),
-            },
-        ))?;
-        let spot = fx_matrix
-            .rate(FxQuery::new(inst.base_currency, inst.quote_currency, as_of))?
-            .rate;
+        let spot = fx_spot(inst, curves, as_of)?;
 
         let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
             &inst.instrument_pricing_overrides.market_quotes,
@@ -150,16 +143,21 @@ impl FxTouchOptionCalculator {
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<(f64, f64, f64, f64, f64)> {
-        let fx_matrix = curves.fx().ok_or(finstack_quant_core::Error::from(
-            finstack_quant_core::InputError::NotFound {
-                id: "fx_matrix".to_string(),
-            },
-        ))?;
-        let spot = fx_matrix
-            .rate(FxQuery::new(inst.base_currency, inst.quote_currency, as_of))?
-            .rate;
+        let spot = fx_spot(inst, curves, as_of)?;
         Ok((spot, 0.0, 0.0, 0.0, 0.0))
     }
+}
+
+/// FX spot (quote currency per unit of base currency) from the market FX matrix.
+pub(crate) fn fx_spot(inst: &FxTouchOption, curves: &MarketContext, as_of: Date) -> Result<f64> {
+    let fx_matrix = curves.fx().ok_or(finstack_quant_core::Error::from(
+        finstack_quant_core::InputError::NotFound {
+            id: "fx_matrix".to_string(),
+        },
+    ))?;
+    Ok(fx_matrix
+        .rate(FxQuery::new(inst.base_currency, inst.quote_currency, as_of))?
+        .rate)
 }
 
 #[allow(clippy::too_many_arguments)]

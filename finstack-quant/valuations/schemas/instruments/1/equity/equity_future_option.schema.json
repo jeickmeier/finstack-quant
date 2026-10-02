@@ -115,7 +115,7 @@
           "properties": {
             "payment_date": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-              "description": "Date on which the fixed exercise payoff is paid."
+              "description": "Date on which the fixed exercise payoff is paid, including after\nearly exercise; this date is not relative to the exercise date."
             },
             "type": {
               "const": "cash",

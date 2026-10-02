@@ -357,55 +357,41 @@ fn first_order_par_spread_shift_scales_by_loss_given_default() {
 }
 
 #[test]
-fn solve_to_par_without_provider_is_a_hard_error() {
-    use finstack_quant_core::market_data::context::MarketContextState;
-
-    let (base_date, mut solved) = par_cds_market();
-    let before = serde_json::to_value(MarketContextState::from(&solved)).unwrap();
-    let mut model = FinancialModelSpec::new("test", vec![]);
+fn default_engine_solves_to_par_without_explicit_provider_wiring() {
+    use finstack_quant_calibration::api::{engine, schema::CalibrationEnvelope};
+    let envelope: CalibrationEnvelope = serde_json::from_str(include_str!(
+        "../../calibration/examples/market_bootstrap/03_single_name_hazard.json"
+    ))
+    .unwrap();
+    let calibrated = engine::calibrate(&envelope).expect("source calibration");
+    let mut market = MarketContext::try_from(calibrated.result.final_market).unwrap();
+    let base = market.get_hazard("ISSUER-A-CDS").unwrap().base_date();
+    let before = market.get_hazard("ISSUER-A-CDS").unwrap().hazard_rate(5.0);
     let mut ctx = ExecutionContext {
-        market: &mut solved,
-        model: Some(&mut model),
+        market: &mut market,
+        model: None,
         instruments: None,
         rate_bindings: None,
         calendar: None,
-        as_of: base_date,
+        as_of: base,
     };
-    let error = ScenarioEngine::new()
+    ScenarioEngine::new()
         .apply(
-            &ScenarioSpec {
-                id: "solve".into(),
-                name: None,
-                description: None,
-                operations: vec![OperationSpec::CurveParallelBp {
+            &regression_scenario(
+                "solve",
+                vec![OperationSpec::CurveParallelBp {
                     curve_kind: CurveKind::ParCDS,
-                    curve_id: "USD-CDS".into(),
+                    curve_id: "ISSUER-A-CDS".into(),
                     discount_curve_id: Some("USD-OIS".into()),
                     bp: 25.0,
                 }],
-                priority: 0,
-                resolution_mode: Default::default(),
-                hazard_bump_mode: HazardBumpMode::SolveToPar,
-            },
+            ),
             &mut ctx,
         )
-        .expect_err("solve-to-par requires an injected provider");
+        .expect("the default engine carries a recalibration provider");
 
-    assert_eq!(ctx.as_of, base_date);
-    assert_eq!(
-        serde_json::to_value(MarketContextState::from(&*ctx.market)).unwrap(),
-        before
-    );
-    match error {
-        finstack_quant_scenarios::Error::Core(finstack_quant_core::Error::Calibration {
-            message,
-            category,
-        }) => {
-            assert_eq!(category, "recalibration_provider_missing");
-            assert!(message.contains("par_cds_scenario"));
-        }
-        other => panic!("unexpected missing-provider error: {other}"),
-    }
+    let after = market.get_hazard("ISSUER-A-CDS").unwrap().hazard_rate(5.0);
+    assert!(after > before, "{after} vs {before}");
 }
 
 #[test]
@@ -585,7 +571,7 @@ fn solve_to_par_after_roll_requotes_surviving_pillars_at_the_horizon() {
         "../../calibration/examples/market_bootstrap/03_single_name_hazard.json"
     ))
     .unwrap();
-    let calibrated = engine::execute(&envelope).expect("source calibration");
+    let calibrated = engine::calibrate(&envelope).expect("source calibration");
     let source = MarketContext::try_from(calibrated.result.final_market).unwrap();
     let original = source.get_hazard("ISSUER-A-CDS").unwrap();
     let base = original.base_date();
@@ -698,10 +684,336 @@ fn solve_to_par_after_roll_requotes_surviving_pillars_at_the_horizon() {
     }
 }
 
+#[test]
+fn standalone_roll_preserves_calibrated_hazard_for_a_later_zero_spread_shock() {
+    use finstack_quant_calibration::{
+        api::{engine, schema::CalibrationEnvelope},
+        recalibration::CachedRecalibrationProvider,
+    };
+    use std::sync::Arc;
+
+    let envelope: CalibrationEnvelope = serde_json::from_str(include_str!(
+        "../../calibration/examples/market_bootstrap/03_single_name_hazard.json"
+    ))
+    .expect("calibration fixture");
+    let calibrated = engine::calibrate(&envelope).expect("source calibration");
+    let source = MarketContext::try_from(calibrated.result.final_market).expect("source market");
+    let original = source.get_hazard("ISSUER-A-CDS").expect("source hazard");
+    let base = original.base_date();
+    let engine = ScenarioEngine::new()
+        .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()));
+    for (period, apply_shocks) in [("1M", false), ("2Y", true)] {
+        let unrelated_discount = DiscountCurve::builder("EUR-OIS")
+            .base_date(base)
+            .knots([(0.0, 1.0), (10.0, 0.8)])
+            .build()
+            .expect("second discount curve");
+        let mut market = source.clone().insert(unrelated_discount);
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: None,
+            instruments: None,
+            rate_bindings: None,
+            calendar: None,
+            as_of: base,
+        };
+        engine
+            .apply(
+                &regression_scenario(
+                    "standalone-roll",
+                    vec![OperationSpec::TimeRollForward {
+                        period: period.into(),
+                        apply_shocks,
+                        roll_mode: finstack_quant_scenarios::TimeRollMode::CalendarDays,
+                    }],
+                ),
+                &mut ctx,
+            )
+            .expect("standalone roll");
+        let horizon = ctx.as_of;
+        let rolled = ctx
+            .market
+            .get_hazard("ISSUER-A-CDS")
+            .expect("rolled hazard");
+        let recipe = rolled.hazard_calibration().expect("usable horizon recipe");
+        assert_eq!(recipe.hazard_params["base_date"], horizon.to_string());
+        assert_eq!(recipe.hazard_params["discount_curve_id"], "USD-OIS");
+        assert!(recipe
+            .calibration_inputs
+            .iter()
+            .all(|input| input.pillar_date > horizon));
+        let conditional = original
+            .roll_forward((horizon - base).whole_days())
+            .expect("conditional hazard");
+        for (t, _) in conditional.knot_points() {
+            assert!((rolled.sp(t) - conditional.sp(t)).abs() < 1e-8);
+        }
+        engine
+            .apply(
+                &regression_scenario(
+                    "later-zero-spread",
+                    vec![OperationSpec::CurveParallelBp {
+                        curve_kind: CurveKind::ParCDS,
+                        curve_id: "ISSUER-A-CDS".into(),
+                        discount_curve_id: Some("USD-OIS".into()),
+                        bp: 0.0,
+                    }],
+                ),
+                &mut ctx,
+            )
+            .expect("independent horizon replay");
+        let replayed = ctx
+            .market
+            .get_hazard("ISSUER-A-CDS")
+            .expect("replayed hazard");
+        for (t, _) in rolled.knot_points() {
+            assert!((rolled.sp(t) - replayed.sp(t)).abs() < 1e-8);
+        }
+    }
+}
+
+#[test]
+fn default_provider_replays_calibrated_hazard_rolls_without_explicit_wiring() {
+    use finstack_quant_calibration::api::{engine, schema::CalibrationEnvelope};
+    use finstack_quant_core::market_data::scalars::MarketScalar;
+
+    let envelope: CalibrationEnvelope = serde_json::from_str(include_str!(
+        "../../calibration/examples/market_bootstrap/03_single_name_hazard.json"
+    ))
+    .expect("calibration fixture");
+    let calibrated = engine::calibrate(&envelope).expect("source calibration");
+    let source = MarketContext::try_from(calibrated.result.final_market)
+        .expect("source market")
+        .insert_price("SPOT", MarketScalar::Unitless(100.0));
+    let original = source.get_hazard("ISSUER-A-CDS").expect("hazard");
+    let base = original.base_date();
+    // Neither the standalone helper nor `ScenarioEngine::new()` is given a
+    // provider: both carry the default one, so a calibrated hazard keeps a
+    // usable recipe at the horizon instead of failing or losing it.
+    for standalone in [false, true] {
+        let mut market = source.clone();
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: None,
+            instruments: None,
+            rate_bindings: None,
+            calendar: None,
+            as_of: base,
+        };
+        if standalone {
+            finstack_quant_scenarios::apply_time_roll_forward(
+                &mut ctx,
+                "1M",
+                finstack_quant_scenarios::TimeRollMode::CalendarDays,
+            )
+            .expect("standalone helper replays calibrated hazards");
+        } else {
+            ScenarioEngine::new()
+                .apply(
+                    &regression_scenario(
+                        "default-provider-roll",
+                        vec![
+                            OperationSpec::TimeRollForward {
+                                period: "1M".into(),
+                                apply_shocks: true,
+                                roll_mode: finstack_quant_scenarios::TimeRollMode::CalendarDays,
+                            },
+                            OperationSpec::EquityPricePct {
+                                ids: vec!["SPOT".into()],
+                                pct: 10.0,
+                            },
+                        ],
+                    ),
+                    &mut ctx,
+                )
+                .expect("default engine replays calibrated hazards");
+        }
+        let horizon = ctx.as_of;
+        assert!(horizon > base);
+        let rolled = ctx
+            .market
+            .get_hazard("ISSUER-A-CDS")
+            .expect("rolled hazard");
+        let recipe = rolled.hazard_calibration().expect("usable horizon recipe");
+        assert_eq!(recipe.hazard_params["base_date"], horizon.to_string());
+        let conditional = original
+            .roll_forward((horizon - base).whole_days())
+            .expect("conditional hazard");
+        for (t, _) in conditional.knot_points() {
+            assert!((rolled.sp(t) - conditional.sp(t)).abs() < 1e-8);
+        }
+    }
+}
+
+#[test]
+fn zero_day_business_rolls_preserve_recipes_and_allow_subsequent_shocks_without_replay() {
+    use finstack_quant_calibration::{
+        api::{engine, schema::CalibrationEnvelope},
+        recalibration::CachedRecalibrationProvider,
+    };
+    use finstack_quant_core::market_data::context::MarketContextState;
+    use finstack_quant_core::market_data::scalars::MarketScalar;
+    use std::sync::Arc;
+    use time::macros::date;
+
+    // Jan 31 is Saturday: ModifiedFollowing would cross into February, so it
+    // selects Friday Jan 30 and produces a genuine zero-day forward roll.
+    let fixture =
+        include_str!("../../calibration/examples/market_bootstrap/03_single_name_hazard.json")
+            .replace("2026-05-08", "2026-01-30");
+    let envelope: CalibrationEnvelope =
+        serde_json::from_str(&fixture).expect("dated calibration fixture");
+    let calibrated = engine::calibrate(&envelope).expect("source calibration");
+    let source = MarketContext::try_from(calibrated.result.final_market)
+        .expect("source market")
+        .insert_price("SPOT", MarketScalar::Unitless(100.0));
+    let base = date!(2026 - 01 - 30);
+    let original_hazard = source.get_hazard("ISSUER-A-CDS").expect("source hazard");
+    let original_discount = source.get_discount("USD-OIS").expect("source discount");
+    assert_eq!(original_hazard.base_date(), base);
+    let original_recipe = original_hazard
+        .hazard_calibration()
+        .expect("source recipe")
+        .clone();
+
+    for with_provider in [false, true] {
+        for apply_shocks in [false, true] {
+            let mut market = source.clone();
+            let mut ctx = ExecutionContext {
+                market: &mut market,
+                model: None,
+                instruments: None,
+                rate_bindings: None,
+                calendar: None,
+                as_of: base,
+            };
+            let scenario_engine = if with_provider {
+                ScenarioEngine::new()
+                    .with_recalibration_provider(Arc::new(CachedRecalibrationProvider::new()))
+            } else {
+                ScenarioEngine::new()
+            };
+            let report = scenario_engine
+                .apply(
+                    &regression_scenario(
+                        "zero-day-roll",
+                        vec![
+                            OperationSpec::TimeRollForward {
+                                period: "1D".into(),
+                                apply_shocks,
+                                roll_mode: finstack_quant_scenarios::TimeRollMode::BusinessDays,
+                            },
+                            OperationSpec::EquityPricePct {
+                                ids: vec!["SPOT".into()],
+                                pct: 10.0,
+                            },
+                        ],
+                    ),
+                    &mut ctx,
+                )
+                .expect("zero-day roll needs no replay");
+            let roll = report.time_roll.expect("roll report");
+            assert_eq!((roll.old_date, roll.new_date, roll.days), (base, base, 0));
+            assert!(roll.instrument_carry.is_empty());
+            assert_eq!(ctx.as_of, base);
+            assert!(!report.changes.as_of_changed);
+            let hazard = ctx.market.get_hazard("ISSUER-A-CDS").expect("hazard");
+            assert!(
+                Arc::ptr_eq(&hazard, &original_hazard),
+                "zero-day roll must not rebuild hazards"
+            );
+            assert_eq!(hazard.hazard_calibration(), Some(&original_recipe));
+            assert!(
+                Arc::ptr_eq(
+                    &ctx.market.get_discount("USD-OIS").expect("discount"),
+                    &original_discount
+                ),
+                "zero-day roll must not rebuild discounts"
+            );
+            assert!(
+                matches!(ctx.market.get_price("SPOT").expect("spot"), MarketScalar::Unitless(spot) if (*spot - if apply_shocks { 110.0 } else { 100.0 }).abs() < 1e-12)
+            );
+            assert_eq!(report.operations_applied, if apply_shocks { 2 } else { 1 });
+        }
+    }
+    let mut market = source;
+    let original_snapshot = serde_json::to_value(
+        MarketContextState::try_from(&market).expect("coherent market snapshot"),
+    )
+    .expect("snapshot");
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: None,
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of: base,
+    };
+    let report = finstack_quant_scenarios::apply_time_roll_forward(
+        &mut ctx,
+        "1D",
+        finstack_quant_scenarios::TimeRollMode::BusinessDays,
+    )
+    .expect("standalone no-op needs no provider");
+    assert_eq!(report.days, 0);
+    assert_eq!(
+        serde_json::to_value(
+            MarketContextState::try_from(&*ctx.market).expect("coherent market snapshot")
+        )
+        .expect("unchanged snapshot"),
+        original_snapshot
+    );
+}
+
 fn regression_scenario(id: &str, operations: Vec<OperationSpec>) -> ScenarioSpec {
     ScenarioSpec {
         id: id.into(),
         operations,
         ..Default::default()
+    }
+}
+
+#[test]
+fn several_failing_par_cds_ops_report_the_first_op_in_order() {
+    // Sixteen independent ParCDS replacements on missing hazard curves run as
+    // one parallel batch on native targets. The error must name the first op's
+    // curve on every run, as the serial (wasm32) path does.
+    let base_date = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let scenario = ScenarioSpec {
+        id: "missing_hazards".into(),
+        name: None,
+        description: None,
+        operations: (0..16)
+            .map(|i| OperationSpec::CurveParallelBp {
+                curve_kind: CurveKind::ParCDS,
+                curve_id: format!("HZ-{i:03}").into(),
+                discount_curve_id: None,
+                bp: 10.0,
+            })
+            .collect(),
+        priority: 0,
+        resolution_mode: Default::default(),
+        hazard_bump_mode: HazardBumpMode::SolveToPar,
+    };
+    let engine = ScenarioEngine::new();
+    for _ in 0..20 {
+        let mut market = MarketContext::new();
+        let mut model = FinancialModelSpec::new("test", vec![]);
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: Some(&mut model),
+            instruments: None,
+            rate_bindings: None,
+            calendar: None,
+            as_of: base_date,
+        };
+        let error = engine
+            .apply(&scenario, &mut ctx)
+            .expect_err("missing hazard curves must fail")
+            .to_string();
+        assert!(
+            error.contains("HZ-000"),
+            "expected the first op's curve, got {error}"
+        );
     }
 }

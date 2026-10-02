@@ -1,0 +1,23 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/liquidity_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for liquidity calculations.",
+  "properties": {
+    "tier_thresholds": {
+      "description": "Days-to-liquidate thresholds for tier boundaries.\n\nArray of 4 thresholds: \\[tier1_max, tier2_max, tier3_max, tier4_max\\].\nDefault: \\[1.0, 5.0, 20.0, 60.0\\].",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "maxItems": 4,
+      "minItems": 4,
+      "type": "array"
+    }
+  },
+  "required": [
+    "tier_thresholds"
+  ],
+  "title": "LiquidityConfig",
+  "type": "object"
+}

@@ -1,0 +1,57 @@
+{
+  "$defs": {
+    "ScorecardStatus": {
+      "description": "Status of a scorecard run.",
+      "oneOf": [
+        {
+          "const": "success",
+          "description": "Scorecard executed successfully",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "Scorecard execution failed",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/scorecard_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Report produced by `CreditScorecardExtension::execute`.",
+  "properties": {
+    "data": {
+      "additionalProperties": true,
+      "description": "Structured output (rating, total_score, metric_scores, rating_scale).\nWith no usable positive-weight evidence, rating and total_score are\nnull, partial is true, and status is Failed.",
+      "type": "object"
+    },
+    "errors": {
+      "description": "Errors (per-metric failures)",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "message": {
+      "description": "Human-readable summary",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/ScorecardStatus",
+      "description": "Overall execution status"
+    },
+    "warnings": {
+      "description": "Warnings (non-fatal)",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "message"
+  ],
+  "title": "ScorecardReport",
+  "type": "object"
+}

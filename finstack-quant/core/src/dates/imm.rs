@@ -44,17 +44,18 @@
 //! use time::{Date, Month};
 //!
 //! // IMM date for a specific month
-//! let imm_march = third_wednesday(Month::March, 2025);
+//! let imm_march = third_wednesday(Month::March, 2025)?;
 //! assert_eq!(imm_march, Date::from_calendar_date(2025, Month::March, 19).expect("Valid date"));
 //!
 //! // Find next IMM date after a given date
 //! let date = Date::from_calendar_date(2025, Month::March, 20).expect("Valid date");
-//! let next = next_imm(date);
+//! let next = next_imm(date)?;
 //! assert_eq!(next, Date::from_calendar_date(2025, Month::June, 18).expect("Valid date"));
 //!
 //! // CDS settlement date
-//! let cds = next_cds_date(Date::from_calendar_date(2025, Month::March, 10).expect("Valid date"));
+//! let cds = next_cds_date(Date::from_calendar_date(2025, Month::March, 10).expect("Valid date"))?;
 //! assert_eq!(cds, Date::from_calendar_date(2025, Month::March, 20).expect("Valid date"));
+//! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
 //! # Standards Reference
@@ -94,9 +95,9 @@ enum Scan {
 /// inclusivity given by `scan`) by walking `months` year by year, where
 /// candidates are produced by `candidate_fn`.
 #[inline]
-fn scan_months<F>(date: Date, months: &[Month], scan: Scan, candidate_fn: F) -> Date
+fn scan_months<F>(date: Date, months: &[Month], scan: Scan, candidate_fn: F) -> crate::Result<Date>
 where
-    F: Fn(Month, i32) -> Date,
+    F: Fn(Month, i32) -> crate::Result<Date>,
 {
     let forward = matches!(scan, Scan::After | Scan::OnOrAfter);
     let hit = |candidate: Date| match scan {
@@ -107,36 +108,32 @@ where
     };
     let mut year = date.year();
     loop {
-        let mut ordered: [Option<Month>; 12] = [None; 12];
-        for (slot, &m) in ordered.iter_mut().zip(months) {
-            *slot = Some(m);
+        for index in 0..months.len() {
+            let month = months[if forward {
+                index
+            } else {
+                months.len() - 1 - index
+            }];
+            let candidate = candidate_fn(month, year)?;
+            if hit(candidate) {
+                return Ok(candidate);
+            }
         }
-        let candidates = ordered.iter().flatten().copied();
-        let found = if forward {
-            candidates.map(|m| candidate_fn(m, year)).find(|&c| hit(c))
-        } else {
-            candidates
-                .rev()
-                .map(|m| candidate_fn(m, year))
-                .find(|&c| hit(c))
-        };
-        if let Some(candidate) = found {
-            return candidate;
+        if (forward && year == Date::MAX.year()) || (!forward && year == Date::MIN.year()) {
+            return Err(crate::Error::Validation(format!(
+                "no matching roll date {} {date} within the supported date range",
+                if forward { "after" } else { "before" }
+            )));
         }
         year += if forward { 1 } else { -1 };
     }
 }
 
-/// The 20th of `month` in `year`, clamped to the `time` range at the edges.
+/// The actual 20th of `month` in `year`.
 #[inline]
-fn twentieth(month: Month, year: i32) -> Date {
-    Date::from_calendar_date(year, month, 20).unwrap_or_else(|_| {
-        if year < Date::MIN.year() {
-            Date::MIN
-        } else {
-            Date::MAX
-        }
-    })
+fn twentieth(month: Month, year: i32) -> crate::Result<Date> {
+    Date::from_calendar_date(year, month, 20)
+        .map_err(|error| crate::Error::Validation(error.to_string()))
 }
 
 /// Return the **third Wednesday** of `month` in `year`.
@@ -149,13 +146,14 @@ fn twentieth(month: Month, year: i32) -> Date {
 /// * `month` - Gregorian month for which to locate the third Wednesday.
 /// * `year` - Proleptic Gregorian calendar year accepted by the `time` crate.
 ///
-/// # Panics
-/// Never panics for valid Gregorian years supported by the `time` crate.
-#[must_use]
-#[allow(clippy::unreachable)] // Every Gregorian month has at least four Wednesdays.
-pub fn third_wednesday(month: Month, year: i32) -> Date {
-    nth_weekday_of_month(year, month, Weekday::Wednesday, 3)
-        .unwrap_or_else(|| unreachable!("every month has at least four Wednesdays"))
+/// # Errors
+/// Returns `Error::Validation` when `year` is outside the supported date range.
+pub fn third_wednesday(month: Month, year: i32) -> crate::Result<Date> {
+    Date::from_calendar_date(year, month, 1)
+        .map_err(|error| crate::Error::Validation(error.to_string()))?;
+    nth_weekday_of_month(year, month, Weekday::Wednesday, 3).ok_or_else(|| {
+        crate::Error::Validation(format!("year {year} is outside the supported date range"))
+    })
 }
 
 /// Return the **next IMM date** (third Wednesday of Mar/Jun/Sep/Dec) **strictly
@@ -165,8 +163,9 @@ pub fn third_wednesday(month: Month, year: i32) -> Date {
 ///
 /// * `date` - Reference date to advance from. An IMM date supplied here returns
 ///   the following quarterly IMM date rather than itself.
-#[must_use]
-pub fn next_imm(date: Date) -> Date {
+/// # Errors
+/// Returns `Error::Validation` when no later IMM date is representable.
+pub fn next_imm(date: Date) -> crate::Result<Date> {
     scan_months(date, &QUARTERLY_MONTHS, Scan::After, third_wednesday)
 }
 
@@ -234,8 +233,9 @@ pub fn is_imm_date(date: Date) -> bool {
 ///
 /// * `date` - Reference date to advance from. A CDS roll date supplied here
 ///   returns the next quarterly roll date rather than itself.
-#[must_use]
-pub fn next_cds_date(date: Date) -> Date {
+/// # Errors
+/// Returns `Error::Validation` when no later CDS roll date is representable.
+pub fn next_cds_date(date: Date) -> crate::Result<Date> {
     scan_months(date, &QUARTERLY_MONTHS, Scan::After, twentieth)
 }
 
@@ -253,7 +253,7 @@ pub fn next_cds_date(date: Date) -> Date {
 ///
 /// let d = Date::from_calendar_date(2025, Month::January, 15)?;
 /// assert_eq!(
-///     prev_cds_date(d),
+///     prev_cds_date(d)?,
 ///     Date::from_calendar_date(2024, Month::December, 20)?
 /// );
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -263,8 +263,9 @@ pub fn next_cds_date(date: Date) -> Date {
 ///
 /// * `date` - Reference date to step back from. A CDS roll date supplied here
 ///   returns the preceding quarterly roll date rather than itself.
-#[must_use]
-pub fn prev_cds_date(date: Date) -> Date {
+/// # Errors
+/// Returns `Error::Validation` when no earlier CDS roll date is representable.
+pub fn prev_cds_date(date: Date) -> crate::Result<Date> {
     scan_months(date, &QUARTERLY_MONTHS, Scan::Before, twentieth)
 }
 
@@ -290,7 +291,7 @@ pub fn prev_cds_date(date: Date) -> Date {
 ///
 /// let trade = Date::from_calendar_date(2024, Month::January, 15)?;
 /// assert_eq!(
-///     prev_cds_semiannual_roll(trade),
+///     prev_cds_semiannual_roll(trade)?,
 ///     Date::from_calendar_date(2023, Month::September, 20)?
 /// );
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -299,8 +300,9 @@ pub fn prev_cds_date(date: Date) -> Date {
 /// # Arguments
 ///
 /// * `date` - Trade or valuation date anchoring the on-the-run contract.
-#[must_use]
-pub fn prev_cds_semiannual_roll(date: Date) -> Date {
+/// # Errors
+/// Returns `Error::Validation` when no CDS semiannual roll on or before `date` is representable.
+pub fn prev_cds_semiannual_roll(date: Date) -> crate::Result<Date> {
     const SEMIANNUAL_ROLL_MONTHS: [Month; 2] = [Month::March, Month::September];
     scan_months(date, &SEMIANNUAL_ROLL_MONTHS, Scan::OnOrBefore, twentieth)
 }
@@ -327,7 +329,7 @@ pub fn prev_cds_semiannual_roll(date: Date) -> Date {
 /// // 20-Sep roll + 5Y = 20-Sep-2028 -> standard maturity 20-Dec-2028
 /// let raw = Date::from_calendar_date(2028, Month::September, 20)?;
 /// assert_eq!(
-///     next_semiannual_cds_maturity(raw),
+///     next_semiannual_cds_maturity(raw)?,
 ///     Date::from_calendar_date(2028, Month::December, 20)?
 /// );
 /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -337,8 +339,9 @@ pub fn prev_cds_semiannual_roll(date: Date) -> Date {
 ///
 /// * `date` - Unadjusted candidate maturity to snap forward to the standard
 ///   semi-annual maturity grid.
-#[must_use]
-pub fn next_semiannual_cds_maturity(date: Date) -> Date {
+/// # Errors
+/// Returns `Error::Validation` when no CDS maturity on or after `date` is representable.
+pub fn next_semiannual_cds_maturity(date: Date) -> crate::Result<Date> {
     const MATURITY_MONTHS: [Month; 2] = [Month::June, Month::December];
     scan_months(date, &MATURITY_MONTHS, Scan::OnOrAfter, twentieth)
 }
@@ -355,13 +358,14 @@ pub fn next_semiannual_cds_maturity(date: Date) -> Date {
 /// * `month` - Gregorian month whose third Wednesday anchors the option expiry.
 /// * `year` - Proleptic Gregorian calendar year accepted by the `time` crate.
 ///
-/// # Panics
-/// Never panics for valid Gregorian years supported by the `time` crate.
-#[must_use]
-pub fn imm_option_expiry(month: Month, year: i32) -> Date {
-    let third_wed = third_wednesday(month, year);
+/// # Errors
+/// Returns `Error::Validation` when `year` or the option expiry is outside the supported date range.
+pub fn imm_option_expiry(month: Month, year: i32) -> crate::Result<Date> {
+    let third_wed = third_wednesday(month, year)?;
     // Friday before Wednesday = subtract 5 days
-    third_wed - Duration::days(5)
+    third_wed.checked_sub(Duration::days(5)).ok_or_else(|| {
+        crate::Error::Validation("IMM option expiry is outside the supported date range".into())
+    })
 }
 
 /// Return the **third Friday** of `month` in `year`.
@@ -374,13 +378,14 @@ pub fn imm_option_expiry(month: Month, year: i32) -> Date {
 /// * `month` - Gregorian month for which to locate the third Friday.
 /// * `year` - Proleptic Gregorian calendar year accepted by the `time` crate.
 ///
-/// # Panics
-/// Never panics for valid Gregorian years supported by the `time` crate.
-#[must_use]
-#[allow(clippy::unreachable)] // Every Gregorian month has at least four Fridays.
-pub fn third_friday(month: Month, year: i32) -> Date {
-    nth_weekday_of_month(year, month, Weekday::Friday, 3)
-        .unwrap_or_else(|| unreachable!("every month has at least four Fridays"))
+/// # Errors
+/// Returns `Error::Validation` when `year` is outside the supported date range.
+pub fn third_friday(month: Month, year: i32) -> crate::Result<Date> {
+    Date::from_calendar_date(year, month, 1)
+        .map_err(|error| crate::Error::Validation(error.to_string()))?;
+    nth_weekday_of_month(year, month, Weekday::Friday, 3).ok_or_else(|| {
+        crate::Error::Validation(format!("year {year} is outside the supported date range"))
+    })
 }
 
 /// Return the **next IMM option expiry date** (Friday before third Wednesday of
@@ -390,23 +395,26 @@ pub fn third_friday(month: Month, year: i32) -> Date {
 ///
 /// * `date` - Reference date to advance from. An expiry date supplied here
 ///   returns the following quarterly expiry rather than itself.
-#[must_use]
-pub fn next_imm_option_expiry(date: Date) -> Date {
+/// # Errors
+/// Returns `Error::Validation` when no later IMM option expiry is representable.
+pub fn next_imm_option_expiry(date: Date) -> crate::Result<Date> {
     scan_months(date, &QUARTERLY_MONTHS, Scan::After, imm_option_expiry)
 }
 
-/// Return the **next equity option expiry date** (third Friday of any month)
-/// **strictly after** `date`.
+/// Return the next unadjusted third Friday of any month strictly after `date`.
 ///
-/// Equity options typically expire on the third Friday of each month, providing
-/// a monthly expiration cycle for equity derivatives.
+/// This is a Gregorian monthly roll primitive. It does not apply exchange
+/// holidays or determine a listed option's last trading or expiration date.
+/// For example, April 2025 returns Good Friday, April 18, even though U.S.
+/// listed monthly equity options used April 17 that month.
 ///
 /// # Arguments
 ///
-/// * `date` - Reference date to advance from. A third-Friday expiry supplied
-///   here returns the next monthly expiry rather than itself.
-#[must_use]
-pub fn next_equity_option_expiry(date: Date) -> Date {
+/// * `date` - Reference date to advance from. A third Friday supplied here
+///   returns the following month's third Friday rather than itself.
+/// # Errors
+/// Returns `Error::Validation` when no later third Friday is representable.
+pub fn next_third_friday(date: Date) -> crate::Result<Date> {
     const ALL_MONTHS: [Month; 12] = [
         Month::January,
         Month::February,
@@ -497,17 +505,18 @@ const fn estimated_sifma_business_day_index(class: SifmaSettlementClass) -> u8 {
 /// * `month` - Settlement month to estimate.
 /// * `year` - Settlement year to estimate using the embedded SIFMA calendar.
 /// * `class` - Agency-MBS settlement class whose business-day anchor is used.
-#[allow(clippy::unreachable)] // Gregorian month construction and weekday counts are invariant.
-#[must_use]
+/// # Errors
+/// Returns `Error::Validation` when `year` is outside the supported date range or
+/// the requested month has too few business days for the class's estimate.
 pub fn estimated_sifma_settlement_date_for_class(
     month: Month,
     year: i32,
     class: SifmaSettlementClass,
-) -> Date {
+) -> crate::Result<Date> {
     let calendar = super::calendar_by_id("sifma");
     let target = estimated_sifma_business_day_index(class);
     let mut date = Date::from_calendar_date(year, month, 1)
-        .unwrap_or_else(|_| unreachable!("the first day of a Gregorian month is valid"));
+        .map_err(|error| crate::Error::Validation(error.to_string()))?;
     let mut seen = 0;
 
     while date.month() == month {
@@ -520,12 +529,17 @@ pub fn estimated_sifma_settlement_date_for_class(
         if is_business_day {
             seen += 1;
             if seen == target {
-                return date;
+                return Ok(date);
             }
         }
-        date += Duration::days(1);
+        let Some(next) = date.next_day() else {
+            break;
+        };
+        date = next;
     }
-    unreachable!("every Gregorian month has at least 16 weekdays")
+    Err(crate::Error::Validation(format!(
+        "month {month} in year {year} has fewer than {target} business days"
+    )))
 }
 
 // Generated from `data/sifma_settlements.csv`. Rows may contain a subset of
@@ -643,8 +657,73 @@ mod tests {
     use super::*;
 
     #[test]
+    fn roll_helpers_reject_unrepresentable_successors_and_predecessors() {
+        for next in [
+            next_imm,
+            next_cds_date,
+            next_semiannual_cds_maturity,
+            next_imm_option_expiry,
+            next_third_friday,
+        ] {
+            assert!(matches!(next(Date::MAX), Err(crate::Error::Validation(_))));
+        }
+        for previous in [prev_cds_date, prev_cds_semiannual_roll] {
+            assert!(matches!(
+                previous(Date::MIN),
+                Err(crate::Error::Validation(_))
+            ));
+        }
+
+        let last_cds = twentieth(Month::December, Date::MAX.year()).expect("last CDS roll");
+        assert!(next_cds_date(last_cds).is_err());
+        assert_eq!(
+            next_semiannual_cds_maturity(last_cds).expect("inclusive maturity"),
+            last_cds
+        );
+        let first_cds = twentieth(Month::March, Date::MIN.year()).expect("first CDS roll");
+        assert!(prev_cds_date(first_cds).is_err());
+        assert_eq!(
+            prev_cds_semiannual_roll(first_cds).expect("inclusive roll"),
+            first_cds
+        );
+    }
+
+    #[test]
+    fn caller_supplied_years_are_checked_without_panics() {
+        for year in [
+            Date::MIN.year() - 1,
+            Date::MAX.year() + 1,
+            i32::MIN,
+            i32::MAX,
+        ] {
+            assert!(third_wednesday(Month::January, year).is_err());
+            assert!(third_friday(Month::December, year).is_err());
+            assert!(imm_option_expiry(Month::March, year).is_err());
+            assert!(estimated_sifma_settlement_date_for_class(
+                Month::January,
+                year,
+                SifmaSettlementClass::A
+            )
+            .is_err());
+        }
+        for year in [Date::MIN.year(), Date::MAX.year()] {
+            for month in [Month::January, Month::December] {
+                assert!(third_wednesday(month, year).is_ok());
+                assert!(third_friday(month, year).is_ok());
+                assert!(imm_option_expiry(month, year).is_ok());
+                assert!(estimated_sifma_settlement_date_for_class(
+                    month,
+                    year,
+                    SifmaSettlementClass::D
+                )
+                .is_ok());
+            }
+        }
+    }
+
+    #[test]
     fn third_wed_march_2025() {
-        let d = third_wednesday(Month::March, 2025);
+        let d = third_wednesday(Month::March, 2025).expect("supported roll date");
         assert_eq!(
             d,
             Date::from_calendar_date(2025, Month::March, 19).expect("Valid test date")
@@ -654,7 +733,7 @@ mod tests {
     #[test]
     fn next_imm_after_mar20_2025() {
         let start = Date::from_calendar_date(2025, Month::March, 20).expect("Valid test date");
-        let imm = next_imm(start);
+        let imm = next_imm(start).expect("supported roll date");
         assert_eq!(
             imm,
             Date::from_calendar_date(2025, Month::June, 18).expect("Valid test date")
@@ -664,7 +743,7 @@ mod tests {
     #[test]
     fn next_cds_before_mar20() {
         let d = Date::from_calendar_date(2025, Month::March, 10).expect("Valid test date");
-        let cds = next_cds_date(d);
+        let cds = next_cds_date(d).expect("supported roll date");
         assert_eq!(
             cds,
             Date::from_calendar_date(2025, Month::March, 20).expect("Valid test date")
@@ -676,27 +755,27 @@ mod tests {
         let d = |y, m, day| Date::from_calendar_date(y, m, day).expect("valid test date");
         // Mid-January -> prior September roll
         assert_eq!(
-            prev_cds_semiannual_roll(d(2024, Month::January, 15)),
+            prev_cds_semiannual_roll(d(2024, Month::January, 15)).expect("supported roll date"),
             d(2023, Month::September, 20)
         );
         // Between rolls (May) -> March roll of same year
         assert_eq!(
-            prev_cds_semiannual_roll(d(2026, Month::May, 2)),
+            prev_cds_semiannual_roll(d(2026, Month::May, 2)).expect("supported roll date"),
             d(2026, Month::March, 20)
         );
         // Exactly on the roll date -> that roll date (on-or-before semantics)
         assert_eq!(
-            prev_cds_semiannual_roll(d(2025, Month::March, 20)),
+            prev_cds_semiannual_roll(d(2025, Month::March, 20)).expect("supported roll date"),
             d(2025, Month::March, 20)
         );
         // Day before the roll -> prior September roll
         assert_eq!(
-            prev_cds_semiannual_roll(d(2025, Month::March, 19)),
+            prev_cds_semiannual_roll(d(2025, Month::March, 19)).expect("supported roll date"),
             d(2024, Month::September, 20)
         );
         // June 20 (quarterly but not semi-annual roll) -> March roll
         assert_eq!(
-            prev_cds_semiannual_roll(d(2025, Month::June, 20)),
+            prev_cds_semiannual_roll(d(2025, Month::June, 20)).expect("supported roll date"),
             d(2025, Month::March, 20)
         );
     }
@@ -706,27 +785,30 @@ mod tests {
         let d = |y, m, day| Date::from_calendar_date(y, m, day).expect("valid test date");
         // Roll + tenor lands on 20-Sep -> extend to 20-Dec
         assert_eq!(
-            next_semiannual_cds_maturity(d(2028, Month::September, 20)),
+            next_semiannual_cds_maturity(d(2028, Month::September, 20))
+                .expect("supported roll date"),
             d(2028, Month::December, 20)
         );
         // Lands on 20-Mar -> extend to 20-Jun
         assert_eq!(
-            next_semiannual_cds_maturity(d(2031, Month::March, 20)),
+            next_semiannual_cds_maturity(d(2031, Month::March, 20)).expect("supported roll date"),
             d(2031, Month::June, 20)
         );
         // Already on 20-Jun -> unchanged (on-or-after semantics)
         assert_eq!(
-            next_semiannual_cds_maturity(d(2030, Month::June, 20)),
+            next_semiannual_cds_maturity(d(2030, Month::June, 20)).expect("supported roll date"),
             d(2030, Month::June, 20)
         );
         // Already on 20-Dec -> unchanged
         assert_eq!(
-            next_semiannual_cds_maturity(d(2029, Month::December, 20)),
+            next_semiannual_cds_maturity(d(2029, Month::December, 20))
+                .expect("supported roll date"),
             d(2029, Month::December, 20)
         );
         // Late December date -> next June
         assert_eq!(
-            next_semiannual_cds_maturity(d(2029, Month::December, 21)),
+            next_semiannual_cds_maturity(d(2029, Month::December, 21))
+                .expect("supported roll date"),
             d(2030, Month::June, 20)
         );
     }
@@ -734,7 +816,7 @@ mod tests {
     #[test]
     fn imm_option_expiry_march_2025() {
         // March 2025: third Wednesday is 19th, so option expiry is Friday 14th
-        let expiry = imm_option_expiry(Month::March, 2025);
+        let expiry = imm_option_expiry(Month::March, 2025).expect("supported roll date");
         assert_eq!(
             expiry,
             Date::from_calendar_date(2025, Month::March, 14).expect("Valid test date")
@@ -744,7 +826,7 @@ mod tests {
     #[test]
     fn imm_option_expiry_june_2025() {
         // June 2025: third Wednesday is 18th, so option expiry is Friday 13th
-        let expiry = imm_option_expiry(Month::June, 2025);
+        let expiry = imm_option_expiry(Month::June, 2025).expect("supported roll date");
         assert_eq!(
             expiry,
             Date::from_calendar_date(2025, Month::June, 13).expect("Valid test date")
@@ -754,7 +836,7 @@ mod tests {
     #[test]
     fn third_friday_march_2025() {
         // March 2025: third Friday is 21st
-        let friday = third_friday(Month::March, 2025);
+        let friday = third_friday(Month::March, 2025).expect("supported roll date");
         assert_eq!(
             friday,
             Date::from_calendar_date(2025, Month::March, 21).expect("Valid test date")
@@ -764,7 +846,7 @@ mod tests {
     #[test]
     fn third_friday_february_2025() {
         // February 2025: third Friday is 21st
-        let friday = third_friday(Month::February, 2025);
+        let friday = third_friday(Month::February, 2025).expect("supported roll date");
         assert_eq!(
             friday,
             Date::from_calendar_date(2025, Month::February, 21).expect("Valid test date")
@@ -775,7 +857,7 @@ mod tests {
     fn next_imm_option_expiry_after_march() {
         // Starting after March 2025 IMM option expiry, should get June 2025
         let start = Date::from_calendar_date(2025, Month::March, 15).expect("Valid test date");
-        let next_expiry = next_imm_option_expiry(start);
+        let next_expiry = next_imm_option_expiry(start).expect("supported roll date");
         assert_eq!(
             next_expiry,
             Date::from_calendar_date(2025, Month::June, 13).expect("Valid test date")
@@ -786,7 +868,7 @@ mod tests {
     fn next_imm_option_expiry_before_march() {
         // Starting before March 2025 IMM option expiry, should get March 2025
         let start = Date::from_calendar_date(2025, Month::March, 10).expect("Valid test date");
-        let next_expiry = next_imm_option_expiry(start);
+        let next_expiry = next_imm_option_expiry(start).expect("supported roll date");
         assert_eq!(
             next_expiry,
             Date::from_calendar_date(2025, Month::March, 14).expect("Valid test date")
@@ -794,10 +876,19 @@ mod tests {
     }
 
     #[test]
-    fn next_equity_option_expiry_mid_march() {
+    fn next_third_friday_remains_unadjusted_on_good_friday() {
+        let date = Date::from_calendar_date(2025, Month::April, 1).unwrap();
+        assert_eq!(
+            next_third_friday(date).unwrap(),
+            Date::from_calendar_date(2025, Month::April, 18).unwrap()
+        );
+    }
+
+    #[test]
+    fn next_third_friday_mid_march() {
         // Starting mid-March 2025, should get March third Friday (21st)
         let start = Date::from_calendar_date(2025, Month::March, 15).expect("Valid test date");
-        let next_expiry = next_equity_option_expiry(start);
+        let next_expiry = next_third_friday(start).expect("supported roll date");
         assert_eq!(
             next_expiry,
             Date::from_calendar_date(2025, Month::March, 21).expect("Valid test date")
@@ -805,10 +896,10 @@ mod tests {
     }
 
     #[test]
-    fn next_equity_option_expiry_after_march_friday() {
+    fn next_third_friday_after_march_friday() {
         // Starting after March third Friday, should get April third Friday
         let start = Date::from_calendar_date(2025, Month::March, 22).expect("Valid test date");
-        let next_expiry = next_equity_option_expiry(start);
+        let next_expiry = next_third_friday(start).expect("supported roll date");
         assert_eq!(
             next_expiry,
             Date::from_calendar_date(2025, Month::April, 18).expect("Valid test date")
@@ -816,10 +907,10 @@ mod tests {
     }
 
     #[test]
-    fn next_equity_option_expiry_year_rollover() {
+    fn next_third_friday_year_rollover() {
         // Starting in December, should roll to January of next year
         let start = Date::from_calendar_date(2025, Month::December, 25).expect("Valid test date");
-        let next_expiry = next_equity_option_expiry(start);
+        let next_expiry = next_third_friday(start).expect("supported roll date");
         assert_eq!(
             next_expiry,
             Date::from_calendar_date(2026, Month::January, 16).expect("Valid test date")
@@ -922,7 +1013,8 @@ mod tests {
             Month::January,
             2025,
             SifmaSettlementClass::B,
-        );
+        )
+        .expect("supported roll date");
         assert_eq!(date.year(), 2025);
         assert_eq!(date.month(), Month::January);
     }
@@ -940,7 +1032,8 @@ mod tests {
         ];
         for (class, day) in expected {
             assert_eq!(
-                estimated_sifma_settlement_date_for_class(Month::January, 2026, class),
+                estimated_sifma_settlement_date_for_class(Month::January, 2026, class)
+                    .expect("supported roll date"),
                 Date::from_calendar_date(2026, Month::January, day).expect("valid date"),
                 "Class {class:?} should use its SIFMA business-day anchor"
             );

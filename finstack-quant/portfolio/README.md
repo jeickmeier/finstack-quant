@@ -14,9 +14,8 @@ Top of the Rust stack. It depends on `finstack-quant-core`,
 depends on it; only the `finstack-quant` umbrella crate and the Python/WASM
 binding crates do.
 
-Cargo features: `default = []` and `ts_export` (emits TypeScript declarations
-for the materialization contract types via `ts-rs`; see
-[`tests/ts_export.rs`](tests/ts_export.rs)). Rayon parallelism is
+Cargo features: `json-schema` (default; `schemars` derives, the schema
+registry and the `gen_materialization_schemas` binary). Rayon parallelism is
 unconditional — there is no feature flag for it.
 
 ## Public surface

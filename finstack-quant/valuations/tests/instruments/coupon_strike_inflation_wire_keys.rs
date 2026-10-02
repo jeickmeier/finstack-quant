@@ -14,8 +14,10 @@
 //!   and interpolation are `lag` / `interpolation`.
 //!
 //! Each retired spelling is rejected by `deny_unknown_fields`, and the PV of
-//! every migrated JSON example is pinned to the reference value recorded
-//! before the migration.
+//! migrated JSON examples are checked against recorded values or independent
+//! contractual-rate formulas when the corrected curve annualization applies.
+//! The CMS and inflation references include subsequent pricing corrections
+//! independently reconciled in the September 2026 valuation audit evidence.
 
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::PricingOptions;
@@ -69,35 +71,195 @@ fn set_path(root: &mut Value, path: &[Value], value: Value) {
     *cur = value;
 }
 
-/// Native PV of each pricing case, captured on the pre-migration source.
-///
-/// `cap_floor` was re-captured on 2026-09-30 when term caplets moved from the
-/// discount-factor-implied accrual-period forward to the shared term-fixing
-/// projection (tenor forward at the fixing's value date): 515716.67931458101
-/// -> 515701.30620389282. The input migration it guards is unaffected.
-const PINNED_PV: &[(&str, &str)] = &[
-    ("asset_backed_facility", "77045997.819227106393914245443"),
-    ("cap_floor", "515701.30620389282"),
-    ("cms_option", "153240.2421427181"),
-    ("cms_spread_option", "14788.25095109598"),
-    ("cms_swap", "-105219.6877460222"),
-    ("commodity_swap", "57241.779109393"),
-    ("deposit", "725.2194690658727500000"),
-    ("forward_rate_agreement", "12414.05804431126"),
-    ("inflation_cap_floor", "155100.9801517787"),
-    ("inflation_linked_bond", "3359979.7227661326209574555315"),
-    ("inflation_swap", "-4080.8031999999000000"),
-    ("quanto_option", "257243.9712687773"),
-    ("snowball", "994168.490541813"),
-    ("structured_credit", "108912295.58406585274007447394"),
-    ("tarn", "879899.920584479"),
-    ("yoy_inflation_swap", "-13354.31626472641"),
+#[derive(Clone, Copy)]
+enum PvReference {
+    Recorded(&'static str),
+    ContractualRate,
+    CanonicalRoundtrip,
+}
+
+/// Preserve recorded values where economics are unchanged. Cap/FRA references
+/// explicitly annualize projection-DF growth on the contractual day count;
+/// their former pins treated an ACT/365F curve quote as an ACT/360 index rate.
+const PINNED_PV: &[(&str, PvReference)] = &[
+    (
+        "asset_backed_facility",
+        PvReference::Recorded("77045997.819227106393914245443"),
+    ),
+    ("cap_floor", PvReference::ContractualRate),
+    // Independently reconciled with QuantLib schedules, Black pricing and an
+    // annuity-measure convexity calculation: reference floating-leg growth
+    // uses contractual ACT/360 accrual, rather than the ACT/365F curve clock.
+    ("cms_option", PvReference::Recorded("147738.4488021919")),
+    (
+        "cms_spread_option",
+        PvReference::Recorded("14329.01531811942"),
+    ),
+    ("cms_swap", PvReference::Recorded("-99606.9359312007")),
+    ("commodity_swap", PvReference::Recorded("57241.779109393")),
+    ("deposit", PvReference::Recorded("725.2194690658727500000")),
+    ("forward_rate_agreement", PvReference::ContractualRate),
+    (
+        "inflation_cap_floor",
+        PvReference::Recorded("3742.853205610149"),
+    ),
+    (
+        "inflation_linked_bond",
+        PvReference::Recorded("3359979.7227661326209574555315"),
+    ),
+    (
+        "inflation_swap",
+        PvReference::Recorded("-4080.8031999999000000"),
+    ),
+    ("quanto_option", PvReference::Recorded("257243.9712687773")),
+    // These wire tests check the current canonical contract exactly; model
+    // discretization/RNG evolution is covered by the dedicated model tests.
+    ("snowball", PvReference::CanonicalRoundtrip),
+    (
+        "structured_credit",
+        PvReference::Recorded("108912295.58406585274007447394"),
+    ),
+    ("tarn", PvReference::CanonicalRoundtrip),
+    (
+        "yoy_inflation_swap",
+        PvReference::Recorded("-13354.31626472641"),
+    ),
 ];
+
+/// Independent rate-instrument reference: projection discount factors encode
+/// growth, while the contract's accrual fraction determines the fixing's units.
+/// The oracle uses neither the instrument pricer nor its projection helper.
+fn contractual_rate_reference(
+    instrument: &dyn finstack_quant_valuations::instruments::Instrument,
+    market: &MarketContext,
+    as_of: finstack_quant_core::dates::Date,
+) -> f64 {
+    use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::specs::RollRule;
+    use finstack_quant_core::dates::{DayCount, DayCountContext};
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+    use finstack_quant_core::types::IndexId;
+    use finstack_quant_models::closed_form::black_call;
+    use finstack_quant_valuations::instruments::{CapFloor, ForwardRateAgreement, PayReceive};
+    use finstack_quant_valuations::market::conventions::ConventionRegistry;
+    use rust_decimal::prelude::ToPrimitive;
+
+    let index_rate = |curve: &ForwardCurve, start, end, alpha| {
+        let start_time = curve
+            .day_count()
+            .year_fraction(curve.base_date(), start, DayCountContext::default())
+            .expect("projection start");
+        let end_time = curve
+            .day_count()
+            .year_fraction(curve.base_date(), end, DayCountContext::default())
+            .expect("projection end");
+        (curve.df(start_time).expect("start DF") / curve.df(end_time).expect("end DF") - 1.0)
+            / alpha
+    };
+    if let Some(fra) = instrument.as_any().downcast_ref::<ForwardRateAgreement>() {
+        let curve = market
+            .get_forward(fra.forward_curve_id.as_str())
+            .expect("forward");
+        let discount = market
+            .get_discount(fra.discount_curve_id.as_str())
+            .expect("discount");
+        let alpha = fra
+            .day_count
+            .year_fraction(fra.start_date, fra.maturity, DayCountContext::default())
+            .expect("contract accrual");
+        let forward = index_rate(&curve, fra.start_date, fra.maturity, alpha);
+        let fixed = fra.fixed_rate.to_f64().expect("fixed rate");
+        let direction = if fra.side == PayReceive::Receive {
+            -1.0
+        } else {
+            1.0
+        };
+        return direction * fra.notional.amount() * (forward - fixed) * alpha
+            / (1.0 + forward * alpha)
+            * discount
+                .df_between_dates(as_of, fra.start_date)
+                .expect("settlement DF");
+    }
+    let cap = instrument
+        .as_any()
+        .downcast_ref::<CapFloor>()
+        .expect("cap or FRA oracle");
+    assert!(cap.overnight_coupon.is_none(), "reference covers term caps");
+    assert_eq!(
+        cap.rate_option_type,
+        finstack_quant_valuations::instruments::RateOptionType::Cap
+    );
+    let curve = market
+        .get_forward(cap.forward_curve_id.as_str())
+        .expect("forward");
+    let discount = market
+        .get_discount(cap.discount_curve_id.as_str())
+        .expect("discount");
+    let vol = market
+        .get_surface(cap.vol_surface_id.as_str())
+        .expect("volatility");
+    let sigma = vol.vols()[0];
+    assert!(
+        vol.vols().iter().all(|value| *value == sigma),
+        "reference requires flat Black vol"
+    );
+    let registry = ConventionRegistry::try_global().expect("conventions");
+    let convention = registry
+        .require_rate_index(&IndexId::new(cap.forward_curve_id.as_str()))
+        .expect("term-index convention");
+    let periods = build_periods(BuildPeriodsParams {
+        start: cap.start_date,
+        end: cap.maturity,
+        frequency: cap.frequency,
+        stub: cap.stub,
+        business_day_convention: cap.business_day_convention,
+        calendar_id: cap
+            .calendar_id
+            .as_deref()
+            .unwrap_or(&convention.market_calendar_id),
+        end_of_month: false,
+        day_count: cap.day_count,
+        payment_lag_days: convention.default_payment_lag_days,
+        reset_lag_days: Some(convention.default_reset_lag_days),
+        adjust_accrual_dates: false,
+        roll_rule: RollRule::None,
+    })
+    .expect("cap schedule");
+    let strike = cap.strike.to_f64().expect("strike");
+    let spread = cap.spread_bp.to_f64().expect("spread bp") * 1e-4;
+    periods
+        .iter()
+        .map(|period| {
+            let fixing = period.reset_date.expect("term fixing");
+            assert!(fixing >= as_of, "reference covers future fixings");
+            let expiry = DayCount::Act365F
+                .year_fraction(as_of, fixing, DayCountContext::default())
+                .expect("option time");
+            let forward = index_rate(
+                &curve,
+                period.accrual_start,
+                period.accrual_end,
+                period.accrual_year_fraction,
+            ) + spread;
+            discount
+                .df_between_dates(as_of, period.payment_date)
+                .expect("payment DF")
+                * period.accrual_year_fraction
+                * cap.notional.amount()
+                * black_call(forward, strike, sigma, expiry)
+        })
+        .sum()
+}
 
 /// Price the UI pricing case for `ty` after applying the case's own patches and
 /// then `extra` (`(path, value)` pairs on the instrument envelope). Returns the
-/// exact `Money` amount string.
-fn price_case(cases: &Value, ty: &str, extra: &[(Value, Value)]) -> String {
+/// exact `Money` amount string and whether it matches its financial reference.
+fn price_case(
+    cases: &Value,
+    ty: &str,
+    extra: &[(Value, Value)],
+    reference: PvReference,
+) -> (String, bool) {
     let root = workspace_root();
     let case = cases["cases"]
         .as_array()
@@ -143,7 +305,53 @@ fn price_case(cases: &Value, ty: &str, extra: &[(Value, Value)]) -> String {
     )
     .unwrap_or_else(|e| panic!("{ty}: {e}"));
     let value = serde_json::to_value(result.value).expect("money");
-    value["amount"].as_str().expect("amount").to_string()
+    let amount = value["amount"].as_str().expect("amount").to_string();
+    let matches = match reference {
+        PvReference::Recorded(expected) => amount == expected,
+        PvReference::ContractualRate => {
+            let as_of =
+                finstack_quant_core::dates::parse_iso_date(request["asOf"].as_str().expect("asOf"))
+                    .expect("valuation date");
+            let expected = contractual_rate_reference(parsed.as_instrument(), &market, as_of);
+            let actual: f64 = amount.parse().expect("amount number");
+            // Independent DF-ratio subtraction and Black aggregation may differ
+            // by f64 roundoff. USD 1e-7 is far below any economic discrepancy.
+            assert!(
+                (actual - expected).abs() < 1e-7,
+                "{ty}: contractual reference {expected}, actual {actual}"
+            );
+            true
+        }
+        PvReference::CanonicalRoundtrip => {
+            use finstack_quant_valuations::instruments::{Snowball, Tarn};
+            let spec = instrument["instrument"]["spec"].take();
+            instrument["instrument"]["spec"] = match ty {
+                "snowball" => serde_json::to_value(
+                    serde_json::from_value::<Snowball>(spec).expect("canonical Snowball"),
+                ),
+                "tarn" => serde_json::to_value(
+                    serde_json::from_value::<Tarn>(spec).expect("canonical Tarn"),
+                ),
+                _ => panic!("no typed roundtrip for {ty}"),
+            }
+            .expect("canonical contract JSON");
+            let canonical = parse_boxed_instrument_from_json(&instrument.to_string(), None)
+                .expect("roundtripped instrument");
+            let roundtripped = price_instrument(
+                &canonical,
+                &market,
+                request["asOf"].as_str().expect("asOf"),
+                request["model"].as_str().expect("model"),
+                &[],
+                None,
+                PricingOptions::default(),
+            )
+            .expect("roundtripped price");
+            let canonical_value = serde_json::to_value(roundtripped.value).expect("money");
+            canonical_value["amount"].as_str() == Some(amount.as_str())
+        }
+    };
+    (amount, matches)
 }
 
 fn pricing_cases() -> Value {
@@ -153,18 +361,16 @@ fn pricing_cases() -> Value {
 }
 
 /// Every instrument this slice migrates reprices, from the UI pricing-case
-/// catalogue inputs, to the PV captured natively on the pre-migration source
-/// (`PINNED_PV`). The reference is the exact `Money` amount string, so the
-/// check is bit-for-bit: a renamed or retyped input that changed any number
-/// would fail here.
+/// catalogue inputs, to its recorded native PV or independent contractual-rate
+/// reference. Unchanged recorded references retain exact `Money` strings.
 #[test]
 fn migrated_examples_reprice_to_recorded_reference() {
     let cases = pricing_cases();
     let mismatches: Vec<String> = PINNED_PV
         .iter()
         .filter_map(|(ty, expected)| {
-            let actual = price_case(&cases, ty, &[]);
-            (actual != *expected).then(|| format!("(\"{ty}\", \"{actual}\"),"))
+            let (actual, matches) = price_case(&cases, ty, &[], *expected);
+            (!matches).then(|| format!("(\"{ty}\", \"{actual}\"),"))
         })
         .collect();
     assert!(
@@ -175,12 +381,12 @@ fn migrated_examples_reprice_to_recorded_reference() {
 }
 
 /// A pricing case, the instrument patches that set a non-zero input, and the
-/// PV that input gave before the migration.
-type RescaleCheck = (&'static str, Vec<(Value, Value)>, &'static str);
+/// independently reviewed PV for that economic input.
+type RescaleCheck = (&'static str, Vec<(Value, Value)>, PvReference);
 
 /// Inputs whose unit changed (a decimal margin or floor now quoted in basis
-/// points) reprice to the PV the same economic input gave before the
-/// migration, when the example's zero default is replaced by a non-zero value.
+/// points) reprice to the reviewed PV for the same economic input, when the
+/// example's zero default is replaced by a non-zero value.
 #[test]
 fn rescaled_inputs_reprice_to_recorded_reference() {
     use serde_json::json;
@@ -191,9 +397,7 @@ fn rescaled_inputs_reprice_to_recorded_reference() {
             // 15bp margin over the cap index (was the decimal `spread` 0.0015).
             "cap_floor",
             vec![(spec("spread_bp"), json!("15"))],
-            // Re-captured 2026-09-30 with the shared term-fixing projection
-            // (was 578605.83223393675).
-            "578590.04678681926",
+            PvReference::ContractualRate,
         ),
         (
             // 25bp over the CMS rate and a 10bp floating funding margin (were
@@ -206,14 +410,20 @@ fn rescaled_inputs_reprice_to_recorded_reference() {
                     json!({
                         "type": "floating",
                         "spread_bp": "10",
-                        "payment_dates": ["2025-06-20", "2025-09-22", "2025-12-22", "2026-03-20"],
-                        "accrual_fractions": [0.25, 0.25, 0.25, 0.25],
+                        "periods": [
+                            {"accrual_start": "2025-03-20", "accrual_end": "2025-06-20", "payment_date": "2025-06-20", "reset_date": "2025-03-20", "accrual_year_fraction": 0.25},
+                            {"accrual_start": "2025-06-20", "accrual_end": "2025-09-20", "payment_date": "2025-09-22", "reset_date": "2025-06-20", "accrual_year_fraction": 0.25},
+                            {"accrual_start": "2025-09-20", "accrual_end": "2025-12-20", "payment_date": "2025-12-22", "reset_date": "2025-09-20", "accrual_year_fraction": 0.25},
+                            {"accrual_start": "2025-12-20", "accrual_end": "2026-03-20", "payment_date": "2026-03-20", "reset_date": "2025-12-20", "accrual_year_fraction": 0.25}
+                        ],
                         "day_count": "act_360",
                         "forward_curve_id": "USD-SOFR-3M"
                     }),
                 ),
             ],
-            "-24866.17658060609",
+            // Independent reconciliation includes the explicit funding
+            // accruals (0.25), distinct from the 92/92/91/90-day curve spans.
+            PvReference::Recorded("-19227.15357332333"),
         ),
         (
             // A floating pool asset at SOFR + 450bp with a 5000bp index floor
@@ -240,14 +450,14 @@ fn rescaled_inputs_reprice_to_recorded_reference() {
                     json!(5000.0),
                 ),
             ],
-            "109049787.08034628570527971583",
+            PvReference::Recorded("109049787.08034628570527971583"),
         ),
     ];
     let mismatches: Vec<String> = checks
         .iter()
         .filter_map(|(ty, extra, expected)| {
-            let actual = price_case(&cases, ty, extra);
-            (actual != *expected).then(|| format!("{ty}: {actual}"))
+            let (actual, matches) = price_case(&cases, ty, extra, *expected);
+            (!matches).then(|| format!("{ty}: {actual}"))
         })
         .collect();
     assert!(

@@ -3,14 +3,6 @@
   "name": "Hong Kong Stock Exchange (HKEX) Holidays",
   "ignore_weekends": false,
   "rules": [
-    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1 },
-    { "type": "fixed", "name": "Labour Day", "month": "may", "day": 1 },
-    { "type": "fixed", "name": "HKSAR Establishment Day", "month": "july", "day": 1 },
-    { "type": "fixed", "name": "National Day", "month": "october", "day": 1 },
-    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25 },
-    { "type": "fixed", "name": "First Weekday After Christmas", "month": "december", "day": 26 },
-    { "type": "span", "name": "Lunar New Year Holidays", "start": { "type": "chinese_new_year" }, "len": 3 },
-    { "type": "qing_ming", "name": "Ching Ming Festival" },
-    { "type": "buddhas_birthday", "name": "Buddha's Birthday" }
+    { "type": "hong_kong_public_holidays", "name": "General holidays and jurisdiction-specific substitutions" }
   ]
 }

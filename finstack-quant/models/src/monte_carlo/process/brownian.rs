@@ -22,6 +22,7 @@ use super::metadata::ProcessMetadata;
 
 /// Parameters for one-dimensional Brownian motion with drift.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BrownianParams {
     /// Constant drift per year.
     pub mu: f64,

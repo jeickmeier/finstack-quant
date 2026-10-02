@@ -19,10 +19,9 @@
 //! | `amount` | Signed P&L amount as `f64` |
 //! | `currency` | ISO-4217 code of the row's own `Money` value |
 //!
-//! Each row's `currency` is taken from its OWN `Money` value, never from the
-//! parent factor aggregate: detail maps are not currency-validated by
-//! [`PnlAttribution::validate_currencies`], so stamping the parent's currency
-//! could silently mislabel a mixed-currency payload.
+//! Each row's `currency` is taken from its own `Money` value. The long
+//! projection preserves mixed-currency rows; call
+//! [`PnlAttribution::validate_currencies`] before combining their amounts.
 //!
 //! # Kind taxonomy
 //!
@@ -132,7 +131,8 @@ impl LongDetailRow {
 /// One wide (single-row) projection of a [`PnlAttribution`] aggregate fields.
 ///
 /// Used by the Python `to_dataframe` export. Every amount is taken from its
-/// own `Money` value after [`PnlAttribution::validate_currencies`] so the
+/// own `Money` value after validating all headline and nested currencies with
+/// [`PnlAttribution::validate_currencies`] so the
 /// single `currency` column labels comparable units.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct PnlAttributionWideRow {
@@ -191,8 +191,8 @@ pub struct PnlAttributionWideRow {
 ///
 /// # Errors
 ///
-/// Returns [`finstack_quant_core::Error::Validation`] when any factor
-/// currency differs from `total_pnl`.
+/// Returns [`finstack_quant_core::Error::Validation`] when any headline,
+/// residual, or nested detail currency differs from `total_pnl`.
 pub fn pnl_attribution_wide_row(attribution: &PnlAttribution) -> Result<PnlAttributionWideRow> {
     attribution.validate_currencies()?;
     Ok(PnlAttributionWideRow {

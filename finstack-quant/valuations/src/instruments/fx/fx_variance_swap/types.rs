@@ -25,7 +25,18 @@ fn default_trading_days_per_year() -> f64 {
 
 /// FX variance swap instrument.
 ///
-/// Payoff: Notional * (Realized Variance - Strike Variance)
+/// Payoff: Notional * (Realized Variance - Strike Variance).
+///
+/// Before the final observation, close-to-close pricing projects Gaussian
+/// independent log-return increments using deterministic domestic/foreign
+/// rates and smile-replicated cumulative quadratic variation. It includes
+/// each return's conditional-mean square and applies the contractual
+/// annualization factor divided by the full scheduled return count. This
+/// projection is exact for deterministic instantaneous variance in the
+/// limit of exact smile integration; it does not model general stochastic
+/// volatility/rate joint dynamics. OHLC estimators support fully observed
+/// settlement only, because their future path statistics need a separate
+/// estimator-specific forecast model.
 #[derive(
     PartialEq,
     Clone,
@@ -334,20 +345,25 @@ impl FxVarianceSwap {
         pricer::annualization_factor(self)
     }
 
-    /// Calculate realized fraction based on observation counts.
+    /// Fraction of contractual samples already observed: return intervals
+    /// for close-to-close and Yang-Zhang, independent bars for Parkinson,
+    /// Garman-Klass and Rogers-Satchell. Yang-Zhang excludes its anchor bar.
+    ///
+    /// # Arguments
+    ///
+    /// * `as_of` - Valuation date; observations on this date are included.
     pub fn realized_fraction_by_observations(&self, as_of: Date) -> Result<f64> {
         pricer::realized_fraction_by_observations(self, as_of)
     }
 
-    /// Fraction of the observation period elapsed at `as_of`, measured by the
-    /// instrument's day-count convention.
+    /// Calendar-time fraction elapsed under the instrument day count.
+    /// This descriptive measure is not a variance-pricing weight: the
+    /// contract normalizes squared returns by its scheduled sample count.
     ///
-    /// This is the seasoning weight the pricer (`pricer::compute_pv`) uses to
-    /// blend already-annualized realized and forward variance. Risk metrics
-    /// (vega, variance vega, expected variance) must use the *same* weight as
-    /// the booked PV; an observation-count fraction only coincides for
-    /// perfectly uniform schedules and drifts for weekend-skipping daily
-    /// schedules near maturity.
+    /// # Arguments
+    ///
+    /// * `as_of` - Date at which to measure elapsed time, clamped to the
+    ///   observation window.
     pub fn time_elapsed_fraction(&self, as_of: Date) -> Result<f64> {
         pricer::time_elapsed_fraction(self, as_of)
     }
@@ -362,7 +378,17 @@ impl FxVarianceSwap {
         pricer::partial_realized_variance(self, market, as_of)
     }
 
-    /// Calculate implied forward variance for the remaining period.
+    /// Expected annualized variance of the still-unfixed return samples.
+    /// Uses the same Gaussian projection and annualization convention as PV,
+    /// including a known partial return since the most recent fixing. Returns
+    /// zero once the final observation is fixed; unsupported OHLC forecasts
+    /// return a validation error before that date.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - FX spot, exact historical fixings, domestic and foreign
+    ///   discount curves, and the strike-smile surface used for replication.
+    /// * `as_of` - Valuation date, which must not precede the curves' base dates.
     pub fn remaining_forward_variance(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
         pricer::remaining_forward_variance(self, market, as_of)
     }
@@ -436,31 +462,9 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxVarianceSwap {
 
     fn raw_cashflow_schedule(
         &self,
-        context: &MarketContext,
-        as_of: Date,
+        _context: &MarketContext,
+        _as_of: Date,
     ) -> Result<crate::cashflow::builder::CashFlowSchedule> {
-        let close_series_id = self
-            .close_series_id
-            .clone()
-            .unwrap_or_else(|| self.series_id());
-        let series_ids: Vec<&str> = std::iter::once(close_series_id.as_str())
-            .chain(
-                [
-                    &self.open_series_id,
-                    &self.high_series_id,
-                    &self.low_series_id,
-                ]
-                .into_iter()
-                .filter_map(Option::as_deref),
-            )
-            .collect();
-        let projected_fixings =
-            crate::instruments::common_impl::pricing::variance_observations::projected_price_observations(
-                &series_ids,
-                &self.observation_dates()?,
-                as_of,
-                self.spot_rate(context, as_of).ok(),
-            );
         Ok(crate::cashflow::traits::schedule_from_classified_flows(
             Vec::new(),
             self.day_count,
@@ -468,7 +472,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxVarianceSwap {
                 notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Placeholder,
-                    projected_fixings,
                     ..Default::default()
                 },
             },

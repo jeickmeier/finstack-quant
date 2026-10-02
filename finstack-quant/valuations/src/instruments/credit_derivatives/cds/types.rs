@@ -95,8 +95,9 @@ pub enum CdsValuationConvention {
     /// the ISDA Standard Upfront Model. It is the default for new
     /// `CreditDefaultSwap` instances:
     ///
-    /// - Premium cashflows accrue between business-day-adjusted dates that
-    ///   match the Bloomberg CDSW cashflow schedule.
+    /// - Intermediate premium cashflows accrue between business-day-adjusted
+    ///   dates. Final accrual ends on unadjusted maturity; the final payment
+    ///   follows the business-day convention independently.
     /// - The final coupon period is inclusive of the maturity date (extra
     ///   day) per CDSW convention.
     /// - The reported NPV is the clean principal value (Bloomberg

@@ -11,6 +11,7 @@ use thiserror::Error;
 /// and `implied_pd` contains a probability only when the model has a native
 /// probability transform or an explicit calibration was requested.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ScoringResult {
     /// The raw score value (Z, Z', Z'', O, or Zmijewski Y).
     pub score: f64,
@@ -33,6 +34,7 @@ pub struct ScoringResult {
 /// - `Grey`: ambiguous / requires further analysis.
 /// - `Distress`: high bankruptcy probability.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ScoringZone {
     /// Safe zone (low bankruptcy probability).
@@ -65,6 +67,17 @@ pub enum CreditScoringError {
         /// The invalid indicator.
         value: f64,
     },
+}
+
+impl CreditScoringError {
+    /// Classify this error for host-language exception mapping.
+    ///
+    /// Every variant rejects a caller-supplied financial ratio or indicator,
+    /// so the kind is always validation.
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        finstack_quant_core::error::ErrorKind::Validation
+    }
 }
 
 /// Validate that a value is finite, returning `CreditScoringError::NonFiniteInput` if not.

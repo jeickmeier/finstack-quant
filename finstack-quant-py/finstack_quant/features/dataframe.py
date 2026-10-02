@@ -5,7 +5,9 @@ selected columns to the compiled feature transforms, and returns a
 ``pandas.Series`` aligned to the input index (or a ``pandas.DataFrame`` for
 :func:`panel`). Numeric value columns may contain ``NaN``/``None`` for missing
 data; key selectors may refer to columns, named index levels, or integer index
-level positions, and key values are coerced to strings.
+level positions. Key values must be strings or date-like (datetimes follow the
+Rust key policy); integer key columns raise ``TypeError`` and must be
+converted by the caller, e.g. to zero-padded strings.
 
 Cross-sectional ``time_key`` and time-series ``order`` may be omitted when the
 DataFrame has a ``DatetimeIndex``. ``MultiIndex`` levels should be selected
@@ -394,8 +396,8 @@ def grouped(
             position for the primary partition. Aware datetimes normalize to UTC; strings remain opaque.
             Omit when ``df.index`` is a ``DatetimeIndex``.
         groups: Column name, index level name, or integer index level position
-            for the secondary partition combined with ``time_key``. Entries are
-            coerced to strings.
+            for the secondary partition combined with ``time_key``. Entries
+            must be strings or date-like.
         op: Cross-sectional operation name. See ``transform_cross_sectional``
             for the full set.
         params: Optional operation parameters.

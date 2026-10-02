@@ -10,9 +10,6 @@
       "effective_date": "2026-04-26",
       "ecl": {
         "bucket_width_years": 0.25,
-        "base_scenario_id": "base",
-        "base_scenario_weight": 1.0,
-        "base_scenario_lgd_override": null,
         "lgd_type": "point_in_time"
       },
       "staging": {
@@ -38,9 +35,6 @@
       "forecast_horizon_years": 2.0,
       "reversion_method": "immediate",
       "historical_annual_pd": 0.02,
-      "base_scenario_id": "base",
-      "base_scenario_weight": 1.0,
-      "base_scenario_lgd_override": null,
       "methodology": "pd_lgd_ead"
     }
   ]

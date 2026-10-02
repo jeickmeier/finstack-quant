@@ -235,7 +235,7 @@ mod tests {
                     .insert_price("B", MarketScalar::Unitless(b));
                 CompositeMarketObservation::new(date, &market)
             })
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>>>()?;
         let market = observations
             .last()
             .ok_or_else(|| Error::Internal("test history is empty".to_string()))?
@@ -281,6 +281,38 @@ mod tests {
         let mut composite = CompositeInstrument::example()?;
         composite.state.resolved_legs[0].instrument_id = InstrumentId::new("WRONG");
         assert!(composite.validate_invariants().is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn rebalance_result_wire_carries_the_canonical_instrument_envelope() -> Result<()> {
+        let composite = CompositeInstrument::example()?;
+        let result = composite.spec.initialize_fixed(date!(2025 - 01 - 01))?;
+        let json =
+            serde_json::to_value(&result).map_err(|error| Error::Internal(error.to_string()))?;
+        assert_eq!(json["instrument"]["schema"], "finstack_quant.instrument/1");
+        assert_eq!(json["instrument"]["instrument"]["type"], "composite");
+        // The envelope is accepted by the typed instrument loader as-is.
+        let envelope = serde_json::to_string(&json["instrument"])
+            .map_err(|error| Error::Internal(error.to_string()))?;
+        crate::pricer::parse_typed_instrument_json::<CompositeInstrument>(&envelope)?;
+        let back: CompositeRebalanceResult = serde_json::from_value(json.clone())
+            .map_err(|error| Error::Internal(error.to_string()))?;
+        assert_eq!(
+            serde_json::to_value(&back).map_err(|error| Error::Internal(error.to_string()))?,
+            json
+        );
+
+        let mut wrong = json;
+        wrong["instrument"] = serde_json::to_value(crate::instruments::InstrumentEnvelope::new(
+            crate::instruments::Equity::example()?.into(),
+        ))
+        .map_err(|error| Error::Internal(error.to_string()))?;
+        let error = serde_json::from_value::<CompositeRebalanceResult>(wrong)
+            .expect_err("a non-composite envelope must be rejected");
+        assert!(error
+            .to_string()
+            .contains("expected instrument type `composite`, got `equity`"));
         Ok(())
     }
 
@@ -600,7 +632,7 @@ mod tests {
                 let market = MarketContext::new()
                     .insert_price("A", MarketScalar::Unitless(*price))
                     .insert_price("B", MarketScalar::Unitless(*price));
-                CompositeMarketObservation::new(date, &market)
+                CompositeMarketObservation::new(date, &market).expect("coherent market snapshot")
             })
             .collect()
     }

@@ -1,17 +1,20 @@
 //! WASM bindings for [`finstack_quant_core::money::Money`].
 
 use crate::api::core::currency::JsCurrency;
+use crate::utils::input::{
+    invalid_type, js_f64, js_opt_bool, js_opt_string, js_opt_uint, js_string, json_text,
+};
 use crate::utils::to_js_err;
 use finstack_quant_core::config::RoundingMode;
-use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::{FormatOpts, Money as RustMoney};
 use wasm_bindgen::prelude::*;
 
 /// Currency-tagged monetary amount.
 ///
-/// Money values pin a numeric amount to a [`JsCurrency`]. Arithmetic
-/// (`add`, `sub`) refuses to mix currencies; scalar multiplication and
-/// division preserve the currency.
+/// Money values pin a numeric amount to a `Currency`. The arithmetic
+/// methods carry the Rust names: `checkedAdd` / `checkedSub` refuse to mix
+/// currencies; `checkedMulF64` / `checkedDivF64` scale by a number and keep
+/// the currency; `checkedNeg` negates exactly.
 ///
 /// @example
 /// ```javascript
@@ -20,8 +23,8 @@ use wasm_bindgen::prelude::*;
 /// const usd = new core.Currency("USD");
 /// const total = new core.Money(1_000_000, usd);
 /// const fee   = new core.Money(50, usd);
-/// const net   = total.sub(fee);                 // Money { amount: 999950, currency: USD }
-/// const tax   = net.mulScalar(0.07);            // 7% of net
+/// const net   = total.checkedSub(fee);          // Money { amount: 999950, currency: USD }
+/// const tax   = net.checkedMulF64(0.07);        // 7% of net
 /// console.log(net.toString(), tax.toString());  // "USD 999950.00", "USD 69996.50"
 /// ```
 #[wasm_bindgen(js_name = Money)]
@@ -51,7 +54,8 @@ impl JsMoney {
     /// m.currency.code;   // "USD"
     /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new(amount: f64, currency: &JsCurrency) -> Result<JsMoney, JsValue> {
+    pub fn new(amount: JsValue, currency: &JsCurrency) -> Result<JsMoney, JsValue> {
+        let amount = js_f64(&amount, "amount")?;
         RustMoney::new(amount, currency.inner)
             .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
@@ -74,14 +78,14 @@ impl JsMoney {
     /// occurs. Parse with a JavaScript decimal library for exact arithmetic.
     ///
     /// @returns The exact decimal amount as a string.
-    #[wasm_bindgen(js_name = amountDecimal)]
+    #[wasm_bindgen(getter, js_name = amountDecimal)]
     pub fn amount_decimal(&self) -> String {
         self.inner.amount_decimal().to_string()
     }
 
     /// Currency of this amount.
     ///
-    /// @returns The [`JsCurrency`] this amount is tagged with.
+    /// @returns The `Currency` this amount is tagged with.
     #[wasm_bindgen(getter, js_name = currency)]
     pub fn currency(&self) -> JsCurrency {
         JsCurrency {
@@ -99,14 +103,15 @@ impl JsMoney {
     /// is non-finite or not strictly positive, or if the converted amount cannot
     /// be represented as a decimal.
     #[wasm_bindgen(js_name = convertAtRate)]
-    pub fn convert_at_rate(&self, target: &JsCurrency, rate: f64) -> Result<JsMoney, JsValue> {
+    pub fn convert_at_rate(&self, target: &JsCurrency, rate: JsValue) -> Result<JsMoney, JsValue> {
+        let rate = js_f64(&rate, "rate")?;
         self.inner
             .convert_at_rate(target.inner, rate)
             .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
 
-    /// Add two amounts.
+    /// Add two amounts (Rust `Money::checked_add`).
     ///
     /// @param other - Another `Money` value.
     /// @returns Sum, in the same currency.
@@ -118,66 +123,69 @@ impl JsMoney {
     /// const usd = new core.Currency("USD");
     /// const a = new core.Money(10, usd);
     /// const b = new core.Money(5, usd);
-    /// a.add(b).amount;  // 15
+    /// a.checkedAdd(b).amount;  // 15
     /// ```
-    #[wasm_bindgen(js_name = add)]
-    pub fn add(&self, other: &JsMoney) -> Result<JsMoney, JsValue> {
+    #[wasm_bindgen(js_name = checkedAdd)]
+    pub fn checked_add(&self, other: &JsMoney) -> Result<JsMoney, JsValue> {
         self.inner
             .checked_add(other.inner)
             .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
 
-    /// Subtract two amounts.
+    /// Subtract two amounts (Rust `Money::checked_sub`).
     ///
     /// @param other - Another `Money` value.
     /// @returns Difference, in the same currency.
     /// @throws If `other.currency` differs from `this.currency`, or the
     /// operation is not representable as a `Decimal`.
-    #[wasm_bindgen(js_name = sub)]
-    pub fn sub(&self, other: &JsMoney) -> Result<JsMoney, JsValue> {
+    #[wasm_bindgen(js_name = checkedSub)]
+    pub fn checked_sub(&self, other: &JsMoney) -> Result<JsMoney, JsValue> {
         self.inner
             .checked_sub(other.inner)
             .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
 
-    /// Multiply by a scalar.
+    /// Multiply by a number (Rust `Money::checked_mul_f64`).
     ///
     /// @param factor - Dimensionless multiplier (must be finite).
     /// @returns Scaled amount, in the same currency.
     /// @throws If `factor` is non-finite or the result is not representable.
-    #[wasm_bindgen(js_name = mulScalar)]
-    pub fn mul_scalar(&self, factor: f64) -> Result<JsMoney, JsValue> {
+    #[wasm_bindgen(js_name = checkedMulF64)]
+    pub fn checked_mul_f64(&self, factor: JsValue) -> Result<JsMoney, JsValue> {
+        let factor = js_f64(&factor, "factor")?;
         self.inner
             .checked_mul_f64(factor)
             .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
 
-    /// Divide by a scalar.
+    /// Divide by a number (Rust `Money::checked_div_f64`).
     ///
     /// @param divisor - Dimensionless divisor (must be finite and non-zero).
     /// @returns Scaled amount, in the same currency.
     /// @throws If `divisor` is zero, non-finite, or the result is not representable.
-    #[wasm_bindgen(js_name = divScalar)]
-    pub fn div_scalar(&self, divisor: f64) -> Result<JsMoney, JsValue> {
+    #[wasm_bindgen(js_name = checkedDivF64)]
+    pub fn checked_div_f64(&self, divisor: JsValue) -> Result<JsMoney, JsValue> {
+        let divisor = js_f64(&divisor, "divisor")?;
         self.inner
             .checked_div_f64(divisor)
             .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
     }
 
-    /// Negate the monetary amount.
+    /// Negate the monetary amount (Rust `Money::checked_neg`).
+    ///
+    /// Negation is exact on the stored `Decimal`, keeps its scale and never
+    /// passes through `f64`, so it cannot fail.
     ///
     /// @returns Negated amount in the same currency.
-    /// @throws If the negation is not representable as a `Decimal`.
-    #[wasm_bindgen(js_name = negate)]
-    pub fn negate(&self) -> Result<JsMoney, JsValue> {
-        self.inner
-            .checked_mul_f64(-1.0)
-            .map(|inner| JsMoney { inner })
-            .map_err(to_js_err)
+    #[wasm_bindgen(js_name = checkedNeg)]
+    pub fn checked_neg(&self) -> JsMoney {
+        JsMoney {
+            inner: self.inner.checked_neg(),
+        }
     }
 
     /// Format the amount with explicit display options.
@@ -187,8 +195,9 @@ impl JsMoney {
     /// single-character thousands separator (e.g. `","`); `null`/`undefined`
     /// disables grouping. `rounding` accepts the canonical mode names
     /// (`"bankers"`, `"away_from_zero"`, `"toward_zero"`, `"floor"`,
-    /// `"ceil"`); `null`/`undefined` selects bankers rounding. Formatting
-    /// never mutates the stored amount.
+    /// `"ceil"`; case-sensitive); `null`/`undefined` selects the Rust default
+    /// (`RoundingMode::default()`, bankers). Formatting never mutates the
+    /// stored amount.
     ///
     /// # Arguments
     ///
@@ -196,37 +205,35 @@ impl JsMoney {
     ///   `0..=1_000_000`; null or undefined selects ISO minor units.
     /// * `show_currency` - Whether to prepend the ISO code; omitted means true.
     /// * `group` - Optional single-character thousands separator; omitted means no grouping.
-    /// * `rounding` - Canonical lowercase rounding mode; omitted means bankers.
+    /// * `rounding` - Canonical lowercase rounding mode; omitted selects the
+    ///   Rust default (bankers).
     ///
     /// @returns Formatted amount such as `"USD 1,234.57"`.
     /// @throws If `decimals` is not a non-negative integer or exceeds 1,000,000, if `group` is not a single character, or if `rounding` is not a recognised mode name.
     ///
     /// @example
     /// ```javascript
-    /// const m = core.Money.fromDecimalStr("1234.567", "USD");
+    /// const usd = new core.Currency("USD");
+    /// const m = core.Money.fromDecimalStr("1234.567", usd);
     /// try {
     ///   m.formatWith(2, true, ",", "bankers");  // "USD 1,234.57"
     /// } finally {
     ///   m.free();
+    ///   usd.free();
     /// }
     /// ```
     #[wasm_bindgen(js_name = formatWith)]
     pub fn format_with(
         &self,
         decimals: JsValue,
-        show_currency: Option<bool>,
-        group: Option<String>,
-        rounding: Option<String>,
+        show_currency: Option<JsValue>,
+        group: Option<JsValue>,
+        rounding: Option<JsValue>,
     ) -> Result<String, JsValue> {
-        let decimals = if decimals.is_null() || decimals.is_undefined() {
-            None
-        } else {
-            let value = decimals
-                .as_f64()
-                .filter(|v| v.is_finite() && *v >= 0.0 && v.fract() == 0.0 && *v <= u32::MAX as f64)
-                .ok_or_else(|| to_js_err("decimals must be a non-negative integer"))?;
-            Some(value as usize)
-        };
+        let show_currency = js_opt_bool(show_currency.as_ref(), "showCurrency")?;
+        let group = js_opt_string(group.as_ref(), "group")?;
+        let rounding = js_opt_string(rounding.as_ref(), "rounding")?;
+        let decimals: Option<usize> = js_opt_uint(Some(&decimals), "decimals")?;
         let group = match group {
             None => None,
             Some(sep) => {
@@ -238,9 +245,8 @@ impl JsMoney {
             }
         };
         let rounding = match rounding {
-            Some(mode) => serde_json::from_value::<RoundingMode>(serde_json::Value::String(mode))
-                .map_err(to_js_err)?,
-            None => RoundingMode::Bankers,
+            Some(mode) => mode.parse::<RoundingMode>().map_err(to_js_err)?,
+            None => RoundingMode::default(),
         };
         let opts = FormatOpts::new(decimals, show_currency.unwrap_or(true), group, rounding)
             .map_err(to_js_err)?;
@@ -272,7 +278,8 @@ impl JsMoney {
     /// @returns The parsed `Money`.
     /// @throws If `json` is malformed or fails strict schema validation.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsMoney, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsMoney, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         let inner: RustMoney = serde_json::from_str(json).map_err(to_js_err)?;
         Ok(JsMoney { inner })
     }
@@ -289,26 +296,88 @@ impl JsMoney {
     /// # Arguments
     ///
     /// * `amount` - Exact fixed-point or scientific decimal text in major currency units.
-    /// * `currency` - Case-insensitive ISO-4217 code; surrounding whitespace is trimmed.
+    /// * `currency` - ISO-4217 `Currency` object that tags the amount, as for
+    ///   the `Money` constructor (build one with `new Currency(code)`).
     ///
     /// @returns The constructed `Money`.
-    /// @throws If `amount` is malformed, non-finite, needs more precision than `Decimal` can hold, or underflows its supported scale; or if `currency` is not a recognised code.
+    /// @throws If `amount` is malformed, non-finite, needs more precision than `Decimal` can hold, or underflows its supported scale; or if `currency` is not a `Currency` object.
     ///
     /// @example
     /// ```javascript
-    /// const m = core.Money.fromDecimalStr("1.245", "USD");
+    /// const usd = new core.Currency("USD");
+    /// const m = core.Money.fromDecimalStr("1.245", usd);
     /// try {
-    ///   m.amountDecimal();  // "1.245"
+    ///   m.amountDecimal;  // "1.245"
     /// } finally {
     ///   m.free();
+    ///   usd.free();
     /// }
     /// ```
     #[wasm_bindgen(js_name = fromDecimalStr)]
-    pub fn from_decimal_str(amount: &str, currency: &str) -> Result<JsMoney, JsValue> {
-        let ccy = currency.trim().parse::<Currency>().map_err(to_js_err)?;
-        RustMoney::from_decimal_str(amount, ccy)
+    pub fn from_decimal_str(amount: JsValue, currency: &JsCurrency) -> Result<JsMoney, JsValue> {
+        let amount: &str = &js_string(&amount, "amount")?;
+        RustMoney::from_decimal_str(amount, currency.inner)
             .map(|inner| JsMoney { inner })
             .map_err(to_js_err)
+    }
+
+    /// A zero amount in a currency.
+    ///
+    /// # Arguments
+    ///
+    /// * `currency` - ISO-4217 `Currency` object that tags the amount.
+    ///
+    /// @returns `Money` with amount `0` in `currency`.
+    /// @throws If the amount cannot be constructed (not expected for zero).
+    #[wasm_bindgen(js_name = zero)]
+    pub fn zero(currency: &JsCurrency) -> Result<JsMoney, JsValue> {
+        RustMoney::new(0.0, currency.inner)
+            .map(|inner| JsMoney { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Construct from an `[amount, currencyCode]` pair, the inverse of `toTuple`.
+    ///
+    /// # Arguments
+    ///
+    /// * `tup` - Two-element array: the amount in major units (a finite
+    ///   `number`) and the ISO-4217 alphabetic currency code (a string).
+    ///
+    /// @returns The constructed `Money`.
+    /// @throws `TypeError` (kind `invalid_type`) if `tup` is not a two-element
+    /// array of a number and a string; `FinstackError` (kind `validation`) for
+    /// a non-finite amount or an unknown currency code.
+    #[wasm_bindgen(js_name = fromTuple)]
+    pub fn from_tuple(tup: JsValue) -> Result<JsMoney, JsValue> {
+        if !js_sys::Array::is_array(&tup) {
+            return Err(invalid_type("tup", "expected an [amount, currency] array"));
+        }
+        let pair = js_sys::Array::from(&tup);
+        if pair.length() != 2 {
+            return Err(invalid_type(
+                "tup",
+                &format!("expected 2 elements, got {}", pair.length()),
+            ));
+        }
+        let amount = js_f64(&pair.get(0), "tup[0]")?;
+        let currency = js_string(&pair.get(1), "tup[1]")?
+            .parse()
+            .map_err(to_js_err)?;
+        RustMoney::new(amount, currency)
+            .map(|inner| JsMoney { inner })
+            .map_err(to_js_err)
+    }
+
+    /// The amount and currency code as an `[amount, currencyCode]` pair.
+    ///
+    /// @returns A two-element array: the amount in major units as a `number`
+    /// (the `f64` view of the exact decimal) and the ISO-4217 code.
+    #[wasm_bindgen(js_name = toTuple)]
+    pub fn to_tuple(&self) -> js_sys::Array {
+        js_sys::Array::of2(
+            &JsValue::from_f64(self.inner.amount()),
+            &JsValue::from(self.inner.currency().as_ref()),
+        )
     }
 }
 
@@ -316,73 +385,8 @@ impl JsMoney {
 mod tests {
     use super::*;
 
-    fn usd() -> JsCurrency {
-        JsCurrency::new("USD").expect("USD")
-    }
-
-    #[test]
-    fn construct_and_getters() {
-        let m = JsMoney::new(10.0, &usd()).expect("valid");
-        assert!((m.amount() - 10.0).abs() < 1e-10);
-        assert_eq!(m.currency().code(), "USD");
-    }
-
-    #[test]
-    fn add_same_currency() {
-        let a = JsMoney::new(10.0, &usd()).expect("valid");
-        let b = JsMoney::new(5.0, &usd()).expect("valid");
-        let c = a.add(&b).expect("add");
-        assert!((c.amount() - 15.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn sub_same_currency() {
-        let a = JsMoney::new(10.0, &usd()).expect("valid");
-        let b = JsMoney::new(3.0, &usd()).expect("valid");
-        let c = a.sub(&b).expect("sub");
-        assert!((c.amount() - 7.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn mul_scalar() {
-        let m = JsMoney::new(10.0, &usd()).expect("valid");
-        let scaled = m.mul_scalar(2.5).expect("finite factor");
-        assert!((scaled.amount() - 25.0).abs() < 1e-10);
-    }
-
     // mul_scalar error-path tests live in tests/wasm_*.rs (requires wasm32)
     // because Err(JsValue) panics on native targets.
-
-    #[test]
-    fn div_scalar() {
-        let m = JsMoney::new(10.0, &usd()).expect("valid");
-        let half = m.div_scalar(2.0).expect("div");
-        assert!((half.amount() - 5.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn negate() {
-        let m = JsMoney::new(10.0, &usd()).expect("valid");
-        let neg = m.negate().expect("negate");
-        assert!((neg.amount() + 10.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn to_string_format() {
-        let m = JsMoney::new(10.0, &usd()).expect("valid");
-        let s = m.to_string();
-        assert!(s.contains("USD"), "expected USD in: {s}");
-        assert!(s.contains("10"), "expected 10 in: {s}");
-    }
-
-    #[test]
-    fn json_roundtrip() {
-        let m = JsMoney::new(1234.56, &usd()).expect("valid");
-        let json = m.to_json().expect("serialize");
-        let back = JsMoney::from_json(&json).expect("deserialize");
-        assert_eq!(back.amount_decimal(), m.amount_decimal());
-        assert_eq!(back.currency().code(), "USD");
-    }
 
     #[test]
     fn sub_different_via_inner() {
@@ -413,9 +417,19 @@ mod tests {
     }
 
     #[test]
-    fn negate_zero() {
-        let m = JsMoney::new(0.0, &usd()).expect("valid");
-        let neg = m.negate().expect("negate");
-        assert!(neg.amount().abs() < 1e-12);
+    fn checked_neg_is_the_rust_checked_neg() {
+        for inner in [
+            RustMoney::new(0.0, finstack_quant_core::currency::Currency::USD).expect("zero"),
+            RustMoney::from_decimal_str("0.00", finstack_quant_core::currency::Currency::USD)
+                .expect("scaled zero"),
+            RustMoney::from_decimal_str("1e-27", finstack_quant_core::currency::Currency::USD)
+                .expect("tiny"),
+        ] {
+            let neg = JsMoney { inner }.checked_neg();
+            assert_eq!(
+                neg.to_json().expect("json"),
+                serde_json::to_string(&inner.checked_neg()).expect("json")
+            );
+        }
     }
 }

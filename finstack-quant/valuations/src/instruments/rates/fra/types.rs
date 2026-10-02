@@ -390,6 +390,7 @@ impl ForwardRateAgreement {
                 fwd.as_ref(),
                 self.start_date,
                 self.maturity,
+                tau,
             )?
         };
 
@@ -602,7 +603,7 @@ mod tests {
         // FRA 3M x 6M
         let start = base + time::Duration::days(90);
         let end = base + time::Duration::days(180);
-        let fixing = start.add_weekdays(-2); // 2 business days before start for reset_lag_days
+        let fixing = start.add_weekdays(-2).expect("valid date shift"); // 2 business days before start for reset_lag_days
         let t_start = fwd
             .day_count()
             .year_fraction(base, start, DayCountContext::default())
@@ -611,9 +612,15 @@ mod tests {
             .day_count()
             .year_fraction(base, end, DayCountContext::default())
             .expect("valid end time");
-        let par_forward = fwd
-            .rate_between(t_start, t_end)
-            .expect("valid FRA forward interval");
+        let accrual = DayCount::Act360
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("valid contractual accrual");
+        // Projection DFs use the curve clock; the FRA rate is annualized on
+        // its contractual ACT/360 accrual rather than the curve time span.
+        let par_forward = (fwd.df(t_start).expect("start projection DF")
+            / fwd.df(t_end).expect("end projection DF")
+            - 1.0)
+            / accrual;
         let ctx = MarketContext::new().insert(disc).insert(fwd);
         let fra = ForwardRateAgreement::builder()
             .id("FRA-3x6".into())
@@ -665,7 +672,7 @@ mod tests {
 
         let start = base + time::Duration::days(90);
         let end = base + time::Duration::days(180);
-        let fixing = start.add_weekdays(-2);
+        let fixing = start.add_weekdays(-2).expect("valid date shift");
         let t_start = fwd
             .day_count()
             .year_fraction(base, start, DayCountContext::default())
@@ -674,9 +681,13 @@ mod tests {
             .day_count()
             .year_fraction(base, end, DayCountContext::default())
             .expect("valid end time");
-        let expected_par_rate = fwd
-            .rate_between(t_start, t_end)
-            .expect("valid FRA forward interval");
+        let accrual = DayCount::Act360
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("valid contractual accrual");
+        let expected_par_rate = (fwd.df(t_start).expect("start projection DF")
+            / fwd.df(t_end).expect("end projection DF")
+            - 1.0)
+            / accrual;
         let ctx = MarketContext::new().insert(disc).insert(fwd);
 
         let fra = ForwardRateAgreement::builder()

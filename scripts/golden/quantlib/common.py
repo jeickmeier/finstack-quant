@@ -87,15 +87,17 @@ def flat_forward_curve(
     curve_id: str,
     rate: float,
     *,
+    day_count: str = "act_360",
     projection_dates: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Build a Finstack flat simple forward curve."""
+    """Build a flat simple forward curve with the benchmark index's annualization."""
+    year_days = {"act_360": 360.0, "act_365f": 365.0}[day_count]
     curve = {
         "type": "forward",
         "id": curve_id,
         "base": VALUATION_DATE,
         "reset_lag": 2,
-        "day_count": "act_360",
+        "day_count": day_count,
         "tenor": 0.25,
         "knot_points": [[0.0, rate], [30.0, rate]],
         "interp_style": "linear",
@@ -105,7 +107,7 @@ def flat_forward_curve(
     if projection_dates is not None:
         base = date.fromisoformat(VALUATION_DATE)
         contractual_times = [
-            (date.fromisoformat(projection_date) - base).days / 360.0 for projection_date in projection_dates
+            (date.fromisoformat(projection_date) - base).days / year_days for projection_date in projection_dates
         ]
         projection_grid = [0.0, *contractual_times, 30.0]
         if any(right <= left for left, right in pairwise(projection_grid)):

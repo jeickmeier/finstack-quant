@@ -9,6 +9,7 @@ use finstack_quant_core::Result;
 
 /// Volatility quoting convention.
 #[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
 pub enum VolatilityConvention {
     /// Normal absolute volatility in decimal rate units per square-root year

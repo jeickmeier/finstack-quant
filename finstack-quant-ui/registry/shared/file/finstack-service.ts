@@ -5,7 +5,7 @@ import type {
   calibration,
   statements,
   statements_analytics,
-  Market,
+  MarketContext,
 } from "finstack-quant-wasm";
 import { exportValuation } from "@/lib/finstack/host";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
@@ -21,7 +21,12 @@ export function createService(native: {
   initialize: (wasmUrl?: string) => Promise<unknown>;
   core: Pick<
     typeof core,
-    "availableCalendars" | "FxDeltaVolSurface" | "Money" | "VolCube"
+    | "availableCalendars"
+    | "Currency"
+    | "FxDeltaVolSurface"
+    | "MarketContext"
+    | "Money"
+    | "VolCube"
   >;
   models: {
     volatility: Pick<
@@ -31,23 +36,22 @@ export function createService(native: {
   };
   calibration: Pick<
     typeof calibration,
-    "calibrate" | "dryRun" | "validateCalibrationJson"
+    "calibrate" | "dryRunJson" | "validateCalibrationJson"
   >;
   statements: Pick<
     typeof statements,
     | "validateFinancialModelJson"
     | "modelNodeIds"
     | "validateCheckSuiteSpecJson"
-    | "validateFormula"
-    | "parseFormulaText"
-    | "evaluateModel"
-    | "evaluateModelWithMarket"
+    | "parseAndCompile"
+    | "parseFormula"
+    | "Evaluator"
   >;
   statements_analytics: Pick<
     typeof statements_analytics,
     | "explainFormula"
     | "explainFormulaText"
-    | "traceDependencies"
+    | "DependencyTracer"
     | "runChecks"
     | "runThreeStatementChecks"
     | "runCreditUnderwritingChecks"
@@ -55,11 +59,11 @@ export function createService(native: {
   >;
   valuations: Pick<
     typeof valuations,
-    "Market" | "instruments" | "validateValuationResultJson"
+    "instruments" | "validateValuationResultJson"
   >;
 }): WorkerApi {
   let ready: Promise<unknown> | undefined;
-  const markets = new Map<string, { json: string; handle: Market }>();
+  const markets = new Map<string, { json: string; handle: MarketContext }>();
   const initialize = (url?: string) =>
     (ready ??= Promise.resolve().then(() => native.initialize(url)));
   async function result<T>(
@@ -75,7 +79,7 @@ export function createService(native: {
   function market(json: string) {
     let entry = markets.get(json);
     if (!entry) {
-      const handle = new native.valuations.Market(json);
+      const handle = native.core.MarketContext.fromJson(json);
       let canonical: string;
       try {
         canonical = handle.toJson();
@@ -145,24 +149,29 @@ export function createService(native: {
     },
     validateStatementFormula(formula) {
       return result(() => {
-        native.statements.validateFormula(formula);
-        return native.statements.parseFormulaText(formula);
+        native.statements.parseAndCompile(formula);
+        return native.statements.parseFormula(formula);
       });
     },
     evaluateStatement(request) {
       return result(() => {
-        if (request.marketJson !== undefined || request.asOf !== undefined) {
-          if (request.marketJson === undefined || request.asOf === undefined)
-            throw new TypeError(
-              "Statement market JSON and as-of date must be supplied together",
+        const evaluator = new native.statements.Evaluator();
+        try {
+          if (request.marketJson !== undefined || request.asOf !== undefined) {
+            if (request.marketJson === undefined || request.asOf === undefined)
+              throw new TypeError(
+                "Statement market JSON and as-of date must be supplied together",
+              );
+            return evaluator.evaluateWithMarket(
+              request.modelJson,
+              request.marketJson,
+              request.asOf,
             );
-          return native.statements.evaluateModelWithMarket(
-            request.modelJson,
-            request.marketJson,
-            request.asOf,
-          );
+          }
+          return evaluator.evaluate(request.modelJson);
+        } finally {
+          evaluator.free();
         }
-        return native.statements.evaluateModel(request.modelJson);
       });
     },
     explainStatement(request) {
@@ -186,9 +195,16 @@ export function createService(native: {
       );
     },
     traceStatement(modelJson, nodeId) {
-      return result(() =>
-        native.statements_analytics.traceDependencies(modelJson, nodeId),
-      );
+      return result(() => {
+        const tracer = new native.statements_analytics.DependencyTracer(
+          modelJson,
+        );
+        try {
+          return tracer.dependencyTreeText(nodeId);
+        } finally {
+          tracer.free();
+        }
+      });
     },
     runStatementChecks(request) {
       return result(() => {
@@ -221,7 +237,7 @@ export function createService(native: {
       );
     },
     dryRun(json) {
-      return result(() => native.calibration.dryRun(json));
+      return result(() => native.calibration.dryRunJson(json));
     },
     calibrate(json) {
       return result(() => native.calibration.calibrate(json));

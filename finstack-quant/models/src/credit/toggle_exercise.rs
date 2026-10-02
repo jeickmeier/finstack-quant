@@ -21,13 +21,15 @@
 //!
 //! let model = ToggleExerciseModel::threshold(
 //!     CreditStateVariable::HazardRate, 0.15, ThresholdDirection::Above,
-//! );
-//! let state = CreditState { hazard_rate: 0.20, ..Default::default() };
+//! )?;
+//! let state = CreditState::new(0.20, None, 0.0, 0.0, 0.0, None)?;
 //! let mut rng = Pcg64Rng::new(42);
 //! assert!(model.should_pik(&state, &mut rng));
+//! # Ok::<(), finstack_quant_core::Error>(())
 //! ```
 
 use finstack_quant_core::math::random::{Pcg64Rng, RandomNumberGenerator};
+use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -50,6 +52,70 @@ pub struct CreditState {
     pub asset_value: Option<f64>,
 }
 
+impl CreditState {
+    /// Build a credit state, rejecting non-finite values that JSON cannot
+    /// carry.
+    ///
+    /// # Arguments
+    ///
+    /// * `hazard_rate` - Annualised instantaneous default intensity as a
+    ///   decimal (`0.05` is 5% per year).
+    /// * `distance_to_default` - Optional distance to default in standard
+    ///   deviations; `None` is read as maximally stressed (`0.0`) by a
+    ///   distance-to-default toggle rule.
+    /// * `leverage` - Debt-to-assets ratio.
+    /// * `accreted_notional` - PIK-augmented notional outstanding, in the
+    ///   debt's monetary units.
+    /// * `coupon_due` - Cash coupon amount due at this decision date, in the
+    ///   same units as `accreted_notional`.
+    /// * `asset_value` - Optional fair value of the firm's assets, in the same
+    ///   units; `None` lets the optimal-exercise rule infer it from leverage.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] naming the first non-finite value.
+    pub fn new(
+        hazard_rate: f64,
+        distance_to_default: Option<f64>,
+        leverage: f64,
+        accreted_notional: f64,
+        coupon_due: f64,
+        asset_value: Option<f64>,
+    ) -> Result<Self> {
+        for (label, value) in [
+            ("hazard_rate", Some(hazard_rate)),
+            ("distance_to_default", distance_to_default),
+            ("leverage", Some(leverage)),
+            ("accreted_notional", Some(accreted_notional)),
+            ("coupon_due", Some(coupon_due)),
+            ("asset_value", asset_value),
+        ] {
+            if let Some(value) = value {
+                ensure_finite("CreditState", label, value)?;
+            }
+        }
+        Ok(Self {
+            hazard_rate,
+            distance_to_default,
+            leverage,
+            accreted_notional,
+            coupon_due,
+            asset_value,
+        })
+    }
+}
+
+/// Reject a non-finite model parameter, naming its owner and field.
+fn ensure_finite(owner: &str, label: &str, value: f64) -> Result<()> {
+    if value.is_finite() {
+        Ok(())
+    } else {
+        Err(Error::Validation(format!(
+            "{owner}: {label} must be finite, got {value}"
+        )))
+    }
+}
+
 /// Which credit metric drives the toggle decision.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -66,12 +132,15 @@ pub enum CreditStateVariable {
 impl FromStr for CreditStateVariable {
     type Err = String;
 
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         match value {
             "hazard_rate" => Ok(Self::HazardRate),
             "distance_to_default" => Ok(Self::DistanceToDefault),
             "leverage" => Ok(Self::Leverage),
-            other => Err(format!("unknown credit state variable: {other}")),
+            other => Err(format!(
+                "unknown credit state variable: {other} \
+                 (expected one of hazard_rate, distance_to_default, leverage)"
+            )),
         }
     }
 }
@@ -90,11 +159,13 @@ pub enum ThresholdDirection {
 impl FromStr for ThresholdDirection {
     type Err = String;
 
-    fn from_str(value: &str) -> Result<Self, Self::Err> {
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
         match value {
             "above" => Ok(Self::Above),
             "below" => Ok(Self::Below),
-            other => Err(format!("unknown threshold direction: {other}")),
+            other => Err(format!(
+                "unknown threshold direction: {other} (expected one of above, below)"
+            )),
         }
     }
 }
@@ -381,28 +452,114 @@ struct NestedEquityMcModel {
 }
 
 impl ToggleExerciseModel {
-    /// Create a threshold toggle model.
-    #[must_use]
+    /// Create a threshold toggle model: elect PIK when `variable` crosses
+    /// `threshold` in `direction`.
+    ///
+    /// # Arguments
+    ///
+    /// * `variable` - Credit-state metric the rule observes.
+    /// * `threshold` - Boundary in the units of `variable` (a decimal hazard
+    ///   rate, standard deviations of distance to default, or a leverage
+    ///   ratio).
+    /// * `direction` - [`ThresholdDirection::Above`] elects PIK when the
+    ///   metric exceeds `threshold`; [`ThresholdDirection::Below`] when it is
+    ///   under it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] if `threshold` is non-finite.
     pub fn threshold(
         variable: CreditStateVariable,
         threshold: f64,
         direction: ThresholdDirection,
-    ) -> Self {
-        Self::Threshold(ThresholdToggle {
+    ) -> Result<Self> {
+        ensure_finite("threshold toggle", "threshold", threshold)?;
+        Ok(Self::Threshold(ThresholdToggle {
             state_variable: variable,
             threshold,
             direction,
-        })
+        }))
     }
 
-    /// Create a stochastic (sigmoid) toggle model.
-    #[must_use]
-    pub fn stochastic(variable: CreditStateVariable, intercept: f64, sensitivity: f64) -> Self {
-        Self::Stochastic(StochasticToggle {
+    /// Create a stochastic (sigmoid) toggle model with
+    /// `P(PIK) = 1 / (1 + exp(-(intercept + sensitivity * state)))`.
+    ///
+    /// # Arguments
+    ///
+    /// * `variable` - Credit-state metric the logistic function reads.
+    /// * `intercept` - Logistic intercept (log-odds of PIK at a zero state
+    ///   value).
+    /// * `sensitivity` - Logistic slope per unit of `variable`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] if `intercept` or `sensitivity` is
+    /// non-finite.
+    pub fn stochastic(
+        variable: CreditStateVariable,
+        intercept: f64,
+        sensitivity: f64,
+    ) -> Result<Self> {
+        ensure_finite("stochastic toggle", "intercept", intercept)?;
+        ensure_finite("stochastic toggle", "sensitivity", sensitivity)?;
+        Ok(Self::Stochastic(StochasticToggle {
             state_variable: variable,
             intercept,
             sensitivity,
-        })
+        }))
+    }
+
+    /// Create an optimal-exercise toggle model decided by nested Monte Carlo
+    /// (see [`OptimalToggle`]).
+    ///
+    /// # Arguments
+    ///
+    /// * `nested_paths` - Nested Monte Carlo paths per decision; at least 1
+    ///   (100-500 is typical).
+    /// * `equity_discount_rate` - Continuously compounded equity-holder
+    ///   discount rate as a decimal.
+    /// * `asset_vol` - Annualised asset volatility as a decimal; non-negative.
+    /// * `risk_free_rate` - Continuously compounded risk-free drift as a
+    ///   decimal.
+    /// * `horizon` - Nested-simulation horizon in years; positive.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Validation`] if `nested_paths` is zero, any rate is
+    /// non-finite, `asset_vol` is negative or non-finite, or `horizon` is not
+    /// finite and positive.
+    pub fn optimal(
+        nested_paths: usize,
+        equity_discount_rate: f64,
+        asset_vol: f64,
+        risk_free_rate: f64,
+        horizon: f64,
+    ) -> Result<Self> {
+        const OWNER: &str = "optimal toggle";
+        if nested_paths == 0 {
+            return Err(Error::Validation(format!(
+                "{OWNER}: nested_paths must be at least 1"
+            )));
+        }
+        ensure_finite(OWNER, "equity_discount_rate", equity_discount_rate)?;
+        ensure_finite(OWNER, "risk_free_rate", risk_free_rate)?;
+        if !(asset_vol.is_finite() && asset_vol >= 0.0) {
+            return Err(Error::Validation(format!(
+                "{OWNER}: asset_vol must be finite and non-negative, got {asset_vol}"
+            )));
+        }
+        if !(horizon.is_finite() && horizon > 0.0) {
+            return Err(Error::Validation(format!(
+                "{OWNER}: horizon must be finite and positive, got {horizon}"
+            )));
+        }
+        Ok(Self::OptimalExercise(OptimalToggle {
+            nested_paths,
+            equity_discount_rate,
+            asset_vol,
+            risk_free_rate,
+            horizon,
+        }))
     }
 
     /// Returns `true` if the borrower elects PIK at this coupon date.
@@ -495,7 +652,8 @@ mod tests {
         ));
         assert_eq!(
             "spread".parse::<CreditStateVariable>().unwrap_err(),
-            "unknown credit state variable: spread"
+            "unknown credit state variable: spread \
+             (expected one of hazard_rate, distance_to_default, leverage)"
         );
     }
 
@@ -511,7 +669,39 @@ mod tests {
         ));
         assert_eq!(
             "crossed".parse::<ThresholdDirection>().unwrap_err(),
-            "unknown threshold direction: crossed"
+            "unknown threshold direction: crossed (expected one of above, below)"
+        );
+    }
+
+    /// The constructors reject non-finite parameters, which JSON cannot
+    /// carry (`serde_json` writes them as `null`).
+    #[test]
+    fn constructors_reject_non_finite_parameters() {
+        assert!(CreditState::new(f64::NAN, None, 0.0, 0.0, 0.0, None).is_err());
+        assert!(CreditState::new(0.1, Some(f64::INFINITY), 0.0, 0.0, 0.0, None).is_err());
+        assert!(CreditState::new(0.1, None, 0.0, 0.0, 0.0, Some(f64::NAN)).is_err());
+        let state = CreditState::new(0.1, Some(2.0), 0.5, 100.0, 2.0, Some(200.0)).unwrap();
+        assert!((state.hazard_rate - 0.1).abs() < 1e-15);
+        assert_eq!(state.asset_value, Some(200.0));
+
+        let variable = CreditStateVariable::HazardRate;
+        let above = ThresholdDirection::Above;
+        assert!(ToggleExerciseModel::threshold(variable.clone(), f64::NAN, above).is_err());
+        assert!(ToggleExerciseModel::stochastic(variable.clone(), f64::NAN, 1.0).is_err());
+        assert!(ToggleExerciseModel::stochastic(variable, 1.0, f64::INFINITY).is_err());
+        assert!(ToggleExerciseModel::optimal(0, 0.05, 0.3, 0.03, 1.0).is_err());
+        assert!(ToggleExerciseModel::optimal(100, f64::NAN, 0.3, 0.03, 1.0).is_err());
+        assert!(ToggleExerciseModel::optimal(100, 0.05, -0.3, 0.03, 1.0).is_err());
+        assert!(ToggleExerciseModel::optimal(100, 0.05, 0.3, 0.03, 0.0).is_err());
+        assert_eq!(
+            ToggleExerciseModel::optimal(100, 0.05, 0.3, 0.03, 1.0).unwrap(),
+            ToggleExerciseModel::OptimalExercise(OptimalToggle {
+                nested_paths: 100,
+                equity_discount_rate: 0.05,
+                asset_vol: 0.3,
+                risk_free_rate: 0.03,
+                horizon: 1.0,
+            })
         );
     }
 
@@ -521,7 +711,8 @@ mod tests {
             CreditStateVariable::HazardRate,
             0.15,
             ThresholdDirection::Above,
-        );
+        )
+        .unwrap();
         let mut rng = Pcg64Rng::new(42);
         let state_low = CreditState {
             hazard_rate: 0.10,
@@ -541,7 +732,8 @@ mod tests {
             CreditStateVariable::DistanceToDefault,
             2.0,
             ThresholdDirection::Below,
-        );
+        )
+        .unwrap();
         let mut rng = Pcg64Rng::new(42);
         let state_safe = CreditState {
             distance_to_default: Some(3.0),
@@ -557,7 +749,8 @@ mod tests {
 
     #[test]
     fn stochastic_toggle_probability_increases_with_hazard() {
-        let model = ToggleExerciseModel::stochastic(CreditStateVariable::HazardRate, -3.0, 20.0);
+        let model =
+            ToggleExerciseModel::stochastic(CreditStateVariable::HazardRate, -3.0, 20.0).unwrap();
         // Run 10k samples at lambda=0.10 and lambda=0.20
         let count_low: usize = (0..10_000)
             .filter(|i| {
@@ -591,7 +784,8 @@ mod tests {
             CreditStateVariable::HazardRate,
             0.15,
             ThresholdDirection::Above,
-        );
+        )
+        .unwrap();
         let mut rng = Pcg64Rng::new(42);
         let state_above = CreditState {
             hazard_rate: 0.20,

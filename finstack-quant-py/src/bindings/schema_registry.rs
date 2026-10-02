@@ -15,16 +15,15 @@
 /// # Arguments
 ///
 /// * `$registry` - Expression yielding the crate's `ARTIFACTS` slice.
-/// * `$python_path` - Dotted Python path of the namespace, for `__module__`.
 macro_rules! schema_registry_functions {
-    ($registry:expr, $python_path:literal) => {
+    ($registry:expr) => {
         /// List every JSON Schema this crate publishes.
         ///
         /// Returns
         /// -------
         /// str
         ///     Pretty-printed JSON with an ``artifacts`` array. Each row carries
-        ///     ``path``, ``$id``, ``title``, ``summary``, ``bytes`` and ``kind``
+        ///     ``path``, ``$id``, ``title``, ``type_name`` (the Rust root type), ``summary``, ``bytes`` and ``kind``
         ///     (``input`` for documents you author, ``output`` for documents the
         ///     library emits, ``component`` for shared definitions).
         ///
@@ -73,7 +72,7 @@ macro_rules! schema_registry_functions {
         fn get(selector: &str, profile: &str) -> PyResult<String> {
             let artifact =
                 finstack_quant_core::schema::find_schema_artifact($registry, selector)
-                    .map_err(|error| pyo3::exceptions::PyKeyError::new_err(error.to_string()))?;
+                    .map_err(crate::errors::core_to_py)?;
             let value =
                 finstack_quant::schema::render_profile(artifact, profile)
                     .map_err(|error| pyo3::exceptions::PyValueError::new_err(error.to_string()))?;
@@ -110,7 +109,7 @@ macro_rules! schema_registry_functions {
         fn validate(selector: &str, payload: &str) -> PyResult<String> {
             let artifact =
                 finstack_quant_core::schema::find_schema_artifact($registry, selector)
-                    .map_err(|error| pyo3::exceptions::PyKeyError::new_err(error.to_string()))?;
+                    .map_err(crate::errors::core_to_py)?;
             let parsed: serde_json::Value = serde_json::from_str(payload).map_err(|error| {
                 pyo3::exceptions::PyValueError::new_err(format!("payload is not JSON: {error}"))
             })?;
@@ -131,9 +130,6 @@ macro_rules! schema_registry_functions {
             m.add_function(wrap_pyfunction!(index, m)?)?;
             m.add_function(wrap_pyfunction!(get, m)?)?;
             m.add_function(wrap_pyfunction!(validate, m)?)?;
-            for name in ["index", "get", "validate"] {
-                m.getattr(name)?.setattr("__module__", $python_path)?;
-            }
             Ok(())
         }
     };

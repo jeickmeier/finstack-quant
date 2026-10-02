@@ -11,3 +11,6 @@ mod correctness_regressions;
 mod correlation_validator_agreement;
 #[path = "performance_smoke.rs"]
 mod performance_smoke;
+#[cfg(feature = "json-schema")]
+#[path = "schema_contract.rs"]
+mod schema_contract;

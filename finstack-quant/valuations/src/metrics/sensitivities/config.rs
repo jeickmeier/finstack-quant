@@ -64,6 +64,50 @@ pub(crate) fn format_bucket_label_cow(years: f64) -> std::borrow::Cow<'static, s
     std::borrow::Cow::Owned(s)
 }
 
+/// Format a key-rate coordinate without rounding away its year fraction.
+///
+/// # Arguments
+///
+/// * `years` - Nonnegative finite bucket time in years. Standard coordinates
+///   use their usual month/year names; other coordinates retain their exact
+///   decimal year fraction.
+pub fn format_key_rate_label(years: f64) -> String {
+    let label = format_bucket_label(years);
+    if parse_key_rate_label(&label).ok() == Some(years) {
+        label
+    } else {
+        format!("{years}y")
+    }
+}
+
+/// Recover the year coordinate from a key-rate sensitivity bucket label.
+///
+/// # Arguments
+///
+/// * `label` - Bucket label emitted by [`format_key_rate_label`], using years
+///   (`"1.4y"`) or a standard month coordinate (`"3m"`).
+///
+/// # Errors
+///
+/// Returns a validation error for an unsupported unit, negative or non-finite
+/// coordinate, or an invalid numeric value.
+pub fn parse_key_rate_label(label: &str) -> finstack_quant_core::Result<f64> {
+    let years = if let Some(value) = label.strip_suffix('y') {
+        value.parse::<f64>().ok()
+    } else if let Some(value) = label.strip_suffix('m') {
+        value.parse::<f64>().ok().map(|months| months / 12.0)
+    } else {
+        None
+    };
+    years
+        .filter(|years| years.is_finite() && *years >= 0.0)
+        .ok_or_else(|| {
+            finstack_quant_core::Error::Validation(format!(
+                "invalid sensitivity bucket label '{label}'"
+            ))
+        })
+}
+
 /// Default relative spot bump: 1% of spot (0.01).
 const DEFAULT_SPOT_BUMP_DECIMAL: f64 = 0.01;
 
@@ -343,6 +387,22 @@ mod tests {
             std::borrow::Cow::Borrowed("5y")
         );
         assert_eq!(format_bucket_label_cow(1.25).into_owned(), "1y");
+    }
+
+    #[test]
+    fn key_rate_labels_round_trip_exact_coordinates() {
+        for coordinate in [0.25, 0.75, 1.0, 1.004, 1.4, 4.0, 9.0, 31.125] {
+            let label = format_key_rate_label(coordinate);
+            assert_eq!(
+                parse_key_rate_label(&label).expect("canonical label"),
+                coordinate
+            );
+        }
+        assert_eq!(format_key_rate_label(1.4), "1.4y");
+        assert_eq!(format_key_rate_label(1.004), "1.004y");
+        for invalid in ["NaNy", "infy", "-1y", "5x", "y"] {
+            assert!(parse_key_rate_label(invalid).is_err());
+        }
     }
 
     #[test]

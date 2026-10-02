@@ -232,7 +232,12 @@ mod tests {
             .expect("discount curve");
         let first = date!(2023 - 10 - 01);
         let observations = (0..=122)
-            .map(|month| (first.add_months(month), 100.0 + f64::from(month) * 0.2))
+            .map(|month| {
+                (
+                    first.add_months(month).expect("valid date shift"),
+                    100.0 + f64::from(month) * 0.2,
+                )
+            })
             .collect();
         let index = InflationIndex::new("US-CPI", observations, Currency::USD)
             .expect("inflation index")

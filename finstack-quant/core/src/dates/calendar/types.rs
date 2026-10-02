@@ -2,7 +2,7 @@
 //!
 //! The `Calendar` struct provides a clean, efficient implementation supporting:
 //! - Rule-based holiday definition (see [`super::rule::Rule`])
-//! - A validated year range (`BASE_YEAR..=END_YEAR`); out-of-range queries still
+//! - A cache year range (`BASE_YEAR..=END_YEAR`); out-of-range queries still
 //!   evaluate but emit a one-time warning
 
 use super::algo::{BASE_YEAR, END_YEAR};
@@ -116,9 +116,9 @@ impl Calendar {
 
 impl HolidayCalendar for Calendar {
     fn is_holiday(&self, date: Date) -> bool {
-        // Holiday rules are validated against `[BASE_YEAR, END_YEAR]`; they still
-        // evaluate algorithmically outside that window, but accuracy is not
-        // guaranteed, so warn once per process when queried out of range.
+        // The cache and astronomical tables use `[BASE_YEAR, END_YEAR]`; this
+        // is not the published coverage of every market calendar. Outside
+        // that window some table-based holidays are unavailable, so warn once.
         if !(BASE_YEAR..=END_YEAR).contains(&date.year()) {
             static ONCE: core::sync::atomic::AtomicBool =
                 core::sync::atomic::AtomicBool::new(false);
@@ -128,7 +128,7 @@ impl HolidayCalendar for Calendar {
                     year = date.year(),
                     base_year = BASE_YEAR,
                     end_year = END_YEAR,
-                    "calendar evaluated outside its validated year range"
+                    "calendar evaluated outside its cache year range"
                 );
             }
         }
@@ -176,6 +176,10 @@ impl HolidayCalendar for &Calendar {
         (*self).is_holiday(date)
     }
 
+    fn is_business_day(&self, date: Date) -> bool {
+        <Calendar as HolidayCalendar>::is_business_day(*self, date)
+    }
+
     fn count_business_days(&self, start: Date, end: Date) -> i32 {
         <Calendar as HolidayCalendar>::count_business_days(*self, start, end)
     }
@@ -189,6 +193,37 @@ impl HolidayCalendar for &Calendar {
 mod tests {
     use super::*;
     use time::Month;
+
+    #[test]
+    fn borrowed_and_trait_object_calendars_preserve_weekends_and_counts() {
+        fn generic_business<C: HolidayCalendar>(calendar: C, date: Date) -> bool {
+            calendar.is_business_day(date)
+        }
+
+        for rule in [
+            WeekendRule::SaturdaySunday,
+            WeekendRule::FridaySaturday,
+            WeekendRule::FridayOnly,
+            WeekendRule::None,
+        ] {
+            let calendar =
+                Calendar::new("borrowed", "Borrowed calendar", true, &[]).with_weekend_rule(rule);
+            let borrowed = &calendar;
+            let object: &dyn HolidayCalendar = &borrowed;
+            for day in 1..=7 {
+                let date =
+                    Date::from_calendar_date(2026, Month::October, day).expect("valid test date");
+                let expected = !rule.is_weekend(date.weekday());
+                assert_eq!(calendar.is_business_day(date), expected);
+                assert_eq!(generic_business(borrowed, date), expected);
+                assert_eq!(object.is_business_day(date), expected);
+                assert_eq!(
+                    object.count_business_days(date, date.next_day().expect("next date")),
+                    i32::from(expected)
+                );
+            }
+        }
+    }
 
     #[test]
     fn saturday_sunday_rule() {

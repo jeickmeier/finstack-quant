@@ -64,6 +64,7 @@ impl CheckSuite {
         model: &FinancialModelSpec,
         results: &StatementResult,
     ) -> Result<CheckReport> {
+        self.config.validate()?;
         let context = CheckContext {
             model,
             results,
@@ -251,6 +252,7 @@ impl CheckSuiteBuilder {
 ///
 /// Both built-in and formula checks are resolved by [`CheckSuiteSpec::resolve`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CheckSuiteSpec {
     /// Suite name.
@@ -277,10 +279,11 @@ impl CheckSuiteSpec {
     ///
     /// # Errors
     ///
-    /// This currently returns `Ok` for every deserialized spec because checks
-    /// are materialized without runtime I/O or model access. Formula syntax and
-    /// references are validated when the suite runs against a model.
+    /// Returns an error when configured tolerances or materiality thresholds
+    /// are negative or non-finite. Formula syntax and references are validated
+    /// when the suite runs against a model.
     pub fn resolve(&self) -> Result<CheckSuite> {
+        self.config.validate()?;
         let mut checks: Vec<Box<dyn Check>> = self
             .builtin_checks
             .iter()
@@ -307,6 +310,7 @@ impl CheckSuiteSpec {
 /// the JSON shape is the struct's fields plus a `type` tag. Convert into a
 /// boxed [`Check`] via [`BuiltinCheckSpec::to_check`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum BuiltinCheckSpec {
     /// Balance sheet articulation: Assets = Liabilities + Equity.
@@ -358,6 +362,7 @@ impl BuiltinCheckSpec {
 /// Full suite definitions (built-in + formula) can be stored as a single JSON
 /// document and resolved directly with [`CheckSuiteSpec::resolve`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FormulaCheckSpec {
     /// Unique identifier for this check instance.
@@ -375,7 +380,10 @@ pub struct FormulaCheckSpec {
     pub formula: String,
     /// Template for the finding message (`{period}` is replaced at runtime).
     pub message_template: String,
-    /// Numeric tolerance for floating-point comparisons.
+    /// Finite, nonnegative absolute residual bound in the formula's result units.
+    /// When present, the formula passes when its absolute result is at most
+    /// this bound. When absent, the formula is a predicate and any finite
+    /// nonzero result passes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tolerance: Option<f64>,
 }

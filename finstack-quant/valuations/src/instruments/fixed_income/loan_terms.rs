@@ -99,6 +99,9 @@ impl RateSpec {
     /// # Arguments
     ///
     /// * `date` - Accrual start the rate is projected for.
+    /// * `accrual_end` - Exclusive end of the contractual coupon period.
+    /// * `accrual_year_fraction` - Positive finite coupon accrual under its
+    ///   contractual day count, including any required schedule context.
     /// * `market` - Market holding the forward curve and fixings named by
     ///   the floating spec's `forward_curve_id`.
     ///
@@ -109,6 +112,8 @@ impl RateSpec {
     pub fn try_current_rate_with_index(
         &self,
         date: Date,
+        accrual_end: Date,
+        accrual_year_fraction: f64,
         market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
         let as_of = match self {
@@ -117,7 +122,7 @@ impl RateSpec {
                 .get_forward(spec.forward_curve_id.as_str())?
                 .base_date(),
         };
-        self.try_rate_for_period(date, as_of, market)
+        self.try_rate_for_period(date, accrual_end, accrual_year_fraction, as_of, market)
     }
 
     /// Contractual rate for an explicit accrual period, as a decimal.
@@ -128,7 +133,11 @@ impl RateSpec {
     ///
     /// # Arguments
     ///
-    /// * `accrual_start` - Start of the accrual period.
+    /// * `accrual_start` - Start of the accrual period, also the effective date
+    ///   used to sample a projected term-index quote.
+    /// * `accrual_end` - Exclusive end of the full contractual coupon period.
+    /// * `accrual_year_fraction` - Positive finite contractual coupon accrual,
+    ///   used to convert the curve-basis quote before spreads and rate bounds.
     /// * `as_of` - Valuation date separating observed fixings from projections.
     /// * `market` - Market holding the forward curve and fixings.
     ///
@@ -140,6 +149,8 @@ impl RateSpec {
     pub fn try_rate_for_period(
         &self,
         accrual_start: Date,
+        accrual_end: Date,
+        accrual_year_fraction: f64,
         as_of: Date,
         market: &finstack_quant_core::market_data::context::MarketContext,
     ) -> finstack_quant_core::Result<f64> {
@@ -148,148 +159,57 @@ impl RateSpec {
             Self::Floating(spec) => {
                 let fwd = market.get_forward(spec.forward_curve_id.as_str())?;
                 let params = crate::cashflow::builder::FloatingRateParams::try_from(spec)?;
-                if spec.compounding.is_some() {
-                    if term_reset_date(spec, accrual_start)? <= as_of {
+                let calendar_id = spec
+                    .fixing_calendar_id
+                    .as_deref()
+                    .unwrap_or("weekends_only");
+                let calendar =
+                    finstack_quant_core::dates::calendar_by_id(calendar_id).ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(format!(
+                            "structured-credit tranche fixing calendar '{}' is not registered",
+                            calendar_id
+                        ))
+                    })?;
+                let reset_date = finstack_quant_core::dates::DateExt::add_business_days(
+                    accrual_start,
+                    -spec.reset_lag_days,
+                    calendar,
+                )?;
+                if reset_date <= as_of {
+                    if spec.compounding.is_some() {
                         return Err(finstack_quant_core::Error::Validation(
                             "seasoned compounded-overnight tranche coupons require a canonical compounded fixing schedule"
                                 .into(),
                         ));
                     }
-                    params.validate()?;
+                    let fixings = finstack_quant_core::market_data::fixings::get_fixing_series(
+                        market,
+                        spec.forward_curve_id.as_str(),
+                    )?;
+                    let raw =
+                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
+                            Some(fixings),
+                            spec.forward_curve_id.as_str(),
+                            reset_date,
+                            as_of,
+                        )?;
                     return Ok(
                         crate::cashflow::builder::rate_helpers::calculate_floating_rate(
-                            crate::cashflow::builder::rate_helpers::project_index_rate(
-                                accrual_start,
-                                fwd.as_ref(),
-                            )?,
-                            &params,
+                            raw, &params,
                         ),
                     );
                 }
-                params.validate()?;
-                let reset_date = term_reset_date(spec, accrual_start)?;
-                let index = term_index_rate(market, fwd.as_ref(), reset_date, as_of)?;
-                Ok(crate::cashflow::builder::rate_helpers::calculate_floating_rate(index, &params))
+                crate::cashflow::builder::project_floating_rate(
+                    accrual_start,
+                    fwd.as_ref(),
+                    &params,
+                    accrual_start,
+                    accrual_end,
+                    accrual_year_fraction,
+                )
             }
         }
     }
-
-    /// Raw term-index fixing a floating coupon accruing from `accrual_start`
-    /// observes, valued at the index `try_rate_for_period` projects for it.
-    ///
-    /// The value is `None` when the projection is unavailable (the period
-    /// starts before the curve base, so its fixing is already observed).
-    ///
-    /// # Arguments
-    ///
-    /// * `accrual_start` - Start of the accrual period.
-    /// * `market` - Market holding the projection forward curve.
-    ///
-    /// # Returns
-    ///
-    /// `None` for a fixed or compounded-overnight coupon, else the fixing's
-    /// `FIXING:` series, reset date and raw projected index rate.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the forward curve is missing or the fixing
-    /// calendar is unknown.
-    pub(crate) fn projected_term_fixing(
-        &self,
-        accrual_start: Date,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-    ) -> finstack_quant_core::Result<Option<crate::cashflow::fixings::ProjectedFixing>> {
-        let Self::Floating(spec) = self else {
-            return Ok(None);
-        };
-        if spec.compounding.is_some() {
-            return Ok(None);
-        }
-        let fwd = market.get_forward(spec.forward_curve_id.as_str())?;
-        let date = term_reset_date(spec, accrual_start)?;
-        Ok(Some(crate::cashflow::fixings::ProjectedFixing {
-            series_id: finstack_quant_core::market_data::fixings::fixing_series_id(
-                spec.forward_curve_id.as_str(),
-            ),
-            date,
-            value: projected_term_fixing_value(fwd.as_ref(), date)?,
-        }))
-    }
-}
-
-/// Pre-roll projection recorded for the term fixing on `fixing_date`:
-/// [`crate::cashflow::builder::rate_helpers::project_term_fixing`], or
-/// `None` when the fixing precedes the curve
-/// base (it is observed, not projected).
-///
-/// # Errors
-///
-/// Propagates a projection failure for a fixing on or after the curve base.
-pub(crate) fn projected_term_fixing_value(
-    fwd: &finstack_quant_core::market_data::term_structures::ForwardCurve,
-    fixing_date: Date,
-) -> finstack_quant_core::Result<Option<f64>> {
-    if fixing_date < fwd.base_date() {
-        return Ok(None);
-    }
-    crate::cashflow::builder::rate_helpers::project_term_fixing(fixing_date, fwd).map(Some)
-}
-
-/// Raw term-index rate for the fixing on `fixing_date`, observed or projected.
-///
-/// Start-of-day policy shared with cashflow emission: a fixing before
-/// `as_of` is observed and must be in the `FIXING:` series; a fixing dated
-/// `as_of` uses the series value when published and is projected otherwise;
-/// later fixings are projected with
-/// [`crate::cashflow::builder::rate_helpers::project_term_fixing`].
-///
-/// # Arguments
-///
-/// * `market` - Market holding the `FIXING:{curve id}` series.
-/// * `fwd` - Term-index forward curve projecting unobserved fixings.
-/// * `fixing_date` - Date the index is observed.
-/// * `as_of` - Valuation date separating observed fixings from projections.
-///
-/// # Errors
-///
-/// Returns an error when a required past fixing is missing or the
-/// projection fails.
-pub(crate) fn term_index_rate(
-    market: &finstack_quant_core::market_data::context::MarketContext,
-    fwd: &finstack_quant_core::market_data::term_structures::ForwardCurve,
-    fixing_date: Date,
-    as_of: Date,
-) -> finstack_quant_core::Result<f64> {
-    use finstack_quant_core::market_data::fixings;
-    let series = fixings::get_fixing_series(market, fwd.id().as_str()).ok();
-    if crate::cashflow::builder::rate_helpers::term_fixing_is_observed(series, fixing_date, as_of) {
-        return fixings::require_fixing_value_exact(series, fwd.id().as_str(), fixing_date, as_of);
-    }
-    crate::cashflow::builder::rate_helpers::project_term_fixing(fixing_date, fwd)
-}
-
-/// Reset date of a floating tranche coupon accruing from `accrual_start`:
-/// `reset_lag_days` business days earlier on the fixing calendar
-/// (weekends-only when none is set).
-fn term_reset_date(
-    spec: &crate::cashflow::builder::FloatingRateSpec,
-    accrual_start: Date,
-) -> finstack_quant_core::Result<Date> {
-    let calendar_id = spec
-        .fixing_calendar_id
-        .as_deref()
-        .unwrap_or("weekends_only");
-    let calendar = finstack_quant_core::dates::calendar_by_id(calendar_id).ok_or_else(|| {
-        finstack_quant_core::Error::Validation(format!(
-            "structured-credit tranche fixing calendar '{}' is not registered",
-            calendar_id
-        ))
-    })?;
-    finstack_quant_core::dates::DateExt::add_business_days(
-        accrual_start,
-        -spec.reset_lag_days,
-        calendar,
-    )
 }
 
 /// A scheduled draw `{date, amount}` on a committed facility.

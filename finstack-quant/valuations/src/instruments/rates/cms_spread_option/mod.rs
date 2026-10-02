@@ -6,9 +6,10 @@
 //!
 //! # Pricing
 //!
-//! Standard approach uses SABR marginals for each CMS rate combined via
-//! Gaussian copula. CMS convexity adjustments are applied via static
-//! replication.
+//! The implemented approximation combines lognormal CMS marginals using a
+//! Gaussian copula. Flat-strike Black volatility surfaces (including tenor-axis
+//! ATM surfaces) are supported; SABR cubes and nonflat smiles are rejected.
+//! Each marginal mean uses the shared first-order CMS convexity adjustment.
 //!
 //! # See Also
 //!

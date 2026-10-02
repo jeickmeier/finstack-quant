@@ -202,6 +202,29 @@ fn packaging_compares_recursive_typed_definition_graphs() {
 }
 
 #[test]
+fn packaging_externalizes_a_self_recursive_root_definition() {
+    // `RecursiveProbe` refers to itself; as its own schema root that edge is
+    // `$ref: "#"`, while inside the envelope it is `#/$defs/RecursiveProbe`.
+    let mut schema = serde_json::to_value(schemars::schema_for!(RecursiveEnvelope))
+        .expect("recursive derived schema serializes");
+
+    externalize_schema_definitions(
+        &mut schema,
+        &[ExternalSchemaDefinition::new::<RecursiveProbe>(
+            "RecursiveProbe",
+            "https://example.test/recursive_probe.schema.json",
+        )],
+    )
+    .expect("self-recursive root externalizes");
+
+    assert_eq!(
+        schema["properties"]["probe"]["$ref"],
+        "https://example.test/recursive_probe.schema.json"
+    );
+    assert!(schema.get("$defs").is_none());
+}
+
+#[test]
 fn generated_schema_preserves_derived_assertions() {
     #[allow(dead_code)]
     #[derive(serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
@@ -255,6 +278,11 @@ fn schema_index_is_sorted_by_path_and_carries_kind_and_summary() {
     assert_eq!(rows[0]["kind"], json!("input"));
     assert_eq!(rows[0]["summary"], json!("An explicit one-line summary."));
     assert_eq!(rows[1]["kind"], json!("output"));
+    assert_eq!(
+        rows[0]["type_name"],
+        json!("SuffixProbe"),
+        "each row names the Rust root type, not the display title"
+    );
     assert_eq!(
         rows[1]["summary"],
         json!("Registered second but sorts first by path."),
@@ -765,5 +793,46 @@ fn registry_selection_and_index_use_the_published_contract() {
         json!(super::deterministic_json_bytes(&schema)
             .expect("bytes")
             .len())
+    );
+}
+
+#[test]
+fn example_floats_are_published_to_twelve_significant_digits() {
+    // The last-place noise a platform math library leaves behind must not reach
+    // a checked-in artifact; authored values and integers must pass untouched.
+    let examples = example(&json!({
+        "computed": 0.157_503_064_882_872_8_f64,
+        "authored": 0.0425,
+        "negative_zero": -0.0_f64,
+        "count": 3,
+        "nested": [1.0e-18_f64 / 3.0],
+    }))
+    .expect("serializes");
+
+    assert_eq!(
+        examples,
+        vec![json!({
+            "computed": 0.157_503_064_883_f64,
+            "authored": 0.0425,
+            "negative_zero": 0.0,
+            "count": 3,
+            "nested": [3.333_333_333_33e-19_f64],
+        })]
+    );
+    assert_eq!(
+        serde_json::to_string(&examples[0]["negative_zero"]).expect("ser"),
+        "0.0"
+    );
+}
+
+#[test]
+fn example_from_json_rejects_a_payload_the_contract_does_not_accept() {
+    let accepted = example_from_json::<ExternalText>(json!("ok")).expect("a string is accepted");
+    assert_eq!(accepted, vec![json!("ok")]);
+
+    let error = example_from_json::<ExternalText>(json!(1)).expect_err("a number is not");
+    assert!(
+        error.to_string().contains("ExternalText"),
+        "the error names the contract type: {error}"
     );
 }

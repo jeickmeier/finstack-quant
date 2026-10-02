@@ -1,0 +1,41 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/altman_z_score_input.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Input ratios for the original Altman Z-Score (1968).",
+  "properties": {
+    "ebit_to_total_assets": {
+      "description": "X3: EBIT / Total Assets.",
+      "format": "double",
+      "type": "number"
+    },
+    "market_equity_to_total_liabilities": {
+      "description": "X4: Market Value of Equity / Book Value of Total Liabilities.",
+      "format": "double",
+      "type": "number"
+    },
+    "retained_earnings_to_total_assets": {
+      "description": "X2: Retained Earnings / Total Assets.",
+      "format": "double",
+      "type": "number"
+    },
+    "sales_to_total_assets": {
+      "description": "X5: Sales / Total Assets.",
+      "format": "double",
+      "type": "number"
+    },
+    "working_capital_to_total_assets": {
+      "description": "X1: Working Capital / Total Assets.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "working_capital_to_total_assets",
+    "retained_earnings_to_total_assets",
+    "ebit_to_total_assets",
+    "market_equity_to_total_liabilities",
+    "sales_to_total_assets"
+  ],
+  "title": "AltmanZScoreInput",
+  "type": "object"
+}

@@ -254,11 +254,13 @@ fn test_metric_consistency() {
     let dates = TestDates::standard();
     let market = setup_standard_market(dates.as_of);
 
-    let swap = create_standard_fx_swap(
+    let swap = create_fx_swap_with_rates(
         "CONSISTENCY",
         dates.near_date,
         dates.far_date_1y,
         1_000_000.0,
+        1.10,
+        1.15,
     );
 
     let result = swap
@@ -284,6 +286,6 @@ fn test_metric_consistency() {
     assert!(dv01_dom > 1e-10, "DV01 domestic should be non-zero");
     assert!(dv01_for > 1e-10, "DV01 foreign should be non-zero");
     assert!(fx01 > 1e-10, "FX01 should be non-zero");
-    // DV01 for FX swap at inception with model-implied rates is very small
+    // Explicit contract rates remain fixed when the market is bumped.
     assert!(dv01.is_finite(), "DV01 should be finite");
 }

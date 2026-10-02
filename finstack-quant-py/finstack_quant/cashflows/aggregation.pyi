@@ -76,7 +76,7 @@ class PeriodAggregation:
         """
         ...
 
-    def get(self, period: str, currency: Currency | str) -> Money | None:
+    def get_amount(self, period: str, currency: Currency | str) -> Money | None:
         """
         Total for one ``(period, currency)`` cell.
 
@@ -199,12 +199,12 @@ class PeriodAggregation:
         Returns
         -------
         PeriodAggregation
-            Reconstructed totals.
+            Reconstructed totals whose currency keys match their monetary amounts.
 
         Raises
         ------
         ValueError
-            If the JSON is malformed.
+            If the JSON is malformed or a currency key differs from its Money currency.
 
         Examples
         --------

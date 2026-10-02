@@ -1,27 +1,8 @@
-//! Priority ordering helpers and rules like equity-before-sweep behavior.
+//! Validate the cash currency shared by the waterfall's payment priorities.
 
 use crate::capital_structure::cashflows::CashflowBreakdown;
-use crate::capital_structure::waterfall_spec::PaymentPriority;
 use crate::error::Result;
 use indexmap::IndexMap;
-
-/// Find the position of a priority level in the waterfall stack.
-///
-/// Returns `usize::MAX` when `target` is not present.
-pub(super) fn priority_index(priorities: &[PaymentPriority], target: PaymentPriority) -> usize {
-    priorities
-        .iter()
-        .position(|priority| *priority == target)
-        .unwrap_or(usize::MAX)
-}
-
-/// Position of the ECF `Sweep` rung.
-///
-/// Mandatory and voluntary prepays have their own buckets and must not move
-/// the ECF amort/fee deduction to an earlier rung.
-pub(super) fn extra_principal_priority(priorities: &[PaymentPriority]) -> usize {
-    priority_index(priorities, PaymentPriority::Sweep)
-}
 
 /// Validate that all instruments share a single currency.
 ///

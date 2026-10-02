@@ -1,8 +1,13 @@
+#[cfg(test)]
 use super::characteristic_fn::{heston_pj_characteristic_function, HestonCfStatus};
+#[cfg(test)]
 use super::strip_pricer::HESTON_STRIP_MAX_CORRUPT_FRACTION;
+#[cfg(test)]
 use super::{HestonFourierSettings, HestonPricingParams};
-use finstack_quant_core::math::{gauss_legendre_grid, gauss_legendre_integrate_composite};
+use finstack_quant_core::math::gauss_legendre_grid;
+#[cfg(test)]
 use num_complex::Complex;
+#[cfg(test)]
 use std::f64::consts::PI;
 
 pub(super) fn composite_gauss_legendre_grid(
@@ -23,6 +28,7 @@ pub(super) const HESTON_TAIL_WINDOW_FRACTION: f64 = 0.1;
 /// Carries the information needed to detect the two silent failure modes the
 /// audit flagged: characteristic-function corruption (item 5) and truncation
 /// of the Fourier integral at a fixed `u_max` (item 4).
+#[cfg(test)]
 #[derive(Debug, Clone, Copy)]
 pub(super) struct HestonPjDiagnostics {
     /// Probability clamped to `[0, 1]` — the value used for pricing.
@@ -40,7 +46,7 @@ pub(super) struct HestonPjDiagnostics {
     /// `true` when too many interior integration nodes had a non-finite /
     /// overflow-zeroed characteristic function (see
     /// [`HESTON_STRIP_MAX_CORRUPT_FRACTION`]); the integral is then unreliable
-    /// and pricing must fall back to Black-Scholes — mirroring the strip pricer.
+    /// and must be rejected by the pricing driver.
     pub(super) corrupted: bool,
 }
 
@@ -62,6 +68,7 @@ pub(super) struct HestonPjDiagnostics {
 /// * `time` - Time to maturity
 /// * `params` - Heston model parameters
 /// * `settings` - Integration settings
+#[cfg(test)]
 pub(super) fn heston_pj_with_diagnostics(
     j: u8,
     spot: f64,
@@ -70,44 +77,14 @@ pub(super) fn heston_pj_with_diagnostics(
     params: &HestonPricingParams,
     settings: &HestonFourierSettings,
 ) -> HestonPjDiagnostics {
-    let log_spot = spot.ln();
-    let log_strike = strike.ln();
-    let i = Complex::new(0.0, 1.0);
-
-    // Build the same composite Gauss-Legendre grid the strip pricer uses, so we
-    // can inspect per-node behaviour rather than treating the quadrature as a
-    // black box.
-    let grid =
-        composite_gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels);
-    let Some(grid) = grid else {
-        // Degenerate settings: fall back to the library quadrature with no
-        // node-level diagnostics available.
-        let integrand = |phi: f64| {
-            if phi.abs() < settings.phi_eps {
-                return 0.0;
-            }
-            let (psi, _status) = heston_pj_characteristic_function(j, phi, time, log_spot, params);
-            let exp_term = (-i * phi * log_strike).exp();
-            (exp_term * psi / (i * phi)).re
-        };
-        let (integral, integration_failed) = match gauss_legendre_integrate_composite(
-            integrand,
-            0.0,
-            settings.u_max,
-            settings.gl_order,
-            settings.panels,
-        ) {
-            Ok(v) => (v, false),
-            Err(_) => (0.0, true),
-        };
-        let raw = 0.5 + integral / PI;
+    let Some(grid) =
+        composite_gauss_legendre_grid(0.0, settings.u_max, settings.gl_order, settings.panels)
+    else {
         return HestonPjDiagnostics {
-            probability: raw.clamp(0.0, 1.0),
-            raw_probability: raw,
+            probability: f64::NAN,
+            raw_probability: f64::NAN,
             tail_estimate: f64::INFINITY,
-            // If the fallback integrator also failed, surface corruption so the
-            // caller falls back to Black-Scholes rather than silently using 0.5.
-            corrupted: integration_failed,
+            corrupted: true,
         };
     };
 
@@ -121,6 +98,7 @@ pub(super) fn heston_pj_with_diagnostics(
 /// `time`), so `heston_call_price_fourier` builds it once and
 /// shares it across the `j = 1` and `j = 2` evaluations instead of rebuilding
 /// the `gl_order * panels`-node grid twice per scalar price.
+#[cfg(test)]
 pub(super) fn heston_pj_on_grid(
     j: u8,
     spot: f64,

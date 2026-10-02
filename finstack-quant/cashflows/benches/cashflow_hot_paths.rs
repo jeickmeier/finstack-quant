@@ -214,10 +214,8 @@ fn bench_pv_by_period(c: &mut Criterion) {
                 black_box(&schedule)
                     .pv_by_period_with_discounting(
                         black_box(&periods),
-                        finstack_quant_cashflows::builder::PvDiscountSource::Discount {
-                            disc: black_box(disc.as_ref()),
-                            credit: None,
-                        },
+                        black_box(disc.as_ref()),
+                        None,
                         DateContext::new(
                             black_box(base),
                             DayCount::Act365F,
@@ -259,13 +257,11 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
                 black_box(&schedule)
                     .pv_by_period_with_discounting(
                         black_box(&periods),
-                        finstack_quant_cashflows::builder::PvDiscountSource::Discount {
-                            disc: black_box(disc.as_ref()),
-                            credit: Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
-                                hazard: Some(black_box(hazard.as_ref() as &dyn Survival)),
-                                recovery_rate: None,
-                            }),
-                        },
+                        black_box(disc.as_ref()),
+                        Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
+                            hazard: Some(black_box(hazard.as_ref() as &dyn Survival)),
+                            recovery_rate: None,
+                        }),
                         black_box(ctx),
                     )
                     .unwrap()
@@ -279,13 +275,11 @@ fn bench_pv_by_period_credit(c: &mut Criterion) {
                 black_box(&schedule)
                     .pv_by_period_with_discounting(
                         black_box(&periods),
-                        finstack_quant_cashflows::builder::PvDiscountSource::Discount {
-                            disc: black_box(disc.as_ref()),
-                            credit: Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
-                                hazard: Some(black_box(hazard.as_ref() as &dyn Survival)),
-                                recovery_rate: Some(0.40),
-                            }),
-                        },
+                        black_box(disc.as_ref()),
+                        Some(finstack_quant_cashflows::builder::PvCreditAdjustment {
+                            hazard: Some(black_box(hazard.as_ref() as &dyn Survival)),
+                            recovery_rate: Some(0.40),
+                        }),
                         black_box(ctx),
                     )
                     .unwrap()

@@ -54,8 +54,8 @@ fn build_minimal_market(discount_ids: &[&str], forward_ids: &[&str]) -> MarketCo
 #[test]
 fn test_fra_forward_dependencies_complete() {
     let as_of = date!(2025 - 01 - 01);
-    let start = as_of.add_months(3);
-    let end = as_of.add_months(6);
+    let start = as_of.add_months(3).expect("valid date shift");
+    let end = as_of.add_months(6).expect("valid date shift");
 
     let fra = ForwardRateAgreement::builder()
         .id(InstrumentId::new("FRA-FWD-DEPS"))
@@ -91,8 +91,8 @@ fn test_fra_forward_dependencies_complete() {
 #[test]
 fn test_missing_forward_curve_fails() {
     let as_of = date!(2025 - 01 - 01);
-    let start = as_of.add_months(3);
-    let end = as_of.add_months(6);
+    let start = as_of.add_months(3).expect("valid date shift");
+    let end = as_of.add_months(6).expect("valid date shift");
 
     let fra = ForwardRateAgreement::builder()
         .id(InstrumentId::new("FRA-FWD-MISSING"))

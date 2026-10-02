@@ -228,12 +228,15 @@ class Currency:
         Parameters
         ----------
         code : str
-            Three-letter ISO-4217 alphabetic code.
+            Three-letter ISO-4217 alphabetic code; case-insensitive, and
+            surrounding whitespace is not trimmed (``" USD "`` is rejected).
 
         Raises
         ------
         ValueError
-            If *code* is not a recognised currency.
+            If *code* is not a recognised currency. The message is the Rust
+            parser's, ``Invalid currency code "<code>": not a supported
+            ISO-4217 alphabetic code``, identical in WASM.
         """
         ...
 

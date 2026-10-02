@@ -242,9 +242,16 @@ pub enum InputError {
         actual: String,
     },
 
-    /// Unknown or unsupported currency code supplied by the caller.
-    #[error("Unknown currency code")]
-    UnknownCurrency,
+    /// Text that is not a supported ISO-4217 alphabetic currency code.
+    ///
+    /// Produced by `Currency`'s `FromStr` (and `TryFrom<&str>`). The code is
+    /// reported verbatim: parsing is case-insensitive but does not trim, so
+    /// `" USD "` is rejected here.
+    #[error("Invalid currency code {code:?}: not a supported ISO-4217 alphabetic code")]
+    UnknownCurrency {
+        /// The rejected input text, exactly as supplied.
+        code: String,
+    },
 
     /// Invalid tenor string format.
     #[error("Invalid tenor '{tenor}': {reason}")]

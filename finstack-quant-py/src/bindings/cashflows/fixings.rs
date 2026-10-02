@@ -9,7 +9,7 @@ use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::errors::core_to_py;
 
-/// Raw rate, FX or price observation a schedule projected at its valuation date.
+/// Raw rate or FX observation retained by canonical coupon projection.
 #[pyclass(
     name = "ProjectedFixing",
     module = "finstack_quant.cashflows.fixings",
@@ -36,7 +36,7 @@ impl PyProjectedFixing {
         })
     }
 
-    /// `FIXING:` rate/FX series identifier (with quote orientation) or observed price series.
+    /// Canonical FIXING-prefixed series identifier, including FX quote orientation.
     #[getter]
     fn series_id(&self) -> &str {
         &self.inner.series_id
@@ -48,7 +48,7 @@ impl PyProjectedFixing {
         date_to_py(py, self.inner.date)
     }
 
-    /// Raw annualized decimal rate, oriented FX rate or price level; None means unavailable.
+    /// Raw annualized decimal rate or oriented FX rate; None means unavailable.
     #[getter]
     fn value(&self) -> Option<f64> {
         self.inner.value
@@ -74,13 +74,16 @@ fn materialize_fixings(
 }
 
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "fixings")?;
-    module.setattr("__package__", "finstack_quant.cashflows.fixings")?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "fixings")?;
     module.add_class::<PyProjectedFixing>()?;
     module.add_function(wrap_pyfunction!(materialize_fixings, &module)?)?;
     module.setattr(
         "__all__",
         PyList::new(py, ["ProjectedFixing", "materialize_fixings"])?,
     )?;
-    parent.add_submodule(&module)
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &module,
+        crate::bindings::module_utils::Exposure::Compiled,
+    )
 }

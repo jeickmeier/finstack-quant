@@ -101,6 +101,7 @@ fn cmbs(loans: Vec<PoolAsset>) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_cmbs("CMBS-T14", pool, tranches, close(), maturity(), "USD-OIS")
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
     deal.fees = None;
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
@@ -564,9 +565,13 @@ fn a_balloon_default_books_the_loss_and_recovers_after_the_workout() {
         .expect("the workout recovery is released");
     // The claim runs from the maturity payment date (calendar-adjusted) and
     // lands on the first payment date at or after 18 months later.
-    let due = periods[k].payment_date.add_months(18);
+    let due = periods[k]
+        .payment_date
+        .add_months(18)
+        .expect("valid date shift");
     assert!(
-        periods[release].payment_date >= due && periods[release].payment_date <= due.add_months(1),
+        periods[release].payment_date >= due
+            && periods[release].payment_date <= due.add_months(1).expect("valid date shift"),
         "released 18 months after maturity ({due}): {}",
         periods[release].payment_date
     );

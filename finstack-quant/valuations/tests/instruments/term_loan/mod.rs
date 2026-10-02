@@ -9,3 +9,5 @@ mod pricing;
 mod term_loan_tests;
 mod tree_pricing;
 mod validation;
+
+mod finance_regressions;

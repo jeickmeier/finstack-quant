@@ -1,0 +1,76 @@
+{
+  "$defs": {
+    "ArbitrageSeverity": {
+      "description": "Categorical severity of an arbitrage violation.\n\nSeverity is a *function of magnitude relative to tolerance*, not of\narbitrage type. The same `Butterfly` violation can be `Negligible` (a\nrounding artifact at deep wings) or `Critical` (negative density at ATM).\nUse the `Ord` derive to filter or sort: `Negligible` < `Minor` < `Major`\n< `Critical`.",
+      "oneOf": [
+        {
+          "const": "negligible",
+          "description": "Violation is within numerical noise (< tolerance).\nLikely a finite-difference artifact, not a real arbitrage.",
+          "type": "string"
+        },
+        {
+          "const": "minor",
+          "description": "Small violation that may not be exploitable in practice\ngiven bid-ask spreads, but indicates surface quality issues.",
+          "type": "string"
+        },
+        {
+          "const": "major",
+          "description": "Material violation that would produce negative density or\nnegative local vol in a region with meaningful option liquidity.",
+          "type": "string"
+        },
+        {
+          "const": "critical",
+          "description": "Severe violation: negative prices, negative total variance,\nor local vol density failure at ATM strikes.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/arbitrage_check_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Configuration for the arbitrage detection suite.",
+  "properties": {
+    "check_butterfly": {
+      "description": "Run butterfly (strike convexity) check.",
+      "type": "boolean"
+    },
+    "check_calendar_spread": {
+      "description": "Run calendar spread (expiry monotonicity) check.",
+      "type": "boolean"
+    },
+    "check_local_vol_density": {
+      "description": "Run Dupire local vol density check.",
+      "type": "boolean"
+    },
+    "forward_prices": {
+      "description": "Optional per-expiry forward prices used by butterfly, calendar, and\nlocal-vol density checks.\n\nRequired when any check is enabled. Supply one finite positive value\nto broadcast across expiries or one such value per expiry.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "min_severity": {
+      "$ref": "#/$defs/ArbitrageSeverity",
+      "description": "Minimum severity to include in the report.\nViolations below this severity are filtered out."
+    },
+    "tolerance": {
+      "description": "Tolerance for all checks (total-variance units).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "check_butterfly",
+    "check_calendar_spread",
+    "check_local_vol_density",
+    "tolerance",
+    "min_severity"
+  ],
+  "title": "ArbitrageCheckConfig",
+  "type": "object"
+}

@@ -69,7 +69,10 @@ fn sample_market_context() -> MarketContext {
 
     MarketContext::new()
         .insert(discount_curve)
+        .insert(Arc::clone(&index_data.index_credit_curve))
+        .insert(Arc::clone(&index_data.base_correlation_curve))
         .insert_credit_index("CDX.NA.IG.42", index_data)
+        .expect("Credit index dependencies should be registered")
 }
 
 fn sample_market_context_with_issuers(n: usize) -> MarketContext {
@@ -134,9 +137,21 @@ fn sample_market_context_with_issuers(n: usize) -> MarketContext {
         .build()
         .expect("Curve builder should succeed with valid test data");
 
-    MarketContext::new()
+    let mut market = MarketContext::new()
         .insert(discount_curve)
+        .insert(Arc::clone(&index.index_credit_curve))
+        .insert(Arc::clone(&index.base_correlation_curve));
+    for curve in index
+        .issuer_credit_curves
+        .as_ref()
+        .expect("Issuer curves should exist")
+        .values()
+    {
+        market.insert_mut(Arc::clone(curve));
+    }
+    market
         .insert_credit_index("CDX.NA.IG.42", index)
+        .expect("Credit index dependencies should be registered")
 }
 
 fn sample_tranche() -> CdsTranche {
@@ -406,7 +421,9 @@ fn test_hetero_spa_matches_homogeneous_when_issuers_equal() {
         .issuer_curves(issuer_curves)
         .build()
         .expect("Curve builder should succeed with valid test data");
-    let ctx = ctx_base.insert_credit_index("CDX.NA.IG.42", hetero_index);
+    let ctx = ctx_base
+        .insert_credit_index("CDX.NA.IG.42", hetero_index)
+        .expect("Credit index dependencies should be registered");
 
     let mut homo = CdsTranchePricer::new();
     homo.config.use_issuer_curves = false;
@@ -435,7 +452,7 @@ fn test_hetero_spa_vs_exact_convolution_small_pool() {
         3.0,
         7.0,
         Money::from((10_000_000_i64, Currency::USD)),
-        as_of.add_months(60),
+        as_of.add_months(60).expect("valid fixture date"),
         0.0,
     );
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
@@ -483,7 +500,7 @@ fn price_hetero_tranche(
         attach,
         detach,
         Money::from((10000000_i64, Currency::USD)),
-        as_of.add_months(60),
+        as_of.add_months(60).expect("valid fixture date"),
         0.0,
     );
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
@@ -561,6 +578,151 @@ fn test_hetero_normal_approx_bias_bound_large_pool() {
     );
 }
 
+fn concentration_test_index(count: usize, first_weight: f64) -> CreditIndexData {
+    let base = Date::from_calendar_date(2025, Month::January, 1).expect("date");
+    let hazard = Arc::new(
+        HazardCurve::builder("CONCENTRATION")
+            .base_date(base)
+            .recovery_rate(0.4)
+            .knots([(0.0, 0.05), (10.0, 0.05)])
+            .build()
+            .expect("hazard"),
+    );
+    let correlation = Arc::new(
+        BaseCorrelationCurve::builder("CONCENTRATION-CORR")
+            .knots([(3.0, 0.3), (7.0, 0.3), (100.0, 0.3)])
+            .build()
+            .expect("correlation"),
+    );
+    let curves: Vec<_> = (0..count)
+        .map(|i| (format!("NAME-{i}"), Arc::clone(&hazard)))
+        .collect();
+    let weights: Vec<_> = (0..count)
+        .map(|i| {
+            (
+                format!("NAME-{i}"),
+                if i == 0 {
+                    first_weight
+                } else {
+                    (1.0 - first_weight) / (count - 1) as f64
+                },
+            )
+        })
+        .collect();
+    CreditIndexData::builder()
+        .num_constituents(count as u16)
+        .recovery_rate(0.4)
+        .index_credit_curve(hazard)
+        .base_correlation_curve(correlation)
+        .issuer_curves(curves)
+        .issuer_weights(weights)
+        .build()
+        .expect("concentration index")
+}
+
+fn concentration_test_loss(pricer: &CdsTranchePricer, index: &CreditIndexData) -> f64 {
+    let maturity = Date::from_calendar_date(2026, Month::January, 1).expect("date");
+    let capped = |cap| {
+        pricer
+            .calculate_equity_tranche_capped_hetero(
+                cap,
+                0.3,
+                index,
+                maturity,
+                super::config::PoolExposure::Loss,
+            )
+            .expect("capped loss")
+    };
+    (capped(7.0) - capped(3.0)) / 0.04
+}
+
+#[test]
+fn heterogeneous_one_name_limit_ignores_zero_weight_constituents() {
+    let one = concentration_test_index(1, 1.0);
+    let padded = concentration_test_index(80, 1.0);
+    let expected = 1.0 - (-0.05_f64).exp();
+    for method in [HeteroMethod::ExactConvolution, HeteroMethod::NormalApprox] {
+        let pricer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
+            hetero_method: method,
+            ..Default::default()
+        })
+        .expect("config");
+        let actual = concentration_test_loss(&pricer, &padded);
+        assert!((actual - expected).abs() < 1e-8, "{method:?}: {actual}");
+        assert!((actual - concentration_test_loss(&pricer, &one)).abs() < 1e-12);
+    }
+}
+
+#[test]
+fn heterogeneous_concentrated_large_pool_defaults_to_convolution() {
+    let index = concentration_test_index(80, 0.8);
+    let default_loss = concentration_test_loss(&CdsTranchePricer::new(), &index);
+    let exact = CdsTranchePricer::with_config(CdsTranchePricerConfig {
+        hetero_method: HeteroMethod::ExactConvolution,
+        ..Default::default()
+    })
+    .expect("config");
+    assert!((default_loss - concentration_test_loss(&exact, &index)).abs() < 1e-12);
+    let fine = CdsTranchePricer::with_config(CdsTranchePricerConfig {
+        grid_step: 0.0005,
+        ..Default::default()
+    })
+    .expect("config");
+    let finer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
+        grid_step: 0.00025,
+        ..Default::default()
+    })
+    .expect("config");
+    let fine_loss = concentration_test_loss(&fine, &index);
+    let finer_loss = concentration_test_loss(&finer, &index);
+    // This is a grid convergence control, separate from the exact one-name
+    // oracle. The budget is in tranche-notional fractions, not factor error.
+    assert!((fine_loss - finer_loss).abs() < 1e-4);
+    assert!((default_loss - finer_loss).abs() < 5e-4);
+}
+
+#[test]
+fn heterogeneous_exact_grid_limit_errors_instead_of_switching_method() {
+    let index = concentration_test_index(80, 0.8);
+    let pricer = CdsTranchePricer::with_config(CdsTranchePricerConfig {
+        grid_step: 1e-6,
+        ..Default::default()
+    })
+    .expect("config");
+    let error = pricer
+        .calculate_equity_tranche_capped_hetero(
+            7.0,
+            0.3,
+            &index,
+            Date::from_calendar_date(2026, Month::January, 1).expect("date"),
+            super::config::PoolExposure::Loss,
+        )
+        .expect_err("grid cap must not select a different model");
+    assert!(error.to_string().contains("exceeding the limit"));
+}
+
+#[test]
+fn heterogeneous_work_limit_preflights_stochastic_recovery() {
+    // Creating 3,000 shared curve handles is cheap; evaluating their factor
+    // integrals is deliberately avoided by the resource preflight.
+    let index = concentration_test_index(3_000, 0.8);
+    let config = CdsTranchePricerConfig {
+        integration_max_depth: 0,
+        ..CdsTranchePricerConfig::default().with_stochastic_recovery()
+    };
+    let pricer = CdsTranchePricer::with_config(config).expect("config");
+    let error = pricer
+        .calculate_equity_tranche_capped_hetero(
+            7.0,
+            0.3,
+            &index,
+            Date::from_calendar_date(2026, Month::January, 1).expect("date"),
+            super::config::PoolExposure::Loss,
+        )
+        .expect_err("preflight must reject excessive conditional work");
+    assert!(error.to_string().contains("issuer-grid visits"));
+}
+
 /// Item 4: the homogeneity-detection thresholds for PD, LGD and weight must
 /// be a single consistent tolerance. Previously PD used the 1e-12 probit
 /// clamp while LGD/weight used 1e-9, so a pool uniform in LGD/weight but with
@@ -631,9 +793,21 @@ fn homogeneity_detection_uses_consistent_tolerance() {
             .issuer_curves(issuer_curves)
             .build()
             .expect("index data");
-        MarketContext::new()
+        let mut market = MarketContext::new()
             .insert(discount_curve.clone())
+            .insert(Arc::clone(&index.index_credit_curve))
+            .insert(Arc::clone(&index.base_correlation_curve));
+        for curve in index
+            .issuer_credit_curves
+            .as_ref()
+            .expect("Issuer curves should exist")
+            .values()
+        {
+            market.insert_mut(Arc::clone(curve));
+        }
+        market
             .insert_credit_index("CDX.NA.IG.42", index)
+            .expect("Credit index dependencies should be registered")
     };
 
     let params = CdsTrancheParams::new(
@@ -642,7 +816,7 @@ fn homogeneity_detection_uses_consistent_tolerance() {
         0.0,
         3.0,
         Money::from((10000000_i64, Currency::USD)),
-        as_of.add_months(60),
+        as_of.add_months(60).expect("valid fixture date"),
         0.0,
     );
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
@@ -692,7 +866,7 @@ fn test_grid_step_refines_exact_convolution() {
         0.0,
         3.0,
         Money::from((10_000_000_i64, Currency::USD)),
-        as_of.add_months(60),
+        as_of.add_months(60).expect("valid fixture date"),
         0.0,
     );
     let schedule_params = crate::cashflow::builder::ScheduleParams::quarterly_act360();
@@ -1855,7 +2029,10 @@ fn arbitrage_market_context() -> MarketContext {
 
     MarketContext::new()
         .insert(discount_curve)
+        .insert(Arc::clone(&index_data.index_credit_curve))
+        .insert(Arc::clone(&index_data.base_correlation_curve))
         .insert_credit_index("CDX.NA.IG.42", index_data)
+        .expect("Credit index dependencies should be registered")
 }
 
 /// Item 2: base-correlation arbitrage (`EL(0,D) < EL(0,A)`) must always
@@ -2181,7 +2358,10 @@ fn discounting_is_invariant_under_curve_rebasing() {
     let make_ctx = |base: Date| {
         MarketContext::new()
             .insert(make_disc(base))
+            .insert(Arc::clone(&index_data.index_credit_curve))
+            .insert(Arc::clone(&index_data.base_correlation_curve))
             .insert_credit_index("CDX.NA.IG.42", index_data.clone())
+            .expect("Credit index dependencies should be registered")
     };
 
     let pricer = CdsTranchePricer::new();
@@ -2306,7 +2486,10 @@ fn rising_hazard_lowers_premium_leg_pv() {
             .expect("index data");
         MarketContext::new()
             .insert(discount_curve)
+            .insert(Arc::clone(&index_data.index_credit_curve))
+            .insert(Arc::clone(&index_data.base_correlation_curve))
             .insert_credit_index("CDX.NA.IG.42", index_data)
+            .expect("Credit index dependencies should be registered")
     };
 
     for aod_enabled in [true, false] {
@@ -2364,7 +2547,10 @@ fn recovery_market_context(recovery: f64, hazard_scale: f64) -> MarketContext {
         .expect("index data");
     MarketContext::new()
         .insert(discount_curve)
+        .insert(Arc::clone(&index_data.index_credit_curve))
+        .insert(Arc::clone(&index_data.base_correlation_curve))
         .insert_credit_index("CDX.NA.IG.42", index_data)
+        .expect("Credit index dependencies should be registered")
 }
 
 fn super_senior_tranche(attach: f64, detach: f64) -> CdsTranche {

@@ -438,7 +438,7 @@ impl PyCalibrationReport {
     ///     If pandas cannot build the frame.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        quote_quality_dataframe(py, &residual_rows(&self.inner))
+        quote_quality_dataframe(py, &self.inner.quote_rows())
     }
 
     /// Serialize to compact JSON.
@@ -481,26 +481,6 @@ impl PyCalibrationReport {
             self.inner.rmse
         )
     }
-}
-
-/// Per-quote rows for a report: diagnostics when present, else residual-only rows.
-pub(crate) fn residual_rows(report: &CalibrationReport) -> Vec<QuoteQuality> {
-    if let Some(diag) = &report.diagnostics {
-        if !diag.per_quote.is_empty() {
-            return diag.per_quote.clone();
-        }
-    }
-    report
-        .residuals
-        .iter()
-        .map(|(id, residual)| QuoteQuality {
-            quote_label: id.clone(),
-            target_value: f64::NAN,
-            fitted_value: f64::NAN,
-            residual: *residual,
-            sensitivity: f64::NAN,
-        })
-        .collect()
 }
 
 /// Solver-free validation report: every static envelope error plus the step dependency graph.

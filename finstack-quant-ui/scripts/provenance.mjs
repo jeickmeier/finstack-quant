@@ -295,7 +295,6 @@ export async function generateProvenance(repo, contracts, fixtureManifest) {
     "ValuationDetails",
     "MonteCarloValuationDetails",
     "MoneyValue",
-    "TrancheScenarioCell",
     "VolCubeConstructor",
     "FxDeltaVolSurfaceConstructor",
   ];

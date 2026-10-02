@@ -14,12 +14,12 @@ then supplies a concrete `VolSource` to pricing code.
 
 Consumed by [`models::closed_form`](../closed_form/) and
 [`models::trees`](../trees/) (both use `black::d1_d2`), by
-`calibration::hull_white` (`normal::bachelier_price`), by
+`calibration::hull_white` (`normal::bachelier_price_with_annuity`), by
 `calibration::targets::vol` (`SabrCalibrator::calibrate`, the
 SABR slice fitter behind `VolSurfaceModel::Sabr`), and by the rates/FX/vol
 instrument pricers — `rates/{swaption, cap_floor, cms_option, cms_swap}`,
 the asset-owned futures-option instruments, `fx/fx_digital_option`,
-`exotics/range_accrual` — which reach for `normal::{bachelier_price,
+`exotics/range_accrual` — which reach for `normal::{bachelier_price_with_annuity,
 d_bachelier}`, `black::{d1_d2, d1_black76, d2_black76, d1_d2_black76}`, and
 `SABRParameters` / `sabr::SabrVolType`.
 
@@ -29,7 +29,7 @@ d_bachelier}`, `black::{d1_d2, d1_black76, d2_black76, d1_d2_black76}`, and
 |------|----------|
 | [`mod.rs`](mod.rs) | Re-exports |
 | [`black.rs`](black.rs) | `d1`, `d2`, `d1_d2`, `d1_black76`, `d2_black76`, `d1_d2_black76` |
-| [`normal.rs`](normal.rs) | `d_bachelier`, `bachelier_price` |
+| [`normal.rs`](normal.rs) | `d_bachelier`, `bachelier_price_with_annuity` |
 | [`sabr/`](sabr/) | `SabrParameters`, `SabrModel`, `SabrVolType`, `SabrCalibrator`, `SabrSmile` |
 | [`sabr_derivatives.rs`](sabr_derivatives.rs) | `SabrMarketData`, `SabrCalibrationDerivatives` — finite-difference gradients for the LM solver |
 | [`source.rs`](source.rs) | `VolSource` plus surface, cube, and FX delta-volatility evaluation/materialization |
@@ -78,7 +78,7 @@ d = (F − K) / (σ√T)
 | Function | Signature |
 |----------|-----------|
 | `d_bachelier` | `(forward, strike, sigma, t) -> f64` |
-| `bachelier_price` | `(OptionType, forward, strike, sigma, t, annuity) -> f64` |
+| `bachelier_price_with_annuity` | `(OptionType, forward, strike, sigma, t, annuity) -> f64` |
 
 `sigma` is **normal** volatility in absolute rate/price units, not a percentage
 of the forward. `annuity` is the PV01 (sum of discount factors × accrual
@@ -177,15 +177,20 @@ outside this budget fails, including stalled and iteration-limited solves.
 |--------|-------|
 | `atm_vol()` | `-> Result<f64>` |
 | `vol_type()` | Delegates to the model's `SabrVolType` |
+| `implied_vol(strike)` | `-> Result<f64>`; one strike |
 | `generate_smile(&strikes)` | `-> Result<Vec<f64>>` |
 | `strike_from_delta(delta, is_call)` | Delta-to-strike inversion |
-| `validate_no_arbitrage(&strikes, r, q)` | `-> Result<ArbitrageValidationResult>` |
-| `check_no_arbitrage(&strikes, r, q)` | `-> Result<()>`; errors when arbitrage is present |
-| `repair_arbitrage(&strikes, r, q, max_iter)` | Iterative smoothing |
+| `validate_no_arbitrage(&strikes, r)` | `-> Result<ArbitrageValidationResult>` |
+| `check_no_arbitrage(&strikes, r)` | `-> Result<()>`; errors when arbitrage is present |
+| `repair_arbitrage(&strikes, r, max_iter)` | Iterative smoothing |
 
-`ArbitrageValidationResult` carries `ButterflyViolation` and
-`MonotonicityViolation` records, plus `is_arbitrage_free()` and
-`worst_butterfly_severity()`.
+`ArbitrageValidationResult` carries a serialized `arbitrage_free` verdict,
+`ButterflyViolation` and `MonotonicityViolation` records, plus
+`is_arbitrage_free()` and `worst_butterfly_severity()`. `r` only discounts the
+forward-based call prices; carry is already in the smile's forward.
+
+`SabrShift` parses the host keyword `"auto"` (`FromStr`) and displays as
+`none` / the fixed value / `auto`.
 
 ### `sabr_derivatives.rs`
 
@@ -233,7 +238,7 @@ References: Hagan, Kumar, Lesniewski & Woodward (2002); Obloj (2008).
 ```rust
 use finstack_quant_models::OptionType;
 use finstack_quant_models::volatility::{
-    bachelier_price, d1_d2, d1_d2_black76, norm_cdf,
+    bachelier_price_with_annuity, d1_d2, d1_d2_black76, norm_cdf,
     sabr::SabrVolType,
     SABRCalibrator, SABRModel, SABRParameters, SABRSmile,
 };
@@ -246,7 +251,7 @@ let call_delta = (-0.02_f64 * 0.5).exp() * norm_cdf(d1);
 let (d1_76, d2_76) = d1_d2_black76(0.05, 0.045, 0.20, 2.0);
 
 // Bachelier with a negative forward and strike.
-let receiver = bachelier_price(OptionType::Put, -0.002, -0.003, 0.0050, 1.0, 9.5);
+let receiver = bachelier_price_with_annuity(OptionType::Put, -0.002, -0.003, 0.0050, 1.0, 9.5);
 assert!(receiver >= 0.0);
 
 // SABR: build a rates smile at beta = 0.5 and read one vol off it.
@@ -263,9 +268,9 @@ let fitted = SABRCalibrator::high_precision()
 
 let smile = SABRSmile::new(SABRModel::new(fitted), 0.03, 1.0);
 let vols = smile.generate_smile(&strikes)?;
-let report = smile.validate_no_arbitrage(&strikes, 0.03, 0.0)?;
+let report = smile.validate_no_arbitrage(&strikes, 0.03)?;
 if !report.is_arbitrage_free() {
-    let _repaired = smile.repair_arbitrage(&strikes, 0.03, 0.0, 10)?;
+    let _repaired = smile.repair_arbitrage(&strikes, 0.03, 10)?;
 }
 # Ok::<(), finstack_quant_core::Error>(())
 ```
@@ -273,7 +278,7 @@ if !report.is_arbitrage_free() {
 ## Conventions
 
 - Volatilities, rates, and correlations are decimals (`0.20` = 20%), never
-  basis points. The one exception is `bachelier_price`'s `sigma`, which is an
+  basis points. The one exception is `bachelier_price_with_annuity`'s `sigma`, which is an
   absolute rate volatility.
 - Time is a year fraction; the day-count basis is the caller's choice.
 - Everything here is `f64` analytics, not `Money` — see

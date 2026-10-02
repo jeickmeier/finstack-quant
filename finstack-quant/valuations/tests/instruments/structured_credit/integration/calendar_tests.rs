@@ -92,7 +92,8 @@ fn test_missing_calendar_fails_with_helpful_message() {
         closing_date(),
         maturity_date(),
         "USD_OIS",
-    );
+    )
+    .expect("valid structured-credit dates");
     // Note: NOT calling .with_calendar_id()
 
     let market = create_test_market();
@@ -123,6 +124,7 @@ fn test_invalid_calendar_id_fails_with_available_options() {
         maturity_date(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("NONEXISTENT_CALENDAR");
 
     let market = create_test_market();
@@ -155,6 +157,7 @@ fn test_valid_nyse_calendar_succeeds() {
         maturity_date(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = create_test_market();
@@ -184,6 +187,7 @@ fn test_valid_target2_calendar_succeeds() {
         maturity_date(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("target2");
 
     let market = create_test_market();
@@ -213,6 +217,7 @@ fn test_clo_schedule_avoids_us_holidays() {
         maturity_date(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = create_test_market();
@@ -241,6 +246,7 @@ fn test_seasoned_clo_keeps_contractual_coupon_grid() {
         maturity_date(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     clo.first_payment_date = Date::from_calendar_date(2024, Month::April, 1).unwrap();
@@ -270,6 +276,7 @@ fn test_payment_schedule_is_deterministic_with_calendar() {
         maturity_date(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let clo2 = StructuredCredit::new_clo(
@@ -280,6 +287,7 @@ fn test_payment_schedule_is_deterministic_with_calendar() {
         maturity_date(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     let market = create_test_market();

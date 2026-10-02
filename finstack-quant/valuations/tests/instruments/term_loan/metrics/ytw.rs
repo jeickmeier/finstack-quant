@@ -1,8 +1,9 @@
 //! Yield to worst tests.
 
 use finstack_quant_cashflows::builder::specs::CouponType;
+use finstack_quant_cashflows::CashflowProvider;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
@@ -152,12 +153,7 @@ fn test_ytw_callable_amortizing_loan_coupon_on_call_date() {
     );
 }
 
-/// Regression: a non-callable DDTL loan with FUTURE draws must have YTW equal
-/// to YTM. `solve_irr_to_exercise` previously excluded the negative funding
-/// legs while still crediting the redemption of the balances those draws
-/// create, so YTW received coupons and principal the holder never paid for.
-#[test]
-fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
+fn noncallable_ddtl_with_future_draws(second_draw_date: Date) -> TermLoan {
     let as_of = date!(2025 - 01 - 01);
     let ddtl = DdtlSpec {
         commitment: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
@@ -169,7 +165,7 @@ fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
                 amount: Money::new(6_000_000.0, Currency::USD).expect("valid money fixture"),
             },
             DrawEvent {
-                date: date!(2025 - 09 - 15),
+                date: second_draw_date,
                 amount: Money::new(4_000_000.0, Currency::USD).expect("valid money fixture"),
             },
         ],
@@ -180,7 +176,7 @@ fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
         oid_policy: None,
     };
 
-    let loan = TermLoan::builder()
+    TermLoan::builder()
         .id("TL-YTW-DDTL-FUNDING".into())
         .currency(Currency::USD)
         .notional_limit(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
@@ -200,10 +196,37 @@ fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
         .covenants_opt(None)
         .attributes(Default::default())
         .build()
-        .unwrap();
+        .unwrap()
+}
+
+/// Regression: a non-callable DDTL loan with future draws before its first
+/// coupon has a conventional cashflow pattern, and its YTW must equal YTM.
+/// `solve_irr_to_exercise` previously excluded the negative funding legs
+/// while still crediting the redemption of the balances those draws create.
+#[test]
+fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
+    let as_of = date!(2025 - 01 - 01);
+    // Both future funding obligations precede the first quarterly coupon on
+    // April 1, preserving the unique-return IRR contract's single sign change.
+    let loan = noncallable_ddtl_with_future_draws(date!(2025 - 03 - 31));
 
     let disc_curve = flat_discount_curve(0.05, as_of, "USD-OIS");
     let market = MarketContext::new().insert(disc_curve);
+    let schedule = loan.cashflow_schedule(&market, as_of).expect("cashflows");
+    let funding: Vec<_> = schedule
+        .get_flows()
+        .iter()
+        .filter(|flow| flow.amount.amount() < 0.0)
+        .map(|flow| (flow.date, flow.amount.amount()))
+        .collect();
+    assert_eq!(
+        funding,
+        vec![
+            (date!(2025 - 03 - 15), -6_000_000.0),
+            (date!(2025 - 03 - 31), -4_000_000.0),
+        ],
+        "the equality regression must retain both future funding obligations"
+    );
 
     let result = loan
         .price_with_metrics(
@@ -222,6 +245,34 @@ fn test_ytw_matches_ytm_for_noncallable_ddtl_with_future_draws() {
         (ytw - ytm).abs() < 1e-6,
         "Non-callable DDTL loan must have YTW == YTM: ytw={ytw}, ytm={ytm}"
     );
+}
+
+/// Coupons received before a later DDTL draw create multiple sign changes.
+/// Both yield metrics must propagate the shared IRR engine's rejection of
+/// this nonconventional cashflow pattern rather than select an arbitrary root.
+#[test]
+fn test_ddtl_yields_reject_draws_after_coupon_receipts() {
+    let as_of = date!(2025 - 01 - 01);
+    let loan = noncallable_ddtl_with_future_draws(date!(2025 - 09 - 15));
+    let market = MarketContext::new().insert(flat_discount_curve(0.05, as_of, "USD-OIS"));
+
+    loan.value(&market, as_of)
+        .expect("nonconventional funding cashflows still have a model PV");
+    for metric in [MetricId::Ytm, MetricId::Ytw] {
+        let error = loan
+            .price_with_metrics(
+                &market,
+                as_of,
+                std::slice::from_ref(&metric),
+                finstack_quant_valuations::instruments::PricingOptions::default(),
+            )
+            .expect_err("yield requires a conventional cashflow sign pattern");
+        let message = error.to_string();
+        assert!(
+            message.contains("IRR requires exactly one sign change after netting; found 3"),
+            "{metric:?}: {message}"
+        );
+    }
 }
 
 /// Regression: a seasoned loan whose only call provision is PAST-dated is a

@@ -494,6 +494,10 @@ fn capital_structure_reference_uses_result_cashflows() {
     let model = ModelBuilder::new("test")
         .periods("2025Q1..Q1", None)
         .unwrap()
+        .value(
+            "expected_interest",
+            &[(q(1), AmountOrScalar::amount(25.0, Currency::USD).unwrap())],
+        )
         .build()
         .unwrap();
     let mut results = Evaluator::new().evaluate(&model).unwrap();
@@ -509,7 +513,7 @@ fn capital_structure_reference_uses_result_cashflows() {
         name: "Canonical capital structure reference".into(),
         category: CheckCategory::InternalConsistency,
         severity: Severity::Error,
-        formula: "cs.interest_expense.total == 25".into(),
+        formula: "cs.interest_expense.total == expected_interest".into(),
         message_template: "Interest failed in {period}".into(),
         tolerance: None,
     };

@@ -1,0 +1,172 @@
+{
+  "$defs": {
+    "CreditStateVariable": {
+      "description": "Which credit metric drives the toggle decision.",
+      "oneOf": [
+        {
+          "const": "hazard_rate",
+          "description": "Use the hazard rate.",
+          "type": "string"
+        },
+        {
+          "const": "distance_to_default",
+          "description": "Use the distance-to-default.",
+          "type": "string"
+        },
+        {
+          "const": "leverage",
+          "description": "Use the leverage ratio.",
+          "type": "string"
+        }
+      ]
+    },
+    "OptimalToggle": {
+      "description": "Optimal toggle configuration using nested Monte Carlo simulation.\n\nAt each coupon date the toggle runs a small nested MC to estimate the\nequity value (call-option payoff on the firm's assets) under two\nscenarios:\n\n1. **Cash** – the firm pays out the coupon, reducing asset value by\n   the coupon amount while notional stays unchanged.\n2. **PIK** – the coupon accretes to notional (no cash outflow), so\n   asset value is preserved but the default barrier rises.\n\nPIK is elected when the estimated equity value under PIK exceeds\nthat under cash.  The nested simulation uses a simple GBM forward\nevolution of asset value with a first-passage barrier check.",
+      "properties": {
+        "asset_vol": {
+          "description": "Annualised asset volatility for the nested GBM simulation.",
+          "format": "double",
+          "type": "number"
+        },
+        "equity_discount_rate": {
+          "description": "Equity holder discount rate applied to the nested-MC payoff.\n\nNote: the nested simulation drifts under the risk-neutral measure\n(`risk_free_rate`) but discounts here, so the intermediate equity\nfigures are decision inputs, not measure-consistent prices. The\nrate cancels in the cash-vs-PIK comparison and does not bias the\nelected branch.",
+          "format": "double",
+          "type": "number"
+        },
+        "horizon": {
+          "description": "Forward-looking horizon in years for the nested simulation (e.g. 1.0).",
+          "format": "double",
+          "type": "number"
+        },
+        "nested_paths": {
+          "description": "Number of nested Monte Carlo paths for continuation value estimation.\nRecommended range: 100–500.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "risk_free_rate": {
+          "description": "Risk-free rate (continuous) used as drift in the nested simulation.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "nested_paths",
+        "equity_discount_rate",
+        "asset_vol",
+        "risk_free_rate",
+        "horizon"
+      ],
+      "type": "object"
+    },
+    "StochasticToggle": {
+      "description": "Stochastic (sigmoid) toggle configuration.",
+      "properties": {
+        "intercept": {
+          "description": "Intercept of the logistic function: `P(PIK) = 1 / (1 + exp(-(intercept + sensitivity * state)))`.",
+          "format": "double",
+          "type": "number"
+        },
+        "sensitivity": {
+          "description": "Sensitivity (slope) of the logistic function with respect to the state variable.",
+          "format": "double",
+          "type": "number"
+        },
+        "state_variable": {
+          "$ref": "#/$defs/CreditStateVariable",
+          "description": "Credit metric to observe."
+        }
+      },
+      "required": [
+        "state_variable",
+        "intercept",
+        "sensitivity"
+      ],
+      "type": "object"
+    },
+    "ThresholdDirection": {
+      "description": "Direction for threshold comparison.",
+      "oneOf": [
+        {
+          "const": "above",
+          "description": "PIK when state > threshold (e.g., hazard rate above limit).",
+          "type": "string"
+        },
+        {
+          "const": "below",
+          "description": "PIK when state < threshold (e.g., distance-to-default below limit).",
+          "type": "string"
+        }
+      ]
+    },
+    "ThresholdToggle": {
+      "description": "Hard threshold toggle configuration.",
+      "properties": {
+        "direction": {
+          "$ref": "#/$defs/ThresholdDirection",
+          "description": "Direction for comparison."
+        },
+        "state_variable": {
+          "$ref": "#/$defs/CreditStateVariable",
+          "description": "Credit metric to observe."
+        },
+        "threshold": {
+          "description": "Threshold value.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "state_variable",
+        "threshold",
+        "direction"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/toggle_exercise_model.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Toggle exercise model for PIK/cash decision.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Hard threshold: PIK when credit metric crosses boundary.",
+      "properties": {
+        "threshold": {
+          "$ref": "#/$defs/ThresholdToggle"
+        }
+      },
+      "required": [
+        "threshold"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Stochastic: PIK probability is smooth sigmoid of credit state.",
+      "properties": {
+        "stochastic": {
+          "$ref": "#/$defs/StochasticToggle"
+        }
+      },
+      "required": [
+        "stochastic"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Optimal exercise via nested Monte Carlo simulation.",
+      "properties": {
+        "optimal_exercise": {
+          "$ref": "#/$defs/OptimalToggle"
+        }
+      },
+      "required": [
+        "optimal_exercise"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "ToggleExerciseModel"
+}

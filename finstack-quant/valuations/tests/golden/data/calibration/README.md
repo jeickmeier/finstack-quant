@@ -19,7 +19,7 @@ fixtures under `tests/golden/data/pricing/`. A pricing fixture's `market` block
 is one of two kinds. `envelope` fixtures (49 of the 72 committed today) carry a
 `CalibrationEnvelope` that `resolve_market` in
 [`../../pricing_common.rs`](../../pricing_common.rs) feeds to
-`engine::execute`; `snapshot` fixtures (the other 23) carry a
+`engine::calibrate`; `snapshot` fixtures (the other 23) carry a
 materialized `MarketContext` and skip calibration entirely. Only the `envelope`
 half exercises calibration. In both cases the resulting `MarketContext` prices
 the fixture's `instrument`, and the metrics are compared against `expected`.

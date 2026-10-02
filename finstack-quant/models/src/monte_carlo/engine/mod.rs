@@ -19,6 +19,8 @@
 //!
 //! Several configuration combinations are intentionally rejected at runtime:
 //!
+//! - estimates require at least two independent observations; each antithetic
+//!   pair contributes one observation
 //! - parallel execution requires an RNG with deterministic stream splitting
 //! - auto-stopping via `target_ci_half_width` is currently serial-only
 //! - path capture cannot be combined with antithetic pairing

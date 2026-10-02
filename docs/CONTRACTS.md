@@ -78,7 +78,18 @@ The registries also publish reusable, runtime-backed components:
 - the financial-statement normalization sidecar/configuration contract
   (add-back and deduction adjustments, caps, and self-referential cap base
   mode) — not a root envelope — in
-  [`normalization_config.schema.json`](../finstack-quant/statements/schemas/statements/1/normalization_config.schema.json).
+  [`normalization_config.schema.json`](../finstack-quant/statements/schemas/statements/1/normalization_config.schema.json);
+- the tagged instrument payload `InstrumentJson` (the envelope's `instrument`
+  field, embedded by portfolio positions and candidates) in
+  [`instrument_json.schema.json`](../finstack-quant/valuations/schemas/common/1/instrument_json.schema.json);
+- every other serde type the bindings exchange with a host (analytics results,
+  covenant engines and reports, margin and XVA results, model parameters and
+  results, portfolio analytics results and specs, statements-analytics
+  configurations and reports, and valuation side results), under
+  `analytics/1`, `covenants/1`, `margin/1`, `models/1`, `portfolio/1`,
+  `statements_analytics/1`, `scenarios/1` and `results/1`. Each crate's
+  `schemas/index.json` lists them; the WASM package generates its TypeScript
+  declarations from them.
 
 Every instrument artifact is generated from the same registry that owns its
 serde tag, example provider, binding exposure, and single-variant envelope.

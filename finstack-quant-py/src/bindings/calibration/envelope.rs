@@ -102,11 +102,10 @@ impl PyRateQuote {
         Self { inner }
     }
 
-    fn build(mut fields: Map<String, Value>, kind: &str) -> PyResult<Self> {
-        fields.insert("type".to_string(), Value::String(kind.to_string()));
-        let inner: RateQuote = from_value(Value::Object(fields), "RateQuote")?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
+    fn build(fields: Map<String, Value>, kind: &str) -> PyResult<Self> {
+        RateQuote::from_wire_fields(kind, fields)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 }
 
@@ -240,12 +239,13 @@ impl PyRateQuote {
     /// rate : float | Rate
     ///     Fixed par rate as a decimal.
     /// spread_decimal : float | None, default None
-    ///     Optional floating-leg spread as a decimal (``0.0010`` = 10 bp).
+    ///     Optional finite floating-leg spread as a decimal (``0.0010`` = 10 bp).
+    ///     ``None`` omits the spread; non-finite numbers are rejected.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If the pillar cannot be parsed or the rate is not finite.
+    ///     If the pillar cannot be parsed or the rate or supplied spread is not finite.
     #[staticmethod]
     #[pyo3(signature = (id, index, pillar, rate, spread_decimal = None))]
     #[pyo3(text_signature = "(id, index, pillar, rate, spread_decimal=None)")]
@@ -264,7 +264,14 @@ impl PyRateQuote {
         fields.insert("rate".into(), Value::from(extract_rate_decimal(rate)?));
         fields.insert(
             "spread_decimal".into(),
-            spread_decimal.map_or(Value::Null, Value::from),
+            spread_decimal
+                .map(|spread| {
+                    serde_json::Number::from_f64(spread)
+                        .map(Value::Number)
+                        .ok_or_else(|| value_error("spread_decimal must be finite"))
+                })
+                .transpose()?
+                .unwrap_or(Value::Null),
         );
         Self::build(fields, "swap")
     }
@@ -371,7 +378,6 @@ impl PyCdsQuote {
         extra: Vec<(&str, f64)>,
     ) -> PyResult<Self> {
         let mut fields = Map::new();
-        fields.insert("type".into(), Value::String(kind.into()));
         fields.insert("id".into(), Value::String(id.into()));
         fields.insert("entity".into(), Value::String(entity.into()));
         let mut convention = Map::new();
@@ -382,9 +388,9 @@ impl PyCdsQuote {
         for (key, value) in extra {
             fields.insert(key.into(), Value::from(value));
         }
-        let inner: CdsQuote = from_value(Value::Object(fields), "CdsQuote")?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
+        CdsQuote::from_wire_fields(kind, fields)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 }
 
@@ -584,11 +590,9 @@ impl PyVolQuote {
     }
 
     fn build(variant: &str, fields: Map<String, Value>) -> PyResult<Self> {
-        let mut outer = Map::new();
-        outer.insert(variant.to_string(), Value::Object(fields));
-        let inner: VolQuote = from_value(Value::Object(outer), "VolQuote")?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self::from_inner(inner))
+        VolQuote::from_wire_fields(variant, fields)
+            .map(Self::from_inner)
+            .map_err(core_to_py)
     }
 }
 
@@ -878,6 +882,9 @@ impl PyCalibrationStep {
     }
 
     /// Shared constructor: `kind` + `id` + explicit fields + `**params`.
+    ///
+    /// Rust `CalibrationStep::from_wire_fields` owns the omitted-argument
+    /// defaults (quote set and produced-object identifiers fall back to `id`).
     fn build(
         py: Python<'_>,
         kind: &str,
@@ -888,13 +895,8 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         merge_kwargs(py, &mut fields, params, kind)?;
-        fields.insert("kind".into(), Value::String(kind.into()));
-        fields.insert("id".into(), Value::String(id.into()));
-        fields.insert(
-            "quote_set".into(),
-            Value::String(quote_set.unwrap_or_else(|| id.to_string())),
-        );
-        let inner: CalibrationStep = from_value(Value::Object(fields), &format!("{kind} step"))?;
+        let inner = CalibrationStep::from_wire_fields(kind, id, quote_set.as_deref(), fields)
+            .map_err(core_to_py)?;
         Ok(Self {
             inner,
             quotes: extract_market_data(py, quotes)?,
@@ -953,10 +955,7 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let f = fields(vec![
-            (
-                "curve_id",
-                Value::String(curve_id.unwrap_or_else(|| id.into())),
-            ),
+            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
         ]);
@@ -1006,10 +1005,7 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let f = fields(vec![
-            (
-                "curve_id",
-                Value::String(curve_id.unwrap_or_else(|| id.into())),
-            ),
+            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("tenor_years", Value::from(tenor_years)),
@@ -1067,10 +1063,7 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let f = fields(vec![
-            (
-                "curve_id",
-                Value::String(curve_id.unwrap_or_else(|| id.into())),
-            ),
+            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("entity", Value::String(entity.into())),
             ("seniority", Value::String(seniority.into())),
             ("currency", Value::String(currency_code(currency)?)),
@@ -1090,20 +1083,23 @@ impl PyCalibrationStep {
     /// currency : str | Currency
     ///     Curve currency.
     /// base_date : datetime.date | str
-    ///     Curve base date.
+    ///     Valuation and calibration-instrument start date. The output curve's
+    ///     reference CPI date is this date minus ``observation_lag``.
     /// discount_curve_id : str
     ///     Discount curve used for swap present values.
     /// index : str
     ///     Inflation index identifier (e.g. ``"USA-CPI-U"``).
     /// observation_lag : str
-    ///     Observation lag tenor (e.g. ``"3M"``).
+    ///     Whole-month observation lag (e.g. ``"3M"``, up to 255 months), or
+    ///     no lag (``""``, ``"none"``, ``"0"``, ``"0M"``, or ``"0D"``).
+    ///     Parsing is case-insensitive. Calibration rejects nonzero day lags.
     /// base_cpi : float
-    ///     CPI level at the base date.
+    ///     Contractual reference CPI at the start date after observation lag and
+    ///     monthly interpolation. Supplied index fixings must reproduce this level.
     /// quotes, quote_set, curve_id
     ///     As in ``discount``.
     /// **params
-    ///     Optional wire fields: ``notional``, ``method``, ``interpolation``,
-    ///     ``seasonal_factors``.
+    ///     Optional wire fields: ``notional``, ``method``, ``interpolation``.
     ///
     /// Raises
     /// ------
@@ -1130,10 +1126,7 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let f = fields(vec![
-            (
-                "curve_id",
-                Value::String(curve_id.unwrap_or_else(|| id.into())),
-            ),
+            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("discount_curve_id", Value::String(discount_curve_id.into())),
@@ -1189,7 +1182,7 @@ impl PyCalibrationStep {
         let f = fields(vec![
             (
                 "vol_surface_id",
-                Value::String(vol_surface_id.unwrap_or_else(|| id.into())),
+                vol_surface_id.map_or(Value::Null, Value::String),
             ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("underlying_ticker", Value::String(underlying_ticker.into())),
@@ -1218,6 +1211,8 @@ impl PyCalibrationStep {
     ///     ``sabr_interpolation``, ``calendar_id``, ``fixed_day_count``,
     ///     ``swap_index``, ``vol_tolerance``,
     ///     ``sabr_extrapolation``, ``allow_sabr_missing_bucket_fallback``.
+    ///     ``target_expiries`` are ACT/365F years from ``base_date``;
+    ///     ``fixed_day_count`` controls coupon accruals only.
     ///
     /// Raises
     /// ------
@@ -1243,7 +1238,7 @@ impl PyCalibrationStep {
         let f = fields(vec![
             (
                 "vol_surface_id",
-                Value::String(vol_surface_id.unwrap_or_else(|| id.into())),
+                vol_surface_id.map_or(Value::Null, Value::String),
             ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("discount_curve_id", Value::String(discount_curve_id.into())),
@@ -1412,27 +1407,35 @@ impl PyCalibrationStep {
     /// id : str
     ///     Step identifier (default quote-set name).
     /// discount_curve_id : str
-    ///     Discounting curve (scalars are written as ``"{discount_curve_id}_CAPFLOOR_HW1F"``).
+    ///     Discounting curve and output-key prefix. Scalar fits write
+    ///     ``"{discount_curve_id}_CAPFLOOR_HW1F_KAPPA"`` and
+    ///     ``"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA"``. Piecewise fits write
+    ///     the same kappa scalar and a sigma series at
+    ///     ``"{discount_curve_id}_CAPFLOOR_HW1F_SIGMA_SCHEDULE"``.
     /// forward_curve_id : str
     ///     Curve projecting the caplet forwards.
+    /// index_id : str
+    ///     Term-rate index identifier (e.g. ``"EUR-EURIBOR-3M"``). Rust derives
+    ///     payment and fixing dates, calendars, accruals, and settlement from its
+    ///     conventions. Overnight indices are rejected by this calibration model.
     /// currency : str | Currency
-    ///     Model currency.
+    ///     Model currency, which must match the index conventions.
     /// base_date : datetime.date | str
     ///     Valuation date.
     /// quotes, quote_set
     ///     As in ``discount``.
     /// **params
     ///     Optional wire fields: ``fixed_kappa``, ``initial_kappa``,
-    ///     ``initial_sigma``, ``payment_frequency``, ``volatility_mode``.
+    ///     ``initial_sigma``, ``volatility_mode``. ``fit_tolerance`` is required.
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, discount_curve_id, forward_curve_id, currency, base_date, quotes = None, quote_set = None, **params))]
+    #[pyo3(signature = (id, discount_curve_id, forward_curve_id, index_id, currency, base_date, quotes = None, quote_set = None, **params))]
     #[pyo3(
-        text_signature = "(id, discount_curve_id, forward_curve_id, currency, base_date, quotes=None, quote_set=None, **params)"
+        text_signature = "(id, discount_curve_id, forward_curve_id, index_id, currency, base_date, quotes=None, quote_set=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn cap_floor_hull_white(
@@ -1440,6 +1443,7 @@ impl PyCalibrationStep {
         id: &str,
         discount_curve_id: &str,
         forward_curve_id: &str,
+        index_id: &str,
         currency: &Bound<'_, PyAny>,
         base_date: &Bound<'_, PyAny>,
         quotes: Option<&Bound<'_, PyAny>>,
@@ -1449,6 +1453,7 @@ impl PyCalibrationStep {
         let f = fields(vec![
             ("discount_curve_id", Value::String(discount_curve_id.into())),
             ("forward_curve_id", Value::String(forward_curve_id.into())),
+            ("index_id", Value::String(index_id.into())),
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
         ]);
@@ -1494,7 +1499,7 @@ impl PyCalibrationStep {
         let f = fields(vec![
             (
                 "vol_surface_id",
-                Value::String(vol_surface_id.unwrap_or_else(|| id.into())),
+                vol_surface_id.map_or(Value::Null, Value::String),
             ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("underlying_ticker", Value::String(underlying_ticker.into())),
@@ -1545,10 +1550,7 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let f = fields(vec![
-            (
-                "curve_id",
-                Value::String(curve_id.unwrap_or_else(|| id.into())),
-            ),
+            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("fx_spot", Value::from(fx_spot)),
@@ -1598,10 +1600,7 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         let f = fields(vec![
-            (
-                "curve_id",
-                Value::String(curve_id.unwrap_or_else(|| id.into())),
-            ),
+            ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("model", Value::String(model.into())),
         ]);
@@ -1762,7 +1761,7 @@ impl PyCalibrationPlan {
     /// steps : list[CalibrationStep]
     ///     Steps in execution order; attached quotes populate ``quote_sets``.
     /// id : str, default "plan"
-    ///     Plan identifier.
+    ///     Plan identifier (Rust ``CalibrationPlan::DEFAULT_ID`` when omitted).
     /// description : str | None, default None
     ///     Free-text description.
     /// settings : CalibrationConfig | dict | None, default None
@@ -1774,12 +1773,15 @@ impl PyCalibrationPlan {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``settings`` is invalid or two steps attach quotes under the
-    ///     same set name with different ids, or reuse a quote id with a
-    ///     different payload. Identical attached quotes are collected once,
-    ///     including when their set is supplied explicitly.
+    ///     If ``settings`` is invalid.
+    /// CalibrationEnvelopeError
+    ///     If two steps attach quotes under the same set name with different
+    ///     ids (``kind == "quote_set_conflict"``), or reuse a quote id with a
+    ///     different payload (``kind == "conflicting_market_datum"``).
+    ///     Identical attached quotes are collected once, including when their
+    ///     set is supplied explicitly.
     #[new]
-    #[pyo3(signature = (steps, id = "plan", description = None, settings = None, quote_sets = None))]
+    #[pyo3(signature = (steps, id = CalibrationPlan::DEFAULT_ID, description = None, settings = None, quote_sets = None))]
     #[pyo3(text_signature = "(steps, id='plan', description=None, settings=None, quote_sets=None)")]
     fn new(
         py: Python<'_>,
@@ -1804,57 +1806,21 @@ impl PyCalibrationPlan {
                 );
             }
         }
-        let mut market_data = Vec::new();
-        let mut payloads = IndexMap::new();
-        let mut inner_steps = Vec::with_capacity(steps.len());
-        for step in steps {
-            if !step.quotes.is_empty() {
-                let ids: Vec<_> = step
-                    .quotes
-                    .iter()
-                    .map(|q| finstack_quant_calibration::quotes::ids::QuoteId::new(q.id()))
-                    .collect();
-                match sets.get(&step.inner.quote_set) {
-                    Some(existing) if existing != &ids => {
-                        return Err(value_error(format!(
-                            "quote set '{}' is attached by more than one step with different quotes",
-                            step.inner.quote_set
-                        )));
-                    }
-                    Some(_) => {}
-                    None => {
-                        sets.insert(step.inner.quote_set.clone(), ids);
-                    }
-                }
-                for quote in &step.quotes {
-                    let payload = serde_json::to_value(quote)
-                        .map_err(|error| value_error(error.to_string()))?;
-                    match payloads.get(quote.id()) {
-                        Some(existing) if existing != &payload => {
-                            return Err(value_error(format!(
-                                "quote id '{}' has conflicting attached payloads",
-                                quote.id()
-                            )));
-                        }
-                        Some(_) => {}
-                        None => {
-                            payloads.insert(quote.id().to_string(), payload);
-                            market_data.push(quote.clone());
-                        }
-                    }
-                }
-            }
-            inner_steps.push(step.inner.clone());
-        }
+        let steps = steps
+            .iter()
+            .map(|step| (step.inner.clone(), step.quotes.clone()))
+            .collect();
+        let envelope = CalibrationEnvelope::from_attached_steps(
+            id.to_string(),
+            description,
+            settings,
+            sets,
+            steps,
+        )
+        .map_err(|error| super::envelope_error_to_py(py, error))?;
         Ok(Self {
-            inner: CalibrationPlan {
-                id: id.to_string(),
-                description,
-                quote_sets: sets,
-                steps: inner_steps,
-                settings,
-            },
-            market_data,
+            inner: envelope.plan,
+            market_data: envelope.market_data,
         })
     }
 
@@ -2089,7 +2055,7 @@ impl PyCalibrationEnvelope {
     ///     pointer-level findings.
     #[staticmethod]
     fn from_json(py: Python<'_>, json: &str) -> PyResult<Self> {
-        super::parse_envelope_json(py, json).map(Self::from_inner)
+        super::parse_envelope(py, json).map(Self::from_inner)
     }
 
     /// Pickle support through the JSON wire format.

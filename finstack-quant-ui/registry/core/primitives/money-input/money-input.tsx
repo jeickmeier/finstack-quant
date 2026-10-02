@@ -36,7 +36,12 @@ export function MoneyInput({
         <EnumField
           label={`${label} currency`}
           value={value.currency}
-          onValueChange={(currency) => onValueChange({ ...value, currency })}
+          onValueChange={(currency) =>
+            onValueChange({
+              ...value,
+              currency: currency as MoneyValue["currency"],
+            })
+          }
           options={currencies.map((currency) => ({
             value: currency,
             label: currency,

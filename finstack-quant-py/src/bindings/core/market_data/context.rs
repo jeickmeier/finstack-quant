@@ -3,12 +3,13 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::types::CurveId;
 use pyo3::exceptions::PyTypeError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList, PyModule};
+use pyo3::types::{PyList, PyModule};
 use pyo3::IntoPyObjectExt;
 
 use crate::bindings::core::currency::extract_currency;
@@ -177,7 +178,8 @@ impl PyMarketContext {
     ///     Identifier for the scalar.
     /// value : float | int | decimal.Decimal
     ///     Price or unitless value. Monetary ``Decimal`` values keep full
-    ///     precision; unitless ``Decimal`` values must round-trip through ``float``.
+    ///     precision; unitless ``Decimal`` values must be exactly representable
+    ///     as binary ``float``.
     /// currency : Currency | str, optional
     ///     When given, the scalar is a monetary price in this currency;
     ///     otherwise it is unitless.
@@ -216,21 +218,33 @@ impl PyMarketContext {
     ///     Identifier for the index bundle (e.g. ``"CDX-IG"``); the bundle
     ///     carries no id of its own, so it must be supplied.
     /// data : CreditIndexData
-    ///     Bundle to store.
+    ///     Bundle whose hazard, base-correlation, and issuer curve IDs resolve
+    ///     to curves already inserted in this context. Canonical context curves
+    ///     replace the bundle's embedded references.
     ///
     /// Returns
     /// -------
     /// MarketContext
     ///     ``self``.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If a referenced curve is absent; the context is unchanged.
+    /// ValueError
+    ///     If constituent count, recovery, or issuer data is invalid, or a
+    ///     referenced ID resolves to the wrong curve type.
     #[pyo3(text_signature = "(self, id, data)")]
     fn insert_credit_index<'py>(
         mut slf: PyRefMut<'py, Self>,
         id: &str,
         data: &PyCreditIndexData,
-    ) -> PyRefMut<'py, Self> {
+    ) -> PyResult<PyRefMut<'py, Self>> {
         // Cold path: one deep clone per insert; lookups now share the `Arc`.
-        slf.inner.insert_credit_index_mut(id, (*data.inner).clone());
-        slf
+        slf.inner
+            .insert_credit_index_mut(id, (*data.inner).clone())
+            .map_err(core_to_py)?;
+        Ok(slf)
     }
 
     /// Insert a scalar time series under its own id (fluent, returns ``self``).
@@ -562,29 +576,8 @@ impl PyMarketContext {
     ///     ``dividend_schedule_count``, ``fx_delta_vol_surface_count``,
     ///     ``collateral_mapping_count``.
     #[pyo3(text_signature = "(self)")]
-    fn stats<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let stats = self.inner.stats();
-        let out = PyDict::new(py);
-        let counts = PyDict::new(py);
-        for (kind, count) in &stats.curve_counts {
-            counts.set_item(*kind, *count)?;
-        }
-        out.set_item("curve_counts", counts)?;
-        out.set_item("total_curves", stats.total_curves)?;
-        out.set_item("has_fx", stats.has_fx)?;
-        out.set_item("surface_count", stats.surface_count)?;
-        out.set_item("vol_cube_count", stats.vol_cube_count)?;
-        out.set_item("price_count", stats.price_count)?;
-        out.set_item("series_count", stats.series_count)?;
-        out.set_item("inflation_index_count", stats.inflation_index_count)?;
-        out.set_item("credit_index_count", stats.credit_index_count)?;
-        out.set_item("dividend_schedule_count", stats.dividend_schedule_count)?;
-        out.set_item(
-            "fx_delta_vol_surface_count",
-            stats.fx_delta_vol_surface_count,
-        )?;
-        out.set_item("collateral_mapping_count", stats.collateral_mapping_count)?;
-        Ok(out)
+    fn stats<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.stats())
     }
 
     /// Roll every dated term structure forward by ``days`` calendar days.
@@ -594,7 +587,7 @@ impl PyMarketContext {
     /// Parameters
     /// ----------
     /// days : int
-    ///     Calendar days to roll (may be negative).
+    ///     Signed 64-bit calendar days to roll (may be negative).
     ///
     /// Returns
     /// -------
@@ -604,7 +597,9 @@ impl PyMarketContext {
     /// Raises
     /// ------
     /// ValueError
-    ///     If a curve cannot be rebuilt after rolling.
+    ///     If a rolled base date exceeds the supported date range or a curve cannot be rebuilt after rolling.
+    /// OverflowError
+    ///     If ``days`` is outside the signed 64-bit integer range.
     #[pyo3(text_signature = "(self, days)")]
     fn roll_forward(&self, days: i64) -> PyResult<Self> {
         self.inner
@@ -628,22 +623,46 @@ impl PyMarketContext {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Deserialize a market context from a JSON string.
+    /// Strictly load a persisted market context from its canonical state JSON.
     ///
-    /// Accepts the same JSON format produced by :meth:`to_json` and by the
-    /// calibration and pricing pipelines.
+    /// Uses the Rust ``MarketContext::from_state_slice`` contract loader with
+    /// the default ``LoadLimits`` (64 MiB of input, 96 nested JSON containers),
+    /// exactly as WASM ``core.MarketContext.fromJson`` does.
     ///
-    /// Raises ``ValueError`` if the JSON is malformed or fails validation.
+    /// Parameters
+    /// ----------
+    /// json : str
+    ///     Canonical MarketContext JSON produced by :meth:`to_json` or by the
+    ///     calibration pipeline, carrying ``schema_version: 1``. Unknown fields
+    ///     are rejected.
+    ///
+    /// Returns
+    /// -------
+    /// MarketContext
+    ///     The restored context.
+    ///
+    /// Raises
+    /// ------
+    /// ContractValidationError
+    ///     If the JSON is malformed, ``schema_version`` is missing or
+    ///     unsupported, or the state has unknown fields, invalid market
+    ///     objects, duplicate ids or unresolved curve references; the
+    ///     ``report`` attribute lists the diagnostics. Subclass of ``ValueError``.
+    /// ContractLimitExceededError
+    ///     If the JSON exceeds the canonical input-size or nesting-depth limit.
     #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let ctx: MarketContext = serde_json::from_str(json)
-            .map_err(|e| crate::errors::value_error(format!("invalid MarketContext JSON: {e}")))?;
-        Ok(Self { inner: ctx })
+    #[pyo3(text_signature = "(json, /)")]
+    fn from_json(py: Python<'_>, json: &str) -> PyResult<Self> {
+        let (inner, _report) =
+            MarketContext::from_state_slice(json.as_bytes(), &LoadLimits::default())
+                .map_err(|e| crate::errors::contract_to_py(py, e))?;
+        Ok(Self { inner })
     }
 
     /// Serialize this market context to compact JSON (round-trips with pricers).
     ///
-    /// Raises ``ValueError`` if serialization fails.
+    /// Raises ``ValueError`` if the FX provider cannot supply a coherent
+    /// snapshot or serialization fails.
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(|e| {
@@ -723,7 +742,7 @@ pub(super) const EXPORTS: &[&str] = &["MarketContext"];
 
 /// Register the `finstack_quant.core.market_data.context` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "context")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "context")?;
     m.setattr(
         "__doc__",
         "Market data context container bindings (finstack-quant-core).",
@@ -734,13 +753,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, EXPORTS)?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "context",
-        "finstack_quant.core.market_data",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

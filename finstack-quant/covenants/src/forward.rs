@@ -20,8 +20,12 @@ use serde::{Deserialize, Serialize};
 pub(crate) const DEFAULT_MC_SEED: u64 = 0;
 
 /// Covenant forecast configuration.
+///
+/// Every field is optional on the wire; a missing field takes its
+/// [`Default`] value (deterministic maintenance-scope forecasting).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(default, deny_unknown_fields)]
 pub struct CovenantForecastConfig {
     /// Scope selected by batch forecasts: maintenance by default. Incurrence
     /// forecasts are hypothetical capacity checks, not actual breach events.
@@ -60,6 +64,10 @@ pub struct CovenantForecastConfig {
     /// preceding the first forecast period, so the first simulated point still
     /// has a non-zero forecast horizon.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
     pub reference_date: Option<Date>,
     /// Minimum stochastic breach probability to include in batch breach output.
     #[serde(default = "default_breach_probability_threshold")]
@@ -101,6 +109,7 @@ fn default_breach_probability_threshold() -> f64 {
 
 /// Forecast output with headroom analytics.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CovenantForecast {
     /// Stable covenant instance identifier.
@@ -110,6 +119,10 @@ pub struct CovenantForecast {
     /// Comparison direction for the covenant threshold test.
     pub comparator: BoundKind,
     /// Future test dates for covenant evaluation
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
     pub test_dates: Vec<Date>,
     /// Projected metric values at each test date.
     ///
@@ -131,8 +144,16 @@ pub struct CovenantForecast {
     #[serde(default)]
     pub breach_probability_stderr: Vec<f64>,
     /// Date of first projected breach (if any)
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
     pub first_breach_date: Option<Date>,
     /// Date with minimum finite headroom.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
     pub min_headroom_date: Option<Date>,
     /// Minimum finite headroom value across all active test dates.
     pub min_headroom_value: Option<f64>,
@@ -140,6 +161,7 @@ pub struct CovenantForecast {
 
 /// A projected covenant breach.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FutureBreach {
     /// Stable covenant instance identifier.
@@ -147,6 +169,10 @@ pub struct FutureBreach {
     /// Human-readable covenant description.
     pub covenant_description: String,
     /// Date of the breach
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub breach_date: Date,
     /// Projected value, if finite.
     pub projected_value: Option<f64>,

@@ -302,12 +302,28 @@ impl CommodityFuture {
     ///
     /// Realized observations carry no curve risk. For an arithmetic average,
     /// each remaining observation contributes its equal settlement weight.
+    /// An explicit live quote or official post-trading settlement replaces the
+    /// model mark, so its sensitivity to the price curve is zero. Missing
+    /// required official settlement still returns a validation error.
     ///
     /// # Arguments
     ///
     /// * `as_of` - Valuation date separating realized from projected observations.
     pub fn price_curve_delta(&self, as_of: Date) -> finstack_quant_core::Result<f64> {
         self.validate()?;
+        if as_of > self.terms.settlement_date {
+            return Ok(0.0);
+        }
+        if as_of > self.terms.last_trading_date {
+            // Reuse mark resolution to retain its missing-official-price
+            // failure policy. The live-model callback is not evaluated here.
+            self.terms
+                .resolve_mark(self.id.as_str(), as_of, || Ok(0.0))?;
+            return Ok(0.0);
+        }
+        if self.terms.quoted_price.is_some() {
+            return Ok(0.0);
+        }
         let projected_weight = match &self.fixing {
             CommodityFutureFixing::Single {
                 observation_date, ..
@@ -441,5 +457,45 @@ mod tests {
             .fair_price(&MarketContext::new(), date!(2026 - 01 - 07))
             .expect("fully realized settlement");
         assert_eq!(settlement, 90.0);
+    }
+
+    #[test]
+    fn commodity_future_curve_delta_tracks_the_selected_mark() {
+        let mut future = average_future(vec![(date!(2026 - 01 - 02), 80.0)]);
+        let shifted_market = |shift: f64| {
+            MarketContext::new().insert(
+                PriceCurve::builder("INDEX-FWD")
+                    .base_date(date!(2026 - 01 - 01))
+                    .spot_price(100.0 + shift)
+                    .knots([(0.0, 100.0 + shift), (1.0, 100.0 + shift)])
+                    .build()
+                    .expect("curve"),
+            )
+        };
+        for position in [Position::Long, Position::Short] {
+            future.terms.position = position;
+            for quote in [None, Some(110.0)] {
+                future.terms.quoted_price = quote;
+                future.terms.settlement_price = Some(115.0);
+                for as_of in [
+                    date!(2026 - 01 - 05),
+                    date!(2026 - 01 - 06),
+                    date!(2026 - 01 - 07),
+                ] {
+                    let actual = future.price_curve_delta(as_of).expect("delta");
+                    let up = future.npv_raw(&shifted_market(0.01), as_of).expect("up");
+                    let down = future.npv_raw(&shifted_market(-0.01), as_of).expect("down");
+                    assert!((actual - (up - down) / 0.02).abs() < 1e-8);
+                    if quote.is_some() || as_of > future.terms.last_trading_date {
+                        assert_eq!(actual, 0.0);
+                    }
+                }
+            }
+        }
+        future.terms.settlement_price = None;
+        assert!(future.price_curve_delta(date!(2026 - 01 - 06)).is_err());
+        assert!(future
+            .npv_raw(&flat_market(), date!(2026 - 01 - 06))
+            .is_err());
     }
 }

@@ -133,8 +133,8 @@ pub(crate) fn implied_vol(
         r_d,
         r_f,
         t,
-        inst.option_type,
         target_unit,
+        inst.option_type,
     )
 }
 

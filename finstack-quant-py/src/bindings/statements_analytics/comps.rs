@@ -166,9 +166,7 @@ impl PyCompanyMetrics {
     /// Returns ``None`` when the metric is absent.
     #[pyo3(text_signature = "($self, name)")]
     fn get(&self, name: &str) -> Option<f64> {
-        self.inner
-            .named_metric(name)
-            .or_else(|| self.inner.custom.get(name).copied())
+        self.inner.get(name)
     }
 
     /// Serialize to canonical JSON.
@@ -203,16 +201,14 @@ impl PyCompanyMetrics {
 /// Convert a ``{metric_name: value}`` dict into a `CompanyMetrics`.
 ///
 /// Known field names are mapped onto their dedicated optional fields;
-/// everything else is stored in the `custom` map. ``None`` values are
-/// treated as missing; any other non-numeric value raises ``ValueError``.
+/// everything else is stored in the `custom` map. ``None`` is a missing
+/// metric (the Rust ``CompanyMetrics::from_flat_metrics`` rule); any other
+/// non-numeric value raises ``ValueError``.
 fn dict_to_company_metrics(id: &str, d: &Bound<'_, PyDict>) -> PyResult<CompanyMetrics> {
     let mut values = Vec::with_capacity(d.len());
     for (key, val) in d.iter() {
         let name: String = key.extract()?;
-        if val.is_none() {
-            continue;
-        }
-        let Ok(v) = val.extract::<f64>() else {
+        let Ok(v) = val.extract::<Option<f64>>() else {
             return Err(crate::errors::value_error(format!(
                 "metric '{name}' for company '{id}' must be a number or None, got {}",
                 val.get_type().name().map_or_else(
@@ -546,13 +542,11 @@ impl PyPeerSet {
             let mut meta = BTreeMap::new();
             for (column, cell) in columns.iter().zip(row.iter()) {
                 if cell.is_none() {
-                    continue;
-                }
-                if let Ok(v) = cell.extract::<f64>() {
+                    values.push((column.clone(), None));
+                } else if let Ok(v) = cell.extract::<f64>() {
+                    // pandas marks a missing numeric cell with NaN.
                     let is_nan: bool = math.call_method1("isnan", (v,))?.extract()?;
-                    if !is_nan {
-                        values.push((column.clone(), v));
-                    }
+                    values.push((column.clone(), (!is_nan).then_some(v)));
                 } else if let Ok(s) = cell.extract::<String>() {
                     meta.insert(column.clone(), s);
                 } else {
@@ -657,7 +651,9 @@ impl PyPeerSet {
 ///     Optional explanatory metric in the same notation. ``None`` (default)
 ///     scores the dependent metric against its peer distribution.
 /// weight : float
-///     Weight in the composite score. Default ``1.0``.
+///     Finite non-negative relative weight in the composite score. Default
+///     ``1.0``; zero disables the dimension. Positive weights are normalized
+///     over usable dimensions.
 /// direction : str
 ///     ``"higher_is_cheap"`` (spread-like, default) or ``"higher_is_rich"``
 ///     (multiple-like).
@@ -1149,22 +1145,22 @@ impl PyRelativeValueResult {
     }
 }
 
-/// Percentile rank of ``value`` within ``peer_values`` (0-1 scale).
+/// Percentile rank of ``value`` within ``values`` (0-1 scale).
 ///
 /// Uses the "fraction of values less than or equal" convention (Rust
-/// ``percentile_rank(values, value)`` argument order).
+/// ``percentile_rank(values, value)``).
 ///
 /// Parameters
 /// ----------
-/// peer_values : list[float]
-///     Peer distribution (need not be sorted).
+/// values : list[float]
+///     Peer distribution (need not be sorted); non-finite entries are ignored.
 /// value : float
 ///     The subject value to rank.
 ///
 /// Returns
 /// -------
 /// float | None
-///     Percentile rank in ``[0, 1]``, or ``None`` when ``peer_values`` is empty.
+///     Percentile rank in ``[0, 1]``, or ``None`` when ``values`` is empty.
 ///
 /// Examples
 /// --------
@@ -1172,17 +1168,18 @@ impl PyRelativeValueResult {
 /// >>> percentile_rank([100.0, 200.0, 300.0, 400.0, 500.0], 250.0)
 /// 0.4
 #[pyfunction]
-#[pyo3(text_signature = "(peer_values, value)")]
-fn percentile_rank(peer_values: Vec<f64>, value: f64) -> Option<f64> {
-    core_percentile_rank(&peer_values, value)
+#[pyo3(text_signature = "(values, value)")]
+fn percentile_rank(values: Vec<f64>, value: f64) -> Option<f64> {
+    core_percentile_rank(&values, value)
 }
 
-/// Standard (z-) score of ``value`` in the peer distribution.
+/// Standard (z-) score of ``value`` in the peer distribution (Rust
+/// ``z_score(values, value)``).
 ///
 /// Parameters
 /// ----------
-/// peer_values : list[float]
-///     Peer distribution.
+/// values : list[float]
+///     Peer distribution; non-finite entries are ignored.
 /// value : float
 ///     The subject value.
 ///
@@ -1198,17 +1195,17 @@ fn percentile_rank(peer_values: Vec<f64>, value: f64) -> Option<f64> {
 /// >>> z_score([1.0, 2.0, 3.0, 4.0, 5.0], 3.0)
 /// 0.0
 #[pyfunction]
-#[pyo3(text_signature = "(peer_values, value)")]
-fn z_score(peer_values: Vec<f64>, value: f64) -> Option<f64> {
-    core_z_score(&peer_values, value)
+#[pyo3(text_signature = "(values, value)")]
+fn z_score(values: Vec<f64>, value: f64) -> Option<f64> {
+    core_z_score(&values, value)
 }
 
-/// Descriptive statistics for a peer distribution.
+/// Descriptive statistics for a peer distribution (Rust ``peer_stats(values)``).
 ///
 /// Parameters
 /// ----------
-/// peer_values : list[float]
-///     Peer distribution (need not be sorted).
+/// values : list[float]
+///     Peer distribution (need not be sorted); non-finite entries are ignored.
 ///
 /// Returns
 /// -------
@@ -1222,9 +1219,9 @@ fn z_score(peer_values: Vec<f64>, value: f64) -> Option<f64> {
 /// >>> peer_stats([1.0, 2.0, 3.0, 4.0, 5.0]).count
 /// 5
 #[pyfunction]
-#[pyo3(text_signature = "(peer_values)")]
-fn peer_stats(peer_values: Vec<f64>) -> Option<PyPeerStats> {
-    core_peer_stats(&peer_values).map(|inner| PyPeerStats { inner })
+#[pyo3(text_signature = "(values)")]
+fn peer_stats(values: Vec<f64>) -> Option<PyPeerStats> {
+    core_peer_stats(&values).map(|inner| PyPeerStats { inner })
 }
 
 /// Single-factor OLS fit and evaluation at the subject's X.
@@ -1330,6 +1327,8 @@ fn extract_dimensions(
 ///
 /// The composite is the weighted average of the direction-adjusted dimension
 /// scores: positive = cheap, negative = rich.
+/// Unusable dimensions (missing metrics, insufficient or degenerate samples)
+/// are excluded; regression dimensions retain their regression semantics.
 ///
 /// Parameters
 /// ----------
@@ -1348,7 +1347,8 @@ fn extract_dimensions(
 /// ------
 /// ValueError
 ///     If a payload is malformed, a direction or extractor is unknown, or the
-///     peer set cannot be scored (no peers with the required metrics).
+///     weights are negative/non-finite, no positive-weight dimension is
+///     usable, or the composite cannot be represented as a finite number.
 ///
 /// Examples
 /// --------

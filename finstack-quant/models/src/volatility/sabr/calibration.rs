@@ -247,6 +247,53 @@ pub enum SabrShift {
     Auto,
 }
 
+impl SabrShift {
+    /// Host keyword selecting [`SabrShift::Auto`].
+    pub const AUTO_KEYWORD: &'static str = "auto";
+}
+
+/// Parse the host keyword form of a shift policy.
+///
+/// Only [`SabrShift::AUTO_KEYWORD`] (`"auto"`, case-sensitive) is a keyword;
+/// hosts map their null/None to [`SabrShift::None`] and numbers to
+/// [`SabrShift::Fixed`] themselves.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_models::volatility::sabr::SabrShift;
+///
+/// assert_eq!("auto".parse::<SabrShift>()?, SabrShift::Auto);
+/// assert!("AUTO".parse::<SabrShift>().is_err());
+/// assert_eq!(SabrShift::Auto.to_string(), "auto");
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+impl std::str::FromStr for SabrShift {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        if s == Self::AUTO_KEYWORD {
+            Ok(Self::Auto)
+        } else {
+            Err(Error::Validation(format!(
+                "SABR shift must be null/None, a number, or {:?}; got {s:?}",
+                Self::AUTO_KEYWORD
+            )))
+        }
+    }
+}
+
+/// `none`, the fixed shift value, or `auto`.
+impl std::fmt::Display for SabrShift {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::None => f.write_str("none"),
+            Self::Fixed(shift) => write!(f, "{shift}"),
+            Self::Auto => f.write_str(Self::AUTO_KEYWORD),
+        }
+    }
+}
+
 /// Calibrated SABR parameters and deterministic solver diagnostics.
 #[derive(Clone, Debug)]
 pub struct SabrCalibrationOutcome {

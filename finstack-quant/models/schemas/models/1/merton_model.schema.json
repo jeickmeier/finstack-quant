@@ -1,0 +1,160 @@
+{
+  "$defs": {
+    "AssetDynamics": {
+      "description": "Asset dynamics specification for the Merton model.\n\nControls the stochastic process assumed for the firm's asset value.",
+      "oneOf": [
+        {
+          "const": "geometric_brownian",
+          "description": "Standard geometric Brownian motion (lognormal diffusion).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Jump-diffusion process (Merton 1976) with Poisson jumps.",
+          "properties": {
+            "jump_diffusion": {
+              "properties": {
+                "jump_intensity": {
+                  "description": "Poisson jump arrival intensity (jumps per year).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "jump_mean": {
+                  "description": "Mean log-jump size.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "jump_vol": {
+                  "description": "Volatility of log-jump size.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "jump_intensity",
+                "jump_mean",
+                "jump_vol"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "jump_diffusion"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "CreditGrades model extension with stochastic-barrier survival adjustment.\n\n`default_probability()` applies the standard approximate CreditGrades\nsurvival function using the log-barrier volatility parameter.",
+          "properties": {
+            "credit_grades": {
+              "properties": {
+                "barrier_uncertainty": {
+                  "description": "Log-normal barrier volatility `λ`: the standard deviation of the\nnatural log of the default barrier (Finger et al. 2002,\n\"CreditGrades Technical Document\"). Despite the field name, this\nis *not* a generic uncertainty scalar — it is the lognormal\ndispersion of the global recovery rate, entering the survival\nformula as `a_t² = σ²t + λ²` and the barrier shift `exp(λ²)`.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "mean_recovery": {
+                  "description": "Mean recovery rate at default.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "barrier_uncertainty",
+                "mean_recovery"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "credit_grades"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MertonBarrierType": {
+      "description": "Barrier monitoring type for default determination.",
+      "oneOf": [
+        {
+          "const": "terminal",
+          "description": "Default only assessed at maturity (classic Merton).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Continuous barrier monitoring (Black-Cox extension).",
+          "properties": {
+            "first_passage": {
+              "properties": {
+                "barrier_growth_rate": {
+                  "description": "Growth rate of the default barrier over time.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "barrier_growth_rate"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "first_passage"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/merton_model.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Merton structural credit model.",
+  "properties": {
+    "asset_value": {
+      "description": "Current firm asset value `V_0`, in the issuer's reporting currency.\nStrictly positive.",
+      "format": "double",
+      "type": "number"
+    },
+    "asset_vol": {
+      "description": "Asset volatility `sigma_V`, annualized and expressed as a decimal\nfraction (`0.25` is 25%). Strictly positive.",
+      "format": "double",
+      "type": "number"
+    },
+    "barrier_type": {
+      "$ref": "#/$defs/MertonBarrierType",
+      "description": "Whether default is tested only at maturity or continuously over the\nlife of the debt."
+    },
+    "debt_barrier": {
+      "description": "Default barrier `B`, the debt face value the asset value is compared\nagainst. Strictly positive and in the same currency as `asset_value`.",
+      "format": "double",
+      "type": "number"
+    },
+    "dynamics": {
+      "$ref": "#/$defs/AssetDynamics",
+      "description": "Stochastic process governing the asset value."
+    },
+    "payout_rate": {
+      "description": "Continuous payout (dividend) rate on assets, as a decimal fraction.\nReduces the drift of the asset process under the risk-neutral measure.",
+      "format": "double",
+      "type": "number"
+    },
+    "risk_free_rate": {
+      "description": "Continuously compounded risk-free rate `r`, as a decimal fraction.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "asset_value",
+    "asset_vol",
+    "debt_barrier",
+    "risk_free_rate",
+    "payout_rate",
+    "barrier_type",
+    "dynamics"
+  ],
+  "title": "MertonModel",
+  "type": "object"
+}

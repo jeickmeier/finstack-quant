@@ -19,6 +19,8 @@ mod factor_schema_contract;
 mod factor_strictness;
 #[path = "fx_delta_vol_tests.rs"]
 mod fx_delta_vol_tests;
+#[path = "host_bridges.rs"]
+mod host_bridges;
 #[path = "liability_management.rs"]
 mod liability_management;
 #[path = "lookback_commodity_regressions.rs"]
@@ -27,6 +29,9 @@ mod lookback_commodity_regressions;
 mod market_data_diff_tests;
 #[path = "model_audit_regressions.rs"]
 mod model_audit_regressions;
+#[cfg(feature = "json-schema")]
+#[path = "model_schema_contract.rs"]
+mod model_schema_contract;
 #[path = "portfolio_loss.rs"]
 mod portfolio_loss;
 #[path = "production_audit.rs"]

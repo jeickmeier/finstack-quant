@@ -70,9 +70,7 @@ pub use overnight::{
 
 pub use periods::SchedulePeriod;
 pub use rate_helpers::{project_floating_rate, FloatingRateParams};
-pub use schedule::{
-    CashFlowMeta, CashFlowSchedule, CashflowRepresentation, PvCreditAdjustment, PvDiscountSource,
-};
+pub use schedule::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation, PvCreditAdjustment};
 pub use specs::{
     evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultCurve, DefaultModelSpec,
     FeeAccrualBasis, FeeBase, FeeSpec, FeeTier, FixedCouponSpec, FloatingCouponSpec,

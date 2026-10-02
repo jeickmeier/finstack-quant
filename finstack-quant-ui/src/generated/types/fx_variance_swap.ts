@@ -675,7 +675,18 @@ export interface D_9098E54Fc41F56Cb1Edb {
 /**
  * FX variance swap instrument.
  *
- * Payoff: Notional * (Realized Variance - Strike Variance)
+ * Payoff: Notional * (Realized Variance - Strike Variance).
+ *
+ * Before the final observation, close-to-close pricing projects Gaussian
+ * independent log-return increments using deterministic domestic/foreign
+ * rates and smile-replicated cumulative quadratic variation. It includes
+ * each return's conditional-mean square and applies the contractual
+ * annualization factor divided by the full scheduled return count. This
+ * projection is exact for deterministic instantaneous variance in the
+ * limit of exact smile integration; it does not model general stochastic
+ * volatility/rate joint dynamics. OHLC estimators support fully observed
+ * settlement only, because their future path statistics need a separate
+ * estimator-specific forecast model.
  */
 export interface D_6E351F851936941D91A0 {
   attributes: Attributes;
@@ -1243,6 +1254,7 @@ export interface DD760Eef55C5Bd7D5B1F6 {
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
  * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * Deserialization enforces the same parameter invariants as the constructors.
  */
 export interface D_16451E0Bf3B6B78178D8 {
   /**
@@ -1297,6 +1309,8 @@ export interface D_16451E0Bf3B6B78178D8 {
  * Models the relationship between a firm's leverage and its instantaneous
  * hazard rate, enabling a feedback loop where PIK accrual increases the
  * notional (and hence leverage), which drives the hazard rate higher.
+ * Deserialization validates the parameters and rejects incomplete or
+ * inconsistent tabular calibrations before they can be evaluated.
  */
 export interface DCc8Ed166Abbb10Ad4451 {
   /**

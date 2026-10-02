@@ -51,14 +51,10 @@ Examples:
 ('book', 'USD', 0)
 """
 
-import sys as _sys
-
 from finstack_quant.finstack_quant import portfolio as _portfolio
 
 FinstackError = _portfolio.FinstackError
 PortfolioError = _portfolio.PortfolioError
-ValuationError = _portfolio.ValuationError
-FxError = _portfolio.FxError
 ContractValidationError = _portfolio.ContractValidationError
 UnsupportedContractVersionError = _portfolio.UnsupportedContractVersionError
 MissingContractVersionError = _portfolio.MissingContractVersionError
@@ -110,12 +106,15 @@ allocate_weights = _portfolio.allocate_weights
 allocate_weights_json = _portfolio.allocate_weights_json
 validate_allocation_json = _portfolio.validate_allocation_json
 optimize_portfolio = _portfolio.optimize_portfolio
+rebalance_from_spec = _portfolio.rebalance_from_spec
 replay_portfolio = _portfolio.replay_portfolio
 replay_portfolio_json = _portfolio.replay_portfolio_json
 brinson_fachler = _portfolio.brinson_fachler
 brinson_fachler_json = _portfolio.brinson_fachler_json
 carino_link = _portfolio.carino_link
 carino_link_json = _portfolio.carino_link_json
+carino_link_from_sector_periods = _portfolio.carino_link_from_sector_periods
+carino_link_from_sector_periods_json = _portfolio.carino_link_from_sector_periods_json
 campisi_attribution = _portfolio.campisi_attribution
 campisi_attribution_json = _portfolio.campisi_attribution_json
 campisi_carino_link = _portfolio.campisi_carino_link
@@ -142,7 +141,6 @@ twrr_linked_json = _portfolio.twrr_linked_json
 mwr_xirr = _portfolio.mwr_xirr
 
 # Portfolio factor-model workflow results
-FactorRiskDecomposition = _portfolio.FactorRiskDecomposition
 SensitivityMatrix = _portfolio.SensitivityMatrix
 FactorPnlProfile = _portfolio.FactorPnlProfile
 compute_factor_sensitivities = _portfolio.compute_factor_sensitivities
@@ -180,11 +178,6 @@ CandidatePosition = _portfolio.CandidatePosition
 TradeUniverse = _portfolio.TradeUniverse
 schema = _portfolio.schema
 
-# `schema` is a real submodule, so `import finstack_quant.portfolio.schema`
-# must work as well as attribute access.
-if "finstack_quant.portfolio.schema" not in _sys.modules:
-    _sys.modules["finstack_quant.portfolio.schema"] = schema
-
 __all__ = [
     "BrinsonPeriodResult",
     "CandidatePosition",
@@ -199,12 +192,10 @@ __all__ = [
     "FactorBrinsonResult",
     "FactorContributionDelta",
     "FactorPnlProfile",
-    "FactorRiskDecomposition",
     "FiAttributionResult",
     "FiCarinoLinkedResult",
     "FiReconciliationReport",
     "FinstackError",
-    "FxError",
     "GridAttributionResult",
     "GridCarinoLinkedResult",
     "Inequality",
@@ -245,7 +236,6 @@ __all__ = [
     "TradeUniverse",
     "UnmatchedEntry",
     "UnsupportedContractVersionError",
-    "ValuationError",
     "WeightAllocationResult",
     "WeightingScheme",
     "WhatIfResult",
@@ -269,6 +259,8 @@ __all__ = [
     "campisi_reconciliation_check",
     "campisi_reconciliation_check_json",
     "carino_link",
+    "carino_link_from_sector_periods",
+    "carino_link_from_sector_periods_json",
     "carino_link_json",
     "cell_returns_from_curves",
     "cell_returns_from_curves_json",
@@ -291,6 +283,7 @@ __all__ = [
     "optimize_portfolio",
     "parse_portfolio_spec_json",
     "position_what_if",
+    "rebalance_from_spec",
     "replay_portfolio",
     "replay_portfolio_json",
     "scenario_pnl",

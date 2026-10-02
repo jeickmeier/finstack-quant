@@ -1,0 +1,44 @@
+{
+  "$defs": {
+    "CreditConversionFactor": {
+      "description": "Credit Conversion Factor (CCF) for off-balance-sheet exposures.\n\nRepresents the fraction of undrawn commitments expected to be drawn\nat the time of default.",
+      "properties": {
+        "ccf": {
+          "description": "CCF value in \\[0, 1\\]. Basel IRB: typically 0.75 for revolvers.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "ccf"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/ead_calculator.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Exposure at Default calculator.",
+  "properties": {
+    "ccf": {
+      "$ref": "#/$defs/CreditConversionFactor",
+      "description": "Credit conversion factor for the undrawn portion."
+    },
+    "drawn": {
+      "description": "Currently drawn amount.",
+      "format": "double",
+      "type": "number"
+    },
+    "undrawn": {
+      "description": "Undrawn (available) commitment.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "drawn",
+    "undrawn",
+    "ccf"
+  ],
+  "title": "EadCalculator",
+  "type": "object"
+}

@@ -71,7 +71,10 @@ impl Pricer for CdsHazardPricer {
         let cds =
             expect_inst::<crate::instruments::CreditDefaultSwap>(instrument, InstrumentType::Cds)?;
         let value = cds.base_value(market, as_of).map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
+            PricingError::from_core(
+                e,
+                PricingErrorContext::from_instrument(cds).model(ModelKey::HazardRate),
+            )
         })?;
 
         Ok(
@@ -116,9 +119,10 @@ impl Pricer for StructuredCreditStochasticPricer {
         let stochastic = structured_credit
             .price_stochastic_base(market, as_of)
             .map_err(|e| {
-                PricingError::model_failure_with_context(
-                    e.to_string(),
-                    PricingErrorContext::default(),
+                PricingError::from_core(
+                    e,
+                    PricingErrorContext::from_instrument(structured_credit)
+                        .model(ModelKey::StructuredCreditStochastic),
                 )
             })?;
 

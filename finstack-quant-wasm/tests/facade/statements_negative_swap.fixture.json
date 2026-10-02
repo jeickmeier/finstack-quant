@@ -1,0 +1,142 @@
+{
+  "model": {
+    "id": "negative-rate-receiver",
+    "periods": [
+      {
+        "id": "2025",
+        "start": "2025-01-01",
+        "end": "2026-01-01",
+        "is_actual": false
+      }
+    ],
+    "nodes": {
+      "cash": {
+        "node_id": "cash",
+        "node_type": "value",
+        "values": {
+          "2025": 10.0
+        },
+        "value_type": {
+          "type": "scalar"
+        }
+      },
+      "income": {
+        "node_id": "income",
+        "node_type": "calculated",
+        "formula_text": "cs.interest_income.IRS",
+        "value_type": {
+          "type": "monetary",
+          "currency": "USD"
+        }
+      }
+    },
+    "capital_structure": {
+      "debt_instruments": [
+        {
+          "id": "IRS",
+          "spec": {
+            "type": "interest_rate_swap",
+            "spec": {
+              "id": "IRS",
+              "notional": {
+                "amount": "100",
+                "currency": "USD"
+              },
+              "side": "receive",
+              "fixed_leg": {
+                "discount_curve_id": "USD-OIS",
+                "rate": "0.01",
+                "frequency": {
+                  "count": 6,
+                  "unit": "months"
+                },
+                "day_count": "30_360",
+                "business_day_convention": "modified_following",
+                "calendar_id": "usny",
+                "stub": "none",
+                "start": "2025-01-01",
+                "end": "2026-01-01",
+                "par_method": null,
+                "payment_lag_days": 0,
+                "end_of_month": false
+              },
+              "float_leg": {
+                "discount_curve_id": "USD-OIS",
+                "forward_curve_id": "USD-SOFR-3M",
+                "spread_bp": "0",
+                "frequency": {
+                  "count": 3,
+                  "unit": "months"
+                },
+                "day_count": "act_360",
+                "business_day_convention": "modified_following",
+                "calendar_id": "usny",
+                "stub": "none",
+                "reset_lag_days": 0,
+                "fixing_calendar_id": null,
+                "start": "2025-01-01",
+                "end": "2026-01-01",
+                "compounding": "simple",
+                "payment_lag_days": 0,
+                "end_of_month": false
+              },
+              "attributes": {}
+            }
+          }
+        }
+      ]
+    },
+    "schema_version": 1
+  },
+  "market": {
+    "schema_version": 1,
+    "curves": [
+      {
+        "type": "discount",
+        "id": "USD-OIS",
+        "base": "2025-01-01",
+        "day_count": "act_365f",
+        "knot_points": [
+          [0.0, 1.0],
+          [1.0, 0.9801986733067553]
+        ],
+        "interp_style": "log_linear",
+        "extrapolation": "flat_forward",
+        "min_forward_rate": null,
+        "allow_non_monotonic": false,
+        "min_forward_tenor": 1e-6,
+        "rate_calibration": null,
+        "calibration_ois_cutoff_days": null,
+        "fx_policy": null
+      },
+      {
+        "type": "forward",
+        "id": "USD-SOFR-3M",
+        "base": "2025-01-01",
+        "reset_lag": 2,
+        "day_count": "act_360",
+        "tenor": 0.25,
+        "knot_points": [
+          [0.0, -0.01],
+          [1.0, -0.01]
+        ],
+        "projection_grid": null,
+        "interp_style": "linear",
+        "extrapolation": "flat_forward",
+        "rate_calibration": null,
+        "fx_policy": null
+      }
+    ],
+    "fx": null,
+    "surfaces": [],
+    "prices": {},
+    "series": [],
+    "inflation_indices": [],
+    "dividends": [],
+    "credit_indices": [],
+    "fx_delta_vol_surfaces": [],
+    "vol_cubes": [],
+    "collateral": {},
+    "hierarchy": null
+  }
+}

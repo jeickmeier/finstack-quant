@@ -4,11 +4,10 @@
 //! For standard FRA settlement-at-start conventions and consistent curves,
 //! this equals the forward rate over the period:
 //!
-//! par_rate = ForwardCurve::rate_between(t_start, t_end)
+//! par_rate = (projection_df(start) / projection_df(end) - 1) / index_accrual
 //!
-//! Time mapping uses the forward curve's own day-count convention and base
-//! date, matching the curve's calibration basis rather than the instrument or
-//! discount curve basis.
+//! Discount-factor time mapping uses the forward curve's own day count and base
+//! date. Annualization uses the FRA's contractual index day count.
 
 use crate::instruments::rates::fra::ForwardRateAgreement;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -35,6 +34,11 @@ impl MetricCalculator for FraParRateCalculator {
             fwd.as_ref(),
             fra.start_date,
             fra.maturity,
+            fra.day_count.year_fraction(
+                fra.start_date,
+                fra.maturity,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )?,
         )
     }
 }

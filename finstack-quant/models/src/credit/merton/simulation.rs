@@ -1,10 +1,11 @@
-use finstack_quant_core::math::random::{poisson_inverse_cdf, RandomNumberGenerator};
+use finstack_quant_core::math::random::{poisson_inverse_cdf, Pcg64Rng, RandomNumberGenerator};
 use finstack_quant_core::{Error, Result};
 
 use super::{AssetDynamics, MertonModel};
 
 /// Results from Monte Carlo path simulation.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SimulatedPaths {
     /// Time grid from 0 to T.
     pub times: Vec<f64>,
@@ -109,8 +110,9 @@ impl MertonModel {
     /// # Errors
     ///
     /// Returns [`Error::Validation`] if `num_steps == 0` (the time grid would
-    /// be degenerate with `dt = inf`) or `horizon` is not finite and
-    /// positive.
+    /// be degenerate with `dt = inf`), `horizon` is not finite and positive,
+    /// `num_paths * (num_steps + 1)` overflows `usize`, or the path buffer
+    /// cannot be allocated (on wasm32 the whole address space is 4 GiB).
     pub fn simulate_paths(
         &self,
         num_paths: usize,
@@ -129,10 +131,24 @@ impl MertonModel {
                 "simulate_paths: horizon must be > 0, got {horizon}"
             )));
         }
+        let values_per_path = num_steps.checked_add(1).ok_or_else(|| {
+            Error::Validation(format!(
+                "simulate_paths: num_steps {num_steps} is too large"
+            ))
+        })?;
+        let total_values = num_paths.checked_mul(values_per_path).ok_or_else(|| {
+            Error::Validation(format!(
+                "simulate_paths: {num_paths} paths of {values_per_path} values overflow the address space"
+            ))
+        })?;
+        let mut all_paths: Vec<f64> = reserve_values(total_values)?;
+        let mut times: Vec<f64> = reserve_values(values_per_path)?;
+        let mut normals: Vec<f64> = reserve_values(num_steps)?;
+        normals.resize(num_steps, 0.0);
+
         let dt = horizon / num_steps as f64;
         let sqrt_dt = dt.sqrt();
-
-        let times: Vec<f64> = (0..=num_steps).map(|i| i as f64 * dt).collect();
+        times.extend((0..=num_steps).map(|i| i as f64 * dt));
 
         let v0 = self.asset_value;
         let sigma = self.asset_vol;
@@ -169,10 +185,6 @@ impl MertonModel {
         } else {
             (num_paths, false)
         };
-
-        let values_per_path = num_steps + 1;
-        let mut all_paths: Vec<f64> = Vec::with_capacity(num_paths * values_per_path);
-        let mut normals = vec![0.0; num_steps];
 
         for _ in 0..n_base {
             normals.iter_mut().for_each(|z| *z = rng.normal(0.0, 1.0));
@@ -250,6 +262,52 @@ impl MertonModel {
             num_steps,
         })
     }
+
+    /// Simulate asset value paths from a seed, reproducibly.
+    ///
+    /// Runs [`Self::simulate_paths`] with a PCG64 generator
+    /// ([`Pcg64Rng`]) seeded by `seed`, so the same model, arguments and
+    /// seed return bit-identical paths on every platform. This is the entry
+    /// point both language bindings expose.
+    ///
+    /// # Arguments
+    ///
+    /// * `num_paths` - Number of independent paths to simulate; with
+    ///   `antithetic` set, each path is paired with its sign-flipped twin.
+    /// * `num_steps` - Number of equally spaced time steps per path; must be
+    ///   at least 1, and each path stores `num_steps + 1` values.
+    /// * `horizon` - Time horizon T in years spanned by the grid; must be
+    ///   finite and strictly positive.
+    /// * `seed` - PCG64 seed; equal seeds reproduce equal paths.
+    /// * `antithetic` - When true, generate each odd-indexed path from the
+    ///   negated normals of its predecessor for variance reduction.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::simulate_paths`].
+    pub fn simulate_paths_seeded(
+        &self,
+        num_paths: usize,
+        num_steps: usize,
+        horizon: f64,
+        seed: u64,
+        antithetic: bool,
+    ) -> Result<SimulatedPaths> {
+        let mut rng = Pcg64Rng::new(seed);
+        self.simulate_paths(num_paths, num_steps, horizon, &mut rng, antithetic)
+    }
+}
+
+/// Empty buffer with room for exactly `len` values, or a validation error when
+/// the allocation cannot be made (instead of the allocator aborting).
+fn reserve_values(len: usize) -> Result<Vec<f64>> {
+    let mut values = Vec::new();
+    values.try_reserve_exact(len).map_err(|error| {
+        Error::Validation(format!(
+            "simulate_paths: cannot allocate {len} values: {error}"
+        ))
+    })?;
+    Ok(values)
 }
 
 #[cfg(test)]
@@ -257,11 +315,38 @@ mod tests {
     use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 
     #[test]
+    fn simulate_paths_seeded_is_reproducible_pcg64() {
+        let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
+        let a = m.simulate_paths_seeded(8, 12, 1.0, 7, true).unwrap();
+        let b = m.simulate_paths_seeded(8, 12, 1.0, 7, true).unwrap();
+        assert_eq!(a.asset_values, b.asset_values);
+        let mut rng = finstack_quant_core::math::random::Pcg64Rng::new(7);
+        let explicit = m.simulate_paths(8, 12, 1.0, &mut rng, true).unwrap();
+        assert_eq!(a.asset_values, explicit.asset_values);
+        let other = m.simulate_paths_seeded(8, 12, 1.0, 8, true).unwrap();
+        assert_ne!(a.asset_values, other.asset_values);
+    }
+
+    #[test]
     fn simulate_paths_rejects_degenerate_grid() {
         let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
         let mut rng = finstack_quant_core::math::random::Pcg64Rng::new(42);
         assert!(m.simulate_paths(10, 0, 5.0, &mut rng, false).is_err());
         assert!(m.simulate_paths(10, 60, 0.0, &mut rng, false).is_err());
+    }
+
+    #[test]
+    fn simulate_paths_rejects_sizes_that_overflow_or_cannot_be_allocated() {
+        use finstack_quant_core::error::ErrorKind;
+        let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
+        let mut rng = finstack_quant_core::math::random::Pcg64Rng::new(42);
+        // The last pair fits in usize but not in memory (more than isize::MAX bytes).
+        for (paths, steps) in [(1, usize::MAX), (usize::MAX, 4), (usize::MAX / 16, 1)] {
+            let error = m
+                .simulate_paths(paths, steps, 1.0, &mut rng, false)
+                .expect_err("oversized request");
+            assert_eq!(error.kind(), ErrorKind::Validation, "{error}");
+        }
     }
 
     // Monte Carlo path simulation tests

@@ -95,8 +95,6 @@ pub(crate) fn initial_principal_sign(side: PayReceive) -> f64 {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_export", ts(export, rename_all = "snake_case"))]
 #[non_exhaustive]
 pub enum NotionalExchange {
     /// No principal exchange.
@@ -137,8 +135,6 @@ impl std::fmt::Display for NotionalExchange {
 /// Identifies which leg of an XCCY swap has its notional reset under
 /// MtM-resetting. `Leg1` and `Leg2` refer to `XccySwap::leg1` and `XccySwap::leg2`
 /// respectively.
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
-#[cfg_attr(feature = "ts_export", ts(export, rename_all = "snake_case"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -611,6 +607,7 @@ impl XccySwap {
             adjust_overnight_accrual_boundaries, project_overnight_coupon,
             OvernightCouponProjectionInput, OvernightProjectionCurve,
         };
+        use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
         use crate::instruments::rates::irs::FloatingLegCompounding;
 
         let projected = if !matches!(leg.leg.compounding, FloatingLegCompounding::Simple) {
@@ -638,6 +635,7 @@ impl XccySwap {
                     accrual_end,
                     day_count: leg.leg.day_count,
                     coupon_frequency: Some(leg.leg.frequency),
+                    coupon_period: (accrual_start, accrual_end),
                     compounding: &leg.leg.compounding,
                     fixing_calendar: calendar,
                     compounded_spread: 0.0,
@@ -661,11 +659,7 @@ impl XccySwap {
             }
         } else {
             let fixing_date = period.reset_date.unwrap_or(period.accrual_start);
-            let forward_rate = if crate::cashflow::builder::rate_helpers::term_fixing_is_observed(
-                fixings,
-                fixing_date,
-                as_of,
-            ) {
+            let forward_rate = if fixing_date < as_of {
                 finstack_quant_core::market_data::fixings::require_fixing_value_exact(
                     fixings,
                     leg.leg.forward_curve_id.as_str(),
@@ -673,7 +667,12 @@ impl XccySwap {
                     as_of,
                 )?
             } else {
-                crate::cashflow::builder::rate_helpers::project_term_fixing(fixing_date, fwd)?
+                rate_between_on_dates(
+                    fwd,
+                    period.accrual_start,
+                    period.accrual_end,
+                    period.accrual_year_fraction,
+                )?
             };
             if let Some(out) = projected_fixings {
                 out.push(crate::cashflow::fixings::ProjectedFixing {
@@ -1683,6 +1682,7 @@ mod tests {
             accrual_end: end,
             day_count: DayCount::Act360,
             coupon_frequency: Some(Tenor::quarterly()),
+            coupon_period: (start, end),
             compounding: &compounding,
             fixing_calendar: calendar,
             compounded_spread: 0.0,

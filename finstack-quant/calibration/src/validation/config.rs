@@ -3,8 +3,6 @@
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 pub(crate) fn default_rate_bounds_policy_for_serde() -> RateBoundsPolicy {
     // plan-driven default: choose currency-aware bounds unless explicitly overridden.
@@ -32,8 +30,6 @@ pub(crate) fn default_rate_bounds_policy_for_serde() -> RateBoundsPolicy {
 /// let em_bounds = RateBounds::emerging_markets();
 /// assert!(em_bounds.max_rate > 1.0);
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -58,11 +54,12 @@ impl RateBounds {
     ///
     /// # Errors
     ///
-    /// Returns an error if `min_rate > max_rate`.
+    /// Returns an error if either bound is non-finite or `min_rate > max_rate`.
     pub fn validate(&self) -> Result<()> {
-        if self.min_rate > self.max_rate {
+        if !self.min_rate.is_finite() || !self.max_rate.is_finite() || self.min_rate > self.max_rate
+        {
             return Err(Error::Validation(format!(
-                "RateBounds invalid: min_rate ({}) must be <= max_rate ({})",
+                "RateBounds invalid: min_rate ({}) and max_rate ({}) must be finite and min_rate <= max_rate",
                 self.min_rate, self.max_rate
             )));
         }
@@ -73,7 +70,7 @@ impl RateBounds {
     ///
     /// # Errors
     ///
-    /// Returns an error if `min_rate > max_rate`.
+    /// Returns an error if either bound is non-finite or `min_rate > max_rate`.
     pub fn new(min_rate: f64, max_rate: f64) -> Result<Self> {
         let bounds = Self { min_rate, max_rate };
         bounds.validate()?;
@@ -128,8 +125,6 @@ impl RateBounds {
 ///
 /// Market-standard bounds depend on currency/market regime. `AutoCurrency` makes this choice
 /// explicit and avoids relying on `RateBounds::default()` as an implicit assumption.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -151,8 +146,6 @@ impl std::fmt::Display for RateBoundsPolicy {
 }
 
 /// Runtime validation behavior for arbitrage/consistency checks.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -179,8 +172,6 @@ impl std::fmt::Display for ValidationMode {
 /// This structure defines the limits for various financial metrics
 /// (forward rates, hazard rates, inflation growth) and toggles
 /// for specific arbitrage and monotonicity checks.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -290,6 +281,25 @@ impl ValidationConfig {
     ///
     /// Returns an error if any constraints are violated (e.g. min > max, non-positive tolerances).
     pub fn validate(&self) -> Result<()> {
+        for (label, value) in [
+            ("min_forward_rate", self.min_forward_rate),
+            ("max_forward_rate", self.max_forward_rate),
+            ("tolerance", self.tolerance),
+            ("max_hazard_rate", self.max_hazard_rate),
+            ("min_cpi_growth", self.min_cpi_growth),
+            ("max_cpi_growth", self.max_cpi_growth),
+            ("min_fwd_inflation", self.min_fwd_inflation),
+            ("max_fwd_inflation", self.max_fwd_inflation),
+            ("max_volatility", self.max_volatility),
+            ("butterfly_upper_ratio", self.butterfly_upper_ratio),
+            ("butterfly_lower_ratio", self.butterfly_lower_ratio),
+        ] {
+            if !value.is_finite() {
+                return Err(Error::Validation(format!(
+                    "ValidationConfig invalid: {label} must be finite, got {value}"
+                )));
+            }
+        }
         if self.min_forward_rate > 0.0 {
             return Err(Error::Validation(format!(
                 "ValidationConfig invalid: min_forward_rate must be <= 0.0, got {}",
@@ -338,9 +348,12 @@ impl ValidationConfig {
                 self.max_volatility
             )));
         }
-        if self.butterfly_upper_ratio < self.butterfly_lower_ratio {
+        if self.butterfly_lower_ratio < 0.0
+            || self.butterfly_upper_ratio <= 0.0
+            || self.butterfly_upper_ratio < self.butterfly_lower_ratio
+        {
             return Err(Error::Validation(format!(
-                "ValidationConfig invalid: butterfly_upper_ratio ({}) must be >= butterfly_lower_ratio ({})",
+                "ValidationConfig invalid: butterfly_upper_ratio ({}) must be positive and >= non-negative butterfly_lower_ratio ({})",
                 self.butterfly_upper_ratio, self.butterfly_lower_ratio
             )));
         }

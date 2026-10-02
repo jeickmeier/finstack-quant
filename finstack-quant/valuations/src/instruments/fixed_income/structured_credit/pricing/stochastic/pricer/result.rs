@@ -47,10 +47,15 @@ pub struct StochasticPricingResult {
     /// ES confidence level used
     pub es_confidence: f64,
 
-    /// Standard error of the mean PV estimate
+    /// Sample standard error of the mean PV estimate, in the NPV currency.
+    ///
+    /// Uses Bessel-corrected variance over independent estimators; each
+    /// antithetic pair contributes one mean observation.
     pub pv_std_error: f64,
 
-    /// 95% confidence interval for the mean PV
+    /// Two-sided 95% Student-t confidence interval for the mean PV, in the
+    /// NPV currency, using one fewer degree of freedom than the independent
+    /// estimator count. Coverage is approximate for non-Gaussian payoffs.
     pub pv_confidence_interval: (f64, f64),
 
     /// Number of simulated scenario paths (`2 × pricing_mode.num_paths` for

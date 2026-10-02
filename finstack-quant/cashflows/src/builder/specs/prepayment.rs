@@ -147,10 +147,17 @@ impl PrepaymentModelSpec {
     ///
     /// # Errors
     ///
-    /// Returns `Error::Validation` for a non-finite or negative constant CPR,
-    /// an invalid PSA multiplier, an ABS speed outside `[0, 1]`, or a vector
-    /// curve that is empty or holds a value outside `[0, 1]`.
+    /// Returns `Error::Validation` for a constant or post-lockout CPR that is
+    /// non-finite or outside `[0, 1]`, an invalid PSA multiplier, an ABS speed
+    /// outside `[0, 1]`, or a vector curve that is empty or holds a value
+    /// outside `[0, 1]`. Post-lockout CPR is checked even during lockout.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if matches!(
+            self.curve,
+            None | Some(PrepaymentCurve::Constant | PrepaymentCurve::CmbsLockout { .. })
+        ) {
+            super::super::credit_rates::cpr_to_smm(self.cpr)?;
+        }
         if let Some(PrepaymentCurve::Vector { monthly_cpr }) = &self.curve {
             for (index, cpr) in monthly_cpr.iter().enumerate() {
                 if !cpr.is_finite() || !(0.0..=1.0).contains(cpr) {
@@ -345,6 +352,27 @@ impl PrepaymentModelSpec {
         Self {
             cpr: monthly_cpr.first().copied().unwrap_or(0.0),
             curve: Some(PrepaymentCurve::Vector { monthly_cpr }),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PrepaymentModelSpec;
+
+    #[test]
+    fn lockout_validation_checks_the_post_lockout_cpr() {
+        for lockout_months in [0, 30, 60, u32::MAX] {
+            for cpr in [-0.1, 1.1, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+                assert!(PrepaymentModelSpec::cmbs_with_lockout(lockout_months, cpr)
+                    .validate()
+                    .is_err());
+            }
+            for cpr in [0.0, 0.1, 1.0] {
+                PrepaymentModelSpec::cmbs_with_lockout(lockout_months, cpr)
+                    .validate()
+                    .expect("valid post-lockout CPR");
+            }
         }
     }
 }

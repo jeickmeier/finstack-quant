@@ -89,6 +89,8 @@ pub enum VolQuoteType {
     /// Black (lognormal) implied volatility, relative units (the default).
     #[default]
     BlackLognormal,
+    /// Displaced Black volatility; per-expiry displacements accompany the grid.
+    ShiftedBlackLognormal,
     /// Normal (Bachelier) implied volatility, absolute rate units.
     Normal,
 }
@@ -97,6 +99,7 @@ impl std::fmt::Display for VolQuoteType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::BlackLognormal => write!(f, "black_lognormal"),
+            Self::ShiftedBlackLognormal => write!(f, "shifted_black_lognormal"),
             Self::Normal => write!(f, "normal"),
         }
     }
@@ -108,9 +111,10 @@ impl std::str::FromStr for VolQuoteType {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "black_lognormal" => Ok(Self::BlackLognormal),
+            "shifted_black_lognormal" => Ok(Self::ShiftedBlackLognormal),
             "normal" => Ok(Self::Normal),
             _ => Err(format!(
-                "unknown volatility quote type {value:?}; expected black_lognormal or normal"
+                "unknown volatility quote type {value:?}; expected black_lognormal, shifted_black_lognormal or normal"
             )),
         }
     }
@@ -163,6 +167,7 @@ pub struct VolSurface {
     secondary_axis: VolSurfaceAxis,
     quote_type: VolQuoteType,
     interpolation_mode: VolInterpolationMode,
+    displacements: Option<Box<[f64]>>,
     /// Row-major storage: vols[expiry_idx * n_strikes + strike_idx]
     vols: Box<[f64]>,
 }
@@ -184,6 +189,9 @@ struct VolSurfaceWire {
     pub quote_type: VolQuoteType,
     /// Interpolation contract.
     pub interpolation_mode: VolInterpolationMode,
+    /// Additive displacements in forward/strike units, one per expiry for shifted Black quotes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub displacements: Option<Vec<f64>>,
     /// Volatility values in row-major order
     pub vols_row_major: Vec<f64>,
 }
@@ -197,6 +205,7 @@ impl From<VolSurface> for VolSurfaceWire {
             secondary_axis: surface.secondary_axis,
             quote_type: surface.quote_type,
             interpolation_mode: surface.interpolation_mode,
+            displacements: surface.displacements.map(Vec::from),
             vols_row_major: surface.vols.into_vec(),
         }
     }
@@ -206,15 +215,18 @@ impl TryFrom<VolSurfaceWire> for VolSurface {
     type Error = crate::Error;
 
     fn try_from(state: VolSurfaceWire) -> crate::Result<Self> {
-        Ok(Self::from_grid(
+        Self::from_grid_opts(
             &state.id,
             &state.expiries,
             &state.strikes,
             &state.vols_row_major,
-        )?
-        .with_secondary_axis(state.secondary_axis)
-        .with_quote_type(state.quote_type)
-        .with_interpolation_mode(state.interpolation_mode))
+            VolGridOpts {
+                secondary_axis: state.secondary_axis,
+                quote_type: state.quote_type,
+                interpolation_mode: state.interpolation_mode,
+            },
+            state.displacements.as_deref(),
+        )
     }
 }
 
@@ -234,6 +246,7 @@ impl VolSurface {
             secondary_axis: VolSurfaceAxis::Strike,
             quote_type: VolQuoteType::BlackLognormal,
             interpolation_mode: VolInterpolationMode::Vol,
+            displacements: None,
             vols: Vec::new(),
         }
     }
@@ -268,6 +281,32 @@ impl VolSurface {
         self.quote_type
     }
 
+    /// Per-expiry additive displacements for shifted Black quotes, in the same
+    /// units as the forward and strike. Unshifted and normal surfaces return `None`.
+    pub fn get_displacements(&self) -> Option<&[f64]> {
+        self.displacements.as_deref()
+    }
+
+    /// Attach displaced-Black quote coordinates to every expiry row.
+    ///
+    /// # Arguments
+    ///
+    /// * `displacements` - Finite additive shifts in forward/strike units, one per expiry.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for a mismatched row count or non-finite shift.
+    pub fn with_displacements(mut self, displacements: &[f64]) -> crate::Result<Self> {
+        validate_displacements(
+            VolQuoteType::ShiftedBlackLognormal,
+            Some(displacements),
+            self.expiries.len(),
+        )?;
+        self.quote_type = VolQuoteType::ShiftedBlackLognormal;
+        self.displacements = Some(displacements.to_vec().into_boxed_slice());
+        Ok(self)
+    }
+
     /// Interpolation contract used when evaluating between grid points.
     pub fn interpolation_mode(&self) -> VolInterpolationMode {
         self.interpolation_mode
@@ -281,10 +320,24 @@ impl VolSurface {
     }
 
     /// Return a copy of this surface with an explicit quote-type contract.
-    #[must_use]
-    pub fn with_quote_type(mut self, quote_type: VolQuoteType) -> Self {
+    ///
+    /// # Arguments
+    ///
+    /// * `quote_type` - Units and pricing convention assigned to the stored quotes; this changes metadata without converting values.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when shifted Black is requested without
+    /// displacement rows. Use [`Self::with_displacements`] to attach those rows.
+    pub fn with_quote_type(mut self, quote_type: VolQuoteType) -> crate::Result<Self> {
+        if quote_type == VolQuoteType::ShiftedBlackLognormal {
+            validate_displacements(quote_type, self.get_displacements(), self.expiries.len())?;
+        }
         self.quote_type = quote_type;
-        self
+        if quote_type != VolQuoteType::ShiftedBlackLognormal {
+            self.displacements = None;
+        }
+        Ok(self)
     }
 
     /// Return a copy of this surface with an explicit interpolation contract.
@@ -412,17 +465,12 @@ impl VolSurface {
         let mut bumped_vols = self.vols.clone();
         bumped_vols[idx] = bumped_vol;
 
-        Self::from_grid_opts(
-            self.id.as_str(),
-            &self.expiries,
-            &self.strikes,
-            &bumped_vols,
-            VolGridOpts {
-                secondary_axis: self.secondary_axis,
-                quote_type: self.quote_type,
-                interpolation_mode: self.interpolation_mode,
-            },
-        )
+        if bumped_vols.iter().any(|v| !v.is_finite()) {
+            return Err(InputError::Invalid.into());
+        }
+        let mut bumped = self.clone();
+        bumped.vols = bumped_vols;
+        Ok(bumped)
     }
     /// Add an absolute bump to one grid point in place.
     ///
@@ -539,6 +587,7 @@ impl VolSurface {
                 secondary_axis: self.secondary_axis,
                 quote_type: self.quote_type,
                 interpolation_mode: self.interpolation_mode,
+                displacements: self.displacements.clone(),
                 vols: self.vols.clone(),
             });
         }
@@ -556,6 +605,7 @@ impl VolSurface {
             secondary_axis: self.secondary_axis,
             quote_type: self.quote_type,
             interpolation_mode: self.interpolation_mode,
+            displacements: self.displacements.clone(),
             vols: scaled_vols,
         })
     }
@@ -597,6 +647,7 @@ impl Bumpable for VolSurface {
             secondary_axis: self.secondary_axis,
             quote_type: self.quote_type,
             interpolation_mode: self.interpolation_mode,
+            displacements: self.displacements.clone(),
             vols: bumped_vols,
         })
     }
@@ -643,7 +694,11 @@ impl VolSurface {
             .expiries(self.expiries())
             .strikes(self.strikes())
             .secondary_axis(self.secondary_axis)
-            .quote_type(self.quote_type)
+            .quote_type(if self.displacements.is_some() {
+                VolQuoteType::BlackLognormal
+            } else {
+                self.quote_type
+            })
             .interpolation_mode(self.interpolation_mode);
 
         for (ei, &expiry) in self.expiries.iter().enumerate().take(n_expiries) {
@@ -666,7 +721,11 @@ impl VolSurface {
             builder = builder.row(&row);
         }
 
-        builder.build().ok()
+        let surface = builder.build().ok()?;
+        match self.get_displacements() {
+            Some(shifts) => surface.with_displacements(shifts).ok(),
+            None => Some(surface),
+        }
     }
 }
 
@@ -686,10 +745,21 @@ pub struct VolSurfaceBuilder {
     secondary_axis: VolSurfaceAxis,
     quote_type: VolQuoteType,
     interpolation_mode: VolInterpolationMode,
+    displacements: Option<Vec<f64>>,
     vols: Vec<Vec<f64>>, // row-major expiries
 }
 
 impl VolSurfaceBuilder {
+    /// Attach one additive displaced-Black shift to each expiry row.
+    ///
+    /// # Arguments
+    ///
+    /// * `displacements` - Finite shifts in the forward/strike units, one per expiry; validated when building the surface.
+    pub fn displacements(mut self, displacements: &[f64]) -> Self {
+        self.displacements = Some(displacements.to_vec());
+        self.quote_type = VolQuoteType::ShiftedBlackLognormal;
+        self
+    }
     /// Set the vector of option **expiries** (years).
     pub fn expiries(mut self, exps: &[f64]) -> Self {
         self.expiries.extend_from_slice(exps);
@@ -754,6 +824,7 @@ impl VolSurfaceBuilder {
                 quote_type: self.quote_type,
                 interpolation_mode: self.interpolation_mode,
             },
+            self.displacements.as_deref(),
         )
     }
 }
@@ -812,19 +883,25 @@ impl VolSurface {
     /// * `strikes` - Strictly ordered strike coordinates in underlying price units.
     /// * `vols_row_major` - Annualized decimal volatilities flattened in expiry-major row order.
     /// * `opts` - Secondary-axis meaning, quote type, and interpolation contract for the grid.
+    /// * `displacements` - One finite additive shift per expiry for shifted Black quotes; must be absent for normal or unshifted Black quotes.
     pub fn from_grid_opts(
         id: impl AsRef<str>,
         expiries: &[f64],
         strikes: &[f64],
         vols_row_major: &[f64],
         opts: VolGridOpts,
+        displacements: Option<&[f64]>,
     ) -> crate::Result<Self> {
+        validate_displacements(opts.quote_type, displacements, expiries.len())?;
         if expiries.is_empty() || strikes.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
         validate_axis(expiries)?;
         validate_axis(strikes)?;
-        let n = expiries.len() * strikes.len();
+        let n = expiries
+            .len()
+            .checked_mul(strikes.len())
+            .ok_or(InputError::DimensionMismatch)?;
         if vols_row_major.len() != n {
             return Err(InputError::DimensionMismatch.into());
         }
@@ -843,6 +920,7 @@ impl VolSurface {
             secondary_axis: opts.secondary_axis,
             quote_type: opts.quote_type,
             interpolation_mode: opts.interpolation_mode,
+            displacements: displacements.map(Into::into),
             vols: vols_row_major.to_vec().into_boxed_slice(),
         })
     }
@@ -875,6 +953,7 @@ impl VolSurface {
             strikes,
             vols_row_major,
             VolGridOpts::default(),
+            None,
         )
     }
 
@@ -888,11 +967,54 @@ impl VolSurface {
     /// - Row count does not match `expiries.len()`
     /// - Any row length does not match `strikes.len()`
     /// - Any invariant enforced by [`Self::from_grid_opts`] fails
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Market-data identifier used for context lookup.
+    /// * `expiries` - Strictly increasing option expiries in year fractions.
+    /// * `strikes` - Strictly increasing strikes in the underlying's quote units.
+    /// * `vol_rows` - One row per expiry and one annualized decimal volatility
+    ///   per strike; rows must match the axes exactly.
     pub fn from_rows(
         id: impl AsRef<str>,
         expiries: &[f64],
         strikes: &[f64],
         vol_rows: &[Vec<f64>],
+    ) -> crate::Result<Self> {
+        Self::from_rows_opts(
+            id,
+            expiries,
+            strikes,
+            vol_rows,
+            VolGridOpts::default(),
+            None,
+        )
+    }
+
+    /// Construct a validated rectangular volatility grid from rows and quote conventions.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Market-data identifier used for context lookup.
+    /// * `expiries` - Strictly increasing option expiries in year fractions.
+    /// * `strikes` - Strictly increasing strike, tenor, or moneyness coordinates,
+    ///   interpreted according to `opts.secondary_axis`.
+    /// * `vol_rows` - One row per expiry, each containing one finite non-negative
+    ///   annualized decimal volatility per secondary-axis coordinate.
+    /// * `opts` - Secondary-axis meaning, quote type, and interpolation convention.
+    /// * `displacements` - One finite additive shift per expiry for shifted Black quotes; absent for other quote conventions.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for mismatched row dimensions and the same
+    /// axis, value, and size-overflow errors as [`Self::from_grid_opts`].
+    pub fn from_rows_opts(
+        id: impl AsRef<str>,
+        expiries: &[f64],
+        strikes: &[f64],
+        vol_rows: &[Vec<f64>],
+        opts: VolGridOpts,
+        displacements: Option<&[f64]>,
     ) -> crate::Result<Self> {
         if vol_rows.len() != expiries.len() {
             return Err(Error::Validation(format!(
@@ -902,7 +1024,6 @@ impl VolSurface {
             )));
         }
 
-        let mut flat = Vec::with_capacity(expiries.len() * strikes.len());
         for (i, row) in vol_rows.iter().enumerate() {
             if row.len() != strikes.len() {
                 return Err(Error::Validation(format!(
@@ -911,10 +1032,30 @@ impl VolSurface {
                     strikes.len()
                 )));
             }
+        }
+        let size = expiries
+            .len()
+            .checked_mul(strikes.len())
+            .ok_or(InputError::DimensionMismatch)?;
+        let mut flat = Vec::with_capacity(size);
+        for row in vol_rows {
             flat.extend_from_slice(row);
         }
+        Self::from_grid_opts(id, expiries, strikes, &flat, opts, displacements)
+    }
+}
 
-        Self::from_grid(id, expiries, strikes, &flat)
+pub(super) fn validate_displacements(
+    quote_type: VolQuoteType,
+    displacements: Option<&[f64]>,
+    rows: usize,
+) -> crate::Result<()> {
+    match (quote_type, displacements) {
+        (VolQuoteType::ShiftedBlackLognormal, Some(shifts))
+            if shifts.len() == rows && shifts.iter().all(|s| s.is_finite()) => Ok(()),
+        (VolQuoteType::ShiftedBlackLognormal, _) | (_, Some(_)) => Err(Error::Validation(
+            "shifted Black quotes require one finite displacement per row; other conventions cannot carry shifts".into())),
+        (_, None) => Ok(()),
     }
 }
 
@@ -930,4 +1071,45 @@ fn validate_axis(axis: &[f64]) -> crate::Result<()> {
         crate::math::interp::utils::validate_knots(axis)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod displacement_tests {
+    use super::*;
+
+    #[test]
+    fn shifted_surface_construction_and_serde_require_aligned_displacements() {
+        let opts = VolGridOpts::default().with_quote_type(VolQuoteType::ShiftedBlackLognormal);
+        assert!(
+            VolSurface::from_grid_opts("BAD", &[1.0, 2.0], &[0.03], &[0.2, 0.2], opts, None)
+                .is_err()
+        );
+        assert!(VolSurface::from_grid_opts(
+            "BAD",
+            &[1.0, 2.0],
+            &[0.03],
+            &[0.2, 0.2],
+            opts,
+            Some(&[0.02])
+        )
+        .is_err());
+        let unshifted = VolSurface::from_grid("UNSHIFTED", &[1.0], &[0.03], &[0.2]).unwrap();
+        assert!(unshifted
+            .with_quote_type(VolQuoteType::ShiftedBlackLognormal)
+            .is_err());
+
+        let surface = VolSurface::from_rows_opts(
+            "SHIFT",
+            &[1.0, 2.0],
+            &[0.03],
+            &[vec![0.2], vec![0.2]],
+            opts,
+            Some(&[0.02, 0.03]),
+        )
+        .unwrap();
+        assert_eq!(surface.get_displacements(), Some(&[0.02, 0.03][..]));
+        let mut raw = serde_json::to_value(surface).unwrap();
+        raw["displacements"] = serde_json::Value::Null;
+        assert!(serde_json::from_value::<VolSurface>(raw).is_err());
+    }
 }

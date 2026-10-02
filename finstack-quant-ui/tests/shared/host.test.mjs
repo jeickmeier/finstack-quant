@@ -27,7 +27,7 @@ const credit = await read("fixtures/production_credit_tranche.json");
 const creditMarket = (await read("fixtures/production_cds_option.json")).market;
 const sc = await read("fixtures/production_structured_credit.json");
 sc.instrument.instrument.spec.instrument_pricing_overrides = {
-  model_config: { mc_paths: 1 },
+  model_config: { mc_paths: 2 },
 };
 const bond = await read("instruments/json_examples/bond.json");
 Object.assign(bond.instrument.spec, {
@@ -50,6 +50,7 @@ market.fx = {
   quotes: [["EUR", "USD", 1.1]],
   pinned_quotes: [],
   provider_quotes: [],
+  provider_pinned_quotes: [],
 };
 const fx = await read("instruments/json_examples/fx_forward.json");
 const fxSwap = await read("instruments/json_examples/fx_swap.json");

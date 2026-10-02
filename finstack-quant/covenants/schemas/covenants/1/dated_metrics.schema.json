@@ -1,0 +1,33 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/covenants/1/dated_metrics.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Covenant metric values observed on one date.",
+  "properties": {
+    "date": {
+      "$ref": "#/$defs/DateWire",
+      "description": "Covenant test date the metric values belong to."
+    },
+    "metrics": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "description": "Metric values keyed by covenant metric identifier (for example\n`debt_to_ebitda`), in the units the covenant tests expect: ratios in\nturns (`4.5` means 4.5x), amounts in the reporting currency.",
+      "type": "object"
+    }
+  },
+  "required": [
+    "date",
+    "metrics"
+  ],
+  "title": "DatedMetrics",
+  "type": "object"
+}

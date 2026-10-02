@@ -11,22 +11,13 @@ mod schema;
 
 /// Register the `models.factor` Python domain.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "factor")?;
-    let qual = crate::bindings::module_utils::set_submodule_package_by_package(
-        parent,
-        &m,
-        "factor",
-        "finstack_quant.models",
-    )?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "factor")?;
     m.setattr(
         "__doc__",
         "Factor-model primitives, credit calibration, and decomposition.",
     )?;
 
-    let credit = PyModule::new(py, "credit")?;
-    let credit_qual = crate::bindings::module_utils::set_submodule_package_by_package(
-        &m, &credit, "credit", &qual,
-    )?;
+    let credit = crate::bindings::module_utils::new_submodule(&m, "credit")?;
     credit.setattr(
         "__doc__",
         "Credit factor hierarchy artifacts, calibration, and decomposition.",
@@ -50,11 +41,13 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     credit.setattr("__all__", credit_all)?;
-    crate::bindings::module_utils::register_submodule_at(py, &m, &credit, &credit_qual)?;
+    crate::bindings::module_utils::attach_submodule(
+        &m,
+        &credit,
+        crate::bindings::module_utils::Exposure::Python,
+    )?;
 
-    let risk = PyModule::new(py, "risk")?;
-    let risk_qual =
-        crate::bindings::module_utils::set_submodule_package_by_package(&m, &risk, "risk", &qual)?;
+    let risk = crate::bindings::module_utils::new_submodule(&m, "risk")?;
     risk.setattr(
         "__doc__",
         "Product-independent factor and position risk decomposition kernels.",
@@ -88,13 +81,21 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     risk.setattr("__all__", risk_all)?;
-    crate::bindings::module_utils::register_submodule_at(py, &m, &risk, &risk_qual)?;
+    crate::bindings::module_utils::attach_submodule(
+        &m,
+        &risk,
+        crate::bindings::module_utils::Exposure::Python,
+    )?;
 
     schema::register(py, &m)?;
 
     let all = PyList::new(py, ["credit", "risk", "schema"])?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &m,
+        crate::bindings::module_utils::Exposure::Python,
+    )?;
 
     Ok(())
 }

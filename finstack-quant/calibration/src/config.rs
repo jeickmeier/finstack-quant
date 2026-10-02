@@ -13,10 +13,7 @@ use finstack_quant_core::explain::ExplainOpts;
 use finstack_quant_core::market_data::hierarchy::MarketDataHierarchy;
 use finstack_quant_core::money::fx::FxConfig;
 
-use finstack_quant_core::math::interp::{ExtrapolationPolicy, InterpStyle};
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 /// Calibration method selection (bootstrap vs global solve).
 ///
@@ -36,8 +33,6 @@ use ts_rs::TS;
 ///
 /// let method = CalibrationMethod::GlobalSolve { use_analytical_jacobian: true };
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -71,8 +66,6 @@ impl std::fmt::Display for CalibrationMethod {
 /// - `LinearTime`: Weights increase linearly with time to maturity.
 /// - `SqrtTime`: Weights increase with the square root of time (market-standard).
 /// - `InverseDuration`: Weights based on inverse DV01 approximation.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -118,8 +111,6 @@ impl std::fmt::Display for ResidualWeightingScheme {
 ///     ..Default::default()
 /// };
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
@@ -172,8 +163,6 @@ impl Default for HazardCurveSolveConfig {
 ///     ..Default::default()
 /// };
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
@@ -229,8 +218,6 @@ impl Default for InflationCurveSolveConfig {
 ///     validation_tolerance: 2e-3, // 0.20 vol points
 /// };
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
@@ -264,8 +251,9 @@ impl Default for VolSurfaceSolveConfig {
 /// bootstrapping or global solve process.
 ///
 /// # Invariants
-/// - `df_hard_min` > 0
+/// - `0 < df_hard_min < df_hard_max`, with finite bounds
 /// - `scan_grid_points` > 0
+/// - Scan and finite-difference step sizes are finite and strictly positive
 ///
 /// # Examples
 /// ```
@@ -277,8 +265,6 @@ impl Default for VolSurfaceSolveConfig {
 ///     ..Default::default()
 /// };
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
@@ -287,33 +273,24 @@ pub struct DiscountCurveSolveConfig {
     pub scan_grid_points: usize,
     /// Minimum required success points in scan before attempting polish.
     pub min_scan_grid_points: usize,
-    /// Initial step size for geometric scan grid.
+    /// Finite, strictly positive initial step size for the geometric scan grid.
     pub scan_grid_step: f64,
-    /// Absolute minimum allowed discount factor (prevents singularity).
+    /// Finite, strictly positive lower discount-factor bound, below `df_hard_max`.
     pub df_hard_min: f64,
-    /// Absolute maximum allowed discount factor (prevents divergence).
+    /// Finite upper discount-factor bound, strictly above `df_hard_min`.
     pub df_hard_max: f64,
     /// Minimum time threshold for considering a knot at spot (t=0).
     pub min_t_spot: f64,
-    /// Interpolation style for the constructed curve.
-    #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(skip))]
-    pub interp_style: InterpStyle,
-    /// Extrapolation policy for the constructed curve.
-    #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(skip))]
-    pub extrapolation_policy: ExtrapolationPolicy,
     /// Whether to use a sequential bootstrap to seed a global solve.
     pub bootstrap_seed_global_solve: bool,
     /// Override final-curve monotonicity enforcement (None = policy-driven).
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "boolean | null"))]
     pub allow_non_monotonic_final: Option<bool>,
     /// Weighting scheme for global solve residuals.
     #[serde(default)]
     pub weighting_scheme: ResidualWeightingScheme,
-    /// Step size (h) for finite-difference Jacobian calculation.
-    #[serde(default)]
+    /// Finite, strictly positive relative step for finite-difference Jacobians.
+    /// The parameter bump is `max(h, abs(parameter) * h)`.
     pub jacobian_step_size: f64,
     /// Tolerance for determining calibration *success* (applied to residuals).
     ///
@@ -334,8 +311,6 @@ impl Default for DiscountCurveSolveConfig {
             scan_grid_points: 48,
             min_scan_grid_points: 20,
             scan_grid_step: 1e-4,
-            interp_style: InterpStyle::default(),
-            extrapolation_policy: ExtrapolationPolicy::default(),
             df_hard_min: 1e-12,
             df_hard_max: 1e6,
             min_t_spot: 1e-6,
@@ -367,8 +342,6 @@ impl Default for DiscountCurveSolveConfig {
 ///     ..Default::default()
 /// };
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
@@ -398,8 +371,6 @@ impl Default for ForwardCurveSolveConfig {
     }
 }
 
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 /// Selected side of the market snapshot.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -415,8 +386,6 @@ pub enum MarketQuoteSide {
 }
 
 /// Audit metadata and freshness policy for calibration inputs.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
@@ -542,8 +511,6 @@ fn market_freshness_is_default(policy: &MarketFreshnessPolicy) -> bool {
 ///
 /// - Multi-curve construction context: `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
 /// - Curve interpolation context: `docs/REFERENCES.md#hagan-west-monotone-convex`
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(default, deny_unknown_fields)]
@@ -556,13 +523,11 @@ pub struct CalibrationConfig {
     pub verbose: bool,
     /// Explanation options (opt-in detailed trace for debugging).
     #[serde(skip)]
-    #[cfg_attr(feature = "ts_export", ts(skip))]
     pub explain: ExplainOpts,
     /// Runtime validation mode (warnings vs errors).
     pub validation_mode: ValidationMode,
     /// Validation configuration with thresholds and quality checks.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "Record<string, unknown>"))]
     pub validation: crate::validation::ValidationConfig,
     /// Policy for selecting rate bounds (explicit vs currency-derived).
     #[serde(default = "crate::validation::default_rate_bounds_policy_for_serde")]
@@ -626,7 +591,6 @@ pub struct CalibrationConfig {
 
     /// FX matrix runtime config (pivot currency, triangulation, cache capacity).
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "Record<string, unknown>"))]
     pub fx: FxConfig,
     /// Snapshot timestamp, maximum age, and selected quote side.
     #[serde(default, skip_serializing_if = "market_freshness_is_default")]
@@ -634,7 +598,6 @@ pub struct CalibrationConfig {
 
     /// Optional market-data hierarchy snapshot.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "ts_export", ts(type = "Record<string, unknown> | null"))]
     pub hierarchy: Option<MarketDataHierarchy>,
 }
 
@@ -735,9 +698,12 @@ impl CalibrationConfig {
     ///
     /// # Errors
     ///
-    /// Returns an error when nested validation/rate-bound settings are invalid or
-    /// when solver tolerance is looser than residual success tolerances.
+    /// Returns an error when the solver settings are unusable
+    /// ([`SolverConfig::validate`](crate::SolverConfig::validate)), nested
+    /// validation/rate-bound settings are invalid, or the solver tolerance is
+    /// looser than residual success tolerances.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        self.solver.validate()?;
         self.validation.validate()?;
         self.rate_bounds.validate()?;
         self.market_freshness.validate()?;
@@ -761,6 +727,7 @@ impl CalibrationConfig {
             "vol_surface.validation_tolerance",
             self.vol_surface.validation_tolerance,
         )?;
+        self.validate_discount_controls()?;
         self.validate_hazard_bounds()?;
         self.validate_inflation_bounds()
     }
@@ -780,6 +747,55 @@ impl CalibrationConfig {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CalibrationConfig invalid: solver tolerance ({solver_tolerance}) must be <= {label} ({validation_tolerance})"
             )));
+        }
+        Ok(())
+    }
+
+    fn validate_discount_controls(&self) -> finstack_quant_core::Result<()> {
+        let config = &self.discount_curve;
+        if !config.df_hard_min.is_finite()
+            || !config.df_hard_max.is_finite()
+            || config.df_hard_min <= 0.0
+            || config.df_hard_min >= config.df_hard_max
+        {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CalibrationConfig invalid: discount-factor bounds must satisfy finite 0 < df_hard_min < df_hard_max; got ({}, {})",
+                config.df_hard_min, config.df_hard_max
+            )));
+        }
+        for (label, value) in [
+            ("discount_curve.scan_grid_step", config.scan_grid_step),
+            (
+                "discount_curve.jacobian_step_size",
+                config.jacobian_step_size,
+            ),
+            ("discount_curve.min_t_spot", config.min_t_spot),
+        ] {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CalibrationConfig invalid: {label} must be finite and positive, got {value}"
+                )));
+            }
+        }
+        for (label, count) in [
+            ("discount_curve.scan_grid_points", config.scan_grid_points),
+            (
+                "discount_curve.min_scan_grid_points",
+                config.min_scan_grid_points,
+            ),
+        ] {
+            // The geometric scan allocates two values per point plus the
+            // center. Reject counts whose allocation size would overflow.
+            let valid_size = count
+                .checked_mul(2)
+                .and_then(|points| points.checked_add(1))
+                .and_then(|points| points.checked_mul(std::mem::size_of::<f64>()))
+                .is_some_and(|bytes| bytes <= isize::MAX as usize);
+            if count == 0 || !valid_size {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CalibrationConfig invalid: {label} must be positive and fit a scan-grid allocation, got {count}"
+                )));
+            }
         }
         Ok(())
     }
@@ -910,14 +926,21 @@ impl CalibrationConfig {
     /// Create a Levenberg-Marquardt solver with current config settings.
     ///
     /// Returns the concrete solver for multi-dimensional optimization.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the solver stopping settings are invalid.
     pub fn create_lm_solver(
         &self,
-    ) -> finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver {
+    ) -> finstack_quant_core::Result<
+        finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver,
+    > {
         use finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver;
 
-        LevenbergMarquardtSolver::new()
+        self.solver.validate()?;
+        Ok(LevenbergMarquardtSolver::new()
             .with_tolerance(self.solver.tolerance())
-            .with_max_iterations(self.solver.max_iterations())
+            .with_max_iterations(self.solver.max_iterations()))
     }
 }
 
@@ -925,15 +948,12 @@ impl CalibrationConfig {
 ///
 /// This is a Bloomberg/FinCad-style design: curve construction uses a small set of
 /// *step-level* conventions (e.g., curve time-axis day count).
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RatesStepConventions {
     /// Day count used to map dates to year fractions for curve knot times.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub curve_day_count: Option<finstack_quant_core::dates::DayCount>,
 
     /// Optional override for the OIS floating-leg compounding mode used by
@@ -949,7 +969,6 @@ pub struct RatesStepConventions {
     /// price its bootstrap swaps with the same compounding to bit-match
     /// Bloomberg's resulting DFs.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "unknown | null"))]
     pub ois_compounding:
         Option<finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding>,
 }
@@ -962,6 +981,35 @@ mod tests {
     fn global_solve_json_requires_explicit_jacobian_policy() {
         let json = serde_json::json!({ "global_solve": {} });
         assert!(serde_json::from_value::<CalibrationMethod>(json).is_err());
+    }
+
+    #[test]
+    fn discount_solve_config_has_no_curve_shape_knobs() {
+        // Curve interpolation and extrapolation belong to the discount step
+        // (`DiscountCurveParams`); the solve config never read them.
+        let serialized =
+            serde_json::to_value(DiscountCurveSolveConfig::default()).expect("serializes");
+        assert!(serialized.get("interp_style").is_none());
+        assert!(serialized.get("extrapolation_policy").is_none());
+        for key in ["interp_style", "extrapolation_policy"] {
+            let json = serde_json::json!({ key: "linear" });
+            assert!(
+                serde_json::from_value::<DiscountCurveSolveConfig>(json).is_err(),
+                "{key} must be rejected as an unknown field"
+            );
+        }
+    }
+
+    #[test]
+    fn freshness_age_is_a_plain_json_number() {
+        let policy: MarketFreshnessPolicy =
+            serde_json::from_value(serde_json::json!({ "max_age_seconds": 3600 }))
+                .expect("integer age parses");
+        assert_eq!(policy.max_age_seconds, Some(3600));
+        assert_eq!(
+            serde_json::to_value(&policy).expect("serializes")["max_age_seconds"],
+            serde_json::json!(3600)
+        );
     }
 }
 
@@ -1082,5 +1130,17 @@ mod fx_and_hierarchy_settings_tests {
             .validate()
             .expect_err("inverted hazard bounds should be rejected");
         assert!(err.to_string().to_lowercase().contains("hazard"));
+    }
+
+    #[test]
+    fn solver_settings_are_checked_before_configuration_or_solver_use() {
+        for tolerance in [0.0, -1e-8, f64::NAN, f64::INFINITY] {
+            let config = CalibrationConfig::default().with_tolerance(tolerance);
+            assert!(config.validate().is_err());
+            assert!(config.create_lm_solver().is_err());
+        }
+        let config = CalibrationConfig::default().with_max_iterations(0);
+        assert!(config.validate().is_err());
+        assert!(config.create_lm_solver().is_err());
     }
 }

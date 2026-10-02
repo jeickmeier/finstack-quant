@@ -77,7 +77,6 @@
 //! # Cargo features
 //!
 //! - `json-schema` (default): `schemars` derives and the `schema` generation module.
-//! - `ts_export`: `ts_rs::TS` derives on contract diagnostics types.
 //!
 //! Serde is always enabled. WASM builds this crate with `default-features = false`.
 //!
@@ -125,6 +124,8 @@ pub mod market_data;
 pub mod math;
 /// Currency-tagged monetary amounts with safe arithmetic
 pub mod money;
+/// Order-preserving parallel maps whose error selection matches the serial path.
+pub mod parallel;
 /// Convenient re-exports of commonly used types
 pub mod prelude;
 /// Shared credit rating-scale registry.

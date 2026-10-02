@@ -13,6 +13,59 @@ use finstack_quant_valuations::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_valuations::instruments::{Bond, FixedLegSpec, FloatLegSpec, InterestRateSwap};
 use rust_decimal::Decimal;
 
+/// Inputs for appending a bond with a regional market convention.
+#[derive(Debug)]
+pub struct BondConventionParams {
+    /// Capital-structure identifier; market-aware evaluation rejects duplicates.
+    pub id: String,
+    /// Principal in the tagged currency's major units.
+    pub notional: Money,
+    /// Typed annual decimal coupon rate, such as 0.03 for 3%.
+    pub coupon_rate: Rate,
+    /// Bond issue date, strictly before maturity.
+    pub issue_date: Date,
+    /// Final contractual bond maturity date.
+    pub maturity_date: Date,
+    /// Regional preset controlling coupon frequency, day count, and calendar.
+    pub convention: finstack_quant_valuations::instruments::BondConvention,
+    /// Discount-curve lookup identifier used during market-aware evaluation.
+    pub discount_curve_id: String,
+}
+
+/// Financial terms for appending a pay-fixed, zero-spread interest-rate swap.
+#[derive(Debug)]
+pub struct SwapParams {
+    /// Capital-structure identifier; market-aware evaluation rejects duplicates.
+    pub id: String,
+    /// Swap notional in the tagged currency's major units.
+    pub notional: Money,
+    /// Finite annual fixed-leg decimal rate, such as 0.04 for 4%.
+    pub fixed_rate: f64,
+    /// Effective accrual start date, strictly before maturity.
+    pub start_date: Date,
+    /// Final contractual swap maturity date.
+    pub maturity_date: Date,
+    /// Discount-curve lookup identifier used at evaluation.
+    pub discount_curve_id: String,
+    /// Floating forward-curve identifier, coherent with simple term-index compounding.
+    pub forward_curve_id: String,
+}
+
+/// Schedule and accrual conventions for a simple-compounding swap.
+#[derive(Debug)]
+pub struct SwapConventions {
+    /// Contractual fixed-leg payment cadence.
+    pub fixed_frequency: Tenor,
+    /// Fixed-leg accrual year-fraction convention.
+    pub fixed_day_count: DayCount,
+    /// Contractual floating-leg payment and fixing cadence.
+    pub float_frequency: Tenor,
+    /// Floating-leg accrual year-fraction convention.
+    pub float_day_count: DayCount,
+    /// Schedule-date rolling rule on the currency's settlement calendar.
+    pub business_day_convention: BusinessDayConvention,
+}
+
 /// Helper to ensure capital structure exists and return mutable reference.
 ///
 /// Returns a mutable reference to the capital structure spec, creating an empty
@@ -154,10 +207,10 @@ impl<State> ModelBuilder<State> {
     ///
     /// # Arguments
     /// * `id` - Unique instrument identifier
-    /// * `notional` - Principal amount
-    /// * `coupon_rate` - Annual coupon rate (e.g., 0.05 for 5%)
-    /// * `issue_date` - Bond issue date
-    /// * `maturity_date` - Bond maturity date
+    /// * `notional` - Principal in the tagged currency's major units.
+    /// * `coupon_rate` - Annual decimal coupon rate, such as 0.05 for 5%.
+    /// * `issue_date` - Contractual issue and coupon accrual start date; must precede maturity.
+    /// * `maturity_date` - Final contractual repayment date; must follow the issue date.
     /// * `discount_curve_id` - Discount curve ID for pricing
     ///
     /// # Returns
@@ -165,7 +218,7 @@ impl<State> ModelBuilder<State> {
     /// The resulting specification stores the tagged valuations JSON needed by
     /// [`Evaluator::evaluate_with_market`](crate::evaluator::Evaluator::evaluate_with_market).
     /// It does not price the bond or check that `id` is unique in the complete
-    /// capital structure; model-level validation remains the final boundary.
+    /// capital structure; market-aware evaluation rejects duplicate identifiers.
     ///
     /// # Example
     /// ```
@@ -206,6 +259,44 @@ impl<State> ModelBuilder<State> {
         maturity_date: Date,
         discount_curve_id: impl Into<String>,
     ) -> Result<Self> {
+        self.try_add_bond(
+            id,
+            notional,
+            coupon_rate,
+            issue_date,
+            maturity_date,
+            discount_curve_id,
+        )?;
+        Ok(self)
+    }
+
+    /// Append a fixed-rate bond only after its construction succeeds.
+    ///
+    /// A rejected instrument leaves every accumulated builder field intact.
+    /// Uses the same US corporate conventions as [`add_bond`](Self::add_bond).
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Instrument identifier recorded in the capital structure; market-aware evaluation rejects duplicate identifiers.
+    /// * `notional` - Principal in the tagged currency's major units.
+    /// * `coupon_rate` - Annual coupon as a finite decimal fraction, such as 0.05 for 5%.
+    /// * `issue_date` - Bond issue date, strictly before maturity.
+    /// * `maturity_date` - Final contractual maturity date.
+    /// * `discount_curve_id` - Discount-curve lookup identifier used during market-aware evaluation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation or construction error for an invalid rate, schedule,
+    /// notional, or identifier, without changing the builder.
+    pub fn try_add_bond(
+        &mut self,
+        id: impl Into<String>,
+        notional: Money,
+        coupon_rate: f64,
+        issue_date: Date,
+        maturity_date: Date,
+        discount_curve_id: impl Into<String>,
+    ) -> Result<()> {
         let id_str: String = id.into();
 
         let bond = Bond::fixed(
@@ -221,8 +312,7 @@ impl<State> ModelBuilder<State> {
             crate::error::Error::build(format!("Failed to create bond '{}': {}", id_str, e))
         })?;
 
-        push_bond(&mut self.capital_structure, id_str, bond)?;
-        Ok(self)
+        push_bond(&mut self.capital_structure, id_str, bond)
     }
 
     /// Add a bond instrument with a market convention preset.
@@ -233,11 +323,11 @@ impl<State> ModelBuilder<State> {
     ///
     /// # Arguments
     /// * `id` - Unique instrument identifier
-    /// * `notional` - Principal amount
-    /// * `coupon_rate` - Annual coupon rate as typed `Rate`
-    /// * `issue_date` - Bond issue date
-    /// * `maturity_date` - Bond maturity date
-    /// * `convention` - Regional convention preset (e.g., `BondConvention::EurGovernment`)
+    /// * `notional` - Principal in the tagged currency's major units.
+    /// * `coupon_rate` - Typed annual decimal coupon rate, such as 0.03 for 3%.
+    /// * `issue_date` - Contractual issue and coupon accrual start date; must precede maturity.
+    /// * `maturity_date` - Final contractual repayment date; must follow the issue date.
+    /// * `convention` - Regional coupon, day-count, and calendar preset, such as `BondConvention::GermanBund`.
     /// * `discount_curve_id` - Discount curve ID for pricing
     ///
     /// The convention controls the coupon schedule and date conventions; its
@@ -287,7 +377,39 @@ impl<State> ModelBuilder<State> {
         convention: finstack_quant_valuations::instruments::BondConvention,
         discount_curve_id: impl Into<String>,
     ) -> Result<Self> {
-        let id_str: String = id.into();
+        self.try_add_bond_with_convention(BondConventionParams {
+            id: id.into(),
+            notional,
+            coupon_rate,
+            issue_date,
+            maturity_date,
+            convention,
+            discount_curve_id: discount_curve_id.into(),
+        })?;
+        Ok(self)
+    }
+
+    /// Append a bond with regional conventions without changing state on failure.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Bond identity, tagged notional, annual decimal coupon,
+    ///   contractual dates, regional convention, and discount-curve lookup identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns a bond construction error for an invalid schedule, notional, or
+    /// identifier; the accumulated model remains unchanged.
+    pub fn try_add_bond_with_convention(&mut self, params: BondConventionParams) -> Result<()> {
+        let BondConventionParams {
+            id: id_str,
+            notional,
+            coupon_rate,
+            issue_date,
+            maturity_date,
+            convention,
+            discount_curve_id,
+        } = params;
 
         let bond = Bond::with_convention(
             InstrumentId::new(&id_str),
@@ -302,8 +424,7 @@ impl<State> ModelBuilder<State> {
             crate::error::Error::build(format!("Failed to create bond '{}': {}", id_str, e))
         })?;
 
-        push_bond(&mut self.capital_structure, id_str, bond)?;
-        Ok(self)
+        push_bond(&mut self.capital_structure, id_str, bond)
     }
 
     /// Add an interest rate swap to the capital structure.
@@ -317,8 +438,8 @@ impl<State> ModelBuilder<State> {
     /// * `id` - Unique instrument identifier stored on the capital-structure debt entry
     /// * `notional` - Swap notional as [`Money`] in the trade currency's major units
     /// * `fixed_rate` - Fixed leg rate as a decimal (for example 0.04 for 4%)
-    /// * `start_date` - Effective / accrual start date of the swap schedule
-    /// * `maturity_date` - Final maturity date of the swap schedule
+    /// * `start_date` - Contractual accrual start date for both legs; must precede maturity.
+    /// * `maturity_date` - Final contractual accrual end date for both legs; must follow the start date.
     /// * `discount_curve_id` - Market-context ID of the discount curve used at evaluation
     /// * `forward_curve_id` - Market-context ID of the floating-leg forward curve
     ///
@@ -369,23 +490,43 @@ impl<State> ModelBuilder<State> {
         discount_curve_id: impl Into<String>,
         forward_curve_id: impl Into<String>,
     ) -> Result<Self> {
-        let id_str: String = id.into();
-        let swap = build_swap_internal(
-            &id_str,
+        self.try_add_swap(SwapParams {
+            id: id.into(),
             notional,
             fixed_rate,
             start_date,
             maturity_date,
-            discount_curve_id.into(),
-            forward_curve_id.into(),
-            Tenor::semi_annual(),
-            DayCount::Thirty360,
-            Tenor::quarterly(),
-            DayCount::Act360,
-            BusinessDayConvention::ModifiedFollowing,
-        )?;
-        push_swap(&mut self.capital_structure, id_str, swap)?;
+            discount_curve_id: discount_curve_id.into(),
+            forward_curve_id: forward_curve_id.into(),
+        })?;
         Ok(self)
+    }
+
+    /// Append a US-convention swap only after its construction succeeds.
+    ///
+    /// Uses the pay-fixed, zero-spread, simple-compounding conventions of
+    /// [`add_swap`](Self::add_swap). Rejected inputs leave the builder intact.
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Swap identity, tagged notional, annual fixed decimal rate,
+    ///   contractual dates, and discount/forward curve lookup identifiers.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation or construction error for an invalid rate, schedule,
+    /// index convention, or identifier without changing the builder.
+    pub fn try_add_swap(&mut self, params: SwapParams) -> Result<()> {
+        self.try_add_swap_with_conventions(
+            params,
+            SwapConventions {
+                fixed_frequency: Tenor::semi_annual(),
+                fixed_day_count: DayCount::Thirty360,
+                float_frequency: Tenor::quarterly(),
+                float_day_count: DayCount::Act360,
+                business_day_convention: BusinessDayConvention::ModifiedFollowing,
+            },
+        )
     }
 
     /// Add an interest rate swap with custom conventions.
@@ -408,8 +549,8 @@ impl<State> ModelBuilder<State> {
     /// * `id` - Unique instrument identifier stored on the capital-structure debt entry
     /// * `notional` - Swap notional as [`Money`] in the trade currency's major units
     /// * `fixed_rate` - Fixed leg rate as a decimal (for example 0.04 for 4%)
-    /// * `start_date` - Effective / accrual start date of the swap schedule
-    /// * `maturity_date` - Final maturity date of the swap schedule
+    /// * `start_date` - Contractual accrual start date for both legs; must precede maturity.
+    /// * `maturity_date` - Final contractual accrual end date for both legs; must follow the start date.
     /// * `discount_curve_id` - Market-context ID of the discount curve used at evaluation
     /// * `forward_curve_id` - Market-context ID of the floating-leg forward curve
     /// * `fixed_frequency` - Payment frequency of the fixed leg
@@ -441,23 +582,79 @@ impl<State> ModelBuilder<State> {
         float_day_count: DayCount,
         business_day_convention: BusinessDayConvention,
     ) -> Result<Self> {
-        let id_str: String = id.into();
+        self.try_add_swap_with_conventions(
+            SwapParams {
+                id: id.into(),
+                notional,
+                fixed_rate,
+                start_date,
+                maturity_date,
+                discount_curve_id: discount_curve_id.into(),
+                forward_curve_id: forward_curve_id.into(),
+            },
+            SwapConventions {
+                fixed_frequency,
+                fixed_day_count,
+                float_frequency,
+                float_day_count,
+                business_day_convention,
+            },
+        )?;
+        Ok(self)
+    }
+
+    /// Append a custom-convention swap without changing state on failure.
+    ///
+    /// Builds the same pay-fixed, simple-compounding swap as
+    /// [`add_swap_with_conventions`](Self::add_swap_with_conventions).
+    ///
+    /// # Arguments
+    ///
+    /// * `params` - Swap identity, tagged notional, annual fixed decimal rate,
+    ///   contractual dates, and discount/forward curve lookup identifiers.
+    /// * `conventions` - Fixed/floating payment frequencies and day counts plus
+    ///   the business-day rolling rule; floating compounding remains simple.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation or construction error for an invalid rate,
+    /// schedule, index convention, or identifier without changing the builder.
+    pub fn try_add_swap_with_conventions(
+        &mut self,
+        params: SwapParams,
+        conventions: SwapConventions,
+    ) -> Result<()> {
+        let SwapParams {
+            id: id_str,
+            notional,
+            fixed_rate,
+            start_date,
+            maturity_date,
+            discount_curve_id,
+            forward_curve_id,
+        } = params;
+        let SwapConventions {
+            fixed_frequency,
+            fixed_day_count,
+            float_frequency,
+            float_day_count,
+            business_day_convention,
+        } = conventions;
         let swap = build_swap_internal(
             &id_str,
             notional,
             fixed_rate,
             start_date,
             maturity_date,
-            discount_curve_id.into(),
-            forward_curve_id.into(),
+            discount_curve_id,
+            forward_curve_id,
             fixed_frequency,
             fixed_day_count,
             float_frequency,
             float_day_count,
             business_day_convention,
         )?;
-        push_swap(&mut self.capital_structure, id_str, swap)?;
-        Ok(self)
+        push_swap(&mut self.capital_structure, id_str, swap)
     }
 
     /// Add a typed debt instrument.

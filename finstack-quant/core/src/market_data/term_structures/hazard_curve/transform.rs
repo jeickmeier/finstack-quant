@@ -1,6 +1,7 @@
 //! Curve transformations and market bumps.
 
 use super::*;
+use crate::dates::DateExt;
 use crate::market_data::bumps::{BumpSpec, BumpType, Bumpable};
 
 impl HazardCurve {
@@ -297,7 +298,7 @@ impl HazardCurve {
     /// - Hazard rates are preserved (no carry/theta adjustment)
     ///
     /// # Arguments
-    /// * `days` - Number of days to roll forward
+    /// * `days` - Signed calendar-day shift; negative values move the base date backward.
     ///
     /// # Returns
     /// A new hazard curve with updated base date and shifted knots.
@@ -308,11 +309,10 @@ impl HazardCurve {
     /// knot points remain after the roll, or the rebuilt curve violates a
     /// construction invariant. `days` is signed; a negative value moves the
     /// base date backward rather than rejecting the request.
+    /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
-        let new_base = self.base + time::Duration::days(days);
-        let dt_years =
-            self.day_count
-                .year_fraction(self.base, new_base, DayCountContext::default())?;
+        let new_base = self.base.add_days(days)?;
+        let dt_years = super::super::common::year_fraction_to(self.base, new_base, self.day_count)?;
 
         // Anchor the active post-roll hazard at the new origin, then retain
         // future hazard changes. This preserves conditional survival rather

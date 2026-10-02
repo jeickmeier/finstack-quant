@@ -51,7 +51,7 @@ pub mod types;
 pub mod vega;
 mod wire;
 
-pub use engine::FrtbSbaEngine;
+pub use engine::{frtb_sba_charge, FrtbSbaEngine};
 pub use types::{
     CorrelationScenario, DrcAssetType, DrcPosition, DrcSector, DrcSeniority, FrtbRiskClass,
     FrtbSbaResult, FrtbSensitivities, RraoPosition,

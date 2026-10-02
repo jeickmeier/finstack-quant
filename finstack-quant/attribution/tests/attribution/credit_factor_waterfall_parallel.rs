@@ -12,8 +12,8 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IssuerId};
 use finstack_quant_models::factor::credit::hierarchy::{
-    AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec, DateRange,
-    FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
+    AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditHierarchySpec,
+    DateRange, FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
     IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
 };
 use finstack_quant_models::factor::{
@@ -103,7 +103,7 @@ fn make_model(levels: Vec<HierarchyDimension>) -> CreditFactorModel {
             idiosyncratic: BTreeMap::new(),
         },
         factor_histories: None,
-        diagnostics: CalibrationDiagnostics {
+        diagnostics: CreditCalibrationDiagnostics {
             mode_counts: BTreeMap::new(),
             bucket_sizes_per_level: vec![],
             fold_ups: vec![],

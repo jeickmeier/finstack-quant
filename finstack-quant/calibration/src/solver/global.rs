@@ -588,7 +588,7 @@ where
         crate::config::CalibrationMethod::Bootstrap => false,
     };
 
-    let solver = config.create_lm_solver();
+    let solver = config.create_lm_solver()?;
 
     let eval_diagnostics: RefCell<EvalDiagnostics> = RefCell::new(EvalDiagnostics::default());
     let eval_counter: Cell<usize> = Cell::new(0);
@@ -1087,7 +1087,7 @@ fn param_range(params: &[f64]) -> (f64, f64) {
 ///
 /// This function builds per-quote quality metrics using finite-difference
 /// sensitivities (dResidual/dParam for the most sensitive parameter per quote),
-/// computes the Jacobian's normal equations (J^T * J) for condition number
+/// computes the weighted Jacobian's normal equations (J^T * W * J) for condition number
 /// estimation, and calculates residual summary statistics.
 fn compute_global_diagnostics<T>(
     target: &T,
@@ -1166,7 +1166,7 @@ where
         });
     }
 
-    // 2. Compute condition number from J^T * J eigenvalues.
+    // 2. Compute the condition number of J^T * W * J from its eigenvalues.
     let condition_number = if jacobian_ok && n_params > 0 {
         compute_condition_number(&jacobian, n_params, weight_scales)
     } else {
@@ -1181,34 +1181,50 @@ where
     }
 }
 
-/// Estimate the 2-norm condition number of the weighted normal equations matrix
-/// `J^T W J` via power iteration for the largest eigenvalue and Cholesky-based
-/// inverse iteration for the smallest.
+/// Compute the 2-norm condition number of the weighted normal equations matrix
+/// `J^T W J` using a symmetric eigendecomposition.
 ///
-/// Both eigenvalue solves are correct for symmetric positive (semi-)definite matrices;
-/// the smallest-eigenvalue path uses `cholesky_solve` for exact back-substitution rather
-/// than Gauss-Seidel sweeps. Returns `None` if `J^T W J` is singular (Cholesky factor not
-/// PD) or has a non-finite largest eigenvalue — the caller treats `None` as "report
-/// `cond=N/A`".
+/// The eigenvalue ratio is the condition number of the normal equations, not its
+/// square root (which would instead describe `sqrt(W) J`). Normalizing the weighted
+/// Jacobian before forming the Gram matrix makes the result invariant to a common
+/// scale and avoids squaring very large or small residual sensitivities. Returns
+/// `None` for malformed or non-finite inputs and for numerical rank deficiency.
 fn compute_condition_number(
     jacobian: &[Vec<f64>],
     n_params: usize,
     weight_scales: &[f64],
 ) -> Option<f64> {
-    use finstack_quant_core::math::linalg::{cholesky_decomposition, cholesky_solve};
+    use finstack_quant_core::math::linalg::symmetric_eigen;
 
-    if n_params == 0 {
+    if n_params == 0
+        || jacobian.len() != weight_scales.len()
+        || jacobian.iter().any(|row| row.len() != n_params)
+        || weight_scales.iter().any(|w| !w.is_finite() || *w < 0.0)
+    {
         return None;
     }
 
-    // Build J^T W J row-major as flat Vec<f64> (n×n), W = diag(weight_scales^2).
-    let mut jtj = vec![0.0_f64; n_params * n_params];
-    for (i, row) in jacobian.iter().enumerate() {
-        let w2 = weight_scales.get(i).copied().unwrap_or(1.0).powi(2);
+    let mut scale = 0.0_f64;
+    for (row, &weight) in jacobian.iter().zip(weight_scales) {
+        for &value in row {
+            let weighted = weight * value;
+            if !weighted.is_finite() {
+                return None;
+            }
+            scale = scale.max(weighted.abs());
+        }
+    }
+    if scale == 0.0 {
+        return None;
+    }
+
+    // Build the normalized J^T W J, with W = diag(weight_scales^2).
+    let mut jtj = vec![0.0_f64; n_params.checked_mul(n_params)?];
+    for (row, &weight) in jacobian.iter().zip(weight_scales) {
         for j in 0..n_params {
-            let rj = row[j];
+            let rj = (weight * row[j]) / scale;
             for k in j..n_params {
-                let val = w2 * rj * row[k];
+                let val = rj * ((weight * row[k]) / scale);
                 jtj[j * n_params + k] += val;
                 if k != j {
                     jtj[k * n_params + j] += val;
@@ -1217,86 +1233,26 @@ fn compute_condition_number(
         }
     }
 
-    if n_params == 1 {
-        return if jtj[0].abs() > 1e-30 {
-            Some(1.0)
-        } else {
-            None
-        };
-    }
-
-    // λ_max via power iteration on J^T W J.
-    let mat_vec_flat = |m: &[f64], x: &[f64], out: &mut [f64]| {
-        for (i, oi) in out.iter_mut().enumerate() {
-            let row = &m[i * n_params..(i + 1) * n_params];
-            *oi = row.iter().zip(x.iter()).map(|(a, b)| a * b).sum();
-        }
-    };
-
-    let max_iter = 100;
-    let tol = 1e-10;
-    let mut v = vec![1.0 / (n_params as f64).sqrt(); n_params];
-    let mut w = vec![0.0_f64; n_params];
+    let (eigenvalues, _) = symmetric_eigen(&jtj, n_params).ok()?;
     let mut lambda_max = 0.0_f64;
-    for _ in 0..max_iter {
-        mat_vec_flat(&jtj, &v, &mut w);
-        let norm = w.iter().map(|x| x * x).sum::<f64>().sqrt();
-        if !norm.is_finite() || norm < 1e-30 {
+    let mut lambda_min = f64::INFINITY;
+    for eigenvalue in eigenvalues {
+        if !eigenvalue.is_finite() {
             return None;
         }
-        let new_lambda = w.iter().zip(v.iter()).map(|(a, b)| a * b).sum::<f64>();
-        for (vi, wi) in v.iter_mut().zip(w.iter()) {
-            *vi = wi / norm;
-        }
-        if (new_lambda - lambda_max).abs() < tol * lambda_max.abs().max(1.0) {
-            lambda_max = new_lambda;
-            break;
-        }
-        lambda_max = new_lambda;
+        lambda_max = lambda_max.max(eigenvalue);
+        lambda_min = lambda_min.min(eigenvalue);
     }
-    if !lambda_max.is_finite() || lambda_max <= 0.0 {
+
+    // The Gram matrix loses directions below its relative floating-point resolution.
+    // Do not turn a rounded, tiny positive eigenvalue of a singular matrix into a
+    // spurious finite condition number.
+    let rank_tolerance = f64::EPSILON * n_params.max(jacobian.len()) as f64 * lambda_max;
+    if lambda_max <= 0.0 || lambda_min <= rank_tolerance {
         return None;
     }
 
-    // λ_min via inverse power iteration: x_{k+1} = A^{-1} x_k, Rayleigh = x^T A x / x^T x.
-    // A^{-1} application uses Cholesky factorisation of J^T W J. If the matrix is
-    // singular, Cholesky fails and we report `cond = N/A` rather than a misleading
-    // huge number.
-    let Ok(chol) = cholesky_decomposition(&jtj, n_params) else {
-        return None;
-    };
-    let mut v_min = vec![1.0 / (n_params as f64).sqrt(); n_params];
-    let mut x_solve = vec![0.0_f64; n_params];
-    let mut lambda_min = lambda_max;
-
-    for _ in 0..max_iter {
-        if cholesky_solve(&chol, &v_min, &mut x_solve).is_err() {
-            return None;
-        }
-        let norm = x_solve.iter().map(|x| x * x).sum::<f64>().sqrt();
-        if !norm.is_finite() || norm < 1e-30 {
-            return None;
-        }
-        // Rayleigh quotient on the normalized x: x^T A x / x^T x = λ_min once x converges
-        // to the smallest eigenvector. We compute it directly via mat-vec.
-        for (vi, xi) in v_min.iter_mut().zip(x_solve.iter()) {
-            *vi = xi / norm;
-        }
-        mat_vec_flat(&jtj, &v_min, &mut w);
-        let rayleigh: f64 = w.iter().zip(v_min.iter()).map(|(a, b)| a * b).sum();
-        if (rayleigh - lambda_min).abs() < tol * lambda_min.abs().max(1.0) {
-            lambda_min = rayleigh;
-            break;
-        }
-        lambda_min = rayleigh;
-    }
-
-    if !lambda_min.is_finite() || lambda_min.abs() < 1e-30 {
-        return None;
-    }
-
-    // Eigenvalues of JᵀWJ are squared singular values, so report κ(J).
-    Some((lambda_max / lambda_min).abs().sqrt())
+    Some(lambda_max / lambda_min)
 }
 
 #[cfg(test)]
@@ -1305,6 +1261,70 @@ mod tests {
     use crate::CalibrationConfig;
     use finstack_quant_core::Error;
     use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
+
+    #[test]
+    fn condition_number_detects_correlated_parameter_directions() {
+        for rho in [0.9999_f64, 1.0 - 1e-8, -0.9999] {
+            // J^T J = [[1, rho], [rho, 1]], with exact eigenvalues 1 +/- rho.
+            // An all-ones iteration seed lies in just one of these eigenspaces.
+            let jacobian = vec![vec![1.0, rho], vec![0.0, (1.0 - rho * rho).sqrt()]];
+            let condition = compute_condition_number(&jacobian, 2, &[1.0, 1.0])
+                .expect("correlated but full-rank Jacobian");
+            let expected = (1.0 + rho.abs()) / (1.0 - rho.abs());
+            assert!(
+                (condition / expected - 1.0).abs() < 1e-7,
+                "normal-equations condition {condition} should equal {expected} for rho={rho}"
+            );
+        }
+    }
+
+    #[test]
+    fn condition_number_uses_residual_weights_and_normal_equations() {
+        let jacobian = vec![vec![1.0, 0.0], vec![0.0, 2.0]];
+        // sqrt(W) J = diag(2, 6), so J^T W J = diag(4, 36).
+        let condition = compute_condition_number(&jacobian, 2, &[2.0, 3.0])
+            .expect("weighted Jacobian is full rank");
+        assert!((condition - 9.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn condition_number_is_invariant_to_common_extreme_scales() {
+        for (sensitivity_scale, weight_scale) in
+            [(1e-200, 1.0), (1e200, 1.0), (1.0, 1e-200), (1.0, 1e200)]
+        {
+            let jacobian = vec![
+                vec![sensitivity_scale, 0.0],
+                vec![0.0, 2.0 * sensitivity_scale],
+            ];
+            let condition = compute_condition_number(&jacobian, 2, &[weight_scale, weight_scale])
+                .expect("a common finite scale must preserve rank");
+            assert!((condition - 4.0).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn condition_number_does_not_report_a_finite_value_for_rank_deficiency() {
+        for jacobian in [
+            vec![vec![1.0, 1.0], vec![2.0, 2.0]],
+            vec![vec![1.0, 0.0], vec![0.0, 0.0]],
+            vec![vec![0.0, 0.0], vec![0.0, 0.0]],
+        ] {
+            assert!(compute_condition_number(&jacobian, 2, &[1.0, 1.0]).is_none());
+        }
+        let jacobian = vec![vec![1.0, 0.0], vec![0.0, 1.0]];
+        assert!(compute_condition_number(&jacobian, 2, &[1.0, 0.0]).is_none());
+    }
+
+    #[test]
+    fn condition_number_rejects_invalid_inputs() {
+        assert!(compute_condition_number(&[vec![1.0]], 2, &[1.0]).is_none());
+        assert!(compute_condition_number(&[vec![1.0]], 1, &[]).is_none());
+        assert!(compute_condition_number(&[vec![1.0]], 1, &[-1.0]).is_none());
+        for value in [f64::NAN, f64::INFINITY] {
+            assert!(compute_condition_number(&[vec![value]], 1, &[1.0]).is_none());
+            assert!(compute_condition_number(&[vec![1.0]], 1, &[value]).is_none());
+        }
+    }
 
     #[test]
     fn global_parameter_bounds_validate_dimensions_finiteness_and_ordering() {

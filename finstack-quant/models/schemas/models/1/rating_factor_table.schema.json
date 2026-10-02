@@ -1,0 +1,32 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/rating_factor_table.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Rating factor table for a specific rating-agency methodology.",
+  "properties": {
+    "agency": {
+      "type": "string"
+    },
+    "default_factor": {
+      "format": "double",
+      "type": "number"
+    },
+    "factors": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "object"
+    },
+    "methodology": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "factors",
+    "agency",
+    "methodology",
+    "default_factor"
+  ],
+  "title": "RatingFactorTable",
+  "type": "object"
+}

@@ -1,0 +1,41 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/impact_estimate.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Estimated market-impact execution *costs* from a trade.",
+  "properties": {
+    "cost_bp": {
+      "description": "Cost as basis points of notional value.",
+      "format": "double",
+      "type": "number"
+    },
+    "execution_risk": {
+      "description": "Execution risk (standard deviation of cost).",
+      "format": "double",
+      "type": "number"
+    },
+    "permanent_impact": {
+      "description": "Permanent-impact component of the expected execution cost, in\ncurrency units (information leakage, irreversible). Despite the\nname, this is a cost, not a price displacement.",
+      "format": "double",
+      "type": "number"
+    },
+    "temporary_impact": {
+      "description": "Temporary-impact component of the expected execution cost, in\ncurrency units (order-flow pressure, mean-reverts). Despite the\nname, this is a cost, not a price displacement.",
+      "format": "double",
+      "type": "number"
+    },
+    "total_cost": {
+      "description": "Total expected execution cost (permanent + temporary), in currency\nunits.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "permanent_impact",
+    "temporary_impact",
+    "total_cost",
+    "cost_bp",
+    "execution_risk"
+  ],
+  "title": "ImpactEstimate",
+  "type": "object"
+}

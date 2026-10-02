@@ -18,6 +18,7 @@
 
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
+use crate::instruments::rates::cms_common::annuity_weight;
 use crate::instruments::rates::cms_option::types::CmsOption;
 use crate::instruments::OptionType;
 use crate::pricer::{
@@ -47,44 +48,6 @@ pub(crate) struct CmsOptionletInputs<'a> {
     pub payments_per_year: f64,
     /// ACT/365F years from reference-swap start to coupon payment.
     pub payment_delay: f64,
-}
-
-/// Value and first two rate derivatives of the payment-to-annuity mapping.
-fn annuity_weight(rate: f64, tenor: f64, m: f64, delay: f64) -> (f64, f64, f64) {
-    let n = tenor * m;
-    let x = rate / m;
-    // Series avoids cancellation in A, A' and A'' near zero. Keep fourth
-    // order so the second derivative remains accurate across the branch.
-    let (a, ap, app) = if (n * x).abs() < 1e-3 {
-        let c1 = -(n + 1.0) / 2.0;
-        let c2 = (n + 1.0) * (n + 2.0) / 6.0;
-        let c3 = -(n + 1.0) * (n + 2.0) * (n + 3.0) / 24.0;
-        let c4 = (n + 1.0) * (n + 2.0) * (n + 3.0) * (n + 4.0) / 120.0;
-        (
-            tenor * (1.0 + x * (c1 + x * (c2 + x * (c3 + x * c4)))),
-            tenor / m * (c1 + x * (2.0 * c2 + x * (3.0 * c3 + x * 4.0 * c4))),
-            tenor / (m * m) * (2.0 * c2 + x * (6.0 * c3 + x * 12.0 * c4)),
-        )
-    } else {
-        let q = (-n * x.ln_1p()).exp();
-        let b = -(-n * x.ln_1p()).exp_m1();
-        let bp = n * q / (m + rate);
-        let bpp = -n * (n + 1.0) * q / (m + rate).powi(2);
-        (
-            b / rate,
-            bp / rate - b / rate.powi(2),
-            bpp / rate - 2.0 * bp / rate.powi(2) + 2.0 * b / rate.powi(3),
-        )
-    };
-    let delta = m * delay;
-    let weight = (-delta * x.ln_1p()).exp() / a;
-    let log_prime = -delta / (m + rate) - ap / a;
-    let log_second = delta / (m + rate).powi(2) - app / a + (ap / a).powi(2);
-    (
-        weight,
-        weight * log_prime,
-        weight * (log_prime.powi(2) + log_second),
-    )
 }
 
 /// Replicate a discounted CMS optionlet per unit notional and accrual.
@@ -276,7 +239,7 @@ impl CmsReplicationPricer {
                 swap_start.add_months(crate::instruments::rates::cms_common::cms_tenor_months(
                     inst.cms_tenor,
                     "CmsOption cms_tenor",
-                )?);
+                )?)?;
 
             // F (forward swap rate). The market annuity A₀ is intentionally
             // discarded: the static replication uses the closed-form par

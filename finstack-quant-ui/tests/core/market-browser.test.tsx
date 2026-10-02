@@ -59,13 +59,14 @@ it("retains the realistic CDX calibration and native canonical supplemental fixt
   expect(native.calibrate(source).result.final_market).toEqual(
     fixture.calibrated,
   );
-  const handle = new native.Market(JSON.stringify(market));
+  const handle = native.MarketContext.fromJson(JSON.stringify(market));
   try {
     expect(JSON.parse(handle.toJson())).toEqual(market);
   } finally {
     handle.free();
   }
-}, 15000);
+  // One native CDX base-correlation solve takes ~20 s under the wasm-test profile.
+}, 60000);
 it("navigates every supplied leaf with exact displayed and copied values", async () => {
   const copy = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, "clipboard", {
@@ -226,6 +227,11 @@ it("preserves FX source, direction, date, policy and unavailable diagonals witho
   ]);
   expect(rows("provider_quotes")[0]![2]).toBe("1.12 · Undated");
   expect(rows("provider_quotes")[2]![2]).toBe("0.007 · Undated");
+  expect(rows("provider_pinned_quotes")[0]![2]).toBe(
+    market
+      .fx!.provider_pinned_quotes.map((q) => `${q[4]} · ${q[2]} · ${q[3]}`)
+      .join("; "),
+  );
   expect(rows("pinned_quotes")[0]![2]).toBe(
     market
       .fx!.pinned_quotes.map((q) => `${q[4]} · ${q[2]} · ${q[3]}`)

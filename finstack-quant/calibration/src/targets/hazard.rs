@@ -538,8 +538,9 @@ impl HazardCurveTarget {
                 if let Ok(idx) = ctx.get_credit_index(curve_id) {
                     let mut updated = idx.as_ref().clone();
                     updated.index_credit_curve = std::sync::Arc::new(curve.clone());
-                    ctx.insert_credit_index_mut(curve_id, updated);
+                    ctx.insert_credit_index_mut(curve_id, updated)?;
                 }
+                Ok(())
             },
             op,
         )

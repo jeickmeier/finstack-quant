@@ -5,9 +5,11 @@
 
 #![cfg(target_arch = "wasm32")]
 
+use finstack_quant_wasm::api::valuations::exotic_rates::*;
 use finstack_quant_wasm::api::valuations::pricing::{
     instrument_cashflows_json, list_standard_metrics, price_instrument,
 };
+use finstack_quant_wasm::api::valuations::structured_credit::*;
 use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_test::*;
 
@@ -105,6 +107,7 @@ fn structured_credit_instrument_json() -> String {
     .unwrap();
     let mut sc =
         StructuredCredit::new_abs("ABS-STOCH-PV", pool, tranches, closing, maturity, "USD-OIS")
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
     sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
     sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -115,7 +118,9 @@ fn structured_credit_instrument_json() -> String {
     sc.credit_model.stochastic_default_spec = Some(StochasticDefaultSpec::deterministic(
         sc.credit_model.default_spec.clone(),
     ));
-    sc.instrument_pricing_overrides = InstrumentPricingOverrides::default().with_mc_paths(1);
+    // Sampling diagnostics require two independent estimators. Default
+    // antithetic pairing prices four identical paths for this deterministic deal.
+    sc.instrument_pricing_overrides = InstrumentPricingOverrides::default().with_mc_paths(2);
 
     serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::StructuredCredit(
         Box::new(sc),
@@ -191,10 +196,10 @@ fn price_instrument_returns_result() {
     let mkt = market_context_json();
     let metrics = serde_wasm_bindgen::to_value(&vec!["dirty_price".to_string()]).unwrap();
     let result = price_instrument(
-        &inst,
-        &mkt,
-        "2024-01-01",
-        Some("discounting".to_string()),
+        JsValue::from(&inst),
+        JsValue::from(&mkt),
+        JsValue::from("2024-01-01"),
+        Some(JsValue::from("discounting".to_string())),
         Some(metrics),
         None,
         None,
@@ -210,12 +215,14 @@ fn price_instrument_accepts_metric_pricing_overrides() {
     let mkt = market_context_json();
     let metrics = serde_wasm_bindgen::to_value(&vec!["dirty_price".to_string()]).unwrap();
     let result = price_instrument(
-        &inst,
-        &mkt,
-        "2024-01-01",
-        Some("discounting".to_string()),
+        JsValue::from(&inst),
+        JsValue::from(&mkt),
+        JsValue::from("2024-01-01"),
+        Some(JsValue::from("discounting".to_string())),
         Some(metrics),
-        Some(r#"{"theta_period":{"count":1,"unit":"days"}}"#.to_string()),
+        Some(JsValue::from(
+            r#"{"theta_period":{"count":1,"unit":"days"}}"#.to_string(),
+        )),
         None,
     )
     .unwrap();
@@ -228,10 +235,10 @@ fn registered_term_loan_metrics_cross_wasm_json_boundary() {
     let metrics =
         serde_wasm_bindgen::to_value(&vec!["all_in_rate".to_string(), "yt2y".to_string()]).unwrap();
     let result = price_instrument(
-        &term_loan_instrument_json(),
-        &market_context_json(),
-        "2024-01-01",
-        Some("discounting".to_string()),
+        JsValue::from(&term_loan_instrument_json()),
+        JsValue::from(&market_context_json()),
+        JsValue::from("2024-01-01"),
+        Some(JsValue::from("discounting".to_string())),
         Some(metrics),
         None,
         None,
@@ -256,59 +263,70 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
 
     let errors = [
         price_instrument(
-            &instrument,
-            market,
-            "not-a-date",
-            Some("not-a-model".to_string()),
+            JsValue::from(&instrument),
+            JsValue::from(market),
+            JsValue::from("not-a-date"),
+            Some(JsValue::from("not-a-model".to_string())),
             None,
             None,
             None,
         )
         .unwrap_err(),
         price_instrument(
-            &instrument,
-            market,
-            "not-a-date",
-            Some("not-a-model".to_string()),
+            JsValue::from(&instrument),
+            JsValue::from(market),
+            JsValue::from("not-a-date"),
+            Some(JsValue::from("not-a-model".to_string())),
             Some(metrics),
             None,
             None,
         )
         .unwrap_err(),
-        instrument_cashflows_json(&instrument, market, "not-a-date", "not-a-model").unwrap_err(),
-        structured_credit_tranche_discount_margin(
-            &instrument,
-            "missing",
-            market,
-            "not-a-date",
-            f64::NAN,
+        instrument_cashflows_json(
+            JsValue::from(&instrument),
+            JsValue::from(market),
+            JsValue::from("not-a-date"),
+            JsValue::from("not-a-model"),
         )
         .unwrap_err(),
-        structured_credit_tranche_breakeven_cdr(&instrument, "missing", market, "not-a-date")
-            .unwrap_err(),
+        structured_credit_tranche_discount_margin(
+            JsValue::from(&instrument),
+            JsValue::from("missing"),
+            JsValue::from(market),
+            JsValue::from("not-a-date"),
+            JsValue::from(f64::NAN),
+        )
+        .unwrap_err(),
+        structured_credit_tranche_breakeven_cdr(
+            JsValue::from(&instrument),
+            JsValue::from("missing"),
+            JsValue::from(market),
+            JsValue::from("not-a-date"),
+        )
+        .unwrap_err(),
         structured_credit_tranche_oas(
-            &instrument,
-            "missing",
-            market,
-            "not-a-date",
-            f64::NAN,
-            Some("not-json".to_string()),
+            JsValue::from(&instrument),
+            JsValue::from("missing"),
+            JsValue::from(market),
+            JsValue::from("not-a-date"),
+            JsValue::from(f64::NAN),
+            Some(JsValue::from("not-json".to_string())),
         )
         .unwrap_err(),
         structured_credit_tranche_scenario_table(
-            &instrument,
-            "missing",
-            market,
-            "not-a-date",
-            "not-json",
+            JsValue::from(&instrument),
+            JsValue::from("missing"),
+            JsValue::from(market),
+            JsValue::from("not-a-date"),
+            JsValue::from("not-json"),
         )
         .unwrap_err(),
         structured_credit_tranche_metrics(
-            &instrument,
-            "missing",
-            market,
-            "not-a-date",
-            Some(f64::NAN),
+            JsValue::from(&instrument),
+            JsValue::from("missing"),
+            JsValue::from(market),
+            JsValue::from("not-a-date"),
+            Some(JsValue::from(f64::NAN)),
         )
         .unwrap_err(),
     ];
@@ -326,15 +344,17 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
 fn fx_price_with_metrics_validates_merged_overrides_before_market() {
     use finstack_quant_wasm::api::valuations::fx::JsFxOption;
 
-    let option = JsFxOption::from_json(&fx_option_instrument_json()).unwrap();
+    let option = JsFxOption::from_json(JsValue::from(&fx_option_instrument_json())).unwrap();
     let metrics = serde_wasm_bindgen::to_value(&Vec::<String>::new()).unwrap();
     let error = option
         .price(
-            "not-market-json",
-            "not-a-date",
-            Some("not-a-model".to_string()),
+            JsValue::from("not-market-json"),
+            JsValue::from("not-a-date"),
+            Some(JsValue::from("not-a-model".to_string())),
             Some(metrics),
-            Some(r#"{"bump_config":{"vol_bump_decimal":-0.20}}"#.to_string()),
+            Some(JsValue::from(
+                r#"{"bump_config":{"vol_bump_decimal":-0.20}}"#.to_string(),
+            )),
             None,
         )
         .unwrap_err();
@@ -351,21 +371,36 @@ fn price_instrument_structured_credit_stochastic_returns_details() {
     let inst = structured_credit_instrument_json();
     let mkt = market_context_json();
     let result = price_instrument(
-        &inst,
-        &mkt,
-        "2024-01-01",
-        Some("structured_credit_stochastic".to_string()),
+        JsValue::from(&inst),
+        JsValue::from(&mkt),
+        JsValue::from("2024-01-01"),
+        Some(JsValue::from("structured_credit_stochastic".to_string())),
         None,
         None,
         None,
     )
     .expect("price");
     let parsed = valuation_object(result);
-    assert_eq!(parsed["details"]["type"], "structured_credit_stochastic");
+    assert_deterministic_structured_credit_details(&parsed);
     let tranches = parsed["details"]["data"]["tranche_results"]
         .as_array()
         .expect("tranche_results array");
     assert_eq!(tranches.len(), 2);
+}
+
+fn assert_deterministic_structured_credit_details(parsed: &serde_json::Value) {
+    assert_eq!(parsed["details"]["type"], "structured_credit_stochastic");
+    let details = &parsed["details"]["data"];
+    // usize counts cross the pricing boundary as BigInt; valuation_object
+    // preserves them as decimal strings when round-tripping through JSON.
+    assert_eq!(details["pricing_mode"]["monte_carlo"]["num_paths"], "2");
+    assert_eq!(details["pricing_mode"]["monte_carlo"]["antithetic"], true);
+    assert_eq!(details["num_paths"], "4", "two antithetic estimator pairs");
+    assert_eq!(
+        details["pv_std_error"].as_f64(),
+        Some(0.0),
+        "identical deterministic paths have zero sampling uncertainty"
+    );
 }
 
 #[wasm_bindgen_test]
@@ -381,17 +416,17 @@ fn price_instrument_structured_credit_waterfall_rules() {
     let inst = serde_json::to_string(&value).unwrap();
     let mkt = market_context_json();
     let result = price_instrument(
-        &inst,
-        &mkt,
-        "2024-01-01",
-        Some("structured_credit_stochastic".to_string()),
+        JsValue::from(&inst),
+        JsValue::from(&mkt),
+        JsValue::from("2024-01-01"),
+        Some(JsValue::from("structured_credit_stochastic".to_string())),
         None,
         None,
         None,
     )
     .expect("price");
     let parsed = valuation_object(result);
-    assert_eq!(parsed["details"]["type"], "structured_credit_stochastic");
+    assert_deterministic_structured_credit_details(&parsed);
 }
 
 /// Round a typed JS object result through `JSON.stringify` for assertions.
@@ -411,36 +446,72 @@ fn structured_credit_tranche_metrics_through_json() {
     let inst = structured_credit_instrument_json();
     let mkt = market_context_json();
 
-    let breakeven = structured_credit_tranche_breakeven_cdr(&inst, "SR", &mkt, "2024-01-01")
-        .expect("breakeven cdr");
+    let breakeven = structured_credit_tranche_breakeven_cdr(
+        JsValue::from(&inst),
+        JsValue::from("SR"),
+        JsValue::from(&mkt),
+        JsValue::from("2024-01-01"),
+    )
+    .expect("breakeven cdr");
     assert!(breakeven >= 0.0);
 
     // Discount margin is only defined for floating-rate tranches; "SR" is
     // fixed-rate, so the binding must surface the validation error rather than
     // silently returning a value (parity with the Python negative test).
-    let dm_err = structured_credit_tranche_discount_margin(&inst, "SR", &mkt, "2024-01-01", 100.0)
-        .expect_err("discount margin on a fixed-rate tranche should error");
+    let dm_err = structured_credit_tranche_discount_margin(
+        JsValue::from(&inst),
+        JsValue::from("SR"),
+        JsValue::from(&mkt),
+        JsValue::from("2024-01-01"),
+        JsValue::from(100.0),
+    )
+    .expect_err("discount margin on a fixed-rate tranche should error");
     assert!(format!("{dm_err:?}").to_lowercase().contains("floating"));
 
-    let oas = structured_credit_tranche_oas(&inst, "SR", &mkt, "2024-01-01", 99.0, None)
-        .expect("tranche oas");
+    let oas = structured_credit_tranche_oas(
+        JsValue::from(&inst),
+        JsValue::from("SR"),
+        JsValue::from(&mkt),
+        JsValue::from("2024-01-01"),
+        JsValue::from(99.0),
+        None,
+    )
+    .expect("tranche oas");
     let oas_parsed = js_object_to_json(&oas);
     assert!(oas_parsed["model_price"].as_f64().expect("model_price") > 0.0);
 
     let grid = r#"{"cprs":[0.10,0.20],"cdrs":[0.02],"severities":[0.40]}"#;
-    let table = structured_credit_tranche_scenario_table(&inst, "SR", &mkt, "2024-01-01", grid)
-        .expect("scenario table");
+    let table = structured_credit_tranche_scenario_table(
+        JsValue::from(&inst),
+        JsValue::from("SR"),
+        JsValue::from(&mkt),
+        JsValue::from("2024-01-01"),
+        JsValue::from(grid),
+    )
+    .expect("scenario table");
     let table_parsed = js_object_to_json(&table);
     assert_eq!(table_parsed["cells"].as_array().expect("cells").len(), 2);
 
     // Per-tranche metrics bundle: model-price z-spread ~ 0, widening at a cheaper price.
-    let tm = structured_credit_tranche_metrics(&inst, "SR", &mkt, "2024-01-01", None)
-        .expect("tranche metrics");
+    let tm = structured_credit_tranche_metrics(
+        JsValue::from(&inst),
+        JsValue::from("SR"),
+        JsValue::from(&mkt),
+        JsValue::from("2024-01-01"),
+        None,
+    )
+    .expect("tranche metrics");
     let tm_parsed = js_object_to_json(&tm);
     assert_eq!(tm_parsed["tranche_id"], "SR");
     assert!(tm_parsed["pv"].as_f64().expect("pv") > 0.0);
-    let tm_cheap = structured_credit_tranche_metrics(&inst, "SR", &mkt, "2024-01-01", Some(95.0))
-        .expect("tranche metrics @95");
+    let tm_cheap = structured_credit_tranche_metrics(
+        JsValue::from(&inst),
+        JsValue::from("SR"),
+        JsValue::from(&mkt),
+        JsValue::from("2024-01-01"),
+        Some(JsValue::from(95.0)),
+    )
+    .expect("tranche metrics @95");
     let cheap_parsed = js_object_to_json(&tm_cheap);
     assert!(
         cheap_parsed["z_spread_bp"].as_f64().expect("z")
@@ -455,14 +526,101 @@ fn price_instrument_structured_credit_stochastic_missing_market_data_errors() {
         serde_json::to_string(&finstack_quant_core::market_data::context::MarketContext::new())
             .unwrap();
     let err = price_instrument(
-        &inst,
-        &empty_market,
-        "2024-01-01",
-        Some("structured_credit_stochastic".to_string()),
+        JsValue::from(&inst),
+        JsValue::from(&empty_market),
+        JsValue::from("2024-01-01"),
+        Some(JsValue::from("structured_credit_stochastic".to_string())),
         None,
         None,
         None,
     )
     .expect_err("missing discount curve should error");
     assert!(format!("{err:?}").contains("USD-OIS"));
+}
+
+#[wasm_bindgen_test]
+fn cms_spread_option_intrinsic_call_works() {
+    let p = cms_spread_option_intrinsic(
+        JsValue::from(0.04),
+        JsValue::from(0.02),
+        JsValue::from(0.01),
+        JsValue::from(true),
+        JsValue::from(1_000_000.0),
+    )
+    .expect("cms");
+    assert!((p - 10_000.0).abs() < 1e-9);
+}
+
+#[wasm_bindgen_test]
+fn public_json_routes_validate_instrument_before_market_json_binding() {
+    assert!(structured_credit_tranche_discount_margin(
+        JsValue::from("{}"),
+        JsValue::from("missing"),
+        JsValue::from("not-market-json"),
+        JsValue::from("not-a-date"),
+        JsValue::from(f64::NAN),
+    )
+    .is_err());
+    assert!(structured_credit_tranche_breakeven_cdr(
+        JsValue::from("{}"),
+        JsValue::from("missing"),
+        JsValue::from("not-market-json"),
+        JsValue::from("not-a-date"),
+    )
+    .is_err());
+    assert!(structured_credit_tranche_oas(
+        JsValue::from("{}"),
+        JsValue::from("missing"),
+        JsValue::from("not-market-json"),
+        JsValue::from("not-a-date"),
+        JsValue::from(f64::NAN),
+        Some(JsValue::from("not-json".to_string())),
+    )
+    .is_err());
+    assert!(structured_credit_tranche_scenario_table(
+        JsValue::from("{}"),
+        JsValue::from("missing"),
+        JsValue::from("not-market-json"),
+        JsValue::from("not-a-date"),
+        JsValue::from("not-json"),
+    )
+    .is_err());
+    assert!(structured_credit_tranche_metrics(
+        JsValue::from("{}"),
+        JsValue::from("missing"),
+        JsValue::from("not-market-json"),
+        JsValue::from("not-a-date"),
+        Some(JsValue::from(f64::NAN)),
+    )
+    .is_err());
+}
+
+#[wasm_bindgen_test]
+fn snowball_honors_cap_and_floor() {
+    let coupons = snowball_coupon_profile(
+        JsValue::from(0.02),
+        JsValue::from(0.05),
+        JsValue::from(vec![0.01_f64, 0.04, 0.03]),
+        JsValue::from(0.0),
+        Some(JsValue::from(0.10)),
+    )
+    .expect("snowball");
+    assert_eq!(coupons.len(), 3);
+    for c in coupons {
+        assert!((0.0..=0.10).contains(&c));
+    }
+}
+
+#[wasm_bindgen_test]
+fn inverse_floater_uses_explicit_gearing() {
+    let coupons = inverse_floater_coupon_profile(
+        JsValue::from(0.05),
+        JsValue::from(vec![0.01_f64, 0.02]),
+        JsValue::from(0.0),
+        Some(JsValue::from(0.10)),
+        JsValue::from(2.0),
+    )
+    .expect("inverse floater");
+    assert!((coupons[0] - 0.03).abs() < 1e-12);
+    assert!((coupons[1] - 0.01).abs() < 1e-12);
 }

@@ -45,9 +45,6 @@ impl finstack_quant_cashflows::CashflowScheduleSource for StructuredCredit {
                 notional_hint: self.notional()?,
                 meta: crate::cashflow::builder::CashFlowMeta {
                     representation: crate::cashflow::builder::CashflowRepresentation::Projected,
-                    projected_fixings: crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::deal_projected_fixings(
-                        self, context, as_of,
-                    )?,
                     ..Default::default()
                 },
             },
@@ -314,7 +311,7 @@ impl StructuredCredit {
             // The timeline runs from the loan's origination (acquisition
             // date, else closing).
             let anchor = asset.acquisition_date.unwrap_or(self.closing_date);
-            if anchor.add_months(months) > self.maturity {
+            if anchor.add_months(months)? > self.maturity {
                 return Err(invalid(format!(
                     "asset {} resolves {} months after its origination {anchor}, past the deal \
                      maturity {}",

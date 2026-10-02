@@ -9,6 +9,7 @@ use finstack_quant_models::monte_carlo::results::{MoneyEstimate, MonteCarloResul
 ///
 /// Contains the present value, optional 3-factor path data, and the detailed cashflow schedule.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PathResult {
     /// Present value for this path
     pub pv: Money,
@@ -33,6 +34,7 @@ pub struct PathResult {
 /// Extends the standard `MonteCarloResult` with individual path results
 /// for distribution analysis and visualization.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct EnhancedMonteCarloResult {
     /// Standard MC statistics (mean, std error, CI)
     pub mc_result: MonteCarloResult,

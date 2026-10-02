@@ -573,8 +573,8 @@ mod calibration_pipeline {
             Some(2),
             "level-1 bucket size must count both BucketOnly members"
         );
-        // Calibrated artifacts must not default to the silent Residual
-        // policy: dropped credit exposure should at least surface a warning.
+        // Calibrated artifacts explicitly opt into Warn so dropped credit
+        // exposure is surfaced instead of silently omitted.
         assert_eq!(
             model.config.unmatched_policy,
             Some(crate::factor::UnmatchedPolicy::Warn),

@@ -63,7 +63,7 @@ pub(crate) fn resolve_market(market: &Market) -> Result<MarketContext, String> {
             let (env, _load_report) =
                 CalibrationEnvelope::from_slice_strict(&bytes, &LoadLimits::default())
                     .map_err(|error| format!("strictly load market envelope: {error}"))?;
-            let result = engine::execute(&env).map_err(|error| {
+            let result = engine::calibrate(&env).map_err(|error| {
                 let plan_id = &env.plan.id;
                 let details = error.details();
                 format!(
@@ -337,7 +337,7 @@ mod tests {
             serde_json::json!({"kind": "envelope", "envelope": minimal_envelope()}),
         );
         let pricing = fixture.pricing().expect("pricing body");
-        resolve_market(&pricing.market).expect("envelope resolves through engine::execute");
+        resolve_market(&pricing.market).expect("envelope resolves through engine::calibrate");
     }
 
     #[test]
@@ -603,8 +603,8 @@ mod tests {
         .expect("registry DV01 should price");
         let registry_dv01 = registry_result.measures["dv01"];
 
-        assert_close(discount, -3_082.840_589_949_861, 1e-6);
-        assert_close(sofr_3m, 2_835.453_923_810_273, 1e-6);
+        assert_close(discount, -3_082.891_017_534_77, 1e-6);
+        assert_close(sofr_3m, 2_836.106_479_169_801, 1e-6);
         // Take the combined target from the fixture rather than repeating the
         // literal here, so a re-blessed fixture cannot leave this test stale.
         assert_close(combined, fixture.expected["dv01"], 1e-6);

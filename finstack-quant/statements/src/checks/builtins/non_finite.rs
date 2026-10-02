@@ -12,6 +12,7 @@ use crate::Result;
 /// `CheckResult::passed` to `false` and fails a pipeline gate. Non-finite
 /// values poison every downstream calculation, so they are never advisory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct NonFiniteCheck {
     /// Specific nodes to check; if empty, all nodes in results are inspected.
     #[serde(default)]

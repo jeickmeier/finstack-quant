@@ -448,15 +448,12 @@ impl PyOperationSpec {
         apply_shocks: bool,
         roll_mode: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let roll_mode = roll_mode
-            .map(extract_time_roll_mode)
-            .transpose()?
-            .unwrap_or_default();
-        Ok(Self::wrap(OperationSpec::TimeRollForward {
-            period: period.to_string(),
-            apply_shocks,
+        let roll_mode = roll_mode.map(extract_time_roll_mode).transpose()?;
+        Ok(Self::wrap(OperationSpec::time_roll_forward(
+            period,
+            Some(apply_shocks),
             roll_mode,
-        }))
+        )))
     }
 
     /// Validate this operation with the canonical Rust rules (identifiers,

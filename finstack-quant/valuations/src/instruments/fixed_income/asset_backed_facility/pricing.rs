@@ -32,6 +32,7 @@ pub const RESIDUAL_TRANCHE_ID: &str = "RESIDUAL";
 
 /// Projected cashflows of a facility and its residual.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct FacilityProjection {
     /// Interest and principal paid to the facility note.
@@ -41,10 +42,18 @@ pub struct FacilityProjection {
     /// Commitment fee accrued on `commitment − opening facility balance` per
     /// accrual period while the line revolves, paid on the period's payment
     /// date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub commitment_fees: Vec<(Date, Money)>,
     /// Lender draws applied (scheduled draws and re-advances) per payment
     /// date: cash the lender advances, an outflow in the lender's IRR.
     #[serde(default)]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub draws: Vec<(Date, Money)>,
     /// Per-period deal record of the synthetic deal.
     pub diagnostics: SimulationDiagnostics,
@@ -113,7 +122,7 @@ impl AssetBackedFacility {
     pub fn synthesized_deal(&self) -> finstack_quant_core::Result<StructuredCredit> {
         self.validate()?;
         let residual = self.collateral.total_balance()?.checked_sub(self.drawn)?;
-        let repayment_date = self.repayment_date();
+        let repayment_date = self.repayment_date()?;
 
         let coupon = self.rate.clone();
         let mut note = Tranche::from_balance(
@@ -185,7 +194,7 @@ impl AssetBackedFacility {
             .pool(pool)
             .tranches(tranches)
             .closing_date(self.closing_date)
-            .first_payment_date(self.closing_date.add_months(months))
+            .first_payment_date(self.closing_date.add_months(months)?)
             .maturity(self.maturity)
             .frequency(self.frequency)
             .discount_curve_id(self.discount_curve_id.clone())
@@ -322,7 +331,7 @@ impl AssetBackedFacility {
             }
             let accrual = self.day_count.year_fraction(
                 period.start,
-                period.end,
+                period.end.min(commitment_end),
                 DayCountContext::default(),
             )?;
             let fee = undrawn * fee_bp / 10_000.0 * accrual;

@@ -153,7 +153,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope).expect("execute");
+    let result = engine::calibrate(&envelope).expect("execute");
     assert!(result.result.report.success);
 
     let ctx = MarketContext::try_from(result.result.final_market).expect("restore context");
@@ -380,7 +380,7 @@ fn hazard_calibration_rejects_zero_spread() {
         prior_market: prior,
     };
 
-    let err: finstack_quant_core::Error = engine::execute(&envelope)
+    let err: finstack_quant_core::Error = engine::calibrate(&envelope)
         .expect_err("zero spread should be invalid")
         .into();
     assert!(matches!(
@@ -454,7 +454,7 @@ fn hazard_calibration_rejects_negative_spread() {
         prior_market: prior,
     };
 
-    let err: finstack_quant_core::Error = engine::execute(&envelope)
+    let err: finstack_quant_core::Error = engine::calibrate(&envelope)
         .expect_err("negative spread should be invalid")
         .into();
     assert!(matches!(
@@ -526,7 +526,7 @@ fn hazard_calibration_rejects_non_standard_upfront_running_coupon() {
         prior_market: prior,
     };
 
-    let err: finstack_quant_core::Error = engine::execute(&envelope)
+    let err: finstack_quant_core::Error = engine::calibrate(&envelope)
         .expect_err("non-standard upfront running coupon should be invalid")
         .into();
     assert!(matches!(
@@ -634,7 +634,7 @@ fn hazard_calibration_handles_extreme_high_spread() {
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope).expect("high spread calibration should succeed");
+    let result = engine::calibrate(&envelope).expect("high spread calibration should succeed");
     assert!(result.result.report.success);
 
     let ctx = MarketContext::try_from(result.result.final_market).expect("restore context");
@@ -759,7 +759,7 @@ fn hazard_calibration_global_solve_sqrt_time_is_not_rougher_than_bootstrap() {
         prior_market: prior.clone(),
     };
 
-    let bootstrap_result = engine::execute(&bootstrap_env).expect("bootstrap execute");
+    let bootstrap_result = engine::calibrate(&bootstrap_env).expect("bootstrap execute");
     let bootstrap_report = bootstrap_result
         .result
         .step_reports
@@ -816,7 +816,7 @@ fn hazard_calibration_global_solve_sqrt_time_is_not_rougher_than_bootstrap() {
         prior_market: prior,
     };
 
-    let global_result = engine::execute(&global_env).expect("global execute");
+    let global_result = engine::calibrate(&global_env).expect("global execute");
     let global_report = global_result
         .result
         .step_reports
@@ -916,7 +916,7 @@ fn hazard_calibration_reprices_par_spread() {
         prior_market: prior,
     };
 
-    let result = engine::execute(&envelope).expect("execute");
+    let result = engine::calibrate(&envelope).expect("execute");
     let ctx = MarketContext::try_from(result.result.final_market).expect("restore context");
 
     let mut curve_ids = HashMap::default();

@@ -337,5 +337,5 @@ def test_convention_registry_errors() -> None:
         registry.require_xccy("NOPE")
     with pytest.raises(ValueError, match=r"unknown CDS doc clause"):
         registry.resolve_cds("USD", "snac")
-    with pytest.raises(ValueError, match=r"Matching variant not found"):
+    with pytest.raises(ValueError, match=r'Invalid currency code "XXX"'):
         registry.primary_cds_family("XXX")

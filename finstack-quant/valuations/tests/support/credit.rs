@@ -131,7 +131,7 @@ pub fn calibrated_hazard_curve_from_spec(
         market_data: quotes.into_iter().map(MarketDatum::from).collect(),
         prior_market: vec![PriorMarketObject::DiscountCurve(discount.as_ref().clone())],
     };
-    let result = engine::execute(&envelope)?;
+    let result = engine::calibrate(&envelope)?;
     if !result.result.report.success {
         return Err(finstack_quant_core::Error::Calibration {
             message: format!("test hazard calibration failed for '{curve_id}'"),

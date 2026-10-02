@@ -1,0 +1,44 @@
+{
+  "$defs": {
+    "NodeId": {
+      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/effective_tax_rate_check.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Verifies that the effective tax rate (tax expense / pretax income) falls within an expected range.",
+  "properties": {
+    "expected_range": {
+      "description": "Expected (min, max) for the effective tax rate (decimals, e.g. 0.15..0.40).",
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "format": "double",
+          "type": "number"
+        }
+      ],
+      "type": "array"
+    },
+    "pretax_income_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "Pretax income node."
+    },
+    "tax_expense_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "Tax expense node."
+    }
+  },
+  "required": [
+    "tax_expense_node",
+    "pretax_income_node",
+    "expected_range"
+  ],
+  "title": "EffectiveTaxRateCheck",
+  "type": "object"
+}

@@ -14,11 +14,6 @@ use pyo3::types::PyDict;
 
 fn money(amount: f64, currency: &str) -> PyResult<Money> {
     let ccy: Currency = currency.parse().map_err(display_to_py)?;
-    if !amount.is_finite() {
-        return Err(crate::errors::value_error(format!(
-            "amount must be finite, got {amount}"
-        )));
-    }
     Money::new(amount, ccy).map_err(core_to_py)
 }
 

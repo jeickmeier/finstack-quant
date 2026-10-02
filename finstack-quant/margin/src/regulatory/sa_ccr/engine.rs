@@ -148,6 +148,31 @@ impl SaCcrEngine {
     }
 }
 
+/// SA-CCR Exposure at Default for one netting set.
+///
+/// # Arguments
+///
+/// * `trades` - Derivative trades in the netting set, all in one currency.
+/// * `config` - Netting-set collateral, threshold, MTA, NICA and MPOR terms.
+/// * `alpha` - Supervisory alpha override (finite, at least 1.0), or `None`
+///   for the regulatory 1.4.
+///
+/// # Errors
+///
+/// Returns a validation error if `alpha` is non-finite or below 1.0, or if
+/// `config` or any trade fails validation.
+pub fn saccr_ead(
+    trades: &[SaCcrTrade],
+    config: &SaCcrNettingSetConfig,
+    alpha: Option<f64>,
+) -> Result<EadResult> {
+    let engine = match alpha {
+        Some(alpha) => SaCcrEngine::with_alpha(alpha)?,
+        None => SaCcrEngine::default(),
+    };
+    engine.calculate_ead(config, trades)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -568,5 +593,24 @@ mod tests {
             "EAD must be non-negative, got {}",
             result.ead
         );
+    }
+
+    #[test]
+    fn saccr_ead_uses_the_regulatory_alpha_unless_overridden() {
+        let trades = [simple_ir_trade("T1", 10_000_000.0, 1.0, 50_000.0)];
+        let config = unmargined_config(0.0);
+
+        let default = saccr_ead(&trades, &config, None).expect("default alpha");
+        let engine = SaCcrEngine::default()
+            .calculate_ead(&config, &trades)
+            .expect("engine");
+        assert_eq!(default.ead, engine.ead);
+        assert_eq!(default.alpha, 1.4);
+
+        let overridden = saccr_ead(&trades, &config, Some(2.0)).expect("alpha override");
+        assert_eq!(overridden.alpha, 2.0);
+        assert!((overridden.ead - default.ead * 2.0 / 1.4).abs() <= 1e-6 * default.ead);
+
+        assert!(saccr_ead(&trades, &config, Some(0.5)).is_err());
     }
 }

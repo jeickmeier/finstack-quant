@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 /// constraint to be included. For OR semantics across sectors or
 /// ratings, supply multiple values in the respective `Vec`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PeerFilter {
     /// GICS sector codes to include (meta key: "gics_sector").
     pub gics_sectors: Vec<String>,
@@ -110,6 +111,7 @@ impl PeerFilter {
 /// The subject company (the one being analyzed) is stored separately from
 /// the peers for clarity in downstream calculations.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PeerSet {
     /// The subject company being evaluated.
     pub subject: CompanyMetrics,

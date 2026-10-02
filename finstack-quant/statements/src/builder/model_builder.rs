@@ -26,7 +26,8 @@ const RESERVED_DSL_IDENTIFIERS: &[&str] = &["if", "and", "or", "not", "true", "f
 /// The `__cs__` prefix is reserved for internal capital structure references,
 /// `__` prefix is reserved for other internal use, and identifiers that
 /// collide with a DSL keyword (see `RESERVED_DSL_IDENTIFIERS`) would shadow the
-/// language primitive.
+/// language primitive. `period_id` is reserved for the timeline column in
+/// wide result exports.
 ///
 /// Exposed so binding layers can pre-validate a node id without consuming a
 /// (move-based) builder — mirroring the check `compute` runs internally.
@@ -38,9 +39,14 @@ const RESERVED_DSL_IDENTIFIERS: &[&str] = &["if", "and", "or", "not", "true", "f
 ///
 /// # Errors
 ///
-/// Returns an error if `node_id` uses a reserved prefix or collides with a DSL
-/// keyword.
+/// Returns an error if `node_id` uses a reserved prefix, is `period_id`, or
+/// collides with a DSL keyword.
 pub fn validate_node_id(node_id: &str) -> Result<()> {
+    if node_id == "period_id" {
+        return Err(Error::build(
+            "Node ID 'period_id' is reserved for the timeline column in result exports",
+        ));
+    }
     if node_id.contains("__cs__") {
         return Err(Error::build(format!(
             "Node ID '{}' contains reserved prefix '__cs__'. \
@@ -142,6 +148,52 @@ impl<State> ModelBuilder<State> {
     /// that need to iterate over periods to generate per-period value nodes.
     pub fn periods_slice(&self) -> &[Period] {
         &self.periods
+    }
+
+    /// Resolve and validate the timeline for importing period-labelled values.
+    ///
+    /// An existing timeline is retained. Otherwise the first and last columns
+    /// define an inclusive range, including any intervening periods. Every
+    /// column must belong to the resolved timeline, even when its cells are
+    /// missing. This method does not mutate the builder.
+    ///
+    /// # Arguments
+    ///
+    /// * `columns` - Parsed period identifiers in input-column order. Must
+    ///   contain at least one column; duplicate identifiers retain the normal
+    ///   last-value-wins semantics of value-node construction.
+    /// * `actuals_until` - Inclusive actual-period cutoff used only when the
+    ///   builder has no timeline. It must share the inferred range's period
+    ///   family. Existing timelines retain their actual/forecast flags.
+    ///
+    /// # Errors
+    ///
+    /// Returns a period error for empty columns, an invalid inferred range or
+    /// cutoff, or a column outside the resolved model timeline.
+    pub fn resolve_period_columns(
+        &self,
+        columns: &[PeriodId],
+        actuals_until: Option<&str>,
+    ) -> Result<Vec<Period>> {
+        let (Some(first), Some(last)) = (columns.first(), columns.last()) else {
+            return Err(Error::period(
+                "Value import requires at least one period column",
+            ));
+        };
+        let periods = if self.periods.is_empty() {
+            build_periods(&format!("{first}..{last}"), actuals_until)?.periods
+        } else {
+            self.periods.clone()
+        };
+        let period_ids: IndexSet<_> = periods.iter().map(|period| period.id).collect();
+        for column in columns {
+            if !period_ids.contains(column) {
+                return Err(Error::period(format!(
+                    "Period column {column} is not present in the model timeline"
+                )));
+            }
+        }
+        Ok(periods)
     }
 
     /// Model identifier this builder will stamp on the built specification.

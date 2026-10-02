@@ -163,7 +163,9 @@ fn position_primitive_report(
     {
         let report = composite
             .primitive_exposures(market, portfolio.as_of, metrics)
-            .map_err(|err| Error::valuation(position.position_id.clone(), err.to_string()))?;
+            .map_err(|err| {
+                Error::valuation(position.position_id.clone(), err.kind(), err.to_string())
+            })?;
         let mut paths = Vec::with_capacity(report.paths.len());
         let mut definitions = Vec::with_capacity(report.paths.len());
         for exposure in report.paths {
@@ -202,6 +204,7 @@ fn position_primitive_report(
     let definition = position.instrument.to_instrument_json().ok_or_else(|| {
         Error::valuation(
             position.position_id.clone(),
+            finstack_quant_core::error::ErrorKind::Validation,
             "instrument is not registered for canonical serialization",
         )
     })?;
@@ -209,7 +212,9 @@ fn position_primitive_report(
     let result = position
         .instrument
         .price_with_metrics(market, portfolio.as_of, metrics, PricingOptions::default())
-        .map_err(|err| Error::valuation(position.position_id.clone(), err.to_string()))?;
+        .map_err(|err| {
+            Error::valuation(position.position_id.clone(), err.kind(), err.to_string())
+        })?;
     let value = convert_to_base(
         result.value,
         portfolio.as_of,

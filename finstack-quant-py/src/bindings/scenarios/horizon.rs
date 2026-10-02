@@ -7,7 +7,7 @@ use crate::errors::{core_to_py, display_to_py, scenarios_to_py};
 use pyo3::prelude::*;
 
 use super::engine::PyApplicationReport;
-use super::extract::{extract_config, extract_scenario_spec, recalibration_provider};
+use super::extract::{extract_config, extract_scenario_spec};
 
 /// Compute horizon total return under a scenario.
 ///
@@ -27,13 +27,17 @@ use super::extract::{extract_config, extract_scenario_spec, recalibration_provid
 ///     Valuation date (ISO 8601 accepted, e.g. ``"2025-01-15"``).
 /// scenario : ScenarioSpec | str
 ///     Typed scenario or JSON-serialized ``ScenarioSpec``.
-/// method : str, default "parallel"
+/// method : str | None, default None
 ///     Attribution method: ``"parallel"``, ``"waterfall"``,
-///     ``"metrics_based"``, or ``"taylor"``. ``"metrics_based"`` re-prices
-///     the instrument with the default attribution metric set (DV01, CS01,
-///     vega, ...) under the same configuration and recalibration provider
-///     the scenario engine uses; instruments lacking a metric raise
-///     ``RuntimeError`` rather than silently dropping the factor.
+///     ``"metrics_based"``, or ``"taylor"``. ``None`` selects the Rust default
+///     (``AttributionMethod::default()``, currently ``"parallel"``).
+///     ``"metrics_based"`` calculates the instrument's applicable subset of
+///     the default attribution metrics (DV01, CS01, vega, ...) at the opening
+///     snapshot, using the same configuration and recalibration provider as
+///     the scenario engine. The canonical Rust registry omits metrics
+///     unsupported by that instrument type. Selected metric failures raise
+///     ``ValueError`` for invalid inputs, ``KeyError`` for missing data, or
+///     ``RuntimeError`` for computation failures.
 /// config : FinstackConfig | str | None, default None
 ///     Library configuration (rounding, tolerances, bump sizes) threaded
 ///     into both the scenario engine and the attribution pricing.
@@ -52,11 +56,11 @@ use super::extract::{extract_config, extract_scenario_spec, recalibration_provid
 /// ------
 /// ValueError
 ///     If an input fails to parse or validate, ``method`` is unknown,
-///     ``calendar_id`` is not a built-in calendar, or the scenario contains
-///     an instrument-scoped operation (horizon analysis prices one instrument
-///     instance at both dates).
+///     or the scenario contains an instrument-scoped operation (horizon
+///     analysis prices one instrument instance at both dates).
 /// KeyError
-///     If the scenario references market data or tenors that do not exist.
+///     If ``calendar_id`` is not a built-in calendar, or the scenario references
+///     market data or tenors that do not exist.
 /// RuntimeError
 ///     If pricing or attribution fails.
 ///
@@ -64,11 +68,12 @@ use super::extract::{extract_config, extract_scenario_spec, recalibration_provid
 /// -----
 /// ``total_return`` is a decimal fraction (``0.05`` = +5%) and is ``nan``
 /// when the initial value and total P&L are denominated in different
-/// currencies (no implicit FX conversion); ``annualized_return`` is ``None``
-/// in that case. The GIL is released while the scenario and attribution
-/// computations run.
+/// currencies (no implicit FX conversion), or the initial value is zero or
+/// negative; ``annualized_return`` is ``None`` in those cases and when total
+/// return is below -100%. The GIL is released while the scenario and
+/// attribution computations run.
 #[pyfunction]
-#[pyo3(signature = (instrument, market, as_of, scenario, method = "parallel", config = None, calendar_id = None))]
+#[pyo3(signature = (instrument, market, as_of, scenario, method = None, config = None, calendar_id = None))]
 // Arity is fixed by the documented Python keyword signature; grouping into a
 // params struct would change the public API.
 #[allow(clippy::too_many_arguments)]
@@ -78,23 +83,30 @@ pub(crate) fn compute_horizon_return<'py>(
     market: &Bound<'py, PyAny>,
     as_of: &Bound<'py, PyAny>,
     scenario: &Bound<'py, PyAny>,
-    method: &str,
+    method: Option<&str>,
     config: Option<&Bound<'py, PyAny>>,
     calendar_id: Option<&str>,
 ) -> PyResult<PyHorizonResult> {
-    use finstack_quant_valuations::instruments::InstrumentEnvelope;
     use std::sync::Arc;
 
     let instrument_json = extract_instrument_json(instrument)?;
-    let boxed = InstrumentEnvelope::from_str(&instrument_json).map_err(core_to_py)?;
-    let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> = Arc::from(boxed);
+    let boxed = finstack_quant_valuations::pricer::json::parse_boxed_instrument_from_json(
+        &instrument_json,
+        None,
+    )
+    .map_err(core_to_py)?;
+    let instrument: Arc<dyn finstack_quant_valuations::instruments::Instrument> =
+        Arc::from(boxed.into_boxed());
 
     // Owned copy so the compute can run without the GIL.
     let market_ctx = extract_market(py, market)?;
     let date = crate::bindings::date_utils::extract_date(as_of)?;
     let scenario = extract_scenario_spec(scenario)?;
-    let attribution_method = finstack_quant_scenarios::horizon::attribution_method_from_str(method)
-        .map_err(scenarios_to_py)?;
+    let attribution_method = method
+        .map(finstack_quant_scenarios::horizon::attribution_method_from_str)
+        .transpose()
+        .map_err(scenarios_to_py)?
+        .unwrap_or_default();
     let finstack_config = extract_config(config)?;
 
     // Run analysis with the GIL released: horizon attribution revalues the
@@ -103,8 +115,7 @@ pub(crate) fn compute_horizon_return<'py>(
     let mut analyzer = finstack_quant_scenarios::horizon::HorizonAnalysis::new(
         attribution_method,
         finstack_config,
-    )
-    .with_recalibration_provider(recalibration_provider());
+    );
     if let Some(id) = calendar_id {
         analyzer = analyzer.with_calendar_id(id);
     }
@@ -189,8 +200,10 @@ impl PyHorizonResult {
         self.inner.total_return()
     }
 
-    /// Annualized return as a decimal fraction (``None`` if no time-roll or
-    /// ``total_return`` is not finite).
+    /// Annualized return as a decimal fraction using a 365-day year.
+    ///
+    /// ``None`` when the horizon is absent or nonpositive, ``total_return`` is
+    /// nonfinite or below -100%, or compounding produces a nonfinite value.
     #[getter]
     fn annualized_return(&self) -> Option<f64> {
         self.inner.annualized_return()
@@ -238,9 +251,11 @@ impl PyHorizonResult {
         Ok(self.inner.factor_contribution(&f))
     }
 
-    /// Serialize to JSON.
+    /// Serialize the canonical horizon result with Rust-computed decimal total
+    /// return, annualized return, and factor contributions. Undefined derived
+    /// values are JSON ``null``.
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serde_json::to_string(&self.inner.to_json()).map_err(display_to_py)
     }
 
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
@@ -249,7 +264,8 @@ impl PyHorizonResult {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Deserialize from JSON produced by ``to_json``.
+    /// Deserialize from JSON produced by ``to_json``. Derived return fields
+    /// are recomputed from the underlying values rather than trusted as inputs.
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {

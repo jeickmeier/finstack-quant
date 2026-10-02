@@ -1,0 +1,178 @@
+{
+  "$defs": {
+    "RatingLevel": {
+      "additionalProperties": false,
+      "description": "Rating level for credit rating scales.",
+      "properties": {
+        "min_score": {
+          "description": "Minimum score threshold for this rating.",
+          "format": "double",
+          "type": "number"
+        },
+        "name": {
+          "description": "Rating name, for example `AAA` or `Aaa`.",
+          "type": "string"
+        },
+        "score": {
+          "description": "Numeric score on a 0-100 scale.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "name",
+        "score",
+        "min_score"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/rating_scales/1/scorecard_scale.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Named scorecard rating scale: rating levels ordered best to worst with score thresholds.",
+  "examples": [
+    {
+      "description": "Standard & Poor's credit rating scale",
+      "ratings": [
+        {
+          "min_score": 95.0,
+          "name": "AAA",
+          "score": 100.0
+        },
+        {
+          "min_score": 90.0,
+          "name": "AA+",
+          "score": 95.0
+        },
+        {
+          "min_score": 85.0,
+          "name": "AA",
+          "score": 90.0
+        },
+        {
+          "min_score": 80.0,
+          "name": "AA-",
+          "score": 85.0
+        },
+        {
+          "min_score": 75.0,
+          "name": "A+",
+          "score": 80.0
+        },
+        {
+          "min_score": 70.0,
+          "name": "A",
+          "score": 75.0
+        },
+        {
+          "min_score": 65.0,
+          "name": "A-",
+          "score": 70.0
+        },
+        {
+          "min_score": 60.0,
+          "name": "BBB+",
+          "score": 65.0
+        },
+        {
+          "min_score": 55.0,
+          "name": "BBB",
+          "score": 60.0
+        },
+        {
+          "min_score": 50.0,
+          "name": "BBB-",
+          "score": 55.0
+        },
+        {
+          "min_score": 45.0,
+          "name": "BB+",
+          "score": 50.0
+        },
+        {
+          "min_score": 40.0,
+          "name": "BB",
+          "score": 45.0
+        },
+        {
+          "min_score": 35.0,
+          "name": "BB-",
+          "score": 40.0
+        },
+        {
+          "min_score": 30.0,
+          "name": "B+",
+          "score": 35.0
+        },
+        {
+          "min_score": 25.0,
+          "name": "B",
+          "score": 30.0
+        },
+        {
+          "min_score": 20.0,
+          "name": "B-",
+          "score": 25.0
+        },
+        {
+          "min_score": 15.0,
+          "name": "CCC+",
+          "score": 20.0
+        },
+        {
+          "min_score": 10.0,
+          "name": "CCC",
+          "score": 15.0
+        },
+        {
+          "min_score": 5.0,
+          "name": "CCC-",
+          "score": 10.0
+        },
+        {
+          "min_score": 2.0,
+          "name": "CC",
+          "score": 5.0
+        },
+        {
+          "min_score": 0.01,
+          "name": "C",
+          "score": 2.0
+        },
+        {
+          "min_score": 0.0,
+          "name": "D",
+          "score": 0.0
+        }
+      ],
+      "scale_name": "S&P"
+    }
+  ],
+  "properties": {
+    "description": {
+      "description": "Human-readable description.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ratings": {
+      "description": "Ordered list of rating levels from best to worst.",
+      "items": {
+        "$ref": "#/$defs/RatingLevel"
+      },
+      "type": "array"
+    },
+    "scale_name": {
+      "description": "Scale name, for example `S&P` or `Moody's`.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "scale_name",
+    "ratings"
+  ],
+  "title": "ScorecardScale",
+  "type": "object"
+}

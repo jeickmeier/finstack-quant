@@ -6,7 +6,7 @@ list one crate each. This namespace merges all of them, so a service exposing
 these contracts does not have to hard-code the domain list.
 
 Each :func:`index` row carries ``domain`` alongside ``path``, ``$id``,
-``title``, ``summary``, ``bytes`` and ``kind``.
+``title``, ``type_name`` (the Rust root type), ``summary``, ``bytes`` and ``kind``.
 
 Examples
 --------
@@ -38,7 +38,7 @@ def index() -> str:
     str
         Pretty-printed JSON with an ``artifacts`` array. Each row carries
         ``domain`` (the owning crate namespace), ``path``, ``$id``, ``title``,
-        ``summary``, ``bytes`` and ``kind`` (``input`` for documents you author,
+        ``type_name`` (the Rust root type), ``summary``, ``bytes`` and ``kind`` (``input`` for documents you author,
         ``output`` for documents the library emits, ``component`` for shared
         definitions). Rows are sorted by ``domain`` then ``path``.
 
@@ -142,10 +142,7 @@ def domains() -> list[str]:
         Sorted domain names, each of which is also a ``domain`` value in
         :func:`index` and a ``finstack_quant.<domain>.schema`` namespace.
 
-    Raises
-    ------
-    ValueError
-        If the registry cannot be read.
+        This function does not raise; the domain list is compiled in.
 
     Examples
     --------

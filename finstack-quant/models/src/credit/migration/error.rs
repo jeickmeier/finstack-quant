@@ -61,6 +61,14 @@ pub enum MigrationError {
     #[error("generator extraction failed: matrix has complex eigenvalues (no real Schur form)")]
     ComplexEigenvalues,
 
+    /// Matrix logarithm failed to reach its bounded convergence criterion.
+    #[error("matrix logarithm failed to converge within numerical limits")]
+    MatrixLogConvergence,
+
+    /// Round-trip tolerance must be finite and non-negative.
+    #[error("round-trip tolerance must be finite and non-negative, got {0}")]
+    InvalidTolerance(f64),
+
     /// Round-trip validation failed: exp(Q) is too far from P.
     #[error("round-trip error ||exp(Q)-P||_inf = {error} exceeds tolerance {tolerance}")]
     RoundTripError {
@@ -112,6 +120,10 @@ pub enum MigrationError {
     #[error("paths per state must be positive")]
     InvalidPathCount,
 
+    /// A serialized rating path violates its time or transition invariants.
+    #[error("invalid rating path: {0}")]
+    InvalidPath(String),
+
     /// Label could not be resolved to a Moody's WARF factor.
     #[error("no WARF factor for label '{label}'")]
     NoWarfFactor {
@@ -147,4 +159,42 @@ pub enum MigrationError {
     /// Internal invariant failed in migration model code.
     #[error("internal migration invariant violated: {0}")]
     Internal(String),
+}
+
+impl MigrationError {
+    /// Classify this error for host-language exception mapping.
+    ///
+    /// Unknown rating states and ratings without a WARF factor are not-found
+    /// errors; failed generator estimation, complex eigenvalues, matrix-logarithm
+    /// non-convergence, round-trip
+    /// and singular-matrix failures and internal invariants are computation
+    /// errors; every other variant rejects the input (validation).
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        use finstack_quant_core::error::ErrorKind;
+        match self {
+            Self::UnknownState { .. } | Self::NoWarfFactor { .. } => ErrorKind::NotFound,
+            Self::NoValidGenerator { .. }
+            | Self::ComplexEigenvalues
+            | Self::MatrixLogConvergence
+            | Self::RoundTripError { .. }
+            | Self::SingularMatrix
+            | Self::Internal(_) => ErrorKind::Computation,
+            Self::DimensionMismatch { .. }
+            | Self::RowSumViolation { .. }
+            | Self::EntryOutOfRange { .. }
+            | Self::InsufficientStates
+            | Self::DuplicateLabel { .. }
+            | Self::NonAbsorbingDefault { .. }
+            | Self::InvalidHorizon(_)
+            | Self::InvalidState { .. }
+            | Self::InvalidPathCount
+            | Self::InvalidPath(_)
+            | Self::InvalidTolerance(_)
+            | Self::NoWarfMapping
+            | Self::InvalidWarf(_)
+            | Self::InvalidDiagnostic { .. }
+            | Self::ScaleMismatch => ErrorKind::Validation,
+        }
+    }
 }

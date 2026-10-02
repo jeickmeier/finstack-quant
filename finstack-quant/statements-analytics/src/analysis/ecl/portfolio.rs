@@ -17,6 +17,7 @@ use super::types::Stage;
 
 /// Portfolio-level ECL result with stage migration and segment breakdown.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioEclResult {
     /// Total ECL across all exposures.
     pub total_ecl: f64,
@@ -168,6 +169,7 @@ impl PortfolioEclResult {
 /// IFRS 9 disclosure convention which treats partial cures out of
 /// credit-impaired separately from full cures.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ProvisionWaterfall {
     /// Opening ECL balance (previous period closing).
     pub opening: f64,

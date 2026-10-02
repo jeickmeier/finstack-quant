@@ -451,3 +451,22 @@ fn rate_binding_compounding_uses_core_wire_form() {
     let spec: RateBindingSpec = serde_json::from_value(canonical).expect("core periodic basis");
     assert_eq!(spec.compounding, Compounding::SEMI_ANNUAL);
 }
+
+#[test]
+fn time_roll_forward_constructor_matches_the_serde_defaults() {
+    let from_wire: OperationSpec =
+        serde_json::from_value(serde_json::json!({ "kind": "time_roll_forward", "period": "3M" }))
+            .expect("minimal time roll");
+    assert_eq!(
+        OperationSpec::time_roll_forward("3M", None, None),
+        from_wire
+    );
+    assert_eq!(
+        OperationSpec::time_roll_forward("3M", Some(false), Some(TimeRollMode::CalendarDays)),
+        OperationSpec::TimeRollForward {
+            period: "3M".into(),
+            apply_shocks: false,
+            roll_mode: TimeRollMode::CalendarDays,
+        }
+    );
+}

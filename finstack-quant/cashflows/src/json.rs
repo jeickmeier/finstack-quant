@@ -9,7 +9,7 @@ use crate::builder::{
     CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, Notional,
     PrincipalExchange, StepUpCouponSpec,
 };
-use crate::primitives::{is_cash_settlement_kind, CFKind};
+use crate::primitives::CFKind;
 use finstack_quant_core::dates::{parse_iso_date, Date};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
@@ -234,7 +234,9 @@ pub struct PrincipalEventSpec {
     pub payment_date: Date,
     /// Outstanding balance delta. Positive increases outstanding, negative repays.
     pub delta: Money,
-    /// Optional cash leg. When omitted, the cash leg equals `delta`.
+    /// Optional settlement amount before classification-dependent sign handling.
+    /// When omitted, amortization repayments use `-delta` and draws use `delta`.
+    /// Amortization emits this amount as a receipt; other kinds negate it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cash: Option<Money>,
     /// Cashflow classification to emit.
@@ -521,8 +523,8 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
 ///
 /// # Errors
 ///
-/// Returns an error if the schedule JSON is invalid or the output cannot be
-/// serialized.
+/// Returns an error if the schedule JSON is invalid, the schedule fails
+/// validation (see [`crate::dated_flows`]), or the output cannot be serialized.
 ///
 /// # Examples
 ///
@@ -547,15 +549,9 @@ pub fn validate_cashflow_schedule_json(schedule_json: &str) -> Result<String> {
 /// ```
 pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
     let schedule = parse_schedule(schedule_json)?;
-    schedule.validate()?;
-    let flows: Vec<DatedFlowJson> = schedule
-        .flows
-        .iter()
-        .filter(|flow| is_cash_settlement_kind(flow.kind))
-        .map(|flow| DatedFlowJson {
-            date: flow.date,
-            amount: flow.amount,
-        })
+    let flows: Vec<DatedFlowJson> = crate::dated_flows(&schedule)?
+        .into_iter()
+        .map(|(date, amount)| DatedFlowJson { date, amount })
         .collect();
     serialize_json(&flows, "dated flows")
 }
@@ -574,12 +570,15 @@ pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
 ///
 /// # Returns
 ///
-/// Scalar accrued-interest amount in the schedule's currency space.
+/// Finite scalar accrued-interest amount in the schedule's currency space.
 ///
 /// # Errors
 ///
 /// Returns an error if the schedule, as-of date, or optional accrual config JSON
-/// cannot be parsed.
+/// cannot be parsed or validated, a day-count or ex-coupon calculation fails,
+/// a compounded coupon-period rate is non-finite or at or below `-1`, or the
+/// accrued-interest formula or accumulated result is non-finite. Valid negative
+/// compounded period rates in `(-1, 0)` remain supported.
 ///
 /// # Examples
 ///
@@ -628,6 +627,110 @@ pub fn accrued_interest(
         None => AccrualConfig::default(),
     };
     accrued_interest_amount(&schedule, as_of, &config)
+}
+
+/// Weighted average life of a schedule JSON payload, in years from `as_of`.
+///
+/// JSON bridge over `CashFlowSchedule::wal`: the schedule is parsed and
+/// validated, then WAL is computed from the positive principal flows
+/// (amortization, notional and prepayment) dated after `as_of`.
+///
+/// # Arguments
+///
+/// * `schedule_json` - JSON-encoded [`CashFlowSchedule`].
+/// * `as_of` - ISO-8601 measurement date (`"YYYY-MM-DD"`); only principal
+///   flows strictly after it count.
+///
+/// # Returns
+///
+/// WAL in years; `0.0` when no principal flow falls after `as_of`.
+///
+/// # Errors
+///
+/// Returns a validation error if the schedule JSON or date is malformed or
+/// the schedule fails validation, and propagates day-count failures.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_cashflows::{build_cashflow_schedule_json, schedule_wal};
+///
+/// let spec_json = r#"{
+///   "notional": { "initial": { "amount": "1000000", "currency": "USD" }, "amort": "none" },
+///   "issue_date": "2024-08-31",
+///   "maturity": "2025-08-31",
+///   "coupon_program": []
+/// }"#;
+/// let schedule_json = build_cashflow_schedule_json(spec_json, None)?;
+/// assert!(schedule_wal(&schedule_json, "2024-08-31")? > 0.99);
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn schedule_wal(schedule_json: &str, as_of: &str) -> Result<f64> {
+    let schedule = parse_schedule(schedule_json)?;
+    schedule.validate()?;
+    schedule.wal(parse_iso_date(as_of)?)
+}
+
+/// Outstanding principal balance after each unique date of a schedule JSON payload.
+///
+/// JSON bridge over `CashFlowSchedule::outstanding_by_date`: the schedule is
+/// parsed and validated, then its principal flows (amortization, PIK, draws
+/// and repayments) are replayed from the initial notional.
+///
+/// # Arguments
+///
+/// * `schedule_json` - JSON-encoded [`CashFlowSchedule`]; `meta.issue_date`
+///   must be set so the initial funding flow can be identified.
+///
+/// # Returns
+///
+/// One [`DatedFlowJson`] per unique balance date, in date order, whose
+/// `amount` is the outstanding balance after that date's flows.
+///
+/// # Errors
+///
+/// Returns a validation error if the schedule JSON is malformed, the schedule
+/// fails validation, `meta.issue_date` is unset, or principal flows mix
+/// currencies.
+pub fn schedule_outstanding_by_date(schedule_json: &str) -> Result<Vec<DatedFlowJson>> {
+    let schedule = parse_schedule(schedule_json)?;
+    schedule.validate()?;
+    Ok(schedule
+        .outstanding_by_date()?
+        .into_iter()
+        .map(|(date, amount)| DatedFlowJson { date, amount })
+        .collect())
+}
+
+/// Calendar-year non-principal / principal / PV ladder of a schedule JSON payload.
+///
+/// JSON bridge over `CashFlowSchedule::calendar_year_ladder`: flows are
+/// grouped by the calendar year of their date and split into principal-like
+/// and other amounts.
+///
+/// # Arguments
+///
+/// * `schedule_json` - JSON-encoded [`CashFlowSchedule`].
+/// * `pvs` - Present value of each schedule flow, one entry per flow in
+///   schedule order, in the same units as the flow amounts.
+///
+/// # Returns
+///
+/// One [`crate::aggregation::CalendarYearLadderRow`] per calendar year, in
+/// ascending year order.
+///
+/// # Errors
+///
+/// Returns a validation error if the schedule JSON is malformed, the schedule
+/// fails validation, `pvs` does not have one entry per flow, or an amount or
+/// PV is non-finite.
+pub fn schedule_calendar_year_ladder(
+    schedule_json: &str,
+    pvs: &[f64],
+) -> Result<Vec<crate::aggregation::CalendarYearLadderRow>> {
+    let schedule = parse_schedule(schedule_json)?;
+    schedule.validate()?;
+    schedule.calendar_year_ladder(pvs)
 }
 
 fn parse_schedule(schedule_json: &str) -> Result<CashFlowSchedule> {

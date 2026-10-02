@@ -322,6 +322,12 @@ fn terminal_lookback_spot(
 }
 
 fn expired_lookback_payoff(inst: &LookbackOption, spot: f64) -> finstack_quant_core::Result<f64> {
+    let observes_expiry = match &inst.monitoring {
+        crate::instruments::Monitoring::Continuous => true,
+        crate::instruments::Monitoring::Discrete { observation_dates } => {
+            observation_dates.contains(&inst.expiry)
+        }
+    };
     let payoff = match inst.lookback_type {
         LookbackType::FixedStrike => {
             let strike = inst.strike.ok_or_else(|| {
@@ -332,11 +338,21 @@ fn expired_lookback_payoff(inst: &LookbackOption, spot: f64) -> finstack_quant_c
             match inst.option_type {
                 crate::instruments::OptionType::Call => {
                     let observed_max = inst.observed_max.unwrap_or(spot);
-                    (observed_max.max(spot) - strike).max(0.0)
+                    let maximum = if observes_expiry {
+                        observed_max.max(spot)
+                    } else {
+                        observed_max
+                    };
+                    (maximum - strike).max(0.0)
                 }
                 crate::instruments::OptionType::Put => {
                     let observed_min = inst.observed_min.unwrap_or(spot);
-                    (strike - observed_min.min(spot)).max(0.0)
+                    let minimum = if observes_expiry {
+                        observed_min.min(spot)
+                    } else {
+                        observed_min
+                    };
+                    (strike - minimum).max(0.0)
                 }
             }
         }
@@ -966,5 +982,104 @@ mod tests {
             "MC fixed-strike lookback call {mc_pv:.6} exceeds ceiling {ceil:.6}; \
              possible model error. Analytical ref: {analytical_ref:.6}"
         );
+    }
+
+    #[test]
+    fn expired_discrete_lookback_only_observes_scheduled_expiry() {
+        let expiry = date(2025, 1, 31);
+        for include_expiry in [false, true] {
+            for option_type in [OptionType::Call, OptionType::Put] {
+                let mut option = fixed_strike_call(expiry, 110.0, Some(100.0));
+                option.option_type = option_type;
+                option.observed_min = Some(100.0);
+                option.monitoring = crate::instruments::Monitoring::Discrete {
+                    observation_dates: if include_expiry {
+                        vec![date(2025, 1, 30), expiry]
+                    } else {
+                        vec![date(2025, 1, 30)]
+                    },
+                };
+                for terminal in [50.0, 150.0] {
+                    let extremum = if option_type == OptionType::Call {
+                        if include_expiry {
+                            100.0_f64.max(terminal)
+                        } else {
+                            100.0
+                        }
+                    } else if include_expiry {
+                        100.0_f64.min(terminal)
+                    } else {
+                        100.0
+                    };
+                    let expected = if option_type == OptionType::Call {
+                        (extremum - 110.0).max(0.0)
+                    } else {
+                        (110.0 - extremum).max(0.0)
+                    };
+                    assert_eq!(
+                        expired_lookback_payoff(&option, terminal).expect("payoff"),
+                        expected
+                    );
+                    option.lookback_type = LookbackType::FloatingStrike;
+                    let floating = if option_type == OptionType::Call {
+                        (terminal - 100.0).max(0.0)
+                    } else {
+                        (100.0 - terminal).max(0.0)
+                    };
+                    assert_eq!(
+                        expired_lookback_payoff(&option, terminal).expect("floating payoff"),
+                        floating
+                    );
+                    option.lookback_type = LookbackType::FixedStrike;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn discrete_lookback_live_to_expiry_preserves_monitoring_payoff() {
+        let as_of = date(2025, 1, 30);
+        let expiry = date(2025, 1, 31);
+        for include_expiry in [false, true] {
+            for option_type in [OptionType::Call, OptionType::Put] {
+                let (spot, strike) = if option_type == OptionType::Call {
+                    (150.0, 110.0)
+                } else {
+                    (50.0, 90.0)
+                };
+                let mut option = if option_type == OptionType::Call {
+                    fixed_strike_call(expiry, strike, Some(100.0))
+                } else {
+                    fixed_strike_put(expiry, strike, Some(100.0))
+                };
+                option.monitoring = crate::instruments::Monitoring::Discrete {
+                    observation_dates: if include_expiry {
+                        vec![date(2025, 1, 29), expiry]
+                    } else {
+                        vec![date(2025, 1, 29)]
+                    },
+                };
+                option.instrument_pricing_overrides.model_config.mc_paths = Some(16);
+                let curves = market(as_of, spot, 0.0, 0.0, 0.0);
+                let live = option
+                    .value(&curves, as_of)
+                    .expect("live discrete payoff")
+                    .amount();
+                option.expiry_fixing = Some(spot);
+                let terminal = option
+                    .value(&curves, expiry)
+                    .expect("expiry payoff")
+                    .amount();
+                let expected = if include_expiry { 40.0 } else { 0.0 };
+                assert!(
+                    (live - expected).abs() < 1e-10,
+                    "{option_type:?}: live={live}, expected={expected}"
+                );
+                assert!(
+                    (terminal - expected).abs() < 1e-10,
+                    "{option_type:?}: terminal={terminal}, expected={expected}"
+                );
+            }
+        }
     }
 }

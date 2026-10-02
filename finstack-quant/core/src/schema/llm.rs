@@ -74,10 +74,10 @@ pub const RESOLVES_FROM_KEYWORD: &str = "x-finstack-resolves-from";
 ///
 /// 16 KiB is not a tuning knob; it is the gap in the corpus between the two
 /// kinds of shared document. The largest primitive a payload author needs in
-/// front of them is `day_count` at 13.9 KB (`money` is 11.3 KB, `currency`
-/// 11.2 KB). The smallest bag they almost never fill in is
-/// `metric_pricing_overrides` at 20.2 KB, followed by
-/// `instrument_pricing_overrides` at 55.4 KB — and those two drag in the whole
+/// front of them is `money` at 11.4 KB (`currency` is 10.6 KB, `day_count`
+/// 4.9 KB). The smallest bag they almost never fill in is
+/// `metric_pricing_overrides` at 21.4 KB, followed by
+/// `instrument_pricing_overrides` at 44.5 KB — and those two drag in the whole
 /// pricing-model configuration universe behind them.
 ///
 /// Measured across all 109 artifacts, moving this ceiling from 64 KiB to

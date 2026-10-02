@@ -1,0 +1,150 @@
+{
+  "$defs": {
+    "AllocationScheme": {
+      "description": "Strategy allocation scheme.",
+      "oneOf": [
+        {
+          "const": "equal",
+          "description": "Equal weights across all strategies.",
+          "type": "string"
+        },
+        {
+          "const": "fixed",
+          "description": "Caller-supplied fixed weights.",
+          "type": "string"
+        },
+        {
+          "const": "inverse_volatility",
+          "description": "Inverse sample-volatility weights from strategy returns.",
+          "type": "string"
+        },
+        {
+          "const": "risk_budget",
+          "description": "Long-only target risk contribution weights from covariance and budgets.",
+          "type": "string"
+        }
+      ]
+    },
+    "StrategyAllocationInput": {
+      "additionalProperties": false,
+      "description": "Per-strategy allocation input row.",
+      "properties": {
+        "fixed_weight": {
+          "description": "Fixed weight for `fixed` scheme.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "id": {
+          "description": "Stable strategy identifier.",
+          "type": "string"
+        },
+        "returns": {
+          "default": [],
+          "description": "Historical returns for `inverse_volatility`.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "risk_budget": {
+          "description": "Target risk budget fraction for `risk_budget`.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/portfolio/1/weight_allocation_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "JSON specification for strategy-level allocation.",
+  "examples": [
+    {
+      "covariance": null,
+      "money_decimal_places": 10,
+      "scheme": "inverse_volatility",
+      "strategies": [
+        {
+          "fixed_weight": null,
+          "id": "carry",
+          "returns": [
+            0.01,
+            -0.004,
+            0.006,
+            0.002
+          ],
+          "risk_budget": null
+        },
+        {
+          "fixed_weight": null,
+          "id": "trend",
+          "returns": [
+            0.02,
+            -0.012,
+            0.015,
+            -0.006
+          ],
+          "risk_budget": null
+        }
+      ],
+      "total_capital": 10000000.0
+    }
+  ],
+  "properties": {
+    "covariance": {
+      "description": "Optional covariance matrix for `risk_budget`, row-major as nested lists.",
+      "items": {
+        "items": {
+          "format": "double",
+          "type": "number"
+        },
+        "type": "array"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "money_decimal_places": {
+      "default": 10,
+      "description": "Number of decimal places for capital rounding, default 10 and at most 12.\nRounded minor units must remain finite and representable by the\nfloating-point output.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "scheme": {
+      "$ref": "#/$defs/AllocationScheme",
+      "description": "Allocation scheme to apply."
+    },
+    "strategies": {
+      "description": "Strategy input rows.",
+      "items": {
+        "$ref": "#/$defs/StrategyAllocationInput"
+      },
+      "type": "array"
+    },
+    "total_capital": {
+      "description": "Finite signed capital to allocate across strategies. Rounded allocations\nretain this sign and sum to the total rounded at `money_decimal_places`.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "scheme",
+    "total_capital",
+    "strategies"
+  ],
+  "title": "WeightAllocationSpec",
+  "type": "object"
+}

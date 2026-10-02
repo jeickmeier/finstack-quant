@@ -12,6 +12,81 @@ fn sample_forward() -> ForwardCurve {
 }
 
 #[test]
+fn sparse_key_rate_shocks_preserve_continuous_rates_and_exact_bucket_area() {
+    let curve =
+        ForwardCurve::flat("SPARSE", 0.25, sample_forward().base_date(), 0.04).expect("flat");
+    let bumped = curve
+        .with_triangular_key_rate_bump_neighbors(Some(3.03), 3.05, Some(3.07), 100.0)
+        .expect("bucket");
+    assert!((bumped.rate(3.05) - 0.05).abs() < 1e-12);
+    assert!((bumped.rate(3.04) - 0.045).abs() < 1e-12);
+    assert!((bumped.rate(5.0) - 0.04).abs() < 1e-12);
+    // The 4Y Simpson grid misses this 0.04Y-wide bucket entirely; the exact
+    // triangular area is 0.5 * 0.04 * 0.01, averaged over four years.
+    assert!((bumped.rate_period(0.0, 4.0) - 0.04005).abs() < 1e-12);
+}
+
+#[test]
+fn continuous_forward_shocks_survive_roll_scaling_serde_and_rename() {
+    use crate::market_data::bumps::{BumpMode, BumpType, BumpUnits, Bumpable};
+    for style in [
+        InterpStyle::Linear,
+        InterpStyle::LogLinear,
+        InterpStyle::CubicHermite,
+    ] {
+        let source = ForwardCurve::builder("COMPOSITION", 0.25)
+            .base_date(sample_forward().base_date())
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 0.03), (1.0, 0.06), (3.0, 0.02), (5.0, 0.05)])
+            .interp(style)
+            .build()
+            .expect("source");
+        let shocked = source
+            .with_triangular_key_rate_bump_neighbors(Some(0.1), 0.5, Some(2.0), -100.0)
+            .expect("shock");
+        let rolled = shocked.roll_forward(73).expect("roll");
+        let scaled = rolled
+            .apply_bump(BumpSpec {
+                mode: BumpMode::Multiplicative,
+                units: BumpUnits::Factor,
+                value: 1.5,
+                bump_type: BumpType::Parallel,
+            })
+            .expect("scale");
+        let serialized = serde_json::to_string(&scaled).expect("serialize");
+        let restored: ForwardCurve = serde_json::from_str(&serialized).expect("restore");
+        let renamed = scaled
+            .to_builder_with_id("RENAMED")
+            .build()
+            .expect("rename");
+        for t in [0.0, 0.1, 0.3, 1.0, 1.8, 3.5] {
+            assert!((rolled.rate(t) - shocked.rate(t + 0.2)).abs() < 1e-12);
+            assert!((scaled.rate(t) - 1.5 * rolled.rate(t)).abs() < 1e-12);
+            assert!((restored.rate(t) - scaled.rate(t)).abs() < 1e-12);
+            assert!((renamed.rate(t) - scaled.rate(t)).abs() < 1e-12);
+        }
+        assert!((rolled.rate_period(0.0, 1.0) - shocked.rate_period(0.2, 1.2)).abs() < 1e-12);
+    }
+}
+
+#[test]
+fn transformed_loglinear_forward_can_serialize_negative_shocked_rates() {
+    let source = ForwardCurve::builder("NEGATIVE-SHOCK", 0.25)
+        .base_date(sample_forward().base_date())
+        .knots([(0.0, 0.01), (1.0, 0.02)])
+        .interp(InterpStyle::LogLinear)
+        .build()
+        .expect("positive source");
+    let shocked = source.with_parallel_bump(-300.0).expect("negative rates");
+    let restored: ForwardCurve =
+        serde_json::from_str(&serde_json::to_string(&shocked).expect("serialize"))
+            .expect("restore");
+    for t in [0.0, 0.5, 1.0] {
+        assert!((restored.rate(t) - (source.rate(t) - 0.03)).abs() < 1e-12);
+    }
+}
+
+#[test]
 fn interpolates_rate() {
     let fc = sample_forward();
     assert!((fc.rate(0.5) - 0.035).abs() < 1e-12);

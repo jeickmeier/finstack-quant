@@ -84,7 +84,7 @@ pub fn calibrated_hazard_curve(
         market_data: quotes.into_iter().map(MarketDatum::CdsQuote).collect(),
         prior_market: vec![PriorMarketObject::DiscountCurve(discount_curve.clone())],
     };
-    let result = engine::execute(&envelope)?;
+    let result = engine::calibrate(&envelope)?;
     let calibrated_market = MarketContext::try_from(result.result.final_market)?;
     calibrated_market
         .get_hazard(curve_id.as_str())

@@ -22,6 +22,7 @@ import { IdCombobox } from "@/components/finstack/shared/primitives/id-combobox/
 import { DateInput } from "@/components/finstack/core/primitives/date-input/date-input";
 import { FinstackTable } from "@/components/finstack/shared/table/finstack-table/finstack-table";
 import { KnotTable } from "@/components/finstack/core/primitives/knot-table/knot-table";
+import type { MoneyValue as MoneyWire } from "finstack-quant-wasm";
 import { MoneyValue } from "@/components/finstack/core/primitives/money-value/money-value";
 import { MeasureValue } from "@/components/finstack/valuations/primitives/measure-value/measure-value";
 import { StampBadge } from "@/components/finstack/valuations/primitives/stamp-badge/stamp-badge";
@@ -299,7 +300,7 @@ it("date text preserves invalid edits and calendar selection emits ISO", async (
   expect(change).toHaveBeenLastCalledWith("2024-02-28");
 });
 it("shared table uses stable IDs and per-row currencies with working empty/error states", () => {
-  type Row = { id: string; money: { amount: string; currency: string } };
+  type Row = { id: string; money: MoneyWire };
   const data: Row[] = [
     { id: "a", money: { amount: "1.23", currency: "USD" } },
     { id: "b", money: { amount: "2.34", currency: "EUR" } },

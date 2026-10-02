@@ -1,6 +1,7 @@
 //! P&L attribution entry points and JSON helpers.
 
 use crate::bindings::attribution::pnl_attribution::{PyPnlAttribution, WIDE_COLUMNS};
+use crate::bindings::attribution::result_envelope::PyAttributionResultEnvelope;
 use crate::bindings::attribution::return_contribution::{
     extract_return_contribution_spec, PyReturnContributionResult,
 };
@@ -50,8 +51,10 @@ fn build_spec(
     method: &Bound<'_, PyAny>,
     options: AttributionOptions<'_, '_>,
 ) -> PyResult<AttributionSpec> {
-    let market_t0 = MarketContextState::from(&*extract_market_ref(py, market_t0)?);
-    let market_t1 = MarketContextState::from(&*extract_market_ref(py, market_t1)?);
+    let market_t0 =
+        MarketContextState::try_from(&*extract_market_ref(py, market_t0)?).map_err(core_to_py)?;
+    let market_t1 =
+        MarketContextState::try_from(&*extract_market_ref(py, market_t1)?).map_err(core_to_py)?;
     let as_of_t0 = extract_date(as_of_t0)?;
     let as_of_t1 = extract_date(as_of_t1)?;
     let method: AttributionMethod = serde_json::from_value(py_to_json_value(py, method, "method")?)
@@ -153,7 +156,8 @@ fn build_spec(
 /// ------
 /// ValueError
 ///     If an input JSON, the method or config cannot be parsed, a date is
-///     malformed, or attribution validation / pricing fails.
+///     malformed, the FX provider cannot supply a coherent market snapshot,
+///     or attribution validation / pricing fails.
 /// KeyError
 ///     If a required curve, market item, calendar, or FX leg is missing.
 /// RuntimeError
@@ -255,7 +259,8 @@ pub(crate) fn attribute_pnl(
 /// ------
 /// ValueError
 ///     If any input cannot be parsed or an instrument's attribution fails
-///     validation / pricing, or a result mixes currencies across factors.
+///     validation / pricing, the FX provider cannot supply a coherent market
+///     snapshot, or a result mixes currencies across factors.
 /// KeyError
 ///     If a required curve, market item, calendar, or FX leg is missing.
 /// RuntimeError
@@ -403,11 +408,54 @@ pub(crate) fn pnl_bridge(
     Ok(PyMoney::from_inner(pnl))
 }
 
+/// Parse and execute one ``AttributionEnvelope`` with panic containment.
+fn run_attribute_pnl_envelope(
+    py: Python<'_>,
+    spec_json: &str,
+) -> PyResult<finstack_quant_attribution::AttributionResultEnvelope> {
+    let envelope = AttributionEnvelope::from_json(spec_json).map_err(core_to_py)?;
+    py.detach(|| envelope.execute_contained())
+        .map_err(core_to_py)
+}
+
+/// Run attribution from a full JSON ``AttributionEnvelope``.
+///
+/// Typed twin of ``attribute_pnl_envelope_json`` (WASM ``attributePnlEnvelope``).
+/// Most users should prefer ``attribute_pnl``, which accepts separate
+/// arguments.
+///
+/// Parameters
+/// ----------
+/// spec_json : str
+///     JSON-serialized ``AttributionEnvelope`` (schema
+///     ``finstack_quant.attribution/1``).
+///
+/// Returns
+/// -------
+/// AttributionResultEnvelope
+///     The attribution plus its result-policy audit stamp.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If ``spec_json`` is malformed or fails schema validation, or the
+///     attribution fails validation / pricing.
+/// KeyError
+///     If a required curve, market item, calendar, or FX leg is missing.
+/// RuntimeError
+///     If the engine reports an internal failure.
+#[pyfunction]
+#[pyo3(text_signature = "(spec_json)")]
+pub(crate) fn attribute_pnl_envelope(
+    py: Python<'_>,
+    spec_json: &str,
+) -> PyResult<PyAttributionResultEnvelope> {
+    run_attribute_pnl_envelope(py, spec_json).map(|inner| PyAttributionResultEnvelope { inner })
+}
+
 /// Run attribution from a full JSON ``AttributionEnvelope`` and return JSON.
 ///
-/// This is the raw JSON round-trip variant. Most users should prefer
-/// ``attribute_pnl``, which accepts separate arguments and returns a typed
-/// ``PnlAttribution``.
+/// JSON wire twin of ``attribute_pnl_envelope``.
 ///
 /// Parameters
 /// ----------
@@ -429,12 +477,9 @@ pub(crate) fn pnl_bridge(
 /// RuntimeError
 ///     If the engine reports an internal failure.
 #[pyfunction]
+#[pyo3(text_signature = "(spec_json)")]
 pub(crate) fn attribute_pnl_envelope_json(py: Python<'_>, spec_json: &str) -> PyResult<String> {
-    let envelope: AttributionEnvelope = serde_json::from_str(spec_json)
-        .map_err(|e| serde_json_to_py(e, "invalid attribution envelope JSON"))?;
-    let result_envelope = py
-        .detach(|| envelope.execute_contained())
-        .map_err(core_to_py)?;
+    let result_envelope = run_attribute_pnl_envelope(py, spec_json)?;
     serde_json::to_string(&result_envelope).map_err(display_to_py)
 }
 
@@ -474,6 +519,7 @@ pub(crate) fn attribute_pnl_envelope_json(py: Python<'_>, spec_json: &str) -> Py
 /// ------
 /// ValueError
 ///     If the spec is malformed, ``as_of`` is missing for a DataFrame,
+///     numeric inputs or derived weights, contributions, or aggregates are non-finite,
 ///     positions are empty, weighting modes are mixed, or benchmark inputs
 ///     are incomplete, or a Brinson group has zero net weight but nonzero
 ///     return contribution. Split offsetting long/short positions into distinct groups.
@@ -546,7 +592,7 @@ pub(crate) fn validate_attribution_json(json: &str) -> PyResult<String> {
 /// ------
 /// ValueError
 ///     If ``spec_json`` is malformed or violates the weighting / benchmark
-///     invariants.
+///     invariants, or a derived weight, contribution, or aggregate is non-finite.
 #[pyfunction]
 pub(crate) fn validate_return_contribution_json(spec_json: &str) -> PyResult<String> {
     finstack_quant_attribution::validate_return_contribution_json(spec_json).map_err(core_to_py)

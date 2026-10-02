@@ -7,13 +7,13 @@ Examples:
 ['carry', 'rates_curves']
 """
 
-import sys as _sys
-
 from finstack_quant.finstack_quant import attribution as _attribution
 
+AttributionResultEnvelope = _attribution.AttributionResultEnvelope
 PnlAttribution = _attribution.PnlAttribution
 ReturnContributionResult = _attribution.ReturnContributionResult
 attribute_pnl = _attribution.attribute_pnl
+attribute_pnl_envelope = _attribution.attribute_pnl_envelope
 attribute_pnl_envelope_json = _attribution.attribute_pnl_envelope_json
 attribute_pnl_many = _attribution.attribute_pnl_many
 pnl_bridge = _attribution.pnl_bridge
@@ -24,15 +24,12 @@ default_waterfall_order = _attribution.default_waterfall_order
 default_attribution_metrics = _attribution.default_attribution_metrics
 schema = _attribution.schema
 
-# `schema` is a real submodule, so `import finstack_quant.attribution.schema`
-# must work as well as attribute access.
-if "finstack_quant.attribution.schema" not in _sys.modules:
-    _sys.modules["finstack_quant.attribution.schema"] = schema
-
 __all__: list[str] = [
+    "AttributionResultEnvelope",
     "PnlAttribution",
     "ReturnContributionResult",
     "attribute_pnl",
+    "attribute_pnl_envelope",
     "attribute_pnl_envelope_json",
     "attribute_pnl_many",
     "attribute_return_contribution",

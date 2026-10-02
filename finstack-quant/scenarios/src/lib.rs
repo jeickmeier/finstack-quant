@@ -124,12 +124,12 @@ pub use engine::{
 };
 pub use envelope::ScenarioEnvelope;
 pub use error::{Error, Result};
-pub use horizon::{HorizonAnalysis, HorizonResult};
+pub use horizon::{HorizonAnalysis, HorizonReport, HorizonResult, HorizonSummary};
 pub use spec::{
     Compounding, CurveKind, HazardBumpMode, HierarchyTarget, InstrumentType, NodeId, OperationSpec,
     RateBindingSpec, ScenarioSpec, TenorMatchMode, TimeRollMode,
 };
-pub use templates::{AssetClass, Severity, TemplateMetadata, TemplateRegistry};
+pub use templates::{AssetClass, TemplateMetadata, TemplateRegistry, TemplateSeverity};
 pub use warning::Warning;
 
 /// Compiles the crate `README.md` Rust samples as doctests.

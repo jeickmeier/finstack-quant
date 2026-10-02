@@ -45,6 +45,52 @@ pub enum AmortizationEvent {
     },
 }
 
+impl AmortizationEvent {
+    /// Validate the trigger threshold of one event.
+    ///
+    /// Only the context-free bounds are checked here; whether a dated event
+    /// lies inside the facility's `(closing, maturity]` window is checked by
+    /// the facility, which knows those dates.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when a cumulative-loss threshold is not a
+    /// finite decimal fraction in `(0, 1]`, or an excess-spread floor is not
+    /// finite.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        match self {
+            Self::Date { .. } => Ok(()),
+            Self::CumulativeLoss {
+                max_cumulative_loss,
+            } => {
+                if max_cumulative_loss.is_finite()
+                    && *max_cumulative_loss > 0.0
+                    && *max_cumulative_loss <= 1.0
+                {
+                    Ok(())
+                } else {
+                    Err(finstack_quant_core::Error::Validation(format!(
+                        "amortization_events.cumulative_loss.max_cumulative_loss \
+                         ({max_cumulative_loss}) must be a decimal fraction in (0, 1]"
+                    )))
+                }
+            }
+            Self::ExcessSpread {
+                min_excess_spread_3m,
+            } => {
+                if min_excess_spread_3m.is_finite() {
+                    Ok(())
+                } else {
+                    Err(finstack_quant_core::Error::Validation(
+                        "amortization_events.excess_spread.min_excess_spread_3m must be finite"
+                            .to_string(),
+                    ))
+                }
+            }
+        }
+    }
+}
+
 /// Term-out after revolving: collateral principal repays the facility
 /// sequentially for `months` after the (possibly accelerated) revolving end,
 /// and whatever collateral is left is then liquidated at the facility's
@@ -215,6 +261,60 @@ fn default_day_count() -> DayCount {
     DayCount::Act360
 }
 
+/// Setters for single fields of the staged [`CreditModelConfig`].
+///
+/// `credit_model(...)` replaces the whole configuration; these setters change
+/// one field of the staged configuration (starting from
+/// [`CreditModelConfig::default`] when none was staged) and leave the rest.
+impl AssetBackedFacilityBuilder {
+    fn staged_credit_model(&mut self) -> &mut CreditModelConfig {
+        self.credit_model
+            .get_or_insert_with(CreditModelConfig::default)
+    }
+
+    /// Set the deterministic prepayment model of the staged credit model.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Prepayment curve and speed (CPR / PSA / SMM) applied to the
+    ///   collateral pool.
+    pub fn prepayment_spec(
+        mut self,
+        value: crate::instruments::fixed_income::structured_credit::PrepaymentModelSpec,
+    ) -> Self {
+        self.staged_credit_model().prepayment_spec = value;
+        self
+    }
+
+    /// Set the deterministic default model of the staged credit model.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Default curve and rate (CDR / SDA / MDR) applied to the
+    ///   collateral pool.
+    pub fn default_spec(
+        mut self,
+        value: crate::instruments::fixed_income::structured_credit::DefaultModelSpec,
+    ) -> Self {
+        self.staged_credit_model().default_spec = value;
+        self
+    }
+
+    /// Set the deterministic recovery model of the staged credit model.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Recovery rate (decimal fraction of defaulted par) and the
+    ///   recovery lag in months.
+    pub fn recovery_spec(
+        mut self,
+        value: crate::instruments::fixed_income::structured_credit::RecoveryModelSpec,
+    ) -> Self {
+        self.staged_credit_model().recovery_spec = value;
+        self
+    }
+}
+
 impl AssetBackedFacility {
     /// Canonical example: the USD 100M example CLO pool financed by a
     /// USD 80M commitment drawn USD 70M at a fixed 6% (600 bp),
@@ -253,8 +353,8 @@ impl AssetBackedFacility {
             .rate(RateSpec::Fixed { rate: 0.06 })
             .commitment_fee_bp(Decimal::from(50))
             .closing_date(closing)
-            .revolving_end(closing.add_months(24))
-            .maturity(closing.add_months(72))
+            .revolving_end(closing.add_months(24)?)
+            .maturity(closing.add_months(72)?)
             .frequency(Tenor::quarterly())
             .calendar_id("nyse".into())
             .term_out(TermOutSpec { months: 24 })
@@ -295,14 +395,22 @@ impl AssetBackedFacility {
     /// Final repayment date: `maturity`, or the effective revolving end plus
     /// the term-out window when that is earlier (the collateral is then
     /// liquidated on the first payment date at or after it).
-    pub fn repayment_date(&self) -> Date {
-        match self.term_out {
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the term-out window exceeds the supported date range.
+    pub fn repayment_date(&self) -> finstack_quant_core::Result<Date> {
+        Ok(match self.term_out {
             Some(term_out) => self
                 .effective_revolving_end()
-                .add_months(i32::try_from(term_out.months).unwrap_or(i32::MAX))
+                .add_months(i32::try_from(term_out.months).map_err(|_| {
+                    finstack_quant_core::Error::Validation(
+                        "term-out months exceed supported range".into(),
+                    )
+                })?)?
                 .min(self.maturity),
             None => self.maturity,
-        }
+        })
     }
 
     /// Validate amounts, rates, dates and the borrowing-base rules.
@@ -398,36 +506,12 @@ impl AssetBackedFacility {
             previous_draw = Some(draw.date);
         }
         for event in &self.amortization_events {
-            match event {
-                AmortizationEvent::Date { date } => {
-                    if *date <= self.closing_date || *date > self.maturity {
-                        return Err(invalid(format!(
-                            "amortization event date {date} must lie inside (closing, maturity]"
-                        )));
-                    }
-                }
-                AmortizationEvent::CumulativeLoss {
-                    max_cumulative_loss,
-                } => {
-                    if !max_cumulative_loss.is_finite()
-                        || *max_cumulative_loss <= 0.0
-                        || *max_cumulative_loss > 1.0
-                    {
-                        return Err(invalid(format!(
-                            "amortization_events.cumulative_loss.max_cumulative_loss \
-                             ({max_cumulative_loss}) must be a decimal fraction in (0, 1]"
-                        )));
-                    }
-                }
-                AmortizationEvent::ExcessSpread {
-                    min_excess_spread_3m,
-                } => {
-                    if !min_excess_spread_3m.is_finite() {
-                        return Err(invalid(
-                            "amortization_events.excess_spread.min_excess_spread_3m must be finite"
-                                .to_string(),
-                        ));
-                    }
+            event.validate()?;
+            if let AmortizationEvent::Date { date } = event {
+                if *date <= self.closing_date || *date > self.maturity {
+                    return Err(invalid(format!(
+                        "amortization event date {date} must lie inside (closing, maturity]"
+                    )));
                 }
             }
         }

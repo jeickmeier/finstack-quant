@@ -187,29 +187,12 @@ Document any places where divergence from the dominant pattern is intentional:
   `value_column` metric label that the Rust type does not, so it serializes
   through a private wire struct. Without this, `from_json` would silently
   relabel a rolling-Sharpe series.
-- **`SimmCalculator::calculate_from_sensitivities` keeps its `_result` twin**:
-  the base fn returns `(f64, HashMap<String, Money>)`, not a bare scalar, and
-  collapsing it would force an `as_of: Date` parameter onto the public
-  `im_profile_from_simm` and cascade into its binding, stub, and tests. The
-  other three margin pairs were collapsed.
-
-## Known Remaining Gap: paired conversions still owed
-
-These entry points return a bare JSON string under a name with **no** `_json`
-suffix in **both** Python and WASM. They are therefore consistent with each
-other but not with the contract. Converting either side alone would
-*manufacture* the cross-language divergence this contract exists to remove, so
-they must be done as paired changes:
-
-| Domain | Entry points |
-|--------|-------------|
-| attribution | `attribute_pnl_from_spec` |
-| features | `transform_panel` (the typed twin `transform_panel_spec` is already public in Rust) |
-
-The scenarios group is arguably fine as-is — those emit spec *documents* meant
-for re-ingest, so they are wire surfaces and only need `_json`/`Json` suffixes.
-The statements_analytics and factor_model groups are genuine computation
-results and want typed returns on both sides.
+- **`SimmCalculator::calculate_from_sensitivities` keeps a `_parts` variant**:
+  `calculate_from_sensitivities` takes `as_of` and returns a typed, stamped
+  `ImResult`; `calculate_from_sensitivities_parts` returns the bare
+  `(f64, HashMap<String, Money>)` without result stamping, for callers that have
+  no `as_of` (`im_profile_from_simm`). The other three margin pairs were
+  collapsed.
 
 ### Error & Module Structure
 - `error/mod.rs` in core: Uses subdirectory because error module has `inputs.rs` and `suggestions.rs` submodules (justified by size). Valuations uses flat `error.rs` as a re-export facade.

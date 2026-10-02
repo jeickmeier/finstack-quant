@@ -33,13 +33,13 @@ impl PyCurrency {
 
 #[pymethods]
 impl PyCurrency {
-    /// Parse an ISO-4217 alphabetic code (case-insensitive).
+    /// Parse an ISO-4217 alphabetic code (case-insensitive, not trimmed).
     #[new]
     #[pyo3(text_signature = "(code)")]
     fn ctor(code: &str) -> PyResult<Self> {
         Currency::from_str(code)
             .map(Self::from_inner)
-            .map_err(|e| crate::errors::value_error(format!("Invalid currency code {code:?}: {e}")))
+            .map_err(crate::errors::core_to_py)
     }
 
     /// Construct from an ISO-4217 numeric code (e.g. ``840`` for USD).
@@ -140,8 +140,7 @@ pub(crate) fn extract_currency(obj: &Bound<'_, PyAny>) -> PyResult<Currency> {
         return Ok(ccy.inner);
     }
     if let Ok(s) = obj.extract::<String>() {
-        return Currency::from_str(&s)
-            .map_err(|e| crate::errors::value_error(format!("Invalid currency code {s:?}: {e}")));
+        return Currency::from_str(&s).map_err(crate::errors::core_to_py);
     }
     Err(PyTypeError::new_err(
         "expected Currency or str currency code",
@@ -150,7 +149,7 @@ pub(crate) fn extract_currency(obj: &Bound<'_, PyAny>) -> PyResult<Currency> {
 
 /// Build the `finstack_quant.core.currency` submodule and register [`PyCurrency`].
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "currency")?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "currency")?;
     module.setattr(
         "__doc__",
         "ISO-4217 currency bindings (finstack-quant-core).",
@@ -171,13 +170,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, &name_refs)?;
     module.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &module,
-        "currency",
-        "finstack_quant.core",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

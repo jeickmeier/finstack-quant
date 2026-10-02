@@ -99,6 +99,7 @@ fn trust(spec: CardPortfolioSpec, revolving_end: Date) -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_abs("CARD-MT", pool, tranches, close(), maturity(), "USD-OIS")
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
             .with_fees(fees(0.0));
     deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);

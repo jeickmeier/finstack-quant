@@ -1,0 +1,50 @@
+{
+  "artifacts": [
+    {
+      "$id": "https://finstack_quant.dev/schemas/features/1/cross_sectional_op.schema.json",
+      "bytes": 2632,
+      "kind": "component",
+      "path": "schemas/features/1/cross_sectional_op.schema.json",
+      "summary": "Supported cross-sectional transform operation.",
+      "title": "CrossSectionalOp",
+      "type_name": "CrossSectionalOp"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/features/1/pairwise_op.schema.json",
+      "bytes": 691,
+      "kind": "component",
+      "path": "schemas/features/1/pairwise_op.schema.json",
+      "summary": "Supported pairwise rolling time-series transform operation.",
+      "title": "PairwiseOp",
+      "type_name": "PairwiseOp"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/features/1/panel_transform_result.schema.json",
+      "bytes": 1252,
+      "kind": "output",
+      "path": "schemas/features/1/panel_transform_result.schema.json",
+      "summary": "Ordered result columns from a panel transform pipeline.",
+      "title": "PanelTransformResult",
+      "type_name": "PanelTransformResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/features/1/panel_transform_spec.schema.json",
+      "bytes": 11099,
+      "kind": "input",
+      "path": "schemas/features/1/panel_transform_spec.schema.json",
+      "summary": "Specification for a panel transform pipeline.",
+      "title": "PanelTransformSpec",
+      "type_name": "PanelTransformSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/features/1/time_series_op.schema.json",
+      "bytes": 3966,
+      "kind": "component",
+      "path": "schemas/features/1/time_series_op.schema.json",
+      "summary": "Supported time-series transform operation.",
+      "title": "TimeSeriesOp",
+      "type_name": "TimeSeriesOp"
+    }
+  ],
+  "schema_index_version": 1
+}

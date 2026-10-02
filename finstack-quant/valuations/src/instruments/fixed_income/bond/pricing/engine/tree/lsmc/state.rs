@@ -19,6 +19,7 @@ pub(super) struct AccrualClaim {
     pub(super) end: Date,
     pub(super) payment: Date,
     pub(super) day_count: finstack_quant_core::dates::DayCount,
+    pub(super) day_count_context: DayCountContext<'static>,
     pub(super) amount: f64,
     pub(super) pik: bool,
 }
@@ -86,6 +87,8 @@ pub(super) struct FloatingCoupon {
     pub(super) reset_step: usize,
     pub(super) accrual_start_step: usize,
     pub(super) payment_step: usize,
+    /// Economic accrual end at which PIK changes the principal balance.
+    pub(super) effective_end_step: usize,
     pub(super) compiled: CompiledFloatingCoupon,
     pub(super) rate_model: FloatingRateModel,
     pub(super) initial_notional: Option<f64>,
@@ -267,8 +270,10 @@ pub(super) struct ReplayTemplate {
     pub(super) floating_reset_ids: Vec<Vec<usize>>,
     pub(super) floating_accrual_start_ids: Vec<Vec<usize>>,
     pub(super) floating_payment_ids: Vec<Vec<usize>>,
+    pub(super) floating_balance_ids: Vec<Vec<usize>>,
     pub(super) static_accruals: Vec<AccrualClaim>,
     pub(super) static_distributions: Vec<Vec<DistributionEvent>>,
+    pub(super) static_redemption_pik: f64,
     pub(super) exercise: Vec<Vec<ExerciseDate>>,
     pub(super) decision_steps: Vec<usize>,
     pub(super) initial_outstanding: f64,
@@ -285,6 +290,7 @@ pub(super) struct ReplayTemplate {
 
 #[derive(Default)]
 pub(super) struct FloatingBuild {
+    pub(super) day_count_context: Option<DayCountContext<'static>>,
     pub(super) reset: Option<Date>,
     pub(super) start: Option<Date>,
     pub(super) end: Option<Date>,

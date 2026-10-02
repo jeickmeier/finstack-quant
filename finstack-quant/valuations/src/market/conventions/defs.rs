@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 /// let term = RateIndexKind::Term;
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum RateIndexKind {
     /// Overnight Risk-Free Rate index (e.g., SOFR, SONIA, ESTR).
@@ -55,6 +56,7 @@ pub enum RateIndexKind {
 /// // let conv = registry.require_rate_index(&IndexId::new("USD-SOFR-OIS"))?;
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RateIndexConventions {
     /// Operating currency of the index.
     pub currency: Currency,
@@ -199,6 +201,7 @@ pub struct CdsConventionSpec {
 /// business day conventions, fixed leg conventions, and floating leg index references. Used
 /// by swaption builders to construct instruments with correct market conventions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SwaptionConventions {
     /// Calendar for exercise and settlement.
     pub calendar_id: String,
@@ -220,6 +223,7 @@ pub struct SwaptionConventions {
 /// calendars, business day conventions, day count conventions, and inflation lag periods.
 /// Used by inflation swap builders to construct instruments with correct market conventions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct InflationSwapConventions {
     /// Calendar for payment/fixing.
     pub calendar_id: String,
@@ -237,6 +241,7 @@ pub struct InflationSwapConventions {
 
 /// Conventions for cross-currency basis swaps.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct XccyConventions {
     /// Base (foreign) currency of the pair.
     pub base_currency: Currency,
@@ -271,6 +276,7 @@ pub struct XccyConventions {
 
 /// Rule for deriving an interest-rate future's reference period from its expiry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum IrFutureReferencePeriod {
     /// The quoted expiry precedes the term-rate period; the period starts after the
@@ -293,6 +299,7 @@ pub enum IrFutureReferencePeriod {
 /// specifications, reference-period construction, settlement lags, and optional convexity
 /// adjustments.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct IrFutureConventions {
     /// Underlying rate index identifier.
     pub index_id: IndexId,

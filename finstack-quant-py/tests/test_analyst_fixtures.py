@@ -205,15 +205,11 @@ def test_dated_flow_history_drives_native_performance(fixtures: SimpleNamespace)
     assert {"USD-CORP", "EUR-GOVT", "USD-CASH", "EUR-CASH", "ACME-CDS", "USD-PAYER-IRS"} <= settled_positions
     assert cash > 0
     assert fixtures.history.history_spec(start_date) == initial_spec
-    xirr = mwr_xirr(json.dumps(investor_flows))
-    assert math.isfinite(xirr)
-    anchor = date.fromisoformat(investor_flows[0]["date"])
-    npv = sum(
-        flow["amount"] / (1 + xirr) ** ((date.fromisoformat(flow["date"]) - anchor).days / 365.0)
-        for flow in investor_flows
-    )
-    # Native XIRR normalizes cash amounts before applying its 1e-8 tolerance.
-    assert abs(npv) / max(abs(flow["amount"]) for flow in investor_flows) < 1e-8
+    # The May withdrawal followed by the August contribution adds two sign
+    # changes. XIRR deliberately rejects this nonconventional flow history;
+    # the flow-adjusted TWRR calculations above remain well-defined.
+    with pytest.raises(ValueError, match="exactly one sign change"):
+        mwr_xirr(json.dumps(investor_flows))
 
 
 def test_risk_panel_alignment_and_reproducibility(fixtures: SimpleNamespace) -> None:

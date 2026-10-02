@@ -89,10 +89,6 @@
 //! # Ok(())
 //! # }
 //! ```
-//!
-//! # Feature Flag
-//!
-//! `ts_export` enables TypeScript schema type generation.
 
 extern crate self as finstack_quant_valuations;
 

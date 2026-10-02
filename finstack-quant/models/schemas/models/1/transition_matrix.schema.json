@@ -1,0 +1,81 @@
+{
+  "$defs": {
+    "RatingScale": {
+      "additionalProperties": false,
+      "description": "An ordered set of states defining a transition matrix's row/column layout.\n\nStates are identified by string labels for flexibility across rating\ngranularities (coarse, notched, with/without NR, or custom). The scale\ndefines which index is the absorbing default state (if any).\n\n# Examples\n\n```\nuse finstack_quant_models::credit::migration::RatingScale;\n\nlet scale = RatingScale::standard();\nassert_eq!(scale.n_states(), 10);\nassert_eq!(scale.index_of(\"BBB\"), Some(3));\nassert_eq!(scale.default_state(), Some(9)); // D\n```",
+      "properties": {
+        "default_state": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "index_map": {
+          "additionalProperties": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "object"
+        },
+        "labels": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "labels",
+        "index_map"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/transition_matrix.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Row-stochastic N×N transition matrix representing migration probabilities over a fixed time horizon.",
+  "properties": {
+    "data": {
+      "maxItems": 3,
+      "minItems": 3,
+      "prefixItems": [
+        {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      ],
+      "type": "array"
+    },
+    "horizon": {
+      "format": "double",
+      "type": "number"
+    },
+    "scale": {
+      "$ref": "#/$defs/RatingScale"
+    }
+  },
+  "required": [
+    "data",
+    "horizon",
+    "scale"
+  ],
+  "title": "TransitionMatrix",
+  "type": "object"
+}

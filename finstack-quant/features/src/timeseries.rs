@@ -509,8 +509,14 @@ impl EwmaState {
             },
             // The centered variance recursion in standard-deviation form;
             // hypot avoids overflow/underflow from squaring observations.
-            std_dev: (old_weight.sqrt() * self.std_dev)
-                .hypot(cross_weight * value - cross_weight * self.mean),
+            // `libm::hypot` is the same pure-Rust routine std uses on wasm32,
+            // so native and wasm32 builds produce identical bits (the platform
+            // hypot behind `f64::hypot` on native is not correctly rounded and
+            // differs by an ulp).
+            std_dev: libm::hypot(
+                old_weight.sqrt() * self.std_dev,
+                cross_weight * value - cross_weight * self.mean,
+            ),
             mature: true,
         }
     }

@@ -268,6 +268,73 @@ def test_attribute_return_contribution_json_entrypoint() -> None:
     assert relative["residual"] == pytest.approx(0.0, abs=1e-12)
 
 
+@pytest.mark.parametrize(
+    ("positions", "factors"),
+    [
+        ([{"id": "A", "weight": 1e308, "return": 2.0}], []),
+        (
+            [{"id": "A", "weight": 1.0, "return": 0.02}],
+            [{"factor": "F", "exposure": 1e308, "factor_return": 2.0}],
+        ),
+        (
+            [
+                {"id": "A", "market_value": 1e308, "return": 0.02},
+                {"id": "B", "market_value": 1e308, "return": 0.02},
+            ],
+            [],
+        ),
+    ],
+)
+def test_return_contribution_rejects_derived_overflow(positions: list[dict], factors: list[dict]) -> None:
+    spec = {"as_of": "2026-09-29", "positions": positions, "factors": factors}
+    for supplied in (spec, json.dumps(spec)):
+        with pytest.raises(ValueError, match="finite"):
+            attribute_return_contribution(supplied)
+    with pytest.raises(ValueError, match="finite"):
+        validate_return_contribution_json(json.dumps(spec))
+
+
+@pytest.mark.parametrize("method", ["parallel", {"waterfall": default_waterfall_order()}, {"taylor": {}}])
+def test_principal_redemption_is_total_return_without_coupon_income(method: object) -> None:
+    instrument = json.loads(_bond_json())
+    instrument["instrument"]["spec"]["maturity"] = "2025-01-15"
+    instrument["instrument"]["spec"]["cashflow_spec"]["fixed"]["rate"] = "0.0"
+    market = _market_json("2025-01-14")
+    result = attribute_pnl(json.dumps(instrument), market, market, "2025-01-14", "2025-01-16", method)
+    payload = json.loads(result.to_json())
+    detail = payload["carry_detail"]
+    assert float(detail["coupon_income"]["total"]["amount"]) == 0.0
+    assert result.mark_to_market_pnl + 1_000_000.0 == pytest.approx(result.total_pnl, abs=1e-8)
+    assert 0.0 < result.total_pnl < 1_000.0
+    assert abs(result.residual) < 0.01
+
+
+def test_deposit_principal_redemption_is_not_coupon_income() -> None:
+    instrument = {
+        "schema": "finstack_quant.instrument/1",
+        "instrument": {
+            "type": "deposit",
+            "spec": {
+                "id": "ENTRY-ZERO-RATE-DEPOSIT",
+                "notional": {"amount": "1000000", "currency": "USD"},
+                "start_date": "2024-01-15",
+                "maturity": "2025-01-15",
+                "day_count": "act_360",
+                "fixed_rate": "0.0",
+                "discount_curve_id": "USD-OIS",
+                "attributes": {},
+            },
+        },
+    }
+    market = _market_json("2025-01-14")
+    result = attribute_pnl(json.dumps(instrument), market, market, "2025-01-14", "2025-01-16", "parallel")
+    payload = json.loads(result.to_json())
+    assert float(payload["carry_detail"]["coupon_income"]["total"]["amount"]) == 0.0
+    assert result.mark_to_market_pnl + 1_000_000.0 == pytest.approx(result.total_pnl, abs=1e-8)
+    assert 0.0 < result.total_pnl < 1_000.0
+    assert abs(result.residual) < 0.01
+
+
 def test_requested_reporting_currency_requires_fx() -> None:
     with pytest.raises(KeyError, match="fx"):
         attribute_pnl(

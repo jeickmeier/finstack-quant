@@ -412,11 +412,14 @@ mod tests {
         let metrics = CompanyMetrics::from_flat_metrics(
             "SUBJECT",
             [
-                ("enterprise_value".to_string(), 100.0),
-                ("ebitda".to_string(), 20.0),
-                ("custom_signal".to_string(), 3.0),
+                ("enterprise_value".to_string(), Some(100.0)),
+                ("ebitda".to_string(), Some(20.0)),
+                ("custom_signal".to_string(), Some(3.0)),
+                ("revenue".to_string(), None),
             ],
         );
+        assert_eq!(metrics.revenue, None, "a None value is a missing metric");
+        assert_eq!(compute_multiple(&metrics, Multiple::EvEbitda), Some(5.0));
 
         assert_eq!(metrics.named_metric("enterprise_value"), Some(100.0));
         assert_eq!(metrics.named_metric("ebitda"), Some(20.0));
@@ -517,9 +520,9 @@ mod tests {
     #[test]
     fn scoring_regression_positive_residual_is_cheap() {
         let peers = vec![
-            make_company("A", "Energy", "BB", "US", 1.0, 100.0, 5_000.0),
-            make_company("B", "Energy", "BB", "US", 2.0, 200.0, 5_000.0),
-            make_company("C", "Energy", "BB", "US", 3.0, 300.0, 5_000.0),
+            make_company("A", "Energy", "BB", "US", 1.0, 110.0, 5_000.0),
+            make_company("B", "Energy", "BB", "US", 2.0, 180.0, 5_000.0),
+            make_company("C", "Energy", "BB", "US", 3.0, 310.0, 5_000.0),
         ];
         let subject = make_company("SUBJECT", "Energy", "BB", "US", 2.0, 250.0, 5_000.0);
         let peer_set = PeerSet::new(subject, peers, PeriodBasis::Ltm);
@@ -583,11 +586,12 @@ mod tests {
 
         let result = score_relative_value(&peer_set, &dimensions).expect("scoring should succeed");
 
-        assert_eq!(result.dimensions.len(), 3);
+        // Every fixture has EV/EBITDA = 10, so that dimension has no
+        // dispersion and contributes no usable scoring evidence.
+        assert_eq!(result.dimensions.len(), 2);
         // Verify weights are preserved
         assert!((result.dimensions[0].weight - 0.5).abs() < 1e-10);
         assert!((result.dimensions[1].weight - 0.3).abs() < 1e-10);
-        assert!((result.dimensions[2].weight - 0.2).abs() < 1e-10);
     }
 
     // Serde round-trip tests

@@ -1,0 +1,54 @@
+{
+  "$defs": {
+    "RawPdCurve": {
+      "additionalProperties": false,
+      "description": "Raw user-supplied PD term structure with linear interpolation.\n\nUse this when you have a discrete set of cumulative PD observations\n(e.g., from internal rating model output) rather than a parametric\nhazard curve or transition matrix.\n\n# Interpolation\n\n- Knots must be sorted by time and monotonically increasing in PD.\n- For `t` before the first knot, cumulative PD is 0.\n- For `t` after the last knot, cumulative PD is flat-extrapolated.\n- Between knots, linear interpolation is applied.\n\n# Deserialization\n\nDeserialization is validating: JSON inputs go through the same invariant\nchecks as [`RawPdCurve::new`] (first knot at `(0.0, 0.0)`, strictly\nincreasing times, monotone PDs in `[0, 1]`) and unknown fields are\nrejected.",
+      "properties": {
+        "knots": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "rating": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "rating",
+        "knots"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/rating_pd_map.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Rating-keyed map of cumulative PD curves.",
+  "properties": {
+    "curves": {
+      "additionalProperties": {
+        "$ref": "#/$defs/RawPdCurve"
+      },
+      "description": "Cumulative PD curves keyed by the rating label\n[`PdTermStructure::cumulative_pd`] looks up. Lookup uses the map\nkey; the curve's own rating label need not match the key.",
+      "type": "object"
+    }
+  },
+  "required": [
+    "curves"
+  ],
+  "title": "RatingPdMap",
+  "type": "object"
+}

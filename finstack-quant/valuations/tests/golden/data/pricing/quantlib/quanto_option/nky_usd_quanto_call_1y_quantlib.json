@@ -105,7 +105,8 @@
             "USD",
             0.01
           ]
-        ]
+        ],
+        "provider_pinned_quotes": []
       },
       "fx_delta_vol_surfaces": [],
       "hierarchy": null,

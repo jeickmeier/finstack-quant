@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "CopulaSpec": {
+      "description": "Copula model specification for configuration and serialization.\n\nAllows copula selection without constructing the full model,\nenabling deferred construction with market data.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "One-factor Gaussian copula (market standard default).\n\nSimple and fast, but lacks tail dependence.",
+          "properties": {
+            "type": {
+              "const": "gaussian",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Student-t copula with specified degrees of freedom.\n\nCaptures tail dependence - joint extreme defaults are more likely\nthan Gaussian predicts. Lower df = more tail dependence.\n\nTypical calibration: df ∈ [4, 10] for CDX tranches.\n\n# Invariant\n\n`degrees_of_freedom` **must** be finite and `> 2`. Programmatic\nconstruction and [`CopulaSpec::build`] both reject invalid values.",
+          "properties": {
+            "degrees_of_freedom": {
+              "description": "Degrees of freedom (must be > 2 for finite variance)",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "student_t",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "degrees_of_freedom"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Random Factor Loading copula (stochastic correlation).\n\nModels correlation itself as random, capturing the empirical\nobservation that correlation increases during market stress.",
+          "properties": {
+            "loading_volatility": {
+              "description": "Volatility of the factor loading (correlation vol proxy)",
+              "format": "double",
+              "type": "number"
+            },
+            "type": {
+              "const": "random_factor_loading",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "loading_volatility"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Two-factor Gaussian copula with one global and one shared sector factor.",
+          "properties": {
+            "type": {
+              "const": "multi_factor",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/portfolio_loss_config.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Portfolio credit-loss simulation settings.",
+  "properties": {
+    "confidence": {
+      "description": "Loss-positive VaR and expected-shortfall confidence in `(0, 1)`.",
+      "format": "double",
+      "type": "number"
+    },
+    "copula": {
+      "$ref": "#/$defs/CopulaSpec",
+      "description": "Gaussian or Student-t copula specification."
+    },
+    "num_paths": {
+      "description": "Number of simulated paths in `1..=MAX_PORTFOLIO_LOSS_PATHS`.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "seed": {
+      "description": "Root seed for path-indexed Philox streams.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "num_paths",
+    "seed",
+    "confidence",
+    "copula"
+  ],
+  "title": "PortfolioLossConfig",
+  "type": "object"
+}

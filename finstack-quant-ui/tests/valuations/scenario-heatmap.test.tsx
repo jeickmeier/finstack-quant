@@ -13,7 +13,7 @@ import {
   within,
 } from "@testing-library/react";
 import { createChartRuntime } from "@tanstack/charts";
-import type { TrancheScenarioCell } from "finstack-quant-wasm";
+import type { ScenarioCell } from "finstack-quant-wasm";
 import {
   ScenarioHeatmap,
   ScenarioHeatmapPanel,
@@ -117,7 +117,7 @@ it("retains original cells, coordinates, severity and par reference through the 
         },
       );
       const runtime = createChartRuntime<
-        TrancheScenarioCell,
+        ScenarioCell,
         string | number,
         string | number
       >();

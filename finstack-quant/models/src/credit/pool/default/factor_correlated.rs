@@ -66,6 +66,49 @@ impl StochasticDefault for FactorCorrelatedDefault {
     }
 
     fn expected_mdr(&self, seasoning: u32) -> f64 {
-        self.base_mdr_at_seasoning(seasoning)
+        let base_mdr = self.base_mdr_at_seasoning(seasoning);
+        if base_mdr <= f64::EPSILON {
+            return 0.0;
+        }
+        let sigma = (self.factor_loading * self.cdr_volatility).abs();
+        if sigma == 0.0 {
+            return base_mdr.min(0.50);
+        }
+        // E[min(cap, b exp(sigma Z))] has an exact truncated-lognormal
+        // expression. The shock sign does not affect its unconditional mean.
+        let cutoff = (0.50 / base_mdr).ln() / sigma;
+        base_mdr * (0.5 * sigma * sigma).exp() * finstack_quant_core::math::norm_cdf(cutoff - sigma)
+            + 0.50 * finstack_quant_core::math::norm_cdf(-cutoff)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn expected_mdr_matches_conditional_log_normal_mean_including_cap() {
+        for base_cdr in [0.20, 0.99] {
+            let model =
+                FactorCorrelatedDefault::new(DefaultModelSpec::constant_cdr(base_cdr), 1.0, 1.0);
+            let step = 0.0001;
+            let integrated: f64 = (0..200_000)
+                .map(|i| {
+                    let z = -10.0 + (f64::from(i) + 0.5) * step;
+                    let density = (-0.5 * z * z).exp() / (2.0 * std::f64::consts::PI).sqrt();
+                    model.conditional_mdr(30, &[z], &MacroCreditFactors::default()) * density * step
+                })
+                .sum();
+            assert!((model.expected_mdr(30) - integrated).abs() < 1e-8);
+        }
+    }
+
+    #[test]
+    fn deterministic_expected_mdr_matches_the_conditional_cap() {
+        let model = FactorCorrelatedDefault::new(DefaultModelSpec::constant_cdr(1.0), 1.0, 0.0);
+        assert_eq!(
+            model.expected_mdr(30),
+            model.conditional_mdr(30, &[0.0], &MacroCreditFactors::default())
+        );
     }
 }

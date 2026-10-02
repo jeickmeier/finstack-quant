@@ -4,8 +4,9 @@ use std::sync::Arc;
 
 use finstack_quant_core::money::fx::{
     fx_market_pair as rust_fx_market_pair, fx_pair_convention as rust_fx_pair_convention,
-    fx_pip_size as rust_fx_pip_size, invert_fx_rate as rust_invert_fx_rate, FxConversionPolicy,
-    FxMatrix, FxPairConvention, FxQuery, FxQuoteConvention, FxRateResult, SimpleFxProvider,
+    fx_pip_size as rust_fx_pip_size, invert_fx_rate as rust_invert_fx_rate, CurrencyPair,
+    FxConversionPolicy, FxMatrix, FxPairConvention, FxQuery, FxQuoteConvention, FxRateResult,
+    SimpleFxProvider,
 };
 use pyo3::prelude::*;
 use pyo3::types::{PyList, PyModule};
@@ -266,8 +267,9 @@ impl PyFxMatrix {
     ///     Quote (to) currency.
     /// date : datetime.date
     ///     Applicable date for the rate.
-    /// policy : str, optional
-    ///     Conversion policy (default ``"cashflow_date"``).
+    /// policy : FxConversionPolicy | str, optional
+    ///     Conversion policy; ``None`` selects the Rust default query
+    ///     (``FxQuery::new``, ``"cashflow_date"``).
     ///
     /// Returns
     /// -------
@@ -284,12 +286,12 @@ impl PyFxMatrix {
         let base_currency = extract_currency(base)?;
         let quote_currency = extract_currency(quote)?;
         let d = py_to_date(date)?;
-        let pol = match policy {
-            Some(p) => extract_fx_policy(p)?,
-            None => FxConversionPolicy::CashflowDate,
+        let query = match policy {
+            Some(p) => {
+                FxQuery::with_policy(base_currency, quote_currency, d, extract_fx_policy(p)?)
+            }
+            None => FxQuery::new(base_currency, quote_currency, d),
         };
-
-        let query = FxQuery::with_policy(base_currency, quote_currency, d, pol);
 
         let result = self.inner.rate(query).map_err(core_to_py)?;
         Ok(PyFxRateResult { inner: result })
@@ -322,8 +324,9 @@ impl PyFxMatrix {
     /// Parameters
     /// ----------
     /// quotes : dict[str, float]
-    ///     Keys are six-letter ISO pairs (``"EURUSD"``) or slash-separated
-    ///     pairs (``"EUR/USD"``); values are ``1 base = rate quote``.
+    ///     Keys are six ASCII-letter ISO pairs (``"EURUSD"``) or
+    ///     slash-separated pairs (``"EUR/USD"``), parsed by the Rust
+    ///     ``CurrencyPair``; values are ``1 base = rate quote``.
     ///
     /// Returns
     /// -------
@@ -340,20 +343,8 @@ impl PyFxMatrix {
         let mut parsed = Vec::with_capacity(quotes.len());
         for (key, value) in quotes.iter() {
             let pair: String = key.extract()?;
-            let (base, quote) = match pair.split_once('/') {
-                Some((b, q)) => (b.to_string(), q.to_string()),
-                None if pair.len() == 6 => (pair[..3].to_string(), pair[3..].to_string()),
-                None => {
-                    return Err(crate::errors::value_error(format!(
-                        "invalid FX pair {pair:?}: expected \"EURUSD\" or \"EUR/USD\""
-                    )))
-                }
-            };
-            parsed.push((
-                crate::bindings::module_utils::parse_currency(&base)?,
-                crate::bindings::module_utils::parse_currency(&quote)?,
-                value.extract::<f64>()?,
-            ));
+            let pair: CurrencyPair = pair.parse().map_err(core_to_py)?;
+            parsed.push((pair.base, pair.quote, value.extract::<f64>()?));
         }
         matrix.inner.set_quotes(&parsed).map_err(core_to_py)?;
         Ok(matrix)
@@ -367,10 +358,17 @@ impl PyFxMatrix {
     /// Returns
     /// -------
     /// pandas.DataFrame
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If repeated quote updates prevent a coherent snapshot or the
+    ///     provider cannot version its snapshot quotes.
     fn quotes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let mut state: Vec<(String, String, f64)> = self
             .inner
             .get_serializable_state()
+            .map_err(core_to_py)?
             .quotes
             .into_iter()
             .map(|(base, quote, rate)| (base.to_string(), quote.to_string(), rate))
@@ -389,13 +387,13 @@ impl PyFxMatrix {
         crate::bindings::pandas_utils::dict_to_dataframe(py, &data, None)
     }
 
-    fn __repr__(&self) -> String {
-        let state = self.inner.get_serializable_state();
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        let state = self.inner.get_serializable_state().map_err(core_to_py)?;
+        Ok(format!(
             "FxMatrix(quotes={}, pinned_quotes={})",
             state.quotes.len(),
             state.pinned_quotes.len()
-        )
+        ))
     }
 }
 
@@ -611,7 +609,7 @@ pub(super) const EXPORTS: &[&str] = &[
 
 /// Register the `finstack_quant.core.market_data.fx` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "fx")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "fx")?;
     m.setattr(
         "__doc__",
         "FX rate matrix and conversion policy bindings (finstack-quant-core).",
@@ -630,13 +628,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, EXPORTS)?;
     m.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "fx",
-        "finstack_quant.core.market_data",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

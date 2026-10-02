@@ -428,11 +428,12 @@ def test_portfolio_attribution_movers_are_mutually_distinct() -> None:
     assert all(value != 0.0 for value in movers.values()), movers
     assert len(set(movers.values())) == len(movers), movers
 
-    # Pinned levels, so a sign flip or a factor rescale is caught too.
-    assert movers["carry"] == pytest.approx(3_802.592326, rel=1e-9)
-    assert movers["rates_curves_pnl"] == pytest.approx(-13_313.489897, rel=1e-9)
-    assert movers["fx_translation_pnl"] == pytest.approx(50_501.803491, rel=1e-9)
-    assert movers["total_pnl"] == pytest.approx(40_990.905920, rel=1e-9)
+    # Pinned levels use Hagan-West endpoints derived from adjacent instantaneous
+    # forwards; a sign flip or a factor rescale must still fail here.
+    assert movers["carry"] == pytest.approx(4_474.594891591847, rel=1e-9)
+    assert movers["rates_curves_pnl"] == pytest.approx(-13_287.421974675304, rel=1e-9)
+    assert movers["fx_translation_pnl"] == pytest.approx(50_501.79472889498, rel=1e-9)
+    assert movers["total_pnl"] == pytest.approx(41_688.96764581138, rel=1e-9)
 
 
 def test_portfolio_attribution_leaves_untouched_factors_at_zero() -> None:
@@ -469,12 +470,7 @@ def test_portfolio_attribution_of_an_empty_book_is_all_zero() -> None:
 
 
 def test_risk_decomposition_to_factor_dataframe() -> None:
-    """One row per factor contribution, with the pinned column order.
-
-    The column list is deliberately identical to
-    ``FactorRiskDecomposition.to_factor_dataframe`` — both wrappers render the
-    same Rust ``RiskDecomposition``, so they must not diverge.
-    """
+    """One row per factor contribution, with the pinned column order."""
     df = _risk_decomposition().to_factor_dataframe()
 
     assert isinstance(df, pd.DataFrame)

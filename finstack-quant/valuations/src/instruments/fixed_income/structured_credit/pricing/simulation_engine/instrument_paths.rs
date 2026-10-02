@@ -365,7 +365,7 @@ impl<S: PeriodShockSource> PoolFlowSource for InstrumentPathFlowSource<'_, S> {
                 &self.marginal_scratch,
                 &mut self.default_scratch,
                 &mut self.conditional_scratch,
-            ) {
+            )? {
                 PerNameResolution::Realized => {
                     for (slot, &i) in self.alive.iter().enumerate() {
                         self.inputs[i].pd = if self.default_scratch[slot] { 1.0 } else { 0.0 };
@@ -505,6 +505,7 @@ mod tests {
         .expect("tranches");
         let mut deal =
             StructuredCredit::new_clo("POOL-PATH", pool, tranches, AS_OF, maturity, "USD-OIS")
+                .expect("valid structured-credit dates")
                 .with_calendar_id("nyse");
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);

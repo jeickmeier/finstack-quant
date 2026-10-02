@@ -1,0 +1,192 @@
+{
+  "$defs": {
+    "FreeRentWindowSpec": {
+      "additionalProperties": false,
+      "description": "Free rent (concession) window that zeros out rent for `periods` starting at `start`.",
+      "properties": {
+        "periods": {
+          "description": "Number of model periods of free rent.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "start": {
+          "$ref": "#/$defs/PeriodId",
+          "description": "Period (inclusive) when free rent starts."
+        }
+      },
+      "required": [
+        "start",
+        "periods"
+      ],
+      "type": "object"
+    },
+    "LeaseGrowthConvention": {
+      "description": "Convention that determines how `growth_rate` compounds in a lease.\n\n- `AnnualEscalator` (default): `growth_rate` is applied once per\n  **lease-start anniversary**, measured in model periods (every\n  `periods_per_year()` periods from the segment start). Matches Argus /\n  NCREIF annual bumps: rent is flat within a lease year and steps on the\n  anniversary. The bump counter resets at each rent step.\n- `PerPeriod`: `growth_rate` is applied every model period. Must be set\n  explicitly; omitted / defaulted values are never per-period.",
+      "oneOf": [
+        {
+          "const": "per_period",
+          "description": "Growth rate compounds every model period.",
+          "type": "string"
+        },
+        {
+          "const": "annual_escalator",
+          "description": "Growth rate compounds annually on the lease-start anniversary.",
+          "type": "string"
+        }
+      ]
+    },
+    "PeriodId": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    },
+    "RenewalSpec": {
+      "additionalProperties": false,
+      "description": "Renewal specification for a lease.\n\nThis is modeled in an **expected value** sense via `probability`.",
+      "properties": {
+        "downtime_periods": {
+          "default": 0,
+          "description": "Downtime (no rent) after the initial term ends.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "free_rent_periods": {
+          "default": 0,
+          "description": "Free rent periods at renewal start.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "probability": {
+          "description": "Probability of renewal in `0..=1`.",
+          "format": "double",
+          "type": "number"
+        },
+        "rent_factor": {
+          "default": 1.0,
+          "description": "Rent multiplier applied to the last contractual rent of the initial term.\n\nExample: `1.05` means renewal starts at +5% vs prior rent level.",
+          "format": "double",
+          "type": "number"
+        },
+        "term_periods": {
+          "description": "Renewal term length in model periods.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "term_periods",
+        "probability"
+      ],
+      "type": "object"
+    },
+    "RentStepSpec": {
+      "additionalProperties": false,
+      "description": "Rent step that resets the base rent starting at `start` (inclusive).\n\nThe lease `growth_rate` then applies from this step forward until the next step.",
+      "properties": {
+        "rent": {
+          "description": "Rent per model period starting at `start`.",
+          "format": "double",
+          "type": "number"
+        },
+        "start": {
+          "$ref": "#/$defs/PeriodId",
+          "description": "Period (inclusive) when this rent level becomes effective."
+        }
+      },
+      "required": [
+        "start",
+        "rent"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/lease_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Richer lease spec for rent roll generation: - rent steps (explicit bumps) - arbitrary free-rent windows - optional renewal with downtime + probability",
+  "properties": {
+    "base_rent": {
+      "description": "Base rent per period at `start`.",
+      "format": "double",
+      "type": "number"
+    },
+    "end": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PeriodId"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Last period (inclusive) of the initial term. `None` means through model end (no renewal modeling)."
+    },
+    "free_rent_periods": {
+      "default": 0,
+      "description": "Number of free rent periods from `start`.",
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "free_rent_windows": {
+      "description": "Additional free rent windows (beyond the initial `free_rent_periods`).",
+      "items": {
+        "$ref": "#/$defs/FreeRentWindowSpec"
+      },
+      "type": "array"
+    },
+    "growth_convention": {
+      "$ref": "#/$defs/LeaseGrowthConvention",
+      "default": "annual_escalator",
+      "description": "Convention for compounding `growth_rate`.\n\nDefaults to [`LeaseGrowthConvention::AnnualEscalator`]. Set\n[`LeaseGrowthConvention::PerPeriod`] explicitly for per-period\ncompounding."
+    },
+    "growth_rate": {
+      "default": 0.0,
+      "description": "Growth rate applied per period or annually (depending on `growth_convention`)\nwithin a rent segment (between steps).",
+      "format": "double",
+      "type": "number"
+    },
+    "node_id": {
+      "description": "Base id used to derive node ids:\n`{node_id}.pgi`, `{node_id}.free_rent`, `{node_id}.vacancy_loss`, `{node_id}.effective_rent`.",
+      "type": "string"
+    },
+    "occupancy": {
+      "default": 1.0,
+      "description": "Occupancy factor in `0..=1` applied to non-free contractual rent.",
+      "format": "double",
+      "type": "number"
+    },
+    "renewal": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RenewalSpec"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional renewal modeling after `end`."
+    },
+    "rent_steps": {
+      "description": "Rent steps that reset rent levels at their start periods.",
+      "items": {
+        "$ref": "#/$defs/RentStepSpec"
+      },
+      "type": "array"
+    },
+    "start": {
+      "$ref": "#/$defs/PeriodId",
+      "description": "First period (inclusive) when the lease is active."
+    }
+  },
+  "required": [
+    "node_id",
+    "start",
+    "base_rent"
+  ],
+  "title": "LeaseSpec",
+  "type": "object"
+}

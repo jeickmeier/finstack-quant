@@ -195,9 +195,10 @@ impl NelsonSiegelModel {
     /// Construct from a flat parameter vector.
     ///
     /// # Errors
-    /// Returns an error if the vector length doesn't match the variant.
+    /// Returns an error if the vector length doesn't match the variant, any
+    /// parameter is non-finite, or the model's decay horizons are invalid.
     pub fn from_params_vec(variant: NsVariant, params: &[f64]) -> crate::Result<Self> {
-        match variant {
+        let model = match variant {
             NsVariant::Ns => {
                 if params.len() != 4 {
                     return Err(crate::Error::Validation(format!(
@@ -205,12 +206,12 @@ impl NelsonSiegelModel {
                         params.len()
                     )));
                 }
-                Ok(Self::Ns {
+                Self::Ns {
                     beta0: params[0],
                     beta1: params[1],
                     beta2: params[2],
                     tau: params[3],
-                })
+                }
             }
             NsVariant::Nss => {
                 if params.len() != 6 {
@@ -219,19 +220,21 @@ impl NelsonSiegelModel {
                         params.len()
                     )));
                 }
-                Ok(Self::Nss {
+                Self::Nss {
                     beta0: params[0],
                     beta1: params[1],
                     beta2: params[2],
                     beta3: params[3],
                     tau1: params[4],
                     tau2: params[5],
-                })
+                }
             }
-        }
+        };
+        model.validate()?;
+        Ok(model)
     }
 
-    /// Validate the model's time-scale constraints.
+    /// Validate finite rate loadings and the model's time-scale constraints.
     ///
     /// The beta coefficients are unconstrained decimal continuous zero-rate
     /// loadings. For Nelson-Siegel, `tau` controls the decay horizon; for
@@ -240,9 +243,35 @@ impl NelsonSiegelModel {
     ///
     /// # Errors
     ///
-    /// Returns an error when a time-scale parameter is non-positive or, for
+    /// Returns an error when any coefficient or horizon is non-finite, a
+    /// time-scale parameter is non-positive or, for
     /// the Svensson variant, the two time scales differ by less than `1e-10`.
     pub fn validate(&self) -> crate::Result<()> {
+        let finite = match self {
+            Self::Ns {
+                beta0,
+                beta1,
+                beta2,
+                tau,
+            } => [*beta0, *beta1, *beta2, *tau]
+                .iter()
+                .all(|value| value.is_finite()),
+            Self::Nss {
+                beta0,
+                beta1,
+                beta2,
+                beta3,
+                tau1,
+                tau2,
+            } => [*beta0, *beta1, *beta2, *beta3, *tau1, *tau2]
+                .iter()
+                .all(|value| value.is_finite()),
+        };
+        if !finite {
+            return Err(crate::Error::Validation(
+                "Nelson-Siegel coefficients and decay horizons must be finite".to_string(),
+            ));
+        }
         match self {
             Self::Ns { tau, .. } => {
                 if *tau <= 0.0 {
@@ -399,6 +428,10 @@ impl Discounting for ParametricCurve {
         self.base_date
     }
 
+    fn day_count(&self) -> DayCount {
+        self.day_count
+    }
+
     fn df(&self, t: f64) -> f64 {
         if t <= 0.0 {
             return 1.0;
@@ -445,7 +478,8 @@ impl ParametricCurveBuilder {
     ///
     /// Returns an error if `base_date` or `model` was not supplied, or the
     /// model fails [`NelsonSiegelModel::validate`] because its decay horizons
-    /// are non-positive or indistinguishable.
+    /// are non-finite, non-positive or indistinguishable, or its rate loadings
+    /// are non-finite.
     pub fn build(self) -> crate::Result<ParametricCurve> {
         let base_date = self
             .base_date
@@ -531,6 +565,44 @@ mod tests {
     }
 
     #[test]
+    fn parametric_models_reject_every_nonfinite_parameter() {
+        for (variant, baseline) in [
+            (NsVariant::Ns, vec![0.03, -0.02, 0.01, 1.5]),
+            (NsVariant::Nss, vec![0.03, -0.02, 0.01, 0.005, 1.5, 5.0]),
+        ] {
+            for index in 0..baseline.len() {
+                for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+                    let mut parameters = baseline.clone();
+                    parameters[index] = value;
+                    assert!(NelsonSiegelModel::from_params_vec(variant, &parameters).is_err());
+                    let model = match variant {
+                        NsVariant::Ns => NelsonSiegelModel::Ns {
+                            beta0: parameters[0],
+                            beta1: parameters[1],
+                            beta2: parameters[2],
+                            tau: parameters[3],
+                        },
+                        NsVariant::Nss => NelsonSiegelModel::Nss {
+                            beta0: parameters[0],
+                            beta1: parameters[1],
+                            beta2: parameters[2],
+                            beta3: parameters[3],
+                            tau1: parameters[4],
+                            tau2: parameters[5],
+                        },
+                    };
+                    assert!(model.validate().is_err());
+                    assert!(ParametricCurve::builder("INVALID")
+                        .base_date(base_date())
+                        .model(model)
+                        .build()
+                        .is_err());
+                }
+            }
+        }
+    }
+
+    #[test]
     fn round_trip_serde() {
         let curve = ParametricCurve::builder("USD-NS")
             .base_date(base_date())
@@ -547,6 +619,36 @@ mod tests {
         let restored: ParametricCurve = serde_json::from_str(&json).unwrap();
         assert_eq!(curve.id(), restored.id());
         assert!((curve.df(5.0) - restored.df(5.0)).abs() < 1e-12);
+    }
+
+    #[test]
+    fn date_discounting_honors_configured_day_count() {
+        let base = base_date();
+        let maturity = base + time::Duration::days(365);
+        for day_count in [DayCount::Act360, DayCount::Act365F] {
+            let curve = ParametricCurve::builder("FLAT-NS")
+                .base_date(base)
+                .day_count(day_count)
+                .model(NelsonSiegelModel::Ns {
+                    beta0: 0.05,
+                    beta1: 0.0,
+                    beta2: 0.0,
+                    tau: 1.0,
+                })
+                .build()
+                .unwrap();
+            let years = day_count
+                .year_fraction(base, maturity, crate::dates::DayCountContext::default())
+                .unwrap();
+            let expected = (-0.05 * years).exp();
+            assert_eq!(Discounting::day_count(&curve), day_count);
+            assert!((curve.df_between_dates(base, maturity).unwrap() - expected).abs() < 1e-14);
+
+            let serialized = serde_json::to_string(&curve).unwrap();
+            let restored: ParametricCurve = serde_json::from_str(&serialized).unwrap();
+            assert_eq!(Discounting::day_count(&restored), day_count);
+            assert!((restored.df_between_dates(base, maturity).unwrap() - expected).abs() < 1e-14);
+        }
     }
 
     #[test]

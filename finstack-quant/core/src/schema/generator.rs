@@ -264,6 +264,9 @@ pub fn build_schema_index(artifacts: &[SchemaArtifact]) -> Result<Value> {
 
 /// Render canonical metadata for a schema index row.
 ///
+/// Besides the display `title`, the row carries `type_name`: the Rust type
+/// name of the root contract type (its `schemars` schema name).
+///
 /// # Arguments
 ///
 /// * `artifact` - Registry entry supplying the row's identity and description.
@@ -296,6 +299,10 @@ pub fn schema_index_row(artifact: &SchemaArtifact, rendered: &Value) -> Result<M
     row.insert(
         "title".to_string(),
         Value::String(artifact.title.to_string()),
+    );
+    row.insert(
+        "type_name".to_string(),
+        Value::String(artifact.type_name().into_owned()),
     );
     Ok(row)
 }

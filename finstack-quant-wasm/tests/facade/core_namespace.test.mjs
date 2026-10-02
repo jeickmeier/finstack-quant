@@ -4,7 +4,7 @@
  * Loads the public facade (`index.js` + `exports/core.js`), initializes the
  * web-target wasm module from bytes (Node has no `fetch`-able URL), and
  * exercises a minimal slice of `core`: Currency, Money (including the
- * lossless `amountDecimal()` accessor), FxDeltaVolSurface construction, and
+ * lossless `amountDecimal` getter), FxDeltaVolSurface construction, and
  * the FxRateResult `rate` / `triangulated` getters.
  *
  * Requires the wasm-pack web build: npm run build (mise run wasm-build).
@@ -32,6 +32,9 @@ const { core, valuations } = facade;
 
 await init({ module_or_path: readFileSync(WASM_BG) });
 
+// `Money.fromDecimalStr` takes a `Currency` handle, like the `Money` constructor.
+const decimalMoney = (amount, code) => core.Money.fromDecimalStr(amount, new core.Currency(code));
+
 test('core namespace exposes expected constructors', () => {
   assert.equal(typeof core.Currency, 'function');
   assert.equal(typeof core.Money, 'function');
@@ -44,30 +47,117 @@ test('core.Currency creation', () => {
   assert.equal(usd.code, 'USD');
 });
 
+test('core log-normal CDF preserves underflowed tail probabilities', () => {
+  assert.ok(Math.abs(core.logNormCdf(-40) + 804.6084420137538) < 1e-12);
+  assert.equal(core.logNormCdf(-Infinity), -Infinity);
+  assert.ok(core.logNormCdf(Infinity) === 0);
+  assert.ok(Number.isNaN(core.logNormCdf(NaN)));
+});
+
 test('core.Money amount and lossless amountDecimal', () => {
   const usd = new core.Currency('USD');
   const m = new core.Money(1234.56, usd);
   assert.equal(m.amount, 1234.56);
-  assert.equal(typeof m.amountDecimal(), 'string');
-  assert.equal(m.amountDecimal(), '1234.56');
+  assert.equal(typeof m.amountDecimal, 'string');
+  assert.equal(m.amountDecimal, '1234.56');
   const eur = new core.Currency('EUR');
   const converted = m.convertAtRate(eur, 0.9);
   assert.equal(converted.currency.code, 'EUR');
   assert.equal(converted.amount, 1111.104);
   const subCent = new core.Money(1.2345, usd);
-  assert.equal(subCent.amountDecimal(), '1.2345');
+  assert.equal(subCent.amountDecimal, '1.2345');
 });
 
 test('core date integer widths match generated runtime types', () => {
   const start = core.createDate(2025, 1, 1);
   const end = core.createDate(2025, 1, 3);
   assert.ok(core.dateFromEpochDays(start) instanceof Int32Array);
-  assert.equal(typeof core.DayCount.act360().calendarDays(start, end), 'bigint');
+  // `calendarDays` is a static, like Rust `DayCount::calendar_days` and Python.
+  assert.equal(typeof core.DayCount.calendarDays, 'function');
+  assert.equal('calendarDays' in core.DayCount.act360(), false);
+  assert.equal(typeof core.DayCount.calendarDays(start, end), 'bigint');
+  assert.equal(core.DayCount.calendarDays(start, end), 2n);
+});
+
+test('core date inputs reject truncation, wrapping and non-finite epoch days', () => {
+  for (const value of [257, 1.5, Number.NaN, Infinity, -Infinity]) {
+    assert.throws(() => core.createDate(2025, value, 1));
+    assert.throws(() => core.createDate(2025, 1, value));
+  }
+  assert.throws(() => core.createDate(2025.9, 1, 1));
+  assert.throws(() => core.createDate(2 ** 32 + 2025, 1, 1));
+
+  const dayCount = core.DayCount.act360();
+  const context = new core.DayCountContext();
+  const start = core.createDate(2025, 1, 1);
+  const end = core.createDate(2025, 1, 3);
+  try {
+    for (const value of [Number.NaN, Infinity, -Infinity, 0.5, 2 ** 32, -(2 ** 32)]) {
+      assert.throws(() => core.dateFromEpochDays(value));
+      assert.throws(() => core.adjust(value, 'following', 'target2'));
+      assert.throws(() => dayCount.yearFraction(value, end));
+      assert.throws(() => dayCount.yearFraction(start, value));
+      assert.throws(() => dayCount.signedYearFraction(value, end));
+      assert.throws(() => dayCount.yearFraction(start, value, context));
+      assert.throws(() => core.DayCount.calendarDays(value, end));
+      assert.throws(() => new core.DayCountContext(undefined, undefined, undefined, [value, end]));
+      assert.throws(
+        () => new core.DayCountContext(undefined, undefined, undefined, [start, value])
+      );
+    }
+    for (const value of [-1, 252.5, 65536, 65788, Number.NaN, Infinity]) {
+      assert.throws(
+        () => new core.DayCountContext(undefined, undefined, value),
+        (error) => error instanceof TypeError && error.kind === 'invalid_type'
+      );
+    }
+    // A zero Bus/252 divisor is a whole number the Rust constructor rejects.
+    assert.throws(
+      () => new core.DayCountContext(undefined, undefined, 0),
+      (error) => error.kind === 'validation' && /Invalid Bus\/252 basis/.test(error.message)
+    );
+    const validBasis = new core.DayCountContext(undefined, undefined, 252);
+    assert.equal(validBasis.busBasis, 252);
+    validBasis.free();
+    assert.deepEqual([...core.dateFromEpochDays(start)], [2025, 1, 1]);
+    assert.equal(core.DayCount.calendarDays(start, end), 2n);
+  } finally {
+    context.free();
+    dayCount.free();
+  }
+});
+
+test('core matrix dimensions reject fractional, wrapped and non-finite numbers', () => {
+  for (const value of [0, -1, 1.9, Number.NaN, Infinity, 2 ** 32 + 1]) {
+    assert.throws(() => core.choleskyDecomposition([4], value));
+    assert.throws(() => core.applyLowerTriangular([2], value, [4]));
+  }
+  assert.throws(() => core.choleskyDecomposition([], 65536));
+  assert.deepEqual([...core.choleskyDecomposition([4], 1)], [2]);
+  // The system dimension is `b.length`, as in Rust and Python.
+  assert.deepEqual([...core.choleskySolve([2], [4])], [1]);
+  assert.deepEqual([...core.applyLowerTriangular([2], 1, [4])], [8]);
+});
+
+test('core Cholesky solve rejects non-finite inputs and overflowing solutions', () => {
+  for (const value of [Number.NaN, Infinity, -Infinity]) {
+    assert.throws(() => core.choleskySolve([value], [1]));
+    assert.throws(() => core.choleskySolve([1], [value]));
+  }
+  assert.throws(() => core.choleskySolve([1e-160], [1]));
+  assert.deepEqual([...core.choleskySolve([2, NaN, 1, 3], [6, 12])], [1, 1]);
+});
+
+test('core correlation documents canonical missing-data and constant-series behavior', () => {
+  assert.equal(core.correlation([], []), 0);
+  assert.equal(core.correlation([1], [2]), 0);
+  assert.equal(core.correlation([1, 1], [2, 3]), 0);
+  assert.ok(Number.isNaN(core.correlation([1, 2], [3])));
 });
 
 test('core ACT/ACT ICMA short-month rolls require a reference period', () => {
   const dayCount = core.DayCount.actActIsma();
-  const context = new core.DayCountContext().withFrequency(core.Tenor.monthly());
+  const context = new core.DayCountContext(null, core.Tenor.monthly().toString());
   for (const [year, month, day] of [
     [2025, 2, 28],
     [2024, 2, 29],
@@ -75,9 +165,9 @@ test('core ACT/ACT ICMA short-month rolls require a reference period', () => {
   ]) {
     const start = core.createDate(year, month, day);
     const end = core.createDate(year, month + 1, 31);
-    assert.throws(() => dayCount.yearFractionWithContext(start, end, context), /coupon_period/);
-    const reference = context.withCouponPeriod(start, end);
-    assert.ok(Math.abs(dayCount.yearFractionWithContext(start, end, reference) - 1 / 12) < 1e-12);
+    assert.throws(() => dayCount.yearFraction(start, end, context), /coupon_period/);
+    const reference = new core.DayCountContext(null, '1M', null, [start, end]);
+    assert.ok(Math.abs(dayCount.yearFraction(start, end, reference) - 1 / 12) < 1e-12);
   }
 });
 
@@ -91,22 +181,65 @@ test('wasm-bindgen handles expose free and conditional Symbol.dispose', () => {
 });
 
 test('DiscountCurve uses canonical forward and explicit negative-rate validation', () => {
+  const options = { id: 'CHF-OIS', baseDate: '2025-01-01', knots: [0, 1, 1, 1.002] };
+  assert.throws(() => new core.DiscountCurve(options), /non-increasing/);
+  const curve = new core.DiscountCurve({
+    ...options,
+    validationMode: 'negative_rate_friendly',
+    forwardFloor: -0.01,
+  });
+  try {
+    assert.ok(curve.forward(0, 1) < 0);
+    assert.equal(curve.forwardRate, undefined);
+  } finally {
+    curve.free();
+  }
+});
+
+test('DiscountCurve accepts typed-array options and rejects unknown fields', () => {
+  const options = {
+    id: 'USD-OIS',
+    baseDate: '2025-01-01',
+    knots: new Float64Array([0, 1, 1, 0.99]),
+  };
+  const curve = new core.DiscountCurve(options);
+  try {
+    assert.equal(curve.df(1), 0.99);
+  } finally {
+    curve.free();
+  }
   assert.throws(
-    () => new core.DiscountCurve('CHF-OIS', '2025-01-01', [0, 1, 1, 1.002]),
-    /non-increasing/
+    () => new core.DiscountCurve({ ...options, interpolation: 'linear' }),
+    /unknown field/
   );
-  const curve = new core.DiscountCurve(
-    'CHF-OIS',
-    '2025-01-01',
-    [0, 1, 1, 1.002],
-    undefined,
-    undefined,
-    undefined,
-    'negative_rate_friendly',
-    -0.01
+});
+
+test('DiscountCurve options are strict and defaults come from the Rust builder', () => {
+  const knots = new Float64Array([0, 1, 1, 0.98, 5, 0.88]);
+  const curve = new core.DiscountCurve({ id: 'USD-OIS', baseDate: '2025-01-01', knots });
+  const explicit = new core.DiscountCurve(
+    JSON.stringify({
+      id: 'USD-OIS',
+      baseDate: '2025-01-01',
+      knots: [...knots],
+      interp: 'monotone_convex',
+      extrapolation: 'flat_forward',
+      dayCount: 'act_365f',
+      validationMode: 'market_standard',
+    })
   );
-  assert.ok(curve.forward(0, 1) < 0);
-  assert.equal(curve.forwardRate, undefined);
+  assert.equal(curve.df(2.5), explicit.df(2.5));
+  // A floor without `negative_rate_friendly` is rejected by
+  // `ValidationMode::from_preset`, whether the preset is explicit or omitted.
+  assert.throws(
+    () => new core.DiscountCurve({ id: 'X', baseDate: '2025-01-01', knots, forwardFloor: -0.01 }),
+    /forward_floor is only valid/
+  );
+  assert.throws(
+    () => new core.DiscountCurve({ id: 'X', baseDate: '2025-01-01', knots, dayCountt: 'act_360' }),
+    (error) => error.kind === 'validation' && /unknown field `dayCountt`/.test(error.message)
+  );
+  assert.throws(() => new core.DiscountCurve('X', '2025-01-01', knots), /options/);
 });
 
 test('ForwardCurve options expose resetLag', () => {
@@ -124,14 +257,23 @@ test('ForwardCurve options expose resetLag', () => {
 });
 
 test('ForwardCurve options accept typed arrays', () => {
-  const curve = new core.ForwardCurve({
+  const options = {
     id: 'USD-SOFR',
     tenor: 0.25,
     baseDate: '2025-01-01',
     knots: new Float64Array([0, 0.04, 1, 0.045]),
     dayCount: 'act_360',
-  });
-  assert.equal(curve.rate(1), 0.045);
+  };
+  const curve = new core.ForwardCurve(options);
+  try {
+    assert.equal(curve.rate(1), 0.045);
+  } finally {
+    curve.free();
+  }
+  assert.throws(
+    () => new core.ForwardCurve({ ...options, interpolation: 'linear' }),
+    /unknown field/
+  );
 });
 
 test('coupon profile variants use separate explicit entrypoints', () => {
@@ -152,6 +294,31 @@ test('core VolCube is a data-only artifact', () => {
   }
 });
 
+test('core VolCube rejects overflowing grid and flat-parameter dimensions', () => {
+  const axis = Float64Array.from({ length: 65536 }, (_, index) => index + 1);
+  assert.throws(
+    () => new core.VolCube('GRID-OVERFLOW', axis, axis, [], []),
+    /grid dimensions are too large/
+  );
+  const shorter = axis.subarray(0, 32768);
+  assert.throws(
+    () => new core.VolCube('PARAMETER-OVERFLOW', shorter, shorter, [], []),
+    /parameter dimensions are too large/
+  );
+  const cube = new core.VolCube(
+    'VALID-AFTER-REJECTION',
+    [1],
+    [2],
+    [0.01, 0, -0.2, 0.4, NaN],
+    [0.02]
+  );
+  try {
+    assert.equal(cube.id, 'VALID-AFTER-REJECTION');
+  } finally {
+    cube.free();
+  }
+});
+
 test('core.FxDeltaVolSurface constructs from 25-delta quotes', () => {
   const surface = new core.FxDeltaVolSurface(
     'EURUSD-VOL',
@@ -162,6 +329,17 @@ test('core.FxDeltaVolSurface constructs from 25-delta quotes', () => {
   );
   assert.equal(surface.id, 'EURUSD-VOL');
   assert.equal(surface.numExpiries, 3);
+});
+
+test('core FX delta surface absent wings use omitted arguments, not empty arrays', () => {
+  const surface = new core.FxDeltaVolSurface('EURUSD', [1], [0.1], [0], [0], undefined, undefined);
+  try {
+    assert.equal(surface.numExpiries, 1);
+  } finally {
+    surface.free();
+  }
+  assert.throws(() => new core.FxDeltaVolSurface('EURUSD', [1], [0.1], [0], [0], [], []));
+  assert.throws(() => new core.FxDeltaVolSurface('EURUSD', [1], [0.1], [0], [0], [0], undefined));
 });
 
 test('core FX pair convention helpers', () => {
@@ -188,13 +366,14 @@ test('core.FxMatrix quote updates invalidate cached crosses', () => {
     const setEurUsd = (rate) =>
       pinned ? fx.setQuoteOn('EUR', 'USD', date, policy, rate) : fx.setQuote('EUR', 'USD', rate);
     setEurUsd(1.1);
-    assert.ok(Math.abs(fx.rateDefault('EUR', 'GBP', date).rate - 0.88) < 1e-12);
+    assert.ok(Math.abs(fx.rate('EUR', 'GBP', date).rate - 0.88) < 1e-12);
     setEurUsd(1.2);
-    const result = fx.rateDefault('EUR', 'GBP', date);
+    const result = fx.rate('EUR', 'GBP', date);
     assert.ok(Math.abs(result.rate - 0.96) < 1e-12);
     assert.equal(result.triangulated, true);
-    assert.ok(Math.abs(fx.rateDefault('GBP', 'EUR', date).rate - 1 / 0.96) < 1e-12);
-    assert.equal(fx.rateDefault('GBP', 'USD', date).rate, 1.25);
+    assert.ok(Math.abs(fx.rate('GBP', 'EUR', date).rate - 1 / 0.96) < 1e-12);
+    assert.equal(fx.rate('GBP', 'USD', date).rate, 1.25);
+    assert.equal(fx.rate('GBP', 'USD', date, policy).rate, 1.25);
   }
 });
 
@@ -206,9 +385,9 @@ test('core.Money.fromDecimalStr accepts exact fixed and scientific text', () => 
     ['-7.9228162514264337593543950335e28', '-79228162514264337593543950335', 'USD'],
     ['0e999999', '0', 'USD'],
   ]) {
-    const m = core.Money.fromDecimalStr(text, currency);
+    const m = decimalMoney(text, currency);
     try {
-      assert.equal(m.amountDecimal(), expected);
+      assert.equal(m.amountDecimal, expected);
       assert.equal(m.currency.code, currency);
     } finally {
       m.free();
@@ -218,7 +397,7 @@ test('core.Money.fromDecimalStr accepts exact fixed and scientific text', () => 
     ['1.00e-27', '0.0000000000000000000000000010'],
     ['2000e-31', '0.0000000000000000000000000002'],
   ]) {
-    const m = core.Money.fromDecimalStr(text, 'USD');
+    const m = decimalMoney(text, 'USD');
     try {
       assert.equal(m.formatWith(28, false), formatted);
     } finally {
@@ -236,9 +415,9 @@ test('core.Money.fromDecimalStr rejects inexact amounts', () => {
     '1e29',
     '1.23e-28',
   ]) {
-    assert.throws(() => core.Money.fromDecimalStr(text, 'USD'), /exactly representable/);
+    assert.throws(() => decimalMoney(text, 'USD'), /exactly representable/);
   }
-  assert.throws(() => core.Money.fromDecimalStr('1.0', 'NOPE'));
+  assert.throws(() => decimalMoney('1.0', 'NOPE'));
 });
 
 test('core.Money formatWith honours returned rounding modes', () => {
@@ -253,10 +432,10 @@ test('core.Money formatWith honours returned rounding modes', () => {
     ['ceil', '1.241', 'USD 1.25'],
     ['ceil', '-1.249', 'USD -1.24'],
   ]) {
-    const m = core.Money.fromDecimalStr(amount, 'USD');
+    const m = decimalMoney(amount, 'USD');
     try {
       assert.equal(m.formatWith(2, true, ',', mode), expected);
-      assert.equal(m.amountDecimal(), amount);
+      assert.equal(m.amountDecimal, amount);
     } finally {
       m.free();
     }
@@ -264,14 +443,14 @@ test('core.Money formatWith honours returned rounding modes', () => {
 });
 
 test('core.Money formatWith applies native defaults and JPY zero scale', () => {
-  const usd = core.Money.fromDecimalStr('1234.567', 'USD');
+  const usd = decimalMoney('1234.567', 'USD');
   try {
     assert.equal(usd.formatWith(), 'USD 1234.57');
     assert.equal(usd.formatWith(2, true, ','), 'USD 1,234.57');
   } finally {
     usd.free();
   }
-  const jpy = core.Money.fromDecimalStr('1.5', 'JPY');
+  const jpy = decimalMoney('1.5', 'JPY');
   try {
     assert.equal(jpy.formatWith(0), 'JPY 2');
   } finally {
@@ -280,12 +459,12 @@ test('core.Money formatWith applies native defaults and JPY zero scale', () => {
 });
 
 test('core.Money formatWith rejects invalid options and still frees the handle', () => {
-  const m = core.Money.fromDecimalStr('1.245', 'USD');
+  const m = decimalMoney('1.245', 'USD');
   try {
     for (const decimals of [-1, 1.5, Number.NaN, Infinity, '2', 1_000_001]) {
       assert.throws(
         () => m.formatWith(decimals),
-        /non-negative integer|precision/,
+        /decimals: expected a non-negative whole number|decimals: expected a number|precision/,
         `decimals=${decimals}`
       );
     }

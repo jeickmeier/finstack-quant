@@ -32,22 +32,29 @@ if (!existsSync(WASM_BG)) {
 
 const facade = await import('../../index.js');
 const init = facade.default;
-const { core, margin } = facade;
+const { core, margin, models } = facade;
 
 await init({ module_or_path: readFileSync(WASM_BG) });
 
 // Flat DF = 1 out to 4y, so discounting is a no-op and the arithmetic is
 // hand-checkable.
 const flatDiscount = () =>
-  new core.DiscountCurve(
-    'USD-OIS',
-    '2025-01-01',
-    [0.0, 1.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0],
-    'log_linear'
-  );
+  new core.DiscountCurve({
+    id: 'USD-OIS',
+    baseDate: '2025-01-01',
+    knots: [0.0, 1.0, 1.0, 1.0, 2.0, 1.0, 3.0, 1.0, 4.0, 1.0],
+    interp: 'log_linear',
+  });
+
+const hazardOptions = (knots, recoveryRate, id = 'HZ') => ({
+  id,
+  baseDate: '2025-01-01',
+  knots,
+  recoveryRate,
+});
 
 const flatHazard = (lambda) =>
-  new core.HazardCurve('HZ', '2025-01-01', [0.0, lambda, 30.0, lambda], 0.4);
+  new core.HazardCurve(hazardOptions([0.0, lambda, 30.0, lambda], 0.4));
 
 const exposureJson = JSON.stringify({
   times: [1.0, 2.0],
@@ -72,19 +79,37 @@ test('core namespace exports HazardCurve as a live constructor', () => {
 });
 
 test('HazardCurve rejects missing recovery', () => {
+  // `recoveryRate` is a required option key: serde rejects its absence.
   assert.throws(
-    () => new core.HazardCurve('HZ', '2025-01-01', [0.0, 0.02, 30.0, 0.02]),
-    /recovery/i
+    () => new core.HazardCurve({ id: 'HZ', baseDate: '2025-01-01', knots: [0.0, 0.02] }),
+    (error) => error.kind === 'validation' && /missing field `recoveryRate`/.test(error.message)
+  );
+  // NaN has no JSON form, so the options walker rejects it before Rust runs.
+  assert.throws(
+    () => new core.HazardCurve(hazardOptions([0.0, 0.02, 30.0, 0.02], Number.NaN)),
+    (error) => error instanceof TypeError && error.kind === 'invalid_type'
+  );
+});
+
+test('HazardCurve recovery validation is the Rust builder check, in its order', () => {
+  assert.throws(
+    () => new core.HazardCurve(hazardOptions([1.0, 0.01, 5.0, 0.02], 1.5)),
+    (error) =>
+      error.kind === 'validation' &&
+      error.message ===
+        'Validation error: recovery_rate must be a decimal fraction in [0, 1], got 1.5'
+  );
+  // Knots are validated before recovery, exactly as in Python.
+  assert.throws(
+    () => new core.HazardCurve(hazardOptions([1.0, -0.02], 1.5)),
+    (error) => error.kind === 'validation' && error.message === 'Values must be non-negative'
   );
 });
 
 test('HazardCurve recovery boundaries round-trip', () => {
   for (const recovery of [0.0, 1.0]) {
     const hz = new core.HazardCurve(
-      `HZ-${recovery}`,
-      '2025-01-01',
-      [0.0, 0.02, 30.0, 0.02],
-      recovery
+      hazardOptions([0.0, 0.02, 30.0, 0.02], recovery, `HZ-${recovery}`)
     );
     assert.equal(hz.recoveryRate, recovery);
   }
@@ -217,17 +242,101 @@ test('computeBilateralXva rejects unknown funding fields', () => {
   );
 });
 
+test('computeBilateralXva rejects unknown exposure-profile fields', () => {
+  const profile = JSON.parse(exposureJson);
+  const diagnostics = { market_roll_failures: 3, valuation_failures: 0, total_time_points: 2 };
+  const run = (p) =>
+    margin.computeBilateralXva(
+      JSON.stringify(p),
+      flatHazard(0.02),
+      flatHazard(0.02),
+      flatDiscount(),
+      0.4,
+      0.4
+    );
+  // A correctly spelled `diagnostics` with failures trips the XVA validity gate ...
+  assert.throws(() => run({ ...profile, diagnostics }), /not valid for XVA/);
+  // ... and a misspelled key can no longer bypass it.
+  assert.throws(() => run({ ...profile, diagnostic: diagnostics }), /unknown field `diagnostic`/);
+  assert.throws(() => run({ ...profile, bogus: 1 }), /unknown field `bogus`/);
+});
+
 test('VM validation and desk direction retain settlement metadata', () => {
   const csa = margin.csaUsdRegulatoryJson();
   const collect = margin.calculateVm(csa, 1e6, 0, 'USD', '2025-01-10');
-  assert.equal(collect.collect_amount, 1e6);
-  assert.equal(collect.post_amount, 0);
-  assert.equal(collect.currency, 'USD');
+  // Canonical Rust `VmResult` serde: Money amounts are exact decimal strings.
+  assert.deepEqual(Object.keys(collect).sort(), [
+    'collect_amount',
+    'date',
+    'gross_exposure',
+    'net_exposure',
+    'post_amount',
+    'settlement_date',
+  ]);
+  assert.deepEqual(collect.collect_amount, { amount: '1000000', currency: 'USD' });
+  assert.equal(Number(collect.post_amount.amount), 0);
+  assert.equal(collect.gross_exposure.currency, 'USD');
   assert.equal(collect.date, '2025-01-10');
   assert.equal(collect.settlement_date, '2025-01-13');
   const post = margin.calculateVm(csa, -1e6, 0, 'USD', '2025-01-10');
-  assert.equal(post.post_amount, 1e6);
+  assert.equal(Number(post.post_amount.amount), 1e6);
   const invalid = JSON.parse(csa);
   invalid.calendar_id = 'unknown-calendar';
   assert.throws(() => margin.validateCsaJson(JSON.stringify(invalid)));
+});
+
+test('a Merton-calibrated hazard curve feeds computeBilateralXva through HazardCurve.fromJson', () => {
+  const credit = models.credit;
+  const merton = new credit.MertonModel(100.0, 0.25, 80.0, 0.05);
+  const direct = merton.toHazardCurve(
+    'CPTY-MERTON',
+    '2025-01-01',
+    [1.0, 3.0, 5.0],
+    0.4,
+    'act_365f'
+  );
+  const hz = core.HazardCurve.fromJson(direct.toJson());
+  assert.equal(hz.id, 'CPTY-MERTON');
+  assert.equal(hz.toJson(), core.HazardCurve.fromJson(hz.toJson()).toJson());
+  const result = margin.computeBilateralXva(exposureJson, hz, hz, flatDiscount(), 0.4, 0.4);
+  assert.ok(result.cva > 0, `cva ${result.cva}`);
+});
+
+test('HazardCurve JSON round trip and members pass through Rust', () => {
+  const hz = new core.HazardCurve({
+    ...hazardOptions([1.0, 0.02, 5.0, 0.03], 0.4),
+    parSpreads: [1.0, 120.0, 5.0, 180.0],
+    parInterp: 'log_linear',
+    issuer: 'ACME',
+    seniority: 'senior',
+    currency: 'USD',
+  });
+  const back = core.HazardCurve.fromJson(hz.toJson());
+  assert.equal(back.toJson(), hz.toJson());
+  assert.deepEqual([...hz.knotPoints], [1.0, 0.02, 5.0, 0.03]);
+  assert.deepEqual([...hz.parSpreadPoints], [1.0, 120.0, 5.0, 180.0]);
+  assert.equal(hz.dayCount, 'act_365f');
+  assert.equal(hz.issuer, 'ACME');
+  assert.equal(hz.seniority, 'senior');
+  assert.equal(hz.currency.code, 'USD');
+  assert.equal(hz.parInterp, 'log_linear');
+  assert.equal(hz.cdsQuoteBp(3.0), hz.cdsQuoteBp(3.0, 'log_linear'));
+  assert.ok(Math.abs(hz.defaultProb(1.0, 5.0) - (hz.sp(1.0) - hz.sp(5.0))) < 1e-15);
+  assert.throws(
+    () => hz.defaultProb(5.0, 1.0),
+    (error) => error.kind === 'validation'
+  );
+  assert.equal(hz.spOnDate('2025-01-01'), 1.0);
+  assert.deepEqual([...hz.survivalAtDates(['2025-01-01'])], [1.0]);
+  assert.equal(hz.withRecoveryRate(0.25).recoveryRate, 0.25);
+  assert.equal(new core.HazardCurve(hazardOptions([1.0, 0.02], 0.4)).currency, undefined);
+
+  const flat = core.HazardCurve.flat('F', '2025-01-01', 0.02, 0.4);
+  assert.ok(Math.abs(flat.sp(5.0) - Math.exp(-0.1)) < 1e-12);
+  const pillars = core.HazardCurve.fromSurvivalProbs('S', '2025-01-01', [1.0, 0.98, 5.0, 0.9], 0.4);
+  assert.ok(Math.abs(pillars.sp(5.0) - 0.9) < 1e-12);
+  assert.throws(
+    () => new core.HazardCurve({ ...hazardOptions([1.0, 0.02], 0.4), extra: 1 }),
+    (error) => error.kind === 'validation' && /unknown field `extra`/.test(error.message)
+  );
 });

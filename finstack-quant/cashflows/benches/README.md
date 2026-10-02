@@ -19,7 +19,7 @@ ns-per-coupon is linear; rising ns-per-coupon is the regression signal.
 
 | Group | Cases |
 |-------|-------|
-| `cashflow_pv_by_period` | `5y_40cf` — `CashFlowSchedule::pv_by_period_with_discounting` over quarterly reporting periods, `PvDiscountSource::Discount` with no credit leg |
+| `cashflow_pv_by_period` | `5y_40cf` — `CashFlowSchedule::pv_by_period_with_discounting` over quarterly reporting periods, resolved discount handle with no credit leg |
 | `cashflow_pv_by_period_credit` | `no_recovery/5y_40cf`, `with_recovery/5y_40cf` — the same call with a `PvCreditAdjustment` carrying a flat `HazardCurve`, with and without a 40% recovery rate |
 | `cashflow_build_fixed` | `5y_q` — full `CashFlowSchedule::builder()` build of a quarterly fixed-coupon bullet |
 | `cashflow_aggregate_by_period` | `120f_20p` — `aggregate_by_period` over nominal `DatedFlows` |
@@ -39,6 +39,7 @@ outside `b.iter`.
 | Group | Sizes | Measures |
 |-------|-------|----------|
 | `scaling_build_monthly` | 60 / 120 / 240 / 480 / 960 coupons (5–80y monthly) | Schedule build must stay linear in coupon count |
+| `scaling_build_amortizing_monthly` | 60 / 120 / 240 / 480 / 960 coupons (5–80y monthly) | Linear-to-zero amortization build; guards against per-date scans of all amortization boundaries |
 | `scaling_build_adjustment_axes_20y_q` | `payment_only`, `accrual_adjusted`, `accrual_adjusted_lag2` | Marginal cost of business-day adjustment axes on a `usny` calendar at a fixed 20y quarterly size |
 | `scaling_accrued_single_query` | 60 / 120 / 240 / 480 coupons | Cost of one `accrued_interest_amount` query against schedule length |
 | `scaling_accrued_per_exercise_date` | `per_call_rebuild/{60,120,240}` vs `prebuilt_index/{60,120,240}` | The repeated-query pattern: N calls to `accrued_interest_amount` versus one `AccrualIndex::build` plus N `accrued_at` lookups |

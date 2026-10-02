@@ -260,10 +260,10 @@ impl PyStatementResult {
     ///     dates); a typed model or its JSON.
     /// node_id : str
     ///     Node identifier to export.
-    /// convention : {"end", "start"}, default "end"
-    ///     ``"end"`` dates each period on its last inclusive day
-    ///     (``end - 1 day``, since periods are half-open ``[start, end)``);
-    ///     ``"start"`` uses the period start date.
+    /// convention : {"end", "start"}, optional
+    ///     ``"end"`` (the Rust default when omitted) dates each period on its
+    ///     last inclusive day (``end - 1 day``, since periods are half-open
+    ///     ``[start, end)``); ``"start"`` uses the period start date.
     ///
     /// Returns
     /// -------
@@ -277,26 +277,20 @@ impl PyStatementResult {
     ///     If ``node_id`` is not in the result.
     /// ValueError
     ///     If ``convention`` is not ``"end"`` or ``"start"``.
-    #[pyo3(signature = (model, node_id, convention="end"), text_signature = "($self, model, node_id, convention='end')")]
+    #[pyo3(signature = (model, node_id, convention=None), text_signature = "($self, model, node_id, convention=None)")]
     fn to_dated_schedule<'py>(
         &self,
         py: Python<'py>,
         model: &Bound<'py, PyAny>,
         node_id: &str,
-        convention: &str,
+        convention: Option<&str>,
     ) -> PyResult<Vec<(Bound<'py, PyAny>, f64)>> {
         let convention = match convention {
-            "end" => PeriodDateConvention::End,
-            "start" => PeriodDateConvention::Start,
-            other => {
-                return Err(crate::errors::value_error(format!(
-                    "convention must be 'end' or 'start', got {other:?}"
-                )))
-            }
+            Some(convention) => convention
+                .parse::<PeriodDateConvention>()
+                .map_err(statements_to_py)?,
+            None => PeriodDateConvention::default(),
         };
-        if !self.inner.nodes.contains_key(node_id) {
-            return Err(PyKeyError::new_err(format!("unknown node: {node_id:?}")));
-        }
         let model = extract_model_ref(model)?;
         let schedule = finstack_quant_statements::evaluator::node_to_dated_schedule(
             &model,
@@ -354,20 +348,17 @@ impl PyStatementResult {
         self.inner.meta.warnings.len()
     }
 
-    /// Evaluation warnings as human-readable strings.
+    /// Evaluation warnings in their serde form, one dict per ``EvalWarning``.
     ///
-    /// Each entry is the debug form of an ``EvalWarning`` (division by zero,
-    /// non-finite value, skipped non-finite aggregate input, ignored
-    /// capital-structure cashflow, ...), so audit tooling can see *what* was
-    /// flagged rather than only a count.
+    /// Each dict has a single snake_case variant key (``"division_by_zero"``,
+    /// ``"non_finite_value"``, ``"non_finite_aggregate_input"``, ...) whose
+    /// value holds the variant fields: node ids as strings, periods as
+    /// ``"2025Q1"``-style ids and non-finite numbers as ``"nan"`` / ``"inf"``
+    /// / ``"-inf"``. The same objects appear in ``to_json()["meta"]`` and in
+    /// the WASM ``Evaluator.evaluate`` result.
     #[getter]
-    fn warnings(&self) -> Vec<String> {
-        self.inner
-            .meta
-            .warnings
-            .iter()
-            .map(|w| format!("{w:?}"))
-            .collect()
+    fn warnings<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.meta.warnings)
     }
 
     /// Numeric mode stamped into the result envelope (policy visibility).

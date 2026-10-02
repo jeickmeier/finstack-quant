@@ -37,9 +37,8 @@ function pv(marketJson, asOf) {
 }
 
 test('OIS theta equals the reprice on the one-day time-rolled market', () => {
-  const theta = valuations.instruments.priceInstrument(INSTRUMENT, MARKET, AS_OF, null, [
-    'theta',
-  ]).measures.theta;
+  const theta = valuations.instruments.priceInstrument(INSTRUMENT, MARKET, AS_OF, null, ['theta'])
+    .measures.theta;
   assert.ok(Number.isFinite(theta), `theta ${theta}`);
 
   // A scenario time roll materializes the same crossed fixing (as-of

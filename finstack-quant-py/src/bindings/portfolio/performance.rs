@@ -88,19 +88,14 @@ impl PyLinkedReturn {
 ///
 /// Parameters
 /// ----------
-/// period : str | dict | None
-///     Complete ``TwrrPeriod`` (``beginning_market_value``,
-///     ``ending_market_value``, ``cashflows: [{amount,
-///     fraction_of_period_remaining}]``) as JSON or a dict. Omit it to build
-///     the period from the keyword arguments instead.
-/// beginning_market_value : float | None
-///     PV at period start (used when ``period`` is omitted).
-/// ending_market_value : float | None
-///     PV at period end (used when ``period`` is omitted).
-/// cashflows : list[tuple[float, float]] | None
-///     External flows as ``(amount, fraction_of_period_remaining)`` pairs:
-///     positive amount = contribution into the portfolio, fraction in
-///     ``[0, 1]`` weighting the flow by time remaining. Defaults to none.
+/// period : str | dict
+///     ``TwrrPeriod`` as JSON or a dict: ``beginning_market_value``,
+///     ``ending_market_value`` and optional ``cashflows: [{amount,
+///     fraction_of_period_remaining}]`` (omitted means no flows). A positive
+///     ``amount`` is a contribution into the portfolio; the fraction, in
+///     ``[0, 1]``, is the share of the period remaining after the flow.
+///     Unknown keys are rejected. The same input the WASM
+///     ``twrrModifiedDietz`` takes.
 ///
 /// Returns
 /// -------
@@ -111,51 +106,14 @@ impl PyLinkedReturn {
 /// ------
 /// ValueError
 ///     When the return is undefined (non-positive adjusted denominator, a
-///     cashflow weight outside ``[0, 1]``), the inputs are malformed, or
-///     neither ``period`` nor both market values are supplied.
+///     cashflow weight outside ``[0, 1]``) or the period is malformed or has
+///     unknown keys.
 #[pyfunction]
-#[pyo3(
-    signature = (period=None, *, beginning_market_value=None, ending_market_value=None, cashflows=None),
-    text_signature = "(period=None, *, beginning_market_value=None, ending_market_value=None, cashflows=None)"
-)]
-fn twrr_modified_dietz(
-    py: Python<'_>,
-    period: Option<&Bound<'_, PyAny>>,
-    beginning_market_value: Option<f64>,
-    ending_market_value: Option<f64>,
-    cashflows: Option<Vec<(f64, f64)>>,
-) -> PyResult<f64> {
-    let period: finstack_quant_portfolio::TwrrPeriod = match period {
-        Some(obj) => {
-            let json = crate::bindings::extract::extract_records_json(py, obj, "period")?;
-            serde_json::from_str(&json)
-                .map_err(|err| serde_json_to_py(err, "invalid TWRR period JSON"))?
-        }
-        None => {
-            let (Some(beginning_market_value), Some(ending_market_value)) =
-                (beginning_market_value, ending_market_value)
-            else {
-                return Err(crate::errors::value_error(
-                    "twrr_modified_dietz requires either `period` or both \
-                     `beginning_market_value` and `ending_market_value`",
-                ));
-            };
-            finstack_quant_portfolio::TwrrPeriod {
-                beginning_market_value,
-                ending_market_value,
-                cashflows: cashflows
-                    .unwrap_or_default()
-                    .into_iter()
-                    .map(|(amount, fraction_of_period_remaining)| {
-                        finstack_quant_portfolio::performance::DietzFlow {
-                            amount,
-                            fraction_of_period_remaining,
-                        }
-                    })
-                    .collect(),
-            }
-        }
-    };
+#[pyo3(text_signature = "(period)")]
+fn twrr_modified_dietz(py: Python<'_>, period: &Bound<'_, PyAny>) -> PyResult<f64> {
+    let json = crate::bindings::extract::extract_records_json(py, period, "period")?;
+    let period: finstack_quant_portfolio::TwrrPeriod = serde_json::from_str(&json)
+        .map_err(|err| serde_json_to_py(err, "invalid TWRR period JSON"))?;
     py.detach(move || finstack_quant_portfolio::twrr_modified_dietz(&period).map_err(core_to_py))
 }
 
@@ -231,6 +189,8 @@ fn twrr_linked_json(
 
 /// Compute the money-weighted return (XIRR, Act/365F) from dated cashflows.
 ///
+/// Binds Rust ``mwr_xirr_from_cashflows``.
+///
 /// Parameters
 /// ----------
 /// cashflows : str | list[tuple[date, float]] | list[dict] | pandas.DataFrame
@@ -238,17 +198,24 @@ fn twrr_linked_json(
 ///     terminal value / distributions positive. Accepts ``(date, amount)``
 ///     pairs (dates as ``datetime.date`` or ISO strings), JSON-shaped dicts
 ///     with ``date`` and ``amount`` keys, a DataFrame with those columns, or
-///     the canonical JSON array string.
+///     the canonical JSON array string. Dates are sorted and equal-date
+///     flows netted; the remaining nonzero flows must change sign exactly once.
 ///
 /// Returns
 /// -------
 /// float
-///     Annualised internal rate of return as a decimal fraction.
+///     Unique annualised internal rate of return as a finite decimal greater
+///     than -1, using Act/365F year fractions.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If the flows are malformed, all one sign, or no root is found.
+///     If the flows are malformed, have fewer than two nonzero net dates,
+///     do not have exactly one net sign change, or no sufficiently accurate
+///     finite return greater than -1 can be found. Nonconventional cashflows
+///     are rejected even when a numerical solver could find one of their roots.
+/// RuntimeError
+///     If the numerical solver fails to converge within the valid return bracket.
 #[pyfunction]
 #[pyo3(text_signature = "(cashflows)")]
 fn mwr_xirr(py: Python<'_>, cashflows: &Bound<'_, PyAny>) -> PyResult<f64> {

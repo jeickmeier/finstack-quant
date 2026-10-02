@@ -87,8 +87,9 @@ def statement_result_schema() -> str:
     """
     Return the JSON Schema for a serialized ``StatementResult``.
 
-    This is the shape of an evaluated model: per-period node values plus the
-    numeric mode and rounding context stamped into the result envelope.
+    This describes per-period node values and execution statistics: numeric
+    mode, node and period counts, optional elapsed time, parallel execution,
+    and evaluation warnings. Monetary node maps retain amounts and currencies.
 
     Returns
     -------
@@ -118,7 +119,7 @@ def index() -> str:
     -------
     str
         Pretty-printed JSON with an ``artifacts`` array. Each row carries
-        ``path``, ``$id``, ``title``, ``summary``, ``bytes`` and ``kind``
+        ``path``, ``$id``, ``title``, ``type_name`` (the Rust root type), ``summary``, ``bytes`` and ``kind``
         (``input`` for documents you author, ``output`` for documents the
         library emits, ``component`` for shared definitions).
 

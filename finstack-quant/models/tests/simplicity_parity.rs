@@ -71,12 +71,14 @@ fn format_with_handles_negative_amounts() {
 
 #[test]
 fn validation_mode_resolves_binding_presets_canonically() {
+    for name in [None, Some("market_standard")] {
+        assert_eq!(
+            ValidationMode::from_preset(name, None).expect("market preset"),
+            ValidationMode::MarketStandard
+        );
+    }
     assert_eq!(
-        ValidationMode::from_preset("market_standard", None).expect("market preset"),
-        ValidationMode::MarketStandard
-    );
-    assert_eq!(
-        ValidationMode::from_preset("negative_rate_friendly", Some(-0.01))
+        ValidationMode::from_preset(Some("negative_rate_friendly"), Some(-0.01))
             .expect("negative-rate preset"),
         ValidationMode::NegativeRateFriendly {
             forward_floor: -0.01
@@ -84,10 +86,11 @@ fn validation_mode_resolves_binding_presets_canonically() {
     );
 
     for result in [
-        ValidationMode::from_preset("market_standard", Some(-0.01)),
-        ValidationMode::from_preset("negative_rate_friendly", None),
-        ValidationMode::from_preset("negative_rate_friendly", Some(f64::NAN)),
-        ValidationMode::from_preset("unknown", None),
+        ValidationMode::from_preset(None, Some(-0.01)),
+        ValidationMode::from_preset(Some("market_standard"), Some(-0.01)),
+        ValidationMode::from_preset(Some("negative_rate_friendly"), None),
+        ValidationMode::from_preset(Some("negative_rate_friendly"), Some(f64::NAN)),
+        ValidationMode::from_preset(Some("unknown"), None),
     ] {
         assert!(result.is_err());
     }
@@ -162,7 +165,8 @@ fn sample_grid() -> (Vec<f64>, Vec<f64>, Vec<f64>) {
 fn from_grid_opts_default_matches_from_grid() {
     let (exp, strikes, vols) = sample_grid();
     let a = VolSurface::from_grid("S", &exp, &strikes, &vols).unwrap();
-    let b = VolSurface::from_grid_opts("S", &exp, &strikes, &vols, VolGridOpts::default()).unwrap();
+    let b = VolSurface::from_grid_opts("S", &exp, &strikes, &vols, VolGridOpts::default(), None)
+        .unwrap();
 
     for &e in &exp {
         for &k in &strikes {
@@ -199,6 +203,7 @@ fn vol_surface_builder_matches_grid_constructor() {
             quote_type: VolQuoteType::Normal,
             interpolation_mode: VolInterpolationMode::TotalVariance,
         },
+        None,
     )
     .expect("direct surface");
 
@@ -232,6 +237,7 @@ fn from_grid_opts_preserves_axis_and_interpolation_mode() {
             quote_type: VolQuoteType::Normal,
             interpolation_mode: VolInterpolationMode::TotalVariance,
         },
+        None,
     )
     .unwrap();
 

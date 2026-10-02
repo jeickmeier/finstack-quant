@@ -187,16 +187,27 @@ impl MarketContext {
 
     /// Retain only the curves for which `pred` returns `true` (mutable).
     ///
-    /// Intended for snapshot-restore workflows that need drop-and-replace
-    /// semantics for a single curve family (e.g. P&L attribution factor
-    /// isolation): drop the flagged family's curves, then re-insert the
-    /// snapshot's, leaving every other family untouched.
+    /// Credit indices whose dependencies are removed are dropped immediately
+    /// and reported in the returned mutation information. Collateral mappings
+    /// without a surviving discount curve are also removed. For snapshot
+    /// replacement, insert replacement curves before removing obsolete IDs so
+    /// dependent indices remain present throughout the operation.
+    ///
+    /// # Arguments
+    ///
+    /// * `pred` - Predicate called once per curve; `true` retains that ID and
+    ///   `false` removes it. No iteration order is guaranteed.
     pub fn retain_curves_mut(
         &mut self,
         mut pred: impl FnMut(&CurveId, &CurveStorage) -> bool,
-    ) -> &mut Self {
+    ) -> super::ContextMutationInfo {
         Arc::make_mut(&mut self.curves).retain(|id, curve| pred(id, curve));
-        self
+        let curves = &self.curves;
+        Arc::make_mut(&mut self.collateral)
+            .retain(|_, id| matches!(curves.get(id), Some(CurveStorage::Discount(_))));
+        super::ContextMutationInfo {
+            invalidated_credit_indices: self.rebind_all_credit_indices(),
+        }
     }
 
     /// Iterate over the SABR volatility cubes.
@@ -276,7 +287,9 @@ impl MarketContext {
 /// assert_eq!(stats.total_curves, 0);
 /// assert!(!stats.has_fx);
 /// ```
-#[derive(Debug, Clone)]
+///
+/// Serializes with these field names; host bindings return that shape.
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct ContextStats {
     /// Count of curves by type
     pub curve_counts: BTreeMap<&'static str, usize>,
@@ -330,5 +343,37 @@ impl core::fmt::Display for ContextStats {
         )?;
         writeln!(f, "  Has FX: {}", self.has_fx)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod stats_serde_tests {
+    use super::*;
+
+    #[test]
+    fn context_stats_serializes_every_count_by_field_name() {
+        let value = serde_json::to_value(MarketContext::new().stats()).expect("serializable");
+        let object = value.as_object().expect("an object");
+        let mut keys: Vec<&str> = object.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            [
+                "collateral_mapping_count",
+                "credit_index_count",
+                "curve_counts",
+                "dividend_schedule_count",
+                "fx_delta_vol_surface_count",
+                "has_fx",
+                "inflation_index_count",
+                "price_count",
+                "series_count",
+                "surface_count",
+                "total_curves",
+                "vol_cube_count",
+            ]
+        );
+        assert_eq!(object["total_curves"], 0);
+        assert_eq!(object["has_fx"], false);
     }
 }

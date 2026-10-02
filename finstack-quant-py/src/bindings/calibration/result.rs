@@ -1,6 +1,6 @@
 //! `CalibrationResult`: calibrated market plus plan-level and per-step reports.
 
-use super::report::{quote_quality_dataframe, residual_rows, PyCalibrationReport};
+use super::report::{quote_quality_dataframe, PyCalibrationReport};
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::bindings::pickle_support::reduce_via_json;
@@ -9,22 +9,9 @@ use finstack_quant_calibration::api::schema::CalibrationResultEnvelope;
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::MarketContext;
 use numpy::PyArray1;
-use pyo3::exceptions::PyKeyError;
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyString};
 use std::sync::OnceLock;
-
-/// Unbounded limits for in-process round trips (pickle, ``from_json`` of a
-/// result this process produced): the wire format is trusted here, so the
-/// bounded loader's byte/depth caps must not truncate large markets.
-fn unbounded_limits() -> LoadLimits {
-    LoadLimits::default()
-        .with_max_bytes(usize::MAX)
-        .with_max_artifacts(usize::MAX)
-        .with_max_positions(usize::MAX)
-        .with_max_depth(usize::MAX)
-        .with_max_diagnostics(usize::MAX)
-}
 
 /// Result of a calibration plan execution.
 ///
@@ -67,17 +54,7 @@ impl PyCalibrationResult {
         &self,
         step_id: &str,
     ) -> PyResult<&finstack_quant_calibration::CalibrationReport> {
-        self.inner.result.step_reports.get(step_id).ok_or_else(|| {
-            PyKeyError::new_err(format!(
-                "no calibration step '{step_id}'; available steps: {:?}",
-                self.inner
-                    .result
-                    .step_reports
-                    .keys()
-                    .cloned()
-                    .collect::<Vec<_>>()
-            ))
-        })
+        self.inner.result.step_report(step_id).map_err(core_to_py)
     }
 }
 
@@ -103,8 +80,7 @@ impl PyCalibrationResult {
     /// Support ``pickle`` (and therefore ``multiprocessing``, ``joblib``, ``dask``).
     ///
     /// Reconstruction goes through the same strict serde round-trip as
-    /// ``to_json`` / ``from_json`` with unbounded resource limits, so large
-    /// calibrated markets round-trip without hitting the persistence caps.
+    /// ``to_json`` / ``from_json`` with the canonical persistence limits.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let payload = self.to_json(py)?.to_string();
         let from_json = py.get_type::<Self>().getattr("from_json")?;
@@ -116,23 +92,24 @@ impl PyCalibrationResult {
     /// Parameters
     /// ----------
     /// json : str
-    ///     Result envelope JSON (schema ``finstack_quant.calibration/1``).
+    ///     Result envelope JSON (schema ``finstack_quant.calibration/1``),
+    ///     bounded to 64 MiB and 96 nested JSON containers. The loader retains
+    ///     at most 256 diagnostic findings.
     ///
     /// Raises
     /// ------
     /// ContractValidationError
-    ///     If the nested final market fails structural validation; the
-    ///     ``report`` attribute lists the diagnostics (pointer, message).
-    /// MalformedContractSchemaError
-    ///     If the schema marker is missing or malformed.
-    /// UnsupportedContractVersionError
-    ///     If the schema version is not the supported v1.
+    ///     If the JSON, result, or nested final market fails structural
+    ///     validation, or its schema marker is missing, malformed, or unsupported. The
+    ///     ``report`` attribute lists pointer-level diagnostic messages.
+    /// ContractLimitExceededError
+    ///     If the JSON exceeds the canonical input-size or nesting-depth limit.
     /// ValueError
-    ///     If ``json`` is malformed or has an invalid envelope shape.
+    ///     If an invalid nested value cannot be restored.
     #[staticmethod]
     fn from_json(py: Python<'_>, json: &str) -> PyResult<Self> {
         let (inner, _report) =
-            CalibrationResultEnvelope::from_slice_strict(json.as_bytes(), &unbounded_limits())
+            CalibrationResultEnvelope::from_slice_strict(json.as_bytes(), &LoadLimits::default())
                 .map_err(|e| crate::errors::contract_to_py(py, e))?;
         Ok(Self::from_inner(inner))
     }
@@ -185,6 +162,9 @@ impl PyCalibrationResult {
     /// the ``market`` getter before serializing.
     #[getter]
     fn market_json<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyString>> {
+        if let Some(value) = self.cached_market_json.get() {
+            return Ok(PyString::new(py, value));
+        }
         MarketContext::try_from(self.inner.result.final_market.clone()).map_err(display_to_py)?;
         cached_json(py, &self.cached_market_json, || {
             serde_json::to_string(&self.inner.result.final_market)
@@ -299,7 +279,7 @@ impl PyCalibrationResult {
     ///     If no step with the given ``step_id`` exists.
     #[pyo3(text_signature = "($self, step_id)")]
     fn residuals<'py>(&self, py: Python<'py>, step_id: &str) -> PyResult<Bound<'py, PyAny>> {
-        quote_quality_dataframe(py, &residual_rows(self.find_step_report(step_id)?))
+        quote_quality_dataframe(py, &self.find_step_report(step_id)?.quote_rows())
     }
 
     /// Export the per-step summary as a pandas ``DataFrame``.

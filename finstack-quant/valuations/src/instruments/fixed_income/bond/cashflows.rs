@@ -3,8 +3,8 @@
 //! Implements the cashflow schedule source contract for `Bond`, producing a
 //! signed canonical schedule that preserves fees, signed notionals, and all
 //! valid cash events.
-//! Pure PIK accretion is omitted; the notional evolution it drives is captured
-//! in the balance path.
+//! PIK accretion retains its classification and amount for accrual and balance
+//! replay; dated settlement views omit the non-cash rows.
 
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;

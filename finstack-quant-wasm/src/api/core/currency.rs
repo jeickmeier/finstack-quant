@@ -1,5 +1,6 @@
 //! WASM bindings for [`finstack_quant_core::currency::Currency`].
 
+use crate::utils::input::json_text;
 use crate::utils::to_js_err;
 use finstack_quant_core::currency::Currency as RustCurrency;
 use std::str::FromStr;
@@ -30,9 +31,11 @@ impl JsCurrency {
     /// Parse a case-insensitive ISO-4217 alphabetic currency code.
     ///
     /// @param code - Three-letter ISO-4217 code (e.g. `"USD"`, `"eur"`,
-    /// `"GBP"`). Leading and trailing whitespace is trimmed.
+    /// `"GBP"`). Case-insensitive; surrounding whitespace is not trimmed.
     /// @returns Constructed `Currency`.
-    /// @throws If `code` is not a recognized ISO-4217 alphabetic code.
+    /// @throws `TypeError` (kind `invalid_type`) if `code` is not a string;
+    /// `FinstackError` (kind `validation`) naming the rejected text if it is not
+    /// a supported ISO-4217 alphabetic code (e.g. `" USD "`).
     ///
     /// @example
     /// ```javascript
@@ -40,10 +43,29 @@ impl JsCurrency {
     /// eur.code; // "EUR"
     /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new(code: &str) -> Result<JsCurrency, JsValue> {
-        RustCurrency::from_str(code.trim())
+    pub fn new(code: JsValue) -> Result<JsCurrency, JsValue> {
+        let code = crate::utils::input::js_string(&code, "code")?;
+        RustCurrency::from_str(&code)
             .map(|inner| JsCurrency { inner })
             .map_err(to_js_err)
+    }
+
+    /// Look up a currency by its ISO-4217 numeric code (Rust `Currency::try_from`).
+    ///
+    /// # Arguments
+    ///
+    /// * `code` - ISO-4217 numeric code, such as `840` for USD or `978` for EUR.
+    ///
+    /// @returns The matching `Currency`.
+    /// @throws `TypeError` (kind `invalid_type`) if `code` is not an integer in
+    /// `0..=65535`; `FinstackError` (kind `validation`) if no supported
+    /// currency has that numeric code.
+    #[wasm_bindgen(js_name = fromNumeric)]
+    pub fn from_numeric(code: JsValue) -> Result<JsCurrency, JsValue> {
+        let code: u16 = crate::utils::input::js_uint(&code, "code")?;
+        RustCurrency::try_from(code)
+            .map(|inner| JsCurrency { inner })
+            .map_err(|error| to_js_err(error.to_string()))
     }
 
     /// Three-letter ISO-4217 alphabetic code.
@@ -59,7 +81,7 @@ impl JsCurrency {
     /// @returns Numeric code (e.g. `840` for USD, `978` for EUR).
     #[wasm_bindgen(getter, js_name = numeric)]
     pub fn numeric(&self) -> u16 {
-        self.inner as u16
+        self.inner.numeric()
     }
 
     /// Number of decimal places (minor units) for this currency.
@@ -94,7 +116,8 @@ impl JsCurrency {
     /// @returns The parsed `Currency`.
     /// @throws If `json` is malformed or contains an unknown code.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsCurrency, JsValue> {
+    pub fn from_json(json: JsValue) -> Result<JsCurrency, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
         let inner: RustCurrency = serde_json::from_str(json).map_err(to_js_err)?;
         Ok(JsCurrency { inner })
     }
@@ -104,9 +127,17 @@ impl JsCurrency {
 mod tests {
     use super::*;
 
+    /// Native tests cannot build a `JsValue`, so fixtures wrap the Rust
+    /// currency directly; argument conversion is covered by the facade tests.
+    fn currency(code: &str) -> JsCurrency {
+        JsCurrency {
+            inner: code.parse().expect("valid currency code"),
+        }
+    }
+
     #[test]
     fn construct_usd() {
-        let c = JsCurrency::new("USD").expect("valid");
+        let c = currency("USD");
         assert_eq!(c.code(), "USD");
         assert_eq!(c.to_string(), "USD");
         assert_eq!(c.decimals(), 2);
@@ -114,28 +145,20 @@ mod tests {
 
     #[test]
     fn numeric_code() {
-        let c = JsCurrency::new("EUR").expect("valid");
+        let c = currency("EUR");
         assert_eq!(c.numeric(), 978);
     }
 
     #[test]
-    fn json_roundtrip() {
-        let c = JsCurrency::new("GBP").expect("valid");
-        let json = c.to_json().expect("serialize");
-        let c2 = JsCurrency::from_json(&json).expect("deserialize");
-        assert_eq!(c2.code(), "GBP");
-    }
-
-    #[test]
     fn case_insensitive() {
-        let c = JsCurrency::new("usd").expect("valid");
+        let c = currency("usd");
         assert_eq!(c.code(), "USD");
     }
 
     #[test]
     fn multiple_currencies() {
         for code in &["USD", "EUR", "GBP", "JPY", "CHF"] {
-            let c = JsCurrency::new(code).expect("valid");
+            let c = currency(code);
             assert_eq!(c.code(), *code);
             assert_eq!(c.to_string(), *code);
         }
@@ -159,10 +182,10 @@ mod tests {
     }
 
     #[test]
-    fn whitespace_trimmed() {
-        // JsCurrency::new trims, so "  USD  " should succeed
+    fn whitespace_is_not_trimmed() {
+        // `Currency` construction is the Rust parser: untrimmed text is rejected.
         use std::str::FromStr;
-        assert!(RustCurrency::from_str("USD").is_ok());
+        assert!(RustCurrency::from_str("  USD  ").is_err());
     }
 
     #[test]

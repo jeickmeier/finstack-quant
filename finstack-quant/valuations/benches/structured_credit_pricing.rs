@@ -127,6 +127,7 @@ fn create_deal(deal_type: DealType, num_assets: usize) -> StructuredCredit {
         maturity_date(),
         "USD-OIS",
     )
+    .expect("valid structured-credit dates")
 }
 
 // NPV Benchmarks by Deal Type

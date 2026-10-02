@@ -95,6 +95,8 @@ structured_credit/
 embedded registry in
 [`data/assumptions/structured_credit_assumptions.v1.json`](../../../../data/assumptions/structured_credit_assumptions.v1.json)
 (fee defaults, PSA/SDA parameters, concentration limits, standard speeds).
+They return `Result<StructuredCredit>` and reject closing dates whose first
+registry payment period exceeds the supported calendar range.
 
 ## Constructing a deal
 
@@ -110,7 +112,7 @@ let clo = StructuredCredit::new_clo(
     closing_date,
     legal_maturity,
     "USD-OIS",
-);
+).expect("closing date supports the first registry payment period");
 
 // Or start from the canonical example.
 let deal = StructuredCredit::example().expect("example");
@@ -807,6 +809,15 @@ returns the reserve path and draw funding (`SimulationDiagnostics`) and
 returns a `StochasticPricingResult` with the tranche shares of the draw
 option cost and its per-path distribution (`draw_option_cost_dataframe()`).
 WASM carries the same fields in the deal JSON.
+
+Structured-credit Monte Carlo requires at least two independent estimators.
+The `num_paths` argument and `model_config.mc_paths` count those estimators;
+an antithetic estimator averages a mirrored pair, so the result's `num_paths`
+reports twice that many simulated scenarios when pairing is enabled. Present-value
+sampling uncertainty uses the sample standard deviation divided by the square
+root of the independent-estimator count, and a two-sided 95% Student-t interval
+with one fewer degree of freedom. These calculations use pair averages when
+antithetics are enabled.
 
 Both bindings expose structured credit under their `instruments` namespace:
 

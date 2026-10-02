@@ -15,7 +15,7 @@ mod fi_attribution;
 mod grid_attribution;
 mod json_bridge;
 mod materialization;
-mod matrix_input;
+pub(crate) mod matrix_input;
 mod optimization_spec;
 mod performance;
 mod pipeline;
@@ -31,7 +31,7 @@ use pyo3::types::PyList;
 
 /// Register the `portfolio` submodule on the parent module.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "portfolio")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "portfolio")?;
     m.setattr(
         "__doc__",
         "Portfolio construction, valuation, cashflows, scenarios, and metrics.",
@@ -47,11 +47,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "PortfolioError",
         py.get_type::<crate::errors::PortfolioError>(),
     )?;
-    m.add(
-        "ValuationError",
-        py.get_type::<crate::errors::ValuationError>(),
-    )?;
-    m.add("FxError", py.get_type::<crate::errors::FxError>())?;
     m.add(
         "ContractValidationError",
         py.get_type::<crate::errors::ContractValidationError>(),
@@ -93,8 +88,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let exports = vec![
         "FinstackError",
         "PortfolioError",
-        "ValuationError",
-        "FxError",
         "ContractValidationError",
         "UnsupportedContractVersionError",
         "MissingContractVersionError",
@@ -141,12 +134,15 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "allocate_weights",
         "allocate_weights_json",
         "optimize_portfolio",
+        "rebalance_from_spec",
         "replay_portfolio",
         "replay_portfolio_json",
         "brinson_fachler",
         "brinson_fachler_json",
         "carino_link",
         "carino_link_json",
+        "carino_link_from_sector_periods",
+        "carino_link_from_sector_periods_json",
         "campisi_attribution",
         "campisi_attribution_json",
         "campisi_carino_link",
@@ -173,7 +169,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "mwr_xirr",
         "SensitivityMatrix",
         "FactorPnlProfile",
-        "FactorRiskDecomposition",
         "compute_factor_sensitivities",
         "compute_pnl_profiles",
         "decompose_factor_risk",
@@ -214,13 +209,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     schema::register(py, &m)?;
     let all = PyList::new(py, exports)?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "portfolio",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
 
     Ok(())

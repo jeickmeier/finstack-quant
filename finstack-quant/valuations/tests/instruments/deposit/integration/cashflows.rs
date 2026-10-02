@@ -6,7 +6,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 
 #[test]
-fn test_cashflow_generation_two_flows() {
+fn test_cashflow_generation_separates_principal_and_interest() {
     // Setup
     let base = date(2025, 1, 1);
     let ctx = ctx_with_standard_disc(base, "USD-OIS");
@@ -20,8 +20,8 @@ fn test_cashflow_generation_two_flows() {
     // Execute
     let flows = dep.dated_cashflows(&ctx, base).unwrap();
 
-    // Validate - should have exactly 2 flows
-    assert_eq!(flows.len(), 2, "Expected 2 cashflows");
+    // Initial principal, maturity interest, and maturity principal.
+    assert_eq!(flows.len(), 3, "Expected classified maturity cashflows");
 
     // First flow (payment at start)
     assert_eq!(flows[0].0, base);
@@ -31,13 +31,15 @@ fn test_cashflow_generation_two_flows() {
         "First flow should be negative (payment)"
     );
 
-    // Second flow (receipt at end)
+    // Maturity interest precedes principal in the canonical schedule order.
     assert_eq!(flows[1].0, date(2025, 7, 1));
     assert_eq!(flows[1].1.currency(), Currency::USD);
     assert!(
         flows[1].1.amount() > 0.0,
         "Second flow should be positive (receipt)"
     );
+    assert_eq!(flows[2].0, date(2025, 7, 1));
+    assert_eq!(flows[2].1, dep.notional);
 }
 
 #[test]
@@ -70,7 +72,8 @@ fn test_cashflow_redemption_amount() {
     let expected_redemption = notional * (1.0 + rate * yf);
 
     // Validate
-    assert!((flows[1].1.amount() - expected_redemption).abs() < 1.0);
+    let redemption = flows[1].1.checked_add(flows[2].1).unwrap();
+    assert!((redemption.amount() - expected_redemption).abs() < 1.0);
 }
 
 #[test]
@@ -132,7 +135,8 @@ fn test_cashflow_with_zero_rate() {
     let flows = dep.dated_cashflows(&ctx, base).unwrap();
 
     // Validate - with zero rate, redemption = notional
-    assert!((flows[1].1.amount() - notional).abs() < 1e-9);
+    assert_eq!(flows[1].1.amount(), 0.0);
+    assert!((flows[2].1.amount() - notional).abs() < 1e-9);
 }
 
 #[test]
@@ -151,6 +155,7 @@ fn test_cashflow_dates_ordered() {
 
     // Validate - dates should be in order
     assert!(flows[0].0 < flows[1].0);
+    assert_eq!(flows[1].0, flows[2].0);
 }
 
 #[test]
@@ -176,6 +181,7 @@ fn test_cashflow_notional_scales() {
     // Validate - cashflows should scale linearly
     assert!((flows_2m[0].1.amount() / flows_1m[0].1.amount() - 2.0).abs() < 1e-10);
     assert!((flows_2m[1].1.amount() / flows_1m[1].1.amount() - 2.0).abs() < 1e-6);
+    assert!((flows_2m[2].1.amount() / flows_1m[2].1.amount() - 2.0).abs() < 1e-6);
 }
 
 #[test]

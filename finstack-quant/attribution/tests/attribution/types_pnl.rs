@@ -59,9 +59,9 @@ fn test_residual_tolerance() {
     attr.compute_residual()
         .expect("Residual computation should succeed in test");
 
-    assert!(attr.residual_within_tolerance(0.1, 100.0));
-    assert!(!attr.residual_within_tolerance(0.05, 5.0));
-    assert!(attr.residual_within_tolerance(0.01, 100.0));
+    assert!(attr.residual_within_tolerance(Some(0.1), Some(100.0)));
+    assert!(!attr.residual_within_tolerance(Some(0.05), Some(5.0)));
+    assert!(attr.residual_within_tolerance(Some(0.01), Some(100.0)));
 }
 
 #[test]
@@ -107,7 +107,7 @@ fn test_zero_total_pnl_with_nonzero_factors() {
     assert!(!attr.meta.residual_pct.is_nan());
     assert!(!attr.meta.residual_pct.is_infinite());
     assert_eq!(attr.meta.residual_pct, 0.0);
-    assert!(attr.residual_within_tolerance(0.01, 0.01));
+    assert!(attr.residual_within_tolerance(Some(0.01), Some(0.01)));
 }
 
 #[test]
@@ -130,8 +130,8 @@ fn test_zero_total_pnl_with_nonzero_residual() {
     assert_eq!(attr.residual.amount(), -50.0);
     assert!(!attr.meta.residual_pct.is_nan());
     assert_eq!(attr.meta.residual_pct, 0.0);
-    assert!(!attr.residual_within_tolerance(0.01, 10.0));
-    assert!(attr.residual_within_tolerance(0.01, 100.0));
+    assert!(!attr.residual_within_tolerance(Some(0.01), Some(10.0)));
+    assert!(attr.residual_within_tolerance(Some(0.01), Some(100.0)));
 }
 
 #[test]

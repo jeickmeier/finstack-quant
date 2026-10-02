@@ -4,7 +4,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::{HashMap, HashSet};
 
 use finstack_quant_margin::{
     ClearingHouseImCalculator, ImCalculator, ImMethodology, NettingSetId, ScheduleAssetClass,
@@ -240,11 +240,24 @@ impl PortfolioMarginAggregator {
             result.add_netting_set(ns_margin)?;
         }
 
+        let tracked: HashSet<&str> = self.positions.iter().map(|(id, _)| id.as_str()).collect();
+        let degraded: HashSet<&str> = result
+            .degraded_positions
+            .iter()
+            .map(|(id, _)| id.as_str())
+            .collect();
         result.positions_without_margin = portfolio
             .positions
-            .len()
-            .saturating_sub(result.total_positions)
-            + result.degraded_positions.len();
+            .iter()
+            .filter(|position| {
+                !tracked.contains(position.position_id.as_str())
+                    || degraded.contains(position.position_id.as_str())
+            })
+            .count()
+            + degraded
+                .iter()
+                .filter(|id| portfolio.get_position(id).is_none())
+                .count();
 
         self.apply_csa_im_terms(&mut result, current_im_collateral, market, as_of)?;
         Ok(result)
@@ -331,9 +344,9 @@ impl PortfolioMarginAggregator {
                     return Ok(SimmSensitivities::new(self.base_currency));
                 }
             }
-            let sens = marginable
-                .simm_sensitivities(market, as_of)
-                .map_err(|e| Error::valuation(position.position_id.clone(), e.to_string()))?;
+            let sens = marginable.simm_sensitivities(market, as_of).map_err(|e| {
+                Error::valuation(position.position_id.clone(), e.kind(), e.to_string())
+            })?;
             // B-6: instrument sensitivities are per unit (same contract as
             // `mtm_for_vm`), so scale them to the HELD sensitivity by the signed
             // position factor before the netting-set merge. The sign matters:
@@ -376,7 +389,7 @@ impl PortfolioMarginAggregator {
                 market,
                 as_of,
             )
-            .map_err(|e| Error::valuation(position_id.clone(), e.to_string()))?;
+            .map_err(|e| Error::valuation(position_id.clone(), e.kind(), e.to_string()))?;
         Ok(sensitivities.scaled_to_currency(self.base_currency, fx_rate))
     }
 
@@ -687,9 +700,9 @@ impl PortfolioMarginAggregator {
         as_of: Date,
     ) -> Result<Money> {
         if let Some(marginable) = position.instrument.as_marginable() {
-            let unit_mtm = marginable
-                .mtm_for_vm(market, as_of)
-                .map_err(|e| Error::valuation(position.position_id.clone(), e.to_string()))?;
+            let unit_mtm = marginable.mtm_for_vm(market, as_of).map_err(|e| {
+                Error::valuation(position.position_id.clone(), e.kind(), e.to_string())
+            })?;
             if let PositionUnit::Notional(Some(notional_currency)) = position.unit {
                 if notional_currency != unit_mtm.currency() {
                     return Err(Error::invalid_input(format!(
@@ -1169,6 +1182,9 @@ mod tests {
             result.degraded_positions
         );
         assert_eq!(result.total_variation_margin.amount(), 0.0);
+        assert_eq!(result.total_positions, 0);
+        assert_eq!(result.degraded_positions.len(), 1);
+        assert_eq!(result.positions_without_margin, 1);
     }
 
     #[test]

@@ -42,11 +42,11 @@ test('tarnCouponProfile returns a plain object with readable properties', () => 
   assert.equal(typeof profile.redeemed_early, 'boolean');
 });
 
-test('SabrSmile.arbitrageDiagnostics returns a plain object', () => {
+test('SabrSmile.validateNoArbitrage returns a plain object', () => {
   const params = new wasm.SabrParameters(0.2, 1.0, 0.3, -0.2);
   const smile = new wasm.SabrSmile(params, 100.0, 1.0);
-  const diag = smile.arbitrageDiagnostics([80, 90, 100, 110, 120]);
-  assertPlainObject(diag, 'arbitrageDiagnostics result');
+  const diag = smile.validateNoArbitrage([80, 90, 100, 110, 120], 0.0);
+  assertPlainObject(diag, 'validateNoArbitrage result');
   assert.equal(typeof diag.arbitrage_free, 'boolean');
   assert.ok(Array.isArray(diag.butterfly_violations));
   assert.ok(Array.isArray(diag.monotonicity_violations));
@@ -106,6 +106,20 @@ test('FxOption price and greeks return plain objects', () => {
   for (const [key, value] of entries) {
     assert.equal(typeof value, 'number', `greek ${key} is a number`);
   }
+  // Keys keep the Rust STANDARD_OPTION_GREEKS order (not alphabetical).
+  const standardOrder = ['delta', 'gamma', 'vega', 'theta', 'rho', 'foreign_rho', 'vanna', 'volga'];
+  assert.deepEqual(
+    Object.keys(greeks),
+    standardOrder.filter((key) => key in greeks),
+    'greeks keep the Rust STANDARD_OPTION_GREEKS order'
+  );
+
+  // toJson is the compact canonical envelope: byte-identical round trip.
+  const canonical = option.toJson();
+  assert.ok(!canonical.includes('\n'), 'toJson emits compact JSON');
+  assert.equal(JSON.parse(canonical).schema, 'finstack_quant.instrument/1');
+  assert.equal(wasm.FxOption.fromJson(canonical).toJson(), canonical);
+  assert.equal(option.id, fixture.instrument.instrument.spec.id);
 });
 
 test('SabrCalibrator surface: withTolerance, withShift, calibrate, params', () => {

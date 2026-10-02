@@ -34,6 +34,7 @@ use num_complex::Complex64;
 /// - Madan, D. B., Carr, P. P. & Chang, E. C. (1998). "The Variance Gamma
 ///   Process and Option Pricing." *European Finance Review*, 2, 79-105. `docs/REFERENCES.md#madan-carr-chang-1998`
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct VarianceGammaCf {
     /// Risk-free rate.
     pub r: f64,
@@ -62,8 +63,10 @@ impl VarianceGammaCf {
     /// * `r` - Continuously compounded risk-free rate in decimal annual units
     /// * `q` - Continuous dividend yield in decimal annual units
     /// * `sigma` - Diffusion volatility of the process in decimal annual units
-    /// * `nu` - SABR vol-of-vol parameter controlling smile wing curvature
-    /// * `theta` - Long-run mean level of the mean-reverting stochastic factor
+    /// * `nu` - Positive variance rate of the Gamma time change, in years;
+    ///   larger values increase log-return tail thickness.
+    /// * `theta` - Drift of the subordinated Brownian motion, in annual
+    ///   log-return units; its sign controls skew.
     pub fn new(r: f64, q: f64, sigma: f64, nu: f64, theta: f64) -> Result<Self, String> {
         let candidate = Self {
             r,
@@ -83,6 +86,9 @@ impl VarianceGammaCf {
     /// 2. `nu > 0` and finite
     /// 3. `1 - theta*nu - 0.5*sigma^2*nu > 0` (real-valued omega)
     pub fn validate(&self) -> Result<(), String> {
+        if !self.r.is_finite() || !self.q.is_finite() {
+            return Err("VG rates and dividend yield must be finite".to_string());
+        }
         if !self.sigma.is_finite() || self.sigma <= 0.0 {
             return Err(format!(
                 "VG sigma must be > 0 and finite, got {}",
@@ -96,7 +102,7 @@ impl VarianceGammaCf {
             return Err(format!("VG theta must be finite, got {}", self.theta));
         }
         let omega_arg = 1.0 - self.theta * self.nu - 0.5 * self.sigma * self.sigma * self.nu;
-        if omega_arg <= 0.0 {
+        if !omega_arg.is_finite() || omega_arg <= 0.0 {
             return Err(format!(
                 "VG martingale constraint violated: 1 - theta*nu - 0.5*sigma^2*nu = {} \
                  must be > 0 (sigma={}, nu={}, theta={})",

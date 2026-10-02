@@ -709,31 +709,31 @@
   "provenance": [
     {
       "path": "finstack-quant-ui/src/fixtures/results/bond.json",
-      "sha256": "2e0f154d33dfa6aafd81fc8fccccbdd0093a96b14c4e093d312e1d505d77a050"
+      "sha256": "b0ad7ff23e0f9abd1e82b80c14f362bfd5db1c4f8076bafdde370cea21baafbf"
     },
     {
       "path": "finstack-quant-ui/tests/core/market-browser/cases.json",
-      "sha256": "5b8f6ccde3587d008ba7d5e2384e37757c7fbefadf96c1e80d70d68ab82e3b2a"
+      "sha256": "4b5fad9372386f23ef4667f481d469299c53bd772b467106468f3d46b1a4c853"
     },
     {
       "path": "finstack-quant-ui/tests/core/cubes/cases.json",
-      "sha256": "b650cc571861cb45d3f827dc4b2697fb5d1bdfb5284022da1310ed74cac7e24d"
+      "sha256": "3d4993369754d8a35d31bd0c7d38238fcc05672fdda07a880fe02e24829da842"
     },
     {
       "path": "finstack-quant-ui/tests/calibration/cases.json",
-      "sha256": "2714f0f24dae239557481dbc26cd51efbfd22dfd5a1deb010f1d18cc5d859e3f"
+      "sha256": "a95aaaaa903d88468feeb2dd0349572beea148dd575830e0141846bc087b78d7"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/scenario-table/cases.json",
-      "sha256": "859b16495c498743ba6298ca277a0bb9721ee7885d95d5123d980d372e79e04e"
+      "sha256": "2407f834d5c0343590616d05103149184e4a90194dc32f423f5fd61d0922877f"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/cashflows/cases.json",
-      "sha256": "ced10e93c5758e64c1a6c1b139268adf80cb45aba3e9121139929c0945f82074"
+      "sha256": "b6f5d7317ed4060827bb6be1f2f1414ec17e15f9de2680ccfbc793e9c7263d33"
     },
     {
       "path": "finstack-quant-ui/tests/valuations/details/cases.json",
-      "sha256": "119a7f1c2b5dd10654e878943b8a2535b9f3e2c036c05ebb7a9f9514f8272f6a"
+      "sha256": "42eafd98eac48c7b275d6a633df569ea64b6a3cdef62c061e6b3163d9cc93e52"
     },
     {
       "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
@@ -741,7 +741,7 @@
     },
     {
       "path": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
-      "sha256": "d9f52e6d4012bf12e4eafca7b4b031a58c21cca9d8543467b80e2ae86d380474"
+      "sha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4"
     }
   ]
 }

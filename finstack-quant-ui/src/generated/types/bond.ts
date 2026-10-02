@@ -945,7 +945,7 @@ export interface D_2A9Dd97D7E94Dadcad76 {
   spread_bp: number;
 }
 /**
- * Fixed and floating coupon specification.
+ * Fixed coupon specification.
  */
 export interface FixedCouponSpec {
   /**
@@ -983,6 +983,11 @@ export interface FixedCouponSpec {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   frequency: Tenor;
@@ -1064,6 +1069,11 @@ export interface DBf3D60B7Aa736F436254 {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   frequency: Tenor1;
@@ -1168,13 +1178,13 @@ export interface DAfaff9B4B34177Ac633E {
    */
   index_floor_bp?: Decimal5 | null;
   /**
-   * Diagnostic tenor for term-index projection error context.
+   * Explicit term-index tenor when no forward curve resolves.
    *
    * The named forward curve is already the term index (for example a 3M
    * EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
    * average over `[reset, reset + tenor]`. This field (or
-   * [`Self::reset_frequency`] when `None`) is used only to compute
-   * `index_maturity` for error messages. Ignored for overnight-compounded
+   * [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
+   * when no forward curve resolves. Ignored for overnight-compounded
    * legs. When set, the builder warns at build time if it disagrees with
    * the resolved curve's tenor by more than 10% — the curve remains
    * authoritative.
@@ -1196,6 +1206,11 @@ export interface DAfaff9B4B34177Ac633E {
   overnight_basis?: DayCount2 | null;
   /**
    * Index floor/cap application policy for overnight-compounded coupons.
+   *
+   * With changing principal, the builder retains daily compounded-rate
+   * increments. Any bound applied to the final period index or all-in
+   * rate contributes a uniform annual-rate adjustment over the coupon's
+   * contractual accrual time; interim cumulative prefixes are not bounded.
    */
   overnight_index_constraints?: "daily" | "period";
   reset_frequency: Tenor3;
@@ -1309,6 +1324,11 @@ export interface D_336250C98Cf023A4B5E2 {
   /**
    * Whether end-of-month rolling should be preserved when generating the
    * schedule.
+   *
+   * Incompatible with explicit IMM roll rules. With ACT/ACT ICMA, the
+   * regular grid anchor must be month-end: maturity for front stubs, or
+   * start for back stubs and schedules without stubs. An irregular opposite
+   * endpoint remains supported.
    */
   end_of_month?: boolean;
   frequency: Tenor4;
@@ -1794,6 +1814,7 @@ export interface D_5Fdd6C8Cd626De8799Fe {
    * This is stored at cashflow creation time when available.
    * For instruments with intra-period events (e.g., revolving credit with draws/repays),
    * this may represent a time-weighted average rate across sub-periods.
+   * Serialization rejects non-finite rates instead of encoding them as absent.
    */
   rate?: number | null;
   /**
@@ -1811,8 +1832,11 @@ export interface D_931Ca4Fd1B880C77B04D {
    */
   calendar_id?: string | null;
   /**
-   * Regular reference coupon period for ACT/ACT ICMA, including stub accrual.
-   * `None` leaves reference-period selection to the schedule accrual caller.
+   * Unadjusted regular reference coupon period for ACT/ACT ICMA, or the
+   * actual full contractual coupon period for ACT/365L, including when
+   * this flow represents only a rate or balance subinterval.
+   * ACT/365L metadata must retain these boundaries to select the original
+   * coupon's denominator; other conventions may leave this field `None`.
    *
    * @minItems 2
    * @maxItems 2
@@ -1827,6 +1851,7 @@ export interface D_931Ca4Fd1B880C77B04D {
   end_is_termination_date?: boolean;
   /**
    * Projected index rate before spread, gearing, caps, or floors.
+   * Serialization rejects non-finite rates instead of encoding them as absent.
    */
   projected_index_rate?: number | null;
   start: Date6;
@@ -2042,25 +2067,18 @@ export interface DFf91F56De5Ec0B73D330 {
   representation?: "contractual" | "projected" | "placeholder" | "no_residual";
 }
 /**
- * One raw market observation a schedule projected at its valuation date.
- *
- * Floating coupons record their rate-index fixings; instruments that observe
- * a price history on a schedule (variance swaps) record those observations at
- * the valuation-date spot level.
+ * One raw index observation needed by a projected floating coupon.
  */
 export interface DC4190F1F5Bda84C722E6 {
   date: Date8;
   /**
-   * Market-series identifier: `FIXING:{index}` for a rate or FX fixing
-   * series, or the price series an instrument observes (for example an
-   * underlying's close history).
+   * Canonical market-series identifier, including the `FIXING:` prefix.
    */
   series_id: string;
   /**
    * Raw observed quantity in the index convention: annualized decimal rate
-   * before spread/gearing/caps/floors for rates, quote currency per base
-   * currency for an FX fixing series, or the price level for a price series.
-   * The series identifier fixes orientation.
+   * before spread/gearing/caps/floors for rates, or quote currency per base
+   * currency for an FX fixing series. The series identifier fixes orientation.
    * `None` records an observation for which the coupon's fallback policy
    * masked a missing projection dependency; a time roll must supply an
    * existing fixing or fail explicitly when crossing that date.
@@ -2776,6 +2794,7 @@ export interface DD760Eef55C5Bd7D5B1F6 {
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
  * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * Deserialization enforces the same parameter invariants as the constructors.
  */
 export interface D_16451E0Bf3B6B78178D8 {
   /**
@@ -2830,6 +2849,8 @@ export interface D_16451E0Bf3B6B78178D8 {
  * Models the relationship between a firm's leverage and its instantaneous
  * hazard rate, enabling a feedback loop where PIK accrual increases the
  * notional (and hence leverage), which drives the hazard rate higher.
+ * Deserialization validates the parameters and rejects incomplete or
+ * inconsistent tabular calibrations before they can be evaluated.
  */
 export interface DCc8Ed166Abbb10Ad4451 {
   /**

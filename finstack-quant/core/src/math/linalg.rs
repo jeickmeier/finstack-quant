@@ -62,11 +62,13 @@
 use crate::{error, Result};
 use thiserror::Error;
 
-/// Default singular threshold for Cholesky decomposition.
+/// Relative singular threshold for Cholesky decomposition and substitution.
 ///
-/// Used only by the generic unpivoted path (`cholesky_decomposition` / `cholesky_solve`).
-/// The correlation-specific path (`cholesky_correlation`) uses a *relative* tolerance
-/// computed from the matrix's own diagonal magnitude.
+/// The generic unpivoted factorization compares factor pivots with this fraction
+/// of the square root of the largest input diagonal magnitude. Substitution uses
+/// the largest factor diagonal magnitude. Both criteria are invariant to a
+/// uniform rescaling of the system. The correlation-specific path
+/// (`cholesky_correlation`) uses [`PIVOT_TOLERANCE_RELATIVE`] instead.
 pub const SINGULAR_THRESHOLD: f64 = 1e-10;
 
 /// Default tolerance for diagonal elements in correlation matrices.
@@ -103,6 +105,25 @@ pub const CORRELATION_BOUND_SLACK: f64 = 1e-12;
 /// (diagonal ≈ 1) and general covariance matrices with large entries.
 pub const PIVOT_TOLERANCE_RELATIVE: f64 = 1e-10;
 
+/// Number of entries in an `n × n` row-major matrix, or `None` when `n * n`
+/// overflows `usize` (from `n = 65536` on 32-bit targets such as wasm32).
+///
+/// Every flat-matrix size check compares against this rather than an
+/// unchecked `n * n`, which wraps in release builds and lets a wrong-length
+/// buffer pass the check.
+#[inline]
+pub(crate) fn square_len(n: usize) -> Option<usize> {
+    n.checked_mul(n)
+}
+
+/// `n * n` for an error message, or a note that it overflows.
+fn square_len_label(n: usize) -> String {
+    square_len(n).map_or_else(
+        || "more entries than fit in memory".to_owned(),
+        |len| len.to_string(),
+    )
+}
+
 /// Detailed error type for correlation matrix operations.
 ///
 /// Validation variants preserve the first failure detected while checking a
@@ -114,7 +135,7 @@ pub const PIVOT_TOLERANCE_RELATIVE: f64 = 1e-10;
 #[non_exhaustive]
 pub enum CorrelationError {
     /// Matrix size does not match expected n×n.
-    #[error("Invalid matrix size: expected {expected}×{expected}={}, got {actual}", expected * expected)]
+    #[error("Invalid matrix size: expected {expected}×{expected} entries, got {actual}")]
     InvalidSize {
         /// Expected number of factors (n for n×n matrix).
         expected: usize,
@@ -168,6 +189,56 @@ pub enum CorrelationError {
     EigenDecompositionFailed,
 }
 
+impl CorrelationError {
+    /// Host-exception category: an exhausted iteration budget or a failed
+    /// eigendecomposition is a [`ErrorKind::Computation`](crate::error::ErrorKind::Computation)
+    /// failure; every other variant rejects the input matrix
+    /// ([`ErrorKind::Validation`](crate::error::ErrorKind::Validation)).
+    ///
+    /// Agrees with `crate::Error::from(self).kind()`.
+    #[must_use]
+    pub fn kind(&self) -> crate::error::ErrorKind {
+        match self {
+            Self::DidNotConverge { .. } | Self::EigenDecompositionFailed => {
+                crate::error::ErrorKind::Computation
+            }
+            Self::InvalidSize { .. }
+            | Self::DiagonalNotOne { .. }
+            | Self::NotSymmetric { .. }
+            | Self::NotPositiveSemiDefinite { .. }
+            | Self::OutOfBounds { .. } => crate::error::ErrorKind::Validation,
+        }
+    }
+}
+
+impl From<CorrelationError> for crate::Error {
+    /// Fold a correlation failure into the core taxonomy, keeping its
+    /// [`CorrelationError::kind`]: iterative failures become
+    /// `InputError::SolverConvergenceFailed`, everything else a validation error
+    /// with the full message.
+    fn from(error: CorrelationError) -> Self {
+        match error {
+            CorrelationError::DidNotConverge { max_iter, tol } => {
+                crate::Error::Input(error::InputError::SolverConvergenceFailed {
+                    iterations: max_iter,
+                    residual: tol,
+                    last_x: f64::NAN,
+                    reason: error.to_string(),
+                })
+            }
+            CorrelationError::EigenDecompositionFailed => {
+                crate::Error::Input(error::InputError::SolverConvergenceFailed {
+                    iterations: 0,
+                    residual: f64::NAN,
+                    last_x: f64::NAN,
+                    reason: error.to_string(),
+                })
+            }
+            other => crate::Error::Validation(other.to_string()),
+        }
+    }
+}
+
 /// Error type for Cholesky decomposition failures.
 #[derive(Debug, Clone, PartialEq, Error, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -190,7 +261,7 @@ pub enum CholeskyError {
         row: usize,
         /// The column index
         col: usize,
-        /// The threshold used (1e-10)
+        /// Scale-relative threshold used for this matrix
         threshold: f64,
     },
     /// Matrix dimension mismatch.
@@ -372,7 +443,7 @@ impl CorrelationFactor {
     ///   `effective_rank <= n`.
     #[must_use]
     pub fn from_parts(factor: Vec<f64>, n: usize, effective_rank: usize) -> Self {
-        debug_assert_eq!(factor.len(), n * n);
+        debug_assert_eq!(Some(factor.len()), n.checked_mul(n));
         debug_assert!(effective_rank <= n);
         let triangular = is_exactly_lower_triangular(&factor, n);
         Self {
@@ -404,10 +475,11 @@ fn is_exactly_lower_triangular(factor: &[f64], n: usize) -> bool {
 ///
 /// At each step the largest remaining diagonal element is selected as the pivot
 /// (Higham's Algorithm 10.2). If it is below
-/// `PIVOT_TOLERANCE_RELATIVE * max(max_diagonal, 1.0)` factorisation stops and the
-/// remaining block is treated as numerically zero (semidefinite truncation). If it is
-/// strictly negative by more than floating-point noise the matrix is indefinite and an
-/// error is returned.
+/// `PIVOT_TOLERANCE_RELATIVE * max_diagonal` factorisation stops only when the
+/// entire remaining block is numerically zero (semidefinite truncation). A
+/// materially negative residual diagonal or a nonzero residual coupling makes
+/// the matrix indefinite and returns an error. The tolerance scales with the
+/// matrix, including covariance matrices whose variances are smaller than one.
 ///
 /// The permutation is inverted before storage so the returned factor is in the
 /// **original variable ordering** of the input matrix.
@@ -446,7 +518,7 @@ pub fn cholesky_correlation(
     matrix: &[f64],
     n: usize,
 ) -> std::result::Result<CorrelationFactor, CholeskyError> {
-    if matrix.len() != n * n {
+    if square_len(n) != Some(matrix.len()) {
         return Err(CholeskyError::DimensionMismatch {
             expected: n,
             actual: matrix.len(),
@@ -472,7 +544,7 @@ pub fn cholesky_correlation(
     let max_diag = (0..n)
         .map(|i| matrix[i * n + i])
         .fold(f64::NEG_INFINITY, f64::max);
-    let tol = PIVOT_TOLERANCE_RELATIVE * max_diag.abs().max(1.0);
+    let tol = PIVOT_TOLERANCE_RELATIVE * max_diag.abs();
 
     // Work copy of the matrix that we reduce in-place (Schur complement updates).
     let mut a: Vec<f64> = matrix.to_vec();
@@ -501,8 +573,31 @@ pub fn cholesky_correlation(
             });
         }
 
-        // Pivot below relative tolerance → semidefinite truncation.
+        // A zero largest diagonal does not establish that the residual block
+        // is PSD: e.g. [[0, 1], [1, 0]] has eigenvalues -1 and +1.
         if pivot_val <= tol {
+            for row in step..n {
+                let diagonal = a[row * n + row];
+                if diagonal < -tol {
+                    return Err(CholeskyError::NotPositiveDefinite {
+                        diag: diagonal,
+                        row: perm[row],
+                    });
+                }
+                for col in step..row {
+                    let coupling = a[row * n + col];
+                    if coupling.abs() > tol {
+                        // Rayleigh quotient for the signed two-variable
+                        // direction opposing this residual coupling.
+                        let negative_direction =
+                            0.5 * diagonal + 0.5 * a[col * n + col] - coupling.abs();
+                        return Err(CholeskyError::NotPositiveDefinite {
+                            diag: negative_direction,
+                            row: perm[row],
+                        });
+                    }
+                }
+            }
             break;
         }
 
@@ -615,7 +710,7 @@ pub fn symmetric_eigen(
     matrix: &[f64],
     n: usize,
 ) -> std::result::Result<(Vec<f64>, Vec<f64>), CholeskyError> {
-    if matrix.len() != n * n {
+    if square_len(n) != Some(matrix.len()) {
         return Err(CholeskyError::DimensionMismatch {
             expected: n,
             actual: matrix.len(),
@@ -697,7 +792,9 @@ pub fn transpose_row_major(data: &[f64], rows: usize, cols: usize) -> Vec<f64> {
 /// Cholesky decomposition of a correlation/covariance matrix.
 ///
 /// Computes L such that Σ = L L^T, where Σ is the correlation matrix.
-/// Uses the standard algorithm with numerical stability improvements.
+/// Normalizes by the largest input diagonal magnitude before factorization,
+/// then restores the factor's units. The singularity threshold is relative
+/// to the square root of that magnitude.
 ///
 /// # Arguments
 ///
@@ -729,65 +826,22 @@ pub fn cholesky_decomposition(
     matrix: &[f64],
     n: usize,
 ) -> std::result::Result<Vec<f64>, CholeskyError> {
-    if matrix.len() != n * n {
+    if square_len(n) != Some(matrix.len()) {
         return Err(CholeskyError::DimensionMismatch {
             expected: n,
             actual: matrix.len(),
         });
     }
-    for (index, &value) in matrix.iter().enumerate() {
-        if !value.is_finite() {
-            return Err(CholeskyError::NonFiniteInput {
-                value,
-                row: index / n,
-                col: index % n,
-            });
-        }
-    }
-
-    let mut l = vec![0.0; n * n];
-
-    for i in 0..n {
-        for j in 0..=i {
-            let mut sum = 0.0;
-            for k in 0..j {
-                sum += l[i * n + k] * l[j * n + k];
-            }
-
-            if i == j {
-                let diag = matrix[i * n + i] - sum;
-                if diag < 0.0 {
-                    return Err(CholeskyError::NotPositiveDefinite { diag, row: i });
-                }
-                l[i * n + j] = diag.sqrt();
-                if l[i * n + j].abs() < SINGULAR_THRESHOLD {
-                    return Err(CholeskyError::Singular {
-                        value: l[i * n + j],
-                        row: i,
-                        col: j,
-                        threshold: SINGULAR_THRESHOLD,
-                    });
-                }
-            } else {
-                if l[j * n + j].abs() < SINGULAR_THRESHOLD {
-                    return Err(CholeskyError::Singular {
-                        value: l[j * n + j],
-                        row: i,
-                        col: j,
-                        threshold: SINGULAR_THRESHOLD,
-                    });
-                }
-                l[i * n + j] = (matrix[i * n + j] - sum) / l[j * n + j];
-            }
-        }
-    }
-
+    let mut l = vec![0.0; matrix.len()];
+    cholesky_decomposition_into(matrix, n, &mut l)?;
     Ok(l)
 }
 
 /// Cholesky decomposition into a caller-provided buffer (avoids allocation).
 ///
 /// The output buffer `l` must have length `n * n` and will be overwritten.
+/// Singularity uses the same scale-relative criterion as
+/// [`cholesky_decomposition`].
 ///
 /// # Arguments
 ///
@@ -801,7 +855,8 @@ pub fn cholesky_decomposition_into(
     n: usize,
     l: &mut [f64],
 ) -> std::result::Result<(), CholeskyError> {
-    if matrix.len() != n * n || l.len() != n * n {
+    let len = square_len(n);
+    if len != Some(matrix.len()) || len != Some(l.len()) {
         return Err(CholeskyError::DimensionMismatch {
             expected: n,
             actual: matrix.len(),
@@ -817,7 +872,20 @@ pub fn cholesky_decomposition_into(
         }
     }
 
+    let matrix_scale = (0..n)
+        .map(|i| matrix[i * n + i].abs())
+        .fold(0.0_f64, f64::max);
+    let factor_scale = matrix_scale.sqrt();
+
     l.fill(0.0);
+    if n > 0 && matrix_scale == 0.0 {
+        return Err(CholeskyError::Singular {
+            value: 0.0,
+            row: 0,
+            col: 0,
+            threshold: 0.0,
+        });
+    }
 
     for i in 0..n {
         for j in 0..=i {
@@ -827,31 +895,31 @@ pub fn cholesky_decomposition_into(
             }
 
             if i == j {
-                let diag = matrix[i * n + i] - sum;
+                let diag = matrix[i * n + i] / matrix_scale - sum;
                 if diag < 0.0 {
-                    return Err(CholeskyError::NotPositiveDefinite { diag, row: i });
+                    return Err(CholeskyError::NotPositiveDefinite {
+                        diag: diag * matrix_scale,
+                        row: i,
+                    });
                 }
                 l[i * n + j] = diag.sqrt();
-                if l[i * n + j].abs() < SINGULAR_THRESHOLD {
+                if l[i * n + j] < SINGULAR_THRESHOLD {
                     return Err(CholeskyError::Singular {
-                        value: l[i * n + j],
+                        value: l[i * n + j] * factor_scale,
                         row: i,
                         col: j,
-                        threshold: SINGULAR_THRESHOLD,
+                        threshold: SINGULAR_THRESHOLD * factor_scale,
                     });
                 }
             } else {
-                if l[j * n + j].abs() < SINGULAR_THRESHOLD {
-                    return Err(CholeskyError::Singular {
-                        value: l[j * n + j],
-                        row: i,
-                        col: j,
-                        threshold: SINGULAR_THRESHOLD,
-                    });
-                }
-                l[i * n + j] = (matrix[i * n + j] - sum) / l[j * n + j];
+                // This diagonal was checked when its row was factorized.
+                l[i * n + j] = (matrix[i * n + j] / matrix_scale - sum) / l[j * n + j];
             }
         }
+    }
+
+    for value in l {
+        *value *= factor_scale;
     }
 
     Ok(())
@@ -870,8 +938,9 @@ pub fn cholesky_decomposition_into(
 ///
 /// # Errors
 ///
-/// Returns [`crate::error::InputError::DimensionMismatch`] if `l.len() != n * n`
-/// or `z.len() != n`.
+/// Returns [`crate::Error::Validation`], naming both lengths, if `l` does not
+/// hold exactly `n * n` entries (including when `n * n` overflows `usize`) or
+/// `z.len() != n`.
 ///
 /// # Arguments
 ///
@@ -917,8 +986,18 @@ pub fn cholesky_decomposition_into(
 ///
 /// - [`CorrelationFactor::apply`] for the pivoted, rank-aware, allocation-free factor.
 pub fn apply_lower_triangular(l: &[f64], n: usize, z: &[f64]) -> Result<Vec<f64>> {
-    if l.len() != n * n || z.len() != n {
-        return Err(error::InputError::DimensionMismatch.into());
+    if square_len(n) != Some(l.len()) {
+        return Err(crate::Error::Validation(format!(
+            "lower-triangular factor has {} entries but a {n}x{n} factor needs {}",
+            l.len(),
+            square_len_label(n)
+        )));
+    }
+    if z.len() != n {
+        return Err(crate::Error::Validation(format!(
+            "vector has length {} but the factor is {n}x{n}",
+            z.len()
+        )));
     }
 
     let mut out = vec![0.0; n];
@@ -951,12 +1030,42 @@ pub fn apply_lower_triangular(l: &[f64], n: usize, z: &[f64]) -> Result<Vec<f64>
 ///
 /// Returns an error if `chol.len() != b.len()²`, `x.len() != b.len()`, or a
 /// diagonal factor is too close to zero relative to the largest diagonal
-/// magnitude. On a singular-factor error, `x` may already contain a partial
-/// forward-substitution result and must not be used as a solution.
+/// magnitude. Rejects non-finite entries in the consumed lower triangle and
+/// right-hand side, or a non-finite substitution result. The unused upper
+/// triangle is ignored. On a numerical error, `x` may contain a partial result
+/// and must not be used as a solution.
 pub fn cholesky_solve(chol: &[f64], b: &[f64], x: &mut [f64]) -> Result<()> {
     let n = b.len();
-    if chol.len() != n * n || x.len() != n {
-        return Err(crate::error::InputError::DimensionMismatch.into());
+    if square_len(n) != Some(chol.len()) {
+        return Err(crate::Error::Validation(format!(
+            "Cholesky factor has {} entries but a right-hand side of length {n} needs {}",
+            chol.len(),
+            square_len_label(n)
+        )));
+    }
+    if x.len() != n {
+        return Err(crate::Error::Validation(format!(
+            "solution buffer has length {} but the right-hand side has length {n}",
+            x.len()
+        )));
+    }
+    for &value in b {
+        if !value.is_finite() {
+            return Err(crate::InputError::NonFiniteValue {
+                kind: crate::NonFiniteKind::classify(value),
+            }
+            .into());
+        }
+    }
+    for i in 0..n {
+        for &value in &chol[i * n..=i * n + i] {
+            if !value.is_finite() {
+                return Err(crate::InputError::NonFiniteValue {
+                    kind: crate::NonFiniteKind::classify(value),
+                }
+                .into());
+            }
+        }
     }
     let diagonal_scale = (0..n)
         .map(|i| chol[i * n + i].abs())
@@ -975,6 +1084,12 @@ pub fn cholesky_solve(chol: &[f64], b: &[f64], x: &mut [f64]) -> Result<()> {
             return Err(crate::error::InputError::Invalid.into());
         }
         x[i] = (b[i] - sum) / diag;
+        if !x[i].is_finite() {
+            return Err(crate::InputError::NonFiniteValue {
+                kind: crate::NonFiniteKind::classify(x[i]),
+            }
+            .into());
+        }
     }
 
     // Backward substitution: Solve L^T x = y
@@ -990,6 +1105,12 @@ pub fn cholesky_solve(chol: &[f64], b: &[f64], x: &mut [f64]) -> Result<()> {
             return Err(crate::error::InputError::Invalid.into());
         }
         x[i] = (x[i] - sum) / diag;
+        if !x[i].is_finite() {
+            return Err(crate::InputError::NonFiniteValue {
+                kind: crate::NonFiniteKind::classify(x[i]),
+            }
+            .into());
+        }
     }
 
     Ok(())
@@ -1059,7 +1180,7 @@ pub fn validate_correlation_matrix(
     matrix: &[f64],
     n: usize,
 ) -> std::result::Result<(), CorrelationError> {
-    if matrix.len() != n * n {
+    if square_len(n) != Some(matrix.len()) {
         return Err(CorrelationError::InvalidSize {
             expected: n,
             actual: matrix.len(),
@@ -1139,6 +1260,10 @@ pub struct LedoitWolfResult {
 ///
 /// is returned. `Σ*` is a convex combination of the PSD `S` and the PSD `μI`,
 /// hence always positive semi-definite and well-conditioned for `δ* > 0`.
+/// Centered observations are normalized by a common magnitude before forming
+/// second and fourth moments, then the covariance is restored to input units.
+/// This preserves shrinkage under uniform rescaling without overflowing or
+/// underflowing the fourth moments.
 /// The computation is a deterministic serial fold: identical inputs produce
 /// bit-identical outputs. Complexity: O(t·n²) time, O(t·n + n²) space.
 ///
@@ -1150,9 +1275,10 @@ pub struct LedoitWolfResult {
 ///
 /// # Errors
 ///
-/// Returns [`crate::Error::Validation`] when `t < 2`, `n == 0`, or any entry
-/// is non-finite, and [`crate::InputError::DimensionMismatch`] when
-/// `observations.len() != t * n`.
+/// Returns [`crate::Error::Validation`] when `t < 2`, `n == 0`, any entry is
+/// non-finite, `observations.len() != t * n`, the `n * n` covariance size
+/// overflows `usize`, or the centered observations or resulting covariance
+/// exceed the finite `f64` range.
 ///
 /// # Examples
 ///
@@ -1186,8 +1312,16 @@ pub fn ledoit_wolf_shrinkage(
             "ledoit_wolf_shrinkage: need at least 2 observations, got {t}"
         )));
     }
-    if observations.len() != t * n {
-        return Err(crate::InputError::DimensionMismatch.into());
+    if t.checked_mul(n) != Some(observations.len()) {
+        return Err(crate::Error::Validation(format!(
+            "ledoit_wolf_shrinkage: {} observations do not form a {t}x{n} panel",
+            observations.len()
+        )));
+    }
+    if square_len(n).is_none() {
+        return Err(crate::Error::Validation(format!(
+            "ledoit_wolf_shrinkage: a {n}x{n} covariance matrix does not fit in memory"
+        )));
     }
     if let Some(bad) = observations.iter().find(|v| !v.is_finite()) {
         return Err(crate::Error::Validation(format!(
@@ -1198,20 +1332,38 @@ pub fn ledoit_wolf_shrinkage(
     let tf = t as f64;
     let nf = n as f64;
 
-    // Demean columns.
-    let mut means = vec![0.0_f64; n];
-    for row in 0..t {
-        for col in 0..n {
-            means[col] += observations[row * n + col];
+    // Compute each mean in that column's units to avoid overflowing a sum of
+    // finite observations. Center before choosing the common moment scale so
+    // a large constant column cannot erase variation in the other columns.
+    let mut x = vec![0.0_f64; t * n];
+    let mut scale = 0.0_f64;
+    for col in 0..n {
+        let column_scale = (0..t)
+            .map(|row| observations[row * n + col].abs())
+            .fold(0.0_f64, f64::max);
+        let mean = if column_scale > 0.0 {
+            crate::math::summation::neumaier_sum(
+                (0..t).map(|row| observations[row * n + col] / column_scale),
+            ) / tf
+                * column_scale
+        } else {
+            0.0
+        };
+        for row in 0..t {
+            let centered = observations[row * n + col] - mean;
+            if !centered.is_finite() {
+                return Err(crate::Error::Validation(
+                    "ledoit_wolf_shrinkage: centered observations exceed finite f64 range"
+                        .to_owned(),
+                ));
+            }
+            x[row * n + col] = centered;
+            scale = scale.max(centered.abs());
         }
     }
-    for mean in &mut means {
-        *mean /= tf;
-    }
-    let mut x = vec![0.0_f64; t * n];
-    for row in 0..t {
-        for col in 0..n {
-            x[row * n + col] = observations[row * n + col] - means[col];
+    if scale > 0.0 {
+        for value in &mut x {
+            *value /= scale;
         }
     }
 
@@ -1265,7 +1417,16 @@ pub fn ledoit_wolf_shrinkage(
     for i in 0..n {
         for j in 0..n {
             let target = if i == j { mu } else { 0.0 };
-            covariance[i * n + j] = shrinkage * target + (1.0 - shrinkage) * s[i * n + j];
+            let normalized = shrinkage * target + (1.0 - shrinkage) * s[i * n + j];
+            // Restore units in two products: scale² can overflow even when
+            // the final covariance entry is representable.
+            let value = (normalized * scale) * scale;
+            if !value.is_finite() {
+                return Err(crate::Error::Validation(
+                    "ledoit_wolf_shrinkage: covariance exceeds finite f64 range".to_owned(),
+                ));
+            }
+            covariance[i * n + j] = value;
         }
     }
 
@@ -1278,6 +1439,86 @@ pub fn ledoit_wolf_shrinkage(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A dimension whose square overflows `usize` on this target, so an
+    /// unchecked `n * n` wraps (to 0 for `2^(BITS/2)`) and a wrong-length
+    /// buffer would pass the size check.
+    const WRAPPING_N: [usize; 2] = [1 << (usize::BITS / 2), usize::MAX];
+
+    #[test]
+    fn size_checks_reject_a_square_that_overflows() {
+        for n in WRAPPING_N {
+            assert!(cholesky_decomposition(&[], n).is_err(), "n = {n}");
+            assert!(
+                cholesky_decomposition_into(&[], n, &mut []).is_err(),
+                "n = {n}"
+            );
+            assert!(cholesky_correlation(&[], n).is_err(), "n = {n}");
+            assert!(symmetric_eigen(&[], n).is_err(), "n = {n}");
+            assert!(apply_lower_triangular(&[], n, &[]).is_err(), "n = {n}");
+            assert!(ledoit_wolf_shrinkage(&[], 2, n).is_err(), "n = {n}");
+            let size_error = validate_correlation_matrix(&[], n).expect_err("wrapping n");
+            assert!(matches!(size_error, CorrelationError::InvalidSize { .. }));
+            // Display must not multiply the dimension either.
+            assert!(size_error.to_string().contains("entries, got 0"));
+        }
+    }
+
+    #[test]
+    fn cholesky_solve_names_both_lengths() {
+        let mut x = [0.0; 3];
+        let error = cholesky_solve(&[2.0, 0.0, 1.0, 1.0], &[2.0, 1.0, 0.0], &mut x)
+            .expect_err("a 2x2 factor cannot solve a length-3 system");
+        assert_eq!(error.kind(), crate::error::ErrorKind::Validation);
+        assert!(
+            error
+                .to_string()
+                .contains("4 entries but a right-hand side of length 3 needs 9"),
+            "{error}"
+        );
+        let mut x = [0.0; 2];
+        cholesky_solve(&[2.0, 0.0, 1.0, 1.0], &[2.0, 1.0], &mut x).expect("2x2 solve");
+        assert_eq!(x, [0.5, 0.0]);
+    }
+
+    #[test]
+    fn correlation_error_kind_survives_the_core_fold() {
+        use crate::error::ErrorKind;
+        let cases = [
+            (
+                CorrelationError::DidNotConverge {
+                    max_iter: 3,
+                    tol: 1e-9,
+                },
+                ErrorKind::Computation,
+            ),
+            (
+                CorrelationError::EigenDecompositionFailed,
+                ErrorKind::Computation,
+            ),
+            (
+                CorrelationError::InvalidSize {
+                    expected: 2,
+                    actual: 3,
+                },
+                ErrorKind::Validation,
+            ),
+            (
+                CorrelationError::DiagonalNotOne {
+                    index: 0,
+                    value: 2.0,
+                },
+                ErrorKind::Validation,
+            ),
+        ];
+        for (error, kind) in cases {
+            assert_eq!(error.kind(), kind, "{error}");
+            let message = error.to_string();
+            let core = crate::Error::from(error);
+            assert_eq!(core.kind(), kind);
+            assert!(core.to_string().contains(&message), "{core}");
+        }
+    }
 
     #[test]
     fn test_cholesky_2x2() {
@@ -1758,6 +1999,58 @@ mod tests {
     }
 
     #[test]
+    fn pivoted_cholesky_rejects_coupled_zero_residual_block() {
+        let indefinite = [1.0, 1.0, 1.0, 1.0, 1.0, -1.0, 1.0, -1.0, 1.0];
+        assert!(matches!(
+            cholesky_correlation(&indefinite, 3),
+            Err(CholeskyError::NotPositiveDefinite { .. })
+        ));
+        assert!(matches!(
+            validate_correlation_matrix(&indefinite, 3),
+            Err(CorrelationError::NotPositiveSemiDefinite { .. })
+        ));
+
+        let rank_one = [1.0; 9];
+        let factor = cholesky_correlation(&rank_one, 3).expect("uncoupled zero residual is PSD");
+        assert_eq!(factor.effective_rank(), 1);
+        assert_eq!(mat_mul_lt(factor.factor_matrix(), 3), rank_one);
+    }
+
+    #[test]
+    fn pivoted_cholesky_checks_all_residual_diagonals() {
+        let indefinite = [0.0, 0.0, 0.0, -1.0];
+        assert!(matches!(
+            cholesky_correlation(&indefinite, 2),
+            Err(CholeskyError::NotPositiveDefinite { row: 1, .. })
+        ));
+    }
+
+    #[test]
+    fn pivoted_cholesky_is_invariant_to_covariance_scale() {
+        let covariance = [4.0, 1.0, 1.0, 2.0];
+        for scale in [1e-16, 1.0, 1e16] {
+            let scaled = covariance.map(|value| value * scale);
+            let factor = cholesky_correlation(&scaled, 2).expect("scaled SPD covariance");
+            assert_eq!(factor.effective_rank(), 2);
+            for (actual, expected) in mat_mul_lt(factor.factor_matrix(), 2).iter().zip(covariance) {
+                assert!((actual / scale - expected).abs() < 1e-12);
+            }
+        }
+    }
+
+    #[test]
+    fn linalg_rejects_overflowing_dimensions_without_panicking() {
+        let n = usize::MAX;
+        assert!(cholesky_correlation(&[], n).is_err());
+        assert!(cholesky_decomposition(&[], n).is_err());
+        assert!(cholesky_decomposition_into(&[], n, &mut []).is_err());
+        assert!(symmetric_eigen(&[], n).is_err());
+        let error = validate_correlation_matrix(&[], n).expect_err("overflowing square");
+        assert!(error.to_string().contains("Invalid matrix size"));
+        assert!(ledoit_wolf_shrinkage(&[], 2, n).is_err());
+    }
+
+    #[test]
     fn pivoted_cholesky_dimension_mismatch() {
         let small = vec![1.0, 0.5, 0.5, 1.0];
         match cholesky_correlation(&small, 3) {
@@ -1898,6 +2191,78 @@ mod tests {
 
         assert!((x[0] - 2.0).abs() < 1e-12, "x={}", x[0]);
     }
+
+    #[test]
+    fn cholesky_factorization_and_solve_are_invariant_to_system_scale() {
+        // Independent exact solution: [[4, 1], [1, 2]] * [2, -1] = [7, 0].
+        let matrix = [4.0, 1.0, 1.0, 2.0];
+        for scale in [1e-300, 1e-24, 1.0, 1e24, 1e300] {
+            let scaled = matrix.map(|value| scale * value);
+            let factor = cholesky_decomposition(&scaled, 2).expect("scaled SPD matrix");
+            let mut buffer = [f64::NAN; 4];
+            cholesky_decomposition_into(&scaled, 2, &mut buffer)
+                .expect("scaled SPD matrix into supplied buffer");
+            assert_eq!(factor, buffer);
+
+            for (actual, expected) in mat_mul_lt(&factor, 2).iter().zip(matrix) {
+                assert!((actual / scale - expected).abs() < 1e-12);
+            }
+            let mut solution = [0.0; 2];
+            cholesky_solve(&factor, &[7.0 * scale, 0.0], &mut solution)
+                .expect("factored scaled system");
+            assert!((solution[0] - 2.0).abs() < 1e-12, "scale={scale}");
+            assert!((solution[1] + 1.0).abs() < 1e-12, "scale={scale}");
+        }
+    }
+
+    #[test]
+    fn cholesky_factorization_rejects_singular_systems_at_every_scale() {
+        for scale in [1e-300, 1.0, 1e300] {
+            for matrix in [
+                [0.0; 4],
+                [scale, 0.0, 0.0, 0.0],
+                [scale, scale, scale, scale],
+                [scale, 0.0, 0.0, scale * 1e-22],
+            ] {
+                assert!(matches!(
+                    cholesky_decomposition(&matrix, 2),
+                    Err(CholeskyError::Singular { .. })
+                ));
+                assert!(matches!(
+                    cholesky_decomposition_into(&matrix, 2, &mut [0.0; 4]),
+                    Err(CholeskyError::Singular { .. })
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn cholesky_solve_rejects_nonfinite_inputs_before_writing_output() {
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            for factor in [[bad, 0.0, 0.0, 1.0], [1.0, 0.0, bad, 1.0]] {
+                let mut x = [7.0, 8.0];
+                assert!(cholesky_solve(&factor, &[1.0, 1.0], &mut x).is_err());
+                assert_eq!(x, [7.0, 8.0]);
+            }
+            let mut x = [7.0];
+            assert!(cholesky_solve(&[1.0], &[bad], &mut x).is_err());
+            assert_eq!(x, [7.0]);
+        }
+    }
+
+    #[test]
+    fn cholesky_solve_ignores_unused_upper_triangle() {
+        let mut x = [0.0, 0.0];
+        cholesky_solve(&[1.0, f64::NAN, 0.0, 2.0], &[2.0, 12.0], &mut x)
+            .expect("only the lower triangle is consumed");
+        assert_eq!(x, [2.0, 3.0]);
+    }
+
+    #[test]
+    fn cholesky_solve_rejects_overflow_from_finite_inputs() {
+        let mut x = [0.0];
+        assert!(cholesky_solve(&[1.0e-160], &[1.0], &mut x).is_err());
+    }
     #[test]
     fn apply_lower_triangular_reproduces_target_covariance() {
         // L L^T must equal the input matrix, i.e. applying L to each unit
@@ -1968,6 +2333,54 @@ mod ledoit_wolf_tests {
                 "covariance[{idx}]: expected {want}, got {got}"
             );
         }
+    }
+
+    #[test]
+    fn ledoit_wolf_preserves_golden_estimate_under_extreme_rescaling() {
+        let observations = [1.0, 1.0, -1.0, -1.0, 2.0, -2.0, -2.0, 2.0];
+        for scale in [1e-150, 1e-100, 1.0, 1e100, 1e150] {
+            let scaled = observations.map(|value| value * scale);
+            let result = ledoit_wolf_shrinkage(&scaled, 4, 2).expect("finite covariance");
+            assert!((result.shrinkage - 17.0 / 18.0).abs() < 1e-14);
+            for (actual, expected) in
+                result
+                    .covariance
+                    .iter()
+                    .zip([2.5, -1.0 / 12.0, -1.0 / 12.0, 2.5])
+            {
+                assert!((actual / scale / scale - expected).abs() < 1e-13);
+            }
+        }
+    }
+
+    #[test]
+    fn ledoit_wolf_centers_large_constants_without_erasing_other_columns() {
+        let observations = [1e308, 1.0, 1e308, -1.0, 1e308, 2.0, 1e308, -2.0];
+        let result = ledoit_wolf_shrinkage(&observations, 4, 2).expect("finite centered data");
+        // S = diag(0, 2.5), mu = 1.25, d² = 25/16, b² = 9/32.
+        assert!((result.shrinkage - 0.18).abs() < 1e-14);
+        for (actual, expected) in result.covariance.iter().zip([0.225, 0.0, 0.0, 2.275]) {
+            assert!((actual - expected).abs() < 1e-13);
+        }
+        let constant = ledoit_wolf_shrinkage(&[1e308; 8], 4, 2).expect("zero covariance");
+        assert_eq!(constant.shrinkage, 0.0);
+        assert_eq!(constant.covariance, [0.0; 4]);
+    }
+
+    #[test]
+    fn ledoit_wolf_rejects_unrepresentable_covariance() {
+        let result = ledoit_wolf_shrinkage(&[1e308, -1e308], 2, 1);
+        assert!(matches!(result, Err(crate::Error::Validation(_))));
+    }
+
+    #[test]
+    fn ledoit_wolf_restores_finite_covariance_when_scale_squared_overflows() {
+        // E[X²] = (2 * (1.4e154)²) / 4 = 9.8e307 is finite, although
+        // directly squaring the largest centered observation overflows.
+        let result = ledoit_wolf_shrinkage(&[1.4e154, -1.4e154, 0.0, 0.0], 4, 1)
+            .expect("representable variance");
+        assert_eq!(result.shrinkage, 0.0);
+        assert!((result.covariance[0] / 9.8e307 - 1.0).abs() < 1e-14);
     }
 
     /// Demeaning: adding a constant to a column must not change the estimate.

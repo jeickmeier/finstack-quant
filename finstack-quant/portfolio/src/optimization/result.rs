@@ -2,6 +2,7 @@
 //!
 use super::problem::PortfolioOptimizationProblem;
 use super::types::{SLACK_TOL, WEIGHT_TOL};
+use super::universe::CandidatePosition;
 use crate::error::{Error, Result};
 use crate::portfolio::Portfolio;
 use crate::position::Position;
@@ -56,11 +57,11 @@ impl OptimizationStatus {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum TradeDirection {
-    /// Buy more of the instrument (increase exposure).
+    /// Increase the signed instrument quantity, including covering a short.
     Buy,
-    /// Sell the instrument (decrease exposure).
+    /// Decrease the signed instrument quantity, including increasing a short.
     Sell,
-    /// No change in exposure.
+    /// No change in instrument quantity.
     Hold,
 }
 
@@ -94,7 +95,7 @@ pub struct TradeSpec {
     pub target_quantity: f64,
     /// Quantity change (`target - current`).
     pub delta_quantity: f64,
-    /// Buy / Sell / Hold classification.
+    /// Buy / Sell / Hold classification from the sign of `delta_quantity`.
     pub direction: TradeDirection,
     /// Pre‑trade weight.
     pub current_weight: f64,
@@ -134,6 +135,9 @@ pub struct PortfolioOptimizationResult {
     ///   `|instrument.notional().amount()|` and map scale back to quantity
     /// - `UnitScaling`: treat the optimized weight as a quantity multiplier for
     ///   existing positions, or as the direct target quantity for new candidates
+    ///
+    /// Held existing positions retain their exact current quantity under every
+    /// scheme, including positions with zero or negligible present value.
     pub implied_quantities: IndexMap<PositionId, f64>,
 
     /// Objective value at the solution.
@@ -164,50 +168,13 @@ impl PortfolioOptimizationResult {
     /// Returns [`Error::InvalidInput`] if the optimization did not
     /// find a feasible solution.
     pub fn to_rebalanced_portfolio(&self) -> Result<Portfolio> {
-        if !self.status.is_feasible() {
-            return Err(Error::invalid_input(
-                "cannot generate rebalanced portfolio from infeasible solution",
-            ));
-        }
-
-        let mut portfolio = self.problem.portfolio.clone();
-
-        for position in &mut portfolio.positions {
-            if let Some(qty) = self.implied_quantities.get(&position.position_id) {
-                position.quantity = *qty;
-            }
-        }
-        for candidate in &self.problem.trade_universe.candidates {
-            let Some(target_qty) = self.implied_quantities.get(&candidate.id).copied() else {
-                continue;
-            };
-            let target_weight = self
-                .optimal_weights
-                .get(&candidate.id)
-                .copied()
-                .unwrap_or(0.0);
-            if target_weight.abs() < WEIGHT_TOL || target_qty.abs() < WEIGHT_TOL {
-                continue;
-            }
-
-            portfolio
-                .entities
-                .entry(candidate.entity_id.clone())
-                .or_insert_with(|| Entity::new(candidate.entity_id.clone()));
-            let mut position = Position::new(
-                candidate.id.clone(),
-                candidate.entity_id.clone(),
-                candidate.instrument.id(),
-                std::sync::Arc::clone(&candidate.instrument),
-                target_qty,
-                candidate.unit,
-            )?;
-            position.attributes = candidate.attributes.clone();
-            portfolio.add_position(position)?;
-        }
-
-        portfolio.validate()?;
-        Ok(portfolio)
+        rebalance_portfolio(
+            self.problem.portfolio.clone(),
+            &self.problem.trade_universe.candidates,
+            &self.status,
+            &self.implied_quantities,
+            &self.optimal_weights,
+        )
     }
 
     /// Generate trade list (delta from current to target).
@@ -267,9 +234,10 @@ impl PortfolioOptimizationResult {
                     })
                     .unwrap_or_default();
 
-                let direction = if delta_weight > 0.0 {
+                let delta_quantity = target_qty - current_qty;
+                let direction = if delta_quantity > 0.0 {
                     TradeDirection::Buy
-                } else if delta_weight < 0.0 {
+                } else if delta_quantity < 0.0 {
                     TradeDirection::Sell
                 } else {
                     TradeDirection::Hold
@@ -281,7 +249,7 @@ impl PortfolioOptimizationResult {
                     trade_type,
                     current_quantity: current_qty,
                     target_quantity: target_qty,
-                    delta_quantity: target_qty - current_qty,
+                    delta_quantity,
                     direction,
                     current_weight,
                     target_weight,
@@ -326,13 +294,7 @@ impl PortfolioOptimizationResult {
     /// [`OptimizationStatus::is_feasible`] before consuming it.
     #[must_use]
     pub fn binding_constraints(&self) -> Vec<(&str, f64)> {
-        // See `optimization::types::SLACK_TOL` for the rationale behind
-        // the chosen scale.
-        self.constraint_slacks
-            .iter()
-            .filter(|(_, &slack)| slack.abs() < SLACK_TOL)
-            .map(|(name, &slack)| (name.as_str(), slack))
-            .collect()
+        binding_from_slacks(&self.constraint_slacks)
     }
 
     /// Calculate gross turnover (sum of absolute weight changes).
@@ -396,6 +358,110 @@ pub struct PortfolioOptimizationResultWire {
     pub label: Option<String>,
 }
 
+/// Apply an optimization solution to a portfolio: the single owner of the
+/// rebalancing rules shared by [`PortfolioOptimizationResult::to_rebalanced_portfolio`]
+/// and [`super::rebalance_from_spec`].
+///
+/// Held positions take their `implied_quantities`; a candidate is added (with
+/// its entity created when missing) only when both its target weight and its
+/// target quantity are at least `WEIGHT_TOL` in magnitude; the result is
+/// validated.
+pub(crate) fn rebalance_portfolio(
+    mut portfolio: Portfolio,
+    candidates: &[CandidatePosition],
+    status: &OptimizationStatus,
+    implied_quantities: &IndexMap<PositionId, f64>,
+    optimal_weights: &IndexMap<PositionId, f64>,
+) -> Result<Portfolio> {
+    if !status.is_feasible() {
+        return Err(Error::invalid_input(
+            "cannot generate rebalanced portfolio from infeasible solution",
+        ));
+    }
+
+    for position in &mut portfolio.positions {
+        if let Some(qty) = implied_quantities.get(&position.position_id) {
+            position.quantity = *qty;
+        }
+    }
+    for candidate in candidates {
+        let Some(target_qty) = implied_quantities.get(&candidate.id).copied() else {
+            continue;
+        };
+        let target_weight = optimal_weights.get(&candidate.id).copied().unwrap_or(0.0);
+        if target_weight.abs() < WEIGHT_TOL || target_qty.abs() < WEIGHT_TOL {
+            continue;
+        }
+
+        portfolio
+            .entities
+            .entry(candidate.entity_id.clone())
+            .or_insert_with(|| Entity::new(candidate.entity_id.clone()));
+        let mut position = Position::new(
+            candidate.id.clone(),
+            candidate.entity_id.clone(),
+            candidate.instrument.id(),
+            std::sync::Arc::clone(&candidate.instrument),
+            target_qty,
+            candidate.unit,
+        )?;
+        position.attributes = candidate.attributes.clone();
+        portfolio.add_position(position)?;
+    }
+
+    portfolio.validate()?;
+    Ok(portfolio)
+}
+
+/// Constraints whose slack is approximately zero, with that slack, in slack
+/// order. See `optimization::types::SLACK_TOL` for the rationale behind the
+/// chosen scale.
+fn binding_from_slacks(slacks: &IndexMap<String, f64>) -> Vec<(&str, f64)> {
+    slacks
+        .iter()
+        .filter(|(_, &slack)| slack.abs() < SLACK_TOL)
+        .map(|(name, &slack)| (name.as_str(), slack))
+        .collect()
+}
+
+impl PortfolioOptimizationResultWire {
+    /// Executable trade list, largest absolute quantity change first.
+    ///
+    /// The wire form of [`PortfolioOptimizationResult::to_trade_list`]: the
+    /// list was computed when the result was converted to its wire contract
+    /// and is stored in `trades`. Empty for an infeasible solve, which is not
+    /// the same as "nothing to trade"; check `is_feasible` first.
+    #[must_use]
+    pub fn to_trade_list(&self) -> &[TradeSpec] {
+        &self.trades
+    }
+
+    /// Trades whose `trade_type` is [`TradeType::NewPosition`], in trade-list
+    /// order.
+    ///
+    /// Same rule as [`PortfolioOptimizationResult::new_position_trades`],
+    /// applied to the wire trade list; empty for an infeasible solve.
+    #[must_use]
+    pub fn new_position_trades(&self) -> Vec<TradeSpec> {
+        self.trades
+            .iter()
+            .filter(|t| t.trade_type == TradeType::NewPosition)
+            .cloned()
+            .collect()
+    }
+
+    /// Approximately binding constraints (slack ≈ 0) and their slack values.
+    ///
+    /// Derived from `constraint_slacks` with the same tolerance as
+    /// [`PortfolioOptimizationResult::binding_constraints`], so a wire result
+    /// reports exactly what the solved result reports; empty for an
+    /// infeasible solve, which carries no slacks.
+    #[must_use]
+    pub fn binding_constraints(&self) -> Vec<(&str, f64)> {
+        binding_from_slacks(&self.constraint_slacks)
+    }
+}
+
 impl From<&PortfolioOptimizationResult> for PortfolioOptimizationResultWire {
     fn from(result: &PortfolioOptimizationResult) -> Self {
         let status_label = match result.status {
@@ -432,5 +498,64 @@ impl From<&PortfolioOptimizationResult> for PortfolioOptimizationResultWire {
 impl Serialize for PortfolioOptimizationResult {
     fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
         PortfolioOptimizationResultWire::from(self).serialize(serializer)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn trade(position_id: &str, trade_type: TradeType) -> TradeSpec {
+        TradeSpec {
+            position_id: PositionId::new(position_id),
+            instrument_id: position_id.to_string(),
+            trade_type,
+            current_quantity: 0.0,
+            target_quantity: 1.0,
+            delta_quantity: 1.0,
+            direction: TradeDirection::Buy,
+            current_weight: 0.0,
+            target_weight: 0.5,
+        }
+    }
+
+    fn wire() -> PortfolioOptimizationResultWire {
+        let mut constraint_slacks = IndexMap::new();
+        constraint_slacks.insert("budget".to_string(), 0.0);
+        constraint_slacks.insert("max_weight".to_string(), 0.25);
+        PortfolioOptimizationResultWire {
+            schema_version: SchemaVersion::CURRENT,
+            status: OptimizationStatus::Optimal,
+            status_label: "optimal".to_string(),
+            is_feasible: true,
+            objective_value: 1.0,
+            turnover: 0.0,
+            optimal_weights: IndexMap::new(),
+            current_weights: IndexMap::new(),
+            weight_deltas: IndexMap::new(),
+            implied_quantities: IndexMap::new(),
+            metric_values: IndexMap::new(),
+            trades: vec![
+                trade("OLD", TradeType::Existing),
+                trade("NEW", TradeType::NewPosition),
+            ],
+            constraint_slacks,
+            // Deliberately inconsistent with the slacks: the methods derive
+            // from `constraint_slacks`, not from this stored name list.
+            binding_constraints: vec!["max_weight".to_string()],
+            label: None,
+        }
+    }
+
+    #[test]
+    fn wire_new_position_trades_keeps_only_candidates() {
+        let trades = wire().new_position_trades();
+        assert_eq!(trades.len(), 1);
+        assert_eq!(trades[0].position_id.as_str(), "NEW");
+    }
+
+    #[test]
+    fn wire_binding_constraints_derive_from_slacks() {
+        assert_eq!(wire().binding_constraints(), vec![("budget", 0.0)]);
     }
 }

@@ -463,12 +463,22 @@ fn price_arithmetic_tw_commodity(
 
     // Match to lognormal
     if m2 <= m1 * m1 {
-        return df * scale * (m1 - k_eff).max(0.0);
+        return df
+            * scale
+            * match option_type {
+                OptionType::Call => (m1 - k_eff).max(0.0),
+                OptionType::Put => (k_eff - m1).max(0.0),
+            };
     }
 
     let var = (m2 / (m1 * m1)).ln();
     if var <= 0.0 {
-        return df * scale * (m1 - k_eff).max(0.0);
+        return df
+            * scale
+            * match option_type {
+                OptionType::Call => (m1 - k_eff).max(0.0),
+                OptionType::Put => (k_eff - m1).max(0.0),
+            };
     }
 
     let sigma_star = var.sqrt();
@@ -1079,5 +1089,51 @@ mod tests {
         let pv = compute_pv(&option, &MarketContext::new(), as_of)
             .expect("settled Asian option must be zero");
         assert_eq!(pv.amount(), 0.0);
+    }
+
+    #[test]
+    fn arithmetic_asian_zero_vol_calls_and_puts_preserve_seasoning() {
+        let forwards = [(0.25, 70.0), (0.75, 80.0)];
+        let df = 0.96;
+        for (historical_sum, total_count) in [(0.0, 2), (60.0, 3)] {
+            let average = (historical_sum + 150.0) / total_count as f64;
+            for strike in [average - 5.0, average, average + 5.0] {
+                for sigma in [0.0, 1e-10, 1e-5] {
+                    let call = price_arithmetic_tw_commodity(
+                        &forwards,
+                        strike,
+                        sigma,
+                        df,
+                        OptionType::Call,
+                        historical_sum,
+                        total_count,
+                    );
+                    let put = price_arithmetic_tw_commodity(
+                        &forwards,
+                        strike,
+                        sigma,
+                        df,
+                        OptionType::Put,
+                        historical_sum,
+                        total_count,
+                    );
+                    // At ATM, positive sigma retains a small time value.
+                    let tolerance = if strike == average && sigma > 0.0 {
+                        0.001
+                    } else {
+                        1e-10
+                    };
+                    assert!(
+                        (call - df * (average - strike).max(0.0)).abs() < tolerance,
+                        "call: sigma={sigma}, strike={strike}, price={call}"
+                    );
+                    assert!(
+                        (put - df * (strike - average).max(0.0)).abs() < tolerance,
+                        "put: sigma={sigma}, strike={strike}, price={put}"
+                    );
+                    assert!((call - put - df * (average - strike)).abs() < 1e-10);
+                }
+            }
+        }
     }
 }

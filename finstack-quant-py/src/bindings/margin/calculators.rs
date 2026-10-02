@@ -538,11 +538,6 @@ impl PyImResult {
 }
 
 pub(super) fn money_from_amount(amount: f64, currency: Currency) -> PyResult<Money> {
-    if !amount.is_finite() {
-        return Err(crate::errors::value_error(format!(
-            "amount must be finite, got {amount}"
-        )));
-    }
     Money::new(amount, currency).map_err(core_to_py)
 }
 

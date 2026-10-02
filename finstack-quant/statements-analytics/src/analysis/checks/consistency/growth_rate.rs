@@ -16,6 +16,7 @@ use finstack_quant_statements::Result;
 /// For each node, computes `(value_t − value_{t−1}) / |value_{t−1}|`.
 /// Periods where the prior value is zero are skipped.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct GrowthRateConsistency {
     /// Nodes to monitor for growth-rate plausibility.
     pub nodes: Vec<NodeId>,

@@ -58,7 +58,9 @@ pub(crate) fn rate_risk_pool(
     bumped: &MarketContext,
     as_of: Date,
 ) -> Result<AgencyMbsPassthrough> {
-    let end = as_of.add_months(mbs.wam_months as i32);
+    let end = as_of.add_months(i32::try_from(mbs.wam_months).map_err(|_| {
+        finstack_quant_core::Error::Validation("MBS WAM months exceed supported range".into())
+    })?)?;
     let base_curve = base.get_discount(&mbs.discount_curve_id)?;
     let bumped_curve = bumped.get_discount(&mbs.discount_curve_id)?;
     let horizon = base_curve

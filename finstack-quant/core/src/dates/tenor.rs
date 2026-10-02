@@ -57,7 +57,6 @@ use crate::dates::{
     adjust, BusinessDayConvention, Date, DayCount, DayCountContext, HolidayCalendar,
 };
 use crate::error::InputError;
-use time::Duration;
 
 const MAX_TENOR_YEARS: u32 = 200;
 const MAX_TENOR_DAYS: u32 = MAX_TENOR_YEARS * 366;
@@ -103,6 +102,20 @@ impl TenorUnit {
                 reason: "unknown unit; expected D, W, M, or Y".to_string(),
             }
             .into()),
+        }
+    }
+
+    /// Single-character unit code: `'D'`, `'W'`, `'M'` or `'Y'`.
+    ///
+    /// The inverse of `TenorUnit::from_char` and the unit suffix of the
+    /// tenor's `Display` form (`"3M"`).
+    #[must_use]
+    pub const fn designator(self) -> char {
+        match self {
+            Self::Days => 'D',
+            Self::Weeks => 'W',
+            Self::Months => 'M',
+            Self::Years => 'Y',
         }
     }
 }
@@ -558,7 +571,7 @@ impl Tenor {
     /// # Errors
     ///
     /// Returns `InputError::InvalidTenor` when a month or year count cannot be
-    /// represented for date arithmetic. When `calendar` is supplied, it also
+    /// represented for date arithmetic, or a validation error if the shifted date exceeds the supported calendar range. When `calendar` is supplied, it also
     /// propagates the calendar's business-day adjustment error.
     pub fn add_to_date(
         &self,
@@ -569,15 +582,15 @@ impl Tenor {
         use crate::dates::date_extensions::DateExt;
 
         let raw_date: crate::Result<Date> = match self.unit {
-            TenorUnit::Days => Ok(date + Duration::days(i64::from(self.count))),
-            TenorUnit::Weeks => Ok(date + Duration::weeks(i64::from(self.count))),
+            TenorUnit::Days => date.add_days(i64::from(self.count)),
+            TenorUnit::Weeks => date.add_days(i64::from(self.count) * 7),
             TenorUnit::Months => {
                 let count_i32 =
                     i32::try_from(self.count).map_err(|_| InputError::InvalidTenor {
                         tenor: self.to_string(),
                         reason: format!("count {} exceeds i32::MAX", self.count),
                     })?;
-                Ok(date.add_months(count_i32))
+                date.add_months(count_i32)
             }
             TenorUnit::Years => {
                 let count_i32 =
@@ -594,7 +607,7 @@ impl Tenor {
                             self.count
                         ),
                     })?;
-                Ok(date.add_months(months))
+                date.add_months(months)
             }
         };
         let raw_date = raw_date?;
@@ -775,13 +788,7 @@ impl Tenor {
 
 impl std::fmt::Display for Tenor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let unit_char = match self.unit {
-            TenorUnit::Days => 'D',
-            TenorUnit::Weeks => 'W',
-            TenorUnit::Months => 'M',
-            TenorUnit::Years => 'Y',
-        };
-        write!(f, "{}{}", self.count, unit_char)
+        write!(f, "{}{}", self.count, self.unit.designator())
     }
 }
 
@@ -797,6 +804,27 @@ impl std::str::FromStr for Tenor {
 mod tests {
     use super::*;
     use time::Month;
+
+    #[test]
+    fn unit_designator_round_trips_from_char() {
+        for unit in [
+            TenorUnit::Days,
+            TenorUnit::Weeks,
+            TenorUnit::Months,
+            TenorUnit::Years,
+        ] {
+            assert_eq!(TenorUnit::from_char(unit.designator()).expect("unit"), unit);
+        }
+        assert_eq!(Tenor::parse("3M").expect("3M").unit().designator(), 'M');
+    }
+
+    #[test]
+    fn business_day_convention_default_is_modified_following() {
+        assert_eq!(
+            BusinessDayConvention::default(),
+            BusinessDayConvention::ModifiedFollowing
+        );
+    }
 
     #[test]
     fn test_parse_valid_tenors() {

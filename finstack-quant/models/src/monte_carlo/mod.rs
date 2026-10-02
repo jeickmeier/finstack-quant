@@ -90,6 +90,7 @@ pub mod rng;
 pub mod traits;
 
 pub mod barriers;
+pub mod convenience;
 pub mod engine;
 pub mod engine_fractional;
 pub mod greeks;

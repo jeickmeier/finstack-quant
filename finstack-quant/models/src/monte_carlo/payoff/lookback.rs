@@ -156,6 +156,10 @@ impl Lookback {
 }
 
 impl Payoff for Lookback {
+    fn supports_lrm_greeks(&self) -> bool {
+        self.maturity_step > 0 && !self.monitoring.observes(0)
+    }
+
     /// Update the tracked extremum when the event falls on or before maturity.
     ///
     /// # Arguments
@@ -266,6 +270,10 @@ impl FloatingStrikeLookbackCall {
 }
 
 impl Payoff for FloatingStrikeLookbackCall {
+    fn supports_lrm_greeks(&self) -> bool {
+        self.maturity_step > 0 && !self.monitoring.observes(0)
+    }
+
     /// Update the tracked minimum and capture terminal spot at maturity.
     ///
     /// # Arguments
@@ -379,6 +387,10 @@ impl FloatingStrikeLookbackPut {
 }
 
 impl Payoff for FloatingStrikeLookbackPut {
+    fn supports_lrm_greeks(&self) -> bool {
+        self.maturity_step > 0 && !self.monitoring.observes(0)
+    }
+
     /// Update the tracked maximum and capture terminal spot at maturity.
     ///
     /// # Arguments

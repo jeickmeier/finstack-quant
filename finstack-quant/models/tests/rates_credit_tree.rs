@@ -104,7 +104,7 @@ fn calibrate_tree(
     hazard: &HazardCurve,
     horizon: f64,
 ) {
-    let targets = calibration_targets(discount, hazard, tree.config.steps, horizon);
+    let targets = calibration_targets(discount, hazard, tree.get_config().steps, horizon);
     tree.calibrate(&targets).expect("calibrate");
 }
 

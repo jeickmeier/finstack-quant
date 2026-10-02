@@ -159,7 +159,7 @@ pub struct HorizonAnalysis {
 impl Default for HorizonAnalysis {
     fn default() -> Self {
         Self {
-            attribution_method: AttributionMethod::Parallel,
+            attribution_method: AttributionMethod::default(),
             config: FinstackConfig::default(),
             engine: ScenarioEngine::new(),
             calendar_id: None,
@@ -208,7 +208,8 @@ impl HorizonAnalysis {
         self
     }
 
-    /// Attach a quote-recalibration provider to the internal scenario engine.
+    /// Replace the internal scenario engine's default quote-recalibration
+    /// provider (a fresh `CachedRecalibrationProvider`) with a shared one.
     ///
     /// The same provider is threaded into the [`PricingOptions`] used by the
     /// metrics-based attribution path, so quote-replay operations and the
@@ -224,14 +225,12 @@ impl HorizonAnalysis {
         self
     }
 
-    /// Pricing options carrying this analyzer's configuration and, when one
-    /// was attached, the engine's recalibration provider.
+    /// Pricing options carrying this analyzer's configuration and the
+    /// engine's recalibration provider.
     fn pricing_options(&self) -> PricingOptions {
-        let mut options = PricingOptions::default().with_config(&self.config);
-        if let Some(provider) = self.engine.recalibration_provider() {
-            options = options.with_recalibration_provider(Arc::clone(provider));
-        }
-        options
+        PricingOptions::default()
+            .with_config(&self.config)
+            .with_recalibration_provider(Arc::clone(self.engine.recalibration_provider()))
     }
 
     /// Resolve [`Self::calendar_id`] against core's built-in calendar registry.
@@ -254,6 +253,7 @@ impl HorizonAnalysis {
 /// Wraps a [`PnlAttribution`] with scenario context and convenience
 /// accessors for total return percentage and annualized return.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct HorizonResult {
     /// Full factor-decomposed P&L from the attribution framework.
     pub attribution: PnlAttribution,
@@ -265,6 +265,24 @@ pub struct HorizonResult {
     pub horizon_days: Option<i64>,
     /// Report from scenario engine application.
     pub scenario_report: ApplicationReport,
+}
+
+/// Borrowed JSON view of a horizon result, including Rust-derived returns.
+///
+/// Undefined or non-finite returns are represented as `null`. The underlying
+/// result fields are flattened into the same object without cloning attribution
+/// details or scenario reports.
+#[derive(Debug, serde::Serialize)]
+pub struct HorizonResultJson<'a> {
+    /// Original horizon fields flattened into the serialized result object.
+    #[serde(flatten)]
+    pub result: &'a HorizonResult,
+    /// Total P&L divided by positive initial value, as a decimal fraction.
+    pub total_return: Option<f64>,
+    /// Compounded annual return, or `None` when annualization is undefined.
+    pub annualized_return: Option<f64>,
+    /// Each canonical factor's P&L divided by positive initial value.
+    pub factor_contributions: indexmap::IndexMap<AttributionFactor, Option<f64>>,
 }
 
 impl HorizonAnalysis {
@@ -285,6 +303,11 @@ impl HorizonAnalysis {
     /// attribution prices the same instrument instance at both `t0` and `t1`.
     /// Apply those instrument-scoped changes before calling this method, or use
     /// a market-only horizon scenario.
+    ///
+    /// Metrics-based attribution calculates the canonical registry's applicable
+    /// subset of default attribution metrics at the opening snapshot. Metrics
+    /// unsupported by the instrument type are omitted; selected metric
+    /// calculation failures propagate. Terminal pricing does not request metrics.
     ///
     /// # Errors
     ///
@@ -307,6 +330,7 @@ impl HorizonAnalysis {
         as_of_t0: Date,
         scenario: &ScenarioSpec,
     ) -> crate::Result<HorizonResult> {
+        scenario.validate()?;
         if let Some(op_name) = horizon_unsupported_instrument_operation(scenario) {
             return Err(crate::Error::Validation(format!(
                 "{op_name} is not supported by HorizonAnalysis because attribution uses one \
@@ -315,10 +339,26 @@ impl HorizonAnalysis {
             )));
         }
 
-        let initial_value = instrument.value(market_t0, as_of_t0)?;
-
         let calendar = self.resolve_calendar()?;
         let mut market_t1 = market_t0.clone();
+        if let Some((period, mode)) = scenario.operations.iter().find_map(|op| match op {
+            OperationSpec::TimeRollForward {
+                period, roll_mode, ..
+            } => Some((period, *roll_mode)),
+            _ => None,
+        }) {
+            let (horizon_date, _) =
+                crate::adapters::time_roll::resolve_roll_dates(as_of_t0, period, mode, calendar)?;
+            if horizon_date > as_of_t0 {
+                let schedule = instrument.cashflow_schedule(market_t0, as_of_t0)?;
+                market_t1 = finstack_quant_cashflows::fixings::materialize_fixings(
+                    market_t0,
+                    [&schedule],
+                    as_of_t0,
+                    horizon_date,
+                )?;
+            }
+        }
         let mut ctx = ExecutionContext {
             market: &mut market_t1,
             model: None,
@@ -334,10 +374,8 @@ impl HorizonAnalysis {
         let diff_days = (as_of_t1 - as_of_t0).whole_days();
         let horizon_days = if diff_days > 0 { Some(diff_days) } else { None };
 
-        let attribution =
+        let (initial_value, terminal_value, attribution) =
             self.run_attribution(instrument, market_t0, &market_t1, as_of_t0, as_of_t1)?;
-
-        let terminal_value = instrument.value(&market_t1, as_of_t1)?;
 
         Ok(HorizonResult {
             attribution,
@@ -356,10 +394,54 @@ impl HorizonAnalysis {
         market_t1: &MarketContext,
         as_of_t0: Date,
         as_of_t1: Date,
-    ) -> crate::Result<PnlAttribution> {
+    ) -> crate::Result<(Money, Money, PnlAttribution)> {
+        if matches!(self.attribution_method, AttributionMethod::MetricsBased) {
+            let window_days = (as_of_t1 - as_of_t0).whole_days();
+            let metrics_instrument = if window_days > 0 {
+                let mut producer = instrument.clone_box();
+                if let Some(overrides) = producer.get_metric_pricing_overrides_mut() {
+                    let days = u32::try_from(window_days).map_err(|_| {
+                        crate::Error::Validation(format!(
+                            "horizon of {window_days} days exceeds the theta horizon range"
+                        ))
+                    })?;
+                    overrides.theta_period = Some(finstack_quant_core::dates::Tenor::new(
+                        days,
+                        finstack_quant_core::dates::TenorUnit::Days,
+                    )?);
+                }
+                Arc::from(producer)
+            } else {
+                Arc::clone(instrument)
+            };
+            let metrics = finstack_quant_valuations::metrics::standard_registry()
+                .applicable_subset(&default_attribution_metrics(), instrument.key());
+            let val_t0 = metrics_instrument.price_with_metrics(
+                market_t0,
+                as_of_t0,
+                &metrics,
+                self.pricing_options(),
+            )?;
+            let val_t1 =
+                instrument.price_with_metrics(market_t1, as_of_t1, &[], self.pricing_options())?;
+            let attribution = attribute_pnl_metrics_based(
+                &metrics_instrument,
+                market_t0,
+                market_t1,
+                &val_t0,
+                &val_t1,
+                as_of_t0,
+                as_of_t1,
+            )?;
+            return Ok((val_t0.value, val_t1.value, attribution));
+        }
+
+        let initial_value = instrument.value(market_t0, as_of_t0)?;
+        let terminal_value = instrument.value(market_t1, as_of_t1)?;
         let request = AttributionRequest {
             execution_policy: ExecutionPolicy::Parallel,
             strict_validation: false,
+            prepared_endpoints: Some((initial_value, terminal_value)),
             ..AttributionRequest::new(
                 instrument,
                 market_t0,
@@ -369,34 +451,45 @@ impl HorizonAnalysis {
                 &self.config,
             )
         };
-        let result = match &self.attribution_method {
-            AttributionMethod::Parallel
-            | AttributionMethod::Waterfall(_)
-            | AttributionMethod::Taylor(_) => attribute_pnl(&self.attribution_method, &request),
-            AttributionMethod::MetricsBased => {
-                let metrics = default_attribution_metrics();
-                let val_t0 = instrument.price_with_metrics(
-                    market_t0,
-                    as_of_t0,
-                    &metrics,
-                    self.pricing_options(),
-                )?;
-                let val_t1 = instrument.price_with_metrics(
-                    market_t1,
-                    as_of_t1,
-                    &metrics,
-                    self.pricing_options(),
-                )?;
-                attribute_pnl_metrics_based(
-                    instrument, market_t0, market_t1, &val_t0, &val_t1, as_of_t0, as_of_t1,
-                )
-            }
-        };
-        Ok(result?)
+        let attribution = attribute_pnl(&self.attribution_method, &request)?;
+        Ok((initial_value, terminal_value, attribution))
     }
 }
 
 impl HorizonResult {
+    /// Build the canonical serializable view with computed return fields.
+    ///
+    /// The view includes every underlying horizon field, decimal total and
+    /// annualized returns, and all factor contributions. Undefined and
+    /// non-finite derived values become JSON `null`; no financial formulas are
+    /// delegated to host bindings.
+    #[must_use]
+    pub fn to_json(&self) -> HorizonResultJson<'_> {
+        let total_return = self.total_return();
+        HorizonResultJson {
+            result: self,
+            total_return: total_return.is_finite().then_some(total_return),
+            annualized_return: self.annualized_return(),
+            factor_contributions: [
+                AttributionFactor::Carry,
+                AttributionFactor::RatesCurves,
+                AttributionFactor::CreditCurves,
+                AttributionFactor::InflationCurves,
+                AttributionFactor::Correlations,
+                AttributionFactor::Fx,
+                AttributionFactor::Volatility,
+                AttributionFactor::MarketScalars,
+                AttributionFactor::ModelParameters,
+            ]
+            .into_iter()
+            .map(|factor| {
+                let contribution = self.factor_contribution(&factor);
+                (factor, contribution.is_finite().then_some(contribution))
+            })
+            .collect(),
+        }
+    }
+
     /// Total return as a decimal fraction (e.g. `0.05` = 5%).
     ///
     /// Computed as `total_pnl / initial_value`. Returns:
@@ -426,16 +519,16 @@ impl HorizonResult {
     ///
     /// Returns `None` when there is no time-roll in the scenario, when total
     /// return is not finite (e.g. multi-currency result), or when the
-    /// compounded result would not be finite. Total returns at or below
-    /// `-100%` short-circuit to `Some(-1.0)` (a total loss stays a total loss
-    /// under any positive compounding exponent).
+    /// compounded result would not be finite. A return below `-100%` has a
+    /// negative accumulation factor and cannot be compounded as a capital
+    /// return, so it also returns `None`. Exactly `-100%` remains `Some(-1.0)`.
     pub fn annualized_return(&self) -> Option<f64> {
         let days = self.horizon_days? as f64;
         if days <= 0.0 {
             return None;
         }
         let tr = self.total_return();
-        if !tr.is_finite() {
+        if !tr.is_finite() || tr < -1.0 {
             return None;
         }
         if tr <= -1.0 {
@@ -474,6 +567,85 @@ impl HorizonResult {
             return f64::NAN;
         }
         factor_money.amount() / iv
+    }
+}
+
+/// Derived horizon returns computed by the [`HorizonResult`] accessors.
+///
+/// Every value comes from [`HorizonResult::total_return`],
+/// [`HorizonResult::annualized_return`] and
+/// [`HorizonResult::factor_contribution`]. A value those accessors report as
+/// NaN (currency mismatch, zero or negative initial value) is `None` here, so
+/// it serializes as JSON `null`.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct HorizonSummary {
+    /// Total return as a decimal fraction (`0.05` = +5%); `None` when undefined.
+    pub total_return: Option<f64>,
+    /// Annualized total return as a decimal fraction; `None` without a time
+    /// roll or when the total return is undefined.
+    pub annualized_return: Option<f64>,
+    /// ISO-4217 currency of the initial and terminal values.
+    pub currency: finstack_quant_core::currency::Currency,
+    /// Each attribution factor's P&L as a fraction of the initial value, keyed
+    /// by the factor's serde name in the default waterfall order; `None` when
+    /// undefined.
+    pub factor_contributions: indexmap::IndexMap<AttributionFactor, Option<f64>>,
+}
+
+/// Wire view of a [`HorizonResult`] with its derived [`HorizonSummary`].
+///
+/// Serializes the result's own fields flat, plus a `summary` object. This is
+/// the shape host bindings return when they cannot call the result's methods
+/// (WASM); [`HorizonResult`]'s own serde shape is unchanged.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct HorizonReport<'a> {
+    /// The horizon result being reported.
+    #[serde(flatten)]
+    pub result: &'a HorizonResult,
+    /// Derived returns computed from `result`.
+    pub summary: HorizonSummary,
+}
+
+impl HorizonResult {
+    /// The derived returns of this result, with undefined (NaN) values as `None`.
+    ///
+    /// # Returns
+    ///
+    /// A [`HorizonSummary`] holding the total, annualized and per-factor
+    /// returns for every [`AttributionFactor`] (in the default waterfall
+    /// order, which lists each factor once).
+    #[must_use]
+    pub fn summary(&self) -> HorizonSummary {
+        let finite = |value: f64| value.is_finite().then_some(value);
+        HorizonSummary {
+            total_return: finite(self.total_return()),
+            annualized_return: self.annualized_return(),
+            currency: self.initial_value.currency(),
+            factor_contributions: finstack_quant_attribution::default_waterfall_order()
+                .into_iter()
+                .map(|factor| {
+                    let contribution = finite(self.factor_contribution(&factor));
+                    (factor, contribution)
+                })
+                .collect(),
+        }
+    }
+
+    /// Borrow this result together with its [`summary`](Self::summary) for
+    /// serialization.
+    ///
+    /// # Returns
+    ///
+    /// A [`HorizonReport`] that serializes the result fields flat plus
+    /// `summary`.
+    #[must_use]
+    pub fn report(&self) -> HorizonReport<'_> {
+        HorizonReport {
+            result: self,
+            summary: self.summary(),
+        }
     }
 }
 
@@ -885,6 +1057,32 @@ mod tests {
         }
     }
 
+    #[test]
+    fn summary_reports_the_accessor_values_with_nan_as_none() {
+        let result = synthetic_result(Currency::USD, 100.0, Currency::USD, 5.0, 30);
+        let summary = result.summary();
+        assert_eq!(summary.total_return, Some(result.total_return()));
+        assert_eq!(summary.annualized_return, result.annualized_return());
+        assert_eq!(summary.currency, Currency::USD);
+        assert_eq!(summary.factor_contributions.len(), 9);
+        assert_eq!(
+            summary.factor_contributions[&AttributionFactor::Carry],
+            Some(result.factor_contribution(&AttributionFactor::Carry))
+        );
+
+        let mismatch = synthetic_result(Currency::USD, 100.0, Currency::EUR, 10.0, 30).summary();
+        assert_eq!(mismatch.total_return, None);
+        assert_eq!(mismatch.annualized_return, None);
+
+        let report = serde_json::to_value(result.report()).expect("serialize report");
+        let plain = serde_json::to_value(&result).expect("serialize result");
+        for (key, value) in plain.as_object().expect("object") {
+            assert_eq!(&report[key], value, "flattened field {key}");
+        }
+        assert_eq!(report["summary"]["total_return"], serde_json::json!(0.05));
+        assert!(report["summary"]["factor_contributions"]["carry"].is_number());
+    }
+
     /// An unknown calendar identifier must fail loudly at compute time rather
     /// than silently degrading to an unadjusted roll.
     #[test]
@@ -986,17 +1184,231 @@ mod tests {
         );
     }
 
-    /// A total loss (or worse) must collapse to `-100%` annualized rather
-    /// than returning `NaN` from `powf` on a non-positive base.
+    /// Exactly a total loss annualizes to `-100%`; losses beyond initial
+    /// capital have no compounded annualized return.
     #[test]
     fn annualized_return_total_loss_returns_minus_one() {
         let total_loss = synthetic_result(Currency::USD, 100.0, Currency::USD, -100.0, 30);
         assert_eq!(total_loss.total_return(), -1.0);
         assert_eq!(total_loss.annualized_return(), Some(-1.0));
 
-        // Worse-than-total-loss (e.g. short book reported as -120%) must also
-        // resolve to -100%, not NaN.
+        // A loss beyond initial capital has a negative accumulation factor
+        // and cannot be annualized as a compounded capital return.
         let blown_up = synthetic_result(Currency::USD, 100.0, Currency::USD, -120.0, 30);
-        assert_eq!(blown_up.annualized_return(), Some(-1.0));
+        assert!(blown_up.annualized_return().is_none());
+    }
+
+    #[test]
+    fn json_view_contains_canonical_returns_and_null_undefined_values() -> serde_json::Result<()> {
+        let result = synthetic_result(Currency::USD, 100.0, Currency::USD, 10.0, 365);
+        let json = serde_json::to_value(result.to_json())?;
+        assert_eq!(
+            json["initial_value"],
+            serde_json::to_value(result.initial_value)?
+        );
+        assert_eq!(json["total_return"], 0.1);
+        assert!((json["annualized_return"].as_f64().expect("annual return") - 0.1).abs() < 1e-12);
+        let factors = json["factor_contributions"]
+            .as_object()
+            .expect("factor map");
+        assert_eq!(factors.len(), 9);
+        assert_eq!(factors["carry"], 0.0);
+        assert_eq!(factors["model_parameters"], 0.0);
+
+        for result in [
+            synthetic_result(Currency::USD, 0.0, Currency::USD, 10.0, 365),
+            synthetic_result(Currency::USD, -100.0, Currency::USD, 10.0, 365),
+            synthetic_result(Currency::USD, 100.0, Currency::EUR, 10.0, 365),
+        ] {
+            let json = serde_json::to_value(result.to_json())?;
+            assert!(json["total_return"].is_null());
+            assert!(json["annualized_return"].is_null());
+            assert!(json["factor_contributions"]["carry"].is_null());
+        }
+        let leveraged_loss = synthetic_result(Currency::USD, 100.0, Currency::USD, -220.0, 365);
+        let json = serde_json::to_value(leveraged_loss.to_json())?;
+        assert_eq!(json["total_return"], -2.2);
+        assert!(json["annualized_return"].is_null());
+        Ok(())
+    }
+
+    #[test]
+    fn floating_horizon_materializes_crossed_fixing_for_all_methods() -> crate::Result<()> {
+        use finstack_quant_core::dates::Tenor;
+        use finstack_quant_core::market_data::term_structures::ForwardCurve;
+
+        let origin = date!(2025 - 01 - 02);
+        for issue_date in [origin, date!(2025 - 01 - 03)] {
+            let mut bond = Bond::floating(
+                "HORIZON-FRN",
+                Money::from((1_000_000_i64, Currency::USD)),
+                "USD-SOFR-3M",
+                150,
+                issue_date,
+                date!(2026 - 01 - 03),
+                Tenor::quarterly(),
+                DayCount::Act360,
+                "USD-OIS",
+            )?;
+            if let CashflowSpec::Floating(spec) = &mut bond.cashflow_spec {
+                spec.rate_spec.reset_lag_days = 0;
+            }
+            let instrument: Arc<dyn Instrument> = Arc::new(bond);
+            let market = MarketContext::new()
+                .insert(
+                    DiscountCurve::builder("USD-OIS")
+                        .base_date(origin)
+                        .knots([(0.0, 1.0), (1.0, 0.95), (2.0, 0.9)])
+                        .build()?,
+                )
+                .insert(
+                    ForwardCurve::builder("USD-SOFR-3M", 0.25)
+                        .base_date(origin)
+                        .day_count(DayCount::Act360)
+                        .knots([(0.0, 0.03), (1.0, 0.03), (2.0, 0.03)])
+                        .build()?,
+                );
+            let scenario = ScenarioSpec {
+                id: "crossed-reset".into(),
+                operations: vec![OperationSpec::TimeRollForward {
+                    period: "4D".into(),
+                    apply_shocks: false,
+                    roll_mode: crate::TimeRollMode::CalendarDays,
+                }],
+                ..Default::default()
+            };
+            let mut expected_market = market.clone();
+            let mut inventory = vec![instrument.clone_box()];
+            let mut ctx = ExecutionContext {
+                market: &mut expected_market,
+                as_of: origin,
+                model: None,
+                instruments: Some(&mut inventory),
+                rate_bindings: None,
+                calendar: None,
+            };
+            ScenarioEngine::new().apply(&scenario, &mut ctx)?;
+            let expected_value = instrument.value(&expected_market, date!(2025 - 01 - 06))?;
+
+            for method in ["parallel", "waterfall", "metrics_based", "taylor"] {
+                let result = HorizonAnalysis::new(
+                    attribution_method_from_str(method)?,
+                    FinstackConfig::default(),
+                )
+                .compute(&instrument, &market, origin, &scenario)?;
+                assert_eq!(result.horizon_days, Some(4), "{method}");
+                assert_eq!(result.terminal_value, expected_value, "{method}");
+                assert!(result.total_return().is_finite(), "{method}");
+                assert!(
+                    result.scenario_report.warnings.is_empty(),
+                    "{method}: {:?}",
+                    result.scenario_report.warnings
+                );
+            }
+            assert!(market.get_series("FIXING:USD-SOFR-3M").is_err());
+        }
+        Ok(())
+    }
+
+    #[derive(Clone)]
+    struct CountingEndpoints {
+        attributes: Attributes,
+        origin: Date,
+        initial_prices: Arc<std::sync::atomic::AtomicUsize>,
+        terminal_prices: Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl finstack_quant_cashflows::CashflowScheduleSource for CountingEndpoints {
+        fn raw_cashflow_schedule(
+            &self,
+            _: &MarketContext,
+            _: Date,
+        ) -> finstack_quant_core::Result<finstack_quant_cashflows::builder::CashFlowSchedule>
+        {
+            Ok(
+                finstack_quant_cashflows::builder::CashFlowSchedule::from_parts(
+                    Vec::new(),
+                    finstack_quant_cashflows::builder::Notional::par(100.0, Currency::USD)?,
+                    DayCount::Act365F,
+                    Default::default(),
+                ),
+            )
+        }
+    }
+
+    impl Instrument for CountingEndpoints {
+        fn id(&self) -> &str {
+            "COUNT-ENDPOINTS"
+        }
+        fn key(&self) -> finstack_quant_valuations::pricer::InstrumentType {
+            finstack_quant_valuations::pricer::InstrumentType::Bond
+        }
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+            self
+        }
+        fn attributes(&self) -> &Attributes {
+            &self.attributes
+        }
+        fn attributes_mut(&mut self) -> &mut Attributes {
+            &mut self.attributes
+        }
+        fn clone_box(&self) -> Box<dyn Instrument> {
+            Box::new(self.clone())
+        }
+        fn base_value(
+            &self,
+            market: &MarketContext,
+            as_of: Date,
+        ) -> finstack_quant_core::Result<Money> {
+            use std::sync::atomic::Ordering;
+            if as_of == self.origin {
+                self.initial_prices.fetch_add(1, Ordering::Relaxed);
+            } else if market.get_discount("USD-OIS")?.base_date() == as_of {
+                self.terminal_prices.fetch_add(1, Ordering::Relaxed);
+            }
+            Money::new(100.0, Currency::USD)
+        }
+        fn market_dependencies(
+            &self,
+        ) -> finstack_quant_core::Result<finstack_quant_valuations::instruments::MarketDependencies>
+        {
+            Ok(Default::default())
+        }
+    }
+
+    #[test]
+    fn horizon_prices_each_endpoint_once() -> crate::Result<()> {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let origin = date!(2025 - 01 - 15);
+        let initial_prices = Arc::new(AtomicUsize::new(0));
+        let terminal_prices = Arc::new(AtomicUsize::new(0));
+        let instrument: Arc<dyn Instrument> = Arc::new(CountingEndpoints {
+            attributes: Attributes::new(),
+            origin,
+            initial_prices: Arc::clone(&initial_prices),
+            terminal_prices: Arc::clone(&terminal_prices),
+        });
+        let scenario = ScenarioSpec {
+            id: "count-endpoints".into(),
+            operations: vec![OperationSpec::TimeRollForward {
+                period: "1M".into(),
+                apply_shocks: false,
+                roll_mode: crate::TimeRollMode::CalendarDays,
+            }],
+            ..Default::default()
+        };
+        let result = HorizonAnalysis::default().compute(
+            &instrument,
+            &test_market(origin)?,
+            origin,
+            &scenario,
+        )?;
+        assert_eq!(result.initial_value, result.terminal_value);
+        assert_eq!(initial_prices.load(Ordering::Relaxed), 1);
+        assert_eq!(terminal_prices.load(Ordering::Relaxed), 1);
+        Ok(())
     }
 }

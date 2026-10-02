@@ -83,7 +83,7 @@ print(
     "Value overrides forecast, which overrides the 900-unit formula:",
     [precedence_result.get("revenue", period) for period in ["2025Q1", "2025Q2", "2025Q3"]],
 )
-print(DependencyTracer(model).dependency_tree("dscr"))
+print(DependencyTracer(model).dependency_tree_text("dscr"))
 explanation=explain_formula(model,evaluation,"dscr","2025Q1")
 print("DSCR explained:",explanation.to_json())
 ```
@@ -162,7 +162,7 @@ forecast_rows=[]
 for p in PERIODS[4:]:
  forecast_rows.append({"period":p,"growth_opex_usd":evaluation.get("opex",p),"margin_opex_usd":margin_result.get("opex",p),"ebitda_change_usd":margin_result.get("ebitda",p)-evaluation.get("ebitda",p)})
 print(pd.DataFrame(forecast_rows).to_string(index=False))
-print(DependencyTracer(margin_model).dependency_tree("opex"))
+print(DependencyTracer(margin_model).dependency_tree_text("opex"))
 ```
 {/* /notebook-block */}
 

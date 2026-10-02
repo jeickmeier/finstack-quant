@@ -141,9 +141,9 @@ impl PyAdjustment {
     /// Return a copy with a grouping category (``"one_time"``, ``"run_rate"``).
     #[pyo3(text_signature = "($self, category)")]
     fn with_category(&self, category: &str) -> Self {
-        let mut inner = self.inner.clone();
-        inner.category = Some(category.to_string());
-        Self { inner }
+        Self {
+            inner: self.inner.clone().with_category(category),
+        }
     }
 
     /// Support `pickle` via the canonical JSON round-trip.

@@ -279,23 +279,7 @@ pub(crate) fn bump_scalar_price(
     bump_pct: f64,
 ) -> finstack_quant_core::Result<finstack_quant_core::market_data::context::MarketContext> {
     let mut bumped = context.clone();
-    let current = bumped.get_price(price_id)?;
-
-    let bumped_value = match current {
-        finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => {
-            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v * (1.0 + bump_pct))
-        }
-        finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => {
-            finstack_quant_core::market_data::scalars::MarketScalar::Price(
-                finstack_quant_core::money::Money::new(
-                    m.amount() * (1.0 + bump_pct),
-                    m.currency(),
-                )?,
-            )
-        }
-    };
-
-    bumped = bumped.insert_price(price_id, bumped_value);
+    bumped.apply_price_bump_pct_in_place(price_id, bump_pct)?;
     Ok(bumped)
 }
 
@@ -582,6 +566,25 @@ mod tests {
             scalar_numeric_value(bumped.get_price("B").expect("quote should exist")),
             3.5
         );
+    }
+
+    #[test]
+    fn scalar_price_bump_preserves_exact_money_and_reports_overflow() {
+        let exact =
+            Money::from_decimal_str("1.0000000000000001", Currency::USD).expect("exact money");
+        let market = MarketContext::new().insert_price("P", MarketScalar::Price(exact));
+        let unchanged = bump_scalar_price(&market, "P", 0.0).expect("zero bump");
+        assert!(matches!(
+            unchanged.get_price("P").expect("quote"),
+            MarketScalar::Price(actual) if actual == &exact
+        ));
+        let large = Money::from_decimal_str("1e28", Currency::USD).expect("large money");
+        let market = MarketContext::new().insert_price("P", MarketScalar::Price(large));
+        assert!(bump_scalar_price(&market, "P", 900.0).is_err());
+        assert!(matches!(
+            market.get_price("P").expect("original quote"),
+            MarketScalar::Price(actual) if actual == &large
+        ));
     }
 
     #[test]

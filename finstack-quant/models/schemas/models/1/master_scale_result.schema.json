@@ -1,0 +1,35 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/master_scale_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Result of mapping a PD to a master scale grade.",
+  "properties": {
+    "central_pd": {
+      "description": "The central PD for the assigned grade.",
+      "format": "double",
+      "type": "number"
+    },
+    "grade": {
+      "description": "The assigned rating grade label.",
+      "type": "string"
+    },
+    "grade_index": {
+      "description": "Index of the grade in the scale (0 = best).",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "input_pd": {
+      "description": "The input PD that was mapped.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "grade",
+    "central_pd",
+    "input_pd",
+    "grade_index"
+  ],
+  "title": "MasterScaleResult",
+  "type": "object"
+}

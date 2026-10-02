@@ -67,9 +67,15 @@ pub struct FxBarrierOption {
         schemars(with = "Option<finstack_quant_core::wire::DateWire>")
     )]
     pub monitoring_start_date: Option<Date>,
-    /// Observed barrier state for expired options.
+    /// Processed barrier-monitoring state through the valuation date.
     ///
-    /// Historical monitoring must be supplied explicitly for expired contracts.
+    /// `Some(true)` records a breach whose at-hit rebate has already settled,
+    /// including a hit processed on the valuation date. That rebate is not a
+    /// remaining claim at expiry. An at-expiry rebate remains due on expiry.
+    /// `Some(false)` records no breach in the processed monitoring history.
+    /// Historical monitoring must be supplied explicitly for seasoned and
+    /// expired contracts. Same-day unpaid at-hit claims require a separate
+    /// cash receivable; this boolean does not represent pending settlement.
     #[builder(default)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observed_barrier_breached: Option<bool>,
@@ -555,8 +561,58 @@ impl crate::instruments::common_impl::traits::Instrument for FxBarrierOption {
         Ok(result.value)
     }
 
+    fn expiry(&self) -> Option<Date> {
+        Some(self.expiry)
+    }
+
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
         None
+    }
+
+    /// Roll the observed barrier state with spot held at its `as_of` level.
+    ///
+    /// When the roll enters the monitoring window (continuous monitoring from
+    /// `monitoring_start_date`, a discrete observation date before
+    /// `rolled_date`, or expiry) and no state is recorded, the copy records
+    /// the barrier as breached exactly when the `as_of` FX spot is at or
+    /// beyond it.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of` supplying the FX spot held over the roll.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at, capped at expiry.
+    fn theta_observed_state(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<
+        Option<Box<dyn crate::instruments::common_impl::traits::Instrument>>,
+    > {
+        if self.observed_barrier_breached.is_some() || as_of > self.expiry {
+            return Ok(None);
+        }
+        let monitored = rolled_date >= self.expiry
+            || match &self.monitoring {
+                Monitoring::Continuous => self
+                    .monitoring_start_date
+                    .is_some_and(|start| start < rolled_date),
+                Monitoring::Discrete { observation_dates } => {
+                    observation_dates.iter().any(|date| *date < rolled_date)
+                }
+            };
+        if !monitored {
+            return Ok(None);
+        }
+        let spot = super::pricer::resolve_fx_spot(self, market, as_of)?;
+        let breached = if self.barrier_type.is_up() {
+            spot >= self.barrier
+        } else {
+            spot <= self.barrier
+        };
+        let mut observed = self.clone();
+        observed.observed_barrier_breached = Some(breached);
+        Ok(Some(Box::new(observed)))
     }
 
     crate::impl_focused_pricing_overrides!();

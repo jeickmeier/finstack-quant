@@ -155,7 +155,7 @@ it("keeps four native handles, refreshes recency, frees evictions until worker t
       state.curves
         .find((curve) => curve.type === "discount")
         .knot_points.at(-1)[1] -= i * 0.005;
-      const handle = new native.Market(JSON.stringify(state));
+      const handle = native.MarketContext.fromJson(JSON.stringify(state));
       try {
         return handle.toJson();
       } finally {

@@ -5,7 +5,7 @@
       "description": "CMS option instrument (cap/floor on CMS rates).",
       "properties": {
         "accrual_fractions": {
-          "description": "Accrual fractions for each period",
+          "description": "Finite nonnegative accrual fractions for each period; zero gives a zero coupon.",
           "items": {
             "format": "double",
             "type": "number"
@@ -53,7 +53,7 @@
               "type": "null"
             }
           ],
-          "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).\n\nWhen set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,\n`swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still\noverride the convention when explicitly set."
+          "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).\n\nWhen set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,\n`swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still\noverride the convention when explicitly set. Required for USD CMS."
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",

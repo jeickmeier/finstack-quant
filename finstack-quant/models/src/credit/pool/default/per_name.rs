@@ -177,14 +177,20 @@ impl PerNameCopulaDefault {
     ///
     /// The shared Student-t mixing variable `W` is drawn once here (one
     /// uniform), then reused for every name so tail dependence is preserved.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the shared mixing transform fails or a
+    /// latent default variable is non-finite. Output may be partially filled
+    /// on error and must be discarded.
     pub fn simulate_period(
         &self,
         systematic: f64,
         marginal_pd: &[f64],
         rng: &mut PhiloxRng,
         out: &mut Vec<bool>,
-    ) {
-        self.simulate_period_inner(systematic, marginal_pd, rng, out, false);
+    ) -> Result<()> {
+        self.simulate_period_inner(systematic, marginal_pd, rng, out, false)
     }
 
     /// Realize per-name default indicators with optional antithetic negation.
@@ -203,14 +209,19 @@ impl PerNameCopulaDefault {
     /// * `marginal_pd` - Unconditional period default probability for each live name.
     /// * `rng` - Path-local Philox stream shared with the paired base path.
     /// * `out` - Reused output buffer populated with one default flag per name.
+    ///
+    /// # Errors
+    ///
+    /// Propagates the mixing and latent-variable failures documented by
+    /// [`Self::simulate_period`]. Output must be discarded on error.
     pub fn simulate_period_antithetic(
         &self,
         systematic: f64,
         marginal_pd: &[f64],
         rng: &mut PhiloxRng,
         out: &mut Vec<bool>,
-    ) {
-        self.simulate_period_inner(systematic, marginal_pd, rng, out, true);
+    ) -> Result<()> {
+        self.simulate_period_inner(systematic, marginal_pd, rng, out, true)
     }
 
     fn simulate_period_inner(
@@ -220,14 +231,14 @@ impl PerNameCopulaDefault {
         rng: &mut PhiloxRng,
         out: &mut Vec<bool>,
         antithetic: bool,
-    ) {
+    ) -> Result<()> {
         out.clear();
         out.reserve(marginal_pd.len());
 
         // One shared mixing draw per period (1.0 for Gaussian — no mixing).
         // Drawn before any per-name εᵢ so the draw order is fixed regardless
         // of pool size. Not negated under antithetic mode (asymmetric mixing).
-        let mixing = self.copula.sample_mixing(rng.next_u01());
+        let mixing = self.copula.sample_mixing(rng.next_u01())?;
 
         for &pd in marginal_pd {
             let threshold = self.threshold_kind.threshold(pd);
@@ -238,8 +249,14 @@ impl PerNameCopulaDefault {
             let latent =
                 self.copula
                     .latent_variable(systematic, idiosyncratic, mixing, self.correlation);
+            if !latent.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "per-name copula produced a non-finite latent default variable".into(),
+                ));
+            }
             out.push(latent <= threshold);
         }
+        Ok(())
     }
 
     /// Per-name LHP conditional default probabilities for one period.
@@ -260,16 +277,21 @@ impl PerNameCopulaDefault {
     /// * `rng` - Path-local Philox stream; consumes exactly one uniform.
     /// * `out` - Cleared and filled with one conditional probability per
     ///   name, aligned with `marginal_pd`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if mixing inversion fails or a conditional
+    /// probability is non-finite or outside `[0, 1]`. Discard output on error.
     pub fn conditional_default_probs(
         &self,
         systematic: f64,
         marginal_pd: &[f64],
         rng: &mut PhiloxRng,
         out: &mut Vec<f64>,
-    ) {
+    ) -> Result<()> {
         out.clear();
         out.reserve(marginal_pd.len());
-        let mixing = self.copula.sample_mixing(rng.next_u01());
+        let mixing = self.copula.sample_mixing(rng.next_u01())?;
         for &pd in marginal_pd {
             let threshold = self.threshold_kind.threshold(pd);
             let conditional = self
@@ -279,10 +301,11 @@ impl PerNameCopulaDefault {
                     systematic,
                     mixing,
                     self.correlation,
-                )
-                .clamp(0.0, 1.0);
+                );
+            validate_conditional_probability(conditional)?;
             out.push(conditional);
         }
+        Ok(())
     }
 
     /// LHP conditional default probability for one period.
@@ -310,26 +333,42 @@ impl PerNameCopulaDefault {
     /// * `systematic` - Period systematic factor shared by the homogeneous pool.
     /// * `marginal_pd` - Unconditional period default probability as a decimal.
     /// * `rng` - Path-local Philox stream used for the shared copula mixing draw.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if mixing inversion fails or the conditional
+    /// probability is non-finite or outside `[0, 1]`.
     pub fn conditional_default_prob(
         &self,
         systematic: f64,
         marginal_pd: f64,
         rng: &mut PhiloxRng,
-    ) -> f64 {
+    ) -> Result<f64> {
         let threshold = self.threshold_kind.threshold(marginal_pd);
         // One shared mixing draw per period — identical to `simulate_period`
         // (1.0 for Gaussian). Conditioning the LHP limit on this same `W`
         // makes it the genuine `N → ∞` limit of the per-name model.
-        let mixing = self.copula.sample_mixing(rng.next_u01());
-        self.copula
+        let mixing = self.copula.sample_mixing(rng.next_u01())?;
+        let conditional = self
+            .copula
             .conditional_default_prob_given_systematic_and_mixing(
                 threshold,
                 systematic,
                 mixing,
                 self.correlation,
-            )
-            .clamp(0.0, 1.0)
+            );
+        validate_conditional_probability(conditional)?;
+        Ok(conditional)
     }
+}
+
+fn validate_conditional_probability(probability: f64) -> Result<()> {
+    if !probability.is_finite() || !(0.0..=1.0).contains(&probability) {
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "per-name copula produced an invalid conditional default probability {probability}"
+        )));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -368,6 +407,83 @@ mod tests {
 
     use super::*;
 
+    struct FailingMixingCopula;
+
+    impl Copula for FailingMixingCopula {
+        fn conditional_default_prob(&self, _threshold: f64, _factors: &[f64], _rho: f64) -> f64 {
+            0.0
+        }
+
+        fn conditional_default_prob_given_systematic_and_mixing(
+            &self,
+            _threshold: f64,
+            _systematic: f64,
+            _mixing: f64,
+            _rho: f64,
+        ) -> f64 {
+            0.0
+        }
+
+        fn integrate_fn(&self, _f: &dyn Fn(&[f64]) -> f64) -> f64 {
+            0.0
+        }
+
+        fn sample_mixing(&self, _u01: f64) -> Result<f64> {
+            Err(finstack_quant_core::Error::Validation(
+                "mixing inversion failed".into(),
+            ))
+        }
+
+        fn num_factors(&self) -> usize {
+            1
+        }
+
+        fn model_name(&self) -> &'static str {
+            "Failing mixing test copula"
+        }
+
+        fn tail_dependence(&self, _rho: f64) -> f64 {
+            0.0
+        }
+    }
+
+    #[test]
+    fn mixing_failures_abort_every_per_name_and_lhp_entry_point() {
+        let sim = PerNameCopulaDefault {
+            copula: Box::new(FailingMixingCopula),
+            correlation: 0.3,
+            threshold_kind: ThresholdKind::Gaussian,
+        };
+        let mut rng = PhiloxRng::new(42);
+        let mut indicators = Vec::new();
+        let mut probabilities = Vec::new();
+        for result in [
+            sim.simulate_period(0.0, &[0.05], &mut rng, &mut indicators),
+            sim.simulate_period_antithetic(0.0, &[0.05], &mut rng, &mut indicators),
+            sim.conditional_default_probs(0.0, &[0.05], &mut rng, &mut probabilities),
+            sim.conditional_default_prob(0.0, 0.05, &mut rng)
+                .map(|_| ()),
+        ] {
+            let error = result.expect_err("mixing failure must propagate");
+            assert!(error.to_string().contains("mixing inversion failed"));
+        }
+    }
+
+    #[test]
+    fn non_finite_latent_and_conditional_results_are_errors() {
+        let sim = PerNameCopulaDefault::new(&CopulaSpec::Gaussian, 0.3).expect("valid copula");
+        let mut rng = PhiloxRng::new(42);
+        assert!(sim
+            .simulate_period(f64::NAN, &[0.05], &mut rng, &mut Vec::new())
+            .is_err());
+        assert!(sim
+            .conditional_default_probs(f64::NAN, &[0.05], &mut rng, &mut Vec::new())
+            .is_err());
+        assert!(sim
+            .conditional_default_prob(f64::NAN, 0.05, &mut rng)
+            .is_err());
+    }
+
     /// Per-name conditional default probabilities share one mixing draw per
     /// period and reduce to the Gaussian closed form name by name, so a
     /// heterogeneous pool can take the LHP limit without collapsing to a
@@ -380,7 +496,8 @@ mod tests {
         let z = -1.2_f64;
         let mut rng = PhiloxRng::new(9);
         let mut out = Vec::new();
-        sim.conditional_default_probs(z, &marginals, &mut rng, &mut out);
+        sim.conditional_default_probs(z, &marginals, &mut rng, &mut out)
+            .expect("valid copula simulation");
         assert_eq!(out.len(), marginals.len());
         for (pd, cond) in marginals.iter().zip(&out) {
             let threshold = standard_normal_inv_cdf(*pd);
@@ -413,7 +530,8 @@ mod tests {
         let mut total_defaults = 0usize;
         for _ in 0..periods {
             let z = rng.next_std_normal();
-            sim.simulate_period(z, &names, &mut rng, &mut out);
+            sim.simulate_period(z, &names, &mut rng, &mut out)
+                .expect("valid copula simulation");
             total_defaults += out.iter().filter(|d| **d).count();
         }
         let realized = total_defaults as f64 / (periods * names.len()) as f64;
@@ -436,9 +554,12 @@ mod tests {
         let mut out = Vec::new();
 
         for &z in &[-1.5_f64, 0.0, 1.5] {
-            sim.simulate_period(z, &names, &mut rng, &mut out);
+            sim.simulate_period(z, &names, &mut rng, &mut out)
+                .expect("valid copula simulation");
             let realized = out.iter().filter(|d| **d).count() as f64 / n as f64;
-            let lhp = sim.conditional_default_prob(z, pd, &mut rng);
+            let lhp = sim
+                .conditional_default_prob(z, pd, &mut rng)
+                .expect("valid copula simulation");
             assert!(
                 (realized - lhp).abs() < 0.01,
                 "z={z}: realized fraction {realized} should converge to LHP {lhp}"
@@ -456,9 +577,11 @@ mod tests {
         let mut rng = PhiloxRng::new(7);
         let mut out = Vec::new();
 
-        sim.simulate_period(-2.0, &names, &mut rng, &mut out);
+        sim.simulate_period(-2.0, &names, &mut rng, &mut out)
+            .expect("valid copula simulation");
         let stressed = out.iter().filter(|d| **d).count();
-        sim.simulate_period(2.0, &names, &mut rng, &mut out);
+        sim.simulate_period(2.0, &names, &mut rng, &mut out)
+            .expect("valid copula simulation");
         let benign = out.iter().filter(|d| **d).count();
 
         assert!(
@@ -483,7 +606,8 @@ mod tests {
         let trials = 600usize;
         let mut counts = Vec::with_capacity(trials);
         for _ in 0..trials {
-            sim.simulate_period(z, &names, &mut rng, &mut out);
+            sim.simulate_period(z, &names, &mut rng, &mut out)
+                .expect("valid copula simulation");
             counts.push(out.iter().filter(|d| **d).count());
         }
         let min = counts.iter().copied().min().unwrap_or(0);
@@ -516,7 +640,8 @@ mod tests {
         let mut total = 0usize;
         for _ in 0..periods {
             let z = rng.next_std_normal();
-            sim.simulate_period(z, &names, &mut rng, &mut out);
+            sim.simulate_period(z, &names, &mut rng, &mut out)
+                .expect("valid copula simulation");
             total += out.iter().filter(|d| **d).count();
         }
         let realized = total as f64 / (periods * names.len()) as f64;
@@ -543,7 +668,9 @@ mod tests {
         let mut sum = 0.0;
         for _ in 0..periods {
             let z = rng.next_std_normal();
-            sum += sim.conditional_default_prob(z, pd, &mut rng);
+            sum += sim
+                .conditional_default_prob(z, pd, &mut rng)
+                .expect("valid copula simulation");
         }
         let realized = sum / periods as f64;
         // E[Φ((c·√W − √ρ·Z)/√(1−ρ))] = PD. 3σ MC error at p≈0.05, n=4e5 ≈ 0.001.
@@ -581,9 +708,12 @@ mod tests {
         let mut lhp_sum = 0.0;
         for _ in 0..periods {
             let z = pn_rng.next_std_normal();
-            sim.simulate_period(z, &names, &mut pn_rng, &mut out);
+            sim.simulate_period(z, &names, &mut pn_rng, &mut out)
+                .expect("valid copula simulation");
             pn_defaults += out.iter().filter(|d| **d).count();
-            lhp_sum += sim.conditional_default_prob(z, pd, &mut lhp_rng);
+            lhp_sum += sim
+                .conditional_default_prob(z, pd, &mut lhp_rng)
+                .expect("valid copula simulation");
         }
         let pn_rate = pn_defaults as f64 / (periods * n) as f64;
         let lhp_rate = lhp_sum / periods as f64;
@@ -620,9 +750,11 @@ mod tests {
         let z = 0.7_f64;
         let mut normal_out = Vec::new();
         let mut anti_out = Vec::new();
-        sim.simulate_period(z, &names, &mut normal_rng, &mut normal_out);
+        sim.simulate_period(z, &names, &mut normal_rng, &mut normal_out)
+            .expect("valid copula simulation");
         // Antithetic partner: negated Z AND negated εᵢ ⇒ latent = −Aᵢ.
-        sim.simulate_period_antithetic(-z, &names, &mut anti_rng, &mut anti_out);
+        sim.simulate_period_antithetic(-z, &names, &mut anti_rng, &mut anti_out)
+            .expect("valid copula simulation");
 
         assert_eq!(normal_out.len(), anti_out.len());
         for (i, (n, a)) in normal_out.iter().zip(anti_out.iter()).enumerate() {
@@ -669,7 +801,8 @@ mod tests {
         let mut total = 0usize;
         for _ in 0..periods {
             let z = rng.next_std_normal();
-            sim.simulate_period(z, &names, &mut rng, &mut out);
+            sim.simulate_period(z, &names, &mut rng, &mut out)
+                .expect("valid copula simulation");
             total += out.iter().filter(|d| **d).count();
         }
         let realized = total as f64 / (periods * names.len()) as f64;
@@ -697,9 +830,12 @@ mod tests {
             let mut lhp_rng = PhiloxRng::new(seed);
             let mut out = Vec::new();
 
-            sim.simulate_period(z, &names, &mut pn_rng, &mut out);
+            sim.simulate_period(z, &names, &mut pn_rng, &mut out)
+                .expect("valid copula simulation");
             let realized = out.iter().filter(|d| **d).count() as f64 / n as f64;
-            let lhp = sim.conditional_default_prob(z, pd, &mut lhp_rng);
+            let lhp = sim
+                .conditional_default_prob(z, pd, &mut lhp_rng)
+                .expect("valid copula simulation");
             assert!(
                 (realized - lhp).abs() < 0.01,
                 "z={z}: RFL realized fraction {realized} should converge to \
@@ -722,7 +858,8 @@ mod tests {
             let mut all = Vec::new();
             for _ in 0..10 {
                 let z = rng.next_std_normal();
-                sim.simulate_period(z, &names, &mut rng, &mut out);
+                sim.simulate_period(z, &names, &mut rng, &mut out)
+                    .expect("valid copula simulation");
                 all.extend_from_slice(&out);
             }
             all

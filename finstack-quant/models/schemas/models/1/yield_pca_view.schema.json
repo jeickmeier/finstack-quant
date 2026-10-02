@@ -1,0 +1,80 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/yield_pca_view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Serializable view of the leading components of a `YieldPca` fit.",
+  "properties": {
+    "cumulative_variance": {
+      "description": "Cumulative explained-variance fraction through each leading component.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "eigenvalues": {
+      "description": "Leading eigenvalues in descending order.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "explained_variance_ratio": {
+      "description": "Fraction of total variance explained by each leading component.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "loadings": {
+      "description": "Row-major loadings `loadings[tenor][k]` for the leading components.",
+      "items": {
+        "items": {
+          "format": "double",
+          "type": "number"
+        },
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "mean_change": {
+      "description": "Column means subtracted from the yield changes before PCA (one per tenor).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "scores": {
+      "description": "Row-major scores `scores[t][k]` (one row per yield-change observation).",
+      "items": {
+        "items": {
+          "format": "double",
+          "type": "number"
+        },
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "tenors": {
+      "description": "Tenor grid in years, in loading-row order.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "loadings",
+    "scores",
+    "eigenvalues",
+    "explained_variance_ratio",
+    "cumulative_variance",
+    "mean_change",
+    "tenors"
+  ],
+  "title": "YieldPcaView",
+  "type": "object"
+}

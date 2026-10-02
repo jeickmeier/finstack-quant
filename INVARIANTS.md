@@ -84,6 +84,30 @@ Every public stochastic API MUST document one of these tiers:
 Do not claim cross-host bit identity unless it is tested across the supported
 targets and mathematical-library implementations.
 
+**Per-target reproducibility (native vs wasm32).** The tiers above hold within
+one build target. Native (Python) and wasm32 (WASM) builds use different
+platform implementations of transcendental functions (`exp`, `ln`, `powf`,
+statrs CDFs, nalgebra decompositions), so any `f64` result that uses them may
+differ at the ulp level between targets. Monte Carlo and finite-difference or
+bump metrics amplify this: pricing parity checks observed up to about 1e-8
+relative on Monte Carlo PVs and about 2e-4 relative on carry and bucketed DV01,
+and a Greek that is pure noise (for example a vega bumped off a near-zero vol)
+can be exactly zero on one target and non-zero on the other. Calibration
+diagnostics (iteration counts, multi-start winners) can differ the same way.
+Therefore:
+
+- a Python↔WASM behavioural parity test MUST compare `f64` outputs with an
+  explicit tolerance, never bit equality, unless the kernel is pinned
+  target-independent (as `features` `ewma_vol` is, through `libm::hypot`);
+- baselines captured on one target (for example UI fixtures captured from the
+  wasm32 build) must be recaptured on that same target;
+- what MUST agree across targets is everything that is not `f64` rounding:
+  result structure, keys, ordering, error kinds, and **which item an error
+  names**. Parallel maps return the lowest-index failing item's error on every
+  target and thread count (`finstack_quant_core::parallel::try_map_ordered`),
+  and hash-map iteration order (which differs between 64-bit native and
+  wasm32) never reaches results, floating-point reductions or error selection.
+
 ### 2.2 Random number generation
 
 **Required:** library code MUST use explicit seeds. Do not use

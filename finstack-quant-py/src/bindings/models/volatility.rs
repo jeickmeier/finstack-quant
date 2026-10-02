@@ -23,7 +23,9 @@
 
 use std::sync::Arc;
 
-use crate::bindings::core::market_data::curves::{PyFxDeltaVolSurface, PyVolCube, PyVolSurface};
+use crate::bindings::core::market_data::curves::{
+    PyFxDeltaVolSurface, PyVolCube, PyVolCubeExpirySlice, PyVolSurface,
+};
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::bindings::pandas_utils::serde_to_py;
@@ -37,7 +39,7 @@ use finstack_quant_models::volatility::svi::{calibrate_svi as rust_calibrate_svi
 use finstack_quant_models::volatility::VolatilityConvention;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyList};
+use pyo3::types::{PyBool, PyDict, PyList};
 
 /// SABR model parameters ``(alpha, beta, nu, rho)`` with optional ``shift``.
 ///
@@ -266,17 +268,11 @@ impl PySabrSmile {
     }
 
     /// Implied volatility at a single strike.
+    ///
+    /// Normal (Bachelier) vol in absolute rate units when ``beta < 1e-4``,
+    /// Black decimal vol otherwise.
     fn implied_vol(&self, strike: f64) -> PyResult<f64> {
-        self.inner
-            .generate_smile(&[strike])
-            .map_err(core_to_py)?
-            .first()
-            .copied()
-            .ok_or_else(|| {
-                pyo3::exceptions::PyRuntimeError::new_err(
-                    "SABR smile returned no volatility for the requested strike",
-                )
-            })
+        self.inner.implied_vol(strike).map_err(core_to_py)
     }
 
     /// Generate implied volatilities for a vector of strikes.
@@ -289,47 +285,43 @@ impl PySabrSmile {
         self.inner.generate_smile(&strikes).map_err(core_to_py)
     }
 
-    /// Arbitrage diagnostics (butterfly + monotonicity) across ``strikes``.
+    /// Butterfly + strike-monotonicity static-arbitrage check across ``strikes``.
     ///
     /// Parameters
     /// ----------
     /// strikes : list[float]
-    ///     Strike grid to evaluate. Must be sorted in ascending order for
-    ///     monotonicity checks to be meaningful.
-    /// r : float, optional
-    ///     Risk-free rate (default ``0.0``).
-    /// q : float, optional
-    ///     Dividend / foreign rate (default ``0.0``).
+    ///     Finite strikes in strictly ascending order. Spacing may vary;
+    ///     convexity checks use the actual distances between strikes.
+    /// r : float
+    ///     Continuously compounded risk-free rate (decimal) that discounts the
+    ///     forward-based Black call prices compared against the 1e-6
+    ///     tolerance.
     ///
     /// Returns
     /// -------
     /// dict
-    ///     ``{"arbitrage_free": bool, "butterfly_violations": [...],
-    ///     "monotonicity_violations": [...]}``. Violation lists contain dicts
-    ///     with strike, price, and severity fields.
-    #[pyo3(signature = (strikes, r=0.0, q=0.0))]
-    fn arbitrage_diagnostics<'py>(
+    ///     The Rust ``ArbitrageValidationResult``: ``{"arbitrage_free": bool,
+    ///     "butterfly_violations": [...], "monotonicity_violations": [...]}``.
+    ///     Violation lists contain dicts with strike, price, and severity
+    ///     fields.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If strikes are non-finite or not strictly ascending, ``r`` is
+    ///     non-finite, or smile generation or call-price evaluation is invalid.
+    #[pyo3(signature = (strikes, r))]
+    fn validate_no_arbitrage<'py>(
         &self,
         py: Python<'py>,
         strikes: Vec<f64>,
         r: f64,
-        q: f64,
-    ) -> PyResult<Bound<'py, PyDict>> {
+    ) -> PyResult<Bound<'py, PyAny>> {
         let result = self
             .inner
-            .validate_no_arbitrage(&strikes, r, q)
+            .validate_no_arbitrage(&strikes, r)
             .map_err(core_to_py)?;
-        let out = PyDict::new(py);
-        out.set_item("arbitrage_free", result.is_arbitrage_free())?;
-        out.set_item(
-            "butterfly_violations",
-            serde_to_py(py, &result.butterfly_violations)?,
-        )?;
-        out.set_item(
-            "monotonicity_violations",
-            serde_to_py(py, &result.monotonicity_violations)?,
-        )?;
-        Ok(out)
+        serde_to_py(py, &result)
     }
 
     /// Tabulate the smile on a strike grid as a ``pandas.DataFrame``.
@@ -533,19 +525,21 @@ impl PySabrCalibrator {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``shift`` is neither ``None``, a float, nor ``"auto"``.
+    ///     If ``shift`` is neither ``None``, a float, nor ``"auto"`` (a
+    ///     ``bool`` is rejected, not read as a 0/1 shift).
     #[pyo3(signature = (shift))]
     fn with_shift(&self, shift: &Bound<'_, PyAny>) -> PyResult<Self> {
+        // Host-union conversion only: None → None, str → the Rust `SabrShift`
+        // keyword parser, float → Fixed. `bool` subclasses `int`, so reject it
+        // before the float extraction.
         let shift = if shift.is_none() {
             SabrShift::None
         } else if let Ok(text) = shift.extract::<String>() {
-            if text == "auto" {
-                SabrShift::Auto
-            } else {
-                return Err(PyValueError::new_err(format!(
-                    "shift must be None, a float, or \"auto\"; got {text:?}"
-                )));
-            }
+            text.parse::<SabrShift>().map_err(core_to_py)?
+        } else if shift.is_instance_of::<PyBool>() {
+            return Err(PyValueError::new_err(
+                "shift must be None, a float, or \"auto\"; got bool",
+            ));
         } else if let Ok(value) = shift.extract::<f64>() {
             SabrShift::Fixed(value)
         } else {
@@ -581,7 +575,7 @@ impl PySabrCalibrator {
         let shift = match self.inner.shift() {
             SabrShift::None => "None".to_string(),
             SabrShift::Fixed(value) => value.to_string(),
-            SabrShift::Auto => "'auto'".to_string(),
+            SabrShift::Auto => format!("'{}'", SabrShift::Auto),
         };
         format!(
             "SabrCalibrator(tolerance={}, max_iterations={}, shift={}, atm_pinning={})",
@@ -666,28 +660,44 @@ fn materialize_cube_tenor_slice_normal(
         .map_err(core_to_py)
 }
 
-/// Materialize a cube expiry slice as a lognormal tenor-axis surface artifact.
+/// Materialize a cube expiry slice as a lognormal grid with an explicit fixed expiry and tenor axis.
 #[pyfunction]
 fn materialize_cube_expiry_slice(
     cube: &PyVolCube,
     expiry: f64,
     strikes: Vec<f64>,
-) -> PyResult<PyVolSurface> {
+) -> PyResult<PyVolCubeExpirySlice> {
     vol::materialize_cube_expiry_slice(&cube.inner, expiry, &strikes)
-        .map(|surface| PyVolSurface::from_inner(Arc::new(surface)))
+        .map(|surface| PyVolCubeExpirySlice::from_inner(Arc::new(surface)))
         .map_err(core_to_py)
 }
 
-/// Materialize a cube expiry slice as a normal-volatility tenor-axis surface artifact.
+/// Materialize a cube expiry slice as a normal-volatility grid with an explicit fixed expiry and tenor axis.
 #[pyfunction]
 fn materialize_cube_expiry_slice_normal(
     cube: &PyVolCube,
     expiry: f64,
     strikes: Vec<f64>,
-) -> PyResult<PyVolSurface> {
+) -> PyResult<PyVolCubeExpirySlice> {
     vol::materialize_cube_expiry_slice_normal(&cube.inner, expiry, &strikes)
-        .map(|surface| PyVolSurface::from_inner(Arc::new(surface)))
+        .map(|surface| PyVolCubeExpirySlice::from_inner(Arc::new(surface)))
         .map_err(core_to_py)
+}
+
+/// Evaluate a fixed-expiry cube slice at an underlying tenor and strike.
+#[pyfunction]
+fn get_cube_expiry_slice_vol(
+    slice: &PyVolCubeExpirySlice,
+    tenor: f64,
+    strike: f64,
+) -> PyResult<f64> {
+    vol::get_cube_expiry_slice_vol(&slice.inner, tenor, strike).map_err(core_to_py)
+}
+
+/// Evaluate a fixed-expiry cube slice with coordinates clamped to its stored axes.
+#[pyfunction]
+fn get_cube_expiry_slice_vol_clamped(slice: &PyVolCubeExpirySlice, tenor: f64, strike: f64) -> f64 {
+    vol::get_cube_expiry_slice_vol_clamped(&slice.inner, tenor, strike)
 }
 
 /// Return ATM, 25-delta put, and 25-delta call vols at a stored FX expiry.
@@ -1085,7 +1095,7 @@ fn calibrate_svi(
 
 /// Register the volatility submodule under `finstack_quant.models`.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "volatility")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "volatility")?;
     m.setattr(
         "__doc__",
         "Product-independent volatility models, evaluators, fitting, and convention conversion.",
@@ -1100,6 +1110,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(surface_to_dataframe, &m)?)?;
     m.add_function(wrap_pyfunction!(get_surface_vol, &m)?)?;
     m.add_function(wrap_pyfunction!(get_surface_vol_clamped, &m)?)?;
+    m.add_function(wrap_pyfunction!(get_cube_expiry_slice_vol, &m)?)?;
+    m.add_function(wrap_pyfunction!(get_cube_expiry_slice_vol_clamped, &m)?)?;
     m.add_function(wrap_pyfunction!(get_cube_vol, &m)?)?;
     m.add_function(wrap_pyfunction!(get_cube_vol_clamped, &m)?)?;
     m.add_function(wrap_pyfunction!(get_cube_normal_vol, &m)?)?;
@@ -1132,6 +1144,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "check_surface_grid",
                 "convert_atm_volatility",
                 "delta_to_strike",
+                "get_cube_expiry_slice_vol",
+                "get_cube_expiry_slice_vol_clamped",
                 "get_cube_normal_vol",
                 "get_cube_normal_vol_clamped",
                 "get_cube_vol",
@@ -1150,13 +1164,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             ],
         )?,
     )?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "volatility",
-        "finstack_quant.models",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
     Ok(())
 }

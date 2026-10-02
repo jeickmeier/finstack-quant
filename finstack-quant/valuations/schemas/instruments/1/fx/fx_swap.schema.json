@@ -30,7 +30,7 @@
         },
         "far_rate": {
           "default": null,
-          "description": "Optional far leg FX rate (quote per base). If None, source from forwards.",
+          "description": "Optional far leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to far settlement.",
           "format": "double",
           "type": [
             "number",
@@ -63,7 +63,7 @@
         },
         "near_rate": {
           "default": null,
-          "description": "Optional near leg FX rate (quote per base). If None, source from market.",
+          "description": "Optional near leg FX rate (quote per base). If absent, use the market\noutright forward from the valuation date to near settlement.",
           "format": "double",
           "type": [
             "number",

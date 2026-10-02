@@ -22,6 +22,8 @@ mod materialization_benchmark_contract;
 mod materialization_schema;
 mod numerical_stability;
 mod optimization_basic;
+#[cfg(feature = "json-schema")]
+mod portfolio_schema_contract;
 mod replay;
 mod report_serialization;
 mod result_schema;

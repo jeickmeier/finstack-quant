@@ -35,7 +35,7 @@ this matters.
 | [`exports/`](exports)                          | one namespace shim per crate domain, re-exporting raw bindgen names           |
 | [`src/api/`](src/api)                          | Rust bindings, one module per crate domain                                    |
 | [`src/utils/`](src/utils)                      | shared error, serialization, and date conversion helpers                      |
-| [`types/generated/`](types/generated)          | Rust-owned TypeScript types for JSON envelopes (`ts-rs` output)               |
+| [`types/generated/`](types/generated)          | TypeScript types generated from the Rust JSON Schemas, one module per crate   |
 | [`tests/`](tests)                              | four test layers — see [`tests/README.md`](tests/README.md)                   |
 | [`benchmarks/bench.mjs`](benchmarks/bench.mjs) | Node micro-benchmarks against the `pkg-node/` build                           |
 | [`scripts/`](scripts)                          | JSDoc / TypeScript documentation checkers and sync tooling                    |
@@ -47,25 +47,26 @@ Its `README.md` and `.d.ts` are wasm-pack copies; treat nothing in `pkg/` or
 
 ## Namespaces
 
-`index.js` exports the initializer plus these 14 namespaces, assembled from
+`index.js` exports the initializer plus these 15 namespaces, assembled from
 `exports/*.js`:
 
-| Namespace              | Contents                                                                                                                                                                                                                                                        |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `core`                 | `Currency`, `Money`, `Rate`/`Bps`/`Percentage`, `DayCount`, `Tenor`, date helpers, `DiscountCurve`/`HazardCurve`/`ForwardCurve`, `VolCube`, `FxDeltaVolSurface`, `FxMatrix`, and the `math` helpers (Cholesky, statistics, special functions, stable summation) |
-| `analytics`            | `Performance` panel engine, `constrainedLeastSquares`                                                                                                                                                                                                           |
-| `attribution`          | `attributePnl`, `attributePnlJson`, waterfall/metric defaults, schema validation                                                                                                                                                                                |
-| `calibration`          | quote ingestion, market construction, plan validation, dependency graphs, and explicit Bermudan LMM base-vol fitting                                                                                                                                            |
-| `cashflows`            | schedule build/validate, `accruedInterest`, dated flows, CPR↔SMM and CDR↔MDR conversions                                                                                                                                                                        |
-| `covenants`            | spec/report/engine validation, `evaluateEngine`, preset covenant packages                                                                                                                                                                                       |
-| `features`             | signal cleaning, neutralization, weighting, and timeseries / cross-sectional / panel transforms                                                                                                                                                                 |
-| `margin`               | CSA presets and validation, `calculateVm`, `computeBilateralXva`                                                                                                                                                                                                |
-| `models`               | analytical/Fourier/SABR exports plus nested `monteCarlo`, `credit`, `correlation`, `factor`, `rates`, `volatility`, and `liquidity` model engines                                                                                                               |
-| `portfolio`            | `Portfolio` and `InstrumentArtifactCache`, materialization, Brinson / Campisi / grid attribution, TWRR and MWR, valuation and scenario revaluation, VaR and ES decomposition, factor sensitivities                                                              |
-| `scenarios`            | spec parse/compose/validate, builtin templates and components, `applyScenario`, `computeHorizonReturn`                                                                                                                                                          |
-| `statements`           | model and check-suite validation, `evaluateModel`, `runMonteCarlo`, formula parsing                                                                                                                                                                             |
-| `statements_analytics` | sensitivity, variance, scenario sets, backtesting, goal seek, DCF, LBO, WACC, check reports, comps                                                                                                                                                              |
-| `valuations`           | nested `instruments`, `fx`, `creditDerivatives`, `composite`, and `market`; product-specific coupon helpers; and the reusable `Market` handle                                                                                                                   |
+| Namespace              | Contents                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `core`                 | `Currency` (with a static per ISO code), `Money`, `Rate`/`Bps`/`Percentage`, `CreditRating`, `FinstackConfig`, `DayCount`, `Tenor`, calendars, periods, schedules and IMM/CDS/SIFMA date rules, every curve and surface handle (`DiscountCurve` … `VolSurface`), `ScalarTimeSeries`, `InflationIndex`, `FxMatrix`, `MarketContext`, the rating-scale registry, and the `math` helpers |
+| `analytics`            | `Performance` panel engine, `constrainedLeastSquares`, scalar metrics `sharpe`/`sortino`/`volatility`/`maxDrawdown`                                                                                                                                                                                                                                                                   |
+| `attribution`          | `attributePnl`, `attributePnlEnvelope` and their `*Json` twins, waterfall/metric defaults, schema validation                                                                                                                                                                                                                                                                          |
+| `calibration`          | quote ingestion, market construction, plan validation, dependency graphs, and explicit Bermudan LMM base-vol fitting                                                                                                                                                                                                                                                                  |
+| `cashflows`            | `CashFlowSchedule` / `CashFlowBuilder` / `AccrualIndex` handles, schedule build/validate (typed and `*Json`), accrual, period aggregation, spec constructors and presets, CPR↔SMM and CDR↔MDR conversions                                                                                                                                                                             |
+| `covenants`            | `CovenantEngine` handle, covenant definitions as plain objects, preset packages (typed and `*Json`), series evaluation and breach forecasting, spec/report/engine validation                                                                                                                                                                                                          |
+| `features`             | signal cleaning, neutralization, weighting, and timeseries / cross-sectional / panel transforms                                                                                                                                                                                                                                                                                       |
+| `margin`               | CSA / schedule / metric twins over plain objects, VM / SIMM / schedule / haircut IM calculators, FRTB SBA, SA-CCR, bilateral XVA and MVA                                                                                                                                                                                                                                              |
+| `models`               | analytical/Fourier/SABR exports plus nested `monteCarlo`, `credit`, `correlation`, `factor`, `rates`, `volatility`, and `liquidity` model engines                                                                                                                                                                                                                                     |
+| `portfolio`            | `Portfolio` and `InstrumentArtifactCache`, materialization, Brinson / Campisi / grid attribution, TWRR and MWR, valuation and scenario revaluation, VaR and ES decomposition, factor sensitivities                                                                                                                                                                                    |
+| `scenarios`            | spec parse/compose/validate, builtin templates and components, `applyScenario`, `computeHorizonReturn`                                                                                                                                                                                                                                                                                |
+| `schema`               | workspace-wide JSON Schema registry: `index`, `get`, `validate`, `domains`. Each of `core`, `attribution`, `calibration`, `cashflows`, `margin`, `models.factor`, `portfolio`, `scenarios`, `statements` and `valuations` also has a `schema` sub-namespace for its own schemas                                                                                                       |
+| `statements`           | model and check-suite validation, `Evaluator`, `ModelBuilder`, `Registry`, formula parsing                                                                                                                                                                                                                                                                                            |
+| `statements_analytics` | sensitivity, variance, scenario sets, backtesting, goal seek, DCF, LBO, corporate analysis, WACC, check reports, comps, ECL, model templates, `DependencyTracer`, `CorkscrewExtension`, `CreditScorecardExtension`                                                                                                                                                                    |
+| `valuations`           | nested `instruments`, `fx`, `creditDerivatives`, `composite`, and `market`; product-specific coupon helpers (the reusable market handle is `core.MarketContext`)                                                                                                                                                                                                                      |
 
 Hover any namespace member in a TypeScript IDE for its arguments, result shape,
 error behavior, and conventions. `index.d.ts` is the authoritative surface; use its
@@ -78,11 +79,11 @@ import init, { analytics, calibration, core, models, valuations } from 'finstack
 
 await init();
 
-// Currency-tagged amounts. `amount` is the f64 view; `amountDecimal()` is exact.
+// Currency-tagged amounts. `amount` is the f64 view; `amountDecimal` is exact.
 const usd = new core.Currency('USD');
 const notional = new core.Money(1_000_000, usd);
 notional.amount; // 1000000
-notional.amountDecimal(); // '1000000'
+notional.amountDecimal; // '1000000'
 
 // Rates are decimals internally; use the factories for quoted units.
 core.Rate.fromBp(250).asDecimal; // 0.025
@@ -110,29 +111,63 @@ const bond = valuations.instruments.Bond.fixed(
   'USD-OIS'
 );
 JSON.parse(bond.toJson()).schema; // 'finstack_quant.instrument/1'
+
+// Every typed instrument has one getter per Rust field, `price` / `metric`,
+// and a fluent builder whose setters map one for one onto the Rust builder.
+// `Money`, `Tenor`, `DayCount` and `Currency` are handles; dates are ISO-8601
+// strings; nested specs are plain objects.
+const swap = valuations.instruments.InterestRateSwap.example();
+swap.notional.amount; // 10000000
+swap.fixedLeg.rate; // '0.04'
+const copy = valuations.instruments.InterestRateSwap.builder()
+  .id('IRS-COPY')
+  .notional(swap.notional)
+  .side(swap.side)
+  .fixedLeg(swap.fixedLeg)
+  .floatLeg(swap.floatLeg)
+  .build();
+copy.toDict().id; // 'IRS-COPY'
 ```
 
 ### Pricing against a market
 
-`calibration.calibrate` turns a quote envelope into a materialized market; the result's
-`result.final_market` is the MarketContext every pricing entry point accepts. When
-pricing many instruments, parse it once into a `Market` handle.
+Every pricing entry point takes a market: either canonical MarketContext JSON or,
+when pricing many instruments, a `core.MarketContext` handle parsed once. Build one
+by inserting curves, or load the `result.final_market` of a calibration.
 
 ```javascript
-const calibrated = calibration.calibrate(envelope); // CalibrationResultEnvelope
-const market = new valuations.Market(JSON.stringify(calibrated.result.final_market));
+import init, { core, valuations } from 'finstack-quant-wasm';
+
+await init();
+
+const market = new core.MarketContext();
+market.insert(core.DiscountCurve.flat('USD-OIS', '2025-06-15', 0.03));
+
+const usd = new core.Currency('USD');
+const instruments = ['2030-01-01', '2035-01-01'].map((maturity) =>
+  valuations.instruments.Bond.fixed(
+    `BOND-${maturity}`,
+    new core.Money(1_000_000, usd),
+    new core.Rate(0.05),
+    '2025-01-01',
+    maturity,
+    'none',
+    'USD-OIS'
+  ).toJson()
+);
 
 for (const instrumentJson of instruments) {
   const result = valuations.instruments.priceInstrumentWithMarket(
     instrumentJson,
     market,
-    '2025-06-15',
-    'default'
+    '2025-06-15'
   );
   console.log(result.instrument_id, result.value);
 }
 ```
 
+`calibration.calibrate(envelope)` turns a quote envelope into a materialized market:
+`core.MarketContext.fromJson(calibrated.result.final_market)` is the handle above.
 Always inspect `calibrated.result.step_reports` and `calibrated.result.report` before
 using a calibrated market downstream. `calibration.validateCalibrationJson` is the
 fast pre-flight that canonicalizes an envelope without solving.
@@ -148,8 +183,11 @@ import { readFileSync } from 'node:fs';
 import init, { core } from 'finstack-quant-wasm';
 
 await init({
-  module_or_path: readFileSync('node_modules/finstack-quant-wasm/pkg/finstack_quant_wasm_bg.wasm'),
+  module_or_path: readFileSync(
+    new URL(import.meta.resolve('finstack-quant-wasm/pkg/finstack_quant_wasm_bg.wasm'))
+  ),
 });
+new core.Currency('USD').numeric; // 840
 ```
 
 The `pkg-node/` build (`wasm-pack --target nodejs`) is also published and
@@ -181,47 +219,71 @@ explicitly with `cargo nextest run -p finstack-quant-wasm --test wasm return_sha
 For LSMC valuations, `standard_error` measures pricing-path sampling uncertainty
 under the frozen fitted exercise policy and excludes regression approximation,
 time-grid discretization, and model error. Monte Carlo valuation details expose
-their full-width deterministic `seed` as a JavaScript `bigint`. Preserve it when producing application JSON with a replacer,
-for example
-`JSON.stringify(result, (_, value) => typeof value === "bigint" ? value.toString() : value)`.
-The resulting decimal string is lossless; ordinary `JSON.stringify(result)` throws
-when Monte Carlo details are present.
+their full-width deterministic `seed` as a JavaScript `bigint`. Serialize such a
+result with `valuations.valuationResultToJson(result)`, which writes the canonical
+JSON (the same text as Python `ValuationResult.to_json()`) with every integer exact;
+ordinary `JSON.stringify(result)` throws when Monte Carlo details are present.
 
-**Errors.** Bindings that route through `crate::utils::to_js_err` — the large
-majority — throw a real `Error` whose `name` is `FinstackError` and whose `kind` is
-`not_found`, `validation`, or `computation`. The persisted-contract entry points
-(`portfolio.Portfolio.fromMaterialization` and `validateMaterialization`) instead
-throw `ContractValidationError`: `kind` is `report` when structured diagnostics are
-available, and `error.report` then carries the serialized `ValidationReport`; a
-breached load limit gives `kind` `limit_exceeded`. Their remaining failures stay
-`FinstackError` with a domain `kind` (`unknown_entity`, `fx_conversion`,
-`valuation`, `missing_market_data`, and so on). A handful of low-level argument
-guards still reject with a bare string, so match on `err.message` defensively
-rather than assuming `Error` everywhere.
+**Errors.** Exports throw a real `Error` whose `name` is `FinstackError` and whose
+`kind` is the Rust error kind: `not_found`, `validation`, or `computation`.
+The Python bindings raise `KeyError`, `ValueError`, or `RuntimeError` for the same
+failures, so both hosts classify an error identically. A wrong JavaScript argument
+type throws a `TypeError` with `kind` `invalid_type` (see below). Where the Rust
+error defines a finer `code()`, it is set as `error.code`. The persisted-contract
+entry points (`portfolio.Portfolio.fromMaterialization` and
+`validateMaterialization`) throw `ContractValidationError` (`kind` `validation`)
+for a contract that cannot be loaded: `code` is `report` when structured
+diagnostics are available, and `error.report` then carries the serialized
+`ValidationReport`; a breached load limit gives `code` `limit_exceeded`. Their
+remaining failures are ordinary `FinstackError`s (an unknown entity or missing FX
+rate is `not_found`, a failed valuation carries the kind of its cause).
+The calibration envelope entry points (`calibrate`, `validateCalibrationJson`,
+`dryRun`, `dryRunJson`) throw `CalibrationEnvelopeError`, whose `kind` is the Rust execution
+category (`strict_load`, `solver_not_converged`, …) alongside the failing `stage`,
+`step_id`, `solver_diagnostics` and strict-load `diagnostics`. No export throws a bare string:
+`mise run wasm-check-errors` rejects any binding error that bypasses
+`crate::utils::to_js_err`.
 
 **Money.** `new core.Money(amount, currency)` takes a finite JavaScript `number`,
 converts it to a Rust `Decimal`, and does **not** round to the currency's minor
 units. Precision already lost in the `number` cannot be recovered. `toString()` and
-other formatting do not mutate the stored amount; `amountDecimal()` renders the exact
-stored `Decimal` as a string. `add` and `sub` refuse to mix currencies.
+other formatting do not mutate the stored amount; `amountDecimal` renders the exact
+stored `Decimal` as a string. The arithmetic carries the Rust method names:
+`checkedAdd` and `checkedSub` refuse to mix currencies, `checkedMulF64` /
+`checkedDivF64` scale by a number and `checkedNeg` negates exactly.
+`Money.fromDecimalStr(text, currency)` takes a `Currency` handle, like the constructor.
 
 **Rates.** Rates are decimals: `0.05` is 5%. Use `Rate.fromPercent` / `Rate.fromBp`
 for quoted units. `Rate.fromBp` is integer-backed and rejects fractional basis points
 rather than rounding them.
 
 **Dates.** Two conventions coexist, both matching the Rust API. The `core` date
-functions (`createDate`, `dateFromEpochDays`, `adjust`) speak signed epoch-day
-integers. Instrument, market, and pricing entry points take ISO-8601 date strings
+utilities (`createDate`, `dateFromEpochDays`, `adjust`, the IMM/CDS/SIFMA rules,
+`HolidayCalendar`, `Schedule`, `PeriodKind`) speak signed epoch-day integers;
+`core.daysSinceEpoch('2025-06-15')` converts an ISO string. Curves, series,
+`MarketContext`, instrument and pricing entry points take ISO-8601 date strings
 (`'2025-06-15'`). Calendar codes come from `core.availableCalendars()`.
 
-**Integer widths.** `u64`/`i64` arguments and returns cross as `BigInt`
-(Monte Carlo seeds, `DayCount.calendarDays`). `usize` counts marshal as IEEE-754
-doubles; where a count can plausibly get large, the binding calls
-`utils::check_js_safe_count` and throws above `Number.MAX_SAFE_INTEGER` rather than
-returning a silently rounded value.
+**Argument types are checked, not coerced.** Every string, boolean, number and
+number-array argument is validated before Rust runs: a wrong type throws a `TypeError`
+with `kind: "invalid_type"` and a message that starts with the argument name
+(`"asOf: expected a string, got number"`). Numbers must be JavaScript `number`s:
+`null`, `undefined` (for a required argument), numeric strings, booleans, `bigint`s and
+`[1]`-style arrays throw instead of going through `ToNumber`. `NaN` and `±Infinity` are
+numbers and reach Rust, which rejects them wherever a finite value is required. Number
+arrays take a `Float64Array` or an array of `number`s; a string, a plain object or a
+non-number item throws. An optional number or number array treats `undefined` and
+`null` as omitted. Integers must be whole numbers in range (`1.5`, `-1`, `NaN` and `"5"`
+throw rather than truncate or wrap); 64-bit seeds take a safe-integer `number` or an
+exact `bigint`; booleans must be `true` or `false`.
+JSON inputs (`*Json` parameters, typed `JsonInput`) take JSON text or the equivalent
+plain object/array, and objects get the same unknown-field checks as text;
+`NaN`, `Infinity`, `Map`s, class instances and WASM handles inside them throw.
+Returned 64-bit values (Monte Carlo seeds, `DayCount.calendarDays`) are `bigint`.
 
-**Determinism.** Simulation entry points take an explicit seed; the same seed and
-path count reproduce the same estimate.
+**Determinism.** Simulation entry points are seeded; where the seed is optional
+(`models.monteCarlo.priceHestonCall/Put`) the Rust registry supplies a fixed
+default, so the same seed and path count always reproduce the same estimate.
 
 **Serde strictness.** JSON envelopes deny unknown fields and are versioned
 (`finstack_quant.instrument/1`, `finstack_quant.calibration/1`, …). See
@@ -236,9 +298,20 @@ hand-maintained [`index.d.ts`](index.d.ts), policed by `tests/dts_contract.rs` a
 `tsc` compile checks under two `lib` targets — both wired into `mise` tasks — plus
 the manually-run `tests/return_shapes.rs`.
 
-`types/generated/*` holds only the Rust-owned JSON envelope shapes, exported from the
-Rust types with `ts-rs`. Regenerate with `mise run wasm-gen-bindings`; verify without
-mutating the tree with `mise run wasm-check-bindings` (also run by `mise run gen-check`).
+`types/generated/<crate>/` holds the JSON contract types, generated by
+`scripts/generate-contract-types.mjs` from each crate's checked-in JSON Schemas
+(`finstack-quant/<crate>/schemas/`). Every crate is one module whose types keep
+their Rust names (the schema index's `type_name`); `finstack-quant-wasm/types`
+re-exports each crate as a namespace (`import type { calibration } from
+'finstack-quant-wasm/types'`, then `calibration.MarketDatum`), because the same
+Rust name can appear in several crates. The package root re-exports the envelope
+types the facade signatures use (`CalibrationEnvelope`, `MaterializationReport`,
+...). Integer fields in these JSON envelopes are `number`. Regenerate with
+`mise run wasm-gen-bindings`; verify without mutating the tree with
+`mise run wasm-check-bindings` (also run by `mise run gen-check`).
+`npm run test:dts` compiles the published types under `NodeNext` with
+`skipLibCheck: false`, and `tests/facade/contract_types.test.mjs` type-checks real
+runtime outputs against them.
 
 `types/valuation-result.d.ts` and `schemas/host/1/valuation_result.schema.json`
 are generated from Rust for the facade's bigint-enabled result serializer.
@@ -312,7 +385,7 @@ The rules that the gates actually enforce:
   `src/lib.rs` does not `pub use api::*`, which is what keeps the `core` module from
   shadowing `std::core`.
 - Serialize with `crate::utils::to_js_value`; map errors with
-  `crate::utils::to_js_err` / `to_js_error`. No `unwrap`, `expect`, or `panic`
+  `crate::utils::to_js_err`. No `unwrap`, `expect`, or `panic`
   (denied at the crate root).
 - Keep validation logic in a private `*_inner` helper returning the domain error and
   make the `#[wasm_bindgen]` function a thin converter, so native tests can assert on

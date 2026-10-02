@@ -1,0 +1,49 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/multi_ou_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Parameters for a multi-dimensional Ornstein-Uhlenbeck process.",
+  "properties": {
+    "correlation": {
+      "description": "Optional row-major `n x n` correlation matrix.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "kappas": {
+      "description": "Mean-reversion speeds `κ_i` per year.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "sigmas": {
+      "description": "Diffusion scales `σ_i` per square root year.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "thetas": {
+      "description": "Long-run means `θ_i` in state units.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "kappas",
+    "thetas",
+    "sigmas"
+  ],
+  "title": "MultiOuParams",
+  "type": "object"
+}

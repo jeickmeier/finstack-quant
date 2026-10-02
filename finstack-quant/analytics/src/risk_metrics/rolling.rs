@@ -1,11 +1,15 @@
 //! Rolling risk metrics: Sharpe, Sortino, and volatility over a sliding window.
 //!
-//! Crate-internal except for [`DatedSeries`] (re-exported at the crate root).
-//! All rolling functions share O(n) incremental kernels with window rebuilds
-//! and return a [`DatedSeries`] aligned to window-end dates.
+//! Crate-internal except for [`DatedSeries`] and [`RollingMetric`] (re-exported
+//! at the crate root).
+//! All rolling functions use incremental kernels with periodic full-window
+//! rebuilds and return a [`DatedSeries`] aligned to window-end dates. With
+//! rebuild interval `k`, scheduled rebuilds cost `O(n + n * window / k)`;
+//! numerical recovery can trigger additional rebuilds.
 
 use crate::dates::Date;
 use finstack_quant_core::math::neumaier_sum;
+use finstack_quant_core::math::summation::NeumaierAccumulator;
 
 use super::return_based::{invalid_annualization_factor, sharpe};
 
@@ -36,9 +40,13 @@ fn recompute_mean_m2(window: &[f64]) -> (f64, f64) {
 }
 
 #[inline]
-fn recompute_sum_sum_ds(window: &[f64], mar: f64) -> (f64, f64) {
+fn recompute_sum_sum_ds(window: &[f64], mar: f64) -> (NeumaierAccumulator, f64) {
+    let mut sum = NeumaierAccumulator::new();
+    for &value in window {
+        sum.add(value);
+    }
     (
-        neumaier_sum(window.iter().copied()),
+        sum,
         neumaier_sum(window.iter().filter(|&&r| r < mar).map(|&r| {
             let d = mar - r;
             d * d
@@ -46,35 +54,101 @@ fn recompute_sum_sum_ds(window: &[f64], mar: f64) -> (f64, f64) {
     )
 }
 
-/// A dated time-series column: scalar values aligned with window-end dates.
+/// The metric a rolling [`DatedSeries`] carries.
 ///
-/// Shared carrier type for rolling analytics outputs. Concrete metrics
-/// (rolling Sharpe, Sortino, volatility, etc.) reuse this struct so they
-/// share field names, serde shape, and helper methods.
-#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
-pub struct DatedSeries {
-    /// Computed metric values, one per completed rolling window.
-    pub values: Vec<f64>,
-    /// Window-end dates aligned 1:1 with `values`.
-    pub dates: Vec<Date>,
+/// Serialized as its lowercase name (`"volatility"`, `"sortino"`,
+/// `"sharpe"`, `"return"`), which hosts also use as the value-column label.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum RollingMetric {
+    /// Annualized sample volatility (`Performance::rolling_volatility`).
+    Volatility,
+    /// Annualized Sortino ratio (`Performance::rolling_sortino`).
+    Sortino,
+    /// Annualized Sharpe ratio (`Performance::rolling_sharpe`).
+    Sharpe,
+    /// Compounded simple return over the window (`Performance::rolling_returns`).
+    Return,
 }
 
-impl DatedSeries {
-    /// Allocate an empty series with capacity for `cap` points.
-    #[inline]
+impl RollingMetric {
+    /// The metric's wire name, identical to its serde form.
+    ///
+    /// # Returns
+    ///
+    /// `"volatility"`, `"sortino"`, `"sharpe"` or `"return"`.
     #[must_use]
-    pub(crate) fn with_capacity(cap: usize) -> Self {
-        Self {
-            values: Vec::with_capacity(cap),
-            dates: Vec::with_capacity(cap),
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Volatility => "volatility",
+            Self::Sortino => "sortino",
+            Self::Sharpe => "sharpe",
+            Self::Return => "return",
         }
     }
 }
 
-fn nan_series(dates: &[Date], start: usize, len: usize) -> DatedSeries {
+impl std::fmt::Display for RollingMetric {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+/// A dated time-series column: scalar values aligned with window-end dates.
+///
+/// Shared carrier type for rolling analytics outputs. Concrete metrics
+/// (rolling Sharpe, Sortino, volatility, returns) reuse this struct so they
+/// share field names, serde shape, and helper methods; `value_column` names
+/// the metric that produced the values.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct DatedSeries {
+    /// Computed metric values, one per completed rolling window. An undefined
+    /// window (e.g. a zero-volatility Sharpe) is `NaN`; JSON carries it as the
+    /// `"nan"` sentinel so the series round-trips.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64_seq")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::NonFiniteF64Wire>")
+    )]
+    pub values: Vec<f64>,
+    /// Window-end dates aligned 1:1 with `values`.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
+    pub dates: Vec<Date>,
+    /// Metric carried by `values`; hosts use its name as the value-column label.
+    pub value_column: RollingMetric,
+}
+
+impl DatedSeries {
+    /// An empty series of `metric` (no complete window).
+    #[inline]
+    #[must_use]
+    pub(crate) fn empty(metric: RollingMetric) -> Self {
+        Self::with_capacity(metric, 0)
+    }
+
+    /// Allocate an empty series of `metric` with capacity for `cap` points.
+    #[inline]
+    #[must_use]
+    pub(crate) fn with_capacity(metric: RollingMetric, cap: usize) -> Self {
+        Self {
+            values: Vec::with_capacity(cap),
+            dates: Vec::with_capacity(cap),
+            value_column: metric,
+        }
+    }
+}
+
+fn nan_series(metric: RollingMetric, dates: &[Date], start: usize, len: usize) -> DatedSeries {
     DatedSeries {
         values: vec![f64::NAN; len],
         dates: dates[start..start + len].to_vec(),
+        value_column: metric,
     }
 }
 
@@ -107,13 +181,13 @@ pub(crate) fn rolling_sharpe(
 ) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
-        return DatedSeries::default();
+        return DatedSeries::empty(RollingMetric::Sharpe);
     }
     if window < 2 || invalid_annualization_factor(true, ann_factor) {
-        return nan_series(dates, window - 1, n - window + 1);
+        return nan_series(RollingMetric::Sharpe, dates, window - 1, n - window + 1);
     }
     let w = window as f64;
-    let mut out = DatedSeries::with_capacity(n - window + 1);
+    let mut out = DatedSeries::with_capacity(RollingMetric::Sharpe, n - window + 1);
     let mut date_idx = window - 1;
     rolling_mean_m2_kernel(returns, n, window, |mean, m2| {
         let ann_mean = mean * ann_factor;
@@ -155,13 +229,13 @@ pub(crate) fn rolling_volatility(
 ) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
-        return DatedSeries::default();
+        return DatedSeries::empty(RollingMetric::Volatility);
     }
     if window < 2 || invalid_annualization_factor(true, ann_factor) {
-        return nan_series(dates, window - 1, n - window + 1);
+        return nan_series(RollingMetric::Volatility, dates, window - 1, n - window + 1);
     }
     let w = window as f64;
-    let mut out = DatedSeries::with_capacity(n - window + 1);
+    let mut out = DatedSeries::with_capacity(RollingMetric::Volatility, n - window + 1);
     let mut date_idx = window - 1;
     rolling_mean_m2_kernel(returns, n, window, |_, m2| {
         let var = if window == 1 {
@@ -203,18 +277,20 @@ pub(crate) fn rolling_sortino(
 ) -> DatedSeries {
     let n = returns.len().min(dates.len());
     if n < window || window == 0 {
-        return DatedSeries::default();
+        return DatedSeries::empty(RollingMetric::Sortino);
     }
     if window < 2 || invalid_annualization_factor(true, ann_factor) || !mar.is_finite() {
-        return nan_series(dates, window - 1, n - window + 1);
+        return nan_series(RollingMetric::Sortino, dates, window - 1, n - window + 1);
     }
     let w = window as f64;
-    let mut out = DatedSeries::with_capacity(n - window + 1);
+    let mut out = DatedSeries::with_capacity(RollingMetric::Sortino, n - window + 1);
     let mut date_idx = window - 1;
     rolling_sortino_kernel(returns, n, window, mar, |sum, sum_ds| {
         let m = sum / w - mar;
         let dd = (sum_ds / w).sqrt();
-        out.values.push(if dd == 0.0 {
+        out.values.push(if !m.is_finite() || !dd.is_finite() {
+            f64::NAN
+        } else if dd == 0.0 {
             if m > 0.0 {
                 f64::INFINITY
             } else if m < 0.0 {
@@ -294,12 +370,15 @@ where
 {
     let (mut sum, mut sum_ds) = recompute_sum_sum_ds(&returns[..window], mar);
     let mut downside_scale = sum_ds;
-    emit(sum, sum_ds);
+    emit(sum.total(), sum_ds);
     let mut steps_since_recompute = 0_usize;
     for i in window..n {
         let add = returns[i];
         let rem = returns[i - window];
-        sum += add - rem;
+        // Keep insertion and removal separate so a departing positive outlier
+        // cannot erase the small returns retained in the compensation term.
+        sum.add(add);
+        sum.add(-rem);
         if add < mar {
             let d = mar - add;
             sum_ds += d * d;
@@ -310,7 +389,7 @@ where
             sum_ds -= d * d;
         }
         steps_since_recompute += 1;
-        if !sum.is_finite()
+        if !sum.total().is_finite()
             || !sum_ds.is_finite()
             || sum_ds < 0.0
             || (downside_scale > 0.0 && sum_ds <= f64::EPSILON.sqrt() * downside_scale)
@@ -321,7 +400,7 @@ where
             downside_scale = sum_ds;
             steps_since_recompute = 0;
         }
-        emit(sum, sum_ds);
+        emit(sum.total(), sum_ds);
     }
 }
 
@@ -332,6 +411,48 @@ mod tests {
     use crate::risk_metrics::return_based::{sortino, volatility};
     fn jan1(year: i32) -> Date {
         Date::from_calendar_date(year, Month::January, 1).expect("valid date")
+    }
+
+    #[test]
+    fn rolling_series_carry_their_metric_label() {
+        let returns: Vec<f64> = (0..20).map(|i| (i as f64 - 10.0) * 0.001).collect();
+        let dates: Vec<Date> = (0..20).map(|i| jan1(2025) + Duration::days(i)).collect();
+        let cases = [
+            (rolling_sharpe(&returns, &dates, 5, 252.0, 0.0), "sharpe"),
+            (rolling_volatility(&returns, &dates, 5, 252.0), "volatility"),
+            (rolling_sortino(&returns, &dates, 5, 252.0, 0.0), "sortino"),
+            // Empty and all-NaN early exits keep the label too.
+            (rolling_sharpe(&returns, &dates, 50, 252.0, 0.0), "sharpe"),
+            (rolling_volatility(&returns, &dates, 1, 252.0), "volatility"),
+        ];
+        for (series, label) in cases {
+            assert_eq!(series.value_column.as_str(), label);
+            let json = serde_json::to_value(&series).expect("serialize");
+            assert_eq!(json["value_column"], label);
+        }
+        let series = rolling_sharpe(&returns, &dates, 5, 252.0, 0.0);
+        let back: DatedSeries =
+            serde_json::from_value(serde_json::to_value(&series).expect("serialize"))
+                .expect("round trip");
+        assert_eq!(back, series);
+        let bogus = serde_json::json!({"values": [], "dates": [], "value_column": "alpha"});
+        assert!(serde_json::from_value::<DatedSeries>(bogus).is_err());
+    }
+
+    #[test]
+    fn undefined_windows_round_trip_through_json() {
+        let returns: Vec<f64> = (0..6).map(|i| (i as f64 - 3.0) * 0.001).collect();
+        let dates: Vec<Date> = (0..6).map(|i| jan1(2025) + Duration::days(i)).collect();
+        // A one-point window has zero volatility, so every Sharpe is undefined.
+        let series = rolling_sharpe(&returns, &dates, 1, 252.0, 0.0);
+        assert!(series.values.iter().any(|value| !value.is_finite()));
+        let json = serde_json::to_string(&series).expect("serialize");
+        assert!(!json.contains("null"), "{json}");
+        let back: DatedSeries = serde_json::from_str(&json).expect("round trip");
+        assert_eq!(back.values.len(), series.values.len());
+        for (after, before) in back.values.iter().zip(&series.values) {
+            assert!(after == before || (after.is_nan() && before.is_nan()));
+        }
     }
 
     #[test]
@@ -423,6 +544,47 @@ mod tests {
                 "window {window_start}: got {got}, expected {expected}",
             );
         }
+    }
+
+    #[test]
+    fn rolling_sortino_preserves_small_returns_after_positive_outlier_leaves() {
+        for tail in [1.0e-12, 1.0e-18] {
+            for returns in [
+                vec![0.1, tail, -tail, tail, -tail, tail],
+                vec![0.1, tail, tail, -tail, tail, -tail],
+            ] {
+                let dates: Vec<Date> = (0..returns.len())
+                    .map(|i| jan1(2025) + Duration::days(i as i64))
+                    .collect();
+                let rolling = rolling_sortino(&returns, &dates, 3, 252.0, 0.0);
+                for (start, window) in returns.windows(3).enumerate() {
+                    let expected = sortino(window, true, 252.0, 0.0);
+                    let actual = rolling.values[start];
+                    if expected.is_infinite() {
+                        assert_eq!(actual, expected);
+                    } else {
+                        assert!(
+                            (actual - expected).abs() <= 1.0e-12 * expected.abs().max(1.0),
+                            "tail={tail}, window={window:?}: got {actual}, expected {expected}"
+                        );
+                    }
+                    assert_eq!(rolling.dates[start], dates[start + 2]);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn rolling_sortino_preserves_non_finite_statistics_before_zero_risk_sentinels() {
+        let returns = [1.0e308, 1.0e308, 0.0, 0.0];
+        let dates: Vec<Date> = (0..returns.len())
+            .map(|i| jan1(2025) + Duration::days(i as i64))
+            .collect();
+        let rolling = rolling_sortino(&returns, &dates, 2, 252.0, 0.0);
+        assert!(rolling.values[0].is_nan());
+        assert!(sortino(&returns[..2], true, 252.0, 0.0).is_nan());
+        assert_eq!(rolling.values[1], f64::INFINITY);
+        assert_eq!(rolling.values[2], 0.0);
     }
 
     #[test]

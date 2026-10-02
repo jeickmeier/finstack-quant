@@ -33,7 +33,7 @@ if (!existsSync(WASM_BG)) {
 
 const facade = await import('../../index.js');
 const init = facade.default;
-const { valuations } = facade;
+const { core, valuations } = facade;
 
 await init({ module_or_path: readFileSync(WASM_BG) });
 
@@ -170,7 +170,8 @@ test('priceInstrument returns readable measures without JSON.parse', () => {
 });
 
 test('priceInstrumentWithMarket / …WithMetricsAndMarket return objects too', () => {
-  const market = new valuations.Market(MARKET_JSON);
+  const market = core.MarketContext.fromJson(MARKET_JSON);
+  assert.equal(valuations.Market, undefined, 'the handle lives in core only');
   try {
     const priced = valuations.instruments.priceInstrumentWithMarket(
       bondInstrumentJson(),
@@ -194,6 +195,32 @@ test('priceInstrumentWithMarket / …WithMetricsAndMarket return objects too', (
     assert.equal(typeof withMetrics, 'object');
     assert.equal(typeof withMetrics.measures.moic, 'number');
     assert.equal(JSON.parse(JSON.stringify(withMetrics)).measures.moic, withMetrics.measures.moic);
+
+    // `model` is optional, like priceInstrument and Python price_instrument:
+    // omitted and null both select the instrument-native default model.
+    const explicit = valuations.instruments.priceInstrumentWithMarket(
+      bondInstrumentJson(),
+      market,
+      '2024-01-01',
+      'default'
+    );
+    for (const omitted of [
+      valuations.instruments.priceInstrumentWithMarket(bondInstrumentJson(), market, '2024-01-01'),
+      valuations.instruments.priceInstrumentWithMarket(
+        bondInstrumentJson(),
+        market,
+        '2024-01-01',
+        null
+      ),
+    ]) {
+      assert.equal(omitted.value.amount, explicit.value.amount);
+    }
+    assert.equal(
+      valuations.instruments.priceInstrument(bondInstrumentJson(), MARKET_JSON, '2024-01-01').value
+        .amount,
+      explicit.value.amount
+    );
+    assert.equal(core.MarketContext.fromJson(market.toJson()).toJson(), market.toJson());
   } finally {
     market.free();
   }

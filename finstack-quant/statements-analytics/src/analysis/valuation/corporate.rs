@@ -11,7 +11,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
-use finstack_quant_statements::error::Result;
+use finstack_quant_statements::error::{Error, Result};
 use finstack_quant_statements::evaluator::{Evaluator, StatementResult};
 use finstack_quant_statements::types::{FinancialModelSpec, NodeValueType};
 use finstack_quant_valuations::instruments::equity::dcf_equity::{
@@ -25,6 +25,7 @@ use finstack_quant_valuations::instruments::{Attributes, Instrument};
 /// `FinancialModelSpec::meta["currency"]`. Ratios such as
 /// `equity_value_per_share` are plain scalars.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CorporateValuationResult {
     /// Equity value (EV - Net Debt, after discounts)
     pub equity_value: Money,
@@ -46,12 +47,26 @@ pub struct CorporateValuationResult {
     pub dcf_instrument: Option<DiscountedCashFlow>,
 }
 
+/// Node id the DCF entry points read unlevered free cash flow from when the
+/// caller names none (`"ufcf"`).
+///
+/// The `dcf` step of [`CorporateAnalysisBuilder`](crate::analysis::CorporateAnalysisBuilder)
+/// reads this node, and the host bindings use it as the default `ufcf_node`
+/// of `dcf_sensitivity` / `evaluate_dcf`.
+pub const DEFAULT_UFCF_NODE: &str = "ufcf";
+
 /// Optional configuration for DCF valuation beyond the core WACC/terminal parameters.
 ///
 /// Percentage-style inputs use decimal form, so `0.10` means `10%`.
 /// [`Default`] caps perpetual stable growth at 5%.
+///
+/// The serde form is the host input for DCF options: every field is optional
+/// and a missing field takes its [`Default`] value, while an unknown field is
+/// rejected. For example `{"exit_multiple_bump": {"relative": 0.10}}` keeps
+/// every other default and shocks the exit multiple by ±10%.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(deny_unknown_fields)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(default, deny_unknown_fields)]
 pub struct DcfOptions {
     /// Enable mid-year discounting convention (default: false).
     pub mid_year_convention: bool,
@@ -139,6 +154,7 @@ impl Default for DcfOptions {
 /// ±1.0x). Relative bumps are decimal fractions of the base multiple
 /// (e.g. `Relative(0.10)` is ±10%).
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ExitMultipleBump {
     /// Absolute bump in turns of the multiple.
@@ -175,6 +191,10 @@ pub(crate) struct DcfEvalContext<'a> {
 ///
 /// `wacc` and terminal growth rates use decimal fractions. Cashflows dated on
 /// or before the valuation date are excluded.
+/// Growth terminals require a complete contiguous calendar year of monetary
+/// UFCF ending at the last forecast boundary. The window can
+/// include actual periods. Partial periods are not prorated; weekly boundaries
+/// that do not align with the calendar-year start are rejected.
 ///
 /// # Arguments
 ///
@@ -207,7 +227,8 @@ pub(crate) struct DcfEvalContext<'a> {
 /// model currency cannot be inferred, if monetary nodes use another currency
 /// or no opening balance is available without a net-debt override, if an
 /// exit-multiple metric node is missing or non-finite, or if the
-/// terminal-value assumptions are internally inconsistent.
+/// terminal-value assumptions are internally inconsistent. Growth terminals
+/// also reject missing, overlapping, or partial trailing-year UFCF history.
 ///
 /// # Examples
 ///
@@ -296,6 +317,7 @@ const SENSITIVITY_CLAMP_EPSILON: f64 = 1e-12;
 /// `FinancialModelSpec::meta["currency"]`. Rates are decimal fractions
 /// (`0.10` means `10%`) and multiples are plain scalars (`9.5` means `9.5x`).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DcfSensitivityResult {
     /// Unshocked enterprise value the tornado deltas are measured against.
     pub baseline_enterprise_value: Money,
@@ -774,9 +796,10 @@ pub(crate) fn evaluate_dcf_from_results_impl(
         if date <= valuation_date {
             continue;
         }
-        if let Some(ufcf_value) = results.get_money(ufcf_node, &period.id) {
-            flows.push((date, ufcf_value.amount()));
-        }
+        flows.push((
+            date,
+            monetary_node_value(results, ufcf_node, &period.id, currency)?,
+        ));
     }
 
     if flows.is_empty() {
@@ -860,33 +883,24 @@ pub(crate) fn evaluate_dcf_from_results_impl(
     }
 
     // Growth-perpetuity terminal values (Gordon, H-Model) capitalize an
-    // *annual* flow with annual WACC/g. When the model's period grid is
-    // sub-annual, annualize the terminal flow as the trailing sum of the
-    // final year's period flows (standard trailing-twelve-month
-    // convention; Koller et al., Damodaran). If fewer than a full year of
-    // forecast flows exists, the trailing sum is scaled up pro-rata.
-    // Annual grids pass the last flow through unchanged.
+    // *annual* flow with annual WACC/g. Require a complete contiguous trailing
+    // calendar year, including for explicitly dated annual stub periods.
+    // Sparse observations or partial years cannot be substituted for that
+    // history without changing the terminal-flow basis.
     let terminal_flow_override = match &terminal_value {
         TerminalValueSpec::GordonGrowth { .. } | TerminalValueSpec::HModel { .. } => {
-            let periods_per_year = model
+            let last_forecast = model
                 .periods
                 .iter()
                 .rfind(|period| !period.is_actual)
-                .map(|period| usize::from(period.id.periods_per_year()))
-                .unwrap_or(1);
-            if periods_per_year > 1 {
-                let trailing = flows.len().min(periods_per_year);
-                let trailing_sum: f64 = flows
-                    .iter()
-                    .rev()
-                    .take(trailing)
-                    .map(|(_, amount)| amount)
-                    .sum();
-                let annualized = trailing_sum * (periods_per_year as f64 / trailing as f64);
-                Some(annualized)
-            } else {
-                None
-            }
+                .ok_or_else(|| Error::eval("Growth terminal value requires a forecast period"))?;
+            Some(trailing_year_metric(
+                model,
+                results,
+                ufcf_node,
+                last_forecast.end,
+                currency,
+            )?)
         }
         TerminalValueSpec::ExitMultiple { .. } => None,
     };
@@ -1057,7 +1071,21 @@ fn resolve_exit_multiple_metric(
             "Exit-multiple metric node requires a forecast period".into(),
         ));
     };
-    let end = last_forecast.end;
+    let currency = extract_currency_from_model(model)?;
+    let metric = trailing_year_metric(model, results, node, last_forecast.end, currency)?;
+    Ok(TerminalValueSpec::ExitMultiple {
+        terminal_metric: metric,
+        multiple,
+    })
+}
+
+fn trailing_year_metric(
+    model: &FinancialModelSpec,
+    results: &StatementResult,
+    node: &str,
+    end: Date,
+    currency: Currency,
+) -> Result<f64> {
     let year = end.year() - 1;
     let start = Date::from_calendar_date(year, end.month(), end.day())
         .or_else(|_| Date::from_calendar_date(year, end.month(), 28))
@@ -1068,10 +1096,9 @@ fn resolve_exit_multiple_metric(
         })?;
     let incomplete = || {
         finstack_quant_statements::error::Error::Eval(format!(
-        "Exit-multiple metric '{node}' requires complete contiguous history from {start} to {end}; set exit_multiple_metric_node=None and supply an explicit annual terminal_metric when history is insufficient"
-    ))
+            "Terminal metric '{node}' requires complete contiguous history from {start} to {end}"
+        ))
     };
-    let currency = extract_currency_from_model(model)?;
     let mut cursor = end;
     let mut metric = 0.0;
     for period in model
@@ -1092,10 +1119,7 @@ fn resolve_exit_multiple_metric(
     if cursor != start || !metric.is_finite() {
         return Err(incomplete());
     }
-    Ok(TerminalValueSpec::ExitMultiple {
-        terminal_metric: metric,
-        multiple,
-    })
+    Ok(metric)
 }
 
 /// Read a monetary statement node without discarding its currency.
@@ -1127,6 +1151,29 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_statements::builder::ModelBuilder;
     use finstack_quant_statements::types::AmountOrScalar;
+
+    /// `DcfOptions` is the host input for DCF options: a partial document
+    /// fills the rest from `Default`, and an unknown key is rejected.
+    #[test]
+    fn dcf_options_partial_json_fills_defaults() {
+        let options: DcfOptions = serde_json::from_str(
+            r#"{"exit_multiple_metric_node": "ebitda", "exit_multiple_bump": {"relative": 0.1}}"#,
+        )
+        .expect("partial options parse");
+        let defaults = DcfOptions::default();
+        assert_eq!(options.exit_multiple_metric_node.as_deref(), Some("ebitda"));
+        assert!(matches!(
+            options.exit_multiple_bump,
+            ExitMultipleBump::Relative(bump) if (bump - 0.1).abs() < 1e-12
+        ));
+        assert_eq!(options.mid_year_convention, defaults.mid_year_convention);
+        assert!((options.wacc_sensitivity_bump - defaults.wacc_sensitivity_bump).abs() < 1e-12);
+        assert!((options.max_stable_growth_rate - defaults.max_stable_growth_rate).abs() < 1e-12);
+
+        let empty: DcfOptions = serde_json::from_str("{}").expect("empty options parse");
+        assert!(empty.exit_multiple_metric_node.is_none());
+        assert!(serde_json::from_str::<DcfOptions>(r#"{"exit_multiple_node": "ebitda"}"#).is_err());
+    }
 
     #[test]
     fn evaluate_dcf_requires_explicit_currency_metadata() {

@@ -1,0 +1,103 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/estimate.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Numeric Monte Carlo estimate for discounted path values.",
+  "properties": {
+    "ci_95": {
+      "description": "95% confidence interval for the discounted mean.",
+      "maxItems": 2,
+      "minItems": 2,
+      "prefixItems": [
+        {
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "format": "double",
+          "type": "number"
+        }
+      ],
+      "type": "array"
+    },
+    "max": {
+      "description": "Optional maximum of captured discounted path values.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "mean": {
+      "description": "Mean of the discounted path values.",
+      "format": "double",
+      "type": "number"
+    },
+    "median": {
+      "description": "Optional median of captured discounted path values.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "min": {
+      "description": "Optional minimum of captured discounted path values.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "num_paths": {
+      "description": "Number of independent path estimators contributing to the estimate.\n\nWith variance reduction disabled (`antithetic = false`), this equals the\nnumber of simulated sample paths. With antithetic variates enabled each\nestimator is the mean of an antithetic pair, so\n`num_simulated_paths == 2 * num_paths`. The engine records both so\ndownstream consumers can distinguish statistical sample size from\nsimulation work.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "num_simulated_paths": {
+      "description": "Total number of simulated sample paths driving the estimator.\n\nEqual to `num_paths` without variance reduction. When\n[`crate::monte_carlo::engine::McEngineConfig::antithetic`] is enabled this is twice\n`num_paths` because each estimator averages an antithetic pair of\npaths.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "percentile_25": {
+      "description": "Optional 25th percentile of captured discounted path values.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "percentile_75": {
+      "description": "Optional 75th percentile of captured discounted path values.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "std_dev": {
+      "description": "Optional sample standard deviation of discounted path values.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "stderr": {
+      "description": "Standard error of the discounted mean.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "mean",
+    "stderr",
+    "ci_95",
+    "num_paths",
+    "num_simulated_paths"
+  ],
+  "title": "Estimate",
+  "type": "object"
+}

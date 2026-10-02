@@ -5,13 +5,13 @@
   "rules": [
     { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "next_monday" },
     { "type": "fixed", "name": "Canada Day", "month": "july", "day": 1, "observed": "next_monday" },
-    { "type": "fixed", "name": "National Day for Truth and Reconciliation", "month": "september", "day": 30, "observed": "next_monday" },
+    { "type": "fixed", "name": "National Day for Truth and Reconciliation", "month": "september", "day": 30, "observed": "next_monday", "from_year": 2021 },
     { "type": "fixed", "name": "Remembrance Day", "month": "november", "day": 11, "observed": "next_monday" },
-    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "next_monday" },
-    { "type": "fixed", "name": "Boxing Day", "month": "december", "day": 26, "observed": "next_monday" },
-    { "type": "nth_weekday", "name": "Family Day", "n": 3, "weekday": "monday", "month": "february" },
+    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "mon_if_sat_tue_if_sun" },
+    { "type": "fixed", "name": "Boxing Day", "month": "december", "day": 26, "observed": "mon_if_sat_tue_if_sun" },
+    { "type": "nth_weekday", "name": "Family Day", "n": 3, "weekday": "monday", "month": "february", "from_year": 2008 },
     { "type": "easter_offset", "name": "Good Friday", "days": -3 },
-    { "type": "weekday_shift", "name": "Victoria Day", "weekday": "monday", "month": "may", "day": 25, "dir": "before" },
+    { "type": "weekday_shift", "name": "Victoria Day", "weekday": "monday", "month": "may", "day": 24, "dir": "before" },
     { "type": "nth_weekday", "name": "Civic Holiday", "n": 1, "weekday": "monday", "month": "august" },
     { "type": "nth_weekday", "name": "Labour Day", "n": 1, "weekday": "monday", "month": "september" },
     { "type": "nth_weekday", "name": "Thanksgiving", "n": 2, "weekday": "monday", "month": "october" }

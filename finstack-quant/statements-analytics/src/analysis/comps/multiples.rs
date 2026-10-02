@@ -10,8 +10,8 @@ use super::types::{CompanyId, CompanyMetrics, Multiple};
 /// Compute the value of a multiple for a single company.
 ///
 /// Returns `None` if the required inputs are missing or the
-/// denominator is non-positive (avoids divide-by-zero and
-/// meaningless negative multiples).
+/// denominator is non-positive, or an input/result is non-finite (avoids
+/// divide-by-zero, invalid observations, and overflowing multiples).
 ///
 /// # Arguments
 ///
@@ -30,31 +30,9 @@ pub fn compute_multiple(metrics: &CompanyMetrics, multiple: Multiple) -> Option<
         Multiple::Pb => div_positive(metrics.market_cap?, metrics.book_value?),
         Multiple::Ptbv => div_positive(metrics.market_cap?, metrics.tangible_book_value?),
         Multiple::PFcf => div_positive(metrics.market_cap?, metrics.lfcf?),
-        Multiple::DividendYield => {
-            let price = metrics.share_price?;
-            let dps = metrics.dividends_per_share?;
-            if price <= 0.0 {
-                return None;
-            }
-            Some(dps / price)
-        }
-
-        Multiple::SpreadPerTurn => {
-            let spread = metrics.oas_bp?;
-            let leverage = metrics.leverage?;
-            if leverage <= 0.0 {
-                return None;
-            }
-            Some(spread / leverage)
-        }
-        Multiple::YieldPerCoverage => {
-            let yld = metrics.yield_pct?;
-            let coverage = metrics.interest_coverage?;
-            if coverage <= 0.0 {
-                return None;
-            }
-            Some(yld / coverage)
-        }
+        Multiple::DividendYield => div_positive(metrics.dividends_per_share?, metrics.share_price?),
+        Multiple::SpreadPerTurn => div_positive(metrics.oas_bp?, metrics.leverage?),
+        Multiple::YieldPerCoverage => div_positive(metrics.yield_pct?, metrics.interest_coverage?),
     }
 }
 
@@ -81,6 +59,37 @@ fn div_positive(numerator: f64, denominator: f64) -> Option<f64> {
     if denominator <= 0.0 || !denominator.is_finite() || !numerator.is_finite() {
         None
     } else {
-        Some(numerator / denominator)
+        let value = numerator / denominator;
+        value.is_finite().then_some(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn all_multiple_branches_reject_non_finite_inputs_and_results() {
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut metrics = CompanyMetrics::new("invalid");
+            metrics.dividends_per_share = Some(invalid);
+            metrics.share_price = Some(1.0);
+            metrics.oas_bp = Some(invalid);
+            metrics.leverage = Some(1.0);
+            metrics.yield_pct = Some(invalid);
+            metrics.interest_coverage = Some(1.0);
+            for multiple in [
+                Multiple::DividendYield,
+                Multiple::SpreadPerTurn,
+                Multiple::YieldPerCoverage,
+            ] {
+                assert!(compute_multiple(&metrics, multiple).is_none());
+            }
+        }
+        let mut metrics = CompanyMetrics::new("overflow");
+        metrics.enterprise_value = Some(f64::MAX);
+        metrics.ebitda = Some(f64::MIN_POSITIVE);
+        assert!(compute_multiple(&metrics, Multiple::EvEbitda).is_none());
+        assert!(div_positive(1.0, f64::NAN).is_none());
     }
 }

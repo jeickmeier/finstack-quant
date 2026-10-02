@@ -18,6 +18,10 @@ fn as_json(value: &JsValue) -> serde_json::Value {
     serde_json::from_str(&text).expect("stringified result must be valid JSON")
 }
 
+fn series(values: &[f64]) -> JsValue {
+    js_sys::Float64Array::from(values).into()
+}
+
 fn get_f64(value: &JsValue, key: &str) -> f64 {
     js_sys::Reflect::get(value, &JsValue::from_str(key))
         .unwrap_or_else(|_| panic!("property read for {key}"))
@@ -27,22 +31,39 @@ fn get_f64(value: &JsValue, key: &str) -> f64 {
 
 #[wasm_bindgen_test]
 fn estimators_return_none_for_missing_estimates() {
-    assert_eq!(roll_effective_spread("[0.01]").unwrap(), None);
-    assert_eq!(amihud_illiquidity("[0.01]", "[0.0]").unwrap(), None);
-    assert_eq!(kyle_lambda("[0.01]", "[0.0]", 100.0).unwrap(), None);
+    assert_eq!(roll_effective_spread(series(&[0.01])).unwrap(), None);
+    assert_eq!(
+        amihud_illiquidity(series(&[0.01]), series(&[0.0])).unwrap(),
+        None
+    );
+    assert_eq!(
+        kyle_lambda(series(&[0.01]), series(&[0.0]), JsValue::from(100.0)).unwrap(),
+        None
+    );
 }
 
 #[wasm_bindgen_test]
 fn kyle_lambda_calibrates_in_price_space() {
-    let lambda = kyle_lambda("[0.01, -0.02]", "[100.0, 200.0]", 50.0)
-        .unwrap()
-        .expect("valid price-space inputs");
+    let lambda = kyle_lambda(
+        series(&[0.01, -0.02]),
+        series(&[100.0, 200.0]),
+        JsValue::from(50.0),
+    )
+    .unwrap()
+    .expect("valid price-space inputs");
     assert!((lambda - 0.005).abs() < 1e-15);
 }
 
 #[wasm_bindgen_test]
 fn lvar_bangia_returns_the_python_dict_shape() {
-    let result = lvar_bangia(-100_000.0, 0.002, 0.0005, 0.99, 1_000_000.0).unwrap();
+    let result = lvar_bangia(
+        JsValue::from(-100_000.0),
+        JsValue::from(0.002),
+        JsValue::from(0.0005),
+        JsValue::from(0.99),
+        JsValue::from(1_000_000.0),
+    )
+    .unwrap();
     let var = get_f64(&result, "var");
     let spread_cost = get_f64(&result, "spread_cost");
     let lvar = get_f64(&result, "lvar");
@@ -56,9 +77,26 @@ fn lvar_bangia_returns_the_python_dict_shape() {
 
 #[wasm_bindgen_test]
 fn almgren_chriss_impact_preserves_fields_and_price_scaling() {
-    let unit = almgren_chriss_impact(10_000.0, 1_000_000.0, 0.02, 1.0, 0.0, 0.01, None).unwrap();
-    let priced =
-        almgren_chriss_impact(10_000.0, 1_000_000.0, 0.02, 1.0, 0.0, 0.01, Some(100.0)).unwrap();
+    let unit = almgren_chriss_impact(
+        JsValue::from(10_000.0),
+        JsValue::from(1_000_000.0),
+        JsValue::from(0.02),
+        JsValue::from(1.0),
+        JsValue::from(0.0),
+        JsValue::from(0.01),
+        None,
+    )
+    .unwrap();
+    let priced = almgren_chriss_impact(
+        JsValue::from(10_000.0),
+        JsValue::from(1_000_000.0),
+        JsValue::from(0.02),
+        JsValue::from(1.0),
+        JsValue::from(0.0),
+        JsValue::from(0.01),
+        Some(JsValue::from(100.0)),
+    )
+    .unwrap();
 
     let object = as_json(&priced);
     assert_eq!(object.as_object().expect("impact object").len(), 5);
@@ -78,4 +116,53 @@ fn almgren_chriss_impact_preserves_fields_and_price_scaling() {
     let unit_cost = get_f64(&unit, "total_cost");
     let priced_cost = get_f64(&priced, "total_cost");
     assert!((priced_cost - 100.0 * unit_cost).abs() < 1e-9 * priced_cost.abs().max(1.0));
+}
+
+#[wasm_bindgen_test]
+fn estimators_return_none_for_missing_estimates_binding() {
+    assert_eq!(
+        roll_effective_spread(series(&[0.01])).expect("numeric series"),
+        None
+    );
+    assert_eq!(
+        amihud_illiquidity(series(&[0.01]), series(&[0.0])).expect("numeric series"),
+        None
+    );
+    assert_eq!(
+        kyle_lambda(series(&[0.01]), series(&[0.0]), JsValue::from(100.0)).expect("numeric series"),
+        None
+    );
+}
+
+#[wasm_bindgen_test]
+fn kyle_lambda_calibrates_in_price_space_binding() {
+    let lambda = kyle_lambda(
+        series(&[0.01, -0.02]),
+        series(&[100.0, 200.0]),
+        JsValue::from(50.0),
+    )
+    .expect("numeric series")
+    .expect("valid price-space inputs");
+    assert!((lambda - 0.005).abs() < 1e-15);
+}
+
+#[wasm_bindgen_test]
+fn liquidity_tier_validates_custom_thresholds_in_rust() {
+    assert_eq!(liquidity_tier(JsValue::from(3.0), None).unwrap(), "tier2");
+    assert_eq!(
+        liquidity_tier(JsValue::from(3.0), Some(series(&[0.5, 2.0, 10.0, 30.0]))).unwrap(),
+        "tier3"
+    );
+    assert!(liquidity_tier(JsValue::from(3.0), Some(series(&[4.0, 3.0, 2.0, 1.0]))).is_err());
+    assert!(liquidity_tier(JsValue::from(3.0), Some(series(&[-1.0, 0.0, 1.0, 2.0]))).is_err());
+    assert!(liquidity_tier(JsValue::from(3.0), Some(series(&[1.0, 2.0, 3.0]))).is_err());
+    assert!(roll_effective_spread(JsValue::from("[0.01, -0.01]")).is_err());
+}
+
+#[wasm_bindgen_test]
+fn tier_without_thresholds_uses_the_rust_default() {
+    assert_eq!(
+        liquidity_tier(JsValue::from(3.0), None).expect("default tiers"),
+        "tier2"
+    );
 }

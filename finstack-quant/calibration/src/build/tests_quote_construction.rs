@@ -65,21 +65,24 @@ fn test_all_quote_types_instrument_construction() {
     let forward_quotes = vec![MarketQuote::Rates(RateQuote::Fra {
         id: QuoteId::new(format!(
             "FRA-{:?}-{:?}",
-            base_date.add_months(3),
-            base_date.add_months(6)
+            base_date.add_months(3).expect("valid fixture date"),
+            base_date.add_months(6).expect("valid fixture date")
         )),
         index: IndexId::new("USD-LIBOR-3M"),
-        start: Pillar::Date(base_date.add_months(3)),
-        end: Pillar::Date(base_date.add_months(6)),
+        start: Pillar::Date(base_date.add_months(3).expect("valid fixture date")),
+        end: Pillar::Date(base_date.add_months(6).expect("valid fixture date")),
         rate: 0.052,
     })];
 
     // 3. Hazard Quotes (CDS) -> Use "NA-HY-Curve" ID to avoid conflict with "NA-HY" Index during bootstrap
     let hazard_quotes = vec![
         MarketQuote::Cds(CdsQuote::CdsParSpread {
-            id: QuoteId::new(format!("CDS-{:?}", base_date.add_months(12))),
+            id: QuoteId::new(format!(
+                "CDS-{:?}",
+                base_date.add_months(12).expect("valid fixture date")
+            )),
             entity: "NA-HY-Curve".to_string(), // Matches Hazard Curve ID
-            pillar: Pillar::Date(base_date.add_months(12)),
+            pillar: Pillar::Date(base_date.add_months(12).expect("valid fixture date")),
             spread_bp: 100.0,
             recovery_rate: 0.40,
             convention: CdsConventionKey {
@@ -88,9 +91,12 @@ fn test_all_quote_types_instrument_construction() {
             },
         }),
         MarketQuote::Cds(CdsQuote::CdsParSpread {
-            id: QuoteId::new(format!("CDS-{:?}", base_date.add_months(36))),
+            id: QuoteId::new(format!(
+                "CDS-{:?}",
+                base_date.add_months(36).expect("valid fixture date")
+            )),
             entity: "NA-HY-Curve".to_string(),
-            pillar: Pillar::Date(base_date.add_months(36)),
+            pillar: Pillar::Date(base_date.add_months(36).expect("valid fixture date")),
             spread_bp: 120.0,
             recovery_rate: 0.40,
             convention: CdsConventionKey {
@@ -104,14 +110,14 @@ fn test_all_quote_types_instrument_construction() {
     let inflation_quotes = vec![
         MarketQuote::Inflation(InflationQuote::InflationSwap {
             id: QuoteId::new("USA-CPI-U-ZCIS-1Y"),
-            maturity: base_date.add_months(12),
+            maturity: base_date.add_months(12).expect("valid fixture date"),
             rate: 0.02,
             index: "USA-CPI-U".to_string(),
             convention: InflationSwapConventionId::new("USD"),
         }),
         MarketQuote::Inflation(InflationQuote::InflationSwap {
             id: QuoteId::new("USA-CPI-U-ZCIS-5Y"),
-            maturity: base_date.add_months(60),
+            maturity: base_date.add_months(60).expect("valid fixture date"),
             rate: 0.025,
             index: "USA-CPI-U".to_string(),
             convention: InflationSwapConventionId::new("USD"),
@@ -121,12 +127,15 @@ fn test_all_quote_types_instrument_construction() {
     // 5. Base Correlation Quotes (Tranches)
     let correlation_quotes = vec![
         MarketQuote::CdsTranche(CdsTrancheQuote {
-            id: QuoteId::new(format!("TR-0-3-{:?}", base_date.add_months(60))),
+            id: QuoteId::new(format!(
+                "TR-0-3-{:?}",
+                base_date.add_months(60).expect("valid fixture date")
+            )),
             index: "NA-HY".to_string(),
             series: 40,
             attachment: 0.0,
             detachment: 0.03, // 0-3% Equity
-            maturity: base_date.add_months(60),
+            maturity: base_date.add_months(60).expect("valid fixture date"),
             upfront_pct: 0.10,
             coupon_bp: 500.0,
             convention: CdsConventionKey {
@@ -135,12 +144,15 @@ fn test_all_quote_types_instrument_construction() {
             },
         }),
         MarketQuote::CdsTranche(CdsTrancheQuote {
-            id: QuoteId::new(format!("TR-3-7-{:?}", base_date.add_months(60))),
+            id: QuoteId::new(format!(
+                "TR-3-7-{:?}",
+                base_date.add_months(60).expect("valid fixture date")
+            )),
             index: "NA-HY".to_string(),
             series: 40,
             attachment: 0.03,
             detachment: 0.07, // 3-7% Mezz
-            maturity: base_date.add_months(60),
+            maturity: base_date.add_months(60).expect("valid fixture date"),
             upfront_pct: 0.0,
             coupon_bp: 300.0,
             convention: CdsConventionKey {

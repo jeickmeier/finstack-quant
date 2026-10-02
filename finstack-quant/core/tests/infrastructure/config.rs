@@ -1,10 +1,94 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
 use finstack_quant_core::config::{
-    rounding_context_from, FinstackConfig, RoundingMode, ToleranceConfig, ZeroKind,
+    rounding_context_from, CurrencyScalePolicy, FinstackConfig, RoundingContext, RoundingMode,
+    ToleranceConfig, ZeroKind,
 };
 use finstack_quant_core::currency::Currency;
 use serde_json::json;
+use std::collections::BTreeMap;
+
+#[test]
+fn currency_scale_rejects_invalid_construction_and_preserves_policy_on_failed_update() {
+    let mut policy = CurrencyScalePolicy::new(BTreeMap::from([(Currency::USD, 4)]))
+        .expect("supported decimal scale");
+    for scale in [29, 1 << 31, u32::MAX] {
+        assert!(CurrencyScalePolicy::new(BTreeMap::from([(Currency::USD, scale)])).is_err());
+        assert!(policy.set_scale(Currency::USD, scale).is_err());
+        assert!(policy.set_scale(Currency::EUR, scale).is_err());
+        assert_eq!(
+            policy.get_overrides(),
+            &BTreeMap::from([(Currency::USD, 4)])
+        );
+    }
+}
+
+#[test]
+fn currency_scale_rejects_invalid_config_and_context_json() {
+    for scale in [29, 1 << 31, u32::MAX] {
+        for field in ["ingest_scale", "output_scale"] {
+            let mut value = serde_json::to_value(FinstackConfig::default()).expect("config JSON");
+            value["rounding"][field]["overrides"]["USD"] = json!(scale);
+            let error = serde_json::from_value::<FinstackConfig>(value)
+                .expect_err("unsupported decimal scale");
+            assert!(error.to_string().contains("0..=28"));
+        }
+        for field in ["ingest_scale_by_currency", "output_scale_by_currency"] {
+            let mut value = serde_json::to_value(RoundingContext::default()).expect("context JSON");
+            value[field]["USD"] = json!(scale);
+            let error = serde_json::from_value::<RoundingContext>(value)
+                .expect_err("unsupported snapshot decimal scale");
+            assert!(error.to_string().contains("0..=28"));
+        }
+    }
+}
+
+#[test]
+fn currency_scale_boundaries_roundtrip_and_keep_money_epsilon_finite_positive() {
+    let mut cfg = FinstackConfig::default();
+    for scale in [0, 28] {
+        cfg.rounding
+            .ingest_scale
+            .set_scale(Currency::USD, scale)
+            .unwrap();
+        cfg.rounding
+            .output_scale
+            .set_scale(Currency::USD, scale)
+            .unwrap();
+        let encoded = serde_json::to_value(&cfg).expect("config JSON");
+        assert_eq!(
+            encoded["rounding"]["output_scale"]["overrides"]["USD"],
+            scale
+        );
+        let decoded: FinstackConfig = serde_json::from_value(encoded).expect("valid config");
+        assert_eq!(decoded.ingest_scale(Currency::USD), scale);
+        let context = rounding_context_from(&decoded);
+        let restored: RoundingContext =
+            serde_json::from_value(serde_json::to_value(&context).expect("context JSON"))
+                .expect("valid context");
+        assert_eq!(restored, context);
+        let epsilon = restored.money_epsilon(Currency::USD);
+        assert!(epsilon.is_finite() && epsilon > 0.0);
+        assert!(!restored.is_effectively_zero_money(1.0, Currency::USD));
+        assert!(restored.is_effectively_zero_money(epsilon, Currency::USD));
+        assert!(!restored.is_effectively_zero_money(2.0 * epsilon, Currency::USD));
+    }
+}
+
+#[cfg(feature = "json-schema")]
+#[test]
+fn currency_scale_schema_bounds_policy_and_snapshot_values() {
+    let policy = serde_json::to_value(schemars::schema_for!(CurrencyScalePolicy)).unwrap();
+    let context = serde_json::to_value(schemars::schema_for!(RoundingContext)).unwrap();
+    for map in [
+        &policy["properties"]["overrides"],
+        &context["properties"]["ingest_scale_by_currency"],
+        &context["properties"]["output_scale_by_currency"],
+    ] {
+        assert_eq!(map["additionalProperties"]["minimum"], 0);
+        assert_eq!(map["additionalProperties"]["maximum"], 28);
+    }
+}
 
 #[test]
 fn config_extensions_roundtrip() {

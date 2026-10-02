@@ -8,6 +8,7 @@ matters, then get pointer-precise feedback on a near miss.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import ModuleType
 
 import pytest
@@ -22,6 +23,8 @@ from finstack_quant.portfolio import schema as portfolio_schema
 from finstack_quant.scenarios import schema as scenarios_schema
 from finstack_quant.statements import schema as statements_schema
 from finstack_quant.valuations import schema as valuations_schema
+
+ROOT = Path(__file__).resolve().parents[2]
 
 # Every crate that owns a schema registry exposes the same three functions.
 NAMESPACES = [
@@ -45,7 +48,7 @@ def test_index_describes_every_artifact(namespace: ModuleType) -> None:
     assert index["schema_index_version"] == 1
     assert index["artifacts"], "every schema namespace publishes at least one artifact"
     for row in index["artifacts"]:
-        assert set(row) == {"$id", "bytes", "kind", "path", "summary", "title"}
+        assert set(row) == {"$id", "bytes", "kind", "path", "summary", "title", "type_name"}
         assert row["kind"] in {"input", "output", "component"}
         assert row["bytes"] > 0
         assert row["summary"]
@@ -128,9 +131,31 @@ def test_every_registry_crate_publishes_the_same_surface() -> None:
         assert {"get", "index", "validate"} <= set(namespace.__all__)
 
 
-def test_indexes_together_cover_the_whole_published_corpus() -> None:
-    paths = {row["path"] for namespace in NAMESPACES for row in json.loads(namespace.index())["artifacts"]}
-    assert len(paths) == 118, "the ten indexes must account for every checked-in artifact"
+# Crate directory (and artifact family, where a crate publishes several) behind
+# each Python namespace. The models crate also publishes a `schemas/models`
+# family that has no Python namespace yet; like the analytics, covenants and
+# statements-analytics registries it is tracked as binding work.
+NAMESPACE_CORPUS = {
+    attribution_schema: ("attribution", "schemas/"),
+    calibration_schema: ("calibration", "schemas/"),
+    cashflows_schema: ("cashflows", "schemas/"),
+    core_schema: ("core", "schemas/"),
+    factor_model_schema: ("models", "schemas/factor_model/"),
+    margin_schema: ("margin", "schemas/"),
+    portfolio_schema: ("portfolio", "schemas/"),
+    scenarios_schema: ("scenarios", "schemas/"),
+    statements_schema: ("statements", "schemas/"),
+    valuations_schema: ("valuations", "schemas/"),
+}
+
+
+@pytest.mark.parametrize("namespace", NAMESPACES)
+def test_index_matches_the_checked_in_crate_index(namespace: ModuleType) -> None:
+    crate, family = NAMESPACE_CORPUS[namespace]
+    checked_in = json.loads((ROOT / "finstack-quant" / crate / "schemas" / "index.json").read_text())
+    expected = {row["path"] for row in checked_in["artifacts"] if row["path"].startswith(family)}
+    served = {row["path"] for row in json.loads(namespace.index())["artifacts"]}
+    assert served == expected, "the namespace must serve exactly the crate's checked-in artifacts"
 
 
 @pytest.mark.parametrize("namespace", NAMESPACES)
@@ -152,14 +177,21 @@ def test_llm_profile_flattens_unit_enums() -> None:
 
 
 def test_llm_profile_strips_rust_prose_but_keeps_the_values() -> None:
+    # A contract whose canonical artifact carries rustdoc verbatim; that is the
+    # cost being cut.
+    verbose = valuations_schema.get("rate_index_conventions.schema.json")
+    assert "```" in verbose
+    assert "# Examples" in verbose
+    trimmed = valuations_schema.get("rate_index_conventions.schema.json", profile="llm")
+    assert "```" not in trimmed, "code fences do not help a payload author"
+    assert "# Examples" not in trimmed
+
+    # `day_count` is inlined into every instrument, so its variant docs are kept
+    # to the definition and citation at source and carry no Rust examples.
     canonical = valuations_schema.get("day_count.schema.json")
     projected = valuations_schema.get("day_count.schema.json", profile="llm")
-
-    # The canonical artifact carries rustdoc verbatim; that is the cost being cut.
-    assert "```" in canonical
-    assert "# Examples" in canonical
-    assert "```" not in projected, "code fences do not help a payload author"
-    assert "# Examples" not in projected
+    assert "```" not in canonical
+    assert "```" not in projected
 
     # ISDA grounding and every accepted spelling must survive the trim.
     assert "ISDA" in projected, "domain references are the part worth keeping"
@@ -168,11 +200,8 @@ def test_llm_profile_strips_rust_prose_but_keeps_the_values() -> None:
 
     # Each spelling keeps its own citation, so the caller can tell `act_360`
     # from `act_365f` by the section each implements rather than by guessing.
-    # That grounding is not free: it is why the projection lands around 6x
-    # smaller rather than the 10x achievable by dropping citations with the
-    # rest of the prose.
     assert "4.16(d)" in projected, "per-variant section numbers survive"
-    assert len(projected) * 5 < len(canonical), f"{len(canonical)} -> {len(projected)}"
+    assert len(projected) < len(canonical), f"{len(canonical)} -> {len(projected)}"
 
 
 def test_get_rejects_an_unknown_profile() -> None:

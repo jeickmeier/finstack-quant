@@ -40,10 +40,10 @@ beforeEach(() => {
       case "statementNodeIds":
         return native.modelNodeIds(arg);
       case "evaluateStatement":
-        return native.evaluateModel(arg.modelJson);
+        return new native.Evaluator().evaluate(arg.modelJson);
       case "validateStatementFormula":
-        native.validateFormula(arg);
-        return native.parseFormulaText(arg);
+        native.parseAndCompile(arg);
+        return native.parseFormula(arg);
       default:
         throw new Error(`Unexpected worker call: ${method}`);
     }
@@ -175,7 +175,9 @@ it("changes a native forecast method and calculates a newly added metric", async
     formula_text: "revenue / debt_closing",
     value_type: { type: "scalar" },
   });
-  const nativeResult = native.evaluateModel(accepted.mock.lastCall![0]);
+  const nativeResult = new native.Evaluator().evaluate(
+    accepted.mock.lastCall![0],
+  );
   expect(nativeResult.nodes.revenue_to_debt["2024Q1"]).toBeCloseTo(
     182400000 / 410000000,
   );

@@ -5,27 +5,31 @@
 
 mod entry;
 pub(crate) mod pnl_attribution;
+mod result_envelope;
 mod return_contribution;
 mod schema;
 
 pub(crate) use pnl_attribution::PyPnlAttribution;
+pub(crate) use result_envelope::PyAttributionResultEnvelope;
 pub(crate) use return_contribution::PyReturnContributionResult;
 
 use entry::{
-    attribute_pnl, attribute_pnl_envelope_json, attribute_pnl_many, attribute_return_contribution,
-    default_attribution_metrics, default_waterfall_order, pnl_bridge, validate_attribution_json,
-    validate_return_contribution_json,
+    attribute_pnl, attribute_pnl_envelope, attribute_pnl_envelope_json, attribute_pnl_many,
+    attribute_return_contribution, default_attribution_metrics, default_waterfall_order,
+    pnl_bridge, validate_attribution_json, validate_return_contribution_json,
 };
 use pyo3::prelude::*;
 use pyo3::types::PyList;
 
 /// Register the attribution submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "attribution")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "attribution")?;
     m.setattr("__doc__", "P&L attribution across multiple methodologies.")?;
+    m.add_class::<PyAttributionResultEnvelope>()?;
     m.add_class::<PyPnlAttribution>()?;
     m.add_class::<PyReturnContributionResult>()?;
     m.add_function(pyo3::wrap_pyfunction!(attribute_pnl, &m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(attribute_pnl_envelope, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(attribute_pnl_envelope_json, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(attribute_pnl_many, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(pnl_bridge, &m)?)?;
@@ -42,9 +46,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(
         py,
         [
+            "AttributionResultEnvelope",
             "PnlAttribution",
             "ReturnContributionResult",
             "attribute_pnl",
+            "attribute_pnl_envelope",
             "attribute_pnl_envelope_json",
             "attribute_pnl_many",
             "attribute_return_contribution",
@@ -57,13 +63,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "attribution",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
     Ok(())
 }

@@ -74,7 +74,7 @@ fn production_history_reuses_the_pricing_boundary_recalibration_provider() {
         "../../calibration/examples/market_bootstrap/03_single_name_hazard.json"
     ))
     .expect("calibration inputs");
-    let calibrated = engine::execute(&envelope).expect("source calibration");
+    let calibrated = engine::calibrate(&envelope).expect("source calibration");
     let market =
         MarketContext::try_from(calibrated.result.final_market).expect("calibrated market");
     let hazard = market.get_hazard("ISSUER-A-CDS").expect("hazard");

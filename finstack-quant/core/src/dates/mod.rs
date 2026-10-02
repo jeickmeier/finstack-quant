@@ -82,7 +82,9 @@ pub use calendar::business_days::{
 };
 
 pub use calendar::business_days::available_calendars;
-pub use calendar::{calendar_by_id, calendar_by_id_strict, calendars_by_ids, WEEKENDS_ONLY};
+pub use calendar::{
+    calendar_by_id, calendar_by_id_strict, calendars_by_ids, canonical_calendar_id, WEEKENDS_ONLY,
+};
 
 mod schedule;
 
@@ -101,8 +103,8 @@ pub use tenor::{Tenor, TenorUnit};
 
 pub use imm::{
     estimated_sifma_settlement_date_for_class, imm_option_expiry, is_cds_date, is_imm_date,
-    next_cds_date, next_equity_option_expiry, next_imm, next_imm_option_expiry,
-    next_semiannual_cds_maturity, next_sifma_settlement, prev_cds_date, prev_cds_semiannual_roll,
+    next_cds_date, next_imm, next_imm_option_expiry, next_semiannual_cds_maturity,
+    next_sifma_settlement, next_third_friday, prev_cds_date, prev_cds_semiannual_roll,
     sifma_settlement_date, sifma_settlement_date_for_class, third_friday, third_wednesday,
     SifmaSettlementClass,
 };

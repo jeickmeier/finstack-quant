@@ -1,0 +1,39 @@
+{
+  "$defs": {
+    "NodeId": {
+      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/liquidity_runway_check.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Estimates the liquidity runway in months and flags periods that fall below configurable warning and error thresholds.",
+  "properties": {
+    "cash_burn_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "Cash burn rate node (positive = burning cash)."
+    },
+    "cash_node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "Cash balance node."
+    },
+    "min_months_error": {
+      "description": "Minimum runway (in months) before an error.",
+      "format": "double",
+      "type": "number"
+    },
+    "min_months_warning": {
+      "description": "Minimum runway (in months) before a warning.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "cash_node",
+    "cash_burn_node",
+    "min_months_warning",
+    "min_months_error"
+  ],
+  "title": "LiquidityRunwayCheck",
+  "type": "object"
+}

@@ -377,7 +377,7 @@ fn metric_groups_start_and_end_at_their_first_and_last_members() {
         (
             MetricGroup::Rates,
             MetricId::Annuity,
-            MetricId::FloatingFirstAccrualFactor,
+            MetricId::ExpectedExerciseTime,
         ),
         (MetricGroup::Fx, MetricId::SpotRate, MetricId::FxVega),
         (
@@ -401,4 +401,16 @@ fn metric_groups_start_and_end_at_their_first_and_last_members() {
         assert_eq!(metrics.first(), Some(&first), "{group:?} first member");
         assert_eq!(metrics.last(), Some(&last), "{group:?} last member");
     }
+}
+
+#[test]
+fn expected_exercise_time_is_a_standard_rates_metric_in_years() {
+    assert_eq!(
+        MetricId::parse_strict("expected_exercise_time").expect("canonical key"),
+        MetricId::ExpectedExerciseTime
+    );
+    assert_eq!(MetricId::ExpectedExerciseTime.unit(), MetricUnit::Years);
+    assert!(MetricGroup::Rates
+        .metrics()
+        .contains(&MetricId::ExpectedExerciseTime));
 }

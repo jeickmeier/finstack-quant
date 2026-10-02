@@ -1,0 +1,46 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/gbm_path_summary.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Compact captured GBM paths for plotting and diagnostics.",
+  "properties": {
+    "num_paths": {
+      "description": "Number of independent estimators requested.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "num_simulated_paths": {
+      "description": "Total number of sample paths simulated.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "paths": {
+      "description": "Captured spot paths in deterministic path-id order.",
+      "items": {
+        "items": {
+          "format": "double",
+          "type": "number"
+        },
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "times": {
+      "description": "Shared path times in year fractions, including time zero.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "num_paths",
+    "num_simulated_paths",
+    "times",
+    "paths"
+  ],
+  "title": "GbmPathSummary",
+  "type": "object"
+}

@@ -17,6 +17,7 @@ use finstack_quant_models::factor::FactorId;
 
 /// Base/after delta for a single factor contribution.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FactorContributionDelta {
     /// Factor identifier whose contribution changed.
     pub factor_id: FactorId,
@@ -28,6 +29,7 @@ pub struct FactorContributionDelta {
 
 /// Result of a position what-if scenario.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct WhatIfResult {
     /// Baseline decomposition used as the comparison point.
     pub before: RiskDecomposition,
@@ -43,6 +45,7 @@ pub struct WhatIfResult {
 /// decomposition on the shocked market. Call [`FactorModel::factor_stress`]
 /// when the stressed decomposition is required.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StressPnl {
     /// Total portfolio P&L under the stressed market.
     pub total_pnl: f64,
@@ -52,6 +55,7 @@ pub struct StressPnl {
 
 /// Result of a factor-stress scenario.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StressResult {
     /// Total portfolio P&L under the stressed market.
     pub total_pnl: f64,
@@ -68,6 +72,7 @@ pub struct StressResult {
 /// "new_quantity": ...}`.
 /// This is the wire shape every host binding accepts for what-if requests.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PositionChange {
     /// Remove an existing position by identifier.
@@ -253,7 +258,7 @@ pub(super) fn factor_stress_pnl(
 
     let affected_indices = changed_factor_keys
         .as_ref()
-        .and_then(|changed_factor_keys| {
+        .map(|changed_factor_keys| -> Result<Option<Vec<usize>>> {
             if changed_factor_keys
                 .iter()
                 .any(|key| matches!(key, crate::MarketFactorKey::Fx { .. }))
@@ -262,15 +267,16 @@ pub(super) fn factor_stress_pnl(
                 // position, including instruments that do not declare an FX
                 // dependency. Reprice the whole book so convert_to_base sees the
                 // bumped matrix.
-                None
+                Ok(None)
             } else {
-                Some(
-                    portfolio
-                        .dependency_index()
-                        .affected_positions(changed_factor_keys),
-                )
+                Ok(Some(portfolio.dependency_index().affected_positions(
+                    changed_factor_keys,
+                    &stressed_market,
+                )?))
             }
-        });
+        })
+        .transpose()?
+        .flatten();
     let stressed_valuation = if let Some(affected_indices) = &affected_indices {
         evaluate_raw_portfolio(RawEvaluationInput {
             portfolio,
@@ -477,6 +483,38 @@ mod tests {
         };
 
         assert!((result.after.total_risk).abs() < 1e-12);
+    }
+
+    #[test]
+    fn model_position_what_if_matches_the_engine_on_its_own_baseline() {
+        let (model, portfolio, market) = build_test_model().expect("setup");
+        let as_of = date!(2024 - 01 - 01);
+        let changes = [PositionChange::Remove {
+            position_id: PositionId::new("pos-1"),
+        }];
+        let (base, sensitivities) = model
+            .analyze_with_sensitivities(&portfolio, &market, as_of)
+            .expect("baseline");
+        let expected = model
+            .what_if(&base, &sensitivities, &portfolio, &market, as_of)
+            .position_what_if(&changes)
+            .expect("engine what-if");
+
+        let actual = model
+            .position_what_if(&portfolio, &market, as_of, &changes)
+            .expect("model what-if");
+
+        assert_eq!(actual, expected);
+        assert!(model
+            .position_what_if(
+                &portfolio,
+                &market,
+                as_of,
+                &[PositionChange::Remove {
+                    position_id: PositionId::new("missing"),
+                }],
+            )
+            .is_err());
     }
 
     #[test]
@@ -858,7 +896,7 @@ mod tests {
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Residual),
+                unmatched_policy: Some(UnmatchedPolicy::Warn),
             })
             .with_custom_sensitivity_engine(FixedSensitivityEngine)
             .build()
@@ -1026,7 +1064,7 @@ mod tests {
                 pricing_mode: PricingMode::DeltaBased,
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Residual),
+                unmatched_policy: Some(UnmatchedPolicy::Warn),
             })
             .with_custom_sensitivity_engine(FixedSensitivityEngine)
             .build();

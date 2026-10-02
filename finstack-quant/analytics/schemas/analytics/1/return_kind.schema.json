@@ -1,0 +1,36 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/analytics/1/return_kind.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "How the dependent return series is interpreted in a multi-factor regression.",
+  "oneOf": [
+    {
+      "const": "excess",
+      "description": "`returns` are already excess returns. Alpha is the annualized OLS\nintercept of excess `y` on the supplied (already-excess) factors.",
+      "type": "string"
+    },
+    {
+      "additionalProperties": false,
+      "description": "`returns` are total returns. The geometrically decompounded period\nrisk-free rate is subtracted from `y` only, then OLS is run.\nAlpha is the annualized intercept and is Jensen-style for the\ndependent variable.",
+      "properties": {
+        "total": {
+          "properties": {
+            "risk_free_rate": {
+              "description": "Annualized risk-free rate in decimal form (e.g. `0.02` for 2%).",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "risk_free_rate"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "total"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "ReturnKind"
+}

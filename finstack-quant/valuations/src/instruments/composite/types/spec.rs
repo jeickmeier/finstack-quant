@@ -1,7 +1,7 @@
 //! Unresolved composite specification: construction, validation,
 //! initialization, and quantity resolution.
 
-use super::instrument::{BoxedLegCache, CompositeInstrument};
+use super::instrument::CompositeInstrument;
 use super::reporting::CompositeRebalanceResult;
 use super::spec_support::{
     convert_amount, leg_index, normalized_scores, sample_std_dev, unit_pnl_series,
@@ -409,7 +409,6 @@ impl CompositeSpec {
             scenario_pricing_overrides: previous
                 .map(|prior| prior.scenario_pricing_overrides.clone())
                 .unwrap_or_default(),
-            boxed_legs: BoxedLegCache::default(),
         };
         instrument.validate_state()?;
         let trades = instrument.execution_trades(previous)?;

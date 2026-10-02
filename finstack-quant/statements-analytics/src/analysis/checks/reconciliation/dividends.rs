@@ -18,6 +18,7 @@ use finstack_quant_statements::Result;
 /// Both dividend nodes are expected to carry
 /// [`SignConventionPolicy::MagnitudePositive`] by default.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DividendReconciliation {
     /// Dividends paid node (cash flow statement, financing).
     pub dividends_cf_node: NodeId,

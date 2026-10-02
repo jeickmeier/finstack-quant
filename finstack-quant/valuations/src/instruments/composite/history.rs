@@ -285,8 +285,8 @@ mod tests {
     fn fixed_history_chains_returns_without_rebalancing() -> Result<()> {
         let initial = CompositeInstrument::example()?;
         let observations = vec![
-            CompositeMarketObservation::new(date!(2025 - 01 - 01), &MarketContext::new()),
-            CompositeMarketObservation::new(date!(2025 - 01 - 02), &MarketContext::new()),
+            CompositeMarketObservation::new(date!(2025 - 01 - 01), &MarketContext::new())?,
+            CompositeMarketObservation::new(date!(2025 - 01 - 02), &MarketContext::new())?,
         ];
         let rows = history(&initial, &observations, &[])?;
         assert_eq!(rows.len(), 2);
@@ -361,7 +361,7 @@ mod tests {
                 .insert_price("B", MarketScalar::Unitless(b));
             CompositeMarketObservation::new(date, &market)
         })
-        .collect::<Vec<_>>();
+        .collect::<Result<Vec<_>>>()?;
 
         let rows = history_from_spec(&spec, &[], &observations, &[])?;
         assert_eq!(rows[1].held_state_effective_date, date!(2025 - 01 - 01));

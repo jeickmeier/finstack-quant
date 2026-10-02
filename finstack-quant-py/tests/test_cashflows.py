@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime
+import doctest
 import json
 import math
 
@@ -10,11 +11,22 @@ import pytest
 
 from finstack_quant.cashflows import (
     accrued_interest,
+    build_cashflow_schedule,
     build_cashflow_schedule_json,
     dated_flows_json,
     validate_cashflow_schedule_json,
 )
 from finstack_quant.valuations.instruments import bond_from_cashflows_json, price_instrument
+
+
+def test_typed_build_runtime_doc_example() -> None:
+    """The installed callable's example must use the canonical program wire form."""
+    example = doctest.DocTestParser().get_doctest(
+        build_cashflow_schedule.__doc__ or "", {}, "build_cashflow_schedule", None, 0
+    )
+    assert example.examples
+    result = doctest.DocTestRunner().run(example)
+    assert result.failed == 0
 
 
 def _cashflow_spec() -> str:

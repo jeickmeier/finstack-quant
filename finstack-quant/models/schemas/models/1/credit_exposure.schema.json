@@ -1,0 +1,43 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/credit_exposure.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "One name in a finite credit portfolio.",
+  "properties": {
+    "default_probability": {
+      "description": "Unconditional default probability in `[0, 1]`.",
+      "format": "double",
+      "type": "number"
+    },
+    "factor_loadings": {
+      "description": "Systematic-factor loadings `β`; the squared norm must not exceed one.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "id": {
+      "description": "Stable exposure identifier.",
+      "type": "string"
+    },
+    "lgd": {
+      "description": "Loss given default in `[0, 1]`.",
+      "format": "double",
+      "type": "number"
+    },
+    "notional": {
+      "description": "Non-negative exposure notional in one caller-defined unit.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "id",
+    "notional",
+    "default_probability",
+    "lgd",
+    "factor_loadings"
+  ],
+  "title": "CreditExposure",
+  "type": "object"
+}

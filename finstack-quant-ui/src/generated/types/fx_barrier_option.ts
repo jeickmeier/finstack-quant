@@ -707,9 +707,15 @@ export interface D_9F54E6F1A3C511F443A0 {
   monitoring_start_date?: Date1 | null;
   notional: Money;
   /**
-   * Observed barrier state for expired options.
+   * Processed barrier-monitoring state through the valuation date.
    *
-   * Historical monitoring must be supplied explicitly for expired contracts.
+   * `Some(true)` records a breach whose at-hit rebate has already settled,
+   * including a hit processed on the valuation date. That rebate is not a
+   * remaining claim at expiry. An at-expiry rebate remains due on expiry.
+   * `Some(false)` records no breach in the processed monitoring history.
+   * Historical monitoring must be supplied explicitly for seasoned and
+   * expired contracts. Same-day unpaid at-hit claims require a separate
+   * cash receivable; this boolean does not represent pending settlement.
    */
   observed_barrier_breached?: boolean | null;
   /**
@@ -1236,6 +1242,7 @@ export interface DD760Eef55C5Bd7D5B1F6 {
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
  * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * Deserialization enforces the same parameter invariants as the constructors.
  */
 export interface D_16451E0Bf3B6B78178D8 {
   /**
@@ -1290,6 +1297,8 @@ export interface D_16451E0Bf3B6B78178D8 {
  * Models the relationship between a firm's leverage and its instantaneous
  * hazard rate, enabling a feedback loop where PIK accrual increases the
  * notional (and hence leverage), which drives the hazard rate higher.
+ * Deserialization validates the parameters and rejects incomplete or
+ * inconsistent tabular calibrations before they can be evaluated.
  */
 export interface DCc8Ed166Abbb10Ad4451 {
   /**

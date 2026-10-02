@@ -20,6 +20,7 @@ pub mod margin;
 pub mod models;
 pub mod portfolio;
 pub mod scenarios;
+pub mod schema;
 pub mod statements;
 pub mod statements_analytics;
 pub mod valuations;

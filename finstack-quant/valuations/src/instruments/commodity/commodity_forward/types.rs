@@ -414,9 +414,10 @@ impl CommodityForward {
     }
 
     fn contractual_invoice_amount(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
-        let contract_price = self
-            .contract_price
-            .unwrap_or(self.forward_price(market, as_of)?);
+        let contract_price = match self.contract_price {
+            Some(price) => price,
+            None => self.forward_price(market, as_of)?,
+        };
         let amount = -self.position.sign() * contract_price * self.quantity * self.multiplier;
         Money::new(amount, self.underlying.currency)
     }
@@ -490,15 +491,39 @@ impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
-        let invoice = self.contractual_invoice_amount(market, as_of)?;
+        self.validate()?;
+        let (settlement, representation) = match self.settlement {
+            SettlementType::Cash => {
+                let forward = self.forward_price(market, as_of)?;
+                let strike = self.contract_price.unwrap_or(forward);
+                (
+                    Money::new(
+                        self.position.sign() * (forward - strike) * self.quantity * self.multiplier,
+                        self.underlying.currency,
+                    )?,
+                    crate::cashflow::builder::CashflowRepresentation::Projected,
+                )
+            }
+            SettlementType::Physical => (
+                self.contractual_invoice_amount(market, as_of)?,
+                if self.contract_price.is_some() {
+                    crate::cashflow::builder::CashflowRepresentation::Contractual
+                } else {
+                    crate::cashflow::builder::CashflowRepresentation::Projected
+                },
+            ),
+        };
         let schedule = crate::cashflow::traits::schedule_from_dated_flows(
-            vec![(self.maturity, invoice)],
+            vec![(self.maturity, settlement)],
             CFKind::Notional,
             finstack_quant_core::dates::DayCount::Act365F,
             crate::cashflow::traits::ScheduleBuildOpts {
-                notional_hint: Some(Money::new(invoice.amount().abs(), invoice.currency())?),
+                notional_hint: Some(Money::new(
+                    settlement.amount().abs(),
+                    settlement.currency(),
+                )?),
                 meta: crate::cashflow::builder::CashFlowMeta {
-                    representation: crate::cashflow::builder::CashflowRepresentation::Projected,
+                    representation,
                     ..Default::default()
                 },
             },
@@ -944,6 +969,7 @@ mod tests {
             .multiplier(1.0)
             .maturity(Date::from_calendar_date(2025, Month::April, 15).expect("valid date"))
             .position(Position::Long)
+            .settlement(SettlementType::Physical)
             .contract_price_opt(Some(72.0))
             .forward_curve_id(CurveId::new("WTI-FORWARD"))
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -966,5 +992,78 @@ mod tests {
             "expected invoice flow of -72,000 USD, got {}",
             flows[0].1.amount()
         );
+    }
+
+    #[test]
+    fn commodity_forward_cash_schedule_reconciles_pv_and_physical_invoice() {
+        use crate::cashflow::builder::CashflowRepresentation;
+        use finstack_quant_cashflows::CashflowScheduleSource;
+        let as_of = Date::from_calendar_date(2025, Month::January, 15).expect("date");
+        let market = test_market(as_of);
+        let mut forward = CommodityForward::example().expect("example");
+        forward.maturity = Date::from_calendar_date(2025, Month::April, 15).expect("maturity");
+        forward.forward_curve_id = CurveId::new("WTI-FORWARD");
+        forward.discount_curve_id = CurveId::new("USD-OIS");
+        forward.quantity = 1000.0;
+        forward.multiplier = 2.0;
+        for quoted in [None, Some(80.0)] {
+            forward.quoted_forward = quoted;
+            let f = forward.forward_price(&market, as_of).expect("forward");
+            for position in [Position::Long, Position::Short] {
+                forward.position = position;
+                for strike in [None, Some(f - 5.0), Some(f), Some(f + 5.0)] {
+                    forward.contract_price = strike;
+                    forward.settlement = SettlementType::Cash;
+                    for valuation_date in [as_of, forward.maturity] {
+                        let schedule = forward
+                            .raw_cashflow_schedule(&market, valuation_date)
+                            .expect("cash schedule");
+                        assert_eq!(
+                            schedule.get_meta().representation,
+                            CashflowRepresentation::Projected
+                        );
+                        let flows = forward
+                            .dated_cashflows(&market, valuation_date)
+                            .expect("flows");
+                        assert_eq!(flows.len(), 1);
+                        assert_eq!(flows[0].0, forward.maturity);
+                        let df = market
+                            .get_discount("USD-OIS")
+                            .expect("discount")
+                            .df_between_dates(valuation_date, forward.maturity)
+                            .expect("df");
+                        assert!(
+                            (flows[0].1.amount() * df
+                                - forward.value(&market, valuation_date).expect("PV").amount())
+                            .abs()
+                                < 1e-8
+                        );
+                    }
+                    assert!(forward
+                        .dated_cashflows(&market, forward.maturity + time::Duration::days(1))
+                        .expect("expired")
+                        .is_empty());
+                    forward.settlement = SettlementType::Physical;
+                    let flows = forward
+                        .dated_cashflows(&market, as_of)
+                        .expect("physical flows");
+                    let expected = -position.sign() * strike.unwrap_or(f) * 2000.0;
+                    assert!((flows[0].1.amount() - expected).abs() < 1e-8);
+                    let representation = forward
+                        .raw_cashflow_schedule(&market, as_of)
+                        .expect("physical schedule")
+                        .get_meta()
+                        .representation;
+                    assert_eq!(
+                        representation,
+                        if strike.is_some() {
+                            CashflowRepresentation::Contractual
+                        } else {
+                            CashflowRepresentation::Projected
+                        }
+                    );
+                }
+            }
+        }
     }
 }

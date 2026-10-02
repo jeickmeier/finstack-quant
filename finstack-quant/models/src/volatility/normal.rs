@@ -54,7 +54,11 @@ pub fn d_bachelier(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
     (forward - strike) / (sigma * t.sqrt())
 }
 
-/// Bachelier (Normal) model price for a call/payer option
+/// Bachelier (Normal) model price scaled by an annuity (unchecked).
+///
+/// The canonical checked unit-annuity price the host bindings expose is
+/// [`crate::closed_form::bachelier_price`]; this variant multiplies by a
+/// caller-supplied annuity and collapses degenerate inputs to intrinsic value.
 ///
 /// # Arguments
 /// * `option_type` - Call (payer) or Put (receiver)
@@ -69,7 +73,7 @@ pub fn d_bachelier(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 /// Option premium in the same units as annuity (typically currency units)
 #[inline]
 #[must_use]
-pub fn bachelier_price(
+pub fn bachelier_price_with_annuity(
     option_type: crate::types::OptionType,
     forward: f64,
     strike: f64,

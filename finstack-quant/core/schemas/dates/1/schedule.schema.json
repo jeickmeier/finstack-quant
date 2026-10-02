@@ -1,0 +1,134 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    },
+    "ScheduleWarning": {
+      "description": "Warning generated during schedule construction.\n\nWarnings indicate non-fatal issues that occurred during schedule generation.\nUnlike errors, these allow the schedule to be created but signal that\nsomething unexpected happened that callers should be aware of.\n\n# Use Cases\n\n- **Graceful fallback**: When [`ScheduleErrorPolicy::GracefulEmpty`] is set and an error\n  would normally occur, the builder returns an empty schedule with a warning\n  describing the original error.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{ScheduleBuilder, Tenor, ScheduleWarning};\nuse time::{Date, Month};\n\nlet start = Date::from_calendar_date(2025, Month::December, 31)?;\nlet end = Date::from_calendar_date(2025, Month::January, 1)?; // Invalid: end before start\n\n// Invalid date ranges are rejected by new() before an error policy applies.\n// rather than an error. Note: new() itself returns Result, so we handle the error\nlet result = ScheduleBuilder::new(start, end);\nassert!(result.is_err()); // new() validates start <= end\n# Ok::<(), Box<dyn std::error::Error>>(())\n```",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Schedule generation failed but graceful fallback returned an empty schedule.\n\nThis warning captures the original error message that would have been\nreturned if graceful fallback mode was not enabled. Callers should\ninspect this to understand why the schedule is empty.",
+          "properties": {
+            "graceful_fallback": {
+              "additionalProperties": false,
+              "properties": {
+                "error_message": {
+                  "description": "Human-readable description of the error that was suppressed.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "error_message"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "graceful_fallback"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A calendar ID was provided, but resolution was skipped because\n[`ScheduleErrorPolicy::MissingCalendarWarning`] was enabled.",
+          "properties": {
+            "missing_calendar_id": {
+              "additionalProperties": false,
+              "properties": {
+                "calendar_id": {
+                  "description": "The calendar identifier that could not be resolved.",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "calendar_id"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "missing_calendar_id"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/dates/1/schedule.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Generated accrual, payment and fixing dates with any construction warnings.",
+  "examples": [
+    {
+      "dates": [
+        "2025-01-15",
+        "2025-02-15",
+        "2025-03-15",
+        "2025-04-15",
+        "2025-05-15",
+        "2025-06-15",
+        "2025-07-15",
+        "2025-08-15",
+        "2025-09-15",
+        "2025-10-15",
+        "2025-11-15",
+        "2025-12-15",
+        "2026-01-15"
+      ],
+      "fixing_dates": [],
+      "payment_dates": [
+        "2025-02-15",
+        "2025-03-15",
+        "2025-04-15",
+        "2025-05-15",
+        "2025-06-15",
+        "2025-07-15",
+        "2025-08-15",
+        "2025-09-15",
+        "2025-10-15",
+        "2025-11-15",
+        "2025-12-15",
+        "2026-01-15"
+      ]
+    }
+  ],
+  "properties": {
+    "dates": {
+      "description": "Unadjusted accrual grid (period start plus each period end).\n\nThese dates are never business-day adjusted. Payment-date adjustment,\npayment lag, and fixing lag live on [`Self::payment_dates`] and\n[`Self::fixing_dates`].",
+      "items": {
+        "$ref": "#/$defs/DateWire"
+      },
+      "type": "array"
+    },
+    "fixing_dates": {
+      "default": [],
+      "description": "Fixing dates for each accrual period.\n\nEmpty when no fixing lag is configured; otherwise the same length as\n[`Self::payment_dates`].",
+      "items": {
+        "$ref": "#/$defs/DateWire"
+      },
+      "type": "array"
+    },
+    "payment_dates": {
+      "default": [],
+      "description": "Payment date for each accrual period (one per period end).\n\nLength is `dates.len().saturating_sub(1)`. Duplicate payment dates are\nretained so the series stays 1:1 with period ends.",
+      "items": {
+        "$ref": "#/$defs/DateWire"
+      },
+      "type": "array"
+    },
+    "warnings": {
+      "description": "Warnings generated during schedule construction.\n\nNon-empty when graceful fallback mode suppressed an error or when\nother non-fatal issues occurred during generation.",
+      "items": {
+        "$ref": "#/$defs/ScheduleWarning"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "dates"
+  ],
+  "title": "Schedule",
+  "type": "object"
+}

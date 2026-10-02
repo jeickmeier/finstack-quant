@@ -85,6 +85,7 @@ pub use finstack_quant_attribution::{
 /// while `by_position` remains in each instrument's native currency so callers
 /// can inspect raw instrument attribution before FX translation.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PortfolioAttribution {
     /// Total portfolio P&L in base currency.
@@ -194,6 +195,7 @@ pub struct PortfolioAttribution {
 ///
 /// Verifies that the sum of all factor P&L buckets plus FX translation equals `total_pnl`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ReconciliationReport {
     /// Total residual: `total_pnl - (sum of factor buckets + fx_translation_pnl)`.
     pub total_residual: f64,
@@ -386,6 +388,7 @@ fn attribute_composite_primitives(
         let definition = exposure.instrument_definition().ok_or_else(|| {
             Error::valuation(
                 composite.id(),
+                finstack_quant_core::error::ErrorKind::Computation,
                 format!(
                     "primitive path '{}' lost its embedded definition",
                     exposure.path.join("/")
@@ -441,7 +444,7 @@ fn attribute_composite_primitives(
             )
             .map_err(Error::Core)?
         };
-        primitive.scale(exposure.quantity);
+        primitive.scale(exposure.quantity)?;
         translate_primitive_attribution(
             &mut primitive,
             value_t0.amount() * exposure.quantity,
@@ -634,7 +637,13 @@ fn attribute_single_position_method_owned(
             request.config,
             request.method,
         )?;
-        pos_attr.scale(position.scale_factor());
+        pos_attr
+            .scale(position.scale_factor())
+            .map_err(|error| Error::ValuationError {
+                position_id: position.position_id.clone(),
+                message: format!("Attribution scaling failed: {error}"),
+                kind: error.kind(),
+            })?;
         return Ok(PositionAttributionData {
             position_id: position.position_id.clone(),
             pos_attr,
@@ -660,9 +669,16 @@ fn attribute_single_position_method_owned(
     .map_err(|error| Error::ValuationError {
         position_id: position.position_id.clone(),
         message: format!("Attribution failed: {error}"),
+        kind: error.kind(),
     })?;
 
-    pos_attr.scale(position.scale_factor());
+    pos_attr
+        .scale(position.scale_factor())
+        .map_err(|error| Error::ValuationError {
+            position_id: position.position_id.clone(),
+            message: format!("Attribution scaling failed: {error}"),
+            kind: error.kind(),
+        })?;
     let inst_currency = pos_attr.total_pnl.currency();
 
     Ok(PositionAttributionData {
@@ -724,6 +740,7 @@ fn prepared_valuation_result<'a>(
     if position_value.position_id != position.position_id {
         return Err(Error::valuation(
             position.position_id.clone(),
+            finstack_quant_core::error::ErrorKind::Validation,
             format!(
                 "Attribution {endpoint} prepared position ID '{}' does not match '{}'",
                 position_value.position_id, position.position_id
@@ -734,6 +751,7 @@ fn prepared_valuation_result<'a>(
     if require_complete_metrics && !position_value.risk_metrics_complete {
         return Err(Error::valuation(
             position.position_id.clone(),
+            finstack_quant_core::error::ErrorKind::Validation,
             format!(
                 "Attribution {endpoint} valuation is incomplete and cannot satisfy a strict metrics-based attribution request"
             ),
@@ -743,6 +761,7 @@ fn prepared_valuation_result<'a>(
     let valuation_result = position_value.valuation_result.as_ref().ok_or_else(|| {
         Error::valuation(
             position.position_id.clone(),
+            finstack_quant_core::error::ErrorKind::NotFound,
             format!("Attribution {endpoint} valuation result is missing"),
         )
     })?;
@@ -750,6 +769,7 @@ fn prepared_valuation_result<'a>(
     if valuation_result.instrument_id != position.instrument.id() {
         return Err(Error::valuation(
             position.position_id.clone(),
+            finstack_quant_core::error::ErrorKind::Validation,
             format!(
                 "Attribution {endpoint} valuation instrument stamp '{}' does not match '{}'",
                 valuation_result.instrument_id,
@@ -761,6 +781,7 @@ fn prepared_valuation_result<'a>(
     if valuation_result.as_of != as_of {
         return Err(Error::valuation(
             position.position_id.clone(),
+            finstack_quant_core::error::ErrorKind::Validation,
             format!(
                 "Attribution {endpoint} valuation date stamp {} does not match {as_of}",
                 valuation_result.as_of
@@ -807,6 +828,7 @@ pub(crate) fn reduce_metrics_based_prepared(
                 .ok_or_else(|| {
                     Error::valuation(
                         position.position_id.clone(),
+                        finstack_quant_core::error::ErrorKind::NotFound,
                         "Attribution T0 prepared position valuation is missing",
                     )
                 })?;
@@ -815,6 +837,7 @@ pub(crate) fn reduce_metrics_based_prepared(
                 .ok_or_else(|| {
                     Error::valuation(
                         position.position_id.clone(),
+                        finstack_quant_core::error::ErrorKind::NotFound,
                         "Attribution T1 prepared position valuation is missing",
                     )
                 })?;
@@ -848,10 +871,17 @@ pub(crate) fn reduce_metrics_based_prepared(
                 .map_err(|error| Error::ValuationError {
                     position_id: position.position_id.clone(),
                     message: format!("Attribution failed: {error}"),
+                    kind: error.kind(),
                 })?
             };
 
-            pos_attr.scale(position.scale_factor());
+            pos_attr
+                .scale(position.scale_factor())
+                .map_err(|error| Error::ValuationError {
+                    position_id: position.position_id.clone(),
+                    message: format!("Attribution scaling failed: {error}"),
+                    kind: error.kind(),
+                })?;
             let inst_currency = pos_attr.total_pnl.currency();
             Ok(PositionAttributionData {
                 position_id: position.position_id.clone(),
@@ -938,6 +968,7 @@ pub(crate) fn reduce_method_owned_prepared(
                 .ok_or_else(|| {
                     Error::valuation(
                         position.position_id.clone(),
+                        finstack_quant_core::error::ErrorKind::NotFound,
                         "Attribution T0 prepared position valuation is missing",
                     )
                 })?;
@@ -946,6 +977,7 @@ pub(crate) fn reduce_method_owned_prepared(
                 .ok_or_else(|| {
                     Error::valuation(
                         position.position_id.clone(),
+                        finstack_quant_core::error::ErrorKind::NotFound,
                         "Attribution T1 prepared position valuation is missing",
                     )
                 })?;
@@ -1084,8 +1116,10 @@ fn attribution_endpoint_error(error: Error, endpoint: &str) -> Error {
         Error::ValuationError {
             position_id,
             message,
+            kind,
         } => Error::valuation(
             position_id,
+            kind,
             format!("Attribution {endpoint} valuation failed: {message}"),
         ),
         other => other,
@@ -1483,7 +1517,13 @@ mod tests {
                     "attribution pricing did not receive FinstackConfig".to_string(),
                 )
             })?;
-            if config.rounding.output_scale.overrides.get(&Currency::USD) != Some(&4) {
+            if config
+                .rounding
+                .output_scale
+                .get_overrides()
+                .get(&Currency::USD)
+                != Some(&4)
+            {
                 return Err(finstack_quant_core::Error::Validation(
                     "attribution pricing received the wrong FinstackConfig".to_string(),
                 )
@@ -1640,8 +1680,8 @@ mod tests {
         config
             .rounding
             .output_scale
-            .overrides
-            .insert(Currency::USD, 4);
+            .set_scale(Currency::USD, 4)
+            .expect("valid decimal scale");
 
         let portfolio = Portfolio::builder("CONFIG_PORTFOLIO")
             .base_currency(Currency::USD)
@@ -1731,8 +1771,8 @@ mod tests {
             config
                 .rounding
                 .output_scale
-                .overrides
-                .insert(Currency::USD, 4);
+                .set_scale(Currency::USD, 4)
+                .expect("valid decimal scale");
             let market_t0 = MarketContext::new();
             let market_t1 = MarketContext::new();
 

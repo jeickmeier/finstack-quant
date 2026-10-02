@@ -310,52 +310,7 @@ impl Money {
     /// assert_eq!(money.amount_decimal().to_string(), "1.245");
     /// ```
     pub fn from_decimal_str(amount: &str, currency: Currency) -> Result<Self, Error> {
-        use rust_decimal::Decimal;
-        let invalid = |error| {
-            Error::Validation(format!(
-                "money amount must be exactly representable as Decimal: {error}"
-            ))
-        };
-        let out_of_range = || {
-            Error::Validation("money amount must be exactly representable as Decimal".to_string())
-        };
-        let decimal = if let Some((mantissa, exponent)) = amount.split_once(['e', 'E']) {
-            let parsed = Decimal::from_str_exact(mantissa).map_err(invalid)?;
-            let exponent = exponent.parse::<i64>().map_err(|error| {
-                Error::Validation(format!("invalid scientific exponent: {error}"))
-            })?;
-            let mut coefficient = parsed.mantissa();
-            if coefficient == 0 {
-                Decimal::ZERO
-            } else {
-                let mut scale = i64::from(parsed.scale())
-                    .checked_sub(exponent)
-                    .ok_or_else(out_of_range)?;
-                while scale > i64::from(Decimal::MAX_SCALE) && coefficient % 10 == 0 {
-                    coefficient /= 10;
-                    scale -= 1;
-                }
-                let scale = if scale < 0 {
-                    let shift = u32::try_from(scale.unsigned_abs()).map_err(|_| out_of_range())?;
-                    if shift > Decimal::MAX_SCALE {
-                        return Err(out_of_range());
-                    }
-                    coefficient = coefficient
-                        .checked_mul(10_i128.pow(shift))
-                        .ok_or_else(out_of_range)?;
-                    0
-                } else {
-                    u32::try_from(scale)
-                        .ok()
-                        .filter(|scale| *scale <= Decimal::MAX_SCALE)
-                        .ok_or_else(out_of_range)?
-                };
-                Decimal::try_from_i128_with_scale(coefficient, scale).map_err(invalid)?
-            }
-        } else {
-            Decimal::from_str_exact(amount).map_err(invalid)?
-        };
-        Self::from_decimal(decimal, currency)
+        Self::from_decimal(crate::decimal::parse_decimal(amount)?, currency)
     }
 
     /// Construct from an exact Decimal using the configured ingest rounding policy.
@@ -374,7 +329,7 @@ impl Money {
         currency: Currency,
         cfg: &FinstackConfig,
     ) -> Result<Self, Error> {
-        let scale = cfg.ingest_scale(currency).min(28) as i32;
+        let scale = cfg.ingest_scale(currency) as i32;
         Self::from_decimal(
             super::rounding::round_decimal(amount, scale, cfg.rounding.mode),
             currency,
@@ -670,8 +625,9 @@ impl Money {
     ///
     /// # Errors
     ///
-    /// Returns `InputError::Invalid` for a zero scalar,
-    /// `InputError::NonFiniteValue` for NaN or infinity, or
+    /// Returns `Error::Validation("division by zero")` for a zero scalar
+    /// (the same error [`Self::checked_div`] reports for a zero `Money`
+    /// divisor), `InputError::NonFiniteValue` for NaN or infinity, or
     /// `InputError::ConversionOverflow` when the quotient is out of range.
     ///
     /// # Arguments
@@ -854,8 +810,8 @@ impl Money {
     /// let mut cfg = FinstackConfig::default();
     /// cfg.rounding
     ///     .output_scale
-    ///     .overrides
-    ///     .insert(Currency::USD, 4);
+    ///     .set_scale(Currency::USD, 4)
+    ///     .expect("supported decimal scale");
     /// assert_eq!(amt.format_with_config(&cfg), "USD 10.0000");
     /// ```
     ///
@@ -1133,8 +1089,23 @@ mod tests {
 
         assert!(money.checked_mul_f64(f64::NAN).is_err());
         assert!(money.checked_mul_f64(f64::INFINITY).is_err());
-        assert!(money.checked_div_f64(0.0).is_err());
         assert!(money.checked_div_f64(f64::NEG_INFINITY).is_err());
+        // A zero scalar and a zero `Money` divisor report the same error.
+        let zero = Money::from((0_i64, Currency::USD));
+        let division_by_zero = Err(Error::Validation("division by zero".into()));
+        assert_eq!(money.checked_div_f64(0.0).map(|_| ()), division_by_zero);
+        assert_eq!(money.checked_div_f64(-0.0).map(|_| ()), division_by_zero);
+        assert_eq!(money.checked_div(zero).map(|_| ()), division_by_zero);
+    }
+
+    #[test]
+    fn checked_neg_is_exact_and_keeps_scale() {
+        let exact = Money::from_decimal_str("1.2500", Currency::USD).expect("exact");
+        let negated = exact.checked_neg();
+        assert_eq!(negated.amount_decimal().to_string(), "-1.2500");
+        assert_eq!(negated.checked_neg(), exact);
+        let tiny = Money::from_decimal_str("1e-27", Currency::USD).expect("exact");
+        assert_eq!(tiny.checked_neg().amount_decimal(), -tiny.amount_decimal());
     }
 
     #[test]
@@ -1275,7 +1246,10 @@ mod tests {
     #[test]
     fn try_new_with_config_succeeds_for_finite_values() {
         let mut cfg = FinstackConfig::default();
-        cfg.rounding.ingest_scale.overrides.insert(Currency::USD, 3);
+        cfg.rounding
+            .ingest_scale
+            .set_scale(Currency::USD, 3)
+            .expect("valid decimal scale");
         let m = Money::new_with_config(1.2345, Currency::USD, &cfg).expect("Finite should succeed");
         assert!((m.amount() - 1.234).abs() < 1e-9);
     }
@@ -1289,7 +1263,10 @@ mod tests {
     #[test]
     fn try_new_with_config_honors_ingest_scale_override() {
         let mut cfg = FinstackConfig::default();
-        cfg.rounding.ingest_scale.overrides.insert(Currency::USD, 2);
+        cfg.rounding
+            .ingest_scale
+            .set_scale(Currency::USD, 2)
+            .expect("valid decimal scale");
         let m = Money::new_with_config(10.999, Currency::USD, &cfg).expect("Finite should succeed");
         assert!((m.amount() - 11.00).abs() < 1e-12);
     }

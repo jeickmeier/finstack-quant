@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "DownturnMethod": {
+      "description": "Method for computing downturn LGD from base (through-the-cycle) LGD.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Proprietary stressed-LGD approximation (mean plus a multiple of the\nBernoulli standard deviation).\n\n```text\nLGD_downturn = LGD_base + sensitivity * sqrt(asset_correlation)\n             * Phi_inv(stress_quantile) * sqrt(LGD_base * (1 - LGD_base))\n  ```\n\n`sqrt(LGD_base * (1 - LGD_base))` is the standard deviation of a\nBernoulli loss indicator with mean `LGD_base`. The adjustment captures\nthe systematic component heuristically: in downturns, recoveries fall\nbecause the same macro factor driving defaults also depresses asset\nvalues.\n\nThis is *not* the Frye-Jacobs (2012) model (whose LGD function is\n`cLGD = Φ(Φ⁻¹(cDR) − k) / cDR`); Frye & Jacobs (2012) is related\nliterature only. See the module-level Methodology Note.",
+          "properties": {
+            "stressed_approximation": {
+              "additionalProperties": false,
+              "properties": {
+                "asset_correlation": {
+                  "description": "Asset correlation (rho). Typical: 0.10-0.24 per Basel.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "lgd_sensitivity": {
+                  "description": "LGD sensitivity to systematic factor. Typical: 0.3-0.5.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "stress_quantile": {
+                  "description": "Stress quantile for downturn scenario. Typical: 0.999 (99.9th percentile).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "asset_correlation",
+                "lgd_sensitivity",
+                "stress_quantile"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "stressed_approximation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Regulatory floor: LGD_downturn = max(LGD_base + add_on, floor).\n\nBasel III mandates that downturn LGD cannot fall below certain floors.\nThe add-on is a flat increment over the base LGD.",
+          "properties": {
+            "regulatory_floor": {
+              "additionalProperties": false,
+              "properties": {
+                "add_on": {
+                  "description": "Flat add-on over base LGD. Typical: 0.05-0.10 (5-10pp).",
+                  "format": "double",
+                  "type": "number"
+                },
+                "floor": {
+                  "description": "Absolute LGD floor. Typical: 0.10 for secured, 0.25 for unsecured.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "add_on",
+                "floor"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "regulatory_floor"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/downturn_lgd.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Downturn LGD adjuster.",
+  "properties": {
+    "method": {
+      "$ref": "#/$defs/DownturnMethod",
+      "description": "Downturn adjustment method."
+    }
+  },
+  "required": [
+    "method"
+  ],
+  "title": "DownturnLgd",
+  "type": "object"
+}

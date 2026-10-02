@@ -324,3 +324,128 @@ fn statement_operation_without_model_errors_clearly() {
         crate::error::Error::MissingStatementModel { .. }
     ));
 }
+
+fn single_op_spec(id: &str, operation: OperationSpec) -> ScenarioSpec {
+    ScenarioSpec {
+        id: id.into(),
+        name: None,
+        description: None,
+        operations: vec![operation],
+        priority: 0,
+        resolution_mode: Default::default(),
+        hazard_bump_mode: Default::default(),
+    }
+}
+
+#[test]
+fn apply_rejects_instrument_scoped_operations_without_inventory() {
+    let operations = [
+        OperationSpec::InstrumentPricePctByType {
+            instrument_types: vec![finstack_quant_valuations::pricer::InstrumentType::Bond],
+            pct: -5.0,
+        },
+        OperationSpec::AssetCorrelationPts { delta_pts: 0.02 },
+    ];
+    for operation in operations {
+        let mut market = MarketContext::new();
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: None,
+            instruments: None,
+            rate_bindings: None,
+            calendar: None,
+            as_of: date!(2025 - 01 - 01),
+        };
+        let error = ScenarioEngine::new()
+            .apply(&single_op_spec("needs_inventory", operation), &mut ctx)
+            .expect_err("instrument-scoped operation without an inventory must fail");
+        assert!(
+            matches!(&error, crate::error::Error::Validation(message)
+                if message.contains("no instruments were supplied")),
+            "unexpected error: {error}"
+        );
+    }
+}
+
+#[test]
+fn apply_reports_spec_errors_before_the_missing_inventory() {
+    let mut market = MarketContext::new();
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: None,
+        instruments: None,
+        rate_bindings: None,
+        calendar: None,
+        as_of: date!(2025 - 01 - 01),
+    };
+    let spec = single_op_spec("", OperationSpec::AssetCorrelationPts { delta_pts: 0.02 });
+    let error = ScenarioEngine::new()
+        .apply(&spec, &mut ctx)
+        .expect_err("blank id must fail");
+    assert!(
+        error.to_string().contains("Scenario ID cannot be empty"),
+        "{error}"
+    );
+}
+
+#[test]
+fn apply_accepts_instrument_scoped_operations_with_an_empty_inventory() {
+    let mut market = MarketContext::new();
+    let mut inventory = Vec::new();
+    let mut ctx = ExecutionContext {
+        market: &mut market,
+        model: None,
+        instruments: Some(&mut inventory),
+        rate_bindings: None,
+        calendar: None,
+        as_of: date!(2025 - 01 - 01),
+    };
+    let report = ScenarioEngine::new()
+        .apply(
+            &single_op_spec(
+                "empty",
+                OperationSpec::AssetCorrelationPts { delta_pts: 0.02 },
+            ),
+            &mut ctx,
+        )
+        .expect("an empty inventory is an inventory");
+    assert_eq!(report.operations_applied, 0);
+}
+
+#[test]
+fn compose_rejects_invalid_inputs_naming_the_scenario() {
+    let blank = single_op_spec(
+        "",
+        OperationSpec::StmtForecastPercent {
+            node_id: "Revenue".into(),
+            pct: 1.0,
+        },
+    );
+    let valid = single_op_spec(
+        "a",
+        OperationSpec::StmtForecastPercent {
+            node_id: "Revenue".into(),
+            pct: 1.0,
+        },
+    );
+    let error = ScenarioSpec::compose(vec![valid.clone(), blank])
+        .expect_err("a blank-id input must be rejected")
+        .to_string();
+    assert!(
+        error.contains("Cannot compose scenario ''")
+            && error.contains("Scenario ID cannot be empty"),
+        "{error}"
+    );
+
+    let nan = single_op_spec(
+        "nan",
+        OperationSpec::StmtForecastPercent {
+            node_id: "Revenue".into(),
+            pct: f64::NAN,
+        },
+    );
+    let error = ScenarioSpec::compose(vec![valid, nan])
+        .expect_err("a non-finite operation must be rejected")
+        .to_string();
+    assert!(error.contains("Cannot compose scenario 'nan'"), "{error}");
+}

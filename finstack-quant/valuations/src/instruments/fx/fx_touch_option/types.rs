@@ -289,6 +289,44 @@ impl crate::instruments::common_impl::traits::Instrument for FxTouchOption {
         None
     }
 
+    /// Roll the observed touch state with spot held at its `as_of` level.
+    ///
+    /// When the roll passes `monitoring_start_date` (or reaches expiry) and
+    /// no state is recorded, the copy records the barrier as touched exactly
+    /// when the `as_of` FX spot is at or beyond it in `barrier_direction`.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of` supplying the FX spot held over the roll.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at, capped at expiry.
+    fn theta_observed_state(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<
+        Option<Box<dyn crate::instruments::common_impl::traits::Instrument>>,
+    > {
+        if self.observed_barrier_breached.is_some() || as_of > self.expiry {
+            return Ok(None);
+        }
+        let monitored = rolled_date >= self.expiry
+            || self
+                .monitoring_start_date
+                .is_some_and(|start| start < rolled_date);
+        if !monitored {
+            return Ok(None);
+        }
+        let spot = pricer::fx_spot(self, market, as_of)?;
+        let touched = match self.barrier_direction {
+            BarrierDirection::Up => spot >= self.barrier,
+            BarrierDirection::Down => spot <= self.barrier,
+        };
+        let mut observed = self.clone();
+        observed.observed_barrier_breached = Some(touched);
+        Ok(Some(Box::new(observed)))
+    }
+
     crate::impl_focused_pricing_overrides!();
 }
 

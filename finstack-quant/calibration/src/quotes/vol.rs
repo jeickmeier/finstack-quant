@@ -11,8 +11,6 @@ use finstack_quant_core::types::UnderlyingId;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations::instruments::OptionType;
 use finstack_quant_valuations::market::conventions::ids::SwaptionConventionId;
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 /// Volatility quotes for option and swaption surface calibration.
 ///
@@ -58,9 +56,6 @@ use ts_rs::TS;
 ///     convention: SwaptionConventionId::new("USD"),
 /// };
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[cfg_attr(feature = "ts_export", ts(rename_all = "snake_case"))]
 // The externally tagged shape makes each quote payload's concrete kind
 // explicit while keeping every nested field fully typed.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -71,13 +66,10 @@ pub enum VolQuote {
     /// Equity or commodity option implied volatility quote.
     OptionVol {
         /// Unique identifier for the quote.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         id: QuoteId,
         /// Underlying identifier
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         underlying: UnderlyingId,
         /// Option expiry
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
@@ -94,10 +86,8 @@ pub enum VolQuote {
     /// Interest rate swaption implied volatility quote.
     SwaptionVol {
         /// Unique identifier for the quote.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         id: QuoteId,
         /// Option expiry
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
@@ -105,7 +95,6 @@ pub enum VolQuote {
         )]
         expiry: Date,
         /// Underlying swap maturity date
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
@@ -117,20 +106,19 @@ pub enum VolQuote {
         /// Implied volatility in canonical decimal units: absolute rate
         /// volatility for normal quotes and Black volatility for lognormal quotes.
         vol: f64,
-        /// Volatility quoting convention.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
+        /// Volatility quoting convention. Shifted Black quotes require a
+        /// `ShiftedLognormal` calibration plan supplying their displacement;
+        /// Hull-White calibration rejects them because its quote contract
+        /// carries no displacement.
         quote_type: VolQuoteType,
         /// Option exercise conventions
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         convention: SwaptionConventionId,
     },
     /// Interest rate cap/floor implied volatility quote.
     CapFloorVol {
         /// Unique identifier for the quote.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         id: QuoteId,
         /// Cap/floor maturity or caplet expiry.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
         #[serde(with = "finstack_quant_core::wire::date")]
         #[cfg_attr(
             feature = "json-schema",
@@ -142,8 +130,9 @@ pub enum VolQuote {
         /// Implied volatility in canonical decimal units: absolute rate
         /// volatility for normal quotes and Black volatility for lognormal quotes.
         vol: f64,
-        /// Volatility quoting convention.
-        #[cfg_attr(feature = "ts_export", ts(type = "string"))]
+        /// Volatility quoting convention. Hull-White calibration accepts
+        /// normal and unshifted Black quotes; it rejects shifted Black
+        /// because this quote does not carry a displacement.
         quote_type: VolQuoteType,
         /// `true` for cap, `false` for floor.
         is_cap: bool,

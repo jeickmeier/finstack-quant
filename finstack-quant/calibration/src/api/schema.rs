@@ -12,7 +12,6 @@
 use crate::api::market_datum::MarketDatum;
 use crate::api::prior_market::PriorMarketObject;
 use crate::config::{CalibrationConfig, CalibrationMethod, RatesStepConventions};
-use crate::hull_white::SwapFrequency;
 use crate::quotes::ids::QuoteId;
 use crate::CalibrationReport;
 use finstack_quant_cashflows::builder::specs::RollRule;
@@ -33,8 +32,6 @@ use finstack_quant_core::types::{CurveId, IndexId};
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsValuationConvention;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 /// Current schema version identifier for the calibration API.
 pub const CALIBRATION_SCHEMA: &str = "finstack_quant.calibration/1";
@@ -44,8 +41,6 @@ pub const CALIBRATION_CONTRACT: ContractDescriptor =
 const FINAL_MARKET_POINTER: &str = "/result/final_market";
 
 /// Exact schema marker accepted by calibration envelopes.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub enum CalibrationSchema {
@@ -238,31 +233,47 @@ fn parse_result_value(
 }
 
 /// Complete calibration result with market snapshot and diagnostics.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CalibrationResult {
     /// Final calibrated market context (all curves, surfaces, scalars, etc.)
-    // MarketContextState is from finstack-quant-core which does not carry ts_export yet.
-    // Using `unknown` as a placeholder until finstack-quant-core adds TS support.
-    #[cfg_attr(feature = "ts_export", ts(type = "unknown"))]
     pub final_market: MarketContextState,
     /// Merged plan-level calibration report.
-    #[cfg_attr(feature = "ts_export", ts(type = "unknown"))]
     pub report: CalibrationReport,
     /// Per-step calibration reports keyed by step id.
-    #[cfg_attr(feature = "ts_export", ts(type = "Record<string, unknown>"))]
     pub step_reports: std::collections::BTreeMap<String, CalibrationReport>,
     /// Results metadata (timestamp, version, rounding context, etc.).
-    #[cfg_attr(feature = "ts_export", ts(type = "unknown"))]
     pub results_meta: ResultsMeta,
 }
 
+impl CalibrationResult {
+    /// Report of one calibration step.
+    ///
+    /// # Arguments
+    ///
+    /// * `step_id` - Identifier of the step, as given in the plan
+    ///   (`CalibrationStep::id`); matched exactly against the keys of
+    ///   [`Self::step_reports`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a not-found input error naming the available step ids when no
+    /// step with `step_id` was executed.
+    pub fn step_report(&self, step_id: &str) -> finstack_quant_core::Result<&CalibrationReport> {
+        self.step_reports.get(step_id).ok_or_else(|| {
+            finstack_quant_core::InputError::NotFound {
+                id: format!(
+                    "calibration step '{step_id}'; available steps: {:?}",
+                    self.step_reports.keys().collect::<Vec<_>>()
+                ),
+            }
+            .into()
+        })
+    }
+}
+
 /// Top-level envelope for calibration results.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -337,8 +348,6 @@ impl CalibrationResultEnvelope {
 /// This is the outer-most structure for a calibration request. It includes
 /// the schema version, the plan to execute, and the flat market-data inputs
 /// (plus optional pre-built prior calibrated objects) to build upon.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -346,7 +355,6 @@ pub struct CalibrationEnvelope {
     /// Optional `$schema` URL/path for editor-side JSON Schema discovery.
     /// Ignored at runtime; serialized when present.
     #[serde(rename = "$schema", default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub schema_url: Option<String>,
     /// Schema marker; current writers emit [`CALIBRATION_SCHEMA`].
     pub schema: CalibrationSchema,
@@ -385,6 +393,91 @@ impl CalibrationEnvelope {
             market_data,
             prior_market,
         }
+    }
+
+    /// Assemble an envelope from steps that carry their own quotes.
+    ///
+    /// Each step's attached quotes become the quote set named by the step's
+    /// `quote_set` (unless `quote_sets` already defines that name with the
+    /// same ids), and every distinct attached quote is appended once to
+    /// `market_data`, in first-seen order. Identical quotes attached by more
+    /// than one step are collected once. Steps without attached quotes keep
+    /// referencing `quote_sets` only. `prior_market` starts empty.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Plan identifier recorded in `plan.id`.
+    /// * `description` - Optional human-readable plan description.
+    /// * `settings` - Global calibration settings for the plan.
+    /// * `quote_sets` - Explicitly named quote sets whose ids must resolve in
+    ///   the envelope `market_data`; they take precedence and are merged with
+    ///   the sets derived from attached quotes.
+    /// * `steps` - Calibration steps in execution order, each paired with the
+    ///   quotes attached to it (possibly empty).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::errors::EnvelopeError::QuoteSetConflict`] when a
+    /// quote-set name is defined (explicitly or by an earlier step) with
+    /// different ids than a step attaches, and
+    /// [`super::errors::EnvelopeError::ConflictingMarketDatum`] when one quote
+    /// id is attached with two different payloads.
+    pub fn from_attached_steps(
+        id: String,
+        description: Option<String>,
+        settings: CalibrationConfig,
+        mut quote_sets: IndexMap<String, Vec<QuoteId>>,
+        steps: Vec<(CalibrationStep, Vec<MarketDatum>)>,
+    ) -> Result<Self, super::errors::EnvelopeError> {
+        use super::errors::EnvelopeError;
+        let mut market_data = Vec::new();
+        let mut payloads: IndexMap<String, serde_json::Value> = IndexMap::new();
+        let mut plan_steps = Vec::with_capacity(steps.len());
+        for (step, quotes) in steps {
+            if !quotes.is_empty() {
+                let ids: Vec<QuoteId> = quotes.iter().map(|q| QuoteId::new(q.id())).collect();
+                match quote_sets.get(&step.quote_set) {
+                    Some(existing) if existing != &ids => {
+                        return Err(EnvelopeError::QuoteSetConflict {
+                            quote_set: step.quote_set.clone(),
+                        });
+                    }
+                    Some(_) => {}
+                    None => {
+                        quote_sets.insert(step.quote_set.clone(), ids);
+                    }
+                }
+                for quote in quotes {
+                    let payload = serde_json::to_value(&quote).map_err(|error| {
+                        EnvelopeError::JsonSerialize {
+                            target: "MarketDatum".to_string(),
+                            message: error.to_string(),
+                        }
+                    })?;
+                    match payloads.get(quote.id()) {
+                        Some(existing) if existing != &payload => {
+                            return Err(EnvelopeError::ConflictingMarketDatum {
+                                id: quote.id().to_string(),
+                            });
+                        }
+                        Some(_) => {}
+                        None => {
+                            payloads.insert(quote.id().to_string(), payload);
+                            market_data.push(quote);
+                        }
+                    }
+                }
+            }
+            plan_steps.push(step);
+        }
+        let plan = CalibrationPlan {
+            id,
+            description,
+            quote_sets,
+            steps: plan_steps,
+            settings,
+        };
+        Ok(Self::new(plan, market_data, Vec::new()))
     }
 
     /// Serialize this request envelope as canonical pretty-printed JSON.
@@ -448,8 +541,6 @@ impl CalibrationEnvelope {
 ///
 /// A plan organizes market data into named sets and defines a sequence of
 /// [`CalibrationStep`] to be executed.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -461,7 +552,6 @@ pub struct CalibrationPlan {
     pub description: Option<String>,
     /// Named ID lists; each ID must resolve to a quote in `market_data`.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "Record<string, Array<string>>"))]
     pub quote_sets: IndexMap<String, Vec<QuoteId>>,
     /// Sequence of calibration steps to execute.
     pub steps: Vec<CalibrationStep>,
@@ -470,12 +560,15 @@ pub struct CalibrationPlan {
     pub settings: CalibrationConfig,
 }
 
+impl CalibrationPlan {
+    /// Plan identifier host builders use when the caller does not name one.
+    pub const DEFAULT_ID: &'static str = "plan";
+}
+
 /// A single step in the calibration process.
 ///
 /// Each step targets the construction or update of a specific market object
 /// (e.g., a yield curve) using a specified set of quotes.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[cfg_attr(feature = "json-schema", schemars(deny_unknown_fields))]
@@ -514,9 +607,6 @@ impl<'de> Deserialize<'de> for CalibrationStep {
 }
 
 /// Polymorphic parameters for different calibration step types.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[cfg_attr(feature = "ts_export", ts(rename_all = "snake_case"))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -591,7 +681,15 @@ impl StepParams {
         match self {
             StepParams::Discount(p) => StepIo {
                 kind: "discount",
-                reads: Vec::new(),
+                reads: [
+                    p.pricing_discount_id.as_ref(),
+                    p.pricing_forward_id.as_ref(),
+                ]
+                .into_iter()
+                .flatten()
+                .filter(|id| *id != &p.curve_id)
+                .map(ToString::to_string)
+                .collect(),
                 writes: vec![p.curve_id.to_string()],
                 primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
             },
@@ -618,8 +716,14 @@ impl StepParams {
                 reads: p
                     .discount_curve_id
                     .as_ref()
-                    .map(|id| vec![id.to_string()])
-                    .unwrap_or_default(),
+                    .map(ToString::to_string)
+                    .into_iter()
+                    .chain(
+                        p.spot_override
+                            .is_none()
+                            .then(|| p.underlying_ticker.clone()),
+                    )
+                    .collect(),
                 writes: vec![p.vol_surface_id.clone()],
                 primary_output: StepPrimaryOutput::Surface(CurveId::from(
                     p.vol_surface_id.as_str(),
@@ -627,7 +731,9 @@ impl StepParams {
             },
             StepParams::SwaptionVol(p) => StepIo {
                 kind: "swaption_vol",
-                reads: vec![p.discount_curve_id.to_string()],
+                reads: std::iter::once(p.discount_curve_id.to_string())
+                    .chain(p.forward_id.clone())
+                    .collect(),
                 writes: vec![p.vol_surface_id.clone()],
                 primary_output: StepPrimaryOutput::Surface(CurveId::from(
                     p.vol_surface_id.as_str(),
@@ -637,8 +743,8 @@ impl StepParams {
                 let curve_id = CurveId::from(format!("{}_CORR", p.index_id));
                 StepIo {
                     kind: "base_correlation",
-                    reads: vec![p.discount_curve_id.to_string()],
-                    writes: vec![curve_id.to_string()],
+                    reads: vec![p.discount_curve_id.to_string(), p.index_id.clone()],
+                    writes: vec![curve_id.to_string(), p.index_id.clone()],
                     primary_output: StepPrimaryOutput::Curve(curve_id),
                 }
             }
@@ -656,12 +762,13 @@ impl StepParams {
                 }
             }
             StepParams::HullWhite(p) => {
-                let scalar_key = format!("{}_HW1F", p.curve_id.as_str());
+                let (kappa_key, sigma_key) =
+                    crate::hull_white::hw1f_scalar_keys(p.curve_id.as_str());
                 StepIo {
                     kind: "hull_white",
                     reads: vec![p.curve_id.to_string()],
-                    writes: vec![scalar_key.clone()],
-                    primary_output: StepPrimaryOutput::Scalar(scalar_key),
+                    writes: vec![kappa_key.clone(), sigma_key],
+                    primary_output: StepPrimaryOutput::Scalar(kappa_key),
                 }
             }
             StepParams::CapFloorHullWhite(p) => {
@@ -669,12 +776,21 @@ impl StepParams {
                 if p.forward_curve_id != p.discount_curve_id {
                     reads.push(p.forward_curve_id.to_string());
                 }
-                let scalar_key = format!("{}_CAPFLOOR_HW1F", p.discount_curve_id.as_str());
+                let (kappa_key, sigma_key) =
+                    crate::hull_white::capfloor_hw1f_scalar_keys(p.discount_curve_id.as_str());
+                let volatility_key = match p.volatility_mode {
+                    HullWhiteVolatilityMode::Scalar => sigma_key,
+                    HullWhiteVolatilityMode::Piecewise => {
+                        crate::hull_white::capfloor_hw1f_sigma_schedule_key(
+                            p.discount_curve_id.as_str(),
+                        )
+                    }
+                };
                 StepIo {
                     kind: "cap_floor_hull_white",
                     reads,
-                    writes: vec![scalar_key.clone()],
-                    primary_output: StepPrimaryOutput::Scalar(scalar_key),
+                    writes: vec![kappa_key.clone(), volatility_key],
+                    primary_output: StepPrimaryOutput::Scalar(kappa_key),
                 }
             }
             StepParams::SviSurface(p) => StepIo {
@@ -682,8 +798,14 @@ impl StepParams {
                 reads: p
                     .discount_curve_id
                     .as_ref()
-                    .map(|id| vec![id.to_string()])
-                    .unwrap_or_default(),
+                    .map(ToString::to_string)
+                    .into_iter()
+                    .chain(
+                        p.spot_override
+                            .is_none()
+                            .then(|| p.underlying_ticker.clone()),
+                    )
+                    .collect(),
                 writes: vec![p.vol_surface_id.clone()],
                 primary_output: StepPrimaryOutput::Surface(CurveId::from(
                     p.vol_surface_id.as_str(),
@@ -714,17 +836,13 @@ impl StepParams {
 // Step Parameter Structs
 
 /// Parameters for discount curve calibration step.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct DiscountCurveParams {
     /// Identifier for the discount curve being built.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub curve_id: CurveId,
     /// Currency of the curve.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub currency: Currency,
     /// Base date for the curve.
     #[serde(with = "finstack_quant_core::wire::date")]
@@ -732,7 +850,6 @@ pub struct DiscountCurveParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_date: Date,
     /// Calibration method to use.
     #[serde(default)]
@@ -743,19 +860,15 @@ pub struct DiscountCurveParams {
     /// factors and piecewise-constant continuously compounded forwards.
     /// `Linear` remains available only when explicitly requested.
     #[serde(default = "default_interp_log_linear")]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub interpolation: InterpStyle,
     /// Extrapolation policy for the curve.
     #[serde(default = "default_extrap_flat")]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub extrapolation: ExtrapolationPolicy,
     /// Optional separate ID for pricing logic (defaults to curve_id).
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub pricing_discount_id: Option<CurveId>,
     /// Optional forward curve ID for pricing (if needed).
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub pricing_forward_id: Option<CurveId>,
 
     /// Step-level conventions for pricing and curve time axis.
@@ -764,17 +877,13 @@ pub struct DiscountCurveParams {
 }
 
 /// Parameters for forward curve calibration step.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ForwardCurveParams {
     /// Identifier for the forward curve being built.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub curve_id: CurveId,
     /// Currency of the curve.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub currency: Currency,
     /// Base date for the curve.
     #[serde(with = "finstack_quant_core::wire::date")]
@@ -782,12 +891,10 @@ pub struct ForwardCurveParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_date: Date,
     /// Tenor in years for the forward curve.
     pub tenor_years: f64,
     /// Identifier for the discount curve to use.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub discount_curve_id: CurveId,
     /// Calibration method to use.
     ///
@@ -802,7 +909,6 @@ pub struct ForwardCurveParams {
     /// shape-preserving forward term structure. `Linear` remains explicitly
     /// opt-in.
     #[serde(default = "default_interp_monotone_convex")]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub interpolation: InterpStyle,
 
     /// Step-level conventions for pricing and curve time axis.
@@ -811,22 +917,17 @@ pub struct ForwardCurveParams {
 }
 
 /// Parameters for hazard curve calibration step.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct HazardCurveParams {
     /// Identifier for the hazard curve being built.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub curve_id: CurveId,
     /// Entity name.
     pub entity: String,
     /// Seniority of the debt.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub seniority: Seniority,
     /// Currency of the curve.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub currency: Currency,
     /// Base date for the curve.
     #[serde(with = "finstack_quant_core::wire::date")]
@@ -834,10 +935,8 @@ pub struct HazardCurveParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_date: Date,
     /// Identifier for the discount curve to use.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub discount_curve_id: CurveId,
     /// Required recovery-rate assumption as a decimal fraction in `[0, 1]`.
     pub recovery_rate: f64,
@@ -856,7 +955,6 @@ pub struct HazardCurveParams {
     /// piecewise-constant hazard representation. Other styles are rejected
     /// before calibration starts.
     #[serde(default = "default_interp_log_linear")]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub interpolation: InterpStyle,
 
     /// Interpolation method for par spreads reported by the calibrated curve.
@@ -865,7 +963,6 @@ pub struct HazardCurveParams {
     /// survival no-arbitrage, which is enforced via non-negative hazards together with the
     /// required log-linear survival interpolation.
     #[serde(default = "default_par_interp_linear")]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub par_interp: ParInterp,
 
     /// Optional CDS documentation-clause assertion.
@@ -878,22 +975,17 @@ pub struct HazardCurveParams {
     /// Optional CDS valuation convention used by synthetic CDS instruments
     /// during hazard calibration and rebootstrap.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub cds_valuation_convention: Option<CdsValuationConvention>,
 }
 
 /// Parameters for inflation curve calibration step.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct InflationCurveParams {
     /// Identifier for the inflation curve being built.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub curve_id: CurveId,
     /// Currency of the curve.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub currency: Currency,
     /// Valuation and calibration-instrument start date. The output curve's
     /// zero-time reference CPI date is this date minus `observation_lag`.
@@ -902,14 +994,13 @@ pub struct InflationCurveParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_date: Date,
     /// Identifier for the discount curve to use.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub discount_curve_id: CurveId,
     /// Reference index (e.g. "USA-CPI-U").
     pub index: String,
-    /// Observation lag (e.g. "3M").
+    /// Month observation lag (e.g. "3M"); "none" means zero months.
+    /// Day-based lags are unsupported because output curves carry month lags.
     ///
     /// Overrides the quote convention's lag and must match any supplied index
     /// lag. The same lag determines the output curve's reference-date origin and the dates
@@ -933,41 +1024,10 @@ pub struct InflationCurveParams {
     pub method: CalibrationMethod,
     /// Interpolation style for the curve.
     #[serde(default = "default_interp_linear")]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub interpolation: InterpStyle,
-
-    /// Optional seasonal adjustment factors for deseasonalizing CPI observations.
-    ///
-    /// When provided, the calibrator will:
-    /// 1. Deseasonalize input CPI levels using the monthly factors
-    /// 2. Fit the smooth zero-coupon curve to deseasonalized levels
-    /// 3. Reseasonalize the output CPI path
-    ///
-    /// Monthly adjustments are additive to log CPI level. They should approximately
-    /// sum to zero over 12 months.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub seasonal_factors: Option<SeasonalFactors>,
-}
-
-/// Monthly seasonal adjustment factors for inflation curves.
-///
-/// Used to deseasonalize CPI observations before fitting a smooth
-/// zero-coupon inflation curve, then reseasonalize the output.
-/// Monthly adjustments should approximately sum to zero.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct SeasonalFactors {
-    /// Monthly adjustment factors (Jan=index 0 through Dec=index 11).
-    /// These are additive adjustments to the log CPI level.
-    pub monthly_adjustments: [f64; 12],
 }
 
 /// Parameters for volatility surface calibration step.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -977,8 +1037,6 @@ pub enum VolSurfaceModel {
 }
 
 /// Parameters for volatility surface calibration step.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -991,7 +1049,6 @@ pub struct VolSurfaceParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_date: Date,
     /// Identifier for the underlying instrument.
     pub underlying_ticker: String,
@@ -999,7 +1056,6 @@ pub struct VolSurfaceParams {
     pub model: VolSurfaceModel,
     /// Discount curve ID.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub discount_curve_id: Option<CurveId>,
     /// SABR Beta parameter.
     #[serde(default = "default_sabr_beta")]
@@ -1032,8 +1088,6 @@ pub struct VolSurfaceParams {
 ///
 /// Defines the structure and conventions for building a volatility surface
 /// from swaption quotes using the SABR model.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -1046,16 +1100,13 @@ pub struct SwaptionVolParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_date: Date,
     /// Discount curve identifier for pricing.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub discount_curve_id: CurveId,
     /// Optional forward curve identifier (if different from discount curve).
     #[serde(default)]
     pub forward_id: Option<String>,
     /// Currency for the swaption surface.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub currency: Currency,
     /// Volatility quoting convention (normal or lognormal).
     #[serde(default)]
@@ -1063,7 +1114,8 @@ pub struct SwaptionVolParams {
     /// SABR beta parameter (typically 0.0 for normal, 1.0 for lognormal).
     #[serde(default = "default_sabr_beta")]
     pub sabr_beta: f64,
-    /// Target expiry times (in years) for the surface grid.
+    /// Target option expiry times in ACT/365F years from `base_date`, independent
+    /// of the fixed-leg coupon day-count convention.
     #[serde(default)]
     pub target_expiries: Vec<f64>,
     /// Target tenor times (in years) for the surface grid.
@@ -1075,9 +1127,9 @@ pub struct SwaptionVolParams {
     /// Optional calendar identifier for date adjustments.
     #[serde(default)]
     pub calendar_id: Option<String>,
-    /// Optional day count convention for fixed leg calculations.
+    /// Optional day count convention for fixed-leg coupon accrual only.
+    /// Option expiry and variance always use ACT/365F.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub fixed_day_count: Option<DayCount>,
 
     /// Optional floating index identifier used to resolve market swap conventions.
@@ -1087,7 +1139,6 @@ pub struct SwaptionVolParams {
     ///
     /// If omitted, individual swaption quotes must provide `float_leg_conventions.index`.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub swap_index: Option<IndexId>,
     /// Maximum absolute error of any fitted volatility quote; defaults to 0.0015.
     ///
@@ -1113,9 +1164,6 @@ pub struct SwaptionVolParams {
 }
 
 /// Extrapolation policy for volatility surface construction.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[cfg_attr(feature = "ts_export", ts(rename_all = "snake_case"))]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -1131,8 +1179,6 @@ pub enum SurfaceExtrapolationPolicy {
 ///
 /// Defines the structure for building a base correlation curve from
 /// CDS tranche quotes with different detachment points.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -1141,7 +1187,8 @@ pub struct BaseCorrelationParams {
     pub index_id: String,
     /// Series number of the credit index.
     pub series: u16,
-    /// Maturity of the tranches in years.
+    /// Finite positive CDS tenor in years, representable as a whole number of months.
+    /// Quotes must resolve to the same CDS convention maturity as this tenor.
     pub maturity_years: f64,
     /// Base date for the calibration.
     #[serde(with = "finstack_quant_core::wire::date")]
@@ -1149,13 +1196,10 @@ pub struct BaseCorrelationParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_date: Date,
     /// Discount curve identifier for pricing.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub discount_curve_id: CurveId,
     /// Currency used for synthetic tranche pricing.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub currency: Currency,
     /// Notional used to price synthetic tranches during calibration.
     ///
@@ -1165,15 +1209,12 @@ pub struct BaseCorrelationParams {
     pub notional: f64,
     /// Payment frequency for synthetic tranches (e.g., quarterly).
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub frequency: Option<Tenor>,
     /// Day count convention for synthetic tranche premium accrual.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub day_count: Option<DayCount>,
     /// Business day convention for synthetic tranche schedule adjustments.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub business_day_convention: Option<BusinessDayConvention>,
     /// Optional calendar identifier for schedule generation and date adjustments.
     #[serde(default)]
@@ -1186,7 +1227,6 @@ pub struct BaseCorrelationParams {
     /// default) for a schedule generated from the convention frequency and
     /// stub. `imm` is rejected.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub roll_rule: RollRule,
 }
 
@@ -1205,8 +1245,6 @@ pub struct BaseCorrelationParams {
 /// - `initial_df`: Starting guess for the degrees of freedom (e.g., 5.0).
 /// - `df_bounds`: Feasible domain for `df` as `(lo, hi)`, e.g., `(2.1, 50.0)`.
 /// - `correlation`: Market-implied flat correlation for the tranche.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -1220,7 +1258,6 @@ pub struct StudentTParams {
     /// When omitted, calibration falls back to the only discount curve present
     /// in the market context as a convenience default.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub discount_curve_id: Option<CurveId>,
     /// Starting guess for degrees of freedom (typically 4-10).
     #[serde(default = "default_student_t_initial_df")]
@@ -1253,8 +1290,6 @@ fn default_student_t_correlation() -> f64 {
 /// ATM European swaption market prices using Jamshidian decomposition.
 /// Supplied strikes must match the contractual forward swap rate within
 /// `1e-8` in decimal rate units (0.0001 bp); off-ATM quotes are rejected.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -1264,10 +1299,8 @@ pub struct HullWhiteStepParams {
     /// This acceptance budget is independent of the numerical solver tolerance.
     pub fit_tolerance: f64,
     /// Discount curve ID (must already exist in market context).
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub curve_id: CurveId,
     /// Currency for conventions.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub currency: Currency,
     /// Base date for the calibration.
     #[serde(with = "finstack_quant_core::wire::date")]
@@ -1275,7 +1308,6 @@ pub struct HullWhiteStepParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_date: Date,
     /// Optional initial guess for mean reversion κ.
     #[serde(default)]
@@ -1286,8 +1318,6 @@ pub struct HullWhiteStepParams {
 }
 
 /// Parameters for Hull-White 1-factor calibration to cap/floor volatility quotes.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -1300,8 +1330,6 @@ pub enum HullWhiteVolatilityMode {
 }
 
 /// Parameters for Hull-White 1-factor calibration to cap/floor volatility quotes.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -1311,14 +1339,11 @@ pub struct CapFloorHullWhiteStepParams {
     /// This acceptance budget is independent of the numerical solver tolerance.
     pub fit_tolerance: f64,
     /// Discount curve ID (must already exist in market context).
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub discount_curve_id: CurveId,
     /// Forward/projection curve ID. If equal to `discount_curve_id`, the
     /// discount curve is used as the single-curve projection proxy.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub forward_curve_id: CurveId,
     /// Currency for conventions.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub currency: Currency,
     /// Base date for the calibration.
     #[serde(with = "finstack_quant_core::wire::date")]
@@ -1326,7 +1351,6 @@ pub struct CapFloorHullWhiteStepParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_date: Date,
     /// Optional source mean reversion κ. Required for one-quote calibration.
     #[serde(default)]
@@ -1337,10 +1361,10 @@ pub struct CapFloorHullWhiteStepParams {
     /// Optional initial guess for short-rate volatility σ when solving both κ and σ.
     #[serde(default)]
     pub initial_sigma: Option<f64>,
-    /// Payment frequency used to decompose quoted caps/floors into caplets.
-    #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
-    pub payment_frequency: SwapFrequency,
+    /// Term-rate index defining settlement, reset tenor, accrual day count,
+    /// calendar, business-day adjustments, and payment lag for caplets.
+    /// Its currency must match `currency`; overnight indices are unsupported.
+    pub index_id: IndexId,
     /// Scalar or expiry-bootstraped piecewise short-rate volatility calibration.
     #[serde(default)]
     pub volatility_mode: HullWhiteVolatilityMode,
@@ -1350,8 +1374,6 @@ pub struct CapFloorHullWhiteStepParams {
 ///
 /// Fits a Stochastic Volatility Inspired (SVI) parameterization per-expiry
 /// to market-implied volatilities.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -1364,13 +1386,11 @@ pub struct SviSurfaceParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_date: Date,
     /// Underlying instrument ticker.
     pub underlying_ticker: String,
     /// Discount curve ID (optional).
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub discount_curve_id: Option<CurveId>,
     /// Target expiries for calibration.
     #[serde(default)]
@@ -1381,16 +1401,15 @@ pub struct SviSurfaceParams {
     /// Optional spot price override.
     #[serde(default)]
     pub spot_override: Option<f64>,
-    /// Optional continuous dividend yield; defaults to the market scalar
-    /// `"<underlying_ticker>-DIVYIELD"` or zero.
+    /// Optional continuous dividend yield in decimal units. Without an override,
+    /// uses the unitless market scalar `"<underlying_ticker>-DIVYIELD"`. When a
+    /// discount curve is supplied, a matching cash-dividend schedule may supply
+    /// carry instead; otherwise an explicit yield is required.
     #[serde(default)]
     pub dividend_yield_override: Option<f64>,
 }
 
 /// Volatility quoting convention for swaptions.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[cfg_attr(feature = "ts_export", ts(rename_all = "snake_case"))]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -1402,21 +1421,22 @@ pub enum SwaptionVolConvention {
     /// Lognormal (Black) volatility in decimal units.
     ///
     /// Example: `0.20` means 20% Black volatility.
+    /// Requires `black_lognormal` quotes and positive forwards/strikes;
+    /// calibration does not introduce a displacement automatically.
     #[default]
     Lognormal,
     /// Shifted lognormal (Black) volatility in decimal units, with an explicit shift.
     ///
-    /// Example: `0.20` means 20% Black volatility.
+    /// Example: `0.20` means 20% Black volatility on displaced forward/strike
+    /// coordinates. Requires `shifted_black_lognormal` quotes.
     ShiftedLognormal {
-        /// Shift amount for negative rate handling
+        /// Finite positive additive shift in decimal rate units, applied to
+        /// both forwards and strikes and retained in calibrated artifacts.
         shift: f64,
     },
 }
 
 /// Interpolation method for SABR parameters across the expiry–tenor grid.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
-#[cfg_attr(feature = "ts_export", ts(rename_all = "snake_case"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
@@ -1460,17 +1480,13 @@ fn default_sabr_beta() -> f64 {
 ///
 /// Derives a foreign-currency discount curve from a domestic OIS curve,
 /// FX spot rate, and cross-currency basis swap or FX forward quotes.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct XccyBasisParams {
     /// Identifier for the foreign discount curve being built.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub curve_id: CurveId,
     /// Foreign currency being calibrated.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub currency: Currency,
     /// Base date for the curve.
     #[serde(with = "finstack_quant_core::wire::date")]
@@ -1478,7 +1494,6 @@ pub struct XccyBasisParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_date: Date,
     /// T+0 cash FX rate (domestic per foreign), used when a quote omits `spot_fx`.
     ///
@@ -1489,9 +1504,8 @@ pub struct XccyBasisParams {
     /// by roughly 1–2 bp.
     pub fx_spot: f64,
     /// Identifier for the pre-calibrated domestic discount curve.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub domestic_discount_id: CurveId,
-    /// Calibration method to use.
+    /// Sequential bootstrap method. `GlobalSolve` is unsupported and rejected.
     #[serde(default)]
     pub method: CalibrationMethod,
     /// Interpolation style for the constructed foreign discount curve.
@@ -1499,18 +1513,15 @@ pub struct XccyBasisParams {
     /// Defaults to log-linear discount factors. `Linear` remains available
     /// only when explicitly requested.
     #[serde(default = "default_interp_log_linear")]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub interpolation: InterpStyle,
     /// Extrapolation policy for the foreign curve.
     #[serde(default = "default_extrap_flat")]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub extrapolation: ExtrapolationPolicy,
     /// Step-level conventions for pricing and curve time axis.
     #[serde(default)]
     pub conventions: RatesStepConventions,
     /// Optional ID for the byproduct basis spread curve.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "string | null"))]
     pub basis_spread_curve_id: Option<CurveId>,
 }
 
@@ -1520,15 +1531,12 @@ pub struct XccyBasisParams {
 ///
 /// Fits a Nelson-Siegel or Nelson-Siegel-Svensson yield curve model to
 /// rate instrument quotes using global (Levenberg-Marquardt) optimization.
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ParametricCurveParams {
     /// Identifier for the single discount curve being fitted. All calibration
     /// instruments use this curve for discounting and implied projection.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub curve_id: CurveId,
     /// Base date for the curve.
     #[serde(with = "finstack_quant_core::wire::date")]
@@ -1536,14 +1544,11 @@ pub struct ParametricCurveParams {
         feature = "json-schema",
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub base_date: Date,
     /// Nelson-Siegel variant (NS or NSS).
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub model: NsVariant,
     /// Optional initial parameter guesses.
     #[serde(default)]
-    #[cfg_attr(feature = "ts_export", ts(type = "unknown | null"))]
     pub initial_params: Option<NelsonSiegelModel>,
 }
 
@@ -1580,5 +1585,34 @@ mod interpolation_default_tests {
         }))
         .expect("xccy params");
         assert_eq!(xccy.interpolation, InterpStyle::LogLinear);
+    }
+}
+
+#[cfg(test)]
+mod step_report_tests {
+    use super::{CalibrationEnvelope, CalibrationPlan};
+
+    #[test]
+    fn step_report_names_the_available_steps_when_missing() {
+        let plan = CalibrationPlan {
+            id: "empty".to_string(),
+            description: None,
+            quote_sets: Default::default(),
+            steps: Vec::new(),
+            settings: Default::default(),
+        };
+        let envelope = CalibrationEnvelope::new(plan, Vec::new(), Vec::new());
+        let result = crate::api::engine::calibrate(&envelope).expect("empty plan calibrates");
+        let error = result
+            .result
+            .step_report("USD-OIS")
+            .expect_err("no such step");
+        assert_eq!(
+            error.kind(),
+            finstack_quant_core::error::ErrorKind::NotFound
+        );
+        assert!(error
+            .to_string()
+            .contains("calibration step 'USD-OIS'; available steps: []"));
     }
 }

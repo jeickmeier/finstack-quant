@@ -19,7 +19,9 @@ use crate::instruments::credit_derivatives::cds::CdsConvention;
 /// and regional ISDA convention. Pair with the trade-specific arguments
 /// (id, notional, side, dates, recovery, curves) on
 /// `CdsIndex::from_preset` to obtain a `CdsIndex` instrument.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CdsIndexParams {
     /// Index name (e.g., "CDX.NA.IG", "iTraxx Europe").
     pub index_name: String,
@@ -150,5 +152,21 @@ impl CdsIndexParams {
             CdsConvention::IsdaEu,
         )
         .with_num_constituents(125)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn params_round_trip_through_json() {
+        let params = CdsIndexParams::cdx_na_ig(42, 1, 100.0);
+        let json = serde_json::to_string(&params).expect("serialize");
+        let back: CdsIndexParams = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(back, params);
+        assert_eq!(back.index_name, "CDX.NA.IG");
+        let unknown = json.replace(r#""series""#, r#""serie""#);
+        assert!(serde_json::from_str::<CdsIndexParams>(&unknown).is_err());
     }
 }

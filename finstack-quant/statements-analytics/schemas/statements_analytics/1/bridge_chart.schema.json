@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "BridgeStep": {
+      "description": "Single driver contribution entry in a bridge chart.",
+      "properties": {
+        "contribution": {
+          "description": "Contribution of this driver to the total variance, in the same units\nas the target metric.",
+          "format": "double",
+          "type": "number"
+        },
+        "driver": {
+          "description": "Driver node identifier (e.g. `\"revenue\"`).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "driver",
+        "contribution"
+      ],
+      "type": "object"
+    },
+    "PeriodId": {
+      "description": "Identifier for a Gregorian period like `2025Q1` or a fiscal period like\n`FY2025W53`.",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/bridge_chart.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Bridge chart for a single target metric and period.",
+  "properties": {
+    "baseline_label": {
+      "description": "Baseline scenario label.",
+      "type": "string"
+    },
+    "baseline_value": {
+      "description": "Baseline value of the target metric.",
+      "format": "double",
+      "type": "number"
+    },
+    "comparison_label": {
+      "description": "Comparison scenario label.",
+      "type": "string"
+    },
+    "comparison_value": {
+      "description": "Comparison value of the target metric.",
+      "format": "double",
+      "type": "number"
+    },
+    "period": {
+      "$ref": "#/$defs/PeriodId",
+      "description": "Period identifier."
+    },
+    "steps": {
+      "description": "Ordered list of driver contributions.",
+      "items": {
+        "$ref": "#/$defs/BridgeStep"
+      },
+      "type": "array"
+    },
+    "target_metric": {
+      "description": "Target metric identifier (e.g. `\"ebitda\"`).",
+      "type": "string"
+    },
+    "unexplained": {
+      "default": 0.0,
+      "description": "Residual not explained by the driver deltas:\n`(comparison_value - baseline_value) - Σ steps.contribution`.\n\nDriver contributions are raw deltas in *driver* units, not\nsensitivities of the target metric, so they generally do not sum\nto the target variance; this term makes the gap explicit instead\nof leaving the bridge silently unbalanced.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "target_metric",
+    "period",
+    "baseline_label",
+    "comparison_label",
+    "baseline_value",
+    "comparison_value",
+    "steps"
+  ],
+  "title": "BridgeChart",
+  "type": "object"
+}

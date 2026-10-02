@@ -6,11 +6,11 @@
 //!
 //! # Features
 //!
-//! - **26 built-in market calendars**: major exchanges, central banks, and
+//! - **27 built-in market calendars**: major exchanges, central banks, and
 //!   settlement systems, generated at build time from `data/calendars/*.json`
 //!   (see [`available_calendars`] for the exact identifier list)
 //! - **Rule-based definitions**: JSON-defined rules for transparency and auditability
-//! - **Cached rule evaluation**: validated years are materialized lazily into a
+//! - **Cached rule evaluation**: cached years are materialized lazily into a
 //!   process-wide holiday bitset and business-day prefix sums; out-of-range
 //!   dates continue to scan the calendar's `&'static` rules directly
 //! - **Composite calendars**: Combine multiple calendars for multi-currency schedules
@@ -19,11 +19,11 @@
 //!
 //! # Lookup Cost
 //!
-//! The first lookup for a calendar year inside the validated range materializes
+//! The first lookup for a calendar year inside the cache range materializes
 //! a 366-bit raw rule-holiday mask and business-day prefix sums. Subsequent
 //! holiday and business-day predicates are constant-time bit lookups, while
 //! interval counts combine at most one prefix-sum lookup per year. Dates outside
-//! the validated range retain direct rule scanning.
+//! the cache range retain direct rule scanning.
 //!
 //! The cache is an implementation detail: public predicates are unchanged.
 //! [`HolidayCalendar::is_holiday`] still applies each calendar's
@@ -32,9 +32,16 @@
 //!
 //! # Supported Date Range
 //!
-//! Holiday rules are validated for years **1970-2150**. Years outside this range
-//! still evaluate via the same rules (a one-time warning is emitted), but their
-//! accuracy is not guaranteed.
+//! The year cache and astronomical/lunar tables cover **1970-2150**. This is
+//! a computational range, not certification of market holidays throughout it.
+//! Published coverage is calendar-specific: SGSI moving holidays cover 2024-2027,
+//! NSE/BSE moving holidays cover 2024-2026, and Matariki dates end in 2052.
+//! Consult each generated calendar constant's source notes and the independent
+//! annual fixtures. Recurring rules outside published coverage may omit closures;
+//! the boolean predicate API cannot report an unsupported-year error.
+//! Years outside the cache range still evaluate directly and emit a one-time
+//! warning; table-based holidays may be unavailable. Trading, settlement,
+//! banking/accrual, and fixing-publication calendars are distinct contracts.
 //!
 //! # Key Concepts
 //!
@@ -47,7 +54,7 @@
 //!
 //! Many calendars include weekends in their holiday definitions for convenience,
 //! while others intentionally omit them. Regardless, [`HolidayCalendar::is_business_day`]
-//! always treats Saturday/Sunday as non-business days.
+//! uses the configured weekend rule (Saturday/Sunday for built-in calendars).
 //!
 //! **Guideline**: Use `is_business_day` for scheduling and date adjustments.
 //! Use `is_holiday` only when you need market-specific holiday information.
@@ -102,6 +109,7 @@
 pub(crate) mod algo;
 pub(crate) mod business_days;
 pub(crate) mod composite;
+mod jurisdictions;
 pub(crate) mod rule;
 pub(crate) mod types;
 mod year_cache;
@@ -147,6 +155,54 @@ pub fn calendar_by_id_strict(id: &str) -> crate::Result<&'static dyn HolidayCale
         .ok_or_else(|| crate::Error::calendar_not_found_with_suggestions(id, available_calendars()))
 }
 
+/// Canonical identifier of the calendar an id resolves to.
+///
+/// A built-in calendar reports its registry id (`"USNY"` gives `"usny"`); a
+/// `+`-joined union reports its members trimmed, lower-cased, sorted and
+/// de-duplicated (`"GBLO + nyse"` gives `"gblo+nyse"`), which is the key the
+/// union is interned under. Two ids with the same canonical form resolve to
+/// the same calendar.
+///
+/// # Arguments
+///
+/// * `id` - Calendar identifier accepted by [`calendar_by_id_strict`]: a
+///   built-in id in any case, or `+`-joined built-in ids.
+///
+/// # Errors
+///
+/// Returns `InputError::CalendarNotFound` (with suggestions) when `id` or any
+/// `+`-joined member is not a built-in calendar.
+///
+/// # Examples
+///
+/// ```rust
+/// use finstack_quant_core::dates::calendar::canonical_calendar_id;
+///
+/// assert_eq!(canonical_calendar_id("NYSE")?, "nyse");
+/// assert_eq!(canonical_calendar_id("nyse + GBLO")?, "gblo+nyse");
+/// assert!(canonical_calendar_id("nope").is_err());
+/// # Ok::<(), finstack_quant_core::Error>(())
+/// ```
+pub fn canonical_calendar_id(id: &str) -> crate::Result<String> {
+    let calendar = calendar_by_id_strict(id)?;
+    Ok(match calendar.metadata() {
+        Some(metadata) => metadata.id.to_string(),
+        None => joint_members(id).join("+"),
+    })
+}
+
+/// Members of a `+`-joined calendar id: trimmed, lower-cased, sorted, de-duplicated.
+fn joint_members(id: &str) -> Vec<String> {
+    let mut parts: Vec<String> = id
+        .split('+')
+        .map(|p| p.trim().to_ascii_lowercase())
+        .filter(|p| !p.is_empty())
+        .collect();
+    parts.sort_unstable();
+    parts.dedup();
+    parts
+}
+
 /// Interned union calendars keyed by their normalized `a+b` identifier.
 ///
 /// Composite calendars borrow their members, so a `'static` handle needs a
@@ -163,13 +219,7 @@ static JOINT_CALENDARS: std::sync::OnceLock<
 /// `"GBLO + nyse"` and `"nyse+gblo"` share one interned composite; a single
 /// distinct member resolves to that built-in calendar directly.
 fn joint_calendar(id: &str) -> crate::Result<&'static dyn HolidayCalendar> {
-    let mut parts: Vec<String> = id
-        .split('+')
-        .map(|p| p.trim().to_ascii_lowercase())
-        .filter(|p| !p.is_empty())
-        .collect();
-    parts.sort_unstable();
-    parts.dedup();
+    let parts = joint_members(id);
     if parts.is_empty() {
         return Err(crate::Error::calendar_not_found_with_suggestions(
             id,
@@ -246,5 +296,31 @@ mod joint_tests {
         ));
         assert!(calendar_by_id_strict("nyse+bogus").is_err());
         assert!(calendar_by_id_strict("+").is_err());
+    }
+}
+
+#[cfg(test)]
+mod canonical_id_tests {
+    use super::*;
+
+    #[test]
+    fn canonical_id_is_registry_id_for_builtin_calendars() {
+        assert_eq!(canonical_calendar_id("NYSE").expect("nyse"), "nyse");
+    }
+
+    #[test]
+    fn canonical_id_normalizes_union_members() {
+        assert_eq!(
+            canonical_calendar_id(" nyse + GBLO+nyse").expect("union"),
+            "gblo+nyse"
+        );
+        // A union of one distinct member is that built-in calendar.
+        assert_eq!(canonical_calendar_id("nyse+NYSE").expect("single"), "nyse");
+    }
+
+    #[test]
+    fn canonical_id_rejects_unknown_members() {
+        assert!(canonical_calendar_id("nyse+nope").is_err());
+        assert!(canonical_calendar_id("+").is_err());
     }
 }

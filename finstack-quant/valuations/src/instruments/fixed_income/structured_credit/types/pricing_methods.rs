@@ -48,28 +48,81 @@ impl StructuredCredit {
             .mdr(seasoning_months)
     }
 
-    /// Advanced stochastic pricing that defaults to Monte Carlo.
+    /// Monte Carlo stochastic pricing with optional estimator-count and
+    /// pairing overrides.
     ///
-    /// Host and registry callers should use
+    /// This is the typed entry point bound by the Python and WASM hosts and
+    /// returns a `StochasticPricingResult`. Registry callers that want the
+    /// valuation envelope use
     /// [`Instrument::price_with_metrics`](crate::instruments::Instrument::price_with_metrics)
-    /// with [`ModelKey::StructuredCreditStochastic`](crate::pricer::ModelKey::StructuredCreditStochastic)
-    /// (or `price_instrument` on the same model key). This method remains for
-    /// tests and direct Rust callers that want a `StochasticPricingResult`
-    /// without going through the registry envelope.
+    /// with [`ModelKey::StructuredCreditStochastic`](crate::pricer::ModelKey::StructuredCreditStochastic);
+    /// [`Self::price_stochastic_with_mode`] forces a tree or hybrid mode.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market context supplying the discount and forward curves.
+    /// * `as_of` - Requested valuation date.
+    /// * `num_paths` - Number of independent estimators; `None` uses
+    ///   `model_config.mc_paths` (default 5,000).
+    /// * `antithetic` - Pair each estimator's path with its sign-flipped
+    ///   mirror, so the engine simulates `2 × num_paths` scenario paths;
+    ///   `None` uses `model_config.mc_antithetic` (default `true`).
+    ///
+    /// # Errors
+    ///
+    /// Returns the deal's validation error, or the Monte Carlo pricer's
+    /// error when a path cannot be simulated or discounted.
     pub fn price_stochastic(
         &self,
         market: &MarketContext,
         as_of: Date,
+        num_paths: Option<usize>,
+        antithetic: Option<bool>,
     ) -> finstack_quant_core::Result<StochasticPricingResult> {
-        let lifecycle =
-            crate::instruments::common_impl::helpers::ValidatedPricingLifecycle::new(self)?;
-        let effective_as_of = lifecycle.effective_as_of(market, as_of);
-        let result = self.price_stochastic_base(market, effective_as_of)?;
-        self.apply_stochastic_price_scenario(result)
+        let model_config = &self.instrument_pricing_overrides.model_config;
+        self.price_stochastic_with_mode(
+            market,
+            as_of,
+            StructuredCreditPricingMode::MonteCarlo {
+                num_paths: num_paths.or(model_config.mc_paths).unwrap_or(5_000),
+                antithetic: antithetic.or(model_config.mc_antithetic).unwrap_or(true),
+            },
+        )
+    }
+
+    /// Projected cashflows of one tranche from the deterministic simulation.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranche_id` - Identifier of a tranche of this deal.
+    /// * `market` - Market context supplying the discount and forward curves.
+    /// * `as_of` - Requested valuation date.
+    ///
+    /// # Errors
+    ///
+    /// Returns `InputError::NotFound` when `tranche_id` is not a class of the
+    /// deal, and the simulation's error otherwise.
+    pub fn tranche_cashflows(
+        &self,
+        tranche_id: &str,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> finstack_quant_core::Result<super::TrancheCashflows> {
+        crate::instruments::fixed_income::structured_credit::pricing::run_simulation(
+            self, market, as_of,
+        )?
+        .remove(tranche_id)
+        .ok_or_else(|| {
+            finstack_quant_core::InputError::NotFound {
+                id: format!("tranche {tranche_id:?} of deal {:?}", self.id.as_str()),
+            }
+            .into()
+        })
     }
 
     /// Monte Carlo with `model_config.mc_paths` independent estimators
-    /// (default 5,000) and `model_config.mc_antithetic` pairing (default on).
+    /// (minimum two, default 5,000) and `model_config.mc_antithetic` pairing
+    /// (default on). Each antithetic pair counts as one estimator.
     fn default_stochastic_pricing_mode(&self) -> StructuredCreditPricingMode {
         let model_config = &self.instrument_pricing_overrides.model_config;
         StructuredCreditPricingMode::MonteCarlo {
@@ -95,6 +148,18 @@ impl StructuredCredit {
     /// Prefer the registry `StructuredCreditStochastic` model key for host
     /// pricing. Use this method only when a caller needs to force a
     /// [`StructuredCreditPricingMode`] without going through `price_with_metrics`.
+    ///
+    /// # Arguments
+    ///
+    /// * `market` - Market context supplying the discount and forward curves.
+    /// * `as_of` - Requested valuation date.
+    /// * `pricing_mode` - Engine to run: the scenario tree, Monte Carlo with
+    ///   an explicit estimator count and antithetic pairing, or the hybrid.
+    ///
+    /// # Errors
+    ///
+    /// Returns the deal's validation error, or the pricer's error when a
+    /// scenario cannot be simulated or discounted.
     pub fn price_stochastic_with_mode(
         &self,
         market: &MarketContext,

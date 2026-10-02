@@ -17,6 +17,7 @@ static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<RatingScaleRegistry> = EmbeddedJs
 
 /// Rating level for credit rating scales.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RatingLevel {
     /// Rating name, for example `AAA` or `Aaa`.
@@ -34,6 +35,7 @@ pub struct RatingLevel {
 /// from `finstack_quant_models::credit::migration::RatingScale`, which models
 /// the ordered state set of a credit-migration / transition matrix.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScorecardScale {
     /// Scale name, for example `S&P` or `Moody's`.

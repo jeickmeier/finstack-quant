@@ -60,6 +60,21 @@ impl CreditIndexData {
         CreditIndexDataBuilder::default()
     }
 
+    /// Check mutable aggregate fields against the builder's invariants.
+    pub(crate) fn validate(&self) -> Result<()> {
+        super::common::validate_unit_range(self.recovery_rate, "recovery_rate")?;
+        if self.num_constituents == 0 {
+            return Err(crate::error::InputError::Invalid.into());
+        }
+        validate_issuer_curves(&self.issuer_credit_curves, self.num_constituents)?;
+        validate_issuer_recovery_rates(&self.issuer_credit_curves, &self.issuer_recovery_rates)?;
+        validate_issuer_weights(
+            &self.issuer_credit_curves,
+            &self.issuer_weights,
+            self.num_constituents,
+        )
+    }
+
     /// Get the credit curve for a specific issuer.
     ///
     /// Returns the issuer-specific curve if available, otherwise falls back
@@ -279,21 +294,7 @@ impl CreditIndexDataBuilder {
             .base_correlation_curve
             .ok_or_else(|| crate::Error::from(crate::error::InputError::Invalid))?;
 
-        super::common::validate_unit_range(recovery_rate, "recovery_rate")?;
-
-        if num_constituents == 0 {
-            return Err(crate::Error::from(crate::error::InputError::Invalid));
-        }
-
-        validate_issuer_curves(&self.issuer_credit_curves, num_constituents)?;
-        validate_issuer_recovery_rates(&self.issuer_credit_curves, &self.issuer_recovery_rates)?;
-        validate_issuer_weights(
-            &self.issuer_credit_curves,
-            &self.issuer_weights,
-            num_constituents,
-        )?;
-
-        Ok(CreditIndexData {
+        let data = CreditIndexData {
             num_constituents,
             recovery_rate,
             index_credit_curve,
@@ -301,7 +302,9 @@ impl CreditIndexDataBuilder {
             issuer_credit_curves: self.issuer_credit_curves,
             issuer_recovery_rates: self.issuer_recovery_rates,
             issuer_weights: self.issuer_weights,
-        })
+        };
+        data.validate()?;
+        Ok(data)
     }
 }
 

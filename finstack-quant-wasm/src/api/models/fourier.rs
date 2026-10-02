@@ -9,6 +9,7 @@
 //!
 //! Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008.
 
+use crate::utils::input::{js_bool, js_f64, js_opt_uint};
 use crate::utils::to_js_err;
 use finstack_quant_models::fourier::cos::{
     bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
@@ -28,25 +29,36 @@ use wasm_bindgen::prelude::*;
 /// @param vol - Annualized volatility expressed as a decimal, such as 0.20 for 20%; must be positive.
 /// @param expiry - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
+/// @param n_terms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `vol` is not positive, the model produces a degenerate or invalid
-/// COS truncation range, a non-finite characteristic-function value or forward
-/// moment, or a non-finite option price.
+/// Throws if spot, strike, expiry, or volatility is not finite and positive,
+/// or rates/carry are non-finite. Throws a `validation` error if `nTerms` is
+/// outside `1..=65536` or `vol` is not positive, and a `computation` error if
+/// the model produces a degenerate or invalid COS truncation range, a
+/// non-finite characteristic-function value or forward moment, or a
+/// non-finite option price.
 #[wasm_bindgen(js_name = bsCosPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn bs_cos_price(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    vol: f64,
-    expiry: f64,
-    is_call: bool,
-    n_terms: Option<usize>,
+    spot: JsValue,
+    strike: JsValue,
+    rate: JsValue,
+    div_yield: JsValue,
+    vol: JsValue,
+    expiry: JsValue,
+    is_call: JsValue,
+    n_terms: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let spot = js_f64(&spot, "spot")?;
+    let strike = js_f64(&strike, "strike")?;
+    let rate = js_f64(&rate, "rate")?;
+    let div_yield = js_f64(&div_yield, "divYield")?;
+    let vol = js_f64(&vol, "vol")?;
+    let expiry = js_f64(&expiry, "expiry")?;
+    let is_call = js_bool(&is_call, "isCall")?;
+    let n_terms: Option<usize> = js_opt_uint(n_terms.as_ref(), "nTerms")?;
     rust_bs_cos_price(BlackScholesCosParams {
         spot,
         strike,
@@ -68,32 +80,45 @@ pub fn bs_cos_price(
 /// @param strike - Option strike price in the same price units as the underlying.
 /// @param rate - Interest rate expressed as a decimal, such as 0.05 for 5%.
 /// @param div_yield - Continuous dividend yield expressed as a decimal, such as 0.02 for 2%.
-/// @param sigma - Annualized volatility expressed as a decimal, such as 0.20 for 20%.
-/// @param theta - Variance-Gamma drift parameter controlling skew in log returns.
-/// @param nu - Variance-Gamma variance-rate parameter; larger values increase tail thickness.
+/// @param sigma - Positive finite volatility of the subordinated Brownian motion, as a decimal.
+/// @param theta - Finite annual log-return drift of the subordinated Brownian motion; its sign controls skew.
+/// @param nu - Positive finite variance rate of the Gamma time change, in years; larger values increase tail thickness.
 /// @param expiry - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
+/// @param n_terms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the model produces a degenerate or invalid
-/// COS truncation range, a non-finite characteristic-function value or forward
+/// Throws if spot, strike, expiry, sigma, or nu is not finite and positive,
+/// rates/carry/theta are non-finite, or the VG martingale condition fails.
+/// Throws a `validation` error if `nTerms` is outside `1..=65536`, and a
+/// `computation` error if the model produces a degenerate or invalid COS
+/// truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
 #[wasm_bindgen(js_name = vgCosPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn vg_cos_price(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    sigma: f64,
-    theta: f64,
-    nu: f64,
-    expiry: f64,
-    is_call: bool,
-    n_terms: Option<usize>,
+    spot: JsValue,
+    strike: JsValue,
+    rate: JsValue,
+    div_yield: JsValue,
+    sigma: JsValue,
+    theta: JsValue,
+    nu: JsValue,
+    expiry: JsValue,
+    is_call: JsValue,
+    n_terms: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let spot = js_f64(&spot, "spot")?;
+    let strike = js_f64(&strike, "strike")?;
+    let rate = js_f64(&rate, "rate")?;
+    let div_yield = js_f64(&div_yield, "divYield")?;
+    let sigma = js_f64(&sigma, "sigma")?;
+    let theta = js_f64(&theta, "theta")?;
+    let nu = js_f64(&nu, "nu")?;
+    let expiry = js_f64(&expiry, "expiry")?;
+    let is_call = js_bool(&is_call, "isCall")?;
+    let n_terms: Option<usize> = js_opt_uint(n_terms.as_ref(), "nTerms")?;
     rust_vg_cos_price(VarianceGammaCosParams {
         spot,
         strike,
@@ -123,28 +148,43 @@ pub fn vg_cos_price(
 /// @param lambda - Annual jump-arrival intensity in the Merton jump-diffusion model.
 /// @param expiry - Time to option expiry in years.
 /// @param is_call - Whether to value a call (`true`) or put (`false`).
-/// @param n_terms - Optional positive number of COS expansion terms; omit to use the pricer default.
+/// @param n_terms - Optional positive integer number of COS expansion terms in `1..=65536`; omit to use the pricer default (128).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the model produces a degenerate or invalid
-/// COS truncation range, a non-finite characteristic-function value or forward
+/// Throws if spot, strike, or expiry is not finite and positive, rates/carry
+/// or log-jump mean are non-finite, volatility/intensity is negative or
+/// non-finite, or the jump compensator overflows. Throws a `validation` error
+/// if `nTerms` is outside `1..=65536`, and a `computation` error if the model
+/// produces a degenerate or invalid COS
+/// truncation range, a non-finite characteristic-function value or forward
 /// moment, or a non-finite option price.
 #[wasm_bindgen(js_name = mertonJumpCosPrice)]
 #[allow(clippy::too_many_arguments)]
 pub fn merton_jump_cos_price(
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    div_yield: f64,
-    sigma: f64,
-    mu_jump: f64,
-    sigma_jump: f64,
-    lambda: f64,
-    expiry: f64,
-    is_call: bool,
-    n_terms: Option<usize>,
+    spot: JsValue,
+    strike: JsValue,
+    rate: JsValue,
+    div_yield: JsValue,
+    sigma: JsValue,
+    mu_jump: JsValue,
+    sigma_jump: JsValue,
+    lambda: JsValue,
+    expiry: JsValue,
+    is_call: JsValue,
+    n_terms: Option<JsValue>,
 ) -> Result<f64, JsValue> {
+    let spot = js_f64(&spot, "spot")?;
+    let strike = js_f64(&strike, "strike")?;
+    let rate = js_f64(&rate, "rate")?;
+    let div_yield = js_f64(&div_yield, "divYield")?;
+    let sigma = js_f64(&sigma, "sigma")?;
+    let mu_jump = js_f64(&mu_jump, "muJump")?;
+    let sigma_jump = js_f64(&sigma_jump, "sigmaJump")?;
+    let lambda = js_f64(&lambda, "lambda")?;
+    let expiry = js_f64(&expiry, "expiry")?;
+    let is_call = js_bool(&is_call, "isCall")?;
+    let n_terms: Option<usize> = js_opt_uint(n_terms.as_ref(), "nTerms")?;
     rust_merton_jump_cos_price(MertonJumpCosParams {
         spot,
         strike,
@@ -159,15 +199,4 @@ pub fn merton_jump_cos_price(
         n_terms,
     })
     .map_err(to_js_err)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn bs_cos_call_atm_is_positive() {
-        let p = bs_cos_price(100.0, 100.0, 0.05, 0.02, 0.2, 1.0, true, None).expect("price");
-        assert!(p > 0.0);
-    }
 }

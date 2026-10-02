@@ -19,19 +19,11 @@ fn enum_label<T: serde::Serialize>(value: &T) -> PyResult<String> {
 fn parse_resolution_mode(
     value: &str,
 ) -> PyResult<finstack_quant_core::market_data::hierarchy::ResolutionMode> {
-    serde_json::from_value(serde_json::Value::String(value.to_string())).map_err(|_| {
-        crate::errors::value_error(format!(
-            "Unknown resolution_mode {value:?}; expected 'most_specific_wins' or 'cumulative'"
-        ))
-    })
+    finstack_quant_core::wire::serde_parse(value).map_err(crate::errors::core_to_py)
 }
 
 fn parse_hazard_bump_mode(value: &str) -> PyResult<finstack_quant_scenarios::HazardBumpMode> {
-    serde_json::from_value(serde_json::Value::String(value.to_string())).map_err(|_| {
-        crate::errors::value_error(format!(
-            "Unknown hazard_bump_mode {value:?}; expected 'solve_to_par' or 'first_order_shift'"
-        ))
-    })
+    finstack_quant_core::wire::serde_parse(value).map_err(crate::errors::core_to_py)
 }
 
 /// Validated scenario specification executed by the scenario engine.
@@ -144,11 +136,8 @@ impl PyScenarioSpec {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_scenarios::ScenarioSpec =
-            serde_json::from_str(json).map_err(|error| {
-                crate::errors::value_error(format!("Failed to parse ScenarioSpec JSON: {error}"))
-            })?;
-        inner.validate().map_err(scenarios_to_py)?;
+        let inner =
+            finstack_quant_scenarios::ScenarioSpec::from_json(json).map_err(scenarios_to_py)?;
         Ok(Self { inner })
     }
 

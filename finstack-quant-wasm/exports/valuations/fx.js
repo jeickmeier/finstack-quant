@@ -11,4 +11,6 @@ export const fx = {
   FxBarrierOption: wasm.FxBarrierOption,
   FxVarianceSwap: wasm.FxVarianceSwap,
   QuantoOption: wasm.QuantoOption,
+  FxForwardBuilder: wasm.FxForwardBuilder,
+  FxOptionBuilder: wasm.FxOptionBuilder,
 };

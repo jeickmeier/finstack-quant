@@ -1,0 +1,18 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/option_kind.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Vanilla option kind for barrier payoff evaluation.",
+  "oneOf": [
+    {
+      "const": "call",
+      "description": "Call option: max(S-K, 0)",
+      "type": "string"
+    },
+    {
+      "const": "put",
+      "description": "Put option: max(K-S, 0)",
+      "type": "string"
+    }
+  ],
+  "title": "OptionKind"
+}

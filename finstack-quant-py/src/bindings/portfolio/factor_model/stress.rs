@@ -590,29 +590,31 @@ pub(super) fn factor_stress(
 ///         used).
 ///     position_pnls: P&L matrix. A ``pandas.DataFrame`` is read as rows =
 ///         scenarios, columns = positions. A nested list or 2-D NumPy array is
-///         read as ``n_positions x n_scenarios`` (position-major); a
-///         ``n_scenarios x n_positions`` layout is accepted when the two
-///         dimensions differ. Losses are negative.
+///         read as ``n_positions x n_scenarios`` (position-major, one row per
+///         position). Losses are negative.
 ///     confidence: Tail confidence as a decimal probability strictly inside
 ///         ``(0.5, 1)``; scenarios at or below the VaR quantile are tail
-///         events.
+///         events. ``None`` uses the confidence of the Rust
+///         ``DecompositionConfig.historical_95()`` preset (``0.95``).
 ///
 /// Returns:
 ///     ``StressAttribution`` with per-position tail-loss contributions and
 ///     per-scenario breakdowns.
 ///
 /// Raises:
-///     ValueError: If the matrix is empty, ragged, its orientation cannot be
-///         resolved against ``position_ids``, or ``confidence`` is outside
-///         ``(0.5, 1)``.
+///     ValueError: If the matrix is empty, ragged, does not have one row per
+///         position id, or ``confidence`` is outside ``(0.5, 1)``.
 #[pyfunction]
-#[pyo3(signature = (position_ids, position_pnls, confidence = 0.95))]
+#[pyo3(signature = (position_ids, position_pnls, confidence = None))]
 pub(super) fn build_stress_attribution(
     py: Python<'_>,
     position_ids: Option<Vec<String>>,
     position_pnls: &Bound<'_, PyAny>,
-    confidence: f64,
+    confidence: Option<f64>,
 ) -> PyResult<PyStressAttribution> {
+    let confidence = confidence.unwrap_or_else(|| {
+        finstack_quant_models::factor::risk::DecompositionConfig::historical_95().confidence
+    });
     let (position_ids, position_pnls) = extract_pnl_input(py, position_ids, position_pnls)?;
     let n_positions = position_ids.len();
     let n_scenarios = position_pnls.n_scenarios();

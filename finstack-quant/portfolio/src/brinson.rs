@@ -86,6 +86,7 @@ use serde::{Deserialize, Serialize};
 /// of portfolio and benchmark. Returns are the period arithmetic returns
 /// for each sector (e.g. `0.015` = +1.5 %).
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SectorPeriod {
     /// Sector identifier (industry / country / any grouping).
     pub sector: String,
@@ -105,6 +106,7 @@ pub struct SectorPeriod {
 
 /// Per-sector attribution effects (Brinson-Fachler three-way split).
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SectorEffect {
     /// Sector identifier (mirrors [`SectorPeriod::sector`]).
     pub sector: String,
@@ -121,6 +123,7 @@ pub struct SectorEffect {
 
 /// Single-period Brinson-Fachler result.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BrinsonPeriodResult {
     /// Per-sector effects, in the order supplied.
     pub sectors: Vec<SectorEffect>,
@@ -271,6 +274,7 @@ pub fn brinson_fachler(sectors: &[SectorPeriod]) -> Result<BrinsonPeriodResult> 
 /// Compounded portfolio vs. benchmark return and Carino-linked effects
 /// across multiple periods.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CarinoLinkedAttribution {
     /// Per-period decompositions in chronological order.
     pub periods: Vec<BrinsonPeriodResult>,

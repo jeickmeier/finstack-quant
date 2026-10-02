@@ -22,13 +22,21 @@ use std::f64::consts::PI;
 
 /// COS method configuration.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CosConfig {
-    /// Positive number of cosine terms (default: 128).
+    /// Number of cosine terms in `1..=`[`CosConfig::MAX_TERMS`] (default: 128).
     /// More terms = higher accuracy for non-smooth or heavy-tailed densities.
     pub num_terms: usize,
     /// Finite positive truncation range multiplier L (default: 10.0).
     /// Integration domain is [c1 - L*sqrt(c2 + sqrt(|c4|)), c1 + L*sqrt(c2 + sqrt(|c4|))].
     pub truncation_l: f64,
+}
+
+impl CosConfig {
+    /// Largest accepted `num_terms` (`65_536`); each term costs one
+    /// characteristic-function evaluation, so larger series are rejected
+    /// rather than allocated.
+    pub const MAX_TERMS: usize = 1 << 16;
 }
 
 impl Default for CosConfig {
@@ -57,7 +65,8 @@ pub struct BlackScholesCosParams {
     pub expiry: f64,
     /// `true` for call, `false` for put.
     pub is_call: bool,
-    /// Optional positive COS term count; defaults to [`CosConfig::default`].
+    /// Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
+    /// [`CosConfig::default`].
     pub n_terms: Option<usize>,
 }
 
@@ -82,7 +91,8 @@ pub struct VarianceGammaCosParams {
     pub expiry: f64,
     /// `true` for call, `false` for put.
     pub is_call: bool,
-    /// Optional positive COS term count; defaults to [`CosConfig::default`].
+    /// Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
+    /// [`CosConfig::default`].
     pub n_terms: Option<usize>,
 }
 
@@ -109,7 +119,8 @@ pub struct MertonJumpCosParams {
     pub expiry: f64,
     /// `true` for call, `false` for put.
     pub is_call: bool,
-    /// Optional positive COS term count; defaults to [`CosConfig::default`].
+    /// Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
+    /// [`CosConfig::default`].
     pub n_terms: Option<usize>,
 }
 
@@ -119,10 +130,21 @@ pub struct MertonJumpCosParams {
 ///
 /// * `params` - Black-Scholes COS input bag containing spot, strike, expiry,
 ///   continuous rates/carry, volatility, payoff direction, and optional term
-///   count; `None` uses [`CosConfig::default`].
+///   count; `None` uses [`CosConfig::default`]. Spot, strike, expiry, and
+///   volatility must be finite and positive; rates/carry must be finite.
+///
+/// # Errors
+///
+/// Returns an error for invalid market inputs, a zero term count, a degenerate
+/// truncation range, or non-finite model evaluations or prices.
 pub fn bs_cos_price(params: BlackScholesCosParams) -> std::result::Result<f64, FourierError> {
+    if !params.div_yield.is_finite() {
+        return Err(FourierError::invalid_input(
+            "Black-Scholes COS div_yield must be finite",
+        ));
+    }
     if !params.vol.is_finite() || params.vol <= 0.0 {
-        return Err(FourierError::model_failure(format!(
+        return Err(FourierError::invalid_input(format!(
             "Black-Scholes COS volatility must be finite and strictly positive, got {}",
             params.vol
         )));
@@ -149,15 +171,23 @@ pub fn bs_cos_price(params: BlackScholesCosParams) -> std::result::Result<f64, F
 ///
 /// * `params` - Variance-Gamma COS input bag containing option data, continuous
 ///   rates/carry, process parameters, payoff direction, and optional term
-///   count; `None` uses [`CosConfig::default`].
+///   count; `None` uses [`CosConfig::default`]. Spot, strike, expiry, sigma,
+///   and nu must be finite and positive. Rates, carry, and theta must be finite;
+///   `1 - theta*nu - sigma*sigma*nu/2` must be finite and positive.
+///
+/// # Errors
+///
+/// Returns an error for invalid market/process inputs, a zero term count, a
+/// degenerate truncation range, or non-finite model evaluations or prices.
 pub fn vg_cos_price(params: VarianceGammaCosParams) -> std::result::Result<f64, FourierError> {
-    let cf = VarianceGammaCf {
-        r: params.rate,
-        q: params.div_yield,
-        sigma: params.sigma,
-        nu: params.nu,
-        theta: params.theta,
-    };
+    let cf = VarianceGammaCf::new(
+        params.rate,
+        params.div_yield,
+        params.sigma,
+        params.nu,
+        params.theta,
+    )
+    .map_err(FourierError::invalid_input)?;
     price_from_cf(
         &cf,
         params.spot,
@@ -175,7 +205,15 @@ pub fn vg_cos_price(params: VarianceGammaCosParams) -> std::result::Result<f64, 
 ///
 /// * `params` - Merton jump-diffusion COS input bag containing option data,
 ///   continuous rates/carry, diffusion and jump parameters, payoff direction,
-///   and optional term count; `None` uses [`CosConfig::default`].
+///   and optional term count; `None` uses [`CosConfig::default`]. Spot, strike,
+///   and expiry must be finite and positive. Rates, carry, and mean log jump
+///   must be finite; diffusion/jump volatility and annual intensity must be
+///   finite and non-negative, with a finite risk-neutral jump compensator.
+///
+/// # Errors
+///
+/// Returns an error for invalid market/process inputs, a zero term count, a
+/// degenerate truncation range, or non-finite model evaluations or prices.
 pub fn merton_jump_cos_price(
     params: MertonJumpCosParams,
 ) -> std::result::Result<f64, FourierError> {
@@ -187,6 +225,7 @@ pub fn merton_jump_cos_price(
         mu_j: params.mu_jump,
         sigma_j: params.sigma_jump,
     };
+    cf.validate().map_err(FourierError::invalid_input)?;
     price_from_cf(
         &cf,
         params.spot,
@@ -327,7 +366,7 @@ impl<'a> CosPricer<'a> {
             .into_iter()
             .next()
             .ok_or_else(|| {
-                FourierError::model_failure(
+                FourierError::numerical(
                     "COS method: price_strip returned no price for a single strike",
                 )
             })
@@ -341,13 +380,34 @@ impl<'a> CosPricer<'a> {
         t: f64,
         is_call: bool,
     ) -> Result<Vec<f64>, FourierError> {
-        if self.config.num_terms == 0 {
-            return Err(FourierError::model_failure(
-                "COS method: num_terms must be positive",
+        for (name, value) in [("spot", spot), ("expiry", t)] {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(FourierError::invalid_input(format!(
+                    "COS method: {name} must be finite and positive, got {value}"
+                )));
+            }
+        }
+        if !r.is_finite() {
+            return Err(FourierError::invalid_input(
+                "COS method: rate must be finite",
             ));
         }
+        for &strike in strikes {
+            if !strike.is_finite() || strike <= 0.0 {
+                return Err(FourierError::invalid_input(format!(
+                    "COS method: strike must be finite and positive, got {strike}"
+                )));
+            }
+        }
+        if self.config.num_terms == 0 || self.config.num_terms > CosConfig::MAX_TERMS {
+            return Err(FourierError::invalid_input(format!(
+                "COS method: num_terms must be in 1..={}, got {}",
+                CosConfig::MAX_TERMS,
+                self.config.num_terms
+            )));
+        }
         if !self.config.truncation_l.is_finite() || self.config.truncation_l <= 0.0 {
-            return Err(FourierError::model_failure(
+            return Err(FourierError::invalid_input(
                 "COS method: truncation_l must be finite and positive",
             ));
         }
@@ -373,7 +433,7 @@ impl<'a> CosPricer<'a> {
         let (a, b) = truncation_range(&cumulants, self.config.truncation_l)?;
 
         if !(a.is_finite() && b.is_finite()) || b <= a {
-            return Err(FourierError::model_failure(
+            return Err(FourierError::numerical(
                 "COS method: invalid truncation range from cumulants",
             ));
         }
@@ -381,6 +441,11 @@ impl<'a> CosPricer<'a> {
         let n = self.config.num_terms;
         let bma = b - a;
         let df = (-r * t).exp();
+        if !df.is_finite() || df <= 0.0 {
+            return Err(FourierError::invalid_input(
+                "COS method: discount factor must be finite and positive",
+            ));
+        }
 
         // Pre-compute the strike-independent COS coefficients
         //   a_k = Re[phi_Y(u_k) * exp(-i*u_k*a)],   u_k = k*pi/(b-a)
@@ -398,7 +463,7 @@ impl<'a> CosPricer<'a> {
             let u_k = k as f64 * PI / bma;
             let cf_val = self.cf.cf(Complex64::new(u_k, 0.0), t);
             if !(cf_val.re.is_finite() && cf_val.im.is_finite()) {
-                return Err(FourierError::model_failure(format!(
+                return Err(FourierError::numerical(format!(
                     "COS method: characteristic function returned a non-finite \
                          value ({cf_val}) at frequency u_{k}={u_k}; the model is \
                          likely parameterised outside its domain of validity"
@@ -428,7 +493,7 @@ impl<'a> CosPricer<'a> {
         let fwd_moment_re = if is_call {
             let fwd_moment = self.cf.cf(Complex64::new(0.0, -1.0), t);
             if !(fwd_moment.re.is_finite() && fwd_moment.im.is_finite()) {
-                return Err(FourierError::model_failure(format!(
+                return Err(FourierError::numerical(format!(
                     "COS method: characteristic function returned a non-finite \
                          forward moment phi(-i) ({fwd_moment}); cannot apply \
                          put-call parity"
@@ -474,7 +539,7 @@ impl<'a> CosPricer<'a> {
     ) -> std::result::Result<f64, FourierError> {
         // x0 = ln(S/K): shift from Y to X = Y + x0.
         // Integration window in X-space, following the moneyness shift.
-        let x0 = (spot / strike).ln();
+        let x0 = spot.ln() - strike.ln();
         let a_x = a + x0;
         let b_x = b + x0;
 
@@ -531,7 +596,7 @@ impl<'a> CosPricer<'a> {
 /// `raw < -tol` is `false` for `NaN`. Surface it as an explicit error instead.
 fn cos_finite_price(raw: f64, side: &str) -> std::result::Result<f64, FourierError> {
     if !raw.is_finite() {
-        return Err(FourierError::model_failure(format!(
+        return Err(FourierError::numerical(format!(
             "COS method: {side} price is non-finite ({raw}); the cosine \
                  series or characteristic function diverged — increase \
                  num_terms / truncation_l or check the model parameters"
@@ -577,7 +642,7 @@ fn truncation_range(
 ) -> std::result::Result<(f64, f64), FourierError> {
     let radicand = c.c2 + c.c4.abs().sqrt();
     if !radicand.is_finite() || radicand <= DEGENERATE_CUMULANT_RADICAND {
-        return Err(FourierError::model_failure(format!(
+        return Err(FourierError::numerical(format!(
             "COS method: degenerate cumulant set (c2={}, c4={}); the \
                  log-price distribution has effectively zero spread, so no \
                  meaningful truncation window exists — the COS method is not \
@@ -622,6 +687,97 @@ fn psi_k(k: usize, a: f64, b: f64, c: f64, d: f64) -> f64 {
 mod tests {
     use super::*;
     use crate::fourier::characteristic_function::{BlackScholesCf, Cumulants, MertonJumpCf};
+
+    #[test]
+    fn cos_rejects_invalid_market_inputs_on_single_and_strip_paths() {
+        let cf = BlackScholesCf {
+            r: 0.05,
+            q: 0.0,
+            sigma: 0.2,
+        };
+        let pricer = CosPricer::new(&cf, CosConfig::default());
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -100.0, 0.0] {
+            assert!(pricer.price_call(invalid, 100.0, 0.05, 1.0).is_err());
+            assert!(pricer.price_put(invalid, 100.0, 0.05, 1.0).is_err());
+            assert!(pricer
+                .price_calls(100.0, &[90.0, invalid], 0.05, 1.0)
+                .is_err());
+            assert!(pricer
+                .price_puts(100.0, &[90.0, invalid], 0.05, 1.0)
+                .is_err());
+            assert!(pricer.price_call(100.0, 100.0, 0.05, invalid).is_err());
+        }
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1000.0, 1000.0] {
+            assert!(pricer.price_call(100.0, 100.0, invalid, 1.0).is_err());
+        }
+    }
+
+    #[test]
+    fn cos_entry_points_validate_process_domains() {
+        let vg = VarianceGammaCosParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.05,
+            div_yield: 0.0,
+            sigma: 0.2,
+            theta: -0.1,
+            nu: 0.2,
+            expiry: 1.0,
+            is_call: true,
+            n_terms: None,
+        };
+        assert!(vg_cos_price(vg).is_ok());
+        for invalid in [f64::NAN, f64::INFINITY, -0.2, 0.0] {
+            assert!(vg_cos_price(VarianceGammaCosParams {
+                sigma: invalid,
+                ..vg
+            })
+            .is_err());
+            assert!(vg_cos_price(VarianceGammaCosParams { nu: invalid, ..vg }).is_err());
+        }
+        assert!(vg_cos_price(VarianceGammaCosParams { theta: 10.0, ..vg }).is_err());
+        assert!(vg_cos_price(VarianceGammaCosParams {
+            div_yield: f64::NAN,
+            ..vg
+        })
+        .is_err());
+        let merton = MertonJumpCosParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.05,
+            div_yield: 0.0,
+            sigma: 0.2,
+            mu_jump: -0.05,
+            sigma_jump: 0.1,
+            lambda: 1.0,
+            expiry: 1.0,
+            is_call: true,
+            n_terms: None,
+        };
+        assert!(merton_jump_cos_price(merton).is_ok());
+        for invalid in [f64::NAN, f64::INFINITY, -0.1] {
+            assert!(merton_jump_cos_price(MertonJumpCosParams {
+                sigma: invalid,
+                ..merton
+            })
+            .is_err());
+            assert!(merton_jump_cos_price(MertonJumpCosParams {
+                sigma_jump: invalid,
+                ..merton
+            })
+            .is_err());
+            assert!(merton_jump_cos_price(MertonJumpCosParams {
+                lambda: invalid,
+                ..merton
+            })
+            .is_err());
+        }
+        assert!(merton_jump_cos_price(MertonJumpCosParams {
+            mu_jump: 1000.0,
+            ..merton
+        })
+        .is_err());
+    }
 
     /// Test CF whose `cf` evaluation returns a non-finite value.
     ///
@@ -886,6 +1042,45 @@ mod tests {
             "Merton should be in BS neighborhood: merton={call}, bs={bs_price}"
         );
         Ok(())
+    }
+
+    #[test]
+    fn cos_term_count_must_be_in_range() {
+        let params = |n_terms| BlackScholesCosParams {
+            spot: 100.0,
+            strike: 100.0,
+            rate: 0.03,
+            div_yield: 0.0,
+            vol: 0.2,
+            expiry: 1.0,
+            is_call: true,
+            n_terms: Some(n_terms),
+        };
+        assert!(bs_cos_price(params(CosConfig::MAX_TERMS)).is_ok());
+        for n_terms in [0, CosConfig::MAX_TERMS + 1] {
+            let err = bs_cos_price(params(n_terms)).expect_err("out-of-range term count");
+            assert!(
+                err.message.contains("num_terms must be in 1..=65536"),
+                "{err}"
+            );
+            assert_eq!(
+                err.kind(),
+                finstack_quant_core::error::ErrorKind::Validation
+            );
+            assert_eq!(
+                finstack_quant_core::Error::from(err).kind(),
+                finstack_quant_core::error::ErrorKind::Validation
+            );
+        }
+        let degenerate = bs_cos_price(BlackScholesCosParams {
+            vol: -0.2,
+            ..params(128)
+        })
+        .expect_err("negative volatility is rejected");
+        assert_eq!(
+            degenerate.kind(),
+            finstack_quant_core::error::ErrorKind::Validation
+        );
     }
 
     /// Item 1: a non-finite characteristic-function result must surface as an

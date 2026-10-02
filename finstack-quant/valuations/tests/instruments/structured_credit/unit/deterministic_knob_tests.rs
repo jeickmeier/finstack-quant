@@ -113,6 +113,7 @@ fn baseline() -> StructuredCredit {
     .expect("structure");
     let mut deal =
         StructuredCredit::new_clo("CLO-KNOBS", pool, tranches, close(), maturity(), "USD-OIS")
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
             .with_fees(DealFees::clo_standard(Currency::USD))
             .with_coverage_triggers(vec![CoverageTestSpec::oc("A", 1.20)])

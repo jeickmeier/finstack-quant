@@ -382,6 +382,16 @@ impl TermLoanDiscountingPricer {
             return Ok(());
         }
 
+        // Overnight coupons already contain the observation compiler's blend
+        // of historical fixings and projected observations. A single reset
+        // fixing cannot replace a daily average or compounded coupon (nor its
+        // lookback, cut-off, floors and segmented outstanding balance).
+        if float_spec.compounding.unwrap_or_default()
+            != crate::cashflow::builder::FloatingLegCompounding::Simple
+        {
+            return Ok(());
+        }
+
         // Seasoned floating PIK cannot be repaired by rescaling: capitalized
         // amounts fixed in the past compound into the outstanding path and the
         // final redemption, which this post-hoc pass does not rebuild. Failing

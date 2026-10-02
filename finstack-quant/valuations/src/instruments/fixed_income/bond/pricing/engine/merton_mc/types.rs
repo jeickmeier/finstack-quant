@@ -395,7 +395,9 @@ impl MertonMcRun {
 }
 
 /// Result from Monte Carlo PIK pricing.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct MertonMcResult {
     /// Clean price as percentage of par: `dirty_price_pct` minus the accrued
     /// interest at the valuation date.
@@ -427,7 +429,9 @@ pub struct MertonMcResult {
 }
 
 /// Path-level statistics from the Monte Carlo simulation.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct PathStatistics {
     /// Fraction of paths that defaulted.
     pub default_rate: f64,

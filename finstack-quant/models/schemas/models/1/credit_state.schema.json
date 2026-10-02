@@ -1,0 +1,51 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/credit_state.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Observable credit state at a point in time.",
+  "properties": {
+    "accreted_notional": {
+      "description": "Accreted (PIK-augmented) notional outstanding.",
+      "format": "double",
+      "type": "number"
+    },
+    "asset_value": {
+      "description": "Fair value of the firm's assets, if available.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "coupon_due": {
+      "default": 0.0,
+      "description": "Cash coupon amount due at this decision date.",
+      "format": "double",
+      "type": "number"
+    },
+    "distance_to_default": {
+      "description": "Distance-to-default (number of standard deviations from the default point).",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "hazard_rate": {
+      "description": "Current hazard rate (annualised instantaneous default intensity).",
+      "format": "double",
+      "type": "number"
+    },
+    "leverage": {
+      "description": "Leverage ratio (debt / assets).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "hazard_rate",
+    "leverage",
+    "accreted_notional"
+  ],
+  "title": "CreditState",
+  "type": "object"
+}

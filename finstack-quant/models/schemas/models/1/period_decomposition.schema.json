@@ -1,0 +1,108 @@
+{
+  "$defs": {
+    "HierarchyDimension": {
+      "description": "A single level in the credit factor hierarchy.\n\nBuilt-in variants (`Rating`, `Region`, `Sector`) have canonical tag keys.\n`Custom(key)` reads `issuer_tags[key]` for arbitrary user-defined dimensions\nsuch as `\"Currency\"` or `\"AssetType\"`.",
+      "oneOf": [
+        {
+          "const": "rating",
+          "description": "Credit rating bucket (e.g. `\"IG\"`, `\"HY\"`, `\"NR\"`).",
+          "type": "string"
+        },
+        {
+          "const": "region",
+          "description": "Geographic region (e.g. `\"EU\"`, `\"NA\"`, `\"APAC\"`).",
+          "type": "string"
+        },
+        {
+          "const": "sector",
+          "description": "Industry sector (e.g. `\"FIN\"`, `\"ENERGY\"`, `\"TECH\"`).",
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "description": "User-defined dimension reading `issuer_tags[key]`.",
+          "properties": {
+            "custom": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "custom"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "LevelValuesDelta": {
+      "description": "Per-level bucket-value deltas produced by [`decompose_period`].",
+      "properties": {
+        "deltas": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "description": "Bucket → `(to.values[bucket] - from.values[bucket])`. Only buckets\npresent in **both** snapshots are included.",
+          "type": "object"
+        },
+        "dimension": {
+          "$ref": "#/$defs/HierarchyDimension",
+          "description": "Dimension for this level."
+        },
+        "level_index": {
+          "description": "Zero-based level index, mirroring [`LevelValuesAtDate::level_index`].",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "level_index",
+        "dimension",
+        "deltas"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/period_decomposition.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Difference between two `LevelsAtDate` snapshots.",
+  "properties": {
+    "by_level": {
+      "description": "Per-level bucket deltas. Same length and same `level_index` /\n`dimension` ordering as [`LevelsAtDate::by_level`].",
+      "items": {
+        "$ref": "#/$defs/LevelValuesDelta"
+      },
+      "type": "array"
+    },
+    "d_adder": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "description": "Per-issuer adder deltas (`to - from`), restricted to issuers present\nin both snapshots.",
+      "type": "object"
+    },
+    "d_generic": {
+      "description": "`to.generic - from.generic`.",
+      "format": "double",
+      "type": "number"
+    },
+    "from": {
+      "description": "Earlier snapshot date.",
+      "type": "string"
+    },
+    "to": {
+      "description": "Later snapshot date.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "from",
+    "to",
+    "d_generic",
+    "by_level",
+    "d_adder"
+  ],
+  "title": "PeriodDecomposition",
+  "type": "object"
+}

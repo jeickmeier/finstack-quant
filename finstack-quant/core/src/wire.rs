@@ -815,10 +815,56 @@ mod tests {
     }
 
     #[test]
+    fn parse_sentinel_inverts_serialize() {
+        for value in [f64::INFINITY, f64::NEG_INFINITY] {
+            let encoded = serde_json::to_value(NonFiniteHolder { value }).expect("serialize");
+            let text = encoded["value"].as_str().expect("sentinel string");
+            assert_eq!(non_finite_f64::parse_sentinel(text), Some(value));
+        }
+        assert!(non_finite_f64::parse_sentinel(" NaN ").is_some_and(f64::is_nan));
+        assert_eq!(non_finite_f64::parse_sentinel("huge"), None);
+    }
+
+    #[test]
     fn date_schema_has_date_format() {
         let schema = serde_json::to_value(schemars::schema_for!(DateWire)).expect("schema");
         assert_eq!(schema["type"], "string");
         assert_eq!(schema["format"], "date");
+    }
+
+    #[test]
+    fn non_finite_wire_schema_lists_exactly_the_serialized_sentinels() {
+        let schema = serde_json::to_value(schemars::schema_for!(NonFiniteF64Wire)).expect("schema");
+        let sentinel = &schema["$defs"]["NonFiniteSentinel"];
+        let mut spellings: Vec<String> = sentinel["oneOf"]
+            .as_array()
+            .map(|variants| {
+                variants
+                    .iter()
+                    .map(|variant| variant["const"].as_str().expect("const").to_string())
+                    .collect()
+            })
+            .or_else(|| {
+                sentinel["enum"].as_array().map(|values| {
+                    values
+                        .iter()
+                        .map(|value| value.as_str().expect("string").to_string())
+                        .collect()
+                })
+            })
+            .expect("sentinel spellings");
+        spellings.sort();
+        assert_eq!(spellings, ["-inf", "inf", "nan"]);
+        for value in [f64::INFINITY, f64::NEG_INFINITY, f64::NAN] {
+            let wire = serde_json::to_value(NonFiniteF64Wire::from(value)).expect("serialize");
+            let adapter = serde_json::to_value(NonFiniteHolder { value }).expect("serialize");
+            assert_eq!(adapter["value"], wire, "adapter and wire type agree");
+            assert!(spellings.iter().any(|spelling| wire == json!(spelling)));
+        }
+        assert_eq!(
+            serde_json::to_value(NonFiniteF64Wire::from(1.5)).expect("serialize"),
+            json!(1.5)
+        );
     }
 
     #[test]
@@ -983,15 +1029,325 @@ pub mod non_finite_f64 {
     {
         match Wire::deserialize(deserializer)? {
             Wire::Number(value) => Ok(value),
-            Wire::Sentinel(text) => match text.trim().to_ascii_lowercase().as_str() {
-                "inf" | "+inf" | "infinity" | "+infinity" => Ok(f64::INFINITY),
-                "-inf" | "-infinity" => Ok(f64::NEG_INFINITY),
-                "nan" => Ok(f64::NAN),
-                other => Err(serde::de::Error::custom(format!(
-                    "expected a number or one of \"inf\", \"-inf\", \"nan\"; got {other:?}"
-                ))),
-            },
+            Wire::Sentinel(text) => parse_sentinel(&text).ok_or_else(|| {
+                serde::de::Error::custom(format!(
+                    "expected a number or one of \"inf\", \"-inf\", \"nan\"; got {:?}",
+                    text.trim().to_ascii_lowercase()
+                ))
+            }),
         }
+    }
+
+    /// Decode one sentinel string written by [`serialize`].
+    ///
+    /// Hosts whose number type represents `±∞` and `NaN` natively (JavaScript)
+    /// use this to turn a serialized sentinel back into a number, so the
+    /// sentinel vocabulary has a single owner.
+    ///
+    /// # Arguments
+    ///
+    /// * `text` - Candidate sentinel. Matching ignores surrounding whitespace
+    ///   and ASCII case; `"inf"`, `"+inf"`, `"infinity"` and `"+infinity"` map
+    ///   to `+∞`, `"-inf"` and `"-infinity"` to `-∞`, and `"nan"` to `NaN`.
+    ///
+    /// # Returns
+    ///
+    /// The decoded value, or `None` when `text` is not a recognized sentinel.
+    #[must_use]
+    pub fn parse_sentinel(text: &str) -> Option<f64> {
+        match text.trim().to_ascii_lowercase().as_str() {
+            "inf" | "+inf" | "infinity" | "+infinity" => Some(f64::INFINITY),
+            "-inf" | "-infinity" => Some(f64::NEG_INFINITY),
+            "nan" => Some(f64::NAN),
+            _ => None,
+        }
+    }
+}
+
+/// An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,
+/// otherwise one of the strings `"inf"`, `"-inf"` or `"nan"`.
+///
+/// Contract types store plain `f64` fields with
+/// `#[serde(with = "finstack_quant_core::wire::non_finite_f64")]` and name this
+/// type in `#[schemars(with = ...)]`, so the generated schema describes the
+/// sentinel strings the serializer actually writes.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(untagged)]
+pub enum NonFiniteF64Wire {
+    /// A finite value, written as a JSON number.
+    Finite(f64),
+    /// A non-finite value, written as its sentinel string.
+    NonFinite(NonFiniteSentinel),
+}
+
+/// Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
+pub enum NonFiniteSentinel {
+    /// `+∞`, written as `"inf"`.
+    Inf,
+    /// `-∞`, written as `"-inf"`.
+    #[serde(rename = "-inf")]
+    NegInf,
+    /// `NaN`, written as `"nan"`.
+    Nan,
+}
+
+impl From<f64> for NonFiniteF64Wire {
+    fn from(value: f64) -> Self {
+        if value.is_nan() {
+            Self::NonFinite(NonFiniteSentinel::Nan)
+        } else if value == f64::INFINITY {
+            Self::NonFinite(NonFiniteSentinel::Inf)
+        } else if value == f64::NEG_INFINITY {
+            Self::NonFinite(NonFiniteSentinel::NegInf)
+        } else {
+            Self::Finite(value)
+        }
+    }
+}
+
+/// Serde adapter for a `Vec<f64>` whose elements may be `±∞` or `NaN`.
+///
+/// Each element uses the [`non_finite_f64`] wire form (a number when finite, a
+/// sentinel string otherwise), so a series with undefined points survives a
+/// JSON round trip instead of turning into `null`s that cannot be read back.
+///
+/// # Examples
+///
+/// ```rust
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Serialize, Deserialize)]
+/// struct Series {
+///     #[serde(with = "finstack_quant_core::wire::non_finite_f64_seq")]
+///     values: Vec<f64>,
+/// }
+///
+/// let json = serde_json::to_string(&Series { values: vec![1.5, f64::NAN] })?;
+/// assert_eq!(json, r#"{"values":[1.5,"nan"]}"#);
+/// let back: Series = serde_json::from_str(&json)?;
+/// assert!(back.values[1].is_nan());
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub mod non_finite_f64_seq {
+    use serde::{Deserialize, Serialize};
+
+    /// One element in the [`super::non_finite_f64`] wire form.
+    #[derive(Serialize, Deserialize)]
+    #[serde(transparent)]
+    struct Element(#[serde(with = "super::non_finite_f64")] f64);
+
+    /// Serialize a slice of `f64`, encoding non-finite elements as sentinels.
+    ///
+    /// # Arguments
+    ///
+    /// * `values` - Elements to encode in order; `±∞` and `NaN` become strings.
+    /// * `serializer` - Serde serializer receiving the sequence.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any failure from the underlying serializer.
+    pub fn serialize<S>(values: &[f64], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_seq(values.iter().map(|value| Element(*value)))
+    }
+
+    /// Deserialize a sequence whose elements may be sentinel strings.
+    ///
+    /// # Arguments
+    ///
+    /// * `deserializer` - Serde deserializer supplying the sequence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an element is `null` or is neither a number nor a
+    /// recognized sentinel (see [`super::non_finite_f64::parse_sentinel`]).
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<f64>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Vec::<Element>::deserialize(deserializer)?
+            .into_iter()
+            .map(|Element(value)| value)
+            .collect())
+    }
+}
+
+/// Names the top-level fields of a result type that serialize through
+/// [`non_finite_f64`].
+///
+/// Those fields reach JSON as sentinel strings when they are `±∞` or `NaN`.
+/// Hosts with a native non-finite number type (JavaScript) read this list to
+/// restore the numbers after serialization, instead of keeping their own copy
+/// of the field names. Every implementation carries a unit test that fills
+/// each `f64` field with `NaN` and checks that exactly these keys come out as
+/// sentinel strings, so the list cannot drift from the serde attributes.
+pub trait NonFiniteFields {
+    /// Serialized names of the fields annotated with
+    /// `#[serde(with = "finstack_quant_core::wire::non_finite_f64")]`.
+    const NON_FINITE_FIELDS: &'static [&'static str];
+}
+
+/// Serde adapter for a count that hosts must receive as an ordinary number.
+///
+/// Result payloads that embed a Monte Carlo `ValuationResult` are serialized
+/// for JavaScript with 64-bit integers mapped to `BigInt`, because MC seeds
+/// span the full `u64` range. A `usize` count next to such a result would
+/// otherwise also arrive as a `BigInt`. This adapter writes the count as a
+/// `u32`, which every serializer emits as a plain number; the JSON text is
+/// unchanged. Deserialization accepts any unsigned integer that fits `usize`.
+///
+/// # Examples
+///
+/// ```rust
+/// use serde::{Deserialize, Serialize};
+///
+/// #[derive(Serialize, Deserialize)]
+/// struct Summary {
+///     #[serde(with = "finstack_quant_core::wire::count")]
+///     num_steps: usize,
+/// }
+///
+/// let json = serde_json::to_string(&Summary { num_steps: 3 })?;
+/// assert_eq!(json, r#"{"num_steps":3}"#);
+/// assert_eq!(serde_json::from_str::<Summary>(&json)?.num_steps, 3);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub mod count {
+    use serde::Deserialize;
+
+    /// Serialize a `usize` count as a `u32`.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Non-negative count to encode; must not exceed `u32::MAX`.
+    /// * `serializer` - Serde serializer receiving the 32-bit count.
+    ///
+    /// # Errors
+    ///
+    /// Returns a serializer error when `value` exceeds `u32::MAX`.
+    pub fn serialize<S>(value: &usize, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let value = u32::try_from(*value).map_err(serde::ser::Error::custom)?;
+        serializer.serialize_u32(value)
+    }
+
+    /// Deserialize a `usize` count.
+    ///
+    /// # Arguments
+    ///
+    /// * `deserializer` - Serde deserializer supplying a non-negative integer.
+    ///
+    /// # Errors
+    ///
+    /// Returns a deserializer error when the value is not a non-negative
+    /// integer that fits `usize`.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<usize, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        usize::deserialize(deserializer)
+    }
+}
+
+/// Serde adapter for a list of counts or indices that hosts must receive as
+/// ordinary numbers.
+///
+/// The list form of [`count`]: each element is written as a `u32` so that a
+/// BigInt-preserving JavaScript serializer still emits plain numbers.
+pub mod counts {
+    use serde::ser::SerializeSeq;
+    use serde::Deserialize;
+
+    /// Serialize a list of `usize` values as `u32` elements.
+    ///
+    /// # Arguments
+    ///
+    /// * `values` - Non-negative counts or indices; each must not exceed `u32::MAX`.
+    /// * `serializer` - Serde serializer receiving the sequence.
+    ///
+    /// # Errors
+    ///
+    /// Returns a serializer error when any element exceeds `u32::MAX`.
+    pub fn serialize<S>(values: &[usize], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let mut seq = serializer.serialize_seq(Some(values.len()))?;
+        for value in values {
+            let value = u32::try_from(*value).map_err(serde::ser::Error::custom)?;
+            seq.serialize_element(&value)?;
+        }
+        seq.end()
+    }
+
+    /// Deserialize a list of `usize` values.
+    ///
+    /// # Arguments
+    ///
+    /// * `deserializer` - Serde deserializer supplying a sequence of
+    ///   non-negative integers.
+    ///
+    /// # Errors
+    ///
+    /// Returns a deserializer error when the value is not a sequence of
+    /// non-negative integers that fit `usize`.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Vec<usize>, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Vec::<usize>::deserialize(deserializer)
+    }
+}
+
+/// Serde adapter for a signed count (for example a day span) that hosts must
+/// receive as an ordinary number.
+///
+/// The signed form of [`count`]: the value is written as an `i32` so that a
+/// BigInt-preserving JavaScript serializer still emits a plain number.
+pub mod signed_count {
+    use serde::Deserialize;
+
+    /// Serialize an `i64` count as an `i32`.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Signed count to encode; must lie within the `i32` range.
+    /// * `serializer` - Serde serializer receiving the 32-bit count.
+    ///
+    /// # Errors
+    ///
+    /// Returns a serializer error when `value` lies outside the `i32` range.
+    pub fn serialize<S>(value: &i64, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let value = i32::try_from(*value).map_err(serde::ser::Error::custom)?;
+        serializer.serialize_i32(value)
+    }
+
+    /// Deserialize an `i64` count.
+    ///
+    /// # Arguments
+    ///
+    /// * `deserializer` - Serde deserializer supplying an integer.
+    ///
+    /// # Errors
+    ///
+    /// Returns a deserializer error when the value is not an integer that
+    /// fits `i64`.
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<i64, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        i64::deserialize(deserializer)
     }
 }
 

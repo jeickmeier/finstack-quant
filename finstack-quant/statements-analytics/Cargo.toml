@@ -16,6 +16,7 @@ finstack-quant-models = { path = "../models", version = "0.9.0", default-feature
 finstack-quant-covenants = { path = "../covenants", version = "0.9.0", default-features = false }
 finstack-quant-statements = { path = "../statements", version = "0.9.0", default-features = false }
 finstack-quant-valuations = { path = "../valuations", version = "0.9.0", default-features = false }
+schemars = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true, features = ["serde"] }
@@ -27,8 +28,25 @@ tracing = { version = "0.1", default-features = false }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 rayon = "1.11"
 
+[features]
+default = ["json-schema"]
+json-schema = [
+    "dep:schemars",
+    "finstack-quant-core/json-schema",
+    "finstack-quant-covenants/json-schema",
+    "finstack-quant-models/json-schema",
+    "finstack-quant-statements/json-schema",
+    "finstack-quant-valuations/json-schema",
+]
+
 [dev-dependencies]
+jsonschema = { version = "0.28", default-features = false }
 time = { workspace = true, features = ["macros"] }
+
+[[bin]]
+name = "gen_statements_analytics_schemas"
+path = "src/bin/gen_schemas.rs"
+required-features = ["json-schema"]
 
 [lints]
 workspace = true

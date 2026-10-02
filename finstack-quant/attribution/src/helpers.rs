@@ -7,7 +7,7 @@
 use super::types::{AttributionFactor, AttributionMethod, CarryDetail, PnlAttribution, SourceLine};
 use finstack_quant_core::config::FinstackConfig;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCountContext, Tenor};
+use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
@@ -22,7 +22,7 @@ use finstack_quant_valuations::instruments::Bond;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::MarketDependencies;
 use finstack_quant_valuations::instruments::PricingOptions;
-use finstack_quant_valuations::metrics::collect_cashflows_in_period;
+use finstack_quant_valuations::metrics::collect_period_cash;
 use finstack_quant_valuations::metrics::MetricId;
 use std::sync::Arc;
 
@@ -219,8 +219,10 @@ pub(crate) fn init_attribution(
 
 /// Raw, repricing-derived inputs for the full-window carry decomposition.
 pub(crate) struct TotalReturnCarryInputs {
-    /// Coupons whose PAYMENT date falls in `[t0, t1)` (drives carry total + total_pnl).
+    /// All period economic cash, including principal; drives total-return addback.
     pub cash_paid: Money,
+    /// Coupon, interest and fee receipts, excluding principal.
+    pub income_cash_paid: Money,
     /// `accrued(t1) - accrued(t0)` (curve-independent); `None` when the instrument has no `Accrued`.
     pub delta_accrued: Option<Money>,
     /// `F_t1 - F_t0` on a flat-YTM(t0) curve (basis cancels); `None` when `Ytm`/flat pricing is unavailable.
@@ -233,6 +235,8 @@ pub(crate) struct TotalReturnCarryInputs {
     pub funding_cost: Option<Money>,
     /// Diagnostics for the caller to merge into `meta.notes`.
     pub warnings: Vec<String>,
+    /// Top-level valuation calls made by this helper, including failed attempts.
+    pub num_repricings: usize,
 }
 
 /// Gather the repricing-based pieces of the carry decomposition over `[as_of_t0, as_of_t1]`,
@@ -249,12 +253,11 @@ pub(crate) fn total_return_carry_inputs(
     currency: Currency,
 ) -> Result<TotalReturnCarryInputs> {
     let mut warnings = Vec::new();
+    let mut num_repricings = 0;
 
-    let cash_paid = Money::new(
-        collect_cashflows_in_period(instrument, market, as_of_t0, as_of_t1, currency)?,
-        currency,
-    )?;
+    let cash = collect_period_cash(instrument, market, as_of_t0, as_of_t1, currency)?;
 
+    num_repricings += 1;
     let t0_metrics = instrument
         .price_with_metrics(
             market,
@@ -270,8 +273,24 @@ pub(crate) fn total_return_carry_inputs(
             .and_then(|r| r.measures.get(id.as_str()).copied())
             .filter(|v| v.is_finite())
     };
-    let accrued_t0 = metric(t0_metrics.as_ref(), MetricId::Accrued);
+    let mut accrued_t0 = metric(t0_metrics.as_ref(), MetricId::Accrued);
     let ytm = metric(t0_metrics.as_ref(), MetricId::Ytm);
+    // Near maturity the quote-date YTM may be unavailable while accrued
+    // interest remains valid. Recover accrued independently so the coupon
+    // partition does not discard it with the failed yield calculation.
+    if t0_metrics.is_none() {
+        num_repricings += 1;
+        accrued_t0 = instrument
+            .price_with_metrics(
+                market,
+                as_of_t0,
+                &[MetricId::Accrued],
+                PricingOptions::default(),
+            )
+            .ok()
+            .and_then(|result| metric(Some(&result), MetricId::Accrued));
+    }
+    num_repricings += 1;
     let accrued_t1 = instrument
         .price_with_metrics(
             market,
@@ -288,9 +307,15 @@ pub(crate) fn total_return_carry_inputs(
     };
 
     let flat_window_diff = match ytm {
-        Some(ytm) => {
-            flat_window_diff_from_ytm(instrument, market, as_of_t0, as_of_t1, currency, ytm)?
-        }
+        Some(ytm) => flat_window_diff_from_ytm(
+            instrument,
+            market,
+            as_of_t0,
+            as_of_t1,
+            currency,
+            ytm,
+            &mut num_repricings,
+        )?,
         None => None,
     };
     let funding_cost = reprice_funding_cost(
@@ -300,14 +325,20 @@ pub(crate) fn total_return_carry_inputs(
         as_of_t1,
         currency,
         &mut warnings,
+        &mut num_repricings,
     );
+    if flat_window_diff.is_none() {
+        warnings.push("carry pull-to-par unavailable: flat-yield repricing could not be resolved; roll_down contains the unpartitioned price-carry residual".into());
+    }
 
     Ok(TotalReturnCarryInputs {
-        cash_paid,
+        cash_paid: cash.total,
+        income_cash_paid: cash.income,
         delta_accrued,
         flat_window_diff,
         funding_cost,
         warnings,
+        num_repricings,
     })
 }
 
@@ -319,14 +350,17 @@ fn flat_window_diff_from_ytm(
     as_of_t1: Date,
     currency: Currency,
     ytm: f64,
+    num_repricings: &mut usize,
 ) -> Result<Option<Money>> {
     let Ok(flat) = build_flat_ytm_market(instrument, market, ytm) else {
         return Ok(None);
     };
+    *num_repricings += 1;
     let Ok(f_t0) = instrument.value(&flat, as_of_t0) else {
         return Ok(None);
     };
     let f_t0 = f_t0.amount();
+    *num_repricings += 1;
     let Ok(f_t1) = instrument.value(&flat, as_of_t1) else {
         return Ok(None);
     };
@@ -406,8 +440,8 @@ fn build_flat_ytm_market(
 /// Repo/funding cost of carrying `PV(t0)` from `as_of_t0` to `as_of_t1`
 /// on the instrument's funding curve, when one is configured and present.
 ///
-/// Accrual is `PV × (exp(r_cont × dcf) − 1)` with a continuously compounded
-/// funding zero — the same formula as the valuations `FundingCost` metric.
+/// Accrual is `PV × (1 / DF(t0, t1) − 1)`, using the funding curve's
+/// date-to-date discount ratio — the same formula as the valuations `FundingCost` metric.
 /// This is a financing overlay: the waterfall/parallel date-roll factor
 /// (`theta + cash`) stays all-in price carry.
 fn reprice_funding_cost(
@@ -417,6 +451,7 @@ fn reprice_funding_cost(
     as_of_t1: Date,
     currency: Currency,
     warnings: &mut Vec<String>,
+    num_repricings: &mut usize,
 ) -> Option<Money> {
     let curve_id = instrument.repo_curve_id()?;
     if as_of_t1 <= as_of_t0 {
@@ -431,6 +466,7 @@ fn reprice_funding_cost(
             return None;
         }
     };
+    *num_repricings += 1;
     let pv = match instrument.value(market, as_of_t0) {
         Ok(value) if value.amount().is_finite() => value.amount(),
         Ok(_) => {
@@ -442,46 +478,20 @@ fn reprice_funding_cost(
             return None;
         }
     };
-    let (day_count, frequency) = if let Some(bond) = instrument.as_any().downcast_ref::<Bond>() {
-        (
-            bond.cashflow_spec.day_count(),
-            Some(bond.cashflow_spec.frequency()),
-        )
-    } else {
-        (funding_curve.day_count(), None)
-    };
-    let dc_ctx = DayCountContext {
-        frequency,
-        ..DayCountContext::default()
-    };
-    let dcf = match day_count.year_fraction(as_of_t0, as_of_t1, dc_ctx) {
-        Ok(value) if value.is_finite() => value,
+    let horizon_df = match funding_curve.df_between_dates(as_of_t0, as_of_t1) {
+        Ok(value) if value.is_finite() && value > 0.0 => value,
         Ok(_) => {
-            warnings
-                .push("funding_cost omitted: day-count year fraction is non-finite".to_string());
+            warnings.push("funding_cost omitted: invalid horizon discount factor".to_string());
             return None;
         }
         Err(e) => {
             warnings.push(format!(
-                "funding_cost omitted: day-count year fraction unavailable ({e})"
+                "funding_cost omitted: horizon discount factor unavailable ({e})"
             ));
             return None;
         }
     };
-    let annual_rate = match funding_curve.zero_rate_on_date(as_of_t1, Compounding::Continuous) {
-        Ok(rate) if rate.is_finite() => rate,
-        Ok(_) => {
-            warnings.push("funding_cost omitted: funding zero rate is non-finite".to_string());
-            return None;
-        }
-        Err(e) => {
-            warnings.push(format!(
-                "funding_cost omitted: funding zero rate unavailable ({e})"
-            ));
-            return None;
-        }
-    };
-    let cost = pv * ((annual_rate * dcf).exp() - 1.0);
+    let cost = pv * (1.0 / horizon_df - 1.0);
     if cost.is_finite() {
         match Money::new(cost, currency) {
             Ok(amount) => Some(amount),
@@ -500,9 +510,10 @@ fn reprice_funding_cost(
 ///
 /// `carry_total = theta + cash_paid` (the isolated date-roll factor);
 /// `total_pnl += cash_paid`. The price-carry detail:
-/// `coupon_income = Δaccrued + cash`, `pull_to_par = (F_t1−F_t0) − Δaccrued`,
+/// `coupon_income = Δaccrued + income_cash`,
+/// `pull_to_par = (F_t1−F_t0) + principal_cash − Δaccrued`,
 /// `roll_down = theta − (F_t1−F_t0)`, which sum to `carry_total`. When accrual / flat pricing is
-/// unavailable (non-bonds), falls back to `coupon_income = cash`, `pull_to_par = None`, and the
+/// unavailable (non-bonds), falls back to `coupon_income = income_cash`, `pull_to_par = None`, and the
 /// whole price-carry residual goes to `roll_down`.
 ///
 /// `funding_cost` is populated when the instrument exposes a funding/repo
@@ -522,11 +533,20 @@ pub(crate) fn apply_total_return_carry(
     }
 
     let coupon_income = match inputs.delta_accrued {
-        Some(da) => da.checked_add(inputs.cash_paid)?,
-        None => inputs.cash_paid,
+        Some(da) => da.checked_add(inputs.income_cash_paid)?,
+        None => inputs.income_cash_paid,
     };
-    let (pull_to_par, roll_down) = match (inputs.delta_accrued, inputs.flat_window_diff) {
-        (Some(da), Some(fd)) => (Some(fd.checked_sub(da)?), Some(theta.checked_sub(fd)?)),
+    let principal_cash = inputs.cash_paid.checked_sub(inputs.income_cash_paid)?;
+    let (pull_to_par, roll_down) = match inputs.flat_window_diff {
+        Some(fd) => {
+            let accrued = inputs
+                .delta_accrued
+                .unwrap_or(Money::from((0_i64, theta.currency())));
+            (
+                Some(fd.checked_add(principal_cash)?.checked_sub(accrued)?),
+                Some(theta.checked_sub(fd)?),
+            )
+        }
         // Fallback (no accrual / flat split, e.g. non-bonds): the whole price-carry residual
         // goes to roll_down so `coupon_income + roll_down = total` still holds.
         _ => (None, Some(attribution.carry.checked_sub(coupon_income)?)),
@@ -646,6 +666,236 @@ mod tests {
     use finstack_quant_core::Error;
     use std::sync::Arc;
     use time::macros::date;
+
+    #[derive(Clone)]
+    struct CountingInstrument {
+        calls: Arc<std::sync::atomic::AtomicUsize>,
+        attributes: finstack_quant_core::types::Attributes,
+        fail_metrics: bool,
+        fail_ytm: bool,
+        fail_values: bool,
+        has_yield: bool,
+        has_funding: bool,
+    }
+
+    finstack_quant_valuations::impl_empty_cashflow_provider!(
+        CountingInstrument,
+        finstack_quant_cashflows::builder::CashflowRepresentation::NoResidual
+    );
+
+    impl Instrument for CountingInstrument {
+        fn id(&self) -> &str {
+            "COUNTED-CARRY"
+        }
+        fn key(&self) -> finstack_quant_valuations::pricer::InstrumentType {
+            finstack_quant_valuations::pricer::InstrumentType::Bond
+        }
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+        fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+            self
+        }
+        fn attributes(&self) -> &finstack_quant_core::types::Attributes {
+            &self.attributes
+        }
+        fn attributes_mut(&mut self) -> &mut finstack_quant_core::types::Attributes {
+            &mut self.attributes
+        }
+        fn clone_box(&self) -> Box<dyn Instrument> {
+            Box::new(self.clone())
+        }
+        fn market_dependencies(&self) -> Result<MarketDependencies> {
+            let mut deps = MarketDependencies::new();
+            deps.add_discount_curve("USD-OIS");
+            Ok(deps)
+        }
+        fn repo_curve_id(&self) -> Option<finstack_quant_core::types::CurveId> {
+            self.has_funding.then(|| "USD-REPO".into())
+        }
+        fn base_value(&self, _market: &MarketContext, _as_of: Date) -> Result<Money> {
+            self.calls
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if self.fail_values {
+                return Err(Error::Validation("intentional value failure".into()));
+            }
+            Ok(Money::from((100_i64, Currency::USD)))
+        }
+        fn price_with_metrics(
+            &self,
+            _market: &MarketContext,
+            as_of: Date,
+            metrics: &[MetricId],
+            _options: PricingOptions,
+        ) -> finstack_quant_valuations::Result<finstack_quant_valuations::results::ValuationResult>
+        {
+            self.calls
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if self.fail_metrics || (self.fail_ytm && metrics.contains(&MetricId::Ytm)) {
+                return Err(Error::Validation("intentional metrics failure".into()).into());
+            }
+            let mut result = finstack_quant_valuations::results::ValuationResult::stamped(
+                self.id(),
+                as_of,
+                Money::from((100_i64, Currency::USD)),
+            );
+            if metrics.contains(&MetricId::Accrued) {
+                result
+                    .measures
+                    .insert(MetricId::Accrued, f64::from(as_of.day()));
+            }
+            if self.has_yield && metrics.contains(&MetricId::Ytm) {
+                result.measures.insert(MetricId::Ytm, 0.05);
+            }
+            Ok(result)
+        }
+    }
+
+    fn counting_market() -> MarketContext {
+        let curve = |id| {
+            DiscountCurve::builder(id)
+                .base_date(date!(2025 - 01 - 15))
+                .knots([(0.0, 1.0), (100.0, (-0.05_f64 * 100.0).exp())])
+                .interp(InterpStyle::LogLinear)
+                .build()
+                .expect("curve")
+        };
+        MarketContext::new()
+            .insert(curve("USD-OIS"))
+            .insert(curve("USD-REPO"))
+    }
+
+    #[test]
+    fn carry_helper_counts_all_attempted_metric_flat_and_funding_valuations() {
+        for (fail_metrics, fail_values, has_yield, has_funding, expected) in [
+            (false, false, false, false, 2),
+            (false, false, true, true, 5),
+            (true, false, false, true, 4),
+            (false, true, true, false, 3),
+        ] {
+            let instrument = CountingInstrument {
+                calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+                attributes: Default::default(),
+                fail_metrics,
+                fail_ytm: false,
+                fail_values,
+                has_yield,
+                has_funding,
+            };
+            let inputs = total_return_carry_inputs(
+                &instrument,
+                &counting_market(),
+                date!(2025 - 01 - 15),
+                date!(2025 - 01 - 16),
+                Currency::USD,
+            )
+            .expect("optional carry inputs");
+            assert_eq!(inputs.num_repricings, expected);
+            assert_eq!(
+                instrument.calls.load(std::sync::atomic::Ordering::Relaxed),
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn repricing_methods_include_actual_carry_helper_cost_in_metadata() {
+        for method in [
+            AttributionMethod::Parallel,
+            AttributionMethod::Waterfall(crate::default_waterfall_order()),
+            AttributionMethod::Taylor(Default::default()),
+            AttributionMethod::Taylor(crate::TaylorAttributionConfig {
+                include_gamma: true,
+                ..Default::default()
+            }),
+        ] {
+            let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+            let instrument: Arc<dyn Instrument> = Arc::new(CountingInstrument {
+                calls: Arc::clone(&calls),
+                attributes: Default::default(),
+                fail_metrics: false,
+                fail_ytm: false,
+                fail_values: false,
+                has_yield: true,
+                has_funding: true,
+            });
+            let market = counting_market();
+            let attribution = crate::attribute_pnl(
+                &method,
+                &crate::AttributionRequest::new(
+                    &instrument,
+                    &market,
+                    &market,
+                    date!(2025 - 01 - 15),
+                    date!(2025 - 01 - 16),
+                    &FinstackConfig::default(),
+                ),
+            )
+            .expect("attribution");
+            assert_eq!(
+                attribution.meta.num_repricings,
+                calls.load(std::sync::atomic::Ordering::Relaxed)
+            );
+        }
+    }
+
+    #[test]
+    fn unavailable_yield_preserves_the_independently_available_accrual_change() {
+        let instrument = CountingInstrument {
+            calls: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
+            attributes: Default::default(),
+            fail_metrics: false,
+            fail_ytm: true,
+            fail_values: false,
+            has_yield: true,
+            has_funding: false,
+        };
+        let inputs = total_return_carry_inputs(
+            &instrument,
+            &counting_market(),
+            date!(2025 - 01 - 15),
+            date!(2025 - 01 - 16),
+            Currency::USD,
+        )
+        .expect("carry inputs without yield");
+        assert_eq!(
+            inputs.delta_accrued.expect("recovered accrued").amount(),
+            1.0
+        );
+        assert_eq!(inputs.flat_window_diff, None);
+        assert_eq!(inputs.num_repricings, 3);
+    }
+
+    #[test]
+    fn carry_partition_separates_principal_and_coupon_accrual() {
+        let mut attribution = PnlAttribution::new(
+            Money::from((-50_i64, Currency::USD)),
+            "CARRY",
+            date!(2025 - 01 - 15),
+            date!(2025 - 01 - 16),
+            AttributionMethod::Parallel,
+        );
+        let inputs = TotalReturnCarryInputs {
+            cash_paid: Money::from((55_i64, Currency::USD)),
+            income_cash_paid: Money::from((5_i64, Currency::USD)),
+            delta_accrued: Some(Money::from((-4_i64, Currency::USD))),
+            flat_window_diff: Some(Money::from((-49_i64, Currency::USD))),
+            funding_cost: None,
+            warnings: Vec::new(),
+            num_repricings: 0,
+        };
+        apply_total_return_carry(
+            &mut attribution,
+            Money::from((-50_i64, Currency::USD)),
+            inputs,
+        )
+        .expect("carry partition");
+        let detail = attribution.carry_detail.expect("detail");
+        assert_eq!(detail.total.amount(), 5.0);
+        assert_eq!(detail.coupon_income.expect("income").total.amount(), 1.0);
+        assert_eq!(detail.pull_to_par.expect("pull to par").amount(), 5.0);
+        assert_eq!(detail.roll_down.expect("roll down").total.amount(), -1.0);
+    }
 
     // Simple test FX provider
     struct TestFx;
@@ -851,6 +1101,7 @@ mod tests {
         let market = MarketContext::new().insert(ois).insert(repo);
 
         let mut warnings = Vec::new();
+        let mut num_repricings = 0;
         let funding = reprice_funding_cost(
             &bond,
             &market,
@@ -858,6 +1109,7 @@ mod tests {
             as_of_t1,
             Currency::USD,
             &mut warnings,
+            &mut num_repricings,
         )
         .expect("funding cost");
         assert!(

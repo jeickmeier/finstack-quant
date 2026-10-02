@@ -1,9 +1,13 @@
 //! Gaussian-copula pricer for CMS spread options.
 //!
-//! The model treats each CMS rate as a convexity-adjusted SABR marginal and
-//! couples the two terminal CMS rates with the instrument's Gaussian rank
-//! correlation. Volatility sources are resolved as concrete `VolSource`s, so a
-//! market can provide full SABR `VolCube`s or simpler 2D volatility surfaces.
+//! Each CMS rate has a lognormal payment-measure marginal with its mean set by
+//! the shared first-order CMS convexity approximation. The two rates are coupled
+//! by a Gaussian copula. Only Black volatility surfaces constant across strike
+//! at the requested expiry are supported; tenor-axis ATM surfaces are also valid.
+//! Smile cubes and nonflat smiles are rejected because a smile-to-payment-measure
+//! distribution is not implemented. This is a flat-volatility approximation,
+//! not SABR static replication. Conditional Black integration of the short rate
+//! leaves one 20-node Gaussian quadrature over the long rate.
 
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
@@ -17,20 +21,20 @@ use crate::pricer::{
 use crate::results::ValuationResult;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::{norm_cdf, GaussHermiteQuadrature};
+use finstack_quant_core::market_data::surfaces::VolSurfaceAxis;
+use finstack_quant_core::math::GaussHermiteQuadrature;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
+use finstack_quant_models::closed_form::volatility::{black_call, black_put};
 use finstack_quant_models::volatility::VolSource;
 
-const DEFAULT_QUADRATURE_ORDER: usize = 10;
+const DEFAULT_QUADRATURE_ORDER: usize = 20;
 const MIN_POSITIVE_RATE: f64 = 1.0e-8;
 const MIN_VOL: f64 = 1.0e-8;
-const QUANTILE_ITERS: usize = 48;
-const TAIL_PROB_EPS: f64 = 1.0e-10;
+const FLAT_VOL_TOLERANCE: f64 = 1.0e-12;
 
 #[derive(Debug, Clone, Copy)]
 struct CmsSpreadLeg {
-    tenor_years: f64,
     forward_rate: f64,
     adjusted_forward_rate: f64,
     convexity_adjustment: f64,
@@ -46,7 +50,11 @@ struct CmsSpreadPricingData {
     expected_payoff: f64,
 }
 
-/// CMS spread option pricer using Gaussian copula and SABR marginals.
+/// CMS spread option pricer using Gaussian copula and flat-volatility lognormal marginals.
+///
+/// The payment-measure means use the shared first-order CMS convexity
+/// approximation. Nonflat strike smiles and SABR cubes return a validation error;
+/// this engine does not transform smile distributions between measures.
 #[derive(Debug, Clone)]
 pub struct CmsSpreadOptionPricer {
     quadrature_order: usize,
@@ -69,8 +77,8 @@ impl CmsSpreadOptionPricer {
         inst.validate()?;
         if inst.payment_date <= as_of {
             return Ok(CmsSpreadPricingData {
-                long_leg: CmsSpreadLeg::zero(inst.long_cms_tenor.to_years()),
-                short_leg: CmsSpreadLeg::zero(inst.short_cms_tenor.to_years()),
+                long_leg: CmsSpreadLeg::zero(),
+                short_leg: CmsSpreadLeg::zero(),
                 discount_factor: 0.0,
                 expected_payoff: 0.0,
             });
@@ -118,7 +126,7 @@ impl CmsSpreadOptionPricer {
                 inst.option_type,
             )
         } else {
-            self.expected_payoff(inst, &long_leg, &long_vol, &short_leg, &short_vol)?
+            self.expected_payoff(inst, &long_leg, &short_leg)?
         };
 
         Ok(CmsSpreadPricingData {
@@ -153,7 +161,6 @@ impl CmsSpreadOptionPricer {
                 inst.expiry,
             )?;
             return Ok(CmsSpreadLeg {
-                tenor_years,
                 forward_rate: observed,
                 adjusted_forward_rate: observed,
                 convexity_adjustment: 0.0,
@@ -168,12 +175,15 @@ impl CmsSpreadOptionPricer {
                 tenor
             ))
         })?;
-        let swap_end = inst.expiry.add_months(tenor_months as i32);
+        let reference_swap = inst.reference_swap();
+        let swap_start = reference_swap.reference_swap_start(inst.expiry)?;
+        let swap_end = swap_start.add_months(i32::try_from(tenor_months).map_err(|_| {
+            finstack_quant_core::Error::Validation("CMS tenor months exceed supported range".into())
+        })?)?;
         // Project the CMS forward swap rate on the instrument's resolved swap
-        // conventions (explicit fields > index_id > currency > USD).
+        // conventions (explicit fields override the required index identifier).
         let (forward_rate, _) =
-            inst.reference_swap()
-                .forward_rate_and_annuity(market, as_of, inst.expiry, swap_end)?;
+            reference_swap.forward_rate_and_annuity(market, as_of, swap_start, swap_end)?;
         if forward_rate <= 0.0 || !forward_rate.is_finite() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "CmsSpreadOption forward CMS rate must be positive and finite, got {}",
@@ -183,13 +193,18 @@ impl CmsSpreadOptionPricer {
 
         let atm_volatility =
             clean_volatility(vol_provider, time_to_expiry, tenor_years, forward_rate)?;
+        if time_to_expiry > 0.0 {
+            validate_flat_marginal(vol_provider, time_to_expiry, tenor_years, atm_volatility)?;
+        }
+        let payment_delay = (inst.payment_date - swap_start).whole_days() as f64 / 365.0;
         let convexity = if time_to_expiry > 0.0 {
             crate::instruments::rates::cms_option::pricer::convexity_adjustment_with_frequency(
                 atm_volatility,
                 time_to_expiry,
                 tenor_years,
                 forward_rate,
-                inst.reference_swap().payments_per_year()?,
+                reference_swap.payments_per_year()?,
+                payment_delay,
             )
         } else {
             0.0
@@ -203,7 +218,6 @@ impl CmsSpreadOptionPricer {
         }
 
         Ok(CmsSpreadLeg {
-            tenor_years,
             forward_rate,
             adjusted_forward_rate,
             convexity_adjustment: convexity,
@@ -216,22 +230,27 @@ impl CmsSpreadOptionPricer {
         &self,
         inst: &CmsSpreadOption,
         long_leg: &CmsSpreadLeg,
-        long_vol: &VolSource,
         short_leg: &CmsSpreadLeg,
-        short_vol: &VolSource,
     ) -> Result<f64> {
         let quadrature = GaussHermiteQuadrature::new(self.quadrature_order)?;
-        let rho = inst.correlation.clamp(-0.999_999, 0.999_999);
-        let rho_complement = (1.0 - rho * rho).sqrt();
+        let rho = inst.correlation;
+        let short_stddev = short_leg.atm_volatility * short_leg.time_to_expiry.sqrt();
+        let conditional_stddev = short_stddev * (1.0 - rho * rho).sqrt();
 
         let strike = inst.strike_rate()?;
         let expected = quadrature.integrate(|z_long| {
-            quadrature.integrate(|z_independent| {
-                let z_short = rho * z_long + rho_complement * z_independent;
-                let long_rate = quantile_from_gaussian(long_vol, long_leg, z_long);
-                let short_rate = quantile_from_gaussian(short_vol, short_leg, z_short);
-                cms_spread_payoff(long_rate, short_rate, strike, inst.option_type)
-            })
+            let long_rate = quantile_from_gaussian(long_leg, z_long);
+            let short_conditional_mean = short_leg.adjusted_forward_rate
+                * (short_stddev * rho * z_long - 0.5 * (short_stddev * rho).powi(2)).exp();
+            // Conditional on the long-rate normal, the short rate is
+            // lognormal. Integrating it with Black removes the payoff kink
+            // from the inner dimension and leaves one Gaussian expectation.
+            conditional_spread_payoff(
+                short_conditional_mean,
+                long_rate - strike,
+                conditional_stddev,
+                inst.option_type,
+            )
         });
 
         if !expected.is_finite() || expected < 0.0 {
@@ -264,9 +283,8 @@ impl Default for CmsSpreadOptionPricer {
 }
 
 impl CmsSpreadLeg {
-    fn zero(tenor_years: f64) -> Self {
+    fn zero() -> Self {
         Self {
-            tenor_years,
             forward_rate: 0.0,
             adjusted_forward_rate: 0.0,
             convexity_adjustment: 0.0,
@@ -373,63 +391,71 @@ fn cms_spread_payoff(long_rate: f64, short_rate: f64, strike: f64, option_type: 
     }
 }
 
-fn quantile_from_gaussian(vol_provider: &VolSource, leg: &CmsSpreadLeg, z: f64) -> f64 {
-    let u = norm_cdf(z).clamp(TAIL_PROB_EPS, 1.0 - TAIL_PROB_EPS);
-    sabr_marginal_quantile(vol_provider, leg, u)
-}
-
-fn sabr_marginal_quantile(vol_provider: &VolSource, leg: &CmsSpreadLeg, target: f64) -> f64 {
-    if leg.time_to_expiry <= 0.0 || leg.atm_volatility <= MIN_VOL {
-        return leg.adjusted_forward_rate;
-    }
-
-    let std_dev = leg.atm_volatility * leg.time_to_expiry.sqrt();
-    let mut low = (leg.adjusted_forward_rate * (-10.0 * std_dev).exp()).max(MIN_POSITIVE_RATE);
-    let mut high = (leg.adjusted_forward_rate * (10.0 * std_dev).exp())
-        .max(leg.adjusted_forward_rate * 4.0)
-        .max(MIN_POSITIVE_RATE * 10.0);
-
-    for _ in 0..8 {
-        if marginal_cdf(vol_provider, leg, high) >= target {
-            break;
-        }
-        high *= 2.0;
-    }
-
-    if marginal_cdf(vol_provider, leg, low) > target {
-        low = MIN_POSITIVE_RATE;
-    }
-
-    for _ in 0..QUANTILE_ITERS {
-        let mid = 0.5 * (low + high);
-        if marginal_cdf(vol_provider, leg, mid) < target {
-            low = mid;
-        } else {
-            high = mid;
-        }
-    }
-    0.5 * (low + high)
-}
-
-fn marginal_cdf(vol_provider: &VolSource, leg: &CmsSpreadLeg, strike: f64) -> f64 {
-    if strike <= MIN_POSITIVE_RATE {
-        return 0.0;
-    }
-    let vol = clean_volatility_or_atm(vol_provider, leg, strike);
-    let sigma_sqrt_t = vol * leg.time_to_expiry.sqrt();
-    if sigma_sqrt_t <= MIN_VOL {
-        return if strike < leg.adjusted_forward_rate {
-            0.0
-        } else {
-            1.0
+fn conditional_spread_payoff(
+    short_mean: f64,
+    long_less_strike: f64,
+    short_stddev: f64,
+    option_type: OptionType,
+) -> f64 {
+    // A spread call is a put on the conditional short rate, and vice versa.
+    // A nonpositive threshold cannot exceed a positive short rate; this also
+    // handles negative spread strikes without taking a logarithm of zero.
+    if long_less_strike <= 0.0 {
+        return match option_type {
+            OptionType::Call => 0.0,
+            OptionType::Put => short_mean - long_less_strike,
         };
     }
-    let d2 = ((leg.adjusted_forward_rate / strike).ln() - 0.5 * vol * vol * leg.time_to_expiry)
-        / sigma_sqrt_t;
-    norm_cdf(-d2)
+    match option_type {
+        OptionType::Call => black_put(short_mean, long_less_strike, short_stddev, 1.0),
+        OptionType::Put => black_call(short_mean, long_less_strike, short_stddev, 1.0),
+    }
+}
+
+fn quantile_from_gaussian(leg: &CmsSpreadLeg, z: f64) -> f64 {
+    let variance = leg.atm_volatility * leg.atm_volatility * leg.time_to_expiry;
+    // Exact lognormal quantile: E[exp(sigma Z - sigma^2/2)] = 1. The
+    // distribution's mean is therefore the same CMS forward reported to callers.
+    leg.adjusted_forward_rate * (variance.sqrt() * z - 0.5 * variance).exp()
+}
+
+fn validate_flat_marginal(
+    provider: &VolSource,
+    expiry: f64,
+    tenor: f64,
+    atm_volatility: f64,
+) -> Result<()> {
+    let unsupported = || {
+        finstack_quant_core::Error::Validation(format!(
+        "CmsSpreadOption requires a flat-strike Black volatility surface; source {} has an unsupported smile (SABR/payment-measure smile mapping is not implemented)",
+        provider.get_id()
+    ))
+    };
+    let VolSource::Surface(surface) = provider else {
+        return Err(unsupported());
+    };
+    // A tenor axis already represents one strike-independent volatility per
+    // expiry/tenor. For strike surfaces, every knot must agree; linear strike
+    // interpolation and flat extrapolation then preserve that constant slice.
+    if surface.secondary_axis() == VolSurfaceAxis::Strike {
+        for &strike in surface.strikes() {
+            let vol = clean_volatility(provider, expiry, tenor, strike)?;
+            if (vol - atm_volatility).abs() > FLAT_VOL_TOLERANCE {
+                return Err(unsupported());
+            }
+        }
+    }
+    Ok(())
 }
 
 fn clean_volatility(vol_provider: &VolSource, expiry: f64, tenor: f64, strike: f64) -> Result<f64> {
+    if vol_provider.get_convention(expiry, tenor)?
+        != finstack_quant_models::volatility::VolatilityConvention::Lognormal
+    {
+        return Err(finstack_quant_core::Error::Validation(
+            "CmsSpreadOption requires unshifted Black volatility quotes".into(),
+        ));
+    }
     let vol =
         vol_provider.get_vol_clamped(expiry.max(0.0), tenor, strike.max(MIN_POSITIVE_RATE))?;
     if vol <= 0.0 || !vol.is_finite() {
@@ -440,18 +466,6 @@ fn clean_volatility(vol_provider: &VolSource, expiry: f64, tenor: f64, strike: f
         )));
     }
     Ok(vol.max(MIN_VOL))
-}
-
-fn clean_volatility_or_atm(vol_provider: &VolSource, leg: &CmsSpreadLeg, strike: f64) -> f64 {
-    let vol = vol_provider.get_vol_clamped(
-        leg.time_to_expiry.max(0.0),
-        leg.tenor_years,
-        strike.max(MIN_POSITIVE_RATE),
-    );
-    match vol {
-        Ok(vol) if vol.is_finite() && vol > 0.0 => vol.max(MIN_VOL),
-        _ => leg.atm_volatility.max(MIN_VOL),
-    }
 }
 
 #[cfg(test)]
@@ -558,5 +572,229 @@ mod tests {
             "seasoned spread option must price intrinsic on the recorded \
              fixings: expected {expected}, got {pv}"
         );
+    }
+
+    fn future_market(as_of: Date) -> MarketContext {
+        use finstack_quant_core::market_data::term_structures::ForwardCurve;
+        MarketContext::new()
+            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.02, 30.0))
+            .insert(
+                ForwardCurve::builder("USD-SOFR-3M", 0.25)
+                    .base_date(as_of)
+                    .day_count(DayCount::Act360)
+                    .knots([(0.0, 0.04), (30.0, 0.04)])
+                    .build()
+                    .expect("forward"),
+            )
+            .insert_surface(flat_vol_surface("USD-SWAPTION-VOL-10Y", 0.30))
+            .insert_surface(flat_vol_surface("USD-SWAPTION-VOL-2Y", 0.20))
+    }
+
+    #[test]
+    fn flat_marginals_match_reported_mean_and_spread_put_call_parity() {
+        let as_of = date(2025, 1, 2);
+        let mut inst = CmsSpreadOption::example().expect("example");
+        inst.expiry = date(2026, 1, 2);
+        inst.payment_date = date(2026, 1, 12);
+        inst.strike = rust_decimal::Decimal::new(25, 4);
+        let market = future_market(as_of);
+        for order in [10, 15, 20] {
+            let pricer = CmsSpreadOptionPricer {
+                quadrature_order: order,
+            };
+            for correlation in [-1.0, -0.8, 0.0, 0.85, 1.0] {
+                for strike in [-25, 0, 25] {
+                    inst.correlation = correlation;
+                    inst.strike = rust_decimal::Decimal::new(strike, 4);
+                    inst.option_type = OptionType::Call;
+                    let call = pricer.price_dyn(&inst, &market, as_of).expect("call");
+                    inst.option_type = OptionType::Put;
+                    let put = pricer.price_dyn(&inst, &market, as_of).expect("put");
+                    let mean = call.measures[&MetricId::custom("cms_spread_forward")];
+                    let df = market
+                        .get_discount("USD-OIS")
+                        .expect("discount")
+                        .df_between_dates(as_of, inst.payment_date)
+                        .expect("df");
+                    let expected =
+                        inst.notional.amount() * df * (mean - inst.strike_rate().expect("strike"));
+                    assert!(
+                        (call.value.amount() - put.value.amount() - expected).abs() < 1.0e-6,
+                        "order {order}, correlation {correlation}, strike {strike}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn conditional_payoff_handles_nonpositive_threshold_and_zero_variance() {
+        for threshold in [-0.02, 0.0, 0.02, 0.06] {
+            let mean = 0.04;
+            let call = conditional_spread_payoff(mean, threshold, 0.0, OptionType::Call);
+            let put = conditional_spread_payoff(mean, threshold, 0.0, OptionType::Put);
+            assert_eq!(call, (threshold - mean).max(0.0));
+            assert_eq!(put, (mean - threshold).max(0.0));
+            if threshold <= 0.0 {
+                assert_eq!(
+                    conditional_spread_payoff(mean, threshold, 0.8, OptionType::Call),
+                    0.0
+                );
+                assert_eq!(
+                    conditional_spread_payoff(mean, threshold, 0.8, OptionType::Put),
+                    mean - threshold
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn identical_perfectly_correlated_legs_have_no_spread_option_value() {
+        let leg = CmsSpreadLeg {
+            forward_rate: 0.04,
+            adjusted_forward_rate: 0.041,
+            convexity_adjustment: 0.001,
+            atm_volatility: 0.30,
+            time_to_expiry: 2.0,
+        };
+        let mut inst = CmsSpreadOption::example().expect("example");
+        inst.correlation = 1.0;
+        inst.strike = rust_decimal::Decimal::ZERO;
+        for option_type in [OptionType::Call, OptionType::Put] {
+            inst.option_type = option_type;
+            let expected = CmsSpreadOptionPricer::new()
+                .expected_payoff(&inst, &leg, &leg)
+                .expect("identical legs");
+            assert!(expected < 1.0e-15, "expected zero, got {expected}");
+        }
+    }
+
+    #[test]
+    fn conditional_quadrature_matches_independent_cms_fixture_integral() {
+        // Independent 1000-node Gauss-Legendre integral over [-10, 10], with
+        // the conditional lognormal expectation evaluated using math.erfc.
+        // Reproducible in audit evidence/implementation-cms-oracle.py.
+        let reference = 0.001_625_713_844_676_493_9;
+        let long_leg = CmsSpreadLeg {
+            forward_rate: 0.04,
+            adjusted_forward_rate: 0.041_670_924_675_754_06,
+            convexity_adjustment: 0.0,
+            atm_volatility: 0.20,
+            time_to_expiry: 3.252_054_794_520_548,
+        };
+        let short_leg = CmsSpreadLeg {
+            adjusted_forward_rate: 0.040_912_523_730_776_02,
+            ..long_leg
+        };
+        let mut inst = CmsSpreadOption::example().expect("example");
+        inst.correlation = 0.85;
+        inst.strike = rust_decimal::Decimal::new(5, 3);
+        let mut estimates = Vec::new();
+        for order in [10, 15, 20] {
+            let pricer = CmsSpreadOptionPricer {
+                quadrature_order: order,
+            };
+            let estimate = pricer
+                .expected_payoff(&inst, &long_leg, &short_leg)
+                .expect("conditional expectation");
+            assert!(
+                (estimate - reference).abs() < 1.0e-9,
+                "order {order}: {estimate} versus {reference}"
+            );
+            estimates.push(estimate);
+        }
+        assert!((estimates[2] - estimates[1]).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn flat_lognormal_quantiles_are_monotone_and_integrate_to_the_declared_mean() {
+        let leg = CmsSpreadLeg {
+            forward_rate: 0.04,
+            adjusted_forward_rate: 0.041,
+            convexity_adjustment: 0.001,
+            atm_volatility: 0.30,
+            time_to_expiry: 2.0,
+        };
+        let quadrature = GaussHermiteQuadrature::new(20).expect("quadrature");
+        assert!((quadrature.integrate(|_| 1.0) - 1.0).abs() < 1.0e-14);
+        let mean = quadrature.integrate(|z| quantile_from_gaussian(&leg, z));
+        assert!((mean - leg.adjusted_forward_rate).abs() < 1.0e-12);
+        let mut previous = 0.0;
+        for z in [-8.0, -4.0, -1.0, 0.0, 1.0, 4.0, 8.0] {
+            let rate = quantile_from_gaussian(&leg, z);
+            assert!(rate > previous);
+            previous = rate;
+        }
+    }
+
+    #[test]
+    fn nonflat_smiles_are_rejected_by_public_pricing() {
+        let as_of = date(2025, 1, 2);
+        let mut inst = CmsSpreadOption::example().expect("example");
+        inst.expiry = date(2026, 1, 2);
+        inst.payment_date = date(2026, 1, 12);
+        let smile = VolSurface::builder("USD-SWAPTION-VOL-10Y")
+            .expiries(&[0.5, 2.0])
+            .strikes(&[0.01, 0.04, 0.10])
+            .row(&[0.20, 0.30, 0.20])
+            .row(&[0.20, 0.30, 0.20])
+            .build()
+            .expect("smile");
+        let market = future_market(as_of).insert_surface(smile);
+        let error = CmsSpreadOptionPricer::new()
+            .price_dyn(&inst, &market, as_of)
+            .expect_err("unsupported smile must fail");
+        assert!(error.to_string().contains("flat-strike Black"), "{error}");
+    }
+
+    #[test]
+    fn sabr_cube_smiles_are_rejected_instead_of_using_a_flat_vol_cdf() {
+        use finstack_quant_core::market_data::surfaces::{SabrParameterData, VolCube};
+        let params = SabrParameterData::new(0.05, 0.5, -0.2, 0.4).expect("SABR");
+        let cube = VolCube::builder("SABR")
+            .expiries(&[0.5, 2.0])
+            .tenors(&[2.0, 10.0])
+            .node(params, 0.04)
+            .node(params, 0.04)
+            .node(params, 0.04)
+            .node(params, 0.04)
+            .build()
+            .expect("cube");
+        let error =
+            validate_flat_marginal(&VolSource::Cube(std::sync::Arc::new(cube)), 1.0, 10.0, 0.25)
+                .expect_err("unsupported cube must fail");
+        assert!(error.to_string().contains("flat-strike Black"));
+    }
+
+    #[test]
+    fn tenor_surface_can_have_distinct_volatilities_for_distinct_cms_tenors() {
+        let surface = VolSurface::builder("ATM")
+            .secondary_axis(VolSurfaceAxis::Tenor)
+            .expiries(&[0.5, 2.0])
+            .strikes(&[2.0, 10.0])
+            .row(&[0.2, 0.3])
+            .row(&[0.2, 0.3])
+            .build()
+            .expect("ATM surface");
+        let source = VolSource::Surface(std::sync::Arc::new(surface));
+        validate_flat_marginal(&source, 1.0, 2.0, 0.2).expect("short tenor");
+        validate_flat_marginal(&source, 1.0, 10.0, 0.3).expect("long tenor");
+    }
+
+    #[test]
+    fn shifted_quotes_cannot_feed_unshifted_cms_marginals() {
+        let surface = VolSurface::builder("SHIFTED")
+            .expiries(&[1.0])
+            .strikes(&[0.03])
+            .row(&[0.20])
+            .build()
+            .expect("surface")
+            .with_displacements(&[0.02])
+            .expect("displacement");
+        let source = VolSource::Surface(std::sync::Arc::new(surface));
+        assert!(clean_volatility(&source, 1.0, 5.0, 0.03)
+            .expect_err("unshifted marginal rejects displaced quote")
+            .to_string()
+            .contains("unshifted Black"));
     }
 }

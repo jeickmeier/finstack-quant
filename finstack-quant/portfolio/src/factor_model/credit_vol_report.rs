@@ -9,7 +9,8 @@ use finstack_quant_models::factor::risk::RiskDecomposition;
 use finstack_quant_models::factor::RiskMeasure;
 
 /// Aggregated credit risk grouped by hierarchy level.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CreditVolReport {
     /// Total risk under the selected measure.
     pub total: f64,
@@ -26,7 +27,8 @@ pub struct CreditVolReport {
 }
 
 /// Aggregated risk contribution for one hierarchy level.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct LevelVolContribution {
     /// Human-readable hierarchy level name.
     pub level_name: String,
@@ -37,7 +39,8 @@ pub struct LevelVolContribution {
 }
 
 /// Position-level credit risk breakdown.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PositionVolContribution {
     /// Portfolio position identifier.
     pub position_id: PositionId,
@@ -155,5 +158,38 @@ pub fn build_credit_vol_report(
         by_level,
         idiosyncratic_total: decomposition.residual_risk,
         by_position_optional,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn credit_vol_report_round_trips_through_json() {
+        let report = CreditVolReport {
+            total: 1.0,
+            measure: RiskMeasure::Variance,
+            generic: 0.1,
+            by_level: vec![LevelVolContribution {
+                level_name: "Rating".to_owned(),
+                total: 0.2,
+                by_bucket: BTreeMap::from([("IG".to_owned(), 0.2)]),
+            }],
+            idiosyncratic_total: 0.4,
+            by_position_optional: Some(vec![PositionVolContribution {
+                position_id: PositionId::new("POS1"),
+                factor_total: 0.3,
+                idiosyncratic: 0.0,
+                total: 0.3,
+            }]),
+        };
+
+        let json = serde_json::to_value(&report).expect("serialize");
+        assert_eq!(json["measure"], "variance");
+        assert_eq!(json["by_level"][0]["by_bucket"]["IG"], 0.2);
+        assert_eq!(json["by_position_optional"][0]["position_id"], "POS1");
+        let restored: CreditVolReport = serde_json::from_value(json).expect("deserialize");
+        assert_eq!(restored, report);
     }
 }

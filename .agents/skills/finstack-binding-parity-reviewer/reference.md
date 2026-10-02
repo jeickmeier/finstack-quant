@@ -161,7 +161,8 @@ Each module has a consistent registration pattern:
 use pyo3::prelude::*;
 
 pub fn register(parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(parent.py(), "currency")?;
+    // Named by its public path (`finstack_quant.core.currency`) from creation.
+    let m = crate::bindings::module_utils::new_submodule(parent, "currency")?;
 
     // Add classes
     m.add_class::<PyCurrency>()?;
@@ -173,10 +174,12 @@ pub fn register(parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.setattr("__all__", vec!["Currency", "parse_currency"])?;
     m.setattr("__doc__", "Currency types and utilities")?;
 
-    // Register as submodule
-    parent.add_submodule(&m)?;
-
-    Ok(())
+    // Attach and register in `sys.modules` (no Python file owns this path).
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &m,
+        crate::bindings::module_utils::Exposure::Compiled,
+    )
 }
 ```
 

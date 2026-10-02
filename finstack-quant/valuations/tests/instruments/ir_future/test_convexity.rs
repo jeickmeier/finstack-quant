@@ -150,6 +150,7 @@ fn test_large_convexity_adjustment() {
 /// Build a flat volatility surface for testing convexity adjustments.
 fn build_flat_vol_surface(vol: f64, vol_surface_id: &str) -> VolSurface {
     VolSurface::builder(vol_surface_id)
+        .quote_type(finstack_quant_core::market_data::surfaces::VolQuoteType::Normal)
         .expiries(&[0.25, 1.0, 2.0, 5.0, 10.0])
         .strikes(&[0.01, 0.03, 0.05, 0.07, 0.10])
         .row(&[vol, vol, vol, vol, vol])

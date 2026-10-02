@@ -27,17 +27,6 @@ const MONTHS_BY_INDEX: [Month; 12] = [
     Month::December,
 ];
 
-#[inline]
-fn saturating_calendar_date(year: i32, month: Month, day: u8) -> Date {
-    Date::from_calendar_date(year, month, day).unwrap_or_else(|_| {
-        if year < Date::MIN.year() {
-            Date::MIN
-        } else {
-            Date::MAX
-        }
-    })
-}
-
 /// Convenience extensions for [`time::Date`].
 pub trait DateExt: Sized {
     /// Returns true if the date falls on a weekend (**Saturday** or **Sunday**).
@@ -56,15 +45,36 @@ pub trait DateExt: Sized {
     ///
     /// Handles negative month offsets correctly and clamps the day to the last
     /// valid day for the target month (e.g. Jan 31 + 1 month → Feb 28/29).
+    /// Date-range overflow is rejected instead of clamping the year.
+    ///
+    /// # Arguments
+    ///
+    /// * `months` - Signed number of calendar months to move; the target day is clamped to the target month's final valid day.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the target year is outside the supported date range.
     ///
     /// # Example
     /// ```
     /// use finstack_quant_core::dates::{Date, DateExt};
     /// use time::Month;
     /// let date = Date::from_calendar_date(2024, Month::January, 31).expect("Valid date");
-    /// assert_eq!(date.add_months(1), Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"));
+    /// assert_eq!(date.add_months(1)?, Date::from_calendar_date(2024, Month::February, 29).expect("Valid date"));
+    /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
-    fn add_months(self, months: i32) -> Self;
+    fn add_months(self, months: i32) -> crate::Result<Self>;
+
+    /// Add a signed number of calendar days, rejecting date-range overflow.
+    ///
+    /// # Arguments
+    ///
+    /// * `days` - Signed calendar-day offset; zero returns the input unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the shifted date cannot be represented.
+    fn add_days(self, days: i64) -> crate::Result<Self>;
 
     /// Return the last day-of-month date for the month containing this date.
     ///
@@ -79,12 +89,20 @@ pub trait DateExt: Sized {
 
     /// Add / subtract a number of **weekdays** (`n`) to the date.
     ///
-    /// This naive algorithm only skips Saturdays & Sundays, and does NOT
+    /// This algorithm only skips Saturdays & Sundays, and does NOT
     /// account for holidays. For true business day adjustments that respect
     /// holidays, use [`DateExt::add_business_days`] with a `HolidayCalendar`.
     /// Positive `n` moves forward, negative `n` moves backward. Zero returns
     /// the input unchanged.
-    fn add_weekdays(self, n: i32) -> Self;
+    ///
+    /// # Arguments
+    ///
+    /// * `n` - Signed weekday offset, excluding Saturdays and Sundays; zero leaves the date unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error if the shifted date is outside the supported range.
+    fn add_weekdays(self, n: i32) -> crate::Result<Self>;
 
     /// Add / subtract a number of **business days** (`n`) to the date using
     /// the provided `calendar` for holiday lookup.
@@ -93,7 +111,13 @@ pub trait DateExt: Sized {
     /// Positive `n` moves forward, negative `n` moves backward. Zero returns
     /// the input unchanged.
     ///
-    /// Returns an error if no business day is found within the bounded search window.
+    /// Returns an error if the date range overflows or no business day is found
+    /// within the bounded search window.
+    ///
+    /// # Arguments
+    ///
+    /// * `n` - Signed number of business days to move under `cal`; zero leaves the date unchanged.
+    /// * `cal` - Holiday and weekend calendar used to determine each counted business day.
     ///
     /// Example:
     /// ```
@@ -182,26 +206,38 @@ impl DateExt for Date {
         }
     }
 
-    fn add_months(self, months: i32) -> Self {
+    fn add_months(self, months: i32) -> crate::Result<Self> {
         let (year, month, _) = self.to_calendar_date();
-        let total_months = year * 12 + (month as i32 - 1) + months;
-        let new_year = total_months.div_euclid(12);
+        let total_months = i64::from(year) * 12 + (month as i64 - 1) + i64::from(months);
+        let new_year = total_months.div_euclid(12) as i32;
         let new_month_idx = total_months.rem_euclid(12);
         let new_month = MONTHS_BY_INDEX[new_month_idx as usize];
 
         let days_in_new_month = new_month.length(new_year);
         let new_day = self.day().min(days_in_new_month);
-        saturating_calendar_date(new_year, new_month, new_day)
+        Date::from_calendar_date(new_year, new_month, new_day).map_err(|_| {
+            crate::Error::Validation("month offset exceeds the supported date range".into())
+        })
+    }
+
+    fn add_days(self, days: i64) -> crate::Result<Self> {
+        i64::from(self.to_julian_day())
+            .checked_add(days)
+            .and_then(|day| i32::try_from(day).ok())
+            .and_then(|day| Date::from_julian_day(day).ok())
+            .ok_or_else(|| {
+                crate::Error::Validation("day offset exceeds the supported date range".into())
+            })
     }
 
     fn end_of_month(self) -> Self {
         let days = self.month().length(self.year());
-        saturating_calendar_date(self.year(), self.month(), days)
+        self + Duration::days(i64::from(days - self.day()))
     }
 
-    fn add_weekdays(self, mut n: i32) -> Self {
+    fn add_weekdays(self, mut n: i32) -> crate::Result<Self> {
         if n == 0 {
-            return self;
+            return Ok(self);
         }
 
         let step = if n > 0 { 1 } else { -1 };
@@ -209,12 +245,12 @@ impl DateExt for Date {
 
         // Phase 1: land on a weekday (at most two steps from a weekend start).
         while date.is_weekend() {
-            date += Duration::days(step as i64);
+            date = date.add_days(i64::from(step))?;
             if !date.is_weekend() {
                 n -= step;
             }
             if n == 0 {
-                return date;
+                return Ok(date);
             }
         }
 
@@ -223,19 +259,19 @@ impl DateExt for Date {
         let remainder = n % 5;
 
         if weeks != 0 {
-            date += Duration::days(weeks as i64 * 7);
+            date = date.add_days(i64::from(weeks) * 7)?;
         }
 
         // Phase 3: remaining weekdays (at most 4).
         let mut rem = remainder;
         while rem != 0 {
-            date += Duration::days(step as i64);
+            date = date.add_days(i64::from(step))?;
             if !date.is_weekend() {
                 rem -= step;
             }
         }
 
-        date
+        Ok(date)
     }
 
     fn add_business_days<C: crate::dates::HolidayCalendar + ?Sized>(
@@ -247,11 +283,13 @@ impl DateExt for Date {
             return Ok(self);
         }
 
+        // A business-day shift cannot require fewer calendar days than counted days.
+        self.add_days(i64::from(n))?;
         let step = if n > 0 { 1 } else { -1 };
         let mut current = self;
         for _ in 0..n.unsigned_abs() {
             // move at least one day in the desired direction, then seek to a business day
-            let start = current + Duration::days(step as i64);
+            let start = current.add_days(i64::from(step))?;
             let conv = if step > 0 {
                 BusinessDayConvention::Following
             } else {
@@ -308,14 +346,14 @@ mod tests {
     #[test]
     fn test_add_weekdays_forward() {
         let start = make_date(2025, 6, 27); // Friday
-        let result = start.add_weekdays(3);
+        let result = start.add_weekdays(3).expect("valid date shift");
         assert_eq!(result, make_date(2025, 7, 2)); // Fri +3 weekdays = Wed (skip weekend)
     }
 
     #[test]
     fn test_add_weekdays_backward() {
         let start = make_date(2025, 6, 29); // Sunday
-        let result = start.add_weekdays(-2);
+        let result = start.add_weekdays(-2).expect("valid date shift");
         assert_eq!(result, make_date(2025, 6, 26)); // Sun -2 weekdays = Thu (skip weekend)
     }
 

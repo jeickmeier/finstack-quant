@@ -65,7 +65,7 @@ pub(crate) struct HazardApplyEnv<'a> {
     /// Solve-to-par versus first-order hazard-knot delivery.
     pub mode: HazardBumpMode,
     /// Quote-recalibration service shared by this immutable scenario batch.
-    pub provider: Option<&'a dyn RecalibrationProvider>,
+    pub provider: &'a dyn RecalibrationProvider,
     /// Dependency snapshots against which each current hazard recipe was calibrated.
     pub source_markets: Option<
         &'a IndexMap<
@@ -82,6 +82,7 @@ pub(crate) struct HazardApplyEnv<'a> {
 /// identifier is a resolved market identifier rather than an unresolved
 /// hierarchy path or a best-effort reconstruction of the original spec.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ScenarioMarketTarget {
     /// A discount, forward, credit, inflation, or commodity curve.
@@ -126,11 +127,14 @@ pub enum ScenarioMarketTarget {
 /// instruments that actually changed, while `all_dirty` provides a
 /// conservative escape hatch for changes that cannot be represented precisely.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScenarioChangeManifest {
     /// Concrete market-data targets changed by applied effects.
     pub market_targets: Vec<ScenarioMarketTarget>,
     /// Zero-based indices of portfolio instruments mutated in place.
+    #[serde(with = "finstack_quant_core::wire::counts")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "Vec<u32>"))]
     pub changed_instrument_indices: Vec<usize>,
     /// Whether the execution context's effective valuation date changed.
     pub as_of_changed: bool,
@@ -180,11 +184,20 @@ impl ScenarioChangeManifest {
 /// assert_eq!(report.days, 31);
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RollForwardReport {
     /// Original as-of date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub old_date: finstack_quant_core::dates::Date,
 
     /// New as-of date after roll.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub new_date: finstack_quant_core::dates::Date,
 
     /// Calendar days between `old_date` and `new_date`.
@@ -194,6 +207,8 @@ pub struct RollForwardReport {
     /// the target date is business-day adjusted, but the span back to
     /// `old_date` is still calendar days. Downstream ACT/365F annualization
     /// depends on this.
+    #[serde(with = "finstack_quant_core::wire::signed_count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "i32"))]
     pub days: i64,
 
     /// Per-instrument carry accrual (if instruments provided), grouped by currency.
@@ -229,6 +244,7 @@ pub struct RollForwardReport {
 /// assert_eq!(report.expanded_operations, 3);
 /// ```
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ApplicationReport {
     /// Number of effects successfully applied to the execution context.
@@ -237,15 +253,21 @@ pub struct ApplicationReport {
     /// hierarchy expansion and target resolution. This low-level effect count
     /// is therefore not an operation-coverage ratio; inspect `changes` and
     /// `warnings` to determine which targets changed or were skipped.
+    #[serde(with = "finstack_quant_core::wire::count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub operations_applied: usize,
     /// Number of user-provided `OperationSpec` entries in the scenario
     /// (before hierarchy expansion and deduplication).
+    #[serde(with = "finstack_quant_core::wire::count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub user_operations: usize,
     /// Number of direct (non-hierarchy) operations produced after hierarchy
     /// expansion and resolution-mode deduplication. No-match expansion and
     /// deduplication can make this smaller than `user_operations`. Because
     /// `operations_applied` counts effects rather than operations, the two
     /// counters are not directly comparable.
+    #[serde(with = "finstack_quant_core::wire::count")]
+    #[cfg_attr(feature = "json-schema", schemars(with = "u32"))]
     pub expanded_operations: usize,
 
     /// Authoritative metadata describing the state changed by applied effects.
@@ -268,9 +290,44 @@ pub struct ApplicationReport {
     pub time_roll: Option<RollForwardReport>,
 }
 
+/// Encode an instrument inventory as canonical envelopes, in input order.
+///
+/// This is the encoding [`ApplicationEnvelope::from_contexts`] uses for its
+/// `instruments` field; host bindings call it to return shocked copies without
+/// serializing the whole envelope.
+///
+/// # Arguments
+///
+/// * `inventory` - Instruments to encode, typically the shocked copies left in
+///   [`ExecutionContext::instruments`] after [`super::ScenarioEngine::apply`].
+///
+/// # Errors
+///
+/// Returns a serialization error naming the instrument when an instrument does
+/// not support its canonical JSON serializer (custom instruments).
+pub fn instrument_envelopes(
+    inventory: &[Box<dyn Instrument>],
+) -> serde_json::Result<Vec<InstrumentEnvelope>> {
+    inventory
+        .iter()
+        .map(|instrument| {
+            instrument
+                .to_instrument_json()
+                .map(InstrumentEnvelope::new)
+                .ok_or_else(|| {
+                    <serde_json::Error as serde::ser::Error>::custom(format!(
+                        "Instrument '{}' does not support canonical serialization",
+                        instrument.id()
+                    ))
+                })
+        })
+        .collect()
+}
+
 /// JSON envelope returned after applying a scenario to market data and,
 /// optionally, a financial model.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ApplicationEnvelope {
     /// Mutated market context.
@@ -326,24 +383,7 @@ impl ApplicationEnvelope {
         Ok(Self {
             market: serde_json::to_value(market)?,
             model: model.map(serde_json::to_value).transpose()?,
-            instruments: instruments
-                .map(|inventory| {
-                    inventory
-                        .iter()
-                        .map(|instrument| {
-                            instrument
-                                .to_instrument_json()
-                                .map(InstrumentEnvelope::new)
-                                .ok_or_else(|| {
-                                    <serde_json::Error as serde::ser::Error>::custom(format!(
-                                        "Instrument '{}' does not support canonical serialization",
-                                        instrument.id()
-                                    ))
-                                })
-                        })
-                        .collect::<serde_json::Result<Vec<_>>>()
-                })
-                .transpose()?,
+            instruments: instruments.map(instrument_envelopes).transpose()?,
             operations_applied: report.operations_applied,
             user_operations: report.user_operations,
             expanded_operations: report.expanded_operations,

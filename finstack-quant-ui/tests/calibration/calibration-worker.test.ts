@@ -33,12 +33,14 @@ for (const fixture of cases)
       native.validateCalibrationJson(fixture.json),
     );
     expect(unwrap(await worker.proxy.dryRun(fixture.json))).toBe(
-      native.dryRun(fixture.json),
+      native.dryRunJson(fixture.json),
     );
     expect(unwrap(await worker.proxy.calibrate(fixture.json))).toEqual(
       native.calibrate(fixture.json),
     );
-  }, 30000);
+    // The CDX base-correlation solve takes ~20 s per run under the wasm-test
+    // profile and this case runs it twice (worker and native).
+  }, 120000);
 it("retains every structured failure field, including absent and available solver diagnostics", async () => {
   const missing = JSON.parse(cases[0]!.json);
   missing.plan.steps[0].quote_set = "missing_quotes";
@@ -78,7 +80,7 @@ it("retains every structured failure field, including absent and available solve
       expect(result.ok ? undefined : result.error[key]).toEqual(direct![key]);
   }
   const report = unwrap(await worker.proxy.dryRun(JSON.stringify(missing)));
-  expect(report).toBe(native.dryRun(JSON.stringify(missing)));
+  expect(report).toBe(native.dryRunJson(JSON.stringify(missing)));
   expect(JSON.parse(report).errors.length).toBeGreaterThan(0);
 });
 it("keys all quotes, prior markets, settings and sessions, and hands the returned market into native pricing", async () => {

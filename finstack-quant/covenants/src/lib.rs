@@ -3,8 +3,10 @@
 //!
 //! [`CovenantEngine`] evaluates [`CovenantSpec`] values from a
 //! [`metric::CovenantMetricSource`]. [`ThresholdSchedule`] supports step-down limits,
-//! [`forecast_covenant_generic`] projects future compliance, and [`templates`]
-//! and [`json`] provide standard packages and the serde-first binding surface.
+//! [`forecast_covenant_generic`] projects future compliance from any
+//! [`ModelTimeSeries`] ([`forecast_covenant`] from plain dated rows), and
+//! [`templates`] and [`json`] provide standard packages and the serde-first
+//! binding surface.
 //!
 //! # Conventions
 //!
@@ -72,6 +74,9 @@ pub mod json;
 pub mod metric;
 pub(crate) mod report;
 pub(crate) mod schedule;
+#[cfg(feature = "json-schema")]
+pub mod schema;
+pub(crate) mod series;
 pub mod templates;
 
 pub use engine::{
@@ -84,12 +89,15 @@ pub use forward::{
     FutureBreach, ModelTimeSeries,
 };
 pub use json::{
-    cov_lite_json, evaluate_engine_map, lbo_standard_json, project_finance_json, real_estate_json,
+    cov_lite_json, evaluate_engine, lbo_standard_json, project_finance_json, real_estate_json,
     validate_covenant_engine_json, validate_covenant_report_json, validate_covenant_spec_json,
 };
 pub use metric::{CovenantMetricId, HashMapMetricSource};
 pub use report::CovenantReport;
 pub use schedule::ThresholdSchedule;
+pub use series::{
+    forecast_breaches, forecast_covenant, DatedCovenantReports, DatedMetricSeries, DatedMetrics,
+};
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

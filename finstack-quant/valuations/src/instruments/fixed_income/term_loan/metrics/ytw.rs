@@ -31,7 +31,7 @@ impl MetricCalculator for YtwCalculator {
         // Snapshot scalar fields off the loan after populating the cache.
         let (currency, maturity, candidate_calls) = {
             let loan: &TermLoan = context.instrument_as()?;
-            let calls = exercisable_call_candidates(loan, &schedule, as_of)?;
+            let calls = exercisable_call_candidates(loan, &schedule, as_of, &context.curves)?;
             (loan.currency, loan.maturity, calls)
         };
         let dirty_now = {
@@ -48,11 +48,7 @@ impl MetricCalculator for YtwCalculator {
 
         // Candidate exercises: each exercisable call and final maturity.
         let mut candidates: Vec<(Date, Money)> = Vec::with_capacity(candidate_calls.len() + 1);
-        for (date, price_pct) in candidate_calls {
-            let out = outstanding_before(&out_path, date, currency);
-            let redemption = Money::new(out.amount() * (price_pct / 100.0), currency)?;
-            candidates.push((date, redemption));
-        }
+        candidates.extend(candidate_calls);
 
         // Always include maturity: pre-redemption outstanding
         // (at maturity itself, outstanding is 0 after the final redemption)

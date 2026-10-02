@@ -18,6 +18,7 @@ use crate::bindings::statements::evaluator::PyStatementResult;
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::bindings::valuations::composite::PyCompositeInstrument;
 use crate::bindings::valuations::instruments::{PyBond, PyTermLoan};
+use crate::bindings::valuations::typed_asset_backed_facility::PyAssetBackedFacility;
 use crate::bindings::valuations::typed_credit::{
     PyCdsIndex, PyCdsTranche, PyConvertibleBond, PyCreditDefaultSwap,
 };
@@ -51,7 +52,7 @@ use crate::errors::{display_to_py as to_py, portfolio_to_py};
 /// Currently wired: `Bond`, `TermLoan`, `InterestRateSwap`, `Swaption`,
 /// `CapFloor`, `CreditDefaultSwap`, `CdsIndex`, `FxForward`, `FxOption`,
 /// `CdsTranche`, `ConvertibleBond`, `EquityOption`, `StructuredCredit`,
-/// `RevolvingCredit`, `CompositeInstrument`.
+/// `RevolvingCredit`, `AssetBackedFacility`, `CompositeInstrument`.
 pub fn extract_instrument_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(composite) = obj.cast::<PyCompositeInstrument>() {
         return composite.borrow().envelope_json();
@@ -63,6 +64,9 @@ pub fn extract_instrument_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
         return loan.borrow().envelope_json();
     }
     if let Ok(facility) = obj.cast::<PyRevolvingCredit>() {
+        return facility.borrow().envelope_json();
+    }
+    if let Ok(facility) = obj.cast::<PyAssetBackedFacility>() {
         return facility.borrow().envelope_json();
     }
     if let Ok(swap) = obj.cast::<PyInterestRateSwap>() {
@@ -174,10 +178,7 @@ pub fn extract_model_ref<'py>(obj: &Bound<'py, PyAny>) -> PyResult<ModelAccess<'
         return Ok(ModelAccess::Borrowed(spec.borrow()));
     }
     let json: String = obj.extract()?;
-    let mut inner: finstack_quant_statements::FinancialModelSpec =
-        serde_json::from_str(&json).map_err(to_py)?;
-    inner
-        .validate_semantics()
+    let inner = finstack_quant_statements::FinancialModelSpec::from_json(&json)
         .map_err(crate::errors::statements_to_py)?;
     Ok(ModelAccess::Owned(Box::new(inner)))
 }
@@ -443,7 +444,8 @@ pub fn extract_credit_rating(
 /// # Errors
 ///
 /// Returns `TypeError` when `obj` is neither, and `ValueError` when the
-/// JSON string does not deserialize as a `ScenarioSpec`.
+/// JSON string does not deserialize as a `ScenarioSpec` or fails
+/// `ScenarioSpec::validate` (both through `ScenarioSpec::from_json`).
 pub fn extract_scenario_spec(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
@@ -456,8 +458,8 @@ pub fn extract_scenario_spec(
             "expected a ScenarioSpec instance or a canonical ScenarioSpec JSON string",
         )
     })?;
-    py.detach(move || serde_json::from_str(&json))
-        .map_err(to_py)
+    py.detach(move || finstack_quant_scenarios::ScenarioSpec::from_json(&json))
+        .map_err(crate::errors::scenarios_to_py)
 }
 
 /// Extract an ordered batch of scenario specs from either a JSON array string
@@ -467,15 +469,19 @@ pub fn extract_scenario_spec(
 /// # Errors
 ///
 /// Returns `TypeError` for an item that is neither form and `ValueError` for
-/// malformed JSON.
+/// malformed JSON or a spec that fails `ScenarioSpec::validate`.
 pub fn extract_scenario_specs(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<finstack_quant_scenarios::ScenarioSpec>> {
     if let Ok(json) = obj.extract::<String>() {
-        return py
+        let specs: Vec<finstack_quant_scenarios::ScenarioSpec> = py
             .detach(move || serde_json::from_str(&json))
-            .map_err(to_py);
+            .map_err(to_py)?;
+        for spec in &specs {
+            spec.validate().map_err(crate::errors::scenarios_to_py)?;
+        }
+        return Ok(specs);
     }
     let mut specs = Vec::new();
     for item in obj.try_iter()? {

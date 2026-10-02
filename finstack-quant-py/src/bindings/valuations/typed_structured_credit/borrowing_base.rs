@@ -151,7 +151,8 @@ impl PyAdvanceRate {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``rate`` is outside ``[0, 1]`` or not finite.
+    ///     If ``asset_class`` is empty or ``rate`` is not a finite decimal in
+    ///     ``[0, 1]`` (Rust ``AdvanceRate::validate``).
     #[new]
     #[pyo3(signature = (asset_class, rate, *, eligibility=None))]
     #[pyo3(text_signature = "(asset_class, rate, *, eligibility=None)")]
@@ -160,19 +161,14 @@ impl PyAdvanceRate {
         rate: f64,
         eligibility: Option<PyRef<'_, PyEligibilityRule>>,
     ) -> PyResult<Self> {
-        if !rate.is_finite() || !(0.0..=1.0).contains(&rate) {
-            return Err(crate::errors::value_error(format!(
-                "advance rate ({rate}) must be a decimal in [0, 1]"
-            )));
-        }
-        Ok(Self {
-            inner: AdvanceRate {
-                asset_class: asset_class.to_string(),
-                rate,
-                eligibility: eligibility
-                    .map_or_else(EligibilityRule::default, |rule| rule.inner.clone()),
-            },
-        })
+        let inner = AdvanceRate {
+            asset_class: asset_class.to_string(),
+            rate,
+            eligibility: eligibility
+                .map_or_else(EligibilityRule::default, |rule| rule.inner.clone()),
+        };
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// ``AssetType`` wire name the rate applies to.
@@ -246,39 +242,25 @@ impl PyConcentrationLimit {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``scope`` is not one of the three names or ``max_pct`` is
-    ///     outside ``[0, 100]``.
+    ///     If ``scope`` is not one of the three names or ``max_pct`` is not a
+    ///     finite percent in ``(0, 100]`` (Rust ``ConcentrationLimit::validate``).
     #[new]
     #[pyo3(text_signature = "(scope, max_pct)")]
     fn new(scope: &str, max_pct: f64) -> PyResult<Self> {
-        let scope = match scope {
-            "obligor" => ConcentrationScope::Obligor,
-            "industry" => ConcentrationScope::Industry,
-            "asset_class" => ConcentrationScope::AssetClass,
-            other => {
-                return Err(crate::errors::value_error(format!(
-                "concentration scope must be 'obligor', 'industry' or 'asset_class', got {other:?}"
-            )))
-            }
+        let inner = ConcentrationLimit {
+            scope: crate::bindings::valuations::instruments::enum_from_str::<ConcentrationScope>(
+                scope, "scope",
+            )?,
+            max_pct,
         };
-        if !max_pct.is_finite() || !(0.0..=100.0).contains(&max_pct) {
-            return Err(crate::errors::value_error(format!(
-                "concentration max_pct ({max_pct}) must be a percent in [0, 100]"
-            )));
-        }
-        Ok(Self {
-            inner: ConcentrationLimit { scope, max_pct },
-        })
+        inner.validate().map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// ``"obligor"``, ``"industry"`` or ``"asset_class"``.
     #[getter]
-    fn scope(&self) -> &'static str {
-        match self.inner.scope {
-            ConcentrationScope::Obligor => "obligor",
-            ConcentrationScope::Industry => "industry",
-            ConcentrationScope::AssetClass => "asset_class",
-        }
+    fn scope(&self) -> PyResult<String> {
+        crate::bindings::valuations::convert::enum_to_py_string(&self.inner.scope)
     }
 
     /// Maximum share of the eligible collateral in percent.
@@ -291,7 +273,7 @@ impl PyConcentrationLimit {
     fn __repr__(&self) -> String {
         format!(
             "ConcentrationLimit(scope={:?}, max_pct={})",
-            self.scope(),
+            self.scope().unwrap_or_default(),
             self.inner.max_pct
         )
     }

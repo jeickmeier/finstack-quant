@@ -245,6 +245,10 @@ impl McEngine {
         F: Payoff,
     {
         state.copy_from_slice(initial_state);
+        // Captured paths reuse the same scratch buffers as streaming paths.
+        // Clear history and step counters before each path, including when
+        // captured and uncaptured paths alternate within one chunk.
+        work.fill(0.0);
 
         let mut path_state = PathState::new(0, 0.0);
         process.populate_path_state(state, &mut path_state);
@@ -322,7 +326,7 @@ impl McEngine {
     /// clones outside the per-path loop so we don't allocate-and-discard a
     /// fresh payoff on every pair.
     #[allow(clippy::too_many_arguments)]
-    pub(super) fn simulate_antithetic_pair<R, P, D, F>(
+    pub(crate) fn simulate_antithetic_pair<R, P, D, F>(
         &self,
         rng: &mut R,
         process: &P,
@@ -348,6 +352,8 @@ impl McEngine {
     {
         // Both payoffs are reset by the caller (so on_path_start has already
         // run and any per-path RNG draws are stable across the pair).
+        work.fill(0.0);
+        work_anti.fill(0.0);
         // Primary path
         state_p.copy_from_slice(initial_state);
         let mut path_state_p = PathState::new(0, 0.0);

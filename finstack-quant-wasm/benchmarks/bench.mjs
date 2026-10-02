@@ -127,7 +127,7 @@ const FINANCIAL_MODEL_JSON = JSON.stringify({
 });
 
 const SENSITIVITY_CONFIG_JSON = JSON.stringify({
-  mode: 'Diagonal',
+  mode: 'diagonal',
   parameters: [
     {
       node_id: 'revenue',
@@ -147,47 +147,21 @@ const PORTFOLIO_SPEC_JSON = JSON.stringify({
   positions: [],
 });
 
-const PORTFOLIO_RESULT_JSON = JSON.stringify({
-  valuation: {
-    as_of: '2024-01-01',
-    position_values: {},
-    total_base_currency: { amount: 1000000.0, currency: 'USD' },
-    by_entity: {},
-  },
-  metrics: {
-    aggregated: {},
-    by_position: {},
-  },
-  meta: {
-    numeric_mode: 'F64',
-    rounding: {
-      mode: 'Bankers',
-      ingest_scale_by_currency: {},
-      output_scale_by_currency: {},
-      tolerances: {
-        rate_epsilon: 1e-12,
-        generic_epsilon: 1e-10,
-      },
-      version: 1,
-    },
-    fx_policy_applied: null,
-    timestamp: null,
-    version: null,
-  },
-});
-
 const INSTRUMENT_JSON = JSON.stringify({
-  type: 'deposit',
-  spec: {
-    id: 'DEP-BENCH',
-    notional: { amount: 100000.0, currency: 'USD' },
-    start_date: '2024-01-01',
-    maturity: '2024-07-01',
-    day_count: 'act_360',
-    fixed_rate: 0.045,
-    discount_curve_id: 'USD-OIS',
-    attributes: {},
-    business_day_convention: 'modified_following',
+  schema: 'finstack_quant.instrument/1',
+  instrument: {
+    type: 'deposit',
+    spec: {
+      id: 'DEP-BENCH',
+      notional: { amount: '100000', currency: 'USD' },
+      start_date: '2024-01-01',
+      maturity: '2024-07-01',
+      day_count: 'act_360',
+      fixed_rate: '0.045',
+      discount_curve_id: 'USD-OIS',
+      attributes: {},
+      business_day_convention: 'modified_following',
+    },
   },
 });
 
@@ -341,11 +315,8 @@ const returnDates = returns.map((_, i) =>
   new Date(Date.UTC(2025, 0, 1 + i)).toISOString().slice(0, 10)
 );
 const statsArr = Array.from({ length: 512 }, (_, i) => i * 0.01 + Math.sin(i));
-const cholMat = [
-  [4, 2, 0],
-  [2, 5, 1],
-  [0, 1, 3],
-];
+// Flat row-major 3x3 SPD matrix (choleskyDecomposition takes a flat array and n).
+const cholMat = [4, 2, 0, 2, 5, 1, 0, 1, 3];
 
 async function main() {
   const wasmHref = pathToFileURL(WASM_JS).href;
@@ -564,9 +535,15 @@ async function main() {
   const moneyA = new w.Money(100.0, usd);
   const moneyB = new w.Money(25.5, usd);
   const day_count = w.DayCount.act360();
+  // Raw pkg-node binding: the context is required (the facade defaults it).
+  const day_count_ctx = new w.DayCountContext();
   const t0d = w.createDate(2024, 1, 2);
   const t1d = w.createDate(2025, 1, 2);
-  const curve = new w.DiscountCurve('USD-OIS', '2024-01-02', [0.0, 1.0, 1.0, 0.98, 5.0, 0.88]);
+  const curve = new w.DiscountCurve({
+    id: 'USD-OIS',
+    baseDate: '2024-01-02',
+    knots: [0.0, 1.0, 1.0, 0.98, 5.0, 0.88],
+  });
   const pricePerf = new w.Performance(priceDates, [prices], ['bench'], null, 'daily');
   const returnPerf = w.Performance.fromReturns(
     returnDates,
@@ -586,12 +563,12 @@ async function main() {
   });
 
   bench('core', 'Money add / sub', 8000, () => {
-    moneyA.add(moneyB);
-    moneyA.sub(moneyB);
+    moneyA.checkedAdd(moneyB);
+    moneyA.checkedSub(moneyB);
   });
 
   bench('core', 'DayCount.yearFraction', 10000, () => {
-    day_count.yearFraction(t0d, t1d);
+    day_count.yearFraction(t0d, t1d, day_count_ctx);
   });
 
   bench('core', 'DiscountCurve.df', 15000, () => {
@@ -599,7 +576,7 @@ async function main() {
   });
 
   bench('core', 'choleskyDecomposition', 3000, () => {
-    w.choleskyDecomposition(cholMat);
+    w.choleskyDecomposition(cholMat, 3);
   });
 
   bench('core', 'mean + variance (512)', 5000, () => {
@@ -635,8 +612,8 @@ async function main() {
     w.jointProbabilities(0.05, 0.08, 0.2);
   });
 
-  bench('models.monteCarlo', 'blackScholesCall', 20000, () => {
-    w.blackScholesCall(100, 100, 0.05, 0.0, 0.2, 1.0);
+  bench('models', 'bsPrice (call)', 20000, () => {
+    w.bsPrice(100, 100, 0.05, 0.0, 0.2, 1.0, true);
   });
 
   const csaCanonical = w.csaUsdRegulatoryJson();
@@ -669,10 +646,6 @@ async function main() {
 
   bench('portfolio', 'parsePortfolioSpecJson', 4000, () => {
     w.parsePortfolioSpecJson(PORTFOLIO_SPEC_JSON);
-  });
-
-  bench('portfolio', 'portfolioResultTotalValue', 8000, () => {
-    w.portfolioResultTotalValue(PORTFOLIO_RESULT_JSON);
   });
 
   runMaterializationBenchmarks();
@@ -720,13 +693,13 @@ async function main() {
     const r = new w.Rate(0.05);
     const _sum = r.asDecimal + r.asPercent + r.asBp;
     void _sum;
-    new w.Bps(50).asDecimal();
-    new w.Percentage(5).asDecimal();
+    void new w.Bps(50).asDecimal;
+    void new w.Percentage(5).asDecimal;
   });
 
-  bench('core', 'Tenor construction + toYearsSimple', 8000, () => {
+  bench('core', 'Tenor construction + toYears', 8000, () => {
     const t = new w.Tenor('3M');
-    t.toYearsSimple();
+    t.toYears();
   });
 
   bench('core', 'ForwardCurve construction + rate()', 4000, () => {
@@ -742,10 +715,11 @@ async function main() {
   bench('core', 'FxMatrix setQuote + rate', 4000, () => {
     const fx = new w.FxMatrix();
     fx.setQuote('USD', 'EUR', 0.92);
-    fx.rateDefault('USD', 'EUR', '2024-01-02');
+    // Raw pkg-node twin of the facade's `rate(base, quote, date)`.
+    fx.rateWithDefaultPolicy('USD', 'EUR', '2024-01-02');
   });
 
-  const cholFactor = w.choleskyDecomposition(cholMat);
+  const cholFactor = w.choleskyDecomposition(cholMat, 3);
   const cholRhs = [1.0, 2.0, 3.0];
   bench('core', 'choleskySolve', 5000, () => {
     w.choleskySolve(cholFactor, cholRhs);
@@ -859,8 +833,8 @@ async function main() {
     returnPerf.calmar();
   });
 
-  bench('core', 'countConsecutive', 8000, () => {
-    w.countConsecutive(statsArr);
+  bench('core', 'longestPositiveRun', 8000, () => {
+    w.longestPositiveRun(statsArr);
   });
 
   const gaussCop = w.CopulaSpec.gaussian().build();
@@ -873,8 +847,8 @@ async function main() {
     recoveryBuilt.conditionalRecovery(-0.15);
   });
 
-  bench('models.monteCarlo', 'blackScholesPut', 20000, () => {
-    w.blackScholesPut(100, 100, 0.05, 0.0, 0.2, 1.0);
+  bench('models', 'bsPrice (put)', 20000, () => {
+    w.bsPrice(100, 100, 0.05, 0.0, 0.2, 1.0, false);
   });
 
   bench('margin', 'csaEurRegulatoryJson', 2000, () => {
@@ -915,26 +889,20 @@ async function main() {
     skipBench('statements_analytics', 'generateTornadoEntries', 'missing sensitivity output');
   }
 
-  benchTry('statements_analytics', 'runMonteCarlo', 30, () => {
-    w.runMonteCarlo(MONTE_CARLO_MODEL_JSON, MONTE_CARLO_CONFIG_JSON);
+  benchTry('statements_analytics', 'evaluateMonteCarlo', 30, () => {
+    const evaluator = new w.Evaluator();
+    evaluator.evaluateMonteCarlo(MONTE_CARLO_MODEL_JSON, MONTE_CARLO_CONFIG_JSON);
+    evaluator.free();
   });
 
   benchTry('statements_analytics', 'goalSeek', 400, () => {
-    w.goalSeek(
-      GOAL_SEEK_MODEL_JSON,
-      'ebitda',
-      '2025Q1',
-      50000.0,
-      'revenue',
-      '2025Q1',
-      false,
-      undefined,
-      undefined
-    );
+    w.goalSeek(GOAL_SEEK_MODEL_JSON, 'ebitda', '2025Q1', 50000.0, 'revenue', '2025Q1', false);
   });
 
-  benchTry('statements_analytics', 'traceDependencies', 2000, () => {
-    w.traceDependencies(FINANCIAL_MODEL_JSON, 'revenue');
+  benchTry('statements_analytics', 'dependencyTree', 2000, () => {
+    const tracer = new w.DependencyTracer(FINANCIAL_MODEL_JSON);
+    tracer.dependencyTree('revenue');
+    tracer.free();
   });
 
   benchTry('statements_analytics', 'explainFormula', 1500, () => {
@@ -943,10 +911,6 @@ async function main() {
 
   benchTry('portfolio', 'buildPortfolioFromSpecJson', 3000, () => {
     w.buildPortfolioFromSpecJson(PORTFOLIO_SPEC_JSON);
-  });
-
-  benchTry('portfolio', 'portfolioResultGetMetric', 6000, () => {
-    w.portfolioResultGetMetric(PORTFOLIO_RESULT_JSON, 'dv01');
   });
 
   benchTry('portfolio', 'valuePortfolio', 200, () => {

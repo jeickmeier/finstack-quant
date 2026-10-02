@@ -188,7 +188,7 @@ impl CdsTranchePricer {
     /// adjusted the up- and down-bumped curves *differently* — destroying the
     /// symmetry of the central difference and biasing Correlation01 near
     /// base-correlation-curve kinks. The repair loop has therefore been
-    /// removed and the curve is built with `allow_non_monotonic()` so the
+    /// removed and decreasing correlation shapes remain representable so the
     /// pure shift is never silently re-shaped.
     ///
     /// # Bounds
@@ -227,7 +227,6 @@ impl CdsTranchePricer {
         // an arbitrage-free pricing curve.
         BaseCorrelationCurve::builder("TEMP_BUMPED_CORR")
             .knots(bumped_points)
-            .allow_non_monotonic()
             .build()
     }
 
@@ -371,7 +370,7 @@ impl CdsTranchePricer {
             let mut out = vec![start_date];
             let mut current = start_date;
             while current < tranche.maturity {
-                current = next_cds_date(current);
+                current = next_cds_date(current)?;
                 // Ensure we don't go past maturity (next_cds_date can go past if close)
                 if current > tranche.maturity {
                     out.push(adjust_date(tranche.maturity)?);
@@ -682,10 +681,16 @@ impl CdsTranchePricer {
 
         let ctx_up = market
             .clone()
-            .insert_credit_index(&tranche.credit_index_id, bumped_index_up);
+            .insert(std::sync::Arc::clone(
+                &bumped_index_up.base_correlation_curve,
+            ))
+            .insert_credit_index(&tranche.credit_index_id, bumped_index_up)?;
         let ctx_down = market
             .clone()
-            .insert_credit_index(&tranche.credit_index_id, bumped_index_down);
+            .insert(std::sync::Arc::clone(
+                &bumped_index_down.base_correlation_curve,
+            ))
+            .insert_credit_index(&tranche.credit_index_id, bumped_index_down)?;
 
         let pv_up = self.price_tranche(tranche, &ctx_up, as_of)?.amount();
         let pv_down = self.price_tranche(tranche, &ctx_down, as_of)?.amount();

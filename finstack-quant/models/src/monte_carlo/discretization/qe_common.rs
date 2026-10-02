@@ -14,22 +14,13 @@
 
 use finstack_quant_core::math::special_functions::norm_cdf;
 
-/// Threshold on `|κ·Δt|` below which the `e^{-κΔt}` expansions in the QE
-/// moments are replaced by their first-order Taylor limits. Chosen so that
+/// Threshold on `|κ·Δt|` used for the Heston spot leg's integrated-variance
+/// approximation. The conditional CIR moments use `expm1` without truncating
+/// their immigration contribution. Chosen so that
 /// the quadratic remainder `(κ·Δt)²/2` is below one part in 1e16 (≈ f64
 /// epsilon) while still being loose enough to trigger for daily steps at
 /// small κ.
 pub(crate) const KAPPA_DT_EXPANSION_EPS: f64 = 1e-8;
-
-/// Lower bound on the conditional mean `m` below which QE forces Case B to
-/// avoid division and log-domain overflow.
-pub(crate) const QE_SMALL_MEAN_EPS: f64 = 1e-10;
-
-/// Upper clamp on ψ = s²/m² before picking Case A vs Case B. Extreme ψ
-/// values already belong in Case B (exponential mixture); the clamp prevents
-/// the Case A formula `2/ψ − 1 + …` from producing negative arguments to
-/// `sqrt` or otherwise destabilising the draw.
-pub(crate) const PSI_CLAMP_MAX: f64 = 10.0;
 
 /// Validate a user-supplied ψ_c switch threshold.
 ///
@@ -65,10 +56,11 @@ pub(crate) fn qe_conditional_moments(
 /// `exp_kappa_dt` is `e^{−κΔt}`; it depends only on `(κ, Δt)` and so is constant
 /// across a uniform grid, so schemes that precompute it (via
 /// `Discretization::prepare`) pass it in to avoid recomputing the transcendental
-/// on every step. Passing `(-κΔt).exp()` reproduces the direct computation
-/// bit-for-bit. Falls back to the first-order Taylor expansion of
-/// `(1 − e^{−κΔt})/κ` when `|κ·Δt|` is near the precision limit (see
-/// [`KAPPA_DT_EXPANSION_EPS`]).
+/// for the decay on every step. Passing `(-κΔt).exp()` reproduces the direct
+/// computation bit-for-bit. The complementary exponential uses `expm1` so
+/// small positive mean reversion retains both its mean and variance
+/// contributions from immigration toward θ. At κ=0 the exact square-root
+/// diffusion limit is `(v_t, v_t·σ²·Δt)`.
 #[inline]
 pub(crate) fn qe_conditional_moments_with_exp(
     v_t: f64,
@@ -78,13 +70,17 @@ pub(crate) fn qe_conditional_moments_with_exp(
     dt: f64,
     exp_kappa_dt: f64,
 ) -> (f64, f64) {
-    let m = theta + (v_t - theta) * exp_kappa_dt;
-    let s2 = if (kappa * dt).abs() < KAPPA_DT_EXPANSION_EPS {
-        v_t * sigma * sigma * dt
+    let kappa_dt = kappa * dt;
+    let one_minus_exp = -(-kappa_dt).exp_m1();
+    let integrated_decay = if kappa_dt == 0.0 {
+        dt
     } else {
-        v_t * sigma * sigma * exp_kappa_dt * (1.0 - exp_kappa_dt) / kappa
-            + theta * sigma * sigma * (1.0 - exp_kappa_dt).powi(2) / (2.0 * kappa)
+        one_minus_exp / kappa
     };
+    let surviving_state = v_t * exp_kappa_dt;
+    let immigration = theta * one_minus_exp;
+    let m = surviving_state + immigration;
+    let s2 = sigma * sigma * integrated_decay * (surviving_state + 0.5 * immigration);
     (m, s2)
 }
 
@@ -96,16 +92,20 @@ pub(crate) fn qe_conditional_moments_with_exp(
 /// correction (Andersen 2008, §4.2 / Prop. 8).
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum QeRegime {
-    /// Case A (ψ ≤ ψ_c): `v_{t+Δt} = a (b + Z)²` with `b² = b_squared`.
+    /// A deterministic transition (zero conditional variance).
+    Deterministic {
+        /// Conditional mean, including the absorbing zero state.
+        value: f64,
+    },
+    /// Case A (ψ ≤ ψ_c): `v_{t+Δt} = (√mean_square + √a·Z)²`.
     Quadratic {
         /// Scale `a = m / (1 + b²)`.
         a: f64,
-        /// Squared offset `b²`.
-        b_squared: f64,
+        /// Squared deterministic component `a·b² = m-a`.
+        mean_square: f64,
     },
     /// Case B (ψ > ψ_c): mixture of an atom at 0 (probability `p`) and an
-    /// exponential with rate `beta`. The degenerate near-zero-mean safeguard
-    /// is represented as `p = 1` (the draw is always 0).
+    /// exponential with rate `beta`.
     Exponential {
         /// Probability mass at zero.
         p: f64,
@@ -119,7 +119,8 @@ impl QeRegime {
     #[inline]
     pub(crate) fn sample(&self, z: f64) -> f64 {
         match *self {
-            QeRegime::Quadratic { a, b_squared } => (a * (z + b_squared.sqrt()).powi(2)).max(0.0),
+            QeRegime::Deterministic { value } => value,
+            QeRegime::Quadratic { a, mean_square } => (mean_square.sqrt() + a.sqrt() * z).powi(2),
             QeRegime::Exponential { p, beta } => {
                 // Clamp u away from 1 so the inverse CDF stays finite when
                 // `norm_cdf` saturates to exactly 1.0 for extreme shocks
@@ -145,12 +146,16 @@ impl QeRegime {
     #[inline]
     pub(crate) fn exp_moment(&self, a_coeff: f64) -> Option<f64> {
         match *self {
-            QeRegime::Quadratic { a, b_squared } => {
+            QeRegime::Deterministic { value } => {
+                let m = (a_coeff * value).exp();
+                m.is_finite().then_some(m)
+            }
+            QeRegime::Quadratic { a, mean_square } => {
                 let denom = 1.0 - 2.0 * a_coeff * a;
                 if denom <= 0.0 {
                     return None;
                 }
-                let m = (a_coeff * a * b_squared / denom).exp() / denom.sqrt();
+                let m = (a_coeff * mean_square / denom).exp() / denom.sqrt();
                 m.is_finite().then_some(m)
             }
             QeRegime::Exponential { p, beta } => {
@@ -198,27 +203,28 @@ pub(crate) fn qe_regime_with_exp(
     let v_t = v_t.max(0.0);
     let (m, s2) = qe_conditional_moments_with_exp(v_t, kappa, theta, sigma, dt, exp_kappa_dt);
 
-    // Safeguard 1: force Case B when the conditional mean is near zero to
-    // avoid division by tiny numbers in ψ = s²/m² and in Case B's `β`.
-    // Safeguard 2: clamp ψ to `PSI_CLAMP_MAX` so Case A never sees a
-    // negative argument inside `sqrt(2/ψ * (2/ψ − 1))` — ψ above the clamp
-    // belongs in Case B anyway.
-    let psi = if m > QE_SMALL_MEAN_EPS {
-        (s2 / (m * m)).min(PSI_CLAMP_MAX)
-    } else {
-        psi_c + 1.0
-    };
+    if m == 0.0 || s2 == 0.0 {
+        return QeRegime::Deterministic { value: m };
+    }
+    // Case B supports arbitrarily large ψ. Altering ψ changes both the
+    // conditional variance and the atom at zero, especially when Feller's
+    // condition fails. Divide sequentially to avoid underflow in m².
+    let psi = (s2 / m) / m;
 
     if psi <= psi_c {
-        let b_squared = 2.0 / psi - 1.0 + (2.0 / psi * (2.0 / psi - 1.0)).sqrt();
-        let a = m / (1.0 + b_squared);
-        QeRegime::Quadratic { a, b_squared }
-    } else if m <= QE_SMALL_MEAN_EPS {
-        // Degenerate: the draw is always zero.
-        QeRegime::Exponential { p: 1.0, beta: 1.0 }
+        // Rationalized a/m = ψ/[2(1+√(1-ψ/2))] avoids forming b²,
+        // which diverges in the deterministic limit. Store a·b² directly
+        // so sampling and exponential moments never multiply zero by infinity.
+        let a = m * (psi / (2.0 * (1.0 + (1.0 - 0.5 * psi).sqrt())));
+        QeRegime::Quadratic {
+            a,
+            mean_square: m - a,
+        }
     } else {
-        let p = (psi - 1.0) / (psi + 1.0);
-        let beta = (1.0 - p) / m;
+        // Algebraically β = 2 / (m·(ψ+1)); compute it before p to avoid
+        // cancellation in (1-p) for highly concentrated atoms at zero.
+        let beta = 2.0 / (s2 / m + m);
+        let p = 1.0 - m * beta;
         QeRegime::Exponential { p, beta }
     }
 }
@@ -228,8 +234,7 @@ pub(crate) fn qe_regime_with_exp(
 /// Given current variance `v_t`, mean-reversion parameters `(κ, θ)`,
 /// vol-of-variance `σ`, step size `Δt`, a standard normal shock `z`, and
 /// the user-facing ψ threshold `psi_c`, returns a non-negative `v_{t+Δt}`
-/// using Andersen (2008)'s Case A / Case B switch with the safeguards
-/// described in [`PSI_CLAMP_MAX`] and [`QE_SMALL_MEAN_EPS`].
+/// using Andersen (2008)'s moment-preserving Case A / Case B switch.
 #[inline]
 pub(crate) fn qe_step_variance(
     v_t: f64,
@@ -248,13 +253,39 @@ mod tests {
     use super::*;
 
     #[test]
-    fn small_kappa_dt_uses_taylor_expansion() {
+    fn small_kappa_dt_converges_to_zero_mean_reversion_limit() {
         let (_, s2_exact) = qe_conditional_moments(0.04, 1.0, 0.04, 0.3, 1e-7);
         let (_, s2_taylor) = qe_conditional_moments(0.04, 0.0, 0.04, 0.3, 1e-7);
         assert!(
             (s2_exact - s2_taylor).abs() / s2_taylor.max(1e-20) < 1e-6,
             "near κ≈0 the exact and Taylor s² should agree: exact={s2_exact} taylor={s2_taylor}"
         );
+    }
+
+    #[test]
+    fn small_positive_mean_reversion_retains_immigration_variance() {
+        // Starting at zero does not make the state absorbing when κθ>0.
+        // Independent expansions at κΔt=1e-9 give mean θ(x-x²/2) and
+        // variance θσ²κΔt²(1-x)/2 to better than 1e-18 relative accuracy.
+        let (mean, variance) = qe_conditional_moments(0.0, 1e-9, 0.04, 1.0, 1.0);
+        assert!((mean / 3.999_999_998e-11 - 1.0).abs() < 1e-14);
+        assert!((variance / 1.999_999_998e-11 - 1.0).abs() < 1e-14);
+        let QeRegime::Exponential { p, beta } = qe_regime(0.0, 1e-9, 0.04, 1.0, 1.0, 1.5) else {
+            panic!("positive immigration with high ψ requires a nondegenerate mixture");
+        };
+        assert!(p < 1.0 && p > 0.999_999_999);
+        assert!(beta.is_finite() && beta > 0.0);
+        assert!(qe_regime(0.0, 1e-9, 0.04, 1.0, 1.0, 1.5).sample(8.0) > 0.0);
+    }
+
+    #[test]
+    fn zero_mean_reversion_has_exact_square_root_diffusion_moments() {
+        for theta in [0.0, 0.04, 10.0] {
+            let (mean, variance) = qe_conditional_moments(0.03, 0.0, theta, 0.4, 0.5);
+            assert_eq!(mean, 0.03);
+            assert!((variance - 0.03 * 0.4 * 0.4 * 0.5).abs() < 1e-18);
+        }
+        assert_eq!(qe_conditional_moments(0.0, 0.0, 0.04, 1.0, 1.0), (0.0, 0.0));
     }
 
     #[test]
@@ -284,9 +315,59 @@ mod tests {
     }
 
     #[test]
-    fn extreme_psi_is_clamped_to_case_b() {
+    fn extreme_psi_uses_case_b() {
         let v = qe_step_variance(0.001, 0.01, 1e-6, 2.0, 1.0, 4.0, 1.5);
         assert!(v.is_finite() && v >= 0.0);
+    }
+
+    #[test]
+    fn high_psi_preserves_both_conditional_moments_and_zero_mass() {
+        let (v, kappa, theta, sigma, dt) = (0.0005, 0.5, 0.04, 1.0, 0.5);
+        let (mean, variance) = qe_conditional_moments(v, kappa, theta, sigma, dt);
+        let psi = variance / mean.powi(2);
+        assert!(psi > 10.0);
+        let QeRegime::Exponential { p, beta } = qe_regime(v, kappa, theta, sigma, dt, 1.5) else {
+            panic!("high ψ must use the exponential mixture");
+        };
+        let mixture_mean = (1.0 - p) / beta;
+        let mixture_variance = (1.0 - p) * (1.0 + p) / beta.powi(2);
+        assert!((mixture_mean / mean - 1.0).abs() < 1e-14);
+        assert!((mixture_variance / variance - 1.0).abs() < 1e-14);
+        assert!((p - (psi - 1.0) / (psi + 1.0)).abs() < 1e-14);
+        assert_eq!(qe_step_variance(v, kappa, theta, sigma, dt, 1.2, 1.5), 0.0);
+    }
+
+    #[test]
+    fn tiny_positive_mean_is_not_replaced_by_an_absorbing_state() {
+        let regime = qe_regime(1e-12, 1.0, 1e-12, 1e-6, 0.1, 1.5);
+        assert!(regime.sample(1.0) > 0.0);
+        assert_eq!(qe_regime(0.04, 2.0, 0.04, 0.0, 1.0, 1.5).sample(3.0), 0.04);
+    }
+
+    #[test]
+    fn nearly_deterministic_quadratic_regime_retains_its_mean_and_exp_moment() {
+        for sigma in [1e-80, 1e-160] {
+            let regime = qe_regime(0.04, 2.0, 0.04, sigma, 1.0, 1.5);
+            for shock in [-8.0, 0.0, 8.0] {
+                let sampled = regime.sample(shock);
+                assert!((sampled - 0.04).abs() < 1e-16, "σ={sigma}, draw={sampled}");
+            }
+            let moment = regime
+                .exp_moment(2.0)
+                .expect("finite deterministic-limit moment");
+            assert!((moment - 0.08_f64.exp()).abs() < 1e-14);
+        }
+    }
+
+    #[test]
+    fn quadratic_regime_preserves_conditional_moments() {
+        let (mean, variance) = qe_conditional_moments(0.05, 2.0, 0.04, 0.3, 0.25);
+        let QeRegime::Quadratic { a, mean_square } = qe_regime(0.05, 2.0, 0.04, 0.3, 0.25, 1.5)
+        else {
+            panic!("fixture must use the quadratic regime");
+        };
+        assert!((a + mean_square - mean).abs() < 1e-16);
+        assert!((2.0 * a * a + 4.0 * a * mean_square - variance).abs() < 1e-16);
     }
 
     /// Monte Carlo moment check: averaging many QE draws should recover the

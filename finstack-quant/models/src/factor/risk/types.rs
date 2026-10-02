@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 /// stays non-negative for a long-risk portfolio because numerator and denominator
 /// carry the same sign.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RiskDecomposition {
     /// Total portfolio risk under the selected `measure`. Sign follows the
@@ -47,6 +48,7 @@ pub struct RiskDecomposition {
 /// idiosyncratic adder is calibrated per issuer) from generic / unattributed
 /// residual sources used by other decomposers.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ResidualContributionSource {
     /// Residual variance sourced from a `CreditFactorModel`'s idiosyncratic
@@ -67,11 +69,13 @@ pub enum ResidualContributionSource {
 /// that want per-position residual *vol* should take the square root of this
 /// field after summing the relevant subset.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PositionResidualContribution {
     /// Portfolio position identifier.
     pub position_id: String,
-    /// Annualized variance contributed by this position's idiosyncratic risk.
-    /// Always non-negative.
+    /// Annualized variance allocated to this position's idiosyncratic risk.
+    /// A hedge sharing another position's issuer shock may receive a negative
+    /// allocation; the total residual variance must remain non-negative.
     pub residual_variance: f64,
     /// Where the residual variance came from.
     pub source: ResidualContributionSource,
@@ -81,6 +85,7 @@ pub struct PositionResidualContribution {
 ///
 /// See [`RiskDecomposition`] for the sign convention applied to each field.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FactorContribution {
     /// Identifier of the factor being reported.
     pub factor_id: FactorId,
@@ -98,6 +103,7 @@ pub struct FactorContribution {
 
 /// Contribution of a single position to a specific factor bucket.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PositionFactorContribution {
     /// Portfolio position identifier.
     pub position_id: String,

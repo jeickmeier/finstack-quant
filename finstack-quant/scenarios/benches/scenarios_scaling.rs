@@ -115,7 +115,7 @@ fn historical_credit_quote_replay(c: &mut Criterion) {
         "../../calibration/examples/market_bootstrap/03_single_name_hazard.json"
     ))
     .expect("calibration inputs");
-    let calibrated = engine::execute(&envelope).expect("source calibration");
+    let calibrated = engine::calibrate(&envelope).expect("source calibration");
     let market = MarketContext::try_from(calibrated.result.final_market).expect("market");
     let hazard = market.get_hazard("ISSUER-A-CDS").expect("hazard");
     let recipe = hazard.hazard_calibration().expect("replay recipe");

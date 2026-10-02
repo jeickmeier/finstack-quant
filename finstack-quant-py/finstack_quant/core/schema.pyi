@@ -1,4 +1,8 @@
-"""Compiled-in JSON Schemas for the market-data wire format.
+"""Compiled-in JSON Schemas for the core wire formats.
+
+The registry covers the persisted market context, the columnar table
+envelope, period plans, date schedules and their specifications, and
+scorecard rating scales.
 
 Schemas are rendered from the crate's registry on demand, so what you read here
 always matches the installed wheel.
@@ -29,7 +33,7 @@ def index() -> str:
     -------
     str
         Pretty-printed JSON with an ``artifacts`` array. Each row carries
-        ``path``, ``$id``, ``title``, ``summary``, ``bytes`` and ``kind``
+        ``path``, ``$id``, ``title``, ``type_name`` (the Rust root type), ``summary``, ``bytes`` and ``kind``
         (``input`` for documents you author, ``output`` for documents the
         library emits, ``component`` for shared definitions).
 

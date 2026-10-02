@@ -579,10 +579,9 @@ fn test_sabr_arbitrage_validation_clean_smile() {
 
     let strikes: Vec<f64> = (70..=130).step_by(5).map(|k| k as f64).collect();
     let r = 0.05;
-    let q = 0.02;
 
     let result = smile
-        .validate_no_arbitrage(&strikes, r, q)
+        .validate_no_arbitrage(&strikes, r)
         .expect("Validation should succeed");
 
     assert!(
@@ -602,7 +601,7 @@ fn test_sabr_arbitrage_check_api() {
 
     let strikes: Vec<f64> = (80..=120).step_by(5).map(|k| k as f64).collect();
 
-    let check_result = smile.check_no_arbitrage(&strikes, 0.05, 0.02);
+    let check_result = smile.check_no_arbitrage(&strikes, 0.05);
     assert!(
         check_result.is_ok(),
         "Clean smile should pass arbitrage check"
@@ -611,7 +610,7 @@ fn test_sabr_arbitrage_check_api() {
 
 #[test]
 fn test_sabr_arbitrage_validation_result_methods() {
-    let mut result = ArbitrageValidationResult::default();
+    let mut result = ArbitrageValidationResult::new(Vec::new(), Vec::new());
 
     assert!(result.is_arbitrage_free());
     assert!(result.worst_butterfly_severity().is_none());
@@ -643,7 +642,7 @@ fn test_sabr_arbitrage_too_few_strikes() {
     let strikes = vec![95.0, 100.0]; // Only 2 strikes
 
     let result = smile
-        .validate_no_arbitrage(&strikes, 0.05, 0.02)
+        .validate_no_arbitrage(&strikes, 0.05)
         .expect("Validation should succeed");
 
     assert!(
@@ -664,7 +663,7 @@ fn test_sabr_arbitrage_extreme_params_may_have_violations() {
 
     // This tests that the validation runs without panicking
     // The result may or may not have violations depending on exact parameters
-    let result = smile.validate_no_arbitrage(&strikes, 0.05, 0.02);
+    let result = smile.validate_no_arbitrage(&strikes, 0.05);
     assert!(result.is_ok(), "Validation should complete without error");
 }
 
@@ -1476,4 +1475,54 @@ fn normal_and_shifted_delta_strikes_follow_active_vol_convention() {
         .abs()
             < 1e-12
     );
+}
+
+#[test]
+fn sabr_shift_keyword_round_trips_through_from_str_and_display() {
+    assert_eq!("auto".parse::<SabrShift>().expect("auto"), SabrShift::Auto);
+    for bad in ["AUTO", "none", "0.02", ""] {
+        let err = bad
+            .parse::<SabrShift>()
+            .expect_err("only \"auto\" is a keyword");
+        assert!(matches!(err, finstack_quant_core::Error::Validation(_)));
+    }
+    assert_eq!(SabrShift::Auto.to_string(), "auto");
+    assert_eq!(SabrShift::None.to_string(), "none");
+    assert_eq!(SabrShift::Fixed(0.02).to_string(), "0.02");
+}
+
+#[test]
+fn sabr_smile_implied_vol_matches_generate_smile() {
+    let params = SabrParameters::new(0.2, 0.5, 0.3, -0.2).expect("Valid SABR parameters");
+    let smile = SabrSmile::new(SabrModel::new(params), 100.0, 1.0);
+    let strikes = [80.0, 100.0, 120.0];
+    let grid = smile.generate_smile(&strikes).expect("smile");
+    for (strike, vol) in strikes.iter().zip(grid) {
+        assert_eq!(smile.implied_vol(*strike).expect("vol"), vol);
+    }
+    assert!(smile.implied_vol(f64::NAN).is_err());
+}
+
+#[test]
+fn arbitrage_validation_result_serializes_its_verdict() {
+    let params = SabrParameters::new(0.2, 0.5, 0.3, -0.2).expect("Valid SABR parameters");
+    let smile = SabrSmile::new(SabrModel::new(params), 100.0, 1.0);
+    for strikes in [vec![95.0, 100.0], vec![80.0, 90.0, 100.0, 110.0, 120.0]] {
+        let result = smile
+            .validate_no_arbitrage(&strikes, 0.0)
+            .expect("validate");
+        assert!(result.arbitrage_free && result.is_arbitrage_free());
+        let json = serde_json::to_value(&result).expect("serialize");
+        assert_eq!(json["arbitrage_free"], serde_json::Value::Bool(true));
+    }
+    let dirty = ArbitrageValidationResult::new(
+        Vec::new(),
+        vec![MonotonicityViolation {
+            strike_low: 90.0,
+            strike_high: 100.0,
+            price_low: 1.0,
+            price_high: 2.0,
+        }],
+    );
+    assert!(!dirty.arbitrage_free);
 }

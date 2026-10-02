@@ -1,0 +1,79 @@
+{
+  "$defs": {
+    "PositionEsContributionView": {
+      "description": "Serializable Expected Shortfall contribution row.",
+      "properties": {
+        "component_es": {
+          "description": "Component Expected Shortfall allocated to the position.",
+          "format": "double",
+          "type": "number"
+        },
+        "marginal_es": {
+          "description": "Marginal Expected Shortfall, when available.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "pct_contribution": {
+          "description": "Fraction of total ES contributed by this position.",
+          "format": "double",
+          "type": "number"
+        },
+        "position_id": {
+          "description": "Position identifier.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "position_id",
+        "component_es",
+        "pct_contribution"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/parametric_es_decomposition_view.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Serializable Expected Shortfall decomposition view.",
+  "properties": {
+    "confidence": {
+      "description": "Confidence level used for ES.",
+      "format": "double",
+      "type": "number"
+    },
+    "contributions": {
+      "description": "Per-position ES contributions.",
+      "items": {
+        "$ref": "#/$defs/PositionEsContributionView"
+      },
+      "type": "array"
+    },
+    "n_positions": {
+      "description": "Number of positions in the decomposition.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "portfolio_es": {
+      "description": "Total portfolio Expected Shortfall.",
+      "format": "double",
+      "type": "number"
+    },
+    "portfolio_var": {
+      "description": "Total portfolio VaR.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "portfolio_var",
+    "portfolio_es",
+    "confidence",
+    "n_positions",
+    "contributions"
+  ],
+  "title": "ParametricEsDecompositionView",
+  "type": "object"
+}

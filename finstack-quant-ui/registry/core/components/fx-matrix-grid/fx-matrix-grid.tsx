@@ -11,6 +11,7 @@ export function fxCurrencies(state: FxState) {
       [
         ...state.quotes,
         ...state.provider_quotes,
+        ...state.provider_pinned_quotes,
         ...state.pinned_quotes,
       ].flatMap((quote) => [quote[0], quote[1]]),
     ),
@@ -29,42 +30,47 @@ export function FxMatrixGrid({
       aria-label="Stored FX matrices"
       className="space-y-4 font-sans text-sm text-foreground"
     >
-      {(["quotes", "provider_quotes", "pinned_quotes"] as const).map(
-        (source) => (
-          <FinstackTable
-            key={source}
-            data={currencies.map((from) => ({ from }))}
-            getRowId={(row) => row.from}
-            caption={source}
-            columns={[
-              {
-                id: "from",
-                header: "From / To",
-                accessorFn: (row) => row.from,
+      {(
+        [
+          "quotes",
+          "provider_quotes",
+          "provider_pinned_quotes",
+          "pinned_quotes",
+        ] as const
+      ).map((source) => (
+        <FinstackTable
+          key={source}
+          data={currencies.map((from) => ({ from }))}
+          getRowId={(row) => row.from}
+          caption={source}
+          columns={[
+            {
+              id: "from",
+              header: "From / To",
+              accessorFn: (row) => row.from,
+            },
+            ...currencies.map((to) => ({
+              id: to,
+              header: to,
+              accessorFn: (row: { from: string }) => {
+                const matches = state[source].filter(
+                  (q) => q[0] === row.from && q[1] === to,
+                );
+                return matches.length
+                  ? matches
+                      .map((q) =>
+                        q.length === 5
+                          ? `${String(q[4])} · ${q[2]} · ${q[3]}`
+                          : `${String(q[2])} · Undated`,
+                      )
+                      .join("; ")
+                  : "Unavailable";
               },
-              ...currencies.map((to) => ({
-                id: to,
-                header: to,
-                accessorFn: (row: { from: string }) => {
-                  const matches = state[source].filter(
-                    (q) => q[0] === row.from && q[1] === to,
-                  );
-                  return matches.length
-                    ? matches
-                        .map((q) =>
-                          q.length === 5
-                            ? `${String(q[4])} · ${q[2]} · ${q[3]}`
-                            : `${String(q[2])} · Undated`,
-                        )
-                        .join("; ")
-                    : "Unavailable";
-                },
-              })),
-            ]}
-            emptyState="No stored currencies supplied"
-          />
-        ),
-      )}
+            })),
+          ]}
+          emptyState="No stored currencies supplied"
+        />
+      ))}
       <JsonViewer label="FX configuration" text={serializeHost(state.config)} />
       <JsonViewer
         label="Complete stored FX state"

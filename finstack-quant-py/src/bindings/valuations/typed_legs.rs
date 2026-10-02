@@ -156,7 +156,7 @@ par_method=None, payment_lag_days=0, end_of_month=False)"
             rate: decimal_from_f64(rate, "rate")?,
             frequency: frequency.inner,
             day_count: day_count.inner,
-            business_day_convention: enum_from_str(
+            business_day_convention: super::convert::bdc_from_str(
                 business_day_convention,
                 "business_day_convention",
             )?,
@@ -466,7 +466,7 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
             spread_bp: decimal_from_f64(spread_bp, "spread_bp")?,
             frequency: frequency.inner,
             day_count: day_count.inner,
-            business_day_convention: enum_from_str(
+            business_day_convention: super::convert::bdc_from_str(
                 business_day_convention,
                 "business_day_convention",
             )?,
@@ -761,7 +761,7 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
             end: extract_date(end)?,
             frequency: frequency.inner,
             stub: stub_kind_from_py(stub, "stub")?,
-            business_day_convention: enum_from_str(
+            business_day_convention: super::convert::bdc_from_str(
                 business_day_convention,
                 "business_day_convention",
             )?,

@@ -163,8 +163,8 @@ pub fn validate_calendar_spread_with_forwards(
     Ok(())
 }
 
-/// Validate that undiscounted call prices are non-increasing and convex in
-/// strike.
+/// Validate that undiscounted call prices are convex in strike and that every
+/// adjacent vertical spread costs between zero and its strike width.
 ///
 /// # Arguments
 ///
@@ -189,11 +189,11 @@ pub fn validate_butterfly_call_convexity(
 
     let strikes = surface.strikes();
     let expiries = surface.expiries();
-    if strikes.len() < 3 {
+    if strikes.len() < 2 {
         return Ok(());
     }
 
-    let mut violations: Vec<(f64, f64, f64, f64)> = Vec::new();
+    let mut violations: Vec<String> = Vec::new();
 
     for (i, &expiry) in expiries.iter().enumerate() {
         let fwd = forwards[i];
@@ -210,22 +210,35 @@ pub fn validate_butterfly_call_convexity(
             })
             .collect::<Result<_>>()?;
 
+        for (strike_pair, call_pair) in strikes.windows(2).zip(calls.windows(2)) {
+            let strike_width = strike_pair[1] - strike_pair[0];
+            let spread = call_pair[0] - call_pair[1];
+            if spread < -price_tol || spread > strike_width + price_tol {
+                let detail = format!(
+                    "Vertical spread at T={expiry:.4}y, K=[{:.4}, {:.4}] costs {spread:.6e}; \
+                     expected a value in [0, strike width {strike_width:.6e}]",
+                    strike_pair[0], strike_pair[1]
+                );
+                if config.lenient_arbitrage {
+                    tracing::warn!("{} in {}", detail, surface.id().as_str());
+                }
+                violations.push(detail);
+            }
+        }
+
         for j in 1..strikes.len() - 1 {
             let (k1, k2, k3) = (strikes[j - 1], strikes[j], strikes[j + 1]);
             let (c1, c2, c3) = (calls[j - 1], calls[j], calls[j + 1]);
-
-            // Vertical spread: calls must be non-increasing in strike.
-            if c2 > c1 + price_tol || c3 > c2 + price_tol {
-                violations.push((expiry, k2, c2, c1.min(c2)));
-                continue;
-            }
 
             // Butterfly: C(K2) must lie on or below the chord through
             // (K1, C1) and (K3, C3).
             let lambda = (k2 - k1) / (k3 - k1);
             let c_interp = c1 + lambda * (c3 - c1);
             if c2 > c_interp + price_tol {
-                violations.push((expiry, k2, c2, c_interp));
+                violations.push(format!(
+                    "Butterfly at T={expiry:.4}y, K={k2:.4} \
+                     (call={c2:.6e} > chord={c_interp:.6e})"
+                ));
                 if config.lenient_arbitrage {
                     tracing::warn!(
                         "Butterfly arbitrage (negative density) at T={:.4}, K={:.4} in {}: \
@@ -242,20 +255,16 @@ pub fn validate_butterfly_call_convexity(
     }
 
     if !violations.is_empty() && !config.lenient_arbitrage {
-        let details: Vec<String> = violations
-            .iter()
-            .take(5)
-            .map(|(t, k, c, ci)| format!("T={t:.4}y, K={k:.4} (call={c:.6e} > chord={ci:.6e})"))
-            .collect();
+        let details: Vec<&str> = violations.iter().take(5).map(String::as_str).collect();
         let suffix = if violations.len() > 5 {
             format!(" (and {} more)", violations.len() - 5)
         } else {
             String::new()
         };
         return Err(Error::Validation(format!(
-            "Butterfly arbitrage (negative implied density) at {} point(s) in {}: [{}]{}. \
-             Undiscounted call prices must be convex and non-increasing in strike \
-             (Breeden–Litzenberger).",
+            "Call-spread arbitrage at {} point(s) in {}: [{}]{}. \
+             Undiscounted call prices must be convex in strike, and adjacent vertical \
+             spreads must cost between zero and their strike width.",
             violations.len(),
             surface.id().as_str(),
             details.join("; "),

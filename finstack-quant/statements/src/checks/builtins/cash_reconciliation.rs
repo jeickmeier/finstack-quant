@@ -12,7 +12,12 @@ use crate::Result;
 
 /// Checks Cash(t) = Cash(t−1) + TotalCF(t) and optionally
 /// TotalCF = CFO + CFI + CFF.
+///
+/// Every configured operand must have the same scalar/monetary units and
+/// currency. Execution rejects incompatible units or non-finite/negative
+/// tolerances; it performs no FX conversion.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CashReconciliation {
     /// Node for cash balance.
     pub cash_balance_node: NodeId,
@@ -47,6 +52,16 @@ impl Check for CashReconciliation {
     }
 
     fn execute(&self, context: &CheckContext) -> Result<CheckResult> {
+        crate::checks::helpers::validate_identity_inputs(
+            self.id(),
+            context,
+            self.tolerance,
+            [&self.cash_balance_node, &self.total_cash_flow_node]
+                .into_iter()
+                .chain(self.cfo_node.iter())
+                .chain(self.cfi_node.iter())
+                .chain(self.cff_node.iter()),
+        )?;
         let mut findings = Vec::new();
         let periods = &context.model.periods;
 

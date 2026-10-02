@@ -156,7 +156,7 @@ fn bench_discount_and_forward_steps(c: &mut Criterion) {
                 prior_market: Vec::new(),
                 plan,
             };
-            engine::execute(black_box(&envelope)).unwrap()
+            engine::calibrate(black_box(&envelope)).unwrap()
         })
     });
 
@@ -192,7 +192,7 @@ fn bench_discount_and_forward_steps(c: &mut Criterion) {
                 prior_market: Vec::new(),
                 plan,
             };
-            engine::execute(black_box(&envelope)).unwrap()
+            engine::calibrate(black_box(&envelope)).unwrap()
         })
     });
 }
@@ -274,7 +274,7 @@ fn bench_residual_normalization(c: &mut Criterion) {
                 prior_market: Vec::new(),
                 plan,
             };
-            engine::execute(black_box(&envelope)).unwrap()
+            engine::calibrate(black_box(&envelope)).unwrap()
         })
     });
 
@@ -315,7 +315,7 @@ fn bench_residual_normalization(c: &mut Criterion) {
                 prior_market: Vec::new(),
                 plan,
             };
-            engine::execute(black_box(&envelope)).unwrap()
+            engine::calibrate(black_box(&envelope)).unwrap()
         })
     });
 }
@@ -332,10 +332,12 @@ fn bench_hazard_bootstrap(c: &mut Criterion) {
     ));
 
     c.bench_function("calibration_hazard_full_plan_5_pillars", |b| {
-        b.iter(|| engine::execute(black_box(&envelope)).expect("hazard calibration should succeed"))
+        b.iter(|| {
+            engine::calibrate(black_box(&envelope)).expect("hazard calibration should succeed")
+        })
     });
 
-    let result = engine::execute(&envelope).expect("hazard calibration setup should succeed");
+    let result = engine::calibrate(&envelope).expect("hazard calibration setup should succeed");
     let market =
         MarketContext::try_from(result.result.final_market).expect("market state should rebuild");
     let hazard = market
@@ -365,7 +367,7 @@ fn bench_base_correlation_bootstrap(c: &mut Criterion) {
 
     c.bench_function("calibration_base_correlation_full_plan_5_knots", |b| {
         b.iter(|| {
-            engine::execute(black_box(&envelope))
+            engine::calibrate(black_box(&envelope))
                 .expect("base-correlation calibration should succeed")
         })
     });
@@ -375,7 +377,8 @@ fn bench_rate_quote_risk_cache(c: &mut Criterion) {
     let envelope = load_example(include_str!(
         "../examples/market_bootstrap/02_usd_3m_forward_curve.json"
     ));
-    let result = engine::execute(&envelope).expect("rate replay benchmark market should calibrate");
+    let result =
+        engine::calibrate(&envelope).expect("rate replay benchmark market should calibrate");
     let market =
         MarketContext::try_from(result.result.final_market).expect("market state should rebuild");
     let as_of = Date::from_calendar_date(2026, Month::May, 8).expect("base date");

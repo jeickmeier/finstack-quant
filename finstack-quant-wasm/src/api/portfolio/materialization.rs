@@ -1,5 +1,6 @@
 //! Browser-safe WASM wrappers for strict portfolio materialization.
 
+use crate::utils::input::js_opt_uint;
 use std::sync::Arc;
 
 use finstack_quant_core::contract::LoadLimits;
@@ -8,7 +9,7 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 
 use super::JsPortfolio;
-use crate::utils::{materialization_to_js_error, structured_js_error, to_js_value_with_kind};
+use crate::utils::{materialization_to_js_error, to_js_value};
 
 /// Reusable bounded cache for decoded content-addressed instrument artifacts.
 ///
@@ -24,14 +25,6 @@ pub struct JsInstrumentArtifactCache {
     inner: Arc<InstrumentArtifactCache>,
 }
 
-impl Default for JsInstrumentArtifactCache {
-    fn default() -> Self {
-        Self {
-            inner: Arc::new(InstrumentArtifactCache::new()),
-        }
-    }
-}
-
 #[wasm_bindgen(js_class = InstrumentArtifactCache)]
 impl JsInstrumentArtifactCache {
     /// Create an empty cache with an explicit entry capacity.
@@ -40,14 +33,15 @@ impl JsInstrumentArtifactCache {
     /// `undefined` to use the native default of 4,096.
     /// @returns A reusable cache with a 64 MiB encoded-source byte bound.
     #[wasm_bindgen(constructor)]
-    pub fn new(capacity: Option<usize>) -> JsInstrumentArtifactCache {
-        Self {
+    pub fn new(capacity: Option<JsValue>) -> Result<JsInstrumentArtifactCache, JsValue> {
+        let capacity: Option<usize> = js_opt_uint(capacity.as_ref(), "capacity")?;
+        Ok(Self {
             inner: Arc::new(
                 capacity
                     .map(InstrumentArtifactCache::with_capacity)
                     .unwrap_or_default(),
             ),
-        }
+        })
     }
 
     /// Number of decoded artifacts currently retained.
@@ -77,12 +71,14 @@ impl JsPortfolio {
     ///
     /// @param bundle - Complete UTF-8 materialization JSON string or `Uint8Array`.
     /// @param cache - Optional reusable decoded-artifact cache created outside
-    /// any timed validation region.
+    /// any timed validation region. Omit, `null`, or `undefined` for a per-call
+    /// cache with the native default bounds (the Python `cache=None` twin).
     /// @returns An object containing the reusable portfolio and load report.
     /// @throws Error - Throws `TypeError` for unsupported input types. Contract
-    /// failures throw `ContractValidationError` with typed `kind` and structured
-    /// `report` properties if the persisted contract is malformed, invalid,
-    /// unsupported, or exceeds a resource limit.
+    /// failures throw `ContractValidationError` (`kind` `validation`) with a
+    /// `code` of `report` plus a structured `report` property if the persisted
+    /// contract is malformed, invalid, or unsupported, or a `code` of
+    /// `limit_exceeded` if it exceeds a resource limit.
     #[wasm_bindgen(js_name = fromMaterialization)]
     pub fn from_materialization(
         bundle: JsValue,
@@ -99,14 +95,10 @@ impl JsPortfolio {
         };
         js_sys::Reflect::set(
             &result,
-            &JsValue::from_str("portfolio"),
+            &JsValue::from("portfolio"),
             &JsValue::from(portfolio),
         )?;
-        js_sys::Reflect::set(
-            &result,
-            &JsValue::from_str("report"),
-            &to_js_value_with_kind(&report, "serialization")?,
-        )?;
+        js_sys::Reflect::set(&result, &JsValue::from("report"), &to_js_value(&report)?)?;
         Ok(result.into())
     }
 
@@ -117,22 +109,24 @@ impl JsPortfolio {
     /// non-contract native failures still throw.
     ///
     /// @param bundle - Complete UTF-8 materialization JSON string or `Uint8Array`.
-    /// @param cache - Reusable decoded-artifact cache used while validating.
+    /// @param cache - Optional reusable decoded-artifact cache used while
+    /// validating. Omit, `null`, or `undefined` for a per-call cache with the
+    /// native default bounds (the Python `cache=None` twin).
     /// @returns A materialization report whose build/index phase counters are zero,
     /// or a `ValidationReport` when the contract is invalid but still reportable.
     /// @throws Error - Throws `TypeError` for unsupported input types or a
     /// structured `ContractValidationError` when validation cannot produce a report.
     #[wasm_bindgen(js_name = validateMaterialization)]
-    pub fn validate_materialization_json(
+    pub fn validate_materialization(
         bundle: JsValue,
         cache: &JsInstrumentArtifactCache,
     ) -> Result<JsValue, JsValue> {
         let bytes = extract_bundle_bytes(bundle)?;
         match RustPortfolio::validate_materialization(&bytes, &cache.inner, &LoadLimits::default())
         {
-            Ok(report) => to_js_value_with_kind(&report, "serialization"),
+            Ok(report) => to_js_value(&report),
             Err(finstack_quant_portfolio::Error::MaterializationFailed(report)) => {
-                to_js_value_with_kind(&report, "serialization")
+                to_js_value(&report)
             }
             Err(error) => Err(materialization_to_js_error(error)),
         }
@@ -146,10 +140,8 @@ fn extract_bundle_bytes(bundle: JsValue) -> Result<Vec<u8>, JsValue> {
     if bundle.is_instance_of::<js_sys::Uint8Array>() {
         return Ok(js_sys::Uint8Array::new(&bundle).to_vec());
     }
-    Err(structured_js_error(
-        "TypeError",
-        "bundle must be a string or Uint8Array",
-        Some("invalid_type"),
-        None,
+    Err(crate::utils::input::invalid_type(
+        "bundle",
+        "expected a string or Uint8Array",
     ))
 }

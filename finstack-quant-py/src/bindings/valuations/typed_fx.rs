@@ -26,7 +26,6 @@ use super::convert::{
     enum_to_py_string, float_repr, money_repr, money_to_py, opt_repr, tenor_from_py,
 };
 use super::instruments::{enum_from_str, serialize_typed_instrument_json};
-use super::pricing::binding_pricing_options;
 
 /// Compute one scalar metric for a typed instrument envelope.
 ///
@@ -61,7 +60,7 @@ pub(crate) fn envelope_metric_value(
             &as_of,
             &model,
             &metric,
-            binding_pricing_options(),
+            finstack_quant_calibration::recalibration::pricing_options(),
         )
     })
     .map_err(core_to_py)
@@ -101,7 +100,7 @@ pub(crate) fn envelope_option_greeks<'py>(
                 &market,
                 &as_of,
                 &model,
-                binding_pricing_options(),
+                finstack_quant_calibration::recalibration::pricing_options(),
             )
         })
         .map_err(core_to_py)?;
@@ -375,15 +374,7 @@ macro_rules! instrument_envelope_methods {
             #[staticmethod]
             #[pyo3(text_signature = "(json)")]
             fn from_json(json: &str) -> PyResult<Self> {
-                match $crate::bindings::valuations::instruments::parse_typed_instrument_json(json)?
-                {
-                    InstrumentJson::$variant(inner) => Ok(Self { inner }),
-                    _ => Err($crate::errors::value_error(concat!(
-                        "expected instrument type \"",
-                        $type_tag,
-                        "\", got a different instrument type"
-                    ))),
-                }
+                $crate::bindings::valuations::instruments::parse_typed_instrument_json(json).map(|inner| Self { inner })
             }
 
             /// Serialize to a canonical ``finstack_quant.instrument/1`` envelope.
@@ -531,7 +522,10 @@ impl PyFxForward {
     ///     the pair (``FxForward.standard_settlement_days``): T+1 for USD/CAD,
     ///     USD/TRY, USD/RUB and T+2 otherwise.
     /// business_day_convention : BusinessDayConvention | str | None
-    ///     Roll rule applied to the maturity; ``None`` means ``"modified_following"``.
+    ///     Roll rule applied to the maturity: a ``BusinessDayConvention`` or a
+    ///     name accepted by ``adjust`` (serde names or ``MF``/``F``/``P``/``MP``
+    ///     short codes). ``None`` selects the Rust ``FxForward::from_trade_date``
+    ///     default, Modified Following.
     /// end_of_month : bool
     ///     Apply the FX end-of-month rule when spot falls on month end.
     ///
@@ -578,13 +572,10 @@ end_of_month=False)"
     ) -> PyResult<Self> {
         let base = currency_from_py(base_currency, "base_currency")?;
         let quote = currency_from_py(quote_currency, "quote_currency")?;
-        let convention = match business_day_convention {
-            Some(value) if !value.is_none() => bdc_from_py(value, "business_day_convention")?,
-            _ => finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
-        };
-        let settlement_days = settlement_days.unwrap_or_else(|| {
-            finstack_quant_valuations::instruments::FxForward::standard_settlement_days(base, quote)
-        });
+        let convention = business_day_convention
+            .filter(|value| !value.is_none())
+            .map(|value| bdc_from_py(value, "business_day_convention"))
+            .transpose()?;
         let inner = finstack_quant_valuations::instruments::FxForward::from_trade_date(
             InstrumentId::new(id.to_string()),
             base,

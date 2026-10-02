@@ -17,11 +17,11 @@
 //! Hagan, P. S. (2003). "Convexity Conundrums: Pricing CMS Swaps, Caps, and Floors."
 //! *Wilmott Magazine*, March, 38-44. `docs/REFERENCES.md#hagan-2003-cms-convexity`
 
-use crate::instruments::common_impl::pricing::time::{
-    rate_between_on_dates, relative_df_discount_curve,
-};
+use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::rates::cms_swap::types::{CmsSwap, FundingLeg};
+use crate::instruments::rates::cms_swap::types::CmsSwap;
+#[cfg(test)]
+use crate::instruments::rates::cms_swap::types::FundingLeg;
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -92,7 +92,14 @@ impl CmsSwapPricer {
                 continue;
             }
 
-            let coupon_rate = cms_coupon_rate(inst, market, as_of, fixing_date, convexity_scale)?;
+            let coupon_rate = cms_coupon_rate(
+                inst,
+                market,
+                as_of,
+                fixing_date,
+                payment_date,
+                convexity_scale,
+            )?;
             let df_pay = relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
 
             total_pv += coupon_rate * accrual_fraction * df_pay * inst.notional.amount();
@@ -105,68 +112,17 @@ impl CmsSwapPricer {
     fn pv_funding_leg(&self, inst: &CmsSwap, market: &MarketContext, as_of: Date) -> Result<f64> {
         let discount_curve = market.get_discount(inst.discount_curve_id.as_ref())?;
 
-        match &inst.funding_leg {
-            FundingLeg::Fixed {
-                rate,
-                payment_dates,
-                accrual_fractions,
-                ..
-            } => {
-                let fixed_rate = finstack_quant_core::decimal::decimal_to_f64(*rate)?;
-                let mut total_pv = 0.0;
-                for (i, &payment_date) in payment_dates.iter().enumerate() {
-                    if payment_date <= as_of {
-                        continue;
-                    }
-                    let accrual = accrual_fractions[i];
-                    let df =
-                        relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
-                    total_pv += fixed_rate * accrual * df * inst.notional.amount();
-                }
-                Ok(total_pv)
-            }
-            FundingLeg::Floating {
-                spread_bp,
-                payment_dates,
-                accrual_fractions,
-                forward_curve_id,
-                ..
-            } => {
-                let spread = finstack_quant_core::decimal::decimal_to_f64(*spread_bp)? / 10_000.0;
-                let fwd_curve = market.get_forward(forward_curve_id.as_ref())?;
-                let fixing_series_id = finstack_quant_core::market_data::fixings::fixing_series_id(
-                    forward_curve_id.as_str(),
-                );
-                let fixings = market.get_series(&fixing_series_id).ok();
-                let mut total_pv = 0.0;
-                let mut prev_date = inst
-                    .effective_start_date()
-                    .unwrap_or_else(|| payment_dates.first().copied().unwrap_or(as_of));
-
-                for (i, &payment_date) in payment_dates.iter().enumerate() {
-                    if payment_date <= as_of {
-                        prev_date = payment_date;
-                        continue;
-                    }
-                    let accrual = accrual_fractions[i];
-                    let fwd_rate = if prev_date < as_of {
-                        finstack_quant_core::market_data::fixings::require_fixing_value_exact(
-                            fixings,
-                            forward_curve_id.as_str(),
-                            prev_date,
-                            as_of,
-                        )?
-                    } else {
-                        rate_between_on_dates(fwd_curve.as_ref(), prev_date, payment_date)?
-                    };
-                    let df =
-                        relative_df_discount_curve(discount_curve.as_ref(), as_of, payment_date)?;
-                    total_pv += (fwd_rate + spread) * accrual * df * inst.notional.amount();
-                    prev_date = payment_date;
-                }
-                Ok(total_pv)
-            }
-        }
+        let direction = match inst.side {
+            crate::instruments::common_impl::parameters::legs::PayReceive::Pay => 1.0,
+            crate::instruments::common_impl::parameters::legs::PayReceive::Receive => -1.0,
+        };
+        inst.funding_leg_flows(market, as_of, false)?
+            .iter()
+            .filter(|flow| flow.date > as_of)
+            .try_fold(0.0, |pv, flow| {
+                let df = relative_df_discount_curve(discount_curve.as_ref(), as_of, flow.date)?;
+                Ok(pv + direction * flow.amount.amount() * df)
+            })
     }
 }
 
@@ -309,7 +265,8 @@ impl CmsSwapReplicationPricer {
             // to the Hagan pricer's seasoned branch (convexity scale is
             // irrelevant on a known rate).
             if fixing_date < as_of {
-                let coupon_rate = cms_coupon_rate(inst, market, as_of, fixing_date, 0.0)?;
+                let coupon_rate =
+                    cms_coupon_rate(inst, market, as_of, fixing_date, payment_date, 0.0)?;
                 total_pv += coupon_rate * accrual_fraction * df_pay * inst.notional.amount();
                 continue;
             }
@@ -404,6 +361,7 @@ pub(super) fn cms_coupon_rate(
     market: &MarketContext,
     as_of: Date,
     fixing_date: Date,
+    payment_date: Date,
     convexity_scale: f64,
 ) -> Result<f64> {
     let vol_surface = market.get_surface(inst.vol_surface_id.as_str())?;
@@ -453,6 +411,10 @@ pub(super) fn cms_coupon_rate(
             inst.cms_tenor.to_years(),
             forward_swap_rate,
             inst.reference_swap().payments_per_year()?,
+            crate::instruments::rates::cms_common::signed_act365f_year_fraction(
+                inst.reference_swap().reference_swap_start(fixing_date)?,
+                payment_date,
+            )?,
         ) * convexity_scale
     } else {
         0.0
@@ -487,7 +449,7 @@ pub(super) fn cms_forward_and_ttf(
         inst.cms_tenor,
         "CmsSwap cms_tenor",
     )?;
-    let swap_end = swap_start.add_months(swap_tenor_months);
+    let swap_end = swap_start.add_months(swap_tenor_months)?;
     let (forward_swap_rate, _annuity) =
         reference_swap.forward_rate_and_annuity(market, as_of, swap_start, swap_end)?;
 
@@ -604,6 +566,16 @@ pub(super) fn cms_embedded_option_value(
 
 #[cfg(test)]
 mod tests {
+    fn funding_period(start: Date, end: Date, accrual: f64) -> super::super::types::FundingPeriod {
+        super::super::types::FundingPeriod {
+            accrual_start: start,
+            accrual_end: end,
+            payment_date: end,
+            reset_date: start,
+            accrual_year_fraction: accrual,
+        }
+    }
+
     #[allow(dead_code, unused_imports)]
     mod date_support {
         include!(concat!(
@@ -620,6 +592,7 @@ mod tests {
     }
 
     use super::*;
+    use crate::instruments::common_impl::pricing::time::rate_between_on_dates;
     use date_support::date;
     use discount_forward_curve_support::{flat_discount_with_tenor, flat_forward_with_tenor};
     use finstack_quant_core::currency::Currency;
@@ -627,6 +600,138 @@ mod tests {
     use finstack_quant_core::types::IndexId;
     use finstack_quant_core::types::{CurveId, InstrumentId};
     use rust_decimal::Decimal;
+
+    #[test]
+    fn scheduled_funding_starts_at_accrual_start_not_cms_fixing() {
+        use super::super::types::FundingLegSpec;
+        use crate::instruments::common_impl::parameters::legs::PayReceive;
+        let as_of = date(2025, 5, 19);
+        let start = date(2025, 5, 20);
+        let end = date(2025, 8, 20);
+        let swap = CmsSwap::from_schedule(
+            "CMS-FUNDING-DATES",
+            start,
+            end,
+            Tenor::quarterly(),
+            Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y"),
+            Decimal::ZERO,
+            FundingLegSpec::Floating {
+                spread_bp: Decimal::ZERO,
+                day_count: DayCount::Act360,
+                forward_curve_id: CurveId::new("USD-FUND"),
+            },
+            Money::from((100_000_000_i64, Currency::USD)),
+            DayCount::Act360,
+            IndexId::new("USD-SOFR-OIS"),
+            PayReceive::Pay,
+            "USD-OIS",
+            "USD-FUND",
+            "USD-CMS10Y-VOL",
+        )
+        .expect("scheduled swap");
+        assert!(swap.fixing_dates[0] < as_of);
+        let FundingLeg::Floating { periods, .. } = &swap.funding_leg else {
+            panic!("floating")
+        };
+        assert_eq!(periods[0].accrual_start, start);
+        assert_eq!(periods[0].accrual_end, end);
+        assert_eq!(periods[0].reset_date, start);
+        let market = MarketContext::new()
+            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0))
+            .insert(
+                finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
+                    "USD-FUND", 0.25,
+                )
+                .base_date(as_of)
+                .day_count(DayCount::Act365F)
+                .knots([(0.0, 0.06), (0.25, 0.08), (1.0, 0.12)])
+                .build()
+                .expect("sloped forward curve"),
+            );
+        let flow = &swap
+            .funding_leg_flows(&market, as_of, true)
+            .expect("no premature fixing required")[0];
+        let forward = market.get_forward("USD-FUND").expect("forward");
+        let accrual = DayCount::Act360
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("accrual");
+        let growth = forward
+            .df_on_date_curve(start)
+            .expect("start projection DF")
+            / forward.df_on_date_curve(end).expect("end projection DF")
+            - 1.0;
+        let expected_cashflow = 100_000_000.0 * growth;
+        let curve_accrual = forward
+            .day_count()
+            .year_fraction(start, end, DayCountContext::default())
+            .expect("curve accrual");
+        assert!((growth / accrual - growth / curve_accrual).abs() > 1e-6);
+        assert!((flow.amount.amount() - expected_cashflow).abs() < 1e-7);
+        let discount = market.get_discount("USD-OIS").expect("discount");
+        let df = relative_df_discount_curve(discount.as_ref(), as_of, end).expect("df");
+        let pv = CmsSwapPricer::new()
+            .pv_funding_leg(&swap, &market, as_of)
+            .expect("funding pv");
+        assert!((pv - expected_cashflow * df).abs() < 1e-7);
+    }
+
+    #[test]
+    fn scheduled_funding_keeps_unadjusted_boundaries_and_adjusted_payments() {
+        use super::super::types::FundingLegSpec;
+        use crate::instruments::common_impl::parameters::legs::PayReceive;
+        let as_of = date(2025, 5, 1);
+        let start = date(2025, 5, 31);
+        let end = date(2025, 11, 30);
+        let swap = CmsSwap::from_schedule(
+            "CMS-FUNDING-ROLL",
+            start,
+            end,
+            Tenor::quarterly(),
+            Tenor::new(10, finstack_quant_core::dates::TenorUnit::Years).expect("10Y"),
+            Decimal::ZERO,
+            FundingLegSpec::Floating {
+                spread_bp: Decimal::ZERO,
+                day_count: DayCount::Act360,
+                forward_curve_id: CurveId::new("USD-FUND"),
+            },
+            Money::from((100_000_000_i64, Currency::USD)),
+            DayCount::Act360,
+            IndexId::new("USD-SOFR-OIS"),
+            PayReceive::Pay,
+            "USD-OIS",
+            "USD-FUND",
+            "USD-CMS10Y-VOL",
+        )
+        .expect("scheduled swap");
+        let FundingLeg::Floating { periods, .. } = &swap.funding_leg else {
+            panic!("floating")
+        };
+        assert_eq!(periods.len(), 2);
+        assert_ne!(periods[0].payment_date, periods[0].accrual_end);
+        assert_eq!(periods[1].accrual_start, periods[0].accrual_end);
+        assert_ne!(periods[1].accrual_start, periods[0].payment_date);
+        let market = MarketContext::new()
+            .insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 2.0))
+            .insert(flat_forward_with_tenor("USD-FUND", as_of, 0.08, 2.0));
+        let flows = swap
+            .funding_leg_flows(&market, as_of, true)
+            .expect("funding flows");
+        let discount = market.get_discount("USD-OIS").expect("discount");
+        let mut expected_pv = 0.0;
+        for (flow, period) in flows.iter().zip(periods) {
+            let accrual = flow.accrual.as_ref().expect("accrual metadata");
+            assert_eq!(accrual.start, period.accrual_start);
+            assert_eq!(accrual.end, period.accrual_end);
+            assert_eq!(flow.date, period.payment_date);
+            assert_eq!(flow.reset_date, Some(period.reset_date));
+            expected_pv += flow.amount.amount()
+                * relative_df_discount_curve(discount.as_ref(), as_of, flow.date).expect("df");
+        }
+        let actual = CmsSwapPricer::new()
+            .pv_funding_leg(&swap, &market, as_of)
+            .expect("pv");
+        assert!((actual - expected_pv).abs() < 1e-7);
+    }
 
     fn floating_leg_swap() -> CmsSwap {
         let start = date(2025, 1, 1);
@@ -646,8 +751,10 @@ mod tests {
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Floating {
                 spread_bp: Decimal::ZERO,
-                payment_dates: vec![first_pay, second_pay],
-                accrual_fractions: vec![0.25, 0.25],
+                periods: vec![
+                    funding_period(start, first_pay, 0.25),
+                    funding_period(first_pay, second_pay, 0.25),
+                ],
                 day_count: DayCount::Act360,
                 forward_curve_id: CurveId::new("USD-LIBOR-3M"),
             })
@@ -656,6 +763,18 @@ mod tests {
             .vol_surface_id(CurveId::new("USD-CMS10Y-VOL"))
             .build()
             .expect("CMS swap should build")
+    }
+
+    #[test]
+    fn settled_funding_requires_no_historical_fixings() {
+        let as_of = date(2025, 7, 1);
+        let swap = floating_leg_swap();
+        let market =
+            MarketContext::new().insert(flat_discount_with_tenor("USD-OIS", as_of, 0.03, 1.0));
+        let pv = CmsSwapPricer::new()
+            .pv_funding_leg(&swap, &market, as_of)
+            .expect("all funding payments excluded before projecting coupons");
+        assert_eq!(pv, 0.0);
     }
 
     #[test]
@@ -674,9 +793,10 @@ mod tests {
             .get_forward("USD-LIBOR-3M")
             .expect("forward curve should exist");
         let first_rate =
-            rate_between_on_dates(fwd.as_ref(), as_of, date(2025, 4, 1)).expect("first rate");
-        let second_rate = rate_between_on_dates(fwd.as_ref(), date(2025, 4, 1), date(2025, 7, 1))
-            .expect("second rate");
+            rate_between_on_dates(fwd.as_ref(), as_of, date(2025, 4, 1), 0.25).expect("first rate");
+        let second_rate =
+            rate_between_on_dates(fwd.as_ref(), date(2025, 4, 1), date(2025, 7, 1), 0.25)
+                .expect("second rate");
         let expected = swap.notional.amount() * (first_rate + second_rate) * 0.25;
         assert!(
             (pv - expected).abs() < 1e-8,
@@ -754,8 +874,7 @@ mod tests {
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
                 rate: Decimal::ZERO,
-                payment_dates: vec![pay],
-                accrual_fractions: vec![0.25],
+                periods: vec![funding_period(fixing, pay, 0.25)],
                 day_count: DayCount::Act365F,
             })
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -864,8 +983,7 @@ mod tests {
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
                 rate: Decimal::ZERO,
-                payment_dates: vec![pay],
-                accrual_fractions: vec![0.25],
+                periods: vec![funding_period(fixing, pay, 0.25)],
                 day_count: DayCount::Act365F,
             })
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -942,8 +1060,7 @@ mod tests {
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
                 rate: Decimal::ZERO,
-                payment_dates: vec![pay],
-                accrual_fractions: vec![0.25],
+                periods: vec![funding_period(fixing, pay, 0.25)],
                 day_count: DayCount::Act365F,
             })
             .discount_curve_id(CurveId::new("USD-OIS"))
@@ -1032,8 +1149,7 @@ mod tests {
             .index_id_opt(Some(IndexId::new("USD-SOFR-OIS")))
             .funding_leg(FundingLeg::Fixed {
                 rate: Decimal::ZERO,
-                payment_dates: vec![payment],
-                accrual_fractions: vec![0.25],
+                periods: vec![funding_period(fixing, payment, 0.25)],
                 day_count: DayCount::Act360,
             })
             .discount_curve_id(CurveId::new("USD-OIS"))

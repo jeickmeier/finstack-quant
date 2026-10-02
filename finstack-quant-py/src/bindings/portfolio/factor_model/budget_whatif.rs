@@ -479,15 +479,15 @@ const _: () = assert!(model_risk::DEFAULT_UTILIZATION_THRESHOLD == 1.2);
 ///         (``1.2``).
 ///
 /// Returns:
-///     ``RiskBudgetResult`` with per-position utilization, excess and breach
-///     flags.
+///     ``RiskBudgetResult`` with per-position utilization and excess, the
+///     total over-budget amount, and a ``has_breach`` flag.
 ///
 /// Raises:
 ///     ValueError: If array lengths differ, a position id is duplicated,
 ///         non-empty target shares do not sum to one, or a non-zero component
 ///         is paired with a zero ``portfolio_var``.
 #[pyfunction]
-#[pyo3(signature = (position_ids, actual_var, target_var_pct, portfolio_var, utilization_threshold = 1.2))]
+#[pyo3(signature = (position_ids, actual_var, target_var_pct, portfolio_var, utilization_threshold = finstack_quant_models::factor::risk::DEFAULT_UTILIZATION_THRESHOLD))]
 pub(super) fn evaluate_risk_budget(
     py: Python<'_>,
     position_ids: Vec<String>,
@@ -539,11 +539,7 @@ pub(super) fn position_what_if(
     let result = py
         .detach(move || {
             let model = fm::FactorModelBuilder::new().config(config).build()?;
-            let (base, sensitivities) =
-                model.analyze_with_sensitivities(portfolio_ref, market_ref, as_of)?;
-            model
-                .what_if(&base, &sensitivities, portfolio_ref, market_ref, as_of)
-                .position_what_if(&changes)
+            model.position_what_if(portfolio_ref, market_ref, as_of, &changes)
         })
         .map_err(portfolio_to_py)?;
 

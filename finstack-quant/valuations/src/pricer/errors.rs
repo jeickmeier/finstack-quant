@@ -267,7 +267,9 @@ impl From<PricingError> for finstack_quant_core::Error {
                     key.instrument, key.model
                 ))
             }
-            PricingError::TypeMismatch { .. } => finstack_quant_core::InputError::Invalid.into(),
+            mismatch @ PricingError::TypeMismatch { .. } => {
+                finstack_quant_core::Error::Validation(mismatch.to_string())
+            }
             PricingError::InvalidInput { message, context } => {
                 finstack_quant_core::Error::Validation(format!(
                     "{message}{}",
@@ -288,6 +290,26 @@ impl From<PricingError> for finstack_quant_core::Error {
 }
 
 impl PricingError {
+    /// Classify this error for host-language exception mapping; agrees with
+    /// the `From<PricingError> for finstack_quant_core::Error` fold.
+    ///
+    /// `UnknownPricer` and `MissingMarketData` are not-found errors,
+    /// `ModelFailure` a computation error, and every other variant a
+    /// validation error.
+    #[must_use]
+    pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
+        use finstack_quant_core::error::ErrorKind;
+        match self {
+            PricingError::UnknownPricer { .. } | PricingError::MissingMarketData { .. } => {
+                ErrorKind::NotFound
+            }
+            PricingError::ModelFailure { .. } => ErrorKind::Computation,
+            PricingError::DuplicateRegistration { .. }
+            | PricingError::TypeMismatch { .. }
+            | PricingError::InvalidInput { .. } => ErrorKind::Validation,
+        }
+    }
+
     /// Convert a [`finstack_quant_core::Error`] into a [`PricingError`] with explicit
     /// context.
     ///
@@ -514,6 +536,55 @@ mod tests {
     use super::*;
 
     #[test]
+    fn kind_agrees_with_the_core_fold() {
+        use finstack_quant_core::error::ErrorKind;
+        let key = PricerKey::new(InstrumentType::Bond, ModelKey::Tree);
+        let cases = [
+            (
+                PricingError::UnknownPricer {
+                    key,
+                    available_models: Vec::new(),
+                },
+                ErrorKind::NotFound,
+            ),
+            (
+                PricingError::DuplicateRegistration { key },
+                ErrorKind::Validation,
+            ),
+            (
+                PricingError::type_mismatch(InstrumentType::Bond, InstrumentType::Deposit),
+                ErrorKind::Validation,
+            ),
+            (
+                PricingError::InvalidInput {
+                    message: "bad".into(),
+                    context: PricingErrorContext::default(),
+                },
+                ErrorKind::Validation,
+            ),
+            (
+                PricingError::MissingMarketData {
+                    missing_id: "USD-OIS".into(),
+                    context: PricingErrorContext::default(),
+                },
+                ErrorKind::NotFound,
+            ),
+            (
+                PricingError::ModelFailure {
+                    message: "diverged".into(),
+                    context: PricingErrorContext::default(),
+                },
+                ErrorKind::Computation,
+            ),
+        ];
+        for (error, kind) in cases {
+            assert_eq!(error.kind(), kind, "{error}");
+            let core = finstack_quant_core::Error::from(error);
+            assert_eq!(core.kind(), kind, "{core}");
+        }
+    }
+
+    #[test]
     fn pricing_error_maps_to_structured_core_errors() {
         // MissingMarketData -> InputError::NotFound
         let missing: finstack_quant_core::Error = PricingError::MissingMarketData {
@@ -541,14 +612,19 @@ mod tests {
             other => panic!("unexpected mapping for unknown pricer: {other:?}"),
         }
 
-        // TypeMismatch -> InputError::Invalid
+        // TypeMismatch -> Error::Validation, keeping the expected/actual types
         let type_mismatch: finstack_quant_core::Error = PricingError::TypeMismatch {
             expected: InstrumentType::Bond,
             got: InstrumentType::Irs,
         }
         .into();
         match type_mismatch {
-            finstack_quant_core::Error::Input(finstack_quant_core::InputError::Invalid) => {}
+            finstack_quant_core::Error::Validation(message) => {
+                assert_eq!(
+                    message,
+                    "Type mismatch: expected bond, got interest_rate_swap"
+                )
+            }
             other => panic!("unexpected mapping for type mismatch: {other:?}"),
         }
 

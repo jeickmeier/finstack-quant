@@ -1,4 +1,4 @@
-import type { StatementResultJson } from "finstack-quant-wasm";
+import type { StatementResult } from "finstack-quant-wasm";
 import type { FinancialModelSpecWire } from "@/lib/finstack/generated/types/financial_model_spec";
 import type { StatementResultWire } from "@/lib/finstack/generated/types/statement_result";
 import statementSchema from "@/lib/finstack/generated/schemas/statement_result.json";
@@ -75,7 +75,7 @@ export interface StatementRow {
 
 /** Verify the complete structured facade result against the generated Rust output schema. */
 export function adaptStatementResult(
-  value: StatementResultJson,
+  value: StatementResult,
 ): StatementResultWire {
   return resultCodec.fromHost(value) as StatementResultWire;
 }

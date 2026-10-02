@@ -524,7 +524,7 @@ mod tests {
             event_date: date!(2008 - 09 - 15),
             asset_classes: vec![crate::AssetClass::Rates, crate::AssetClass::Credit],
             tags: vec!["systemic".into()],
-            severity: crate::Severity::Severe,
+            severity: crate::TemplateSeverity::Severe,
             components: components.into_iter().map(str::to_string).collect(),
         }
     }

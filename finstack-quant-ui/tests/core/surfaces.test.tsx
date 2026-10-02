@@ -34,7 +34,7 @@ it.each([storedSurface, tenorSurface])(
       surfaces: [surface],
       fx_delta_vol_surfaces: [fxQuotes],
     };
-    const market = new native.Market(JSON.stringify(input));
+    const market = native.MarketContext.fromJson(JSON.stringify(input));
     try {
       expect(JSON.parse(market.toJson()).surfaces[0]).toEqual(surface);
     } finally {

@@ -15,7 +15,7 @@
       "extrapolation": "flat_forward",
       "min_forward_rate": null,
       "allow_non_monotonic": false,
-      "min_forward_tenor": 0.000001,
+      "min_forward_tenor": 1e-6,
       "rate_calibration": null,
       "calibration_ois_cutoff_days": null,
       "fx_policy": null
@@ -34,7 +34,7 @@
       "extrapolation": "flat_forward",
       "min_forward_rate": null,
       "allow_non_monotonic": false,
-      "min_forward_tenor": 0.000001,
+      "min_forward_tenor": 1e-6,
       "rate_calibration": null,
       "calibration_ois_cutoff_days": null,
       "fx_policy": null
@@ -53,7 +53,7 @@
       "extrapolation": "flat_forward",
       "min_forward_rate": null,
       "allow_non_monotonic": false,
-      "min_forward_tenor": 0.000001,
+      "min_forward_tenor": 1e-6,
       "rate_calibration": null,
       "calibration_ois_cutoff_days": null,
       "fx_policy": null
@@ -72,7 +72,7 @@
       "extrapolation": "flat_forward",
       "min_forward_rate": null,
       "allow_non_monotonic": false,
-      "min_forward_tenor": 0.000001,
+      "min_forward_tenor": 1e-6,
       "rate_calibration": null,
       "calibration_ois_cutoff_days": null,
       "fx_policy": null
@@ -91,7 +91,7 @@
       "extrapolation": "flat_forward",
       "min_forward_rate": null,
       "allow_non_monotonic": false,
-      "min_forward_tenor": 0.000001,
+      "min_forward_tenor": 1e-6,
       "rate_calibration": null,
       "calibration_ois_cutoff_days": null,
       "fx_policy": null
@@ -110,7 +110,7 @@
       "extrapolation": "flat_forward",
       "min_forward_rate": null,
       "allow_non_monotonic": false,
-      "min_forward_tenor": 0.000001,
+      "min_forward_tenor": 1e-6,
       "rate_calibration": null,
       "calibration_ois_cutoff_days": null,
       "fx_policy": null
@@ -386,7 +386,8 @@
     "quotes": [
       ["EUR", "USD", 1.1],
       ["JPY", "USD", 0.007142857142857143]
-    ]
+    ],
+    "provider_pinned_quotes": []
   },
   "surfaces": [
     {

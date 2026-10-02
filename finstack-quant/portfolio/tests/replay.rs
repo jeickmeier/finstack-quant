@@ -135,6 +135,8 @@ mod replay_tests {
                 (0.0, 1.0),
                 (1.0, (-rate * 1.0_f64).exp()),
                 (5.0, (-rate * 5.0_f64).exp()),
+                // Metrics attribution measures every standard DV01 bucket through 30y.
+                (30.0, (-rate * 30.0_f64).exp()),
             ])
             .interp(InterpStyle::Linear)
             .validation(

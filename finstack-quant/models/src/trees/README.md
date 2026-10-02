@@ -110,6 +110,14 @@ assert!(american >= european - 1e-9); // early exercise never destroys value
 and `price_generic::<V: TreeValuator>`. Greeks are finite differences owned by
 the instrument pricers, not the lattice.
 
+Vanilla option entry points require positive finite spot and strike. The
+generic CRR entry point has no option strike and retains its arbitrary-payoff
+contract. Cash-dividend pricing keeps `dividend_yield` active: the escrowed
+dividend reserve uses `exp(-(r-q)(t_div-t))`, and the stock component evolves
+with carry `r-q`. Continuous yield must exclude the separately scheduled cash
+payments. This matches the reserve convention in
+[QuantLib's escrowed dividend adjustment](https://github.com/lballabio/QuantLib/blob/master/ql/methods/finitedifferences/utilities/escroweddividendadjustment.cpp).
+
 ## Short-rate trees
 
 | Model | Dynamics | Vol convention | Negative rates | Mean reversion |
@@ -143,8 +151,11 @@ Monthly}` — Bloomberg's lognormal OAS model uses `Simple`), and
 defaults; `Default` is Ho-Lee with `DEFAULT_NORMAL_VOL = 0.01`.
 
 `calibrate` takes `(&dyn Discounting, time_to_maturity)` and rejects
-`steps == 0` or a non-positive horizon. Ho-Lee and binomial BDT use equal
-up/down probabilities; the drift lives in the calibrated node rates.
+`steps == 0`, a non-finite/non-positive horizon, or any non-finite/non-positive
+curve discount target. All three models enforce `curve_fit_tolerance_bp`.
+Pricing must use the calibrated horizon; changing it requires recalibration.
+Ho-Lee and binomial BDT use equal up/down probabilities; the drift lives in
+the calibrated node rates.
 
 **Volatility conventions differ by model** and are not interchangeable:
 Ho-Lee σ is absolute (50-150 bp, i.e. 0.005-0.015); BDT σ is proportional
@@ -240,8 +251,14 @@ let config = RatesCreditConfig {
     hazard_mean_reversion: 0.0,
 };
 let mut tree = RatesCreditTree::new(config);
-tree.calibrate(discount_curve, &hazard_curve, time_to_maturity)?;
+tree.calibrate(&conditional_targets)?; // RatesCreditCalibrationTargets
+let steps = tree.get_config().steps;
 ```
+
+Configuration is immutable after construction. `get_config()` returns a shared
+reference; construct and calibrate a new tree to change volatility, mean
+reversion, correlation, or the number of steps. This keeps sampled paths and
+backward induction consistent with the fitted curves.
 
 `RatesCreditConfig::default()` is deterministic in **both** factors
 (`rate_vol = hazard_vol = 0.0`). The lattice still reprices the discount and

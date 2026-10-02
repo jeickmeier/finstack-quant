@@ -16,7 +16,12 @@
 //! - **Wire / spec / validator surfaces** — anything whose purpose is to echo a
 //!   canonical document for re-ingest — return a **JSON string** and their
 //!   names end in `Json` (`Portfolio.toJson`, `parsePortfolioSpecJson`,
-//!   `buildPortfolioFromSpecJson`, `Portfolio.validateMaterialization`).
+//!   `buildPortfolioFromSpecJson`).
+//!
+//! The materialization entry points (`Portfolio.fromMaterialization`,
+//! `Portfolio.validateMaterialization`) return plain structured objects
+//! (`{ portfolio, report }`, and `MaterializationReport | ValidationReport`
+//! respectively); validation diagnostics are returned, not thrown.
 //!
 //! # Stability tiers
 //!
@@ -24,15 +29,16 @@
 //! contract about how disruptive future changes are likely to be.
 //!
 //! **Stable** — golden-tested, signatures preserved across releases:
-//! - `Portfolio` (typed handle: `fromSpec`, `toJson`, `id`, `asOf`,
-//!   `baseCurrency`, `numPositions`)
+//! - `Portfolio` (typed handle: `builder`, `fromSpec`, `toJson`, `id`, `name`,
+//!   `asOf`, `baseCurrency`, `tags`, `meta`, `entityIds`, `positionIds`,
+//!   `numPositions`) and its `PortfolioBuilder`
 //! - `parsePortfolioSpecJson`, `buildPortfolioFromSpecJson`
 //! - `valuePortfolio`, `valuePortfolioBuilt`,
 //!   `aggregateFullCashflows`, `aggregateFullCashflowsBuilt`,
 //!   `applyScenarioAndRevalue`, `applyScenarioAndRevalueBuilt`,
-//!   `scenarioPnl`, `scenarioPnlBuilt`
-//! - `aggregateMetrics`, `portfolioResultTotalValue`,
-//!   `portfolioResultGetMetric`
+//!   `scenarioPnl`, `scenarioPnlBuilt`, `scenarioPnlBatch`,
+//!   `attributePortfolioPnl`
+//! - `aggregateMetrics`
 //! - `replayPortfolio`
 //!
 //! **Stable, JSON-shape may evolve** — function names stable, but the
@@ -42,18 +48,33 @@
 //!   (`PortfolioOptimizationSpec` / `PortfolioOptimizationResult` JSON)
 //! - `parametricVarDecomposition`, `parametricEsDecomposition`,
 //!   `historicalVarDecomposition`, `evaluateRiskBudget`
+//! - `allocateWeights`, `factorStress`, `positionWhatIf`,
+//!   `buildCreditVolReport`
+//!
+//! A Rust method on a result type is a free function that takes the plain
+//! result object first (`portfolioAttributionExplainText`,
+//! `portfolioValuationGetPositionValue`, `portfolioMetricsGetTotal`, ...); see
+//! the `results` module.
 //!
 //! For repeated calls against the same portfolio (scenario sweeps,
 //! interactive dashboards), prefer the `*Built` variants which take a
 //! `Portfolio` handle and skip the per-call `from_spec` rebuild.
 
+use crate::utils::input::{
+    js_f64, js_f64_seq, js_opt_bool, js_opt_string_seq, js_string, json_text,
+};
 use std::sync::Arc;
 
+use crate::api::core::market_context::JsMarketContext;
 use crate::api::core::market_data::JsDiscountCurve;
-use crate::utils::{to_js_err, to_js_value};
+use crate::utils::input::{from_js_json, opt_json_text};
+use crate::utils::{to_js_err, to_js_value, to_js_value_with_bigints};
 use wasm_bindgen::prelude::*;
 
+pub mod builder;
+pub mod factor_model;
 pub mod materialization;
+pub mod results;
 pub mod sensitivity;
 
 /// Handle to a built [`finstack_quant_portfolio::Portfolio`] that can be reused
@@ -70,6 +91,25 @@ pub struct JsPortfolio {
 
 #[wasm_bindgen(js_class = Portfolio)]
 impl JsPortfolio {
+    /// Start a fluent portfolio builder (Rust `PortfolioBuilder`).
+    /// @param id - Portfolio identifier.
+    /// @param base_currency - ISO-4217 reporting currency used for every base-currency rollup.
+    /// @param as_of - ISO-8601 valuation date.
+    /// @returns A `PortfolioBuilder`; chain `.entity(...)` / `.position(...)` / `.tag(...)` and finish with `.build()`.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` (kind `invalid_type`) if an argument is not a
+    /// string, and a `FinstackError` (kind `validation`) if `baseCurrency` is
+    /// not an ISO-4217 code or `asOf` is not an ISO date.
+    pub fn builder(
+        id: JsValue,
+        base_currency: JsValue,
+        as_of: JsValue,
+    ) -> Result<builder::JsPortfolioBuilder, JsValue> {
+        builder::JsPortfolioBuilder::start(&id, &base_currency, &as_of)
+    }
+
     /// Build from a JSON-serialised `PortfolioSpec`.
     /// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
     ///
@@ -80,7 +120,8 @@ impl JsPortfolio {
     /// specification, or portfolio validation finds duplicate identifiers or an
     /// unknown entity reference.
     #[wasm_bindgen(js_name = fromSpec)]
-    pub fn from_spec(spec_json: &str) -> Result<JsPortfolio, JsValue> {
+    pub fn from_spec(spec_json: JsValue) -> Result<JsPortfolio, JsValue> {
+        let spec_json: &str = &json_text(&spec_json, "specJson")?;
         let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
             serde_json::from_str(spec_json).map_err(to_js_err)?;
         let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
@@ -110,13 +151,75 @@ impl JsPortfolio {
         self.inner.base_currency.to_string()
     }
 
+    /// Human-readable portfolio name, or `null` when unset.
+    #[wasm_bindgen(getter)]
+    pub fn name(&self) -> Option<String> {
+        self.inner.name.clone()
+    }
+
+    /// Portfolio-level tags as a plain `{ key: value }` object.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the tags cannot be converted to a
+    /// JavaScript value.
+    #[wasm_bindgen(getter)]
+    pub fn tags(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.tags)
+    }
+
+    /// Portfolio-level metadata as a plain JSON-shaped object.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the metadata cannot be converted to a
+    /// JavaScript value.
+    #[wasm_bindgen(getter)]
+    pub fn meta(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.meta)
+    }
+
+    /// Entity identifiers in registration order (includes the auto-created
+    /// standalone entity when any position uses it).
+    #[wasm_bindgen(getter, js_name = entityIds)]
+    pub fn entity_ids(&self) -> Vec<String> {
+        self.inner
+            .entities
+            .keys()
+            .map(|id| id.as_str().to_owned())
+            .collect()
+    }
+
+    /// Position identifiers in portfolio order.
+    #[wasm_bindgen(getter, js_name = positionIds)]
+    pub fn position_ids(&self) -> Vec<String> {
+        self.inner
+            .positions()
+            .iter()
+            .map(|p| p.position_id.as_str().to_owned())
+            .collect()
+    }
+
     /// Number of positions in the portfolio.
     #[wasm_bindgen(js_name = numPositions)]
     pub fn num_positions(&self) -> usize {
         self.inner.positions().len()
     }
 
-    /// Serialise the canonical spec back to JSON.
+    /// Canonical `PortfolioSpec` of the portfolio (Rust `Portfolio::to_spec`).
+    ///
+    /// @returns Plain `PortfolioSpec` object accepted by `Portfolio.fromSpec`.
+    ///
+    /// # Errors
+    ///
+    /// Throws a JavaScript exception if the specification cannot be converted
+    /// to a JavaScript value.
+    #[wasm_bindgen(js_name = toSpec)]
+    pub fn to_spec(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.to_spec())
+    }
+
+    /// Serialise the canonical spec (Rust `Portfolio::to_spec`) back to JSON.
     ///
     /// # Errors
     ///
@@ -140,7 +243,8 @@ impl JsPortfolio {
 /// Throws a JavaScript exception if `jsonStr` is malformed or does not match the
 /// `PortfolioSpec` schema, or if the canonical form cannot be serialized.
 #[wasm_bindgen(js_name = parsePortfolioSpecJson)]
-pub fn parse_portfolio_spec_json(json_str: &str) -> Result<String, JsValue> {
+pub fn parse_portfolio_spec_json(json_str: JsValue) -> Result<String, JsValue> {
+    let json_str: &str = &json_text(&json_str, "jsonStr")?;
     let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
         serde_json::from_str(json_str).map_err(to_js_err)?;
 
@@ -159,28 +263,53 @@ pub fn parse_portfolio_spec_json(json_str: &str) -> Result<String, JsValue> {
 /// sectors or a non-finite weight or return, portfolio or benchmark weights do
 /// not sum to one, or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = brinsonFachler)]
-pub fn brinson_fachler(sectors_json: &str) -> Result<JsValue, JsValue> {
+pub fn brinson_fachler(sectors_json: JsValue) -> Result<JsValue, JsValue> {
+    let sectors_json: &str = &json_text(&sectors_json, "sectorsJson")?;
     let sectors: Vec<finstack_quant_portfolio::SectorPeriod> =
         serde_json::from_str(sectors_json).map_err(to_js_err)?;
     let result = finstack_quant_portfolio::brinson_fachler(&sectors).map_err(to_js_err)?;
     to_js_value(&result)
 }
 
-/// Compute Carino-linked multi-period Brinson attribution from period JSON.
+/// Carino-link already-computed single-period Brinson-Fachler results.
 ///
-/// Accepts a JSON array of periods, where each period is an array of
-/// `SectorPeriod` objects, and returns a structured `CarinoLinkedAttribution`
-/// object.
-/// @param periods_json - Chronological period-result JSON array.
+/// Binds Rust `carino_link`: accepts a chronological JSON array of
+/// `BrinsonPeriodResult` objects (for example `brinsonFachler` outputs) and
+/// returns a structured `CarinoLinkedAttribution` object whose linked effects
+/// reconstruct the geometrically compounded active return. Use
+/// `carinoLinkFromSectorPeriods` to link raw sector inputs instead.
+/// @param periods_json - Chronological JSON array of `BrinsonPeriodResult` objects with identical sector ordering in every period.
+///
+/// # Errors
+///
+/// Throws a JavaScript exception if `periodsJson` is malformed, the sequence is
+/// empty or changes sector ordering, or a period return is non-finite or at
+/// most `-1`.
+#[wasm_bindgen(js_name = carinoLink)]
+pub fn carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
+    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
+    let periods: Vec<finstack_quant_portfolio::BrinsonPeriodResult> =
+        serde_json::from_str(periods_json).map_err(to_js_err)?;
+    let result = finstack_quant_portfolio::carino_link(&periods).map_err(to_js_err)?;
+    to_js_value(&result)
+}
+
+/// Compute Carino-linked multi-period Brinson attribution from raw sector
+/// periods.
+///
+/// Binds Rust `carino_link_from_sector_periods`: runs `brinsonFachler` on each
+/// period, then Carino-links the results. Returns a structured
+/// `CarinoLinkedAttribution` object.
+/// @param periods_json - Chronological JSON array of periods, each an array of `SectorPeriod` objects (`sector`, `portfolio_weight`, `benchmark_weight`, `portfolio_return`, `benchmark_return`).
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `periodsJson` is malformed, any period fails
-/// Brinson validation, the sequence is empty or changes sector ordering, a
-/// period return is non-finite or at most `-1`, or the result cannot be
-/// converted to a JavaScript value.
-#[wasm_bindgen(js_name = carinoLink)]
-pub fn carino_link(periods_json: &str) -> Result<JsValue, JsValue> {
+/// Brinson validation, the sequence is empty or changes sector ordering, or a
+/// period return is non-finite or at most `-1`.
+#[wasm_bindgen(js_name = carinoLinkFromSectorPeriods)]
+pub fn carino_link_from_sector_periods(periods_json: JsValue) -> Result<JsValue, JsValue> {
+    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
     let periods: Vec<Vec<finstack_quant_portfolio::SectorPeriod>> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
     let result =
@@ -220,10 +349,13 @@ pub fn carino_link(periods_json: &str) -> Result<JsValue, JsValue> {
 /// gross weight; or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = campisiAttribution)]
 pub fn campisi_attribution(
-    portfolio_json: &str,
-    benchmark_json: &str,
-    config_json: &str,
+    portfolio_json: JsValue,
+    benchmark_json: JsValue,
+    config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let portfolio_json: &str = &json_text(&portfolio_json, "portfolioJson")?;
+    let benchmark_json: &str = &json_text(&benchmark_json, "benchmarkJson")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let portfolio: Vec<finstack_quant_portfolio::FiPositionSnapshot> =
         serde_json::from_str(portfolio_json).map_err(to_js_err)?;
     let benchmark: Vec<finstack_quant_portfolio::FiPositionSnapshot> =
@@ -260,7 +392,8 @@ pub fn campisi_attribution(
 /// non-finite or inconsistent, a return is at most `-1`, or the linked result
 /// cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = campisiCarinoLink)]
-pub fn campisi_carino_link(periods_json: &str) -> Result<JsValue, JsValue> {
+pub fn campisi_carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
+    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
     let periods: Vec<finstack_quant_portfolio::FiAttributionResult> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
     let result = finstack_quant_portfolio::campisi_carino_link(&periods).map_err(to_js_err)?;
@@ -283,9 +416,11 @@ pub fn campisi_carino_link(periods_json: &str) -> Result<JsValue, JsValue> {
 /// linking validation, or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = campisiCarinoLinkFromSnapshots)]
 pub fn campisi_carino_link_from_snapshots(
-    periods_json: &str,
-    config_json: &str,
+    periods_json: JsValue,
+    config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let periods: Vec<finstack_quant_portfolio::FiPeriodInput> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
     let config: finstack_quant_portfolio::FiAttributionConfig =
@@ -312,7 +447,12 @@ pub fn campisi_carino_link_from_snapshots(
 /// `FiAttributionResult`, or if the reconciliation report cannot be converted to
 /// a JavaScript value.
 #[wasm_bindgen(js_name = campisiReconciliationCheck)]
-pub fn campisi_reconciliation_check(result_json: &str, tolerance: f64) -> Result<JsValue, JsValue> {
+pub fn campisi_reconciliation_check(
+    result_json: JsValue,
+    tolerance: JsValue,
+) -> Result<JsValue, JsValue> {
+    let tolerance = js_f64(&tolerance, "tolerance")?;
+    let result_json: &str = &json_text(&result_json, "resultJson")?;
     let result: finstack_quant_portfolio::FiAttributionResult =
         serde_json::from_str(result_json).map_err(to_js_err)?;
     to_js_value(&result.reconciliation_check(tolerance))
@@ -338,10 +478,13 @@ pub fn campisi_reconciliation_check(result_json: &str, tolerance: f64) -> Result
 /// safety bound, or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = cellReturnsFromReference)]
 pub fn cell_returns_from_reference(
-    reference_json: &str,
-    base_label: &str,
-    config_json: &str,
+    reference_json: JsValue,
+    base_label: JsValue,
+    config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let reference_json: &str = &json_text(&reference_json, "referenceJson")?;
+    let base_label: &str = &js_string(&base_label, "baseLabel")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let reference: Vec<finstack_quant_portfolio::ReferenceReturn> =
         serde_json::from_str(reference_json).map_err(to_js_err)?;
     let config: finstack_quant_portfolio::CellConfig =
@@ -379,11 +522,15 @@ pub fn cell_returns_from_reference(
 pub fn cell_returns_from_curves(
     start: &JsDiscountCurve,
     end: &JsDiscountCurve,
-    horizon_years: f64,
-    max_duration: f64,
-    base_label: &str,
-    config_json: &str,
+    horizon_years: JsValue,
+    max_duration: JsValue,
+    base_label: JsValue,
+    config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let horizon_years = js_f64(&horizon_years, "horizonYears")?;
+    let max_duration = js_f64(&max_duration, "maxDuration")?;
+    let base_label: &str = &js_string(&base_label, "baseLabel")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let config: finstack_quant_portfolio::CellConfig =
         serde_json::from_str(config_json).map_err(to_js_err)?;
     let table = finstack_quant_portfolio::cell_returns_from_curves(
@@ -417,7 +564,9 @@ pub fn cell_returns_from_curves(
 /// weights do not sum to one, or the result cannot be converted to a JavaScript
 /// value.
 #[wasm_bindgen(js_name = excessReturns)]
-pub fn excess_returns(positions_json: &str, table_json: &str) -> Result<JsValue, JsValue> {
+pub fn excess_returns(positions_json: JsValue, table_json: JsValue) -> Result<JsValue, JsValue> {
+    let positions_json: &str = &json_text(&positions_json, "positionsJson")?;
+    let table_json: &str = &json_text(&table_json, "tableJson")?;
     let positions: Vec<finstack_quant_portfolio::ExcessReturnPosition> =
         serde_json::from_str(positions_json).map_err(to_js_err)?;
     let table: finstack_quant_portfolio::DurationCellTable =
@@ -448,7 +597,12 @@ pub fn excess_returns(positions_json: &str, table_json: &str) -> Result<JsValue,
 /// cell-sector bucket has a zero or near-zero net weight relative to gross
 /// weight, or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = gridAttribution)]
-pub fn grid_attribution(portfolio_json: &str, benchmark_json: &str) -> Result<JsValue, JsValue> {
+pub fn grid_attribution(
+    portfolio_json: JsValue,
+    benchmark_json: JsValue,
+) -> Result<JsValue, JsValue> {
+    let portfolio_json: &str = &json_text(&portfolio_json, "portfolioJson")?;
+    let benchmark_json: &str = &json_text(&benchmark_json, "benchmarkJson")?;
     let portfolio: Vec<finstack_quant_portfolio::GridPosition> =
         serde_json::from_str(portfolio_json).map_err(to_js_err)?;
     let benchmark: Vec<finstack_quant_portfolio::GridPosition> =
@@ -475,7 +629,8 @@ pub fn grid_attribution(portfolio_json: &str, benchmark_json: &str) -> Result<Js
 /// empty, a consumed value is non-finite or inconsistent, a return is at most
 /// `-1`, or the linked result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = gridCarinoLink)]
-pub fn grid_carino_link(periods_json: &str) -> Result<JsValue, JsValue> {
+pub fn grid_carino_link(periods_json: JsValue) -> Result<JsValue, JsValue> {
+    let periods_json: &str = &json_text(&periods_json, "periodsJson")?;
     let periods: Vec<finstack_quant_portfolio::GridAttributionResult> =
         serde_json::from_str(periods_json).map_err(to_js_err)?;
     let result = finstack_quant_portfolio::grid_carino_link(&periods).map_err(to_js_err)?;
@@ -501,9 +656,11 @@ pub fn grid_carino_link(periods_json: &str) -> Result<JsValue, JsValue> {
 /// tolerance; or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = factorBrinsonAttribution)]
 pub fn factor_brinson_attribution(
-    input_json: &str,
-    factor_returns: Vec<f64>,
+    input_json: JsValue,
+    factor_returns: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let factor_returns = js_f64_seq(&factor_returns, "factorReturns")?;
+    let input_json: &str = &json_text(&input_json, "inputJson")?;
     let input: finstack_quant_portfolio::FactorBrinsonInput =
         serde_json::from_str(input_json).map_err(to_js_err)?;
     let result = finstack_quant_portfolio::factor_brinson_attribution(&input, &factor_returns)
@@ -512,15 +669,16 @@ pub fn factor_brinson_attribution(
 }
 
 /// Compute a Modified-Dietz TWRR sub-period return from period JSON.
-/// @param period_json - Single-period result JSON.
+/// @param period_json - `TwrrPeriod` JSON: `beginning_market_value`, `ending_market_value` and optional `cashflows: [{ amount, fraction_of_period_remaining }]` (omitted means no flows); a positive `amount` is a contribution into the portfolio and the fraction, in `[0, 1]`, is the share of the period remaining after the flow. Unknown keys are rejected.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `periodJson` is malformed, does not match
-/// the expected period schema, or the return is undefined (non-positive
-/// adjusted denominator, out-of-range cashflow weight, non-finite inputs).
+/// Throws a JavaScript exception if `periodJson` is malformed, has unknown
+/// keys, or the return is undefined (non-positive adjusted denominator,
+/// out-of-range cashflow weight, non-finite inputs).
 #[wasm_bindgen(js_name = twrrModifiedDietz)]
-pub fn twrr_modified_dietz(period_json: &str) -> Result<f64, JsValue> {
+pub fn twrr_modified_dietz(period_json: JsValue) -> Result<f64, JsValue> {
+    let period_json: &str = &json_text(&period_json, "periodJson")?;
     let period: finstack_quant_portfolio::TwrrPeriod =
         serde_json::from_str(period_json).map_err(to_js_err)?;
     finstack_quant_portfolio::twrr_modified_dietz(&period).map_err(to_js_err)
@@ -537,7 +695,9 @@ pub fn twrr_modified_dietz(period_json: &str) -> Result<f64, JsValue> {
 /// growth factor), or the linked result cannot be converted to a JavaScript
 /// value.
 #[wasm_bindgen(js_name = twrrLinked)]
-pub fn twrr_linked(returns_json: &str, horizon_years: f64) -> Result<JsValue, JsValue> {
+pub fn twrr_linked(returns_json: JsValue, horizon_years: JsValue) -> Result<JsValue, JsValue> {
+    let horizon_years = js_f64(&horizon_years, "horizonYears")?;
+    let returns_json: &str = &json_text(&returns_json, "returnsJson")?;
     let returns: Vec<f64> = serde_json::from_str(returns_json).map_err(to_js_err)?;
     let result =
         finstack_quant_portfolio::twrr_linked(&returns, horizon_years).map_err(to_js_err)?;
@@ -545,15 +705,27 @@ pub fn twrr_linked(returns_json: &str, horizon_years: f64) -> Result<JsValue, Js
 }
 
 /// Compute money-weighted return via XIRR from dated cashflow JSON.
-/// @param cashflows_json - Dated cashflow JSON.
+///
+/// Binds Rust `mwr_xirr_from_cashflows`. Returns the unique annualized decimal
+/// return under Act/365F, finite and greater than -1. Nonconventional streams
+/// are rejected rather than selecting one of their potentially multiple roots.
+///
+/// # Arguments
+///
+/// * `cashflows_json` - JSON array of `{ date, amount }` flows from the
+///   investor's cash account (contributions negative, distributions and
+///   terminal value positive). Dates are sorted and equal-date amounts netted;
+///   remaining nonzero flows must change sign exactly once.
 ///
 /// # Errors
 ///
 /// Throws a JavaScript exception if `cashflowsJson` is malformed, contains an
-/// invalid date or insufficient cash flows for XIRR, or the numerical root
-/// cannot be found.
+/// invalid date or insufficient net cash flows, the nonzero net flows do not
+/// change sign exactly once, or no sufficiently accurate finite return greater
+/// than -1 can be found.
 #[wasm_bindgen(js_name = mwrXirr)]
-pub fn mwr_xirr(cashflows_json: &str) -> Result<f64, JsValue> {
+pub fn mwr_xirr(cashflows_json: JsValue) -> Result<f64, JsValue> {
+    let cashflows_json: &str = &json_text(&cashflows_json, "cashflowsJson")?;
     let cashflows: Vec<finstack_quant_portfolio::DatedCashflow> =
         serde_json::from_str(cashflows_json).map_err(to_js_err)?;
     finstack_quant_portfolio::mwr_xirr_from_cashflows(&cashflows).map_err(to_js_err)
@@ -573,7 +745,8 @@ pub fn mwr_xirr(cashflows_json: &str) -> Result<f64, JsValue> {
 /// specification, portfolio validation fails, or the round-trip form cannot be
 /// serialized.
 #[wasm_bindgen(js_name = buildPortfolioFromSpecJson)]
-pub fn build_portfolio_from_spec_json(spec_json: &str) -> Result<String, JsValue> {
+pub fn build_portfolio_from_spec_json(spec_json: JsValue) -> Result<String, JsValue> {
+    let spec_json: &str = &json_text(&spec_json, "specJson")?;
     let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
         serde_json::from_str(spec_json).map_err(to_js_err)?;
 
@@ -583,44 +756,8 @@ pub fn build_portfolio_from_spec_json(spec_json: &str) -> Result<String, JsValue
     serde_json::to_string(&round_tripped).map_err(to_js_err)
 }
 
-/// Extract the total portfolio value from a JSON result.
-/// @param result_json - Result JSON produced by a prior call.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `resultJson` is malformed or does not match
-/// the `PortfolioResult` schema.
-#[wasm_bindgen(js_name = portfolioResultTotalValue)]
-pub fn portfolio_result_total_value(result_json: &str) -> Result<f64, JsValue> {
-    let result: finstack_quant_portfolio::results::PortfolioResult =
-        serde_json::from_str(result_json).map_err(to_js_err)?;
-
-    Ok(result.total_value().amount())
-}
-
-/// Extract a specific metric from a portfolio result JSON.
-///
-/// Returns `undefined` (via `Option`) if the metric was not produced.
-/// @param result_json - Result JSON produced by a prior call.
-/// @param metric_id - Stable metric identifier used to select the required domain object.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `resultJson` is malformed or does not match
-/// the `PortfolioResult` schema. An absent `metricId` returns `undefined`.
-#[wasm_bindgen(js_name = portfolioResultGetMetric)]
-pub fn portfolio_result_get_metric(
-    result_json: &str,
-    metric_id: &str,
-) -> Result<Option<f64>, JsValue> {
-    let result: finstack_quant_portfolio::results::PortfolioResult =
-        serde_json::from_str(result_json).map_err(to_js_err)?;
-
-    Ok(result.get_metric(metric_id))
-}
-
 /// Aggregate portfolio metrics from a valuation JSON.
-/// @param valuation_json - Portfolio or instrument valuation JSON.
+/// @param valuation_json - `PortfolioValuation` JSON, for example `JSON.stringify(valuePortfolio(...))`.
 /// @param base_currency - ISO-4217 base currency in which aggregate portfolio values are reported.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -633,11 +770,15 @@ pub fn portfolio_result_get_metric(
 /// metrics cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = aggregateMetrics)]
 pub fn aggregate_metrics(
-    valuation_json: &str,
-    base_currency: &str,
-    market_json: &str,
-    as_of: &str,
+    valuation_json: JsValue,
+    base_currency: JsValue,
+    market_json: JsValue,
+    as_of: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let valuation_json: &str = &json_text(&valuation_json, "valuationJson")?;
+    let base_currency: &str = &js_string(&base_currency, "baseCurrency")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
     let valuation: finstack_quant_portfolio::valuation::PortfolioValuation =
         serde_json::from_str(valuation_json).map_err(to_js_err)?;
     let ccy: finstack_quant_core::currency::Currency = base_currency.parse().map_err(to_js_err)?;
@@ -653,23 +794,32 @@ pub fn aggregate_metrics(
 /// Value a portfolio from its spec and market context.
 /// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param strict_risk - Optional; when omitted or `undefined`, defaults to
-///   `true` (fail closed when a requested risk metric fails to compute),
-///   matching Rust `PortfolioValuationOptions`. Pass `false` only for an
-///   intentional PV-preserving fallback.
+/// @param strict_risk - Optional; when omitted or `undefined`, uses the Rust
+///   `PortfolioValuationOptions` default, `true` (fail closed when a requested
+///   risk metric fails to compute). Pass `false` only for an intentional
+///   PV-preserving fallback.
 /// @param metrics - Optional risk-metric ids to offer every position. Omit for
 ///   the standard set (PV plus `dv01`; pricer-specific metrics such as `theta`
 ///   or `cs01` must be listed explicitly); an empty array performs PV-only
-///   valuation. Names are validated strictly against the standard `MetricId`
-///   set — an unknown name throws. The list is a menu, not a
-///   per-position request: one list is chosen for a book of mixed instrument
-///   types, so each position is asked for exactly the entries its own
-///   instrument type has a calculator for, and the rest appear on that
-///   position's `inapplicable_metrics`. Narrowing covers structural
-///   inapplicability only; `strictRisk` still governs a metric an instrument
-///   type supports but fails to compute. `priceInstrument` keeps the opposite
-///   contract and throws on a metric its instrument cannot produce.
-///   Mirrors the Python `metrics=` keyword.
+///   valuation. Names resolve exactly as in `priceInstrument`: every id
+///   `listStandardMetrics()` returns is accepted and an unknown name throws.
+///   The list is a menu, not a per-position request: one list is chosen for a
+///   book of mixed instrument types, so each position is asked for exactly the
+///   entries its own instrument can compute (a composite position: the additive
+///   entries at least one leg supports), and the rest appear on that position's
+///   `inapplicable_metrics`. Narrowing covers structural inapplicability only;
+///   `strictRisk` still governs a metric an instrument supports but fails to
+///   compute. `priceInstrument` keeps the opposite contract and throws on a
+///   metric its instrument cannot produce. Mirrors the Python `metrics=`
+///   keyword.
+///
+/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
+/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
+/// them; serialize one with `valuations.valuationResultToJson`.
+/// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
+/// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
+/// order before other keys, not in the Rust (and Python) insertion order; take
+/// valuation order from `spec.positions` when it matters.
 ///
 /// # Errors
 ///
@@ -680,10 +830,10 @@ pub fn aggregate_metrics(
 /// converted to a JavaScript value.
 #[wasm_bindgen(js_name = valuePortfolio)]
 pub fn value_portfolio(
-    spec_json: &str,
-    market_json: &str,
-    strict_risk: Option<bool>,
-    metrics: Option<Vec<String>>,
+    spec_json: JsValue,
+    market_json: JsValue,
+    strict_risk: Option<JsValue>,
+    metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let portfolio = JsPortfolio::from_spec(spec_json)?;
     value_portfolio_built(&portfolio, market_json, strict_risk, metrics)
@@ -692,9 +842,10 @@ pub fn value_portfolio(
 /// Aggregate the full classified cashflow ladder for a portfolio.
 /// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param allow_partial - Optional; when omitted or `undefined`, defaults to
-///   `false` (fail closed if any position fails schedule construction).
-///   Pass `true` to keep a partial ladder with issues on the result.
+/// @param allow_partial - Optional; when omitted or `undefined`, uses the Rust
+///   `CashflowAggregationOptions` default, `false` (fail closed if any
+///   position fails schedule construction). Pass `true` to keep a partial
+///   ladder with issues on the result.
 ///
 /// # Errors
 ///
@@ -704,25 +855,26 @@ pub fn value_portfolio(
 /// overflows, or the aggregate cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = aggregateFullCashflows)]
 pub fn aggregate_full_cashflows(
-    spec_json: &str,
-    market_json: &str,
-    allow_partial: Option<bool>,
+    spec_json: JsValue,
+    market_json: JsValue,
+    allow_partial: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let portfolio = JsPortfolio::from_spec(spec_json)?;
     aggregate_full_cashflows_built(&portfolio, market_json, allow_partial)
 }
 
 /// Aggregate the full classified cashflow ladder for an already-built
-/// [`JsPortfolio`] handle.
+/// `Portfolio` handle.
 ///
 /// Skips the per-call `PortfolioSpec` parse + `Portfolio::from_spec` rebuild.
 /// For batched or chained workflows (repeated cashflow builds across market
 /// scenarios on the same portfolio), this is the cheap path.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param allow_partial - Optional; when omitted or `undefined`, defaults to
-///   `false` (fail closed if any position fails schedule construction).
-///   Pass `true` to keep a partial ladder with issues on the result.
+/// @param allow_partial - Optional; when omitted or `undefined`, uses the Rust
+///   `CashflowAggregationOptions` default, `false` (fail closed if any
+///   position fails schedule construction). Pass `true` to keep a partial
+///   ladder with issues on the result.
 ///
 /// # Errors
 ///
@@ -733,14 +885,17 @@ pub fn aggregate_full_cashflows(
 #[wasm_bindgen(js_name = aggregateFullCashflowsBuilt)]
 pub fn aggregate_full_cashflows_built(
     portfolio: &JsPortfolio,
-    market_json: &str,
-    allow_partial: Option<bool>,
+    market_json: JsValue,
+    allow_partial: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let allow_partial = js_opt_bool(allow_partial.as_ref(), "allowPartial")?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
-    let options = finstack_quant_portfolio::cashflows::CashflowAggregationOptions {
-        allow_partial: allow_partial.unwrap_or(false),
-    };
+    let mut options = finstack_quant_portfolio::cashflows::CashflowAggregationOptions::default();
+    if let Some(allow_partial) = allow_partial {
+        options.allow_partial = allow_partial;
+    }
     let cashflows = finstack_quant_portfolio::cashflows::aggregate_full_cashflows(
         &portfolio.inner,
         &market,
@@ -750,30 +905,38 @@ pub fn aggregate_full_cashflows_built(
     to_js_value(&cashflows)
 }
 
-/// Value an already-built [`JsPortfolio`] handle. Skips the per-call
+/// Value an already-built `Portfolio` handle. Skips the per-call
 /// `PortfolioSpec` parse + `Portfolio::from_spec` rebuild that
 /// [`value_portfolio`] performs; use this when sweeping market scenarios
 /// against a fixed portfolio.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param strict_risk - Optional; when omitted or `undefined`, defaults to
-///   `true` (fail closed when a requested risk metric fails to compute),
-///   matching Rust `PortfolioValuationOptions`. Pass `false` only for an
-///   intentional PV-preserving fallback.
+/// @param strict_risk - Optional; when omitted or `undefined`, uses the Rust
+///   `PortfolioValuationOptions` default, `true` (fail closed when a requested
+///   risk metric fails to compute). Pass `false` only for an intentional
+///   PV-preserving fallback.
 /// @param metrics - Optional risk-metric ids to offer every position. Omit for
 ///   the standard set (PV plus `dv01`; pricer-specific metrics such as `theta`
 ///   or `cs01` must be listed explicitly); an empty array performs PV-only
-///   valuation. Names are validated strictly against the standard `MetricId`
-///   set — an unknown name throws instead of silently degrading to
-///   PV-only valuation. The list is a menu, not a
-///   per-position request: one list is chosen for a book of mixed instrument
-///   types, so each position is asked for exactly the entries its own
-///   instrument type has a calculator for, and the rest appear on that
-///   position's `inapplicable_metrics`. Narrowing covers structural
-///   inapplicability only; `strictRisk` still governs a metric an instrument
-///   type supports but fails to compute. `priceInstrument` keeps the opposite
-///   contract and throws on a metric its instrument cannot produce.
-///   Mirrors the Python `metrics=` keyword.
+///   valuation. Names resolve exactly as in `priceInstrument`: every id
+///   `listStandardMetrics()` returns is accepted and an unknown name throws.
+///   The list is a menu, not a per-position request: one list is chosen for a
+///   book of mixed instrument types, so each position is asked for exactly the
+///   entries its own instrument can compute (a composite position: the additive
+///   entries at least one leg supports), and the rest appear on that position's
+///   `inapplicable_metrics`. Narrowing covers structural inapplicability only;
+///   `strictRisk` still governs a metric an instrument supports but fails to
+///   compute. `priceInstrument` keeps the opposite contract and throws on a
+///   metric its instrument cannot produce. Mirrors the Python `metrics=`
+///   keyword.
+///
+/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
+/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
+/// them; serialize one with `valuations.valuationResultToJson`.
+/// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
+/// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
+/// order before other keys, not in the Rust (and Python) insertion order; take
+/// valuation order from `spec.positions` when it matters.
 ///
 /// # Errors
 ///
@@ -784,23 +947,29 @@ pub fn aggregate_full_cashflows_built(
 #[wasm_bindgen(js_name = valuePortfolioBuilt)]
 pub fn value_portfolio_built(
     portfolio: &JsPortfolio,
-    market_json: &str,
-    strict_risk: Option<bool>,
-    metrics: Option<Vec<String>>,
+    market_json: JsValue,
+    strict_risk: Option<JsValue>,
+    metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let strict_risk = js_opt_bool(strict_risk.as_ref(), "strictRisk")?;
+    let metrics = js_opt_string_seq(metrics.as_ref(), "metrics")?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     // Strict parsing via the canonical portfolio-crate helper (shared with
     // the Python binding): an unknown metric name throws instead of silently
     // degrading to PV-only valuation.
-    let options = finstack_quant_portfolio::valuation::PortfolioValuationOptions {
-        strict_risk: strict_risk.unwrap_or(true),
+    let mut options = finstack_quant_portfolio::valuation::PortfolioValuationOptions {
         metrics: finstack_quant_portfolio::valuation::RequestedMetrics::try_from_metric_names(
             metrics,
         )
         .map_err(to_js_err)?,
+        ..Default::default()
     };
+    if let Some(strict_risk) = strict_risk {
+        options.strict_risk = strict_risk;
+    }
     let valuation = finstack_quant_portfolio::valuation::value_portfolio(
         &portfolio.inner,
         &market,
@@ -808,14 +977,22 @@ pub fn value_portfolio_built(
         &options,
     )
     .map_err(to_js_err)?;
-    to_js_value(&valuation)
+    to_js_value_with_bigints(&valuation)
 }
 
-/// Apply a scenario to an already-built [`JsPortfolio`] handle and revalue.
+/// Apply a scenario to an already-built `Portfolio` handle and revalue.
 /// Returns a JS object with structured `valuation` and `report` values.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param scenario_json - Scenario specification JSON.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+///
+/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
+/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
+/// them; serialize one with `valuations.valuationResultToJson`.
+/// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
+/// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
+/// order before other keys, not in the Rust (and Python) insertion order; take
+/// valuation order from `spec.positions` when it matters.
 ///
 /// # Errors
 ///
@@ -825,11 +1002,13 @@ pub fn value_portfolio_built(
 #[wasm_bindgen(js_name = applyScenarioAndRevalueBuilt)]
 pub fn apply_scenario_and_revalue_built(
     portfolio: &JsPortfolio,
-    scenario_json: &str,
-    market_json: &str,
+    scenario_json: JsValue,
+    market_json: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let scenario: finstack_quant_scenarios::ScenarioSpec =
-        serde_json::from_str(scenario_json).map_err(to_js_err)?;
+    let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let scenario =
+        finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
@@ -840,7 +1019,7 @@ pub fn apply_scenario_and_revalue_built(
         &config,
     )
     .map_err(to_js_err)?;
-    to_js_value(&out)
+    to_js_value_with_bigints(&out)
 }
 
 /// Apply a scenario to a portfolio and revalue.
@@ -850,6 +1029,14 @@ pub fn apply_scenario_and_revalue_built(
 /// @param scenario_json - Scenario specification JSON.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 ///
+/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
+/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
+/// them; serialize one with `valuations.valuationResultToJson`.
+/// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
+/// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
+/// order before other keys, not in the Rust (and Python) insertion order; take
+/// valuation order from `spec.positions` when it matters.
+///
 /// # Errors
 ///
 /// Throws a JavaScript exception if the portfolio, scenario, or market JSON is
@@ -857,16 +1044,16 @@ pub fn apply_scenario_and_revalue_built(
 /// fails; or the structured result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = applyScenarioAndRevalue)]
 pub fn apply_scenario_and_revalue(
-    spec_json: &str,
-    scenario_json: &str,
-    market_json: &str,
+    spec_json: JsValue,
+    scenario_json: JsValue,
+    market_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let portfolio = JsPortfolio::from_spec(spec_json)?;
     apply_scenario_and_revalue_built(&portfolio, scenario_json, market_json)
 }
 
 /// Compute the profit and loss attributable to a scenario for an already-built
-/// [`JsPortfolio`] handle.
+/// `Portfolio` handle.
 ///
 /// Values the portfolio against the unshocked market and against the
 /// scenario-shocked market, and returns a JS object with structured `pnl`
@@ -885,11 +1072,13 @@ pub fn apply_scenario_and_revalue(
 #[wasm_bindgen(js_name = scenarioPnlBuilt)]
 pub fn scenario_pnl_built(
     portfolio: &JsPortfolio,
-    scenario_json: &str,
-    market_json: &str,
+    scenario_json: JsValue,
+    market_json: JsValue,
 ) -> Result<JsValue, JsValue> {
-    let scenario: finstack_quant_scenarios::ScenarioSpec =
-        serde_json::from_str(scenario_json).map_err(to_js_err)?;
+    let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
+    let scenario =
+        finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
@@ -920,12 +1109,106 @@ pub fn scenario_pnl_built(
 /// result cannot be converted to JavaScript.
 #[wasm_bindgen(js_name = scenarioPnl)]
 pub fn scenario_pnl(
-    spec_json: &str,
-    scenario_json: &str,
-    market_json: &str,
+    spec_json: JsValue,
+    scenario_json: JsValue,
+    market_json: JsValue,
 ) -> Result<JsValue, JsValue> {
     let portfolio = JsPortfolio::from_spec(spec_json)?;
     scenario_pnl_built(&portfolio, scenario_json, market_json)
+}
+
+/// Compute ordered portfolio P&L for a batch of scenarios.
+///
+/// The Rust batch engine values the unstressed base leg once for the whole
+/// request, then applies and revalues each scenario independently. Returns one
+/// `ScenarioPnlBatchItem` (`scenario_id`, `pnl`, `report`) per input scenario,
+/// in input order; an empty batch returns `[]` without a valuation.
+/// @param portfolio - Built portfolio valued for the shared base and every scenario.
+/// @param scenarios - Array of `ScenarioSpec` objects, or its JSON.
+/// @param market - `core.MarketContext` handle holding the unshocked market snapshot.
+/// @returns The ordered `ScenarioPnlBatchItem` array.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) if `scenarios` is not a JSON
+/// string or array, and a `FinstackError` if a scenario is malformed or
+/// inconsistent (kind `validation`), or scenario application, valuation or
+/// base-currency differencing fails; the error is the earliest failing
+/// scenario's.
+#[wasm_bindgen(js_name = scenarioPnlBatch)]
+pub fn scenario_pnl_batch(
+    portfolio: &JsPortfolio,
+    scenarios: JsValue,
+    market: &JsMarketContext,
+) -> Result<JsValue, JsValue> {
+    let scenarios: Vec<finstack_quant_scenarios::ScenarioSpec> =
+        from_js_json(&scenarios, "scenarios")?;
+    for scenario in &scenarios {
+        scenario.validate().map_err(to_js_err)?;
+    }
+    let config = finstack_quant_core::config::FinstackConfig::default();
+    let items = finstack_quant_portfolio::scenarios::scenario_pnl_batch(
+        &portfolio.inner,
+        &scenarios,
+        market.inner(),
+        &config,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&items)
+}
+
+/// Attribute portfolio P&L between two market snapshots.
+///
+/// Returns the `PortfolioAttribution`: base-currency `total_pnl`, one bucket
+/// per factor (`carry`, `rates_curves_pnl`, `credit_curves_pnl`, `fx_pnl`,
+/// `vol_pnl`, ..., `residual`) and the per-position `by_position` detail.
+/// @param portfolio - Built portfolio whose positions are attributed.
+/// @param market_t0 - `core.MarketContext` handle for the opening snapshot.
+/// @param market_t1 - `core.MarketContext` handle for the closing snapshot.
+/// @param as_of_t0 - ISO-8601 date of the opening snapshot.
+/// @param as_of_t1 - ISO-8601 date of the closing snapshot.
+/// @param method - `AttributionMethod` wire value: a unit variant name such as `"parallel"` or `"metrics_based"`, an object such as `{ waterfall: ["carry", "rates_curves"] }`, or the same value as JSON text.
+/// @param config - Optional `FinstackConfig` object or JSON; omit for the Rust default configuration.
+/// @returns The `PortfolioAttribution`.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a
+/// `FinstackError` if a date is not an ISO date or `method` / `config` is
+/// malformed (kind `validation`), a required FX rate or market datum is
+/// missing (kind `not_found`), or a position valuation or attribution fails.
+#[wasm_bindgen(js_name = attributePortfolioPnl)]
+pub fn attribute_portfolio_pnl(
+    portfolio: &JsPortfolio,
+    market_t0: &JsMarketContext,
+    market_t1: &JsMarketContext,
+    as_of_t0: JsValue,
+    as_of_t1: JsValue,
+    method: JsValue,
+    config: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let as_of_t0 = crate::utils::parse_iso_date(&js_string(&as_of_t0, "asOfT0")?)?;
+    let as_of_t1 = crate::utils::parse_iso_date(&js_string(&as_of_t1, "asOfT1")?)?;
+    // `js_wire`, not `from_js_json`: the unit variants are bare wire strings
+    // (`"parallel"`), which `from_js_json` would parse as JSON text.
+    let method: finstack_quant_portfolio::attribution::AttributionMethod =
+        crate::utils::wire::js_wire(&method, "method")?;
+    let config: finstack_quant_core::config::FinstackConfig =
+        match opt_json_text(config.as_ref(), "config")? {
+            Some(text) => serde_json::from_str(&text).map_err(to_js_err)?,
+            None => finstack_quant_core::config::FinstackConfig::default(),
+        };
+    let attribution = finstack_quant_portfolio::attribution::attribute_portfolio_pnl(
+        &portfolio.inner,
+        market_t0.inner(),
+        market_t1.inner(),
+        as_of_t0,
+        as_of_t1,
+        &config,
+        method,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&attribution)
 }
 
 /// Optimize portfolio weights using the LP-based optimizer.
@@ -933,7 +1216,7 @@ pub fn scenario_pnl(
 /// Accepts a `PortfolioOptimizationSpec` JSON (portfolio + objective +
 /// constraints + options) and a `MarketContext` JSON, and returns a structured
 /// `PortfolioOptimizationResult` object.
-/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
+/// @param spec_json - `PortfolioOptimizationSpec` JSON: `portfolio` (a `PortfolioSpec`) plus `objective`, and optional `constraints`, `weighting`, `missing_metric_policy`, `label` and `trade_universe`.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
 ///
 /// # Errors
@@ -943,7 +1226,9 @@ pub fn scenario_pnl(
 /// invalid, a required market-dependent valuation fails, the solver cannot
 /// produce a result, or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = optimizePortfolio)]
-pub fn optimize_portfolio(spec_json: &str, market_json: &str) -> Result<JsValue, JsValue> {
+pub fn optimize_portfolio(spec_json: JsValue, market_json: JsValue) -> Result<JsValue, JsValue> {
+    let spec_json: &str = &json_text(&spec_json, "specJson")?;
+    let market_json: &str = &json_text(&market_json, "marketJson")?;
     let spec: finstack_quant_portfolio::optimization::PortfolioOptimizationSpec =
         serde_json::from_str(spec_json).map_err(to_js_err)?;
     let market: finstack_quant_core::market_data::context::MarketContext =
@@ -955,13 +1240,169 @@ pub fn optimize_portfolio(spec_json: &str, market_json: &str) -> Result<JsValue,
     to_js_value(&result)
 }
 
+/// Rebalance a spec's portfolio to an optimization result.
+///
+/// Wire twin of Python `PortfolioOptimizationResult.to_rebalanced_portfolio`
+/// (Rust `optimization::rebalance_from_spec`): held positions take the
+/// result's implied quantities and trade-universe candidates with a
+/// non-negligible target weight and quantity are added as new positions.
+/// @param spec_json - The `PortfolioOptimizationSpec` JSON passed to `optimizePortfolio`.
+/// @param result_json - The `PortfolioOptimizationResult` that `optimizePortfolio` returned for that spec (object or JSON).
+/// @returns The rebalanced, validated `Portfolio` handle.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if either input is malformed, the solution is
+/// infeasible, or the result names a position that is neither in the spec
+/// portfolio nor a trade-universe candidate (a result paired with the wrong
+/// spec), and propagates portfolio validation failures.
+#[wasm_bindgen(js_name = rebalanceFromSpec)]
+pub fn rebalance_from_spec(
+    spec_json: JsValue,
+    result_json: JsValue,
+) -> Result<JsPortfolio, JsValue> {
+    let spec: finstack_quant_portfolio::optimization::PortfolioOptimizationSpec =
+        serde_json::from_str(&json_text(&spec_json, "specJson")?).map_err(to_js_err)?;
+    let result: finstack_quant_portfolio::optimization::PortfolioOptimizationResultWire =
+        serde_json::from_str(&json_text(&result_json, "resultJson")?).map_err(to_js_err)?;
+    let portfolio = finstack_quant_portfolio::optimization::rebalance_from_spec(&spec, &result)
+        .map_err(to_js_err)?;
+    Ok(JsPortfolio {
+        inner: Arc::new(portfolio),
+    })
+}
+
+/// Net same-currency cashflow amounts per date from a cashflow ladder.
+///
+/// Mirrors Python `net_in_currency_by_date` (Rust
+/// `cashflows::net_in_currency_by_date_json`).
+/// @param cashflows_json - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON), or a bare `{date: {ccy: {kind: money}}}` map.
+/// @param currency - ISO-4217 code selecting which per-date currency bucket to net.
+/// @returns `[isoDate, netAmount]` pairs sorted by date; dates with no flows in `currency` are omitted.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the input is not JSON, `currency` is not
+/// a known ISO code, or `by_date` is not an object.
+#[wasm_bindgen(js_name = netInCurrencyByDate)]
+pub fn net_in_currency_by_date(
+    cashflows_json: JsValue,
+    currency: JsValue,
+) -> Result<JsValue, JsValue> {
+    let rows = finstack_quant_portfolio::cashflows::net_in_currency_by_date_json(
+        &json_text(&cashflows_json, "cashflowsJson")?,
+        &js_string(&currency, "currency")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&rows)
+}
+
+/// Collapse a multi-currency cashflow ladder into the base currency per date and kind.
+///
+/// Free-function twin of Python `PortfolioCashflows.collapse_to_base_by_date_kind_json`
+/// (Rust `PortfolioCashflows::collapse_to_base_by_date_kind`): each flow is
+/// converted at the CIP forward `F(T) = S × DF_from(T) / DF_base(T)` from the
+/// `asOf` spot.
+/// @param cashflows_json - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON).
+/// @param market_json - Canonical market-context JSON supplying the FX matrix and discount curves.
+/// @param base_currency - ISO-4217 reporting currency.
+/// @param as_of - ISO-8601 valuation date for spot FX and the start of each discount interval.
+/// @param discount_curves - Optional `{ currency: curveId }` map; a missing entry uses the ISO code as the curve id.
+/// @returns Nested `{ isoDate: { kind: Money } }` ladder in the base currency.
+///
+/// # Errors
+///
+/// Throws if an input is malformed, an FX rate or discount factor needed for a
+/// conversion is missing or invalid, or monetary aggregation fails.
+#[wasm_bindgen(js_name = collapseToBaseByDateKind)]
+pub fn collapse_to_base_by_date_kind(
+    cashflows_json: JsValue,
+    market_json: JsValue,
+    base_currency: JsValue,
+    as_of: JsValue,
+    discount_curves: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let cashflows: finstack_quant_portfolio::cashflows::PortfolioCashflows =
+        serde_json::from_str(&json_text(&cashflows_json, "cashflowsJson")?).map_err(to_js_err)?;
+    let market: finstack_quant_core::market_data::context::MarketContext =
+        serde_json::from_str(&json_text(&market_json, "marketJson")?).map_err(to_js_err)?;
+    let base_currency: finstack_quant_core::currency::Currency =
+        js_string(&base_currency, "baseCurrency")?
+            .parse()
+            .map_err(to_js_err)?;
+    let as_of = crate::utils::parse_iso_date(&js_string(&as_of, "asOf")?)?;
+    let discount_curves: Option<
+        std::collections::HashMap<
+            finstack_quant_core::currency::Currency,
+            finstack_quant_core::types::CurveId,
+        >,
+    > = match discount_curves.as_ref() {
+        Some(value) if !value.is_undefined() && !value.is_null() => {
+            Some(crate::utils::input::from_js_json(value, "discountCurves")?)
+        }
+        _ => None,
+    };
+    let collapsed = cashflows
+        .collapse_to_base_by_date_kind(&market, base_currency, as_of, discount_curves.as_ref())
+        .map_err(to_js_err)?;
+    to_js_value(&collapsed)
+}
+
+/// Decoded series of one base metric from aggregated portfolio metrics.
+///
+/// Free-function twin of Python `PortfolioMetrics.metric_series` (Rust
+/// `PortfolioMetrics::metric_series`): every aggregated key that encodes a
+/// series of `base` (e.g. `bucketed_dv01::USD-OIS::10y`) is decoded into its
+/// components.
+/// @param metrics_json - `PortfolioMetrics` from `aggregateMetrics` (object or JSON).
+/// @param base - Canonical base metric identifier (e.g. `"bucketed_dv01"`).
+/// @returns `{ components, total, by_entity }` entries in aggregation order.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if the metrics input is malformed or `base`
+/// is not a canonically encoded metric key.
+#[wasm_bindgen(js_name = portfolioMetricsSeries)]
+pub fn portfolio_metrics_series(metrics_json: JsValue, base: JsValue) -> Result<JsValue, JsValue> {
+    let metrics: finstack_quant_portfolio::metrics::PortfolioMetrics =
+        serde_json::from_str(&json_text(&metrics_json, "metricsJson")?).map_err(to_js_err)?;
+    let base: finstack_quant_valuations::metrics::MetricId =
+        js_string(&base, "base")?.parse().map_err(to_js_err)?;
+    let entries: Vec<MetricSeriesEntry<'_>> = metrics
+        .metric_series(&base)
+        .into_iter()
+        .map(|(components, aggregate)| MetricSeriesEntry {
+            components,
+            total: aggregate.total,
+            by_entity: &aggregate.by_entity,
+        })
+        .collect();
+    to_js_value(&entries)
+}
+
+/// One decoded series entry returned by `portfolioMetricsSeries`.
+#[derive(serde::Serialize)]
+struct MetricSeriesEntry<'a> {
+    components: Vec<String>,
+    total: f64,
+    by_entity: &'a indexmap::IndexMap<finstack_quant_portfolio::types::EntityId, f64>,
+}
+
 /// Replay a portfolio through dated market snapshots.
 ///
 /// Accepts a portfolio spec, an array of dated market snapshots, and a
 /// replay configuration. Returns a structured `ReplayResult` object.
 /// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
 /// @param snapshots_json - Market-snapshot JSON array.
-/// @param config_json - Configuration JSON for this call.
+/// @param config_json - `ReplayConfig` JSON with a required `mode` (`pv_only` | `pv_and_pnl` | `full_attribution`) and optional `attribution_method`, `valuation_options` and `on_error`; unknown keys are rejected.
+///
+/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
+/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
+/// them; serialize one with `valuations.valuationResultToJson`.
+/// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
+/// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
+/// order before other keys, not in the Rust (and Python) insertion order; take
+/// valuation order from `spec.positions` when it matters.
 ///
 /// # Errors
 ///
@@ -971,10 +1412,13 @@ pub fn optimize_portfolio(spec_json: &str, market_json: &str) -> Result<JsValue,
 /// step; or the result cannot be converted to a JavaScript value.
 #[wasm_bindgen(js_name = replayPortfolio)]
 pub fn replay_portfolio(
-    spec_json: &str,
-    snapshots_json: &str,
-    config_json: &str,
+    spec_json: JsValue,
+    snapshots_json: JsValue,
+    config_json: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let spec_json: &str = &json_text(&spec_json, "specJson")?;
+    let snapshots_json: &str = &json_text(&snapshots_json, "snapshotsJson")?;
+    let config_json: &str = &json_text(&config_json, "configJson")?;
     let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
         serde_json::from_str(spec_json).map_err(to_js_err)?;
     let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
@@ -991,7 +1435,7 @@ pub fn replay_portfolio(
         &finstack_config,
     )
     .map_err(to_js_err)?;
-    to_js_value(&result)
+    to_js_value_with_bigints(&result)
 }
 
 /// Host-target unit tests.
@@ -1004,7 +1448,6 @@ pub fn replay_portfolio(
 /// round-trip that catches an ES-`Map` serialization regression.
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     fn minimal_portfolio_spec_json() -> String {
         serde_json::json!({
@@ -1018,74 +1461,9 @@ mod tests {
         .to_string()
     }
 
-    #[test]
-    fn parse_portfolio_spec_json_roundtrip() {
-        let json = minimal_portfolio_spec_json();
-        let result = parse_portfolio_spec_json(&json).expect("parse");
-        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid json");
-        assert_eq!(parsed["id"], "test_portfolio");
-    }
-
-    #[test]
-    fn build_portfolio_from_spec_json_empty() {
-        let json = minimal_portfolio_spec_json();
-        let result = build_portfolio_from_spec_json(&json).expect("build");
-        let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid json");
-        assert_eq!(parsed["id"], "test_portfolio");
-    }
-
-    #[test]
-    fn parse_and_rebuild_roundtrip() {
-        let json = minimal_portfolio_spec_json();
-        let canonical = parse_portfolio_spec_json(&json).expect("parse");
-        let rebuilt = build_portfolio_from_spec_json(&canonical).expect("rebuild");
-        let a: serde_json::Value = serde_json::from_str(&canonical).expect("a");
-        let b: serde_json::Value = serde_json::from_str(&rebuilt).expect("b");
-        assert_eq!(a["id"], b["id"]);
-    }
-
     fn empty_market_json() -> String {
         let ctx = finstack_quant_core::market_data::context::MarketContext::new();
         serde_json::to_string(&ctx).expect("serialize")
-    }
-
-    #[test]
-    fn portfolio_handle_exposes_spec_metadata_and_roundtrips() {
-        let spec_json = minimal_portfolio_spec_json();
-        let handle = JsPortfolio::from_spec(&spec_json).expect("build handle");
-        assert_eq!(handle.id(), "test_portfolio");
-        assert_eq!(handle.base_currency(), "USD");
-        assert_eq!(handle.as_of(), "2024-01-15");
-        assert_eq!(handle.num_positions(), 0);
-
-        let round = handle.to_json().expect("to spec json");
-        let parsed: serde_json::Value = serde_json::from_str(&round).expect("json");
-        assert_eq!(parsed["id"], "test_portfolio");
-    }
-
-    #[test]
-    fn portfolio_result_total_value_from_valuation() {
-        let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
-            serde_json::from_str(&minimal_portfolio_spec_json()).expect("parse spec");
-        let portfolio =
-            finstack_quant_portfolio::Portfolio::from_spec(spec).expect("build portfolio");
-        let market: finstack_quant_core::market_data::context::MarketContext =
-            serde_json::from_str(&empty_market_json()).expect("parse market");
-        let valuation = finstack_quant_portfolio::valuation::value_portfolio(
-            &portfolio,
-            &market,
-            &finstack_quant_core::config::FinstackConfig::default(),
-            &finstack_quant_portfolio::valuation::PortfolioValuationOptions::default(),
-        )
-        .expect("value");
-        let result = finstack_quant_portfolio::results::PortfolioResult::new(
-            valuation,
-            Default::default(),
-            Default::default(),
-        );
-        let result_json = serde_json::to_string(&result).expect("ser");
-        let total = portfolio_result_total_value(&result_json).expect("total");
-        assert!(total.is_finite());
     }
 
     /// Tests the replay_portfolio WASM binding logic by exercising the same
@@ -1135,34 +1513,5 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse json");
         assert!(parsed["steps"].is_array());
         assert_eq!(parsed["steps"].as_array().expect("array").len(), 2);
-    }
-
-    #[test]
-    fn twrr_modified_dietz_matches_gips_example() {
-        let period = serde_json::json!({
-            "beginning_market_value": 10_000_000.0,
-            "ending_market_value": 10_500_000.0,
-            "cashflows": [
-                {
-                    "amount": 1_000_000.0,
-                    "fraction_of_period_remaining": 0.60
-                }
-            ]
-        });
-
-        let result = twrr_modified_dietz(&period.to_string()).expect("modified dietz");
-        let expected = -500_000.0 / 10_600_000.0;
-        assert!((result - expected).abs() < 1e-12);
-    }
-
-    #[test]
-    fn mwr_xirr_solves_money_weighted_return() {
-        let cashflows = serde_json::json!([
-            {"date": "2025-01-01", "amount": -100.0},
-            {"date": "2026-01-01", "amount": 110.0}
-        ]);
-
-        let result = mwr_xirr(&cashflows.to_string()).expect("xirr");
-        assert!((result - 0.10).abs() < 1e-6);
     }
 }

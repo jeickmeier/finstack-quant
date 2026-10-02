@@ -30,18 +30,36 @@ export default [
             ],
             "forward_curve_id": "USD-LIBOR-3M",
             "funding_leg": {
-              "accrual_fractions": [
-                0.25,
-                0.25,
-                0.25,
-                0.25
-              ],
               "day_count": "30_360",
-              "payment_dates": [
-                "2025-06-20",
-                "2025-09-22",
-                "2025-12-22",
-                "2026-03-20"
+              "periods": [
+                {
+                  "accrual_end": "2025-06-20",
+                  "accrual_start": "2025-03-20",
+                  "accrual_year_fraction": 0.25,
+                  "payment_date": "2025-06-20",
+                  "reset_date": "2025-03-20"
+                },
+                {
+                  "accrual_end": "2025-09-22",
+                  "accrual_start": "2025-06-20",
+                  "accrual_year_fraction": 0.25,
+                  "payment_date": "2025-09-22",
+                  "reset_date": "2025-06-20"
+                },
+                {
+                  "accrual_end": "2025-12-22",
+                  "accrual_start": "2025-09-22",
+                  "accrual_year_fraction": 0.25,
+                  "payment_date": "2025-12-22",
+                  "reset_date": "2025-09-22"
+                },
+                {
+                  "accrual_end": "2026-03-20",
+                  "accrual_start": "2025-12-22",
+                  "accrual_year_fraction": 0.25,
+                  "payment_date": "2026-03-20",
+                  "reset_date": "2025-12-22"
+                }
               ],
               "rate": "0.03",
               "type": "fixed"
@@ -339,7 +357,7 @@ export default [
   {
     "path": "#/$defs/d_16451e0bf3b6b78178d8",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/DynamicRecoverySpec",
-    "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`]."
+    "description": "Specification for dynamic (notional-dependent) recovery rate.\n\nModels the relationship between the accreted notional and the recovery\nrate in default. As PIK accrual increases the notional relative to the\noriginal base, recovery declines according to the chosen [`RecoveryModel`].\nDeserialization enforces the same parameter invariants as the constructors."
   },
   {
     "path": "#/$defs/d_16451e0bf3b6b78178d8/properties/base_notional",
@@ -762,7 +780,7 @@ export default [
   {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/index_id",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/CmsSwap/properties/index_id",
-    "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`)."
+    "description": "Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).\nRequired for USD CMS; legacy contracts must name their legacy index explicitly."
   },
   {
     "path": "#/$defs/d_3dbd4a1aab74e98eef06/properties/index_id/anyOf/0",
@@ -1052,35 +1070,25 @@ export default [
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0",
-    "description": "Fixed rate funding leg."
-  },
-  {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/accrual_fractions",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/accrual_fractions",
-    "description": "Accrual fractions for each period."
-  },
-  {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/accrual_fractions/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/accrual_fractions/items",
-    "format": "double"
+    "description": "Fixed rate funding leg with explicit contractual periods."
   },
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/day_count",
-    "description": "Day count convention.",
+    "description": "Day count convention used to calculate period year fractions.",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },
   {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/payment_dates",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/payment_dates",
-    "description": "Payment dates for each period."
+    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/periods",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/periods",
+    "description": "Funding accrual and payment schedule, in chronological order."
   },
   {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/payment_dates/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/payment_dates/items",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/periods/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/0/properties/periods/items",
+    "ref": "#/$defs/FundingPeriod",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod"
   },
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/0/properties/rate",
@@ -1097,22 +1105,12 @@ export default [
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1",
-    "description": "Floating rate funding leg.\n\n# Convention: no payment lag\n\nThis leg models each period by its `payment_dates` only and assumes the\n**accrual end equals the payment date** (no payment lag, no\naccrual-vs-pay adjustment). The pricer projects the floating forward over\n`[previous payment date, payment date]` and discounts to the payment\ndate. For funding with a genuine payment lag or accrual end ≠ payment\ndate, model the floating side as a full IRS float leg (which carries\nexplicit accrual start/end and payment dates) instead of this simplified\nfunding leg."
-  },
-  {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/accrual_fractions",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/accrual_fractions",
-    "description": "Accrual fractions for each period."
-  },
-  {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/accrual_fractions/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/accrual_fractions/items",
-    "format": "double"
+    "description": "Simple floating funding coupons with independent reset/accrual/payment dates."
   },
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/day_count",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/day_count",
-    "description": "Day count convention.",
+    "description": "Day count convention used to calculate period year fractions.",
     "ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#"
   },
@@ -1124,15 +1122,15 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/common/1/id.schema.json#"
   },
   {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/payment_dates",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/payment_dates",
-    "description": "Payment dates for each period. Each is also treated as the period's\naccrual-end date (no payment lag — see the variant docs)."
+    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/periods",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/periods",
+    "description": "Funding accrual, reset and payment schedule, in chronological order."
   },
   {
-    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/payment_dates/items",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/payment_dates/items",
-    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+    "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/periods/items",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingLeg/oneOf/1/properties/periods/items",
+    "ref": "#/$defs/FundingPeriod",
+    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod"
   },
   {
     "path": "#/$defs/d_55de605ffd705a3d4f33/oneOf/1/properties/spread_bp",
@@ -1348,7 +1346,7 @@ export default [
   {
     "path": "#/$defs/d_5c13df5a55f1da604df2",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/Compounding",
-    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor positive rates and t > 0: `r_simple > r_annual > r_continuous`\n(less frequent compounding requires a higher quoted rate for the same DF)."
+    "description": "Compounding convention for interest rates.\n\nUsed to specify how interest rates should be quoted or converted.\nAll variants produce mathematically equivalent discount factors when\napplied consistently.\n\n# Relationship Between Conventions\n\nFor a given discount factor DF at time t, the rates under different\nconventions are related by:\n\n```text\nDF = e^(-r_cc × t)                    [Continuous]\n   = (1 + r_ann)^(-t)                 [Annual]\n   = (1 + r_per/n)^(-n×t)             [Periodic(n)]\n   = 1 / (1 + r_simple × t)           [Simple]\n```\n\n# Ordering of Rates\n\nFor a common discount factor below one, annual and simple rates both exceed\nthe continuous rate. Their ordering depends on the maturity `t` in years:\n`r_annual > r_simple` for `0 < t < 1`, they agree at `t = 1`, and\n`r_simple > r_annual` for `t > 1`."
   },
   {
     "path": "#/$defs/d_5c13df5a55f1da604df2/oneOf/0",
@@ -3826,79 +3824,79 @@ export default [
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/0",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/0",
     "const": "one_one",
-    "description": "One unit per contractual accrual period, irrespective of its length.\nInflation fixed legs compound across annual periods using this convention.\nEmpty intervals return zero and reversed intervals are rejected, as for\nall day counts in this API."
+    "description": "1/1 day count convention.\n\nOne unit per contractual accrual period, irrespective of its length.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(a) - \"1/1\""
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/1",
     "const": "act_360",
-    "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French\n\n# Usage\n\nStandard for:\n- USD money market deposits\n- EUR money market instruments\n- Short-term rate derivatives (SOFR, €STR)\n- FX swaps and forwards\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::April, 1).expect(\"Valid date\"); // 90 days\n\nlet yf = DayCount::Act360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 90.0 / 360.0);\n```"
+    "description": "Actual/360 day count convention.\n\nYear fraction = (actual days between dates) / 360\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(d)\n- **ISO 20022**: Day Count Fraction Code \"Actual/360\" (A004)\n- **Also known as**: Act/360, A/360, French"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/10",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/10",
     "const": "act_act_isma",
-    "description": "Actual/Actual (ICMA) day count convention.\n\nUses actual days in numerator and actual days in the coupon period\nas denominator, requiring knowledge of payment frequency.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99\n\n# Algorithm\n\n1. Determine quasi-coupon periods based on payment frequency\n2. For each period: (actual days) / (actual days in coupon period)\n3. Sum fractions across periods\n\n# Usage\n\nStandard for:\n- International bonds with regular coupons\n- Eurobonds with semi-annual or annual payments\n- ICMA-governed securities\n\n# Requirements\n\nRequires `frequency` in [`DayCountContext`] to determine regular coupon periods.\nFor irregular first/last coupons, use\n[`act_act_isma_year_fraction_with_reference_period`].\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 15).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 15).expect(\"Valid date\");\nlet frequency = Tenor::semi_annual(); // Semi-annual\n\nlet yf = DayCount::ActActIsma.year_fraction(\n    start,\n    end,\n    DayCountContext { frequency: Some(frequency), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// Full semi-annual period = 0.5 year fraction (6 months / 12 months)\nassert!((yf - 0.5).abs() < 1e-6);\n```\n\n# References\n\n- ICMA (2010). \"ICMA Rule Book.\" Rule 251. `docs/REFERENCES.md#icma-rule-book`\n- ISMA (1999). \"Recommendations for Accrued Interest Calculations.\""
+    "description": "Actual/Actual (ICMA) day count convention.\n\nActual days over (actual days in the coupon period × coupons per year).\nRequires a coupon frequency. Explicit reference coupon boundaries must\nbe unadjusted regular dates from the contractual nominal month grid,\nnot payment dates.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251 - \"Actual/Actual (ICMA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ICMA\" (A007)\n- **Also known as**: Act/Act (ICMA), Act/Act (ISMA), ISMA-99"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/11",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/11",
     "const": "act_act_afb",
-    "description": "Actual/Actual AFB (Association Française des Banques) day count.\n\nAlso known as Actual/Actual Euro. QuantLib `ActualActual::AFB`.\nWalks whole years **backwards from `end`** until the candidate is\nbefore `start`. Each accepted year-step adds `1.0`. A year-step that\nlands on 28 February of a leap year is bumped to 29 February. The\nresidual fraction is `days(start, residual_end) / den`, where `den`\nis 366 if 29 February lies in `[start, residual_end)`, else 365.\n\nNo [`DayCountContext`] is required.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::ActActAfb.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (29 February lies in the residual period)\nassert_eq!(yf, 29.0 / 366.0);\n```"
+    "description": "Actual/Actual AFB day count convention.\n\nWhole years counted backwards from the end date, plus a residual of\nactual days over 366 if it contains February 29, else 365.\n\n# Standards Reference\n\n- **QuantLib**: `ActualActual::AFB`\n- **AFB**: Association Française des Banques master agreement definitions\n- **Also known as**: Actual/Actual Euro, Act/Act AFB"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/12",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/12",
     "const": "bus_252",
-    "description": "Business/252 day count convention.\n\nYear fraction = (business days between dates) / 252\n\n# Market Convention\n\n- **Brazil**: Standard for BRL-denominated instruments (ANBIMA)\n- **Also used**: Some equity derivatives and variance swaps\n- **Basis**: 252 represents typical trading days per year\n\n# Requirements\n\nRequires `calendar` in [`DayCountContext`] to determine business days.\n\n# Performance\n\nIterates each calendar day in the range to check business-day status,\ngiving O(n) cost where n is the number of calendar days between the\ndates. For 30Y instruments this is ~11,000 iterations.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse finstack_quant_core::dates::calendar::NYSE;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 6).expect(\"Valid date\"); // Monday\nlet end = Date::from_calendar_date(2025, Month::January, 13).expect(\"Valid date\"); // Next Monday\n\nlet yf = DayCount::Bus252.year_fraction(\n    start,\n    end,\n    DayCountContext { calendar: Some(&NYSE), ..Default::default() }\n).expect(\"Year fraction calculation should succeed\");\n\n// 5 business days / 252\nassert!((yf * 252.0 - 5.0).abs() < 0.1);\n```"
+    "description": "Business/252 day count convention.\n\nYear fraction = (business days between dates) / 252. Requires a holiday\ncalendar.\n\n# Standards Reference\n\n- **ANBIMA**: standard for BRL-denominated instruments\n- **Also known as**: BUS/252, Business/252"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/2",
     "const": "act_365f",
-    "description": "Actual/365 Fixed day count convention.\n\nYear fraction = (actual days between dates) / 365\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(e)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365 Fixed\" (A005)\n- **Also known as**: Act/365F, A/365F, English\n\n# Usage\n\nStandard for:\n- GBP money markets (SONIA)\n- Cable (GBP/USD) FX transactions\n- Some Commonwealth bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2026, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365F.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert!((yf - 1.0).abs() < 1e-9); // 365 days / 365 = 1.0\n```"
+    "description": "Actual/365 Fixed day count convention.\n\nYear fraction = (actual days between dates) / 365\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(e)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365 Fixed\" (A005)\n- **Also known as**: Act/365F, A/365F, English"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/3",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/3",
     "const": "act_365l",
-    "description": "Actual/365 Leap day count convention (Actual/365L) per ICMA Rule 251.\n\nYear fraction = (actual days) / (365 or 366), where the denominator\nrule depends on the coupon frequency supplied via [`DayCountContext`]:\n\n- **Annual** (or no frequency supplied): 366 if February 29 falls in\n  the interval `(start, end]` (exclusive of start, inclusive of end),\n  else 365.\n- **Non-annual**: 366 if the period END date falls in a leap year,\n  else 365.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year\n\nNote: this is **not** ACT/ACT AFB (Association Française des Banques),\nwhich uses a different (sub-period splitting) algorithm. The former\n`act_365afb` parse alias was removed because it conflated the two\nconventions. Use [`DayCount::ActActAfb`] for AFB / Actual/Actual Euro.\n\n# Usage\n\nUsed in:\n- GBP floating-rate notes\n- Some European bond markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period containing Feb 29, 2024 (leap year)\nlet start = Date::from_calendar_date(2024, Month::February, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2024, Month::March, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Act365L.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 29 days / 366 (leap year denominator)\nassert_eq!(yf, 29.0 / 366.0);\n```"
+    "description": "Actual/365 Leap day count convention (Actual/365L).\n\nYear fraction = (actual days) / (365 or 366). Requires the coupon\nfrequency and the enclosing coupon period. Annual: 366 if February 29\nfalls in (coupon_start, coupon_end]. Other frequencies: 366 if the next\ncoupon date falls in a leap year. Not Actual/Actual AFB.\n\n# Standards Reference\n\n- **ICMA**: ICMA Rule Book, Rule 251.1(i)(c)\n- **ISO 20022**: Day Count Fraction Code \"Actual/365L\" (A008)\n- **Also known as**: Act/365L, ISMA-Year"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/4",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/4",
     "const": "30_360",
-    "description": "30/360 US (Bond Basis) day count convention.\n\nAssumes 30 days per month and 360 days per year with US market adjustments.\n\n# Standards Reference\n\n- **SIA/PSA**: Standard Securities Calculation Methods (SIA Standard Formulas)\n  — primary reference for this implementation, including the February\n  end-of-month rule\n- **ISO 20022**: Day Count Fraction Code \"30/360\" (A001)\n- **Also known as**: 30U/360, 30/360 US, Bond Basis, 30/360 PSA\n\n# SIA/PSA vs ISDA\n\nThis implementation follows the SIA/PSA convention, which includes a\nFebruary end-of-month rule: when both the start date and the end date\nfall on the last day of February, D₂ is changed to 30. ISDA 2006\n§4.16(f) specifies a slightly different set of adjustment rules that\nomit this February-EOM logic. Both are commonly referred to as\n\"30/360 US\", but they can produce different day counts for periods\nthat start or end on the last day of February.\n\n# Formula\n\n```text\nDays = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')\n\nwhere (SIA/PSA rules):\n  D₁' = 30                       if D₁ is 31 or last day of February\n  D₂' = 30                       if D₂ is 31 and D₁' = 30\n  D₂' = 30                       if D₂ is last day of Feb and D₁ is last day of Feb\n  otherwise D₁' = D₁, D₂' = D₂\n```\n\n# Usage\n\nStandard for:\n- US corporate bonds\n- US municipal bonds\n- US agency debt\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::February, 28).expect(\"Valid date\");\n\nlet yf = DayCount::Thirty360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// Treats Jan 31 as day 30, Feb 28 as day 28: 28 days / 360\nassert_eq!(yf, 28.0 / 360.0);\n```"
+    "description": "30/360 US (Bond Basis) day count convention.\n\n30-day months over a 360-day year with the SIA/PSA adjustments,\nincluding the February end-of-month rule that ISDA §4.16(f) omits.\n\n# Standards Reference\n\n- **SIA/PSA**: Standard Securities Calculation Methods\n- **ISO 20022**: Day Count Fraction Code \"30/360\" (A001)\n- **Also known as**: 30U/360, 30/360 US, Bond Basis, 30/360 PSA"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/5",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/5",
     "const": "30e_360",
-    "description": "30E/360 (Eurobond Basis) day count convention.\n\nAssumes 30 days per month and 360 days per year with European adjustments.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - \"30E/360\"\n- **ISO 20022**: Day Count Fraction Code \"30E/360\" (A002)\n- **Also known as**: 30/360 ISDA, 30/360 European, Eurobond Basis\n\n# Formula\n\n```text\nDays = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')\n\nwhere:\n  D₁' = min(D₁, 30)\n  D₂' = min(D₂, 30)\n```\n\n# Usage\n\nStandard for:\n- Eurobonds\n- International bonds\n- Some interest rate swaps\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::March, 31).expect(\"Valid date\");\n\nlet yf = DayCount::ThirtyE360.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// Treats both 31st as day 30: 60 days / 360\nassert_eq!(yf, 60.0 / 360.0);\n```"
+    "description": "30E/360 (Eurobond Basis) day count convention.\n\n30-day months over a 360-day year; day 31 becomes 30 at both ends, with\nno February adjustment.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(g) - \"30E/360\"\n- **ISO 20022**: Day Count Fraction Code \"30E/360\" (A002)\n- **Also known as**: 30/360 ISDA, 30/360 European, Eurobond Basis"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/6",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/6",
     "const": "30e_360_isda",
-    "description": "30E/360 (ISDA) day count convention.\n\nAssumes 30 days per month and 360 days per year with the ISDA 2006\n§4.16(h) last-day-of-month adjustments (including end-of-February).\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(h) - \"30E/360 (ISDA)\"\n- **Also known as**: 30E/360 ISDA, German, Eurobond Basis (ISDA 2006)\n\n# Formula\n\n```text\nDays = 360(Y₂ - Y₁) + 30(M₂ - M₁) + (D₂' - D₁')\n\nwhere:\n  D₁' = 30 if D₁ is the last day of its month (incl. end of February)\n  D₂' = 30 if D₂ is 31, or if D₂ is the last day of February and the\n        period does not end on the termination (maturity) date\n```\n\n# Termination-date exception\n\nISDA §4.16(h) keeps D₂ unadjusted when the period ends on the\ntermination date and that date is the last day of February. Because\nSet [`DayCountContext::end_is_termination_date`] for the final period\nto maturity; ordinary coupon periods leave it false.\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// ISDA §4.16(h): both end-of-Feb and Aug 31 count as day 30.\nlet start = Date::from_calendar_date(2011, Month::August, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2012, Month::February, 29).expect(\"Valid date\");\n\nlet yf = DayCount::ThirtyE360Isda.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 180.0 / 360.0);\n```"
+    "description": "30E/360 (ISDA) day count convention.\n\n30-day months over a 360-day year; the last day of any month, including\nFebruary, becomes 30, except an end date that is the termination date.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(h) - \"30E/360 (ISDA)\"\n- **Also known as**: 30E/360 ISDA, German, Eurobond Basis (ISDA 2006)"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/7",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/7",
     "const": "30_360_it",
-    "description": "30/360 Italian day count convention.\n\nAssumes 30 days per month and 360 days per year. Day 31 becomes 30,\nand any February day after the 27th becomes 30 (QuantLib\n`Thirty360::Italian`).\n\n# Formula\n\n```text\nD1' = 30 if D1 == 31 or (month == Feb and D1 > 27)\nD2' = 30 if D2 == 31 or (month == Feb and D2 > 27)\ndays = 360*(Y2-Y1) + 30*(M2-M1) + (D2'-D1')\nyear_fraction = days / 360\n```\n\nDistinct from US SIA (February EOM only when both ends are February\nEOM) and 30E/360 (no February-after-27 rule).\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\nlet start = Date::from_calendar_date(2025, Month::January, 31).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::February, 28).expect(\"Valid date\");\n\nlet yf = DayCount::Thirty360It.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// D1=31→30, Feb 28>27 → D2=30: 30 days / 360\nassert_eq!(yf, 30.0 / 360.0);\n```"
+    "description": "30/360 Italian day count convention.\n\n30-day months over a 360-day year; day 31 becomes 30, and any February\nday after the 27th becomes 30.\n\n# Standards Reference\n\n- **QuantLib**: `Thirty360::Italian`\n- **Also known as**: 30/360 Italian"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/8",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/8",
     "const": "nl_365",
-    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL\n- Counts the actual calendar days in `[start, end)` and removes every\n  February 29 that falls in the period, so a full leap year still\n  yields exactly 1.0.\n\n# Usage\n\nUsed in:\n- Some Canadian money-market and mortgage instruments\n- Legacy systems that ignore leap days for accrual\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Full leap year 2024: 366 actual days, Feb 29 excluded → 365/365 = 1.0\nlet start = Date::from_calendar_date(2024, Month::January, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 1).expect(\"Valid date\");\n\nlet yf = DayCount::Nl365.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\nassert_eq!(yf, 1.0);\n```"
+    "description": "NL/365 (Actual/365 No Leap) day count convention.\n\nYear fraction = (actual days excluding any February 29) / 365\n\n# Standards Reference\n\n- **Also known as**: Act/365 No Leap, NL365, Actual/365NL"
   },
   {
     "path": "#/$defs/d_c0401254ec268b317b65/oneOf/9",
     "source": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json#/oneOf/9",
     "const": "act_act",
-    "description": "Actual/Actual (ISDA) day count convention.\n\nUses actual days in numerator and actual days in the containing year(s)\nas denominator, splitting across year boundaries.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(b) - \"Actual/Actual (ISDA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ISDA\" (A006)\n- **Also known as**: Act/Act (ISDA), Actual/Actual, Act/Act\n\n# Algorithm\n\nFor a period spanning multiple calendar years:\n1. Split period at year boundaries\n2. For each year segment: (days in segment) / (days in that year)\n3. Sum the year fractions\n\n# Usage\n\nStandard for:\n- US Treasury bonds\n- Interest rate swaps (USD, EUR fixed legs)\n- Government bonds in many markets\n\n# Examples\n\n```rust\nuse finstack_quant_core::dates::{Date, DayCount, DayCountContext};\nuse time::Month;\n\n// Period spanning year boundary (leap year 2024)\nlet start = Date::from_calendar_date(2024, Month::July, 1).expect(\"Valid date\");\nlet end = Date::from_calendar_date(2025, Month::July, 1).expect(\"Valid date\");\n\nlet yf = DayCount::ActAct.year_fraction(start, end, DayCountContext::default()).expect(\"Year fraction calculation should succeed\");\n// 184/366 (Jul-Dec 2024 in leap year) + 365/365 (all of 2025)\nassert!((yf - 1.0).abs() < 0.01);\n```\n\n# References\n\n- ISDA (2006). \"2006 ISDA Definitions.\" Section 4.16(b). `docs/REFERENCES.md#isda-2006-definitions`"
+    "description": "Actual/Actual (ISDA) day count convention.\n\nActual days over the actual days in the containing calendar year,\nsplit and summed across year boundaries.\n\n# Standards Reference\n\n- **ISDA**: 2006 ISDA Definitions, Section 4.16(b) - \"Actual/Actual (ISDA)\"\n- **ISO 20022**: Day Count Fraction Code \"Actual/Actual ISDA\" (A006)\n- **Also known as**: Act/Act (ISDA), Actual/Actual, Act/Act"
   },
   {
     "path": "#/$defs/d_c08279a20372931820e0",
@@ -3926,7 +3924,7 @@ export default [
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/EndogenousHazardSpec",
-    "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher."
+    "description": "Specification for endogenous (leverage-dependent) hazard rate.\n\nModels the relationship between a firm's leverage and its instantaneous\nhazard rate, enabling a feedback loop where PIK accrual increases the\nnotional (and hence leverage), which drives the hazard rate higher.\nDeserialization validates the parameters and rejects incomplete or\ninconsistent tabular calibrations before they can be evaluated."
   },
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451/properties/base_hazard_rate",
@@ -3969,6 +3967,45 @@ export default [
     "path": "#/$defs/d_cdb8fddc0106047270c4/properties/values/items",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/PiecewiseConstantCurve/properties/values/items",
     "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d1c6696e73834b17d83f",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod",
+    "description": "Contractual dates and accrual fraction of one CMS funding coupon."
+  },
+  {
+    "path": "#/$defs/d_d1c6696e73834b17d83f/properties/accrual_end",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod/properties/accrual_end",
+    "description": "Exclusive accrual end, independent of payment-date adjustment.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_d1c6696e73834b17d83f/properties/accrual_start",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod/properties/accrual_start",
+    "description": "Inclusive accrual start, independent of the CMS observation date.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_d1c6696e73834b17d83f/properties/accrual_year_fraction",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod/properties/accrual_year_fraction",
+    "description": "Positive year fraction measured using the funding leg day count.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_d1c6696e73834b17d83f/properties/payment_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod/properties/payment_date",
+    "description": "Contractual payment date after business-day adjustment.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
+  },
+  {
+    "path": "#/$defs/d_d1c6696e73834b17d83f/properties/reset_date",
+    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/cms_swap.schema.json#/$defs/FundingPeriod/properties/reset_date",
+    "description": "Floating index observation date; ignored for fixed funding.",
+    "ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
+    "resolvedRef": "https://finstack_quant.dev/schemas/common/1/date.schema.json#"
   },
   {
     "path": "#/$defs/d_d30540ea90ce7eca3dee",
@@ -4289,7 +4326,7 @@ export default [
     "path": "#/$defs/d_f80f2b90e7af690c5898/oneOf/1",
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/VarMethod/oneOf/1",
     "const": "taylor_approximation",
-    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options)."
+    "description": "Taylor approximation using sensitivities (Greeks).\n\nFaster method - approximates P&L using pre-computed sensitivities.\nGood for linear instruments and large portfolios, but may be\ninaccurate for highly non-linear instruments (deep OTM options).\nEquity Greeks are associated with their actual market-scalar identifier.\nInstruments with multiple underlying spots or ambiguous scalar ownership\nrequire full revaluation; aggregate gamma is not a multi-asset Hessian."
   },
   {
     "path": "#/$defs/d_fd618cd5743ec18a168f",

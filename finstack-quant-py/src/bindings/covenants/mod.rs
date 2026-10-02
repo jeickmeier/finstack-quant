@@ -100,13 +100,19 @@ fn evaluate_engine<'py>(
     as_of: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let metrics: serde_json::Map<String, serde_json::Value> = engine::extract_metrics(metrics)?
-        .into_iter()
-        .map(|(key, value)| (key, serde_json::Value::from(value)))
-        .collect();
-    let metrics_json = serde_json::to_string(&metrics).map_err(crate::errors::display_to_py)?;
+    let metrics_json = match metrics.extract::<String>() {
+        Ok(text) => text,
+        Err(_) => {
+            let metrics: serde_json::Map<String, serde_json::Value> =
+                engine::extract_metric_dict(metrics)?
+                    .into_iter()
+                    .map(|(key, value)| (key, serde_json::Value::from(value)))
+                    .collect();
+            serde_json::to_string(&metrics).map_err(crate::errors::display_to_py)?
+        }
+    };
     let reports = py.detach(|| {
-        finstack_quant_covenants::evaluate_engine_map(engine_json, &metrics_json, &as_of)
+        finstack_quant_covenants::evaluate_engine(engine_json, &metrics_json, &as_of)
             .map_err(crate::errors::core_to_py)
     })?;
     engine::reports_to_pydict(py, reports)
@@ -194,7 +200,7 @@ fn project_finance_json(
 
 /// Register the `finstack_quant.covenants` Python namespace.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "covenants")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "covenants")?;
     m.setattr(
         "__doc__",
         "Typed covenant definitions, the CovenantEngine evaluator, template packages, \
@@ -266,13 +272,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "covenants",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
 
     Ok(())

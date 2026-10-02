@@ -32,6 +32,7 @@ use serde::{Deserialize, Serialize};
 /// projected cashflows — so they are meaningful per note, unlike the deal-level
 /// aggregates.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct TrancheMetrics {
     /// Identifier of the tranche.

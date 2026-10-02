@@ -169,6 +169,7 @@ fn build_clo(cpr: f64, cdr: f64, recovery: f64, recovery_lag: u32) -> Structured
         maturity(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     clo.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);
@@ -527,6 +528,30 @@ fn stress_scenario_base_vs_stressed() {
         eq_pct_drop * 100.0,
         sr_pct_drop * 100.0,
     );
+}
+
+// Single-tranche accessor
+
+#[test]
+fn tranche_cashflows_returns_one_class_and_reports_unknown_ids() {
+    let market = create_market();
+    let clo = build_clo(0.10, 0.02, 0.40, 12);
+    let all = run_simulation(&clo, &market, as_of()).unwrap();
+    let senior = clo
+        .tranche_cashflows("CLASS_A", &market, as_of())
+        .expect("senior class");
+    let expected = all.get("CLASS_A").expect("senior class in the full run");
+    assert_eq!(senior.total_interest, expected.total_interest);
+    assert_eq!(senior.total_principal, expected.total_principal);
+
+    let error = clo
+        .tranche_cashflows("NOT_A_CLASS", &market, as_of())
+        .expect_err("unknown tranche");
+    assert_eq!(
+        error.kind(),
+        finstack_quant_core::error::ErrorKind::NotFound
+    );
+    assert!(error.to_string().contains("NOT_A_CLASS"), "{error}");
 }
 
 // PIK (Payment-in-Kind) Accretion Tests

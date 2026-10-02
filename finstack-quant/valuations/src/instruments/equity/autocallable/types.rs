@@ -629,6 +629,54 @@ impl crate::instruments::common_impl::traits::Instrument for Autocallable {
         Some(self.expiry)
     }
 
+    /// Record the held `as_of` spot for observations the roll passes.
+    ///
+    /// Observation dates in `(as_of, rolled_date]` with no recorded fixing are
+    /// added at the `as_of` level of `spot_id`, since theta holds spot fixed. A
+    /// trade without `initial_level` (strike set at `as_of`) gets that level as
+    /// its strike-set level once the roll passes an observation date.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of` supplying the `spot_id` level held over the roll.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at.
+    fn theta_observed_state(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: Date,
+        rolled_date: Date,
+    ) -> finstack_quant_core::Result<
+        Option<Box<dyn crate::instruments::common_impl::traits::Instrument>>,
+    > {
+        let rolled_fixings: Vec<Date> = self
+            .observation_dates
+            .iter()
+            .copied()
+            .filter(|date| *date > as_of && *date <= rolled_date && self.fixing_on(*date).is_none())
+            .collect();
+        let needs_initial_level = self.initial_level.is_none()
+            && self
+                .observation_dates
+                .iter()
+                .any(|date| *date <= rolled_date);
+        if rolled_fixings.is_empty() && !needs_initial_level {
+            return Ok(None);
+        }
+        let spot = crate::instruments::common_impl::helpers::scalar_price_amount(
+            market.get_price(&self.spot_id)?,
+            self.notional.currency(),
+        )?;
+        let mut observed = self.clone();
+        if needs_initial_level {
+            observed.initial_level = Some(spot);
+        }
+        observed
+            .past_fixings
+            .extend(rolled_fixings.into_iter().map(|date| (date, spot)));
+        observed.past_fixings.sort_by_key(|(date, _)| *date);
+        Ok(Some(Box::new(observed)))
+    }
+
     crate::impl_focused_pricing_overrides!();
 }
 

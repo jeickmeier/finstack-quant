@@ -10,7 +10,6 @@
 //! - **Type-safe identifiers**: `QuoteId` and convention IDs prevent mismatches
 //! - **Pillar support**: Quotes support both tenor-based and date-based maturity pillars
 //! - **Bump operations**: Quotes support bumping values for sensitivity calculations
-//! - **TypeScript export**: Quotes can be exported to TypeScript when `ts_export` feature is enabled
 //!
 //! # Quick Example
 //!

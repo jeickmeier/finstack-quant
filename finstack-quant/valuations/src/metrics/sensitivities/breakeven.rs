@@ -216,21 +216,18 @@ fn bump_market_for_target(
 ///
 /// # Market-held fixings
 ///
-/// Both horizon reprices run on the unrolled market with every index
-/// observation the as-of schedule projected in `[as_of, rolled_date]` added as
-/// an exact-date fixing at its as-of projection (as theta and carry
-/// decomposition do), so instruments whose horizon crosses a fixing reprice
-/// instead of failing on the unpublished fixing.
+/// Both horizon reprices run on the unrolled market with every coupon fixing
+/// the as-of schedule projected in `[as_of, rolled_date]` added as an
+/// exact-date `FIXING:` observation at its as-of projection (as theta and
+/// carry decomposition do), so instruments whose horizon crosses a fixing
+/// reprice instead of failing on the unpublished fixing.
 ///
-/// The bump is applied **on top of** that fixings-held market: crossed
-/// fixings stay at their unbumped as-of projections in the base and in every
-/// bumped reprice. The objective therefore isolates the parameter shift's
-/// effect on the remaining flows, on the same footing as `carry_total`, which
-/// holds the same fixings. (Materializing after bumping would insert the same
-/// cached as-of projections anyway; bumping on top materializes once rather
-/// than per solver iteration.)
+/// The bump is applied on top of that fixings-held market: crossed fixings
+/// stay at their unbumped as-of projections in the base and in every bumped
+/// reprice. The objective therefore isolates the parameter shift's effect on
+/// the remaining flows, on the same footing as `carry_total`.
 fn iterative_breakeven(
-    context: &mut MetricContext,
+    context: &MetricContext,
     carry_total: f64,
     sensitivity: f64,
     config: &BreakevenConfig,
@@ -241,7 +238,6 @@ fn iterative_breakeven(
     let rolled_date = calculate_theta_date(context.as_of, period, expiry_date)?;
 
     let held_market = context.fixings_held_market(rolled_date)?;
-    let context: &MetricContext = context;
 
     // Base PV at the horizon with current (un-bumped) curves.
     let base_pv_at_horizon = context.reprice_money(&held_market, rolled_date)?.amount();

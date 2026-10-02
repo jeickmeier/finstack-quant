@@ -18,10 +18,8 @@
 //!
 //! where Z ~ N(0, 1).
 //!
-//! When a simulation step straddles one or more θ knots, the step uses the
-//! time-averaged θ over [t, t+Δt] (exact integral of the piecewise-constant
-//! curve). This keeps the conditional distribution exact within each θ
-//! segment and reduces the cross-knot bias from O(Δt) to O(Δt²).
+//! When a simulation step straddles θ knots, each constant segment contributes
+//! its exact exponentially weighted integral to the conditional mean.
 
 use super::super::process::ou::HullWhite1FProcess;
 use super::super::traits::Discretization;
@@ -105,11 +103,7 @@ impl Discretization<HullWhite1FProcess> for ExactHullWhite1F {
         _work: &mut [f64],
     ) {
         let params = process.params();
-        // Time-averaged θ over [t, t+dt]: sampling θ at the step start would
-        // carry an O(dt) local bias whenever the step straddles a θ knot
-        // (common on event-aligned grids); averaging the piecewise-constant
-        // θ across the step reduces this to O(dt²).
-        let theta = process.theta_average(t, dt);
+        let theta_contribution = params.theta_mean_contribution(t, dt);
 
         // Reuse the precomputed `dt`-dependent constants when this step's `dt`
         // matches the prepared one (exact bit match → identical value); fall
@@ -127,7 +121,7 @@ impl Discretization<HullWhite1FProcess> for ExactHullWhite1F {
         };
 
         // Conditional mean E[r_{t+Δt}|r_t] and exact step.
-        let mean = x[0] * consts.exp_kappa_dt + theta * (1.0 - consts.exp_kappa_dt);
+        let mean = x[0] * consts.exp_kappa_dt + theta_contribution;
         x[0] = mean + consts.std_dev * z[0];
     }
 
@@ -240,12 +234,11 @@ mod tests {
         assert!(x2[0] > x1[0]);
     }
 
-    /// A step straddling a θ knot must use the time-averaged θ over the
-    /// step, not the left-endpoint value (which carries an O(dt) bias).
+    /// A step straddling a θ knot must use the exponential OU weighting.
     #[test]
-    fn test_exact_hw1f_theta_averaged_across_knot() {
+    fn test_exact_hw1f_theta_exponentially_weighted_across_knot() {
         let params = HullWhite1FParams::with_time_dependent_theta(
-            0.1,
+            1.0,
             0.01,
             vec![0.02, 0.04],
             vec![0.0, 0.5],
@@ -254,23 +247,44 @@ mod tests {
         let process = HullWhite1FProcess::new(params);
         let disc = ExactHullWhite1F::new();
 
-        // Step [0.4, 0.6] straddles the knot at 0.5: half at θ=0.02, half at
-        // θ=0.04 ⇒ θ̄ = 0.03.
-        let t: f64 = 0.4;
-        let dt: f64 = 0.2;
+        // Ordinary θ averaging would incorrectly leave the mean at 3%.
+        let t: f64 = 0.0;
+        let dt: f64 = 1.0;
         let mut x = vec![0.03];
         let z = vec![0.0];
         let mut work = vec![0.0; disc.work_size(&process)];
         disc.step(&process, t, dt, &mut x, &z, &mut work);
 
-        let theta_bar = 0.03;
-        let expected: f64 =
-            0.03 * (-0.1_f64 * dt).exp() + theta_bar * (1.0 - (-0.1_f64 * dt).exp());
+        let decay = (-0.5_f64).exp();
+        let expected = (0.03 * decay + 0.02 * (1.0 - decay)) * decay + 0.04 * (1.0 - decay);
         assert!(
             (x[0] - expected).abs() < 1e-12,
-            "step across θ knot should use the averaged θ: got {}, expected {expected}",
+            "step across θ knot should equal composition of exact steps: got {}, expected {expected}",
             x[0]
         );
+        assert!((expected - 0.03154818121746176).abs() < 1e-14);
+    }
+
+    #[test]
+    fn exact_hw1f_multi_knot_mean_equals_composed_exact_transitions() {
+        for kappa in [1e-10, 0.1, 1.0, 20.0] {
+            let params = HullWhite1FParams::with_time_dependent_theta(
+                kappa,
+                0.01,
+                vec![-0.01, 0.06, 0.02, 0.04],
+                vec![0.0, 0.2, 0.5, 0.9],
+            )
+            .expect("valid theta curve");
+            let process = HullWhite1FProcess::new(params);
+            let disc = ExactHullWhite1F::new();
+            let mut single = [0.03];
+            disc.step(&process, 0.1, 1.0, &mut single, &[0.0], &mut []);
+            let mut composed = [0.03];
+            for (start, end) in [(0.1, 0.2), (0.2, 0.5), (0.5, 0.9), (0.9, 1.1)] {
+                disc.step(&process, start, end - start, &mut composed, &[0.0], &mut []);
+            }
+            assert!((single[0] - composed[0]).abs() < 1e-14, "κ={kappa}");
+        }
     }
 
     #[test]

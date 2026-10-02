@@ -237,11 +237,12 @@ pub(crate) fn expected_exercise_time(valuator: &BermudanSwaptionTreeValuator) ->
     }
 }
 
-/// Calculator for the conditional expected exercise time.
+/// Calculator for [`crate::metrics::MetricId::ExpectedExerciseTime`]: the
+/// expected exercise time in years, conditional on exercise.
 #[derive(Debug, Clone, Default)]
-pub(crate) struct ExerciseProbabilityCalculator;
+pub(crate) struct ExpectedExerciseTimeCalculator;
 
-impl MetricCalculator for ExerciseProbabilityCalculator {
+impl MetricCalculator for ExpectedExerciseTimeCalculator {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let swaption = context.instrument_as::<BermudanSwaption>()?;
         let hw = HwGreekParams::resolve(swaption, context)?;

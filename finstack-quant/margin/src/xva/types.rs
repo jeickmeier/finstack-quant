@@ -296,6 +296,7 @@ pub struct XvaResult {
 /// genuine zero exposure from missing data.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct ExposureDiagnostics {
     /// Number of time grid points where market data could not be rolled forward.
     pub market_roll_failures: usize,
@@ -317,6 +318,7 @@ pub struct ExposureDiagnostics {
 /// currency inferred by the exposure engine.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct ExposureProfile {
     /// Nonnegative time points in years from valuation date. An explicit zero
     /// node supplies opening exposure; before the first node exposure is held
@@ -415,6 +417,35 @@ impl ExposureProfile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exposure_profile_rejects_unknown_fields() {
+        let base = serde_json::json!({
+            "times": [1.0], "mtm_values": [1.0], "epe": [1.0], "ene": [0.0]
+        });
+        serde_json::from_value::<ExposureProfile>(base.clone()).expect("base profile parses");
+        let diagnostics = serde_json::json!({
+            "market_roll_failures": 3, "valuation_failures": 0, "total_time_points": 1
+        });
+        let mut typo = base.clone();
+        typo["diagnostic"] = diagnostics.clone();
+        let error = serde_json::from_value::<ExposureProfile>(typo)
+            .expect_err("a misspelled diagnostics key must not bypass the XVA gate");
+        assert!(
+            error.to_string().contains("unknown field `diagnostic`"),
+            "{error}"
+        );
+        let mut nested = base;
+        let mut bad_diagnostics = diagnostics;
+        bad_diagnostics["bogus"] = serde_json::json!(1);
+        nested["diagnostics"] = bad_diagnostics;
+        let error = serde_json::from_value::<ExposureProfile>(nested)
+            .expect_err("unknown diagnostics fields must be rejected");
+        assert!(
+            error.to_string().contains("unknown field `bogus`"),
+            "{error}"
+        );
+    }
 
     #[test]
     fn funding_config_defaults_leave_mva_off() {

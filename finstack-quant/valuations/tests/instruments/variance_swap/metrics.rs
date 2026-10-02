@@ -225,8 +225,8 @@ fn test_realized_variance_matches_series_calculation() {
         .collect();
     let manual = realized_variance(
         &used_prices,
-        RealizedVarMethod::CloseToClose,
-        annualization_factor,
+        Some(RealizedVarMethod::CloseToClose),
+        Some(annualization_factor),
     )
     .expect("CloseToClose should succeed");
 

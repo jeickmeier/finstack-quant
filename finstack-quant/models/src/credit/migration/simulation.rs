@@ -25,7 +25,8 @@
 
 use std::sync::Arc;
 
-use rand::Rng;
+use rand::{Rng, SeedableRng};
+use rand_pcg::Pcg64;
 use serde::{Deserialize, Serialize};
 
 use super::{
@@ -39,6 +40,9 @@ use super::{
 ///
 /// The first entry always records the initial state at time 0.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "RatingPathWire")]
+#[cfg_attr(feature = "json-schema", schemars(!try_from))]
 pub struct RatingPath {
     /// Transition events as (time, state_index) pairs, starting with (0.0, s₀).
     transitions: Vec<(f64, usize)>,
@@ -49,6 +53,61 @@ pub struct RatingPath {
     /// re-allocating the labels `Vec` and rebuilding the index map. The serde
     /// "rc" feature keeps the wire format identical to an inline `RatingScale`.
     scale: Arc<RatingScale>,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RatingPathWire {
+    transitions: Vec<(f64, usize)>,
+    horizon: f64,
+    scale: Arc<RatingScale>,
+}
+
+impl TryFrom<RatingPathWire> for RatingPath {
+    type Error = MigrationError;
+
+    fn try_from(wire: RatingPathWire) -> Result<Self, Self::Error> {
+        if !wire.horizon.is_finite() || wire.horizon <= 0.0 {
+            return Err(MigrationError::InvalidHorizon(wire.horizon));
+        }
+        if !matches!(wire.transitions.first(), Some((time, _)) if *time == 0.0) {
+            return Err(MigrationError::InvalidPath(
+                "the first event must record the initial state at time zero".to_string(),
+            ));
+        }
+        for (index, &(time, state)) in wire.transitions.iter().enumerate() {
+            if state >= wire.scale.n_states() {
+                return Err(MigrationError::InvalidState {
+                    state,
+                    n_states: wire.scale.n_states(),
+                });
+            }
+            if !time.is_finite() || time < 0.0 || time > wire.horizon {
+                return Err(MigrationError::InvalidPath(format!(
+                    "event {index} time {time} must be finite and within [0, {}]",
+                    wire.horizon
+                )));
+            }
+            if index > 0 {
+                let (previous_time, previous_state) = wire.transitions[index - 1];
+                if time <= previous_time {
+                    return Err(MigrationError::InvalidPath(format!(
+                        "event {index} time must be strictly after the preceding event"
+                    )));
+                }
+                if Some(previous_state) == wire.scale.default_state() {
+                    return Err(MigrationError::InvalidPath(format!(
+                        "event {index} occurs after the absorbing default state"
+                    )));
+                }
+            }
+        }
+        Ok(Self {
+            transitions: wire.transitions,
+            horizon: wire.horizon,
+            scale: wire.scale,
+        })
+    }
 }
 
 impl RatingPath {
@@ -144,6 +203,7 @@ impl RatingPath {
 /// assert_eq!(paths.len(), 1000);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "MigrationSimulatorWire")]
 pub struct MigrationSimulator {
     /// The generator matrix.
@@ -153,6 +213,7 @@ pub struct MigrationSimulator {
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct MigrationSimulatorWire {
     generator: GeneratorMatrix,
@@ -165,6 +226,21 @@ impl TryFrom<MigrationSimulatorWire> for MigrationSimulator {
     fn try_from(wire: MigrationSimulatorWire) -> Result<Self, Self::Error> {
         Self::new(wire.generator, wire.horizon)
     }
+}
+
+/// Fraction of simulated paths that end in default.
+///
+/// # Arguments
+///
+/// * `paths` - Simulated rating paths; an empty slice has a default rate of
+///   zero.
+#[must_use]
+pub fn default_rate(paths: &[RatingPath]) -> f64 {
+    if paths.is_empty() {
+        return 0.0;
+    }
+    let defaulted = paths.iter().filter(|path| path.defaulted()).count();
+    defaulted as f64 / paths.len() as f64
 }
 
 impl MigrationSimulator {
@@ -204,6 +280,53 @@ impl MigrationSimulator {
         Ok((0..n_paths)
             .map(|_| simulate_path(&self.generator, &scale, initial_state, self.horizon, rng))
             .collect())
+    }
+
+    /// Simulate rating paths with a seeded PCG64 generator.
+    ///
+    /// The generator is owned here, so equal seeds give equal paths in every
+    /// host language.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_state` - Zero-based starting state index in scale order.
+    /// * `n_paths` - Number of independent paths to generate.
+    /// * `seed` - Seed of the PCG64 generator.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MigrationError::InvalidState`] if `initial_state` is outside
+    /// the scale.
+    pub fn simulate_seeded(
+        &self,
+        initial_state: usize,
+        n_paths: usize,
+        seed: u64,
+    ) -> Result<Vec<RatingPath>, MigrationError> {
+        let mut rng = Pcg64::seed_from_u64(seed);
+        self.simulate(initial_state, n_paths, &mut rng)
+    }
+
+    /// Estimate the transition matrix by simulation with a seeded PCG64
+    /// generator.
+    ///
+    /// # Arguments
+    ///
+    /// * `n_paths_per_state` - Paths simulated from every starting state;
+    ///   must be positive.
+    /// * `seed` - Seed of the PCG64 generator.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MigrationError::InvalidPathCount`] if `n_paths_per_state` is
+    /// zero.
+    pub fn empirical_matrix_seeded(
+        &self,
+        n_paths_per_state: usize,
+        seed: u64,
+    ) -> Result<TransitionMatrix, MigrationError> {
+        let mut rng = Pcg64::seed_from_u64(seed);
+        self.empirical_matrix(n_paths_per_state, &mut rng)
     }
 
     /// Estimate the transition matrix from batch simulation.

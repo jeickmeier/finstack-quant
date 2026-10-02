@@ -52,14 +52,14 @@
 //!   }
 //! }"#;
 //!
-//! let model: CreditFactorModel = serde_json::from_str(json).expect("valid artifact");
+//! let model = CreditFactorModel::from_json(json).expect("valid artifact");
 //! assert_eq!(model.schema, CreditFactorModelSchema::CURRENT);
 //! ```
 //!
 //! # Design notes
 //!
 //! - Stable artifact structs use `#[serde(deny_unknown_fields)]` to catch schema
-//!   drift early. `CalibrationDiagnostics` is the explicitly open extension
+//!   drift early. `CreditCalibrationDiagnostics` is the explicitly open extension
 //!   object for additive diagnostic fields.
 //! - All keyed maps use `BTreeMap` for deterministic serialization order.
 //! - `Vec<IssuerBetaRow>` is kept sorted by `issuer_id` so two calibrations on
@@ -208,6 +208,20 @@ pub enum IssuerBetaPolicy {
     GloballyOff,
 }
 
+impl IssuerBetaPolicy {
+    /// Variant label of this policy: `"dynamic"` or `"globally_off"`.
+    ///
+    /// The same string tags the policy in its JSON form, so hosts can report
+    /// the policy without reading the per-issuer overrides it may carry.
+    #[must_use]
+    pub fn kind(&self) -> &'static str {
+        match self {
+            Self::Dynamic { .. } => "dynamic",
+            Self::GloballyOff => "globally_off",
+        }
+    }
+}
+
 /// A single level in the credit factor hierarchy.
 ///
 /// Built-in variants (`Rating`, `Region`, `Sector`) have canonical tag keys.
@@ -226,6 +240,20 @@ pub enum HierarchyDimension {
     Sector,
     /// User-defined dimension reading `issuer_tags[key]`.
     Custom(String),
+}
+
+impl HierarchyDimension {
+    /// Display label of this dimension: `"Rating"`, `"Region"`, `"Sector"`,
+    /// or the custom dimension's own key.
+    #[must_use]
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Rating => "Rating",
+            Self::Region => "Region",
+            Self::Sector => "Sector",
+            Self::Custom(name) => name,
+        }
+    }
 }
 
 /// Ordered list of hierarchy dimensions, broadest → narrowest.
@@ -675,7 +703,9 @@ pub enum IdiosyncraticVolModel {
 
 /// Complete vol state for all factors and all issuers at the calibration date.
 ///
-/// Feeds `Σ(t) = D(t) · ρ · D(t)` and per-issuer idiosyncratic vol forecasts.
+/// Records unregularized per-factor variance estimates and drives per-issuer
+/// idiosyncratic volatility forecasts. Systematic covariance forecasts scale
+/// the calibrated covariance, preserving the selected covariance estimator.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct VolState {
@@ -762,7 +792,7 @@ pub struct FoldUpRecord {
 /// diagnostic fields in future calibration versions.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-pub struct CalibrationDiagnostics {
+pub struct CreditCalibrationDiagnostics {
     /// Count of resolved [`IssuerBetaMode`] values.
     ///
     /// Keys are `"issuer_beta"` and `"bucket_only"`.
@@ -858,32 +888,13 @@ pub struct CreditFactorModel {
     pub issuer_betas: Vec<IssuerBetaRow>,
     /// Factor level values at the calibration anchor date.
     pub anchor_state: LevelsAtAnchor,
-    /// Static factor correlation matrix `ρ` for `Σ(t) = D(t)·ρ·D(t)`.
+    /// Correlation estimate retained from covariance calibration.
     ///
-    /// **Which matrix is authoritative:** vol forecasting rebuilds
-    /// `Σ(t, h) = D·ρ·D` from this matrix plus `vol_state`; point-in-time
-    /// risk uses `config.covariance` directly. Under
-    /// [`CovarianceStrategy::Ridge`][crate::factor::credit::calibration::CovarianceStrategy::Ridge]
-    /// the two deliberately differ —
-    /// `config.covariance = D·ρ·D + α·I`, so its implied correlations are
-    /// shrunk relative to `ρ` by `σᵢσⱼ/√((σᵢ²+α)(σⱼ²+α))`.
-    ///
-    /// Under
-    /// [`CovarianceStrategy::LedoitWolf`][crate::factor::credit::calibration::CovarianceStrategy::LedoitWolf]
-    /// the divergence is larger still, and affects both the diagonal and the
-    /// off-diagonal: `config.covariance` is the shrinkage estimator's own
-    /// `periods_per_year · (δ*·μ·I + (1 − δ*)·S)`, computed once over the
-    /// complete-case rows (dates where every factor is observed), and is
-    /// authoritative for point-in-time risk. The rebuilt `D·ρ·D` instead
-    /// combines this same `ρ` with `vol_state` variances — which are
-    /// estimated per-factor over all available observations (not just the
-    /// complete-case subset) via whichever
-    /// [`VolModelChoice`][crate::factor::credit::calibration::VolModelChoice] was
-    /// configured (`Sample` or `Ewma`). Because the diagonals come from two
-    /// different estimators over two different observation sets, `D·ρ·D`
-    /// deliberately differs from `config.covariance` on **both** the
-    /// diagonal and the off-diagonal; treat it as an approximation for
-    /// horizon scaling, not as a substitute for `config.covariance`.
+    /// `config.covariance` is authoritative for both point-in-time risk and
+    /// horizon forecasts. Under ridge this correlation precedes the diagonal
+    /// ridge addition; under Ledoit-Wolf it is derived from the shrunk
+    /// covariance. Combining it with the unregularized `vol_state.factors`
+    /// does not generally reconstruct the selected covariance estimator.
     pub static_correlation: FactorCorrelationMatrix,
     /// EWMA or sample vol state at the anchor date.
     pub vol_state: VolState,
@@ -893,10 +904,39 @@ pub struct CreditFactorModel {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub factor_histories: Option<FactorHistories>,
     /// Structured calibration diagnostics for programmatic coverage checks.
-    pub diagnostics: CalibrationDiagnostics,
+    pub diagnostics: CreditCalibrationDiagnostics,
 }
 
 impl CreditFactorModel {
+    /// Display labels of the hierarchy levels, broadest first.
+    #[must_use]
+    pub fn level_names(&self) -> Vec<String> {
+        self.hierarchy
+            .levels
+            .iter()
+            .map(|level| level.label().to_owned())
+            .collect()
+    }
+
+    /// Identifiers of the calibrated issuers, in issuer-beta row order.
+    #[must_use]
+    pub fn issuer_ids(&self) -> Vec<String> {
+        self.issuer_betas
+            .iter()
+            .map(|row| row.issuer_id.as_str().to_owned())
+            .collect()
+    }
+
+    /// Identifiers of the factors, in covariance order.
+    #[must_use]
+    pub fn factor_ids(&self) -> Vec<String> {
+        self.config
+            .factors
+            .iter()
+            .map(|factor| factor.id.to_string())
+            .collect()
+    }
+
     /// Load and validate a persisted credit-factor-model artifact.
     ///
     /// This entry point fuses bounded JSON deserialization, explicit schema
@@ -940,6 +980,48 @@ impl CreditFactorModel {
             ContractError::Report(Box::new(report))
         })?;
         Ok((model, ValidationReport::default()))
+    }
+
+    /// Deserialize and validate a credit-factor-model artifact from JSON.
+    ///
+    /// Runs the serde shape checks (including the exact `schema` marker and
+    /// `deny_unknown_fields`) and then [`Self::validate`]. Use
+    /// [`Self::from_slice_strict`] instead when loading an untrusted
+    /// persisted artifact that needs resource limits and a structured
+    /// diagnostics report.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - Complete JSON encoding of a credit factor model, as produced
+    ///   by [`Self::to_json`] or the calibrator.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when the JSON is
+    /// malformed, does not match the artifact shape, or fails
+    /// [`Self::validate`].
+    pub fn from_json(json: &str) -> finstack_quant_core::Result<Self> {
+        let model: Self = serde_json::from_str(json).map_err(|error| {
+            finstack_quant_core::Error::Validation(format!(
+                "invalid CreditFactorModel JSON: {error}"
+            ))
+        })?;
+        model.validate()?;
+        Ok(model)
+    }
+
+    /// Serialize the artifact to compact canonical JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] if serialization
+    /// fails.
+    pub fn to_json(&self) -> finstack_quant_core::Result<String> {
+        serde_json::to_string(self).map_err(|error| {
+            finstack_quant_core::Error::Validation(format!(
+                "cannot serialize CreditFactorModel: {error}"
+            ))
+        })
     }
 
     /// Validate the artifact's internal consistency.
@@ -1132,7 +1214,7 @@ mod tests {
                 idiosyncratic: BTreeMap::new(),
             },
             factor_histories: None,
-            diagnostics: CalibrationDiagnostics {
+            diagnostics: CreditCalibrationDiagnostics {
                 mode_counts: BTreeMap::new(),
                 bucket_sizes_per_level: vec![],
                 fold_ups: vec![],
@@ -1158,6 +1240,24 @@ mod tests {
             level_fit_quality: vec![],
             spread_duration: 1.0,
         }
+    }
+
+    #[test]
+    fn from_json_validates_and_to_json_round_trips() {
+        let model = minimal_model();
+        let json = model.to_json().unwrap();
+        let back = CreditFactorModel::from_json(&json).unwrap();
+        assert_eq!(back.to_json().unwrap(), json);
+
+        let error = CreditFactorModel::from_json("{").unwrap_err();
+        assert!(error.to_string().contains("invalid CreditFactorModel JSON"));
+
+        // Well-formed JSON that fails `validate()` is rejected too.
+        let mut invalid = model;
+        invalid.hierarchy.levels = vec![HierarchyDimension::Rating, HierarchyDimension::Rating];
+        let error =
+            CreditFactorModel::from_json(&serde_json::to_string(&invalid).unwrap()).unwrap_err();
+        assert!(error.to_string().contains("duplicate hierarchy dimension"));
     }
 
     #[test]
@@ -1227,7 +1327,7 @@ mod tests {
 
     // INVARIANTS.md §8 contract: the root artifact is closed
     // (`deny_unknown_fields`), so an unknown root key must FAIL to
-    // deserialize; `CalibrationDiagnostics` is an open extension point, so
+    // deserialize; `CreditCalibrationDiagnostics` is an open extension point, so
     // an unknown diagnostics key must deserialize successfully. Adding a
     // root key therefore requires a coordinated v1 contract change.
     #[test]
@@ -1260,7 +1360,7 @@ mod tests {
         let parsed = serde_json::from_str::<CreditFactorModel>(&with_diag_key);
         assert!(
             parsed.is_ok(),
-            "unknown CalibrationDiagnostics key must deserialize: diagnostics \
+            "unknown CreditCalibrationDiagnostics key must deserialize: diagnostics \
              is a declared open extension point (no deny_unknown_fields)"
         );
     }

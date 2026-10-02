@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 
 /// A point on the volatility surface where an arbitrage condition is violated.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ViolationLocation {
     /// Strike or log-moneyness at which the violation occurs.
     pub strike: f64,
@@ -21,6 +22,7 @@ pub struct ViolationLocation {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ArbitrageType {
     /// Call prices not convex in strike: C(K-d) - 2C(K) + C(K+d) < 0.
@@ -53,6 +55,7 @@ pub enum ArbitrageType {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ArbitrageSeverity {
     /// Violation is within numerical noise (< tolerance).
@@ -82,6 +85,7 @@ impl std::fmt::Display for ArbitrageSeverity {
 
 /// A single arbitrage violation detected on a volatility surface.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ArbitrageViolation {
     /// What type of arbitrage condition was violated.
     pub violation_type: ArbitrageType,
@@ -104,6 +108,7 @@ pub struct ArbitrageViolation {
 
 /// Aggregated arbitrage report for a volatility surface.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ArbitrageReport {
     /// Identifier of the volatility surface that was checked.
     pub vol_surface_id: String,
@@ -115,23 +120,6 @@ pub struct ArbitrageReport {
     pub counts_by_type: BTreeMap<ArbitrageType, usize>,
     /// Count of violations by severity.
     pub counts_by_severity: BTreeMap<ArbitrageSeverity, usize>,
-    /// Wall-clock time for the full check suite (microseconds).
-    ///
-    /// **Non-deterministic.** This field is populated from the host's
-    /// monotonic clock and varies between runs. It is excluded from serde
-    /// when zero (which is also the default after deserialization), so
-    /// golden-test snapshots remain reproducible: serialize sets the field
-    /// only on freshly-computed reports, and the field is dropped from
-    /// the wire format when the report is round-tripped from a snapshot.
-    /// Use [`Self::skip_elapsed`] to drop it explicitly when comparing.
-    #[serde(default, skip_serializing_if = "is_zero_u64")]
-    pub elapsed_us: u64,
-}
-
-/// Helper for `#[serde(skip_serializing_if = ...)]`.
-#[inline]
-fn is_zero_u64(v: &u64) -> bool {
-    *v == 0
 }
 
 impl ArbitrageReport {
@@ -146,16 +134,5 @@ impl ArbitrageReport {
     /// True if any violation is at or above the given severity.
     pub fn has_violations_above(&self, min: ArbitrageSeverity) -> bool {
         self.violations.iter().any(|v| v.severity >= min)
-    }
-
-    /// Return a copy of this report with `elapsed_us` zeroed.
-    ///
-    /// Use when comparing reports against deterministic snapshots: clock
-    /// readings vary between runs and would otherwise cause golden-test
-    /// false negatives.
-    #[must_use]
-    pub fn skip_elapsed(mut self) -> Self {
-        self.elapsed_us = 0;
-        self
     }
 }

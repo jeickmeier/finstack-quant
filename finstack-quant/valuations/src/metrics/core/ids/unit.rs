@@ -156,6 +156,7 @@ fn explicit_unit(name: &str) -> Option<MetricUnit> {
         | "wam"
         | "time_to_maturity"
         | "variance_time_to_maturity"
+        | "expected_exercise_time"
         | "yf" => Years,
         // Percent.
         "rmbs_psa_speed" | "rmbs_sda_speed" => Percent,

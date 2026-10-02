@@ -98,7 +98,7 @@ pub use calculators::{
 pub use schema::MarginEnvelope;
 pub use traits::Marginable;
 pub use types::{
-    ClearingStatus, CollateralAssetClass, CollateralEligibility, CsaSpec,
+    ClearingStatus, CollateralAssetClass, CollateralEligibility, ConcentrationBreach, CsaSpec,
     EligibleCollateralSchedule, ImCollateralResult, ImMethodology, ImParameters, MarginCall,
     MarginCallTiming, MarginCallType, MarginTenor, MaturityConstraints, NettingSetId,
     OtcMarginSpec, RepoMarginSpec, RepoMarginType, SimmCreditClassification, SimmCreditSector,

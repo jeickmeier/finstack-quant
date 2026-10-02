@@ -84,3 +84,67 @@ fn test_commodity_swaption_dv01_and_bucketed_dv01() -> finstack_quant_core::Resu
 
     Ok(())
 }
+
+#[test]
+fn commodity_swaption_zero_vol_delta_matches_parallel_price_shift(
+) -> finstack_quant_core::Result<()> {
+    use finstack_quant_valuations::instruments::{GreekBumps, OptionGreeksProvider};
+    for kind in [OptionType::Call, OptionType::Put] {
+        for f in [2.0, 3.5, 5.0] {
+            for quote_vol in [false, true] {
+                let (mut option, base_market, as_of) = ng_swaption();
+                option.option_type = kind;
+                option
+                    .instrument_pricing_overrides
+                    .market_quotes
+                    .implied_volatility = quote_vol.then_some(0.0);
+                let market = base_market
+                    .clone()
+                    .insert(flat_price_curve("NG-FORWARD", as_of, f, 2.0))
+                    .insert_surface(flat_vol_surface(
+                        "NG-VOL",
+                        &[0.5, 1.0],
+                        &[2.0, 3.5, 5.0],
+                        0.0,
+                    ));
+                // Pin the exact resolved forward for the documented ATM policy,
+                // avoiding floating point noise in the weighted average.
+                if f == 3.5 {
+                    option.fixed_price = option.forward_swap_rate(&market, as_of)?;
+                }
+                let delta = option
+                    .option_delta(&market, as_of, GreekBumps::default())?
+                    .expect("delta");
+                if f == 3.5 {
+                    assert_eq!(delta, 0.0);
+                } else {
+                    let up_market = market.clone().insert(flat_price_curve(
+                        "NG-FORWARD",
+                        as_of,
+                        f + 0.0001,
+                        2.0,
+                    ));
+                    let down_market = market.clone().insert(flat_price_curve(
+                        "NG-FORWARD",
+                        as_of,
+                        f - 0.0001,
+                        2.0,
+                    ));
+                    let fd = (option.value(&up_market, as_of)?.amount()
+                        - option.value(&down_market, as_of)?.amount())
+                        / 0.0002;
+                    assert!((delta - fd).abs() < 1e-4, "delta={delta}, fd={fd}");
+                    option
+                        .instrument_pricing_overrides
+                        .market_quotes
+                        .implied_volatility = Some(1e-10);
+                    let limit = option
+                        .option_delta(&market, as_of, GreekBumps::default())?
+                        .expect("limit");
+                    assert!((limit - delta).abs() < 1e-8);
+                }
+            }
+        }
+    }
+    Ok(())
+}

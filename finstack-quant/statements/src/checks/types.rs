@@ -28,6 +28,7 @@ use crate::types::NodeId;
 ///   "reduction". Used by `total_cash_flow` in `CashReconciliation` and
 ///   `net_income` in `RetainedEarningsReconciliation`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum SignConventionPolicy {
     /// The value must be a non-negative magnitude (the reconciliation's
@@ -130,6 +131,7 @@ pub enum CheckCategory {
 
 /// Scope that determines which periods a check applies to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum PeriodScope {
     /// Run the check on every period.
@@ -225,6 +227,7 @@ fn default_relative_tolerance() -> f64 {
 /// the absolute cent floor catches micro-errors on small balances while the
 /// relative component absorbs f64 accumulation noise on large ones.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CheckConfig {
     /// Default **absolute** tolerance for equality comparisons, expressed in
@@ -256,6 +259,39 @@ impl Default for CheckConfig {
             min_severity: Severity::Info,
         }
     }
+}
+
+impl CheckConfig {
+    /// Validate numeric tolerances and the advisory materiality threshold.
+    ///
+    /// All three numeric settings must be finite and nonnegative. Zero is
+    /// accepted for exact comparisons or to disable a relative/materiality term.
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error for a negative, NaN, or infinite setting.
+    pub fn validate(&self) -> crate::Result<()> {
+        for (name, value) in [
+            ("default_tolerance", self.default_tolerance),
+            (
+                "default_relative_tolerance",
+                self.default_relative_tolerance,
+            ),
+            ("materiality_threshold", self.materiality_threshold),
+        ] {
+            validate_nonnegative_finite(name, value)?;
+        }
+        Ok(())
+    }
+}
+
+pub(crate) fn validate_nonnegative_finite(name: &str, value: f64) -> crate::Result<()> {
+    if !value.is_finite() || value < 0.0 {
+        return Err(crate::Error::invalid_input(format!(
+            "{name} must be finite and nonnegative; got {value}"
+        )));
+    }
+    Ok(())
 }
 
 /// Return the effective tolerance to apply to a diff, given an optional
@@ -334,5 +370,19 @@ impl CheckReport {
     /// True if the report contains at least one warning-severity finding.
     pub fn has_warnings(&self) -> bool {
         self.summary.warnings > 0
+    }
+
+    /// Number of retained findings across all checks.
+    ///
+    /// Counts the findings that survived the suite's `min_severity` and
+    /// `materiality_threshold` reporting filters, read from `results`, so it
+    /// equals the number of findings a host lists for the report (and the
+    /// summary's `errors + warnings + infos` for a report produced by a run).
+    #[must_use]
+    pub fn total_findings(&self) -> usize {
+        self.results
+            .iter()
+            .map(|result| result.findings.len())
+            .sum()
     }
 }

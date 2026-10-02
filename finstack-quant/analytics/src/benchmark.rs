@@ -12,11 +12,12 @@ use crate::dates::Date;
 use crate::math::stats::{OnlineCovariance, OnlineStats};
 use crate::regression::normalized_svd_least_squares;
 use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
+use finstack_quant_core::wire::NonFiniteFields;
 use nalgebra::DMatrix;
 
 // Recompute the four sliding-window sums (sr, sb, srb, sb²) every 64 steps to
-// bound drift from incremental add/remove updates without turning the whole
-// calculation into O(n * window). The greeks kernel maintains four cross-term
+// bound drift from incremental add/remove updates without recomputing every
+// ordinary window. The greeks kernel maintains four cross-term
 // sums that compound floating-point error roughly proportionally to the number
 // of running quantities, so we recompute roughly 16× more often than the
 // single-mean rolling kernels in `risk_metrics::rolling`
@@ -42,8 +43,8 @@ const ROLLING_GREEKS_RECOMPUTE_INTERVAL: usize = 64;
 /// unchanged while making the cancelled quantities `O(variation)` instead of
 /// `O(level)`. This is the standard shifted-data formulation for one-pass
 /// variance (Chan, Golub & LeVeque 1983, "Algorithms for Computing the Sample
-/// Variance"); it costs one subtraction per element and preserves the O(n)
-/// sliding-window update between rebuilds. Rebuilds reset both origins to the
+/// Variance"); it costs one subtraction per element and preserves constant-cost
+/// sliding-window updates between rebuilds. Rebuilds reset both origins to the
 /// first observation in the current window, including after variance collapses.
 ///
 /// The mean-dependent parts of alpha need the unshifted sums; the caller
@@ -248,22 +249,43 @@ pub(crate) fn r_squared(returns: &[f64], benchmark: &[f64]) -> f64 {
 /// All fields are [`f64::NAN`] when fewer than three paired observations are
 /// available or the benchmark variance is zero.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct BetaResult {
     /// Estimated beta coefficient, or [`f64::NAN`] when it is not estimable
     /// together with the confidence interval.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub beta: f64,
     /// Standard error of the beta estimate, or [`f64::NAN`] when undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub std_err: f64,
     /// Lower bound of the 95% confidence interval, or [`f64::NAN`] when
     /// undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub ci_lower: f64,
     /// Upper bound of the 95% confidence interval, or [`f64::NAN`] when
     /// undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub ci_upper: f64,
+}
+
+impl NonFiniteFields for BetaResult {
+    const NON_FINITE_FIELDS: &'static [&'static str] = &["beta", "std_err", "ci_lower", "ci_upper"];
 }
 
 // Two-sided 95% critical value: Student's t with `n−2` degrees of freedom.
@@ -467,20 +489,42 @@ fn jensen_alpha(
 /// zero-variance portfolio, and adjusted R-squared is `NaN` with fewer than
 /// three observations.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct GreeksResult {
     /// Annualized Jensen alpha, or [`f64::NAN`] when the regression slope is
     /// undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub alpha: f64,
     /// Beta (slope) of portfolio vs benchmark, or [`f64::NAN`] when undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub beta: f64,
     /// R-squared of the regression, or [`f64::NAN`] when undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub r_squared: f64,
     /// Adjusted R-squared of the regression, or [`f64::NAN`] when undefined.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub adjusted_r_squared: f64,
+}
+
+impl NonFiniteFields for GreeksResult {
+    const NON_FINITE_FIELDS: &'static [&'static str] =
+        &["alpha", "beta", "r_squared", "adjusted_r_squared"];
 }
 
 /// Single-factor greeks for portfolio vs benchmark.
@@ -559,8 +603,13 @@ pub(crate) fn greeks(
 
 /// Rolling greeks output.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RollingGreeks {
     /// End dates for each rolling window.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
+    )]
     pub dates: Vec<Date>,
     /// Rolling alpha values.
     pub alphas: Vec<f64>,
@@ -593,6 +642,11 @@ pub struct RollingGreeks {
 /// running sums as soon as a non-finite value exits the window). Use
 /// [`multi_factor_greeks`] when strict regression input validation is
 /// required.
+///
+/// Updates take constant time between full-window rebuilds, which occur at
+/// least every 64 windows and when cancellation or non-finite sums require
+/// recovery. Periodic rebuilds cost `O(n + n * window / 64)` overall; repeated
+/// recovery rebuilds can cost `O(n * window)`.
 pub(crate) fn rolling_greeks(
     returns: &[f64],
     benchmark: &[f64],
@@ -622,7 +676,7 @@ pub(crate) fn rolling_greeks(
             window,
             count,
             recompute_interval = ROLLING_GREEKS_RECOMPUTE_INTERVAL,
-            "rolling greeks using incremental O(n) path"
+            "rolling greeks using incremental updates with periodic window rebuilds"
         );
     }
     let mut out_dates = Vec::with_capacity(count);
@@ -630,7 +684,7 @@ pub(crate) fn rolling_greeks(
     let mut betas = Vec::with_capacity(count);
     let rf_period = crate::returns::periodic_risk_free_rate(risk_free_rate, ann_factor);
 
-    // Incremental O(n) sliding-window OLS via running sums.
+    // Constant-cost sliding-window OLS updates between full-window rebuilds.
     //
     // Recenter on rebuilds so that observations which have left the window
     // cannot set the scale of cancellation indefinitely.
@@ -850,11 +904,15 @@ pub(crate) fn batting_average(returns: &[f64], benchmark: &[f64]) -> f64 {
 ///
 /// Factor series are always treated as already-excess (Fama–French style).
 /// Only the dependent series is adjusted when [`ReturnKind::Total`] is used.
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+/// The default, used by the bindings when the kind is omitted, is
+/// [`ReturnKind::Excess`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReturnKind {
     /// `returns` are already excess returns. Alpha is the annualized OLS
     /// intercept of excess `y` on the supplied (already-excess) factors.
+    #[default]
     Excess,
     /// `returns` are total returns. The geometrically decompounded period
     /// risk-free rate is subtracted from `y` only, then OLS is run.
@@ -908,6 +966,7 @@ impl std::str::FromStr for ReturnKind {
 
 /// Result of a multi-factor regression.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MultiFactorResult {
     /// Annualized OLS intercept of the (possibly rf-adjusted) dependent series.
     pub alpha: f64,
@@ -915,6 +974,10 @@ pub struct MultiFactorResult {
     pub betas: Vec<f64>,
     /// Fraction of variance explained; NaN for a constant dependent series.
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub r_squared: f64,
     /// Adjusted R-squared; NaN when R-squared or residual degrees of freedom are undefined.
     ///
@@ -922,9 +985,17 @@ pub struct MultiFactorResult {
     /// adj_R² = 1 − (1 − R²) × (n − 1) / (n − k − 1)
     /// ```
     #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub adjusted_r_squared: f64,
     /// Annualized residual volatility.
     pub residual_vol: f64,
+}
+
+impl NonFiniteFields for MultiFactorResult {
+    const NON_FINITE_FIELDS: &'static [&'static str] = &["r_squared", "adjusted_r_squared"];
 }
 
 fn geometric_capture<F>(returns: &[f64], benchmark: &[f64], ann_factor: f64, include: F) -> f64
@@ -1026,6 +1097,7 @@ where
 /// - any portfolio or factor return is non-finite
 /// - any factor length differs from `returns.len()`
 /// - the factor matrix is singular or numerically rank deficient
+/// - a coefficient, annualized intercept, or residual volatility is non-finite
 ///
 /// # References
 ///
@@ -1121,6 +1193,15 @@ pub(crate) fn multi_factor_greeks(
     let alpha_per_period = beta[0];
     let factor_betas: Vec<f64> = beta[1..].to_vec();
 
+    // Both goodness-of-fit sums use the same response scale, which cancels
+    // from their ratio. Squaring residuals in original units can overflow
+    // even when the resulting standard deviation is representable.
+    let response_scale = y.iter().map(|value| value.abs()).fold(0.0, f64::max);
+    let response_scale = if response_scale > 0.0 {
+        response_scale
+    } else {
+        1.0
+    };
     let mut response_stats = OnlineStats::new();
     let mut ss_res = 0.0_f64;
     for (t, &r) in y.iter().enumerate().take(n) {
@@ -1129,9 +1210,11 @@ pub(crate) fn multi_factor_greeks(
             let fj = factors[j][t];
             y_hat += factor_betas[j] * fj;
         }
-        let residual = r - y_hat;
+        crate::regression::ensure_finite(&[y_hat])?;
+        let scaled_response = r / response_scale;
+        let residual = scaled_response - y_hat / response_scale;
         ss_res += residual * residual;
-        response_stats.update(r);
+        response_stats.update(scaled_response);
     }
 
     // Online variance preserves exact zero for constant observations, even
@@ -1144,14 +1227,18 @@ pub(crate) fn multi_factor_greeks(
     };
     let dof = n as f64 - k as f64 - 1.0;
     let residual_var = if dof > 0.0 { ss_res / dof } else { 0.0 };
-    let residual_vol = residual_var.sqrt() * ann_factor.sqrt();
+    let residual_vol = residual_var.sqrt() * response_scale * ann_factor.sqrt();
     let alpha = alpha_per_period * ann_factor;
+    crate::regression::ensure_finite(&[alpha, residual_vol])?;
 
     let adjusted_r_squared = if dof > 0.0 && r_sq.is_finite() {
         1.0 - (1.0 - r_sq) * (n as f64 - 1.0) / dof
     } else {
         f64::NAN
     };
+    if ss_tot > 0.0 {
+        crate::regression::ensure_finite(&[r_sq, adjusted_r_squared])?;
+    }
 
     Ok(MultiFactorResult {
         alpha,
@@ -1164,6 +1251,38 @@ pub(crate) fn multi_factor_greeks(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn non_finite_field_lists_match_serde_sentinels() {
+        use crate::test_support::assert_non_finite_fields;
+        let beta = BetaResult {
+            beta: f64::NAN,
+            std_err: f64::NAN,
+            ci_lower: f64::NAN,
+            ci_upper: f64::NAN,
+        };
+        assert_non_finite_fields(&beta);
+        let greeks = GreeksResult {
+            alpha: f64::NAN,
+            beta: f64::NAN,
+            r_squared: f64::NAN,
+            adjusted_r_squared: f64::NAN,
+        };
+        assert_non_finite_fields(&greeks);
+        let multi = MultiFactorResult {
+            alpha: f64::NAN,
+            betas: vec![f64::NAN],
+            r_squared: f64::NAN,
+            adjusted_r_squared: f64::NAN,
+            residual_vol: f64::NAN,
+        };
+        assert_non_finite_fields(&multi);
+    }
+
+    #[test]
+    fn return_kind_defaults_to_excess() {
+        assert_eq!(ReturnKind::default(), ReturnKind::Excess);
+    }
+
     use super::*;
 
     use crate::dates::{Duration, Month};
@@ -1835,6 +1954,8 @@ mod tests {
 /// return is also zero (matching the [`sharpe`](crate::risk_metrics) /
 /// `information_ratio` zero-denominator convention). A `NaN` beta (e.g.
 /// from a zero-variance benchmark) propagates to a `NaN` ratio.
+/// Non-finite annualized excess return also returns `NaN`, including when
+/// `risk_free_rate` is non-finite, before applying the zero-beta convention.
 ///
 /// Excess return uses the same geometric rf decompounding as
 /// [`crate::risk_metrics::sharpe`]:
@@ -1849,6 +1970,9 @@ mod tests {
 #[must_use]
 pub(crate) fn treynor(ann_return: f64, risk_free_rate: f64, beta: f64, ann_factor: f64) -> f64 {
     let excess = crate::returns::annualized_excess_return(ann_return, risk_free_rate, ann_factor);
+    if !excess.is_finite() {
+        return f64::NAN;
+    }
     if beta.abs() < 1e-10 {
         return if excess > 0.0 {
             f64::INFINITY

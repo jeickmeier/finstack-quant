@@ -33,16 +33,20 @@ use super::{error::MigrationError, scale::RatingScale};
 /// - Gupton, G. M., Finger, C. C., & Bhatia, M. (1997). *CreditMetrics —
 ///   Technical Document*. J.P. Morgan. `docs/REFERENCES.md#creditmetrics-1997`
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "TransitionMatrixWire")]
 pub struct TransitionMatrix {
+    #[cfg_attr(feature = "json-schema", schemars(with = "(Vec<f64>, usize, usize)"))]
     pub(crate) data: DMatrix<f64>,
     pub(crate) horizon: f64,
     pub(crate) scale: RatingScale,
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct TransitionMatrixWire {
+    #[cfg_attr(feature = "json-schema", schemars(with = "(Vec<f64>, usize, usize)"))]
     data: DMatrix<f64>,
     horizon: f64,
     scale: RatingScale,
@@ -113,6 +117,36 @@ impl TransitionMatrix {
     #[must_use]
     pub fn probability_by_index(&self, from: usize, to: usize) -> f64 {
         self.data[(from, to)]
+    }
+
+    /// Transition probability by row/column index, with bounds checking.
+    ///
+    /// # Arguments
+    ///
+    /// * `from` - Zero-based index of the starting state in scale order.
+    /// * `to` - Zero-based index of the ending state in scale order.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`MigrationError::InvalidState`] if either index is outside the
+    /// scale.
+    pub fn try_probability_by_index(&self, from: usize, to: usize) -> Result<f64, MigrationError> {
+        let n_states = self.n_states();
+        for state in [from, to] {
+            if state >= n_states {
+                return Err(MigrationError::InvalidState { state, n_states });
+            }
+        }
+        Ok(self.data[(from, to)])
+    }
+
+    /// Transition probabilities as one row per starting state, in scale order.
+    #[must_use]
+    pub fn to_rows(&self) -> Vec<Vec<f64>> {
+        self.data
+            .row_iter()
+            .map(|row| row.iter().copied().collect())
+            .collect()
     }
 
     /// Row of transition probabilities from a given state.

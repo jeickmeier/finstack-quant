@@ -83,17 +83,17 @@
       "oneOf": [
         {
           "const": "buy",
-          "description": "Buy more of the instrument (increase exposure).",
+          "description": "Increase the signed instrument quantity, including covering a short.",
           "type": "string"
         },
         {
           "const": "sell",
-          "description": "Sell the instrument (decrease exposure).",
+          "description": "Decrease the signed instrument quantity, including increasing a short.",
           "type": "string"
         },
         {
           "const": "hold",
-          "description": "No change in exposure.",
+          "description": "No change in instrument quantity.",
           "type": "string"
         }
       ]
@@ -119,7 +119,7 @@
         },
         "direction": {
           "$ref": "#/$defs/TradeDirection",
-          "description": "Buy / Sell / Hold classification."
+          "description": "Buy / Sell / Hold classification from the sign of `delta_quantity`."
         },
         "instrument_id": {
           "description": "Underlying instrument identifier (or candidate id).",

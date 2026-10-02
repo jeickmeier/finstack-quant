@@ -277,6 +277,24 @@ class TestDayCountParity:
         yf = DayCount.ACT_365F.year_fraction(start, end)
         assert yf == pytest.approx(182.0 / 365.0, abs=1e-10)
 
+    def test_act365l_partial_coupon_uses_next_coupon_year(self) -> None:
+        start, query, end = date(2023, 10, 15), date(2023, 12, 15), date(2024, 4, 15)
+        ctx = DayCountContext(frequency="6M", coupon_period=(start, end))
+        accrued = DayCount.ACT_365L.year_fraction(start, query, ctx)
+        remaining = DayCount.ACT_365L.year_fraction(query, end, ctx)
+        assert accrued == pytest.approx(61 / 366, abs=1e-14)
+        assert accrued + remaining == pytest.approx(0.5, abs=1e-14)
+        assert DayCount.ACT_365L.signed_year_fraction(query, start, ctx) == pytest.approx(-accrued, abs=1e-14)
+        with pytest.raises(ValueError, match="frequency"):
+            DayCount.ACT_365L.year_fraction(start, end)
+        with pytest.raises(ValueError, match="coupon_period"):
+            DayCount.ACT_365L.year_fraction(start, end, frequency="6M")
+
+    def test_icma_long_last_coupon_preserves_roll_day_after_february(self) -> None:
+        start, end = date(2025, 1, 30), date(2025, 3, 15)
+        ctx = DayCountContext(frequency="1M", coupon_period=(start, date(2025, 2, 28)))
+        assert DayCount.ACT_ACT_ISMA.year_fraction(start, end, ctx) == pytest.approx(0.125, abs=1e-14)
+
     def test_thirty360_year_fraction(self) -> None:
         """30/360: exactly 6 months = 0.5."""
         start, end = date(2024, 1, 15), date(2024, 7, 15)
@@ -813,7 +831,7 @@ class TestMarketContextParity:
         correlation = BaseCorrelationCurve("CDX-IG-CORR", [(3.0, 0.20), (10.0, 0.45)])
         index = CreditIndexData(125, 0.40, hazard, correlation)
         mc = MarketContext()
-
+        mc.insert(hazard).insert(correlation)
         mc.insert_credit_index("CDX-IG", index)
 
         retrieved = mc.get_credit_index("CDX-IG")
@@ -907,7 +925,7 @@ class TestMarketContextParity:
         with pytest.raises(ValueError, match="finite"):
             ScalarTimeSeries("INVALID", [(date(2024, 1, 1), value)])
 
-    def test_scalar_time_series_decimal_values_require_exact_f64_roundtrip(self) -> None:
+    def test_scalar_time_series_decimal_values_require_exact_f64(self) -> None:
         series = ScalarTimeSeries(
             "EXACT",
             [(date(2024, 1, 1), Decimal("100.25"))],
@@ -921,6 +939,33 @@ class TestMarketContextParity:
                 "INEXACT",
                 [(date(2024, 1, 1), Decimal("0.1"))],
             )
+
+    @pytest.mark.parametrize("text", ["1e-20", "1e-28", "2e-28", "9007199254740993"])
+    def test_scalar_decimal_rejects_inexact_binary_values(self, text: str) -> None:
+        value = Decimal(text)
+        observations = [(date(2024, 1, 1), value)]
+
+        with pytest.raises(ValueError, match="exactly representable"):
+            ScalarTimeSeries("INEXACT", observations)
+        with pytest.raises(ValueError, match="exactly representable"):
+            InflationIndex("INEXACT", observations, "USD")
+        context = MarketContext()
+        with pytest.raises(ValueError, match="exactly representable"):
+            context.insert_price("INEXACT", value)
+        with pytest.raises(KeyError):
+            context.get_price("INEXACT")
+
+    @pytest.mark.parametrize(
+        ("text", "expected"),
+        [
+            ("0.0000000037252902984619140625", 2.0**-28),
+            ("9007199254740994", 9007199254740994.0),
+            ("1237940039285380274899124224", 2.0**90),
+        ],
+    )
+    def test_scalar_decimal_accepts_exact_binary_values(self, text: str, expected: float) -> None:
+        series = ScalarTimeSeries("EXACT", [(date(2024, 1, 1), Decimal(text))])
+        assert series.observations == [(date(2024, 1, 1), expected)]
 
     def test_scalar_time_series_json_roundtrip(self) -> None:
         series = ScalarTimeSeries(
@@ -952,6 +997,19 @@ class TestMarketContextParity:
         assert restored.value_on(date(2024, 1, 16)) == pytest.approx(300.7258064516129)
         assert len(restored) == 2
         assert restored_directly.to_json() == index.to_json()
+
+    def test_inflation_publication_schedule_roundtrip(self) -> None:
+        original = InflationIndex("US-CPI", [("2026-01-01", 300.0)], "USD")
+        index = original.with_publication_dates([("2026-01-01", "2026-02-13")])
+        assert original.get_publication_dates() == []
+        assert index.get_publication_date("2026-01-31") == date(2026, 2, 13)
+        assert index.get_publication_date("2026-02-01") is None
+        market = MarketContext().insert_inflation_index(index)
+        restored = MarketContext.from_json(market.to_json()).get_inflation_index("US-CPI")
+        assert restored.get_publication_dates() == [(date(2026, 1, 1), date(2026, 2, 13))]
+        assert InflationIndex.from_json(index.to_json()).get_publication_dates() == index.get_publication_dates()
+        with pytest.raises(ValueError, match="duplicate"):
+            original.with_publication_dates([("2026-01-01", "2026-02-13"), ("2026-01-01", "2026-02-14")])
 
     @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
     def test_inflation_index_rejects_non_finite_observations(self, value: float) -> None:

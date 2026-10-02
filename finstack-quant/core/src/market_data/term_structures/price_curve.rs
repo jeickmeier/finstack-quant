@@ -87,6 +87,7 @@ use super::common::{
     bump_knots_triangular, default_curve_base_date, infer_spot_from_knots, roll_knots,
     split_points, validate_non_negative_knots, year_fraction_to,
 };
+use crate::dates::DateExt;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{
@@ -110,6 +111,41 @@ pub enum PriceCurveKind {
     /// Volatility-index forward levels (VIX, VXN, VSTOXX). Knot levels and
     /// spot must be non-negative; serialised as `spot_level`.
     VolIndex,
+}
+
+impl PriceCurveKind {
+    /// Canonical label: `"price"` or `"vol_index"`.
+    ///
+    /// This is the name host bindings accept and report for the kind; the
+    /// JSON wire form carries the kind through the spot field name instead.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Price => "price",
+            Self::VolIndex => "vol_index",
+        }
+    }
+}
+
+impl std::fmt::Display for PriceCurveKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl std::str::FromStr for PriceCurveKind {
+    type Err = crate::Error;
+
+    /// Parse the canonical label `"price"` or `"vol_index"` (exact match).
+    fn from_str(s: &str) -> crate::Result<Self> {
+        match s {
+            "price" => Ok(Self::Price),
+            "vol_index" => Ok(Self::VolIndex),
+            other => Err(crate::Error::Validation(format!(
+                "Invalid price curve kind {other:?}: expected \"price\" or \"vol_index\""
+            ))),
+        }
+    }
 }
 
 /// Forward price curve for commodities, other price-based assets and
@@ -456,6 +492,8 @@ impl PriceCurve {
     ///
     /// # Errors
     ///
+    /// Rejects non-finite bump magnitudes and bucket coordinates or neighbors
+    /// that do not satisfy `prev_bucket < target_bucket < next_bucket`.
     /// Propagates builder/interpolation validation errors after applying the
     /// triangular knot shock, including non-finite resulting prices or invalid
     /// interpolation input. A successful result retains all curve conventions
@@ -467,6 +505,10 @@ impl PriceCurve {
         next_bucket: Option<f64>,
         bump: f64,
     ) -> crate::Result<Self> {
+        super::common::validate_triangular_bucket_grid(prev_bucket, target_bucket, next_bucket)?;
+        if !bump.is_finite() {
+            return Err(InputError::Invalid.into());
+        }
         if self.knots.len() < 2 {
             return self.with_parallel_bump(bump);
         }
@@ -512,8 +554,9 @@ impl PriceCurve {
     ///
     /// # Errors
     /// Returns an error if no future knot remains after filtering expired points.
+    /// Returns a validation error if the rolled base date exceeds the supported calendar range.
     pub fn roll_forward(&self, days: i64) -> crate::Result<Self> {
-        let new_base = self.base + time::Duration::days(days);
+        let new_base = self.base.add_days(days)?;
         let dt_years = year_fraction_to(self.base, new_base, self.day_count)?;
 
         let mut rolled_points = roll_knots(&self.knots, &self.prices, dt_years);
@@ -595,6 +638,14 @@ impl PriceCurveBuilder {
     /// Set the **spot price**.
     ///
     /// If not set, will be inferred from the first knot point (at t=0).
+    /// An explicit spot is inserted as the zero-time interpolation knot when
+    /// absent and must match any supplied zero-time knot.
+    ///
+    /// # Arguments
+    ///
+    /// * `price` - Finite spot in the same quote units as the forward knots;
+    ///   signed values are allowed for price curves, while volatility-index
+    ///   curves require a non-negative level.
     pub fn spot_price(mut self, price: f64) -> Self {
         self.spot_price = Some(price);
         self
@@ -628,6 +679,8 @@ impl PriceCurveBuilder {
     /// knot; prices may be signed because some commodity/power markets trade
     /// through zero. If spot is omitted, the first knot must be exactly at
     /// `t = 0` so the builder can infer it without extrapolation. A
+    /// supplied spot anchors interpolation at zero; a missing zero-time knot
+    /// is inserted, and a conflicting zero-time price is rejected. A
     /// [`PriceCurveKind::VolIndex`] curve additionally rejects negative knot
     /// levels and a negative spot (zero is permitted).
     ///
@@ -636,7 +689,8 @@ impl PriceCurveBuilder {
     /// Returns an input, validation, or interpolation error if the base date
     /// was not set, fewer than two points were supplied, knots are non-finite
     /// or not strictly increasing, any price/spot is non-finite (or negative
-    /// for a vol-index curve), spot cannot be inferred, or the selected
+    /// for a vol-index curve), spot cannot be inferred or differs from a
+    /// zero-time knot, or the selected
     /// interpolation/extrapolation combination rejects the grid.
     pub fn build(self) -> crate::Result<PriceCurve> {
         if !self.base_is_set {
@@ -646,7 +700,7 @@ impl PriceCurveBuilder {
             return Err(InputError::TooFewPoints.into());
         }
 
-        let (kvec, pvec): (Vec<f64>, Vec<f64>) = split_points(self.points);
+        let (mut kvec, mut pvec): (Vec<f64>, Vec<f64>) = split_points(self.points);
         crate::math::interp::utils::validate_knots(&kvec)?;
 
         if pvec.iter().any(|price| !price.is_finite()) {
@@ -661,6 +715,18 @@ impl PriceCurveBuilder {
 
         if !spot_price.is_finite() {
             return Err(InputError::Invalid.into());
+        }
+
+        let origin = kvec.partition_point(|&t| t < 0.0);
+        if kvec.get(origin).is_some_and(|&t| t == 0.0) {
+            if pvec[origin].partial_cmp(&spot_price) != Some(core::cmp::Ordering::Equal) {
+                return Err(crate::Error::Validation(
+                    "Price knot at t=0 must equal spot_price".to_string(),
+                ));
+            }
+        } else {
+            kvec.insert(origin, 0.0);
+            pvec.insert(origin, spot_price);
         }
 
         if self.kind == PriceCurveKind::VolIndex {
@@ -702,8 +768,11 @@ impl PriceCurveBuilder {
 /// `Additive/Percent` is a percentage of the current level, and
 /// `Multiplicative/{Factor,Percent}` scale every level. `RateBp` is rejected:
 /// a basis point has no meaning for a price or an index level.
+/// A percentage key-rate shock scales each future knot by its own level and
+/// triangular weight; the spot level remains unchanged.
 impl Bumpable for PriceCurve {
     fn apply_bump(&self, spec: BumpSpec) -> crate::Result<Self> {
+        spec.validate_finite()?;
         match spec.bump_type {
             BumpType::Parallel => {
                 match (spec.mode, spec.units) {
@@ -734,27 +803,43 @@ impl Bumpable for PriceCurve {
                 target_bucket,
                 next_bucket,
             } => {
-                let bump = match (spec.mode, spec.units) {
-                    (BumpMode::Additive, BumpUnits::Fraction) => spec.value,
+                match (spec.mode, spec.units) {
+                    (BumpMode::Additive, BumpUnits::Fraction) => {
+                        self.with_triangular_key_rate_bump_neighbors(
+                            prev_bucket, target_bucket, next_bucket, spec.value,
+                        )
+                    }
                     (BumpMode::Additive, BumpUnits::Percent) => {
-                        spec.value / 100.0 * self.spot_price()
+                        super::common::validate_triangular_bucket_grid(
+                            prev_bucket, target_bucket, next_bucket,
+                        )?;
+                        let percentage = spec.value / 100.0;
+                        let points = self.knots.iter().zip(self.prices.iter()).map(|(&time, &price)| {
+                            let weight = super::common::triangular_weight(
+                                time, prev_bucket, target_bucket, next_bucket,
+                            );
+                            (time, if time == 0.0 { self.spot_price } else { price * (1.0 + percentage * weight) })
+                        });
+                        PriceCurve::builder(spec.standard_bump_id(self.id()))
+                            .kind(self.kind)
+                            .base_date(self.base)
+                            .day_count(self.day_count)
+                            .spot_price(self.spot_price)
+                            .knots(points)
+                            .interp(self.interp.style())
+                            .extrapolation(self.interp.extrapolation())
+                            .build()
                     }
                     _ => {
-                        return Err(InputError::UnsupportedBump {
+                        Err(InputError::UnsupportedBump {
                             reason: format!(
                                 "PriceCurve key-rate bump requires Additive mode, got {:?}/{:?}",
                                 spec.mode, spec.units
                             ),
                         }
-                        .into());
+                        .into())
                     }
-                };
-                self.with_triangular_key_rate_bump_neighbors(
-                    prev_bucket,
-                    target_bucket,
-                    next_bucket,
-                    bump,
-                )
+                }
             }
         }
     }
@@ -763,6 +848,44 @@ impl Bumpable for PriceCurve {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn percentage_bucket_shocks_scale_local_signed_levels_and_preserve_spot() {
+        for spot in [100.0, 0.0, -50.0] {
+            let curve = PriceCurve::builder("LOCAL-PERCENT")
+                .base_date(Date::from_calendar_date(2025, time::Month::January, 1).expect("date"))
+                .knots([
+                    (0.0, spot),
+                    (0.5, 80.0),
+                    (1.0, 200.0),
+                    (1.5, -100.0),
+                    (2.0, 300.0),
+                ])
+                .build()
+                .expect("price curve");
+            let bumped = curve
+                .apply_bump(BumpSpec {
+                    mode: BumpMode::Additive,
+                    units: BumpUnits::Percent,
+                    value: 10.0,
+                    bump_type: BumpType::TriangularKeyRate {
+                        prev_bucket: Some(0.0),
+                        target_bucket: 1.0,
+                        next_bucket: Some(2.0),
+                    },
+                })
+                .expect("percentage bucket shock");
+            for (time, expected) in [
+                (0.0, spot),
+                (0.5, 84.0),
+                (1.0, 220.0),
+                (1.5, -105.0),
+                (2.0, 300.0),
+            ] {
+                assert!((bumped.price(time) - expected).abs() < 1e-12);
+            }
+        }
+    }
 
     fn sample_wti_curve() -> PriceCurve {
         PriceCurve::builder("WTI-FORWARD")
@@ -790,6 +913,38 @@ mod tests {
         let curve = sample_wti_curve();
         assert!((curve.price(0.0) - 75.0).abs() < 1e-10);
         assert!((curve.spot_price() - 75.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn future_only_quotes_interpolate_from_explicit_spot() {
+        for kind in [PriceCurveKind::Price, PriceCurveKind::VolIndex] {
+            let curve = PriceCurve::builder("PRICE-ORIGIN")
+                .kind(kind)
+                .base_date(Date::from_calendar_date(2025, time::Month::January, 1).unwrap())
+                .spot_price(75.0)
+                .knots([(1.0, 80.0), (2.0, 100.0)])
+                .build()
+                .unwrap();
+            assert_eq!(curve.knots(), &[0.0, 1.0, 2.0]);
+            assert!((curve.price(0.5) - 77.5).abs() < 1e-12);
+            assert!((curve.price(1e-6) - 75.000005).abs() < 1e-12);
+            assert!((curve.price(1.0) - 80.0).abs() < 1e-12);
+
+            let restored: PriceCurve =
+                serde_json::from_str(&serde_json::to_string(&curve).unwrap()).unwrap();
+            assert_eq!(restored.knots(), curve.knots());
+            assert_eq!(restored.price(0.5), curve.price(0.5));
+        }
+    }
+
+    #[test]
+    fn conflicting_zero_time_price_is_rejected() {
+        let result = PriceCurve::builder("PRICE-CONFLICT")
+            .base_date(Date::from_calendar_date(2025, time::Month::January, 1).unwrap())
+            .spot_price(75.0)
+            .knots([(0.0, 100.0), (1.0, 110.0)])
+            .build();
+        assert!(result.is_err());
     }
 
     #[test]
@@ -895,6 +1050,25 @@ mod tests {
     }
 
     #[test]
+    fn triangular_bumps_reject_malformed_bucket_grids() {
+        let curve = sample_wti_curve();
+        for (previous, target, next) in [
+            (None, f64::NAN, None),
+            (Some(f64::NEG_INFINITY), 1.0, None),
+            (None, 1.0, Some(f64::INFINITY)),
+            (Some(2.0), 1.0, Some(3.0)),
+            (Some(0.0), 1.0, Some(1.0)),
+        ] {
+            assert!(curve
+                .with_triangular_key_rate_bump_neighbors(previous, target, next, 10.0)
+                .is_err());
+        }
+        assert!(curve
+            .with_triangular_key_rate_bump_neighbors(None, 1.0, None, f64::NAN)
+            .is_err());
+    }
+
+    #[test]
     fn requires_at_least_two_points() {
         let result = PriceCurve::builder("WTI").knots([(0.0, 75.0)]).build();
         assert!(result.is_err());
@@ -962,6 +1136,15 @@ mod tests {
             "interp_style": "linear", "extrapolation": "flat_zero"
         });
         assert!(serde_json::from_value::<PriceCurve>(both).is_err());
+    }
+
+    #[test]
+    fn kind_labels_round_trip_and_reject_unknown_names() {
+        for kind in [PriceCurveKind::Price, PriceCurveKind::VolIndex] {
+            assert_eq!(kind.to_string().parse::<PriceCurveKind>().ok(), Some(kind));
+        }
+        assert_eq!(PriceCurveKind::VolIndex.as_str(), "vol_index");
+        assert!("Price".parse::<PriceCurveKind>().is_err());
     }
 
     #[test]

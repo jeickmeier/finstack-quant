@@ -29,39 +29,71 @@ await init({ module_or_path: readFileSync(WASM_BG) });
 const EXPORTED_KEYS = [
   'InstrumentArtifactCache',
   'Portfolio',
+  'PortfolioBuilder',
   'aggregateFullCashflows',
   'aggregateFullCashflowsBuilt',
   'aggregateMetrics',
+  'allocateWeights',
+  'allocateWeightsJson',
   'applyScenarioAndRevalue',
   'applyScenarioAndRevalueBuilt',
+  'attributePortfolioPnl',
   'brinsonFachler',
+  'buildCreditVolReport',
   'buildPortfolioFromSpecJson',
   'campisiAttribution',
   'campisiCarinoLink',
   'campisiCarinoLinkFromSnapshots',
   'campisiReconciliationCheck',
   'carinoLink',
+  'carinoLinkFromSectorPeriods',
   'cellReturnsFromCurves',
   'cellReturnsFromReference',
+  'collapseToBaseByDateKind',
   'computeFactorSensitivities',
   'computeFactorSensitivitiesWithMarket',
   'computePnlProfiles',
   'computePnlProfilesWithMarket',
+  'constraintBudget',
+  'constraintExposureLimit',
+  'constraintExposureMinimum',
+  'constraintMaxTurnover',
+  'constraintWeightBounds',
   'decomposeFactorRisk',
   'excessReturns',
   'factorBrinsonAttribution',
+  'factorStress',
   'gridAttribution',
   'gridCarinoLink',
   'mwrXirr',
+  'netInCurrencyByDate',
   'optimizePortfolio',
   'parsePortfolioSpecJson',
-  'portfolioResultGetMetric',
-  'portfolioResultTotalValue',
+  'portfolioAttributionExplainText',
+  'portfolioAttributionReconciliationCheck',
+  'portfolioMetricsGetMetric',
+  'portfolioMetricsGetPositionMetrics',
+  'portfolioMetricsGetTotal',
+  'portfolioMetricsRequireTotal',
+  'portfolioMetricsSeries',
+  'portfolioOptimizationResultBindingConstraints',
+  'portfolioOptimizationResultNewPositionTrades',
+  'portfolioOptimizationResultToTradeList',
+  'portfolioValuationGetEntityValue',
+  'portfolioValuationGetPositionValue',
+  'positionWhatIf',
+  'rebalanceFromSpec',
   'replayPortfolio',
   'scenarioPnl',
+  'scenarioPnlBatch',
   'scenarioPnlBuilt',
+  'schema',
+  'sensitivityMatrixDelta',
+  'sensitivityMatrixFactorDeltas',
+  'sensitivityMatrixPositionDeltas',
   'twrrLinked',
   'twrrModifiedDietz',
+  'validateAllocationJson',
   'valuePortfolio',
   'valuePortfolioBuilt',
 ];
@@ -85,12 +117,70 @@ function assertStructured(value, label) {
 test('portfolio namespace exposes exactly the pinned contract surface', () => {
   assert.deepEqual(Object.keys(portfolio).sort(), EXPORTED_KEYS);
   for (const key of EXPORTED_KEYS) {
+    // `schema` is the nested JSON Schema namespace; every other key is callable.
+    const expected = key === 'schema' ? 'object' : 'function';
     assert.equal(
       typeof portfolio[key],
-      'function',
-      `portfolio.${key} must be a function (got ${typeof portfolio[key]})`
+      expected,
+      `portfolio.${key} must be a ${expected} (got ${typeof portfolio[key]})`
     );
   }
+});
+
+test('portfolio.decomposeFactorRisk consumes the canonical Python monetary matrix wire', () => {
+  const sensitivities = {
+    base_currency: 'EUR',
+    position_ids: ['A', 'B'],
+    factor_ids: ['F'],
+    data: [[2.0], [3.0]],
+  };
+  const covariance = JSON.stringify({ factor_ids: ['F'], n: 1, data: [0.04] });
+  const result = assertStructured(
+    portfolio.decomposeFactorRisk(JSON.stringify(sensitivities), covariance),
+    'factor decomposition'
+  );
+  assert.ok(Math.abs(result.total_risk - 1.0) < 1e-12);
+  assert.deepEqual(
+    result.position_factor_contributions.map((row) => row.position_id),
+    ['A', 'B']
+  );
+  assert.ok(
+    Math.abs(
+      result.position_factor_contributions.reduce((sum, row) => sum + row.risk_contribution, 0) -
+        result.total_risk
+    ) < 1e-12
+  );
+  assert.equal(result.measure, 'variance');
+  for (const measure of [
+    'volatility',
+    { var: { confidence: 0.99 } },
+    { expected_shortfall: { confidence: 0.975 } },
+  ]) {
+    const measured = portfolio.decomposeFactorRisk(
+      JSON.stringify(sensitivities),
+      covariance,
+      JSON.stringify(measure)
+    );
+    assert.deepEqual(measured.measure, measure);
+    assert.ok(Number.isFinite(measured.total_risk));
+  }
+});
+
+test('portfolio.decomposeFactorRisk rejects malformed matrices and missing reporting currency', () => {
+  const valid = { base_currency: 'USD', position_ids: ['P'], factor_ids: ['F'], data: [[2.0]] };
+  const covariance = JSON.stringify({ factor_ids: ['F'], n: 1, data: [0.04] });
+  for (const data of [[], [[], []], [[]], [[2.0, 3.0]], [2.0], [[null]]]) {
+    assert.throws(() =>
+      portfolio.decomposeFactorRisk(JSON.stringify({ ...valid, data }), covariance)
+    );
+  }
+  for (const extra of [{ n_factors: 1 }, { unexpected: true }, { base_currency: 'BAD' }]) {
+    assert.throws(() =>
+      portfolio.decomposeFactorRisk(JSON.stringify({ ...valid, ...extra }), covariance)
+    );
+  }
+  const missingCurrency = { position_ids: ['P'], factor_ids: ['F'], data: [[2.0]] };
+  assert.throws(() => portfolio.decomposeFactorRisk(JSON.stringify(missingCurrency), covariance));
 });
 
 // Runtime arity gate. `index.d.ts` is hand-maintained, so a declaration with
@@ -504,11 +594,11 @@ test('portfolio.cellReturnsFromReference rejects an astronomically large duratio
 });
 
 const flatCurveKnots = (id) =>
-  new core.DiscountCurve(
+  new core.DiscountCurve({
     id,
-    '2024-01-01',
-    [0.0, 1.0, 0.25, 0.99004983, 0.5, 0.98019867, 1.25, 0.95122942, 1.5, 0.94176453]
-  );
+    baseDate: '2024-01-01',
+    knots: [0.0, 1.0, 0.25, 0.99004983, 0.5, 0.98019867, 1.25, 0.95122942, 1.5, 0.94176453],
+  });
 
 test('portfolio.cellReturnsFromCurves reproduces the flat-curve pure-carry golden', () => {
   const start = flatCurveKnots('UST');
@@ -529,16 +619,16 @@ test('portfolio.cellReturnsFromCurves reproduces the flat-curve pure-carry golde
 // `DiscountCurve` arguments is not a no-op, unlike the pure-carry golden
 // above whose start === end.
 test('portfolio.cellReturnsFromCurves distinguishes start and end curves under rising rates', () => {
-  const start = new core.DiscountCurve(
-    'UST',
-    '2024-01-01',
-    [0.0, 1.0, 0.5, 0.98019867, 1.5, 0.94176453]
-  );
-  const end = new core.DiscountCurve(
-    'UST',
-    '2024-01-01',
-    [0.0, 1.0, 0.25, 0.9875778, 1.25, 0.93941306]
-  );
+  const start = new core.DiscountCurve({
+    id: 'UST',
+    baseDate: '2024-01-01',
+    knots: [0.0, 1.0, 0.5, 0.98019867, 1.5, 0.94176453],
+  });
+  const end = new core.DiscountCurve({
+    id: 'UST',
+    baseDate: '2024-01-01',
+    knots: [0.0, 1.0, 0.25, 0.9875778, 1.25, 0.93941306],
+  });
   const table = portfolio.cellReturnsFromCurves(
     start,
     end,
@@ -553,8 +643,8 @@ test('portfolio.cellReturnsFromCurves distinguishes start and end curves under r
 
 test('portfolio.cellReturnsFromCurves fails closed when a cell matures inside the holding period', () => {
   const knots = [0.0, 1.0, 0.25, 0.99004983, 0.5, 0.98019867];
-  const start = new core.DiscountCurve('UST', '2024-01-01', knots);
-  const end = new core.DiscountCurve('UST', '2024-01-01', knots);
+  const start = new core.DiscountCurve({ id: 'UST', baseDate: '2024-01-01', knots });
+  const end = new core.DiscountCurve({ id: 'UST', baseDate: '2024-01-01', knots });
   assert.throws(() =>
     portfolio.cellReturnsFromCurves(start, end, 0.25, 0.5, 'UST', JSON.stringify({ width: 0.25 }))
   );
@@ -730,14 +820,14 @@ test('analytics.constrainedLeastSquares returns OLS when the constraint already 
 test('analytics.constrainedLeastSquares rejects fractional nFactors before conversion', () => {
   assert.throws(
     () => analytics.constrainedLeastSquares([1.0, -1.0], 1.5, [0.02, -0.02], [0.5, 0.5]),
-    /nFactors.*positive integer/i
+    /^TypeError: nFactors: expected a non-negative whole number, got 1\.5$/
   );
 });
 
 test('analytics.constrainedLeastSquares rejects truncating nFactors before conversion', () => {
   assert.throws(
     () => analytics.constrainedLeastSquares([1.0, -1.0], 2 ** 32 + 1, [0.02, -0.02], [0.5, 0.5]),
-    /nFactors.*positive integer/i
+    /^TypeError: nFactors: 4294967297 is out of range$/
   );
 });
 
@@ -898,12 +988,39 @@ test('portfolio.brinsonFachler and carinoLink return structured attributions', (
   assert.ok(Math.abs(reconstructed - single.total_excess_return) < 1e-12);
 
   const linked = assertStructured(
-    portfolio.carinoLink(JSON.stringify([JSON.parse(sectors), JSON.parse(sectors)])),
-    'carinoLink result'
+    portfolio.carinoLinkFromSectorPeriods(
+      JSON.stringify([JSON.parse(sectors), JSON.parse(sectors)])
+    ),
+    'carinoLinkFromSectorPeriods result'
   );
   const geometric = linked.portfolio_return_compounded - linked.benchmark_return_compounded;
   const sum = linked.linked_allocation + linked.linked_selection + linked.linked_interaction;
   assert.ok(Math.abs(sum - geometric) < 1e-10);
+
+  // carinoLink binds Rust `carino_link`: it links precomputed period results
+  // (the brinsonFachler output), like campisiCarinoLink and gridCarinoLink.
+  const precomputed = assertStructured(
+    portfolio.carinoLink(JSON.stringify([single, single])),
+    'carinoLink result'
+  );
+  assert.deepEqual(precomputed, linked);
+  assert.throws(
+    () => portfolio.carinoLink(JSON.stringify([JSON.parse(sectors), JSON.parse(sectors)])),
+    (error) => error instanceof Error && error.kind === 'validation'
+  );
+});
+
+test('portfolio.twrrModifiedDietz treats omitted cashflows as none and rejects unknown keys', () => {
+  const bare = { beginning_market_value: 100.0, ending_market_value: 110.0 };
+  assert.ok(Math.abs(portfolio.twrrModifiedDietz(JSON.stringify(bare)) - 0.1) < 1e-15);
+  assert.equal(
+    portfolio.twrrModifiedDietz(JSON.stringify({ ...bare, cashflows: [] })),
+    portfolio.twrrModifiedDietz(JSON.stringify(bare))
+  );
+  assert.throws(
+    () => portfolio.twrrModifiedDietz(JSON.stringify({ ...bare, bogus: 1 })),
+    (error) => error.kind === 'validation' && /unknown field `bogus`/.test(error.message)
+  );
 });
 
 test('portfolio.twrrLinked returns a structured linked return', () => {
@@ -916,70 +1033,145 @@ test('portfolio.twrrLinked returns a structured linked return', () => {
 });
 
 // Position ids / weights / covariance are all shared by the three
-// decomposition entry points.
-const VAR_IDS = JSON.stringify(['A', 'B']);
-const VAR_WEIGHTS = JSON.stringify([0.6, 0.4]);
-const VAR_COVARIANCE = JSON.stringify([
+// decomposition entry points. The key sets and values below are asserted
+// identically by finstack-quant-py/tests/test_factor_risk_wire.py: both hosts
+// return the canonical Rust result types.
+const VAR_IDS = ['A', 'B'];
+const VAR_WEIGHTS = [0.6, 0.4];
+const VAR_COVARIANCE = [
   [0.04, 0.01],
   [0.01, 0.09],
-]);
+];
+const DECOMPOSITION_KEYS = [
+  'confidence',
+  'es_contributions',
+  'euler_residual',
+  'method',
+  'n_positions',
+  'portfolio_es',
+  'portfolio_var',
+  'var_contributions',
+];
+const VAR_ROW_KEYS = [
+  'component_var',
+  'incremental_var',
+  'marginal_var',
+  'position_id',
+  'relative_var',
+];
+const ES_ROW_KEYS = ['component_es', 'marginal_es', 'position_id', 'relative_es'];
+// Parametric 95% VaR of the book above (losses negative), pinned in both hosts.
+const PARAMETRIC_VAR_95 = -0.3015066497719077;
 
-test('models.factor.risk.parametricVarDecomposition returns the Python-parity object', () => {
+test('models.factor.risk.parametricVarDecomposition returns the canonical PositionRiskDecomposition', () => {
   const decomposition = assertStructured(
-    models.factor.risk.parametricVarDecomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE, 0.95),
+    models.factor.risk.parametricVarDecomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE),
     'parametricVarDecomposition result'
   );
+  assert.deepEqual(Object.keys(decomposition).sort(), DECOMPOSITION_KEYS);
+  assert.deepEqual(Object.keys(decomposition.var_contributions[0]).sort(), VAR_ROW_KEYS);
+  assert.deepEqual(Object.keys(decomposition.es_contributions[0]).sort(), ES_ROW_KEYS);
+  // Omitted confidence resolves to the Rust `parametric_95()` preset.
   assert.equal(decomposition.confidence, 0.95);
+  assert.equal(decomposition.method, 'parametric');
   assert.equal(decomposition.n_positions, 2);
-  assert.equal(decomposition.contributions.length, 2);
-  assert.equal(decomposition.contributions[0].position_id, 'A');
-  assert.equal(typeof decomposition.contributions[0].component_var, 'number');
-  assert.equal(typeof decomposition.contributions[0].pct_contribution, 'number');
+  assert.ok(Math.abs(decomposition.portfolio_var - PARAMETRIC_VAR_95) < 1e-12);
+  assert.equal(decomposition.var_contributions[0].position_id, 'A');
+  assert.equal(decomposition.var_contributions[0].incremental_var, null);
+  const shares = decomposition.var_contributions.map((row) => row.relative_var);
+  assert.ok(Math.abs(shares[0] + shares[1] - 1) < 1e-12);
+
+  const explicit = models.factor.risk.parametricVarDecomposition(
+    VAR_IDS,
+    new Float64Array(VAR_WEIGHTS),
+    VAR_COVARIANCE,
+    0.99,
+    true
+  );
+  assert.equal(explicit.confidence, 0.99);
+  assert.equal(typeof explicit.var_contributions[0].incremental_var, 'number');
 });
 
-test('models.factor.risk.parametricEsDecomposition returns the Python-parity object', () => {
+test('models.factor.risk.parametricEsDecomposition returns the ES reporting view', () => {
   const decomposition = assertStructured(
-    models.factor.risk.parametricEsDecomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE, 0.95),
+    models.factor.risk.parametricEsDecomposition(VAR_IDS, VAR_WEIGHTS, VAR_COVARIANCE),
     'parametricEsDecomposition result'
   );
-  assert.equal(decomposition.n_positions, 2);
-  assert.equal(typeof decomposition.portfolio_es, 'number');
-  assert.equal(typeof decomposition.contributions[0].component_es, 'number');
-  assert.equal(typeof decomposition.contributions[0].pct_contribution, 'number');
+  assert.deepEqual(Object.keys(decomposition).sort(), [
+    'confidence',
+    'contributions',
+    'n_positions',
+    'portfolio_es',
+    'portfolio_var',
+  ]);
+  assert.equal(decomposition.confidence, 0.95);
+  assert.deepEqual(Object.keys(decomposition.contributions[0]).sort(), [
+    'component_es',
+    'marginal_es',
+    'pct_contribution',
+    'position_id',
+  ]);
 });
 
-test('models.factor.risk.historicalVarDecomposition returns a structured decomposition', () => {
+test('models.factor.risk.historicalVarDecomposition returns ES rows and takes position-major P&L only', () => {
   // (1 - confidence) * n_scenarios must be at least 1 to resolve the tail, so
   // 0.9 confidence needs >= 10 scenarios per position.
   const scenarios = 20;
-  const pnls = JSON.stringify([
+  const pnls = [
     Array.from({ length: scenarios }, (_, i) => i - scenarios / 2),
     Array.from({ length: scenarios }, (_, i) => (i - scenarios / 2) / 2),
-  ]);
+  ];
   const decomposition = assertStructured(
     models.factor.risk.historicalVarDecomposition(VAR_IDS, pnls, 0.9),
     'historicalVarDecomposition result'
   );
-  assert.equal(decomposition.n_positions, 2);
-  assert.equal(decomposition.contributions.length, 2);
+  assert.deepEqual(Object.keys(decomposition).sort(), DECOMPOSITION_KEYS);
+  assert.equal(decomposition.method, 'historical');
+  assert.equal(decomposition.es_contributions.length, 2);
+  assert.equal(decomposition.euler_residual, null);
+  // Omitted confidence resolves to the Rust `historical_95()` preset (two
+  // tail scenarios need at least 40 at 95%).
+  const longer = [
+    Array.from({ length: 40 }, (_, i) => i - 20),
+    Array.from({ length: 40 }, (_, i) => (i - 20) / 2),
+  ];
+  assert.equal(models.factor.risk.historicalVarDecomposition(VAR_IDS, longer).confidence, 0.95);
+  // A scenario-major (20 x 2) matrix is rejected in both hosts.
+  const scenarioMajor = pnls[0].map((value, i) => [value, pnls[1][i]]);
+  assert.throws(
+    () => models.factor.risk.historicalVarDecomposition(VAR_IDS, scenarioMajor, 0.9),
+    (error) => error.kind === 'validation' && /must have 2 rows, got 20/.test(error.message)
+  );
 });
 
-test('models.factor.risk.evaluateRiskBudget returns a structured budget report', () => {
+test('models.factor.risk.evaluateRiskBudget returns the canonical RiskBudgetResult', () => {
   const budget = assertStructured(
-    models.factor.risk.evaluateRiskBudget(
-      VAR_IDS,
-      JSON.stringify([60.0, 40.0]),
-      JSON.stringify([0.5, 0.5]),
-      100.0,
-      1.1
-    ),
+    models.factor.risk.evaluateRiskBudget(VAR_IDS, [60.0, 40.0], [0.5, 0.5], 100.0, 1.1),
     'evaluateRiskBudget result'
   );
-  assert.equal(budget.portfolio_var, 100.0);
-  assert.equal(budget.utilization_threshold, 1.1);
-  assert.equal(budget.positions.length, 2);
+  assert.deepEqual(Object.keys(budget).sort(), ['has_breach', 'positions', 'total_overbudget']);
+  assert.deepEqual(Object.keys(budget.positions[0]).sort(), [
+    'actual_component_var',
+    'excess',
+    'position_id',
+    'target_component_var',
+    'utilization',
+  ]);
   assert.equal(budget.positions[0].position_id, 'A');
-  assert.equal(typeof budget.positions[0].breach, 'boolean');
+  assert.equal(budget.has_breach, true);
+  assert.ok(Math.abs(budget.total_overbudget - 10.0) < 1e-12);
+});
+
+test('factor-risk inputs are arrays, not JSON strings', () => {
+  assert.throws(
+    () =>
+      models.factor.risk.parametricVarDecomposition(
+        JSON.stringify(VAR_IDS),
+        VAR_WEIGHTS,
+        VAR_COVARIANCE
+      ),
+    (error) => error instanceof TypeError && error.kind === 'invalid_type'
+  );
 });
 
 test('factor-risk kernels are absent from the portfolio namespace', () => {
@@ -987,6 +1179,77 @@ test('factor-risk kernels are absent from the portfolio namespace', () => {
   assert.equal('parametricEsDecomposition' in portfolio, false);
   assert.equal('historicalVarDecomposition' in portfolio, false);
   assert.equal('evaluateRiskBudget' in portfolio, false);
+});
+
+// Cross-host golden, asserted identically by
+// finstack-quant-py/tests/test_portfolio_sensitivity_wire.py: the canonical
+// sensitivity-matrix wire object, a 2x2 covariance and the resulting risk.
+const SENSITIVITY_WIRE = {
+  base_currency: 'USD',
+  position_ids: ['A', 'B'],
+  factor_ids: ['F1', 'F2'],
+  data: [
+    [1.0, 2.0],
+    [3.0, -1.0],
+  ],
+};
+const SENSITIVITY_COVARIANCE = JSON.stringify({
+  factor_ids: ['F1', 'F2'],
+  n: 2,
+  data: [0.04, 0.01, 0.01, 0.09],
+});
+
+test('portfolio.decomposeFactorRisk reads the canonical wire and returns the Rust result', () => {
+  const variance = assertStructured(
+    portfolio.decomposeFactorRisk(JSON.stringify(SENSITIVITY_WIRE), SENSITIVITY_COVARIANCE),
+    'decomposeFactorRisk result'
+  );
+  // exposures e = [4, 1]; e' S e = 16*0.04 + 2*4*0.01 + 0.09 = 0.81
+  assert.ok(Math.abs(variance.total_risk - 0.81) < 1e-12);
+  assert.equal(variance.measure, 'variance');
+  assert.equal(variance.position_factor_contributions.length, 4);
+  assert.deepEqual(variance.position_residual_contributions, []);
+
+  // A plain object is accepted too, and the measure keeps its serde form.
+  for (const [measure, expected] of [
+    [{ var: { confidence: 0.99 } }, { var: { confidence: 0.99 } }],
+    [{ expected_shortfall: { confidence: 0.975 } }, { expected_shortfall: { confidence: 0.975 } }],
+    ['volatility', 'volatility'],
+  ]) {
+    const decomposition = portfolio.decomposeFactorRisk(
+      SENSITIVITY_WIRE,
+      SENSITIVITY_COVARIANCE,
+      JSON.stringify(measure)
+    );
+    assert.deepEqual(decomposition.measure, expected);
+  }
+
+  // A unit variant is its bare wire label, as the declared type says.
+  assert.equal(
+    portfolio.decomposeFactorRisk(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'volatility').measure,
+    'volatility'
+  );
+  assert.throws(
+    () => portfolio.decomposeFactorRisk(SENSITIVITY_WIRE, SENSITIVITY_COVARIANCE, 'nope'),
+    (error) => error.kind === 'validation' && /riskMeasureJson/.test(error.message)
+  );
+});
+
+test('portfolio.decomposeFactorRisk rejects malformed sensitivity wire with a validation error', () => {
+  const isValidation = (pattern) => (error) =>
+    error instanceof Error && error.kind === 'validation' && pattern.test(error.message);
+  for (const [wire, pattern] of [
+    [{ ...SENSITIVITY_WIRE, data: [[1.0, 2.0]] }, /1 row\(s\) but position_ids declares 2/],
+    [{ ...SENSITIVITY_WIRE, data: [[1.0, 2.0], [3.0]] }, /row 1 has 1 element\(s\)/],
+    [{ ...SENSITIVITY_WIRE, n_factors: 2 }, /unknown field `n_factors`/],
+    [{ ...SENSITIVITY_WIRE, base_currency: 'NOT_A_CCY' }, /NOT_A_CCY/],
+    [{ ...SENSITIVITY_WIRE, data: [1.0, 2.0, 3.0, -1.0] }, /invalid type/],
+  ]) {
+    assert.throws(
+      () => portfolio.decomposeFactorRisk(JSON.stringify(wire), SENSITIVITY_COVARIANCE),
+      isValidation(pattern)
+    );
+  }
 });
 
 test('standalone sensitivity outputs require and retain the reporting currency', () => {

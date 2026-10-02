@@ -275,7 +275,9 @@ mod tests {
 
     use super::TemplateRegistry;
     use crate::templates::json::{JsonCompositeTemplate, JsonTemplateDocument};
-    use crate::{AssetClass, CurveKind, OperationSpec, ScenarioSpec, Severity, TemplateMetadata};
+    use crate::{
+        AssetClass, CurveKind, OperationSpec, ScenarioSpec, TemplateMetadata, TemplateSeverity,
+    };
     use indexmap::indexmap;
     use time::macros::date;
 
@@ -283,7 +285,7 @@ mod tests {
         id: &str,
         tag: &str,
         asset_class: AssetClass,
-        severity: Severity,
+        severity: TemplateSeverity,
         component_specs: Vec<ScenarioSpec>,
     ) -> JsonTemplateDocument {
         let component_ids = component_specs
@@ -341,7 +343,7 @@ mod tests {
                 "rates_shock",
                 "systemic",
                 AssetClass::Rates,
-                Severity::Severe,
+                TemplateSeverity::Severe,
                 vec![json_component_spec(
                     "rates_shock_component",
                     "USD-SOFR",
@@ -352,14 +354,14 @@ mod tests {
                 "equity_shock",
                 "equity",
                 AssetClass::Equity,
-                Severity::Moderate,
+                TemplateSeverity::Moderate,
                 vec![empty_component_spec("equity_shock_component")],
             ),
             template_document(
                 "hybrid_shock",
                 "systemic",
                 AssetClass::Credit,
-                Severity::Mild,
+                TemplateSeverity::Mild,
                 vec![
                     json_component_spec("rates_shock", "USD-SOFR", 100.0),
                     empty_component_spec("equity_shock"),
@@ -426,7 +428,7 @@ mod tests {
                 event_date: date!(2020 - 03 - 16),
                 asset_classes: vec![AssetClass::Rates, AssetClass::Equity],
                 tags: vec!["systemic".into(), "json".into()],
-                severity: Severity::Severe,
+                severity: TemplateSeverity::Severe,
                 components: vec!["component_b".into(), "component_a".into()],
             },
             components: indexmap! {
@@ -453,7 +455,7 @@ mod tests {
                 event_date: date!(2020 - 03 - 16),
                 asset_classes: vec![AssetClass::Rates],
                 tags: vec!["json".into()],
-                severity: Severity::Moderate,
+                severity: TemplateSeverity::Moderate,
                 components: vec!["late_priority".into(), "early_priority".into()],
             },
             components: indexmap! {
@@ -480,7 +482,7 @@ mod tests {
                 event_date: date!(2020 - 03 - 16),
                 asset_classes: vec![AssetClass::Rates],
                 tags: vec!["json".into()],
-                severity: Severity::Mild,
+                severity: TemplateSeverity::Mild,
                 components: vec!["component_only".into()],
             },
             components: indexmap! {
@@ -559,7 +561,7 @@ mod tests {
             registry
                 .list()
                 .into_iter()
-                .filter(|metadata| metadata.severity == Severity::Severe)
+                .filter(|metadata| metadata.severity == TemplateSeverity::Severe)
                 .collect(),
         );
         assert_eq!(ids, vec!["rates_shock"]);
@@ -755,7 +757,7 @@ mod tests {
             vec![AssetClass::Rates, AssetClass::Equity]
         );
         assert_eq!(entry.metadata().tags, vec!["systemic", "json"]);
-        assert_eq!(entry.metadata().severity, Severity::Severe);
+        assert_eq!(entry.metadata().severity, TemplateSeverity::Severe);
     }
 
     #[test]

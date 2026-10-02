@@ -143,6 +143,21 @@ fn wrong_size_reports_detailed_error_and_coarse_core_rejection() {
 }
 
 #[test]
+fn overflowing_dimensions_report_errors_from_all_validators() {
+    for n in [usize::MAX, 1usize << (usize::BITS / 2)] {
+        assert_detailed_rejection(
+            &[],
+            n,
+            |error| matches!(error, Error::InvalidSize { expected, actual: 0 } if *expected == n),
+        );
+        assert!(analytics_validate(&[], n)
+            .expect_err("overflowing dimensions must be invalid")
+            .to_string()
+            .contains("Invalid matrix size"));
+    }
+}
+
+#[test]
 fn invalid_diagonal_reports_detailed_error_and_coarse_core_rejection() {
     assert_detailed_rejection(&[0.9, 0.5, 0.5, 1.0], 2, |error| {
         matches!(

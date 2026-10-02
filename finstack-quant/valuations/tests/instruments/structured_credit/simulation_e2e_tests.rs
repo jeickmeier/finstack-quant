@@ -156,6 +156,7 @@ fn build_simple_clo(
         pool_maturity,
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     clo.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(cpr);
@@ -969,6 +970,7 @@ fn e2e_multi_asset_pool_aggregates_correctly() {
         maturity_5y(),
         "USD_OIS",
     )
+    .expect("valid structured-credit dates")
     .with_calendar_id("nyse");
 
     clo.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);

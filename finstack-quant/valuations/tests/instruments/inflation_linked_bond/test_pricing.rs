@@ -13,6 +13,69 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_valuations::instruments::Instrument;
 
 #[test]
+fn adjusted_final_payment_remains_live_after_raw_maturity() {
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount};
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::{DiscountCurve, InflationCurve};
+    use finstack_quant_valuations::instruments::InflationLinkedBond;
+    use rust_decimal::Decimal;
+
+    let base = d(2025, 1, 1);
+    let discount = DiscountCurve::builder("USD-OIS")
+        .base_date(base)
+        .knots([(0.0, 1.0), (2.0, (-0.10_f64).exp())])
+        .build()
+        .unwrap();
+    let market = MarketContext::new().insert(discount.clone()).insert(
+        InflationCurve::builder("US-CPI")
+            .base_date(base)
+            .base_cpi(300.0)
+            .knots([(0.0, 300.0), (2.0, 300.0)])
+            .build()
+            .unwrap(),
+    );
+    for (convention, payment) in [
+        (BusinessDayConvention::Following, d(2026, 2, 2)),
+        (BusinessDayConvention::ModifiedFollowing, d(2026, 1, 30)),
+    ] {
+        let mut bond = InflationLinkedBond::example().unwrap();
+        bond.issue_date = d(2025, 1, 31);
+        bond.maturity = d(2026, 1, 31); // Saturday.
+        bond.base_date = bond.issue_date;
+        bond.base_cpi = 300.0;
+        bond.real_coupon = Decimal::try_from(0.025).unwrap();
+        bond.day_count = DayCount::ActActIsma;
+        bond.calendar_id = Some("usny".into());
+        bond.business_day_convention = convention;
+        for as_of in [
+            d(2026, 1, 29),
+            d(2026, 1, 30),
+            d(2026, 1, 31),
+            d(2026, 2, 1),
+            d(2026, 2, 2),
+            d(2026, 2, 3),
+        ] {
+            let expected = if as_of < payment {
+                // Flat CPI gives ratio 1. ACT/ACT ICMA gives a half-year
+                // final coupon, independently of the payment-date adjustment.
+                1_012_500.0 * discount.df_between_dates(as_of, payment).unwrap()
+            } else {
+                0.0
+            };
+            let actual = bond.value(&market, as_of).unwrap().amount();
+            assert!(
+                (actual - expected).abs() < 1e-6,
+                "{convention:?}, {as_of}: {actual} vs {expected}"
+            );
+            assert_eq!(
+                bond.last_payment_date(&market, as_of).unwrap(),
+                Some(payment)
+            );
+        }
+    }
+}
+
+#[test]
 fn test_npv_basic() {
     // Arrange
     let ilb = sample_tips();

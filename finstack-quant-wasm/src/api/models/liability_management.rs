@@ -1,12 +1,15 @@
 //! WASM bindings for `finstack_quant_models::credit` liability management.
 //!
 //! Mirrors `finstack-quant-py/src/bindings/models/credit/liability_management.rs`.
-//! Structure labels are passed as strings and parsed with the canonical Rust
-//! [`FromStr`](core::str::FromStr) implementations, so JS callers may use the
-//! same market shorthand (`"par"`, `"omr"`, `"A&E"`) as Python. Results are
+//! Structure labels are the canonical snake_case wire values (`par_for_par`,
+//! `discount`, `uptier`, `downtier`; `open_market_repurchase`, `tender_offer`,
+//! `amend_and_extend`, `dropdown`), parsed with the Rust
+//! [`FromStr`](core::str::FromStr) implementations; any other label throws.
+//! Results are
 //! returned as plain JS objects with snake_case keys matching the serde
 //! representation of the Rust result types.
 
+use crate::utils::input::{js_f64, js_opt_f64, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_models::credit::liability_management::{self as lm, ExchangeType, LmeType};
 use wasm_bindgen::prelude::*;
@@ -31,12 +34,17 @@ use wasm_bindgen::prelude::*;
 /// JavaScript object.
 #[wasm_bindgen(js_name = analyzeExchangeOffer)]
 pub fn analyze_exchange_offer(
-    old_pv: f64,
-    new_pv: f64,
-    consent_fee: f64,
-    equity_sweetener_value: f64,
-    exchange_type: &str,
+    old_pv: JsValue,
+    new_pv: JsValue,
+    consent_fee: JsValue,
+    equity_sweetener_value: JsValue,
+    exchange_type: JsValue,
 ) -> Result<JsValue, JsValue> {
+    let old_pv = js_f64(&old_pv, "oldPv")?;
+    let new_pv = js_f64(&new_pv, "newPv")?;
+    let consent_fee = js_f64(&consent_fee, "consentFee")?;
+    let equity_sweetener_value = js_f64(&equity_sweetener_value, "equitySweetenerValue")?;
+    let exchange_type: &str = &js_string(&exchange_type, "exchangeType")?;
     let exchange_type: ExchangeType = exchange_type.parse().map_err(to_js_err)?;
     let analysis = lm::analyze_exchange_offer(
         old_pv,
@@ -70,12 +78,17 @@ pub fn analyze_exchange_offer(
 /// JavaScript object.
 #[wasm_bindgen(js_name = analyzeLme)]
 pub fn analyze_lme(
-    lme_type: &str,
-    notional: f64,
-    repurchase_price_pct: f64,
-    opt_acceptance_pct: f64,
-    ebitda: Option<f64>,
+    lme_type: JsValue,
+    notional: JsValue,
+    repurchase_price_pct: JsValue,
+    opt_acceptance_pct: JsValue,
+    ebitda: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let notional = js_f64(&notional, "notional")?;
+    let repurchase_price_pct = js_f64(&repurchase_price_pct, "repurchasePricePct")?;
+    let opt_acceptance_pct = js_f64(&opt_acceptance_pct, "optAcceptancePct")?;
+    let ebitda = js_opt_f64(ebitda.as_ref(), "ebitda")?;
+    let lme_type: &str = &js_string(&lme_type, "lmeType")?;
     let lme_type: LmeType = lme_type.parse().map_err(to_js_err)?;
     let analysis = lm::analyze_lme(
         lme_type,
@@ -86,4 +99,13 @@ pub fn analyze_lme(
     )
     .map_err(to_js_err)?;
     to_js_value(&analysis)
+}
+
+/// Minimum NPV ratio at which a tender is recommended. Twin of the Rust and
+/// Python constant `TENDER_RECOMMENDATION_HURDLE`: a holder is advised to
+/// tender when the tender NPV is at least `old_npv` times this hurdle.
+/// @returns The dimensionless hurdle multiple.
+#[wasm_bindgen(js_name = tenderRecommendationHurdle)]
+pub fn tender_recommendation_hurdle() -> f64 {
+    finstack_quant_models::credit::liability_management::TENDER_RECOMMENDATION_HURDLE
 }

@@ -7,20 +7,24 @@ use crate::api::schema::ParametricCurveParams;
 use crate::config::CalibrationConfig;
 use crate::prepared::CalibrationQuote;
 use crate::quotes::market_quote::MarketQuote;
+use crate::quotes::rates::RateQuote;
 use crate::solver::global::GlobalFitOptimizer;
 use crate::solver::traits::GlobalSolveTarget;
 use crate::targets::util::{
-    discount_only_curve_ids, prepare_rate_calibration_quotes, ContextScratch,
+    discount_and_forward_curve_ids, prepare_rate_calibration_quotes, ContextScratch,
 };
 use crate::CalibrationReport;
-use finstack_quant_core::dates::Date;
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
     NelsonSiegelModel, NsVariant, ParametricCurve,
 };
 use finstack_quant_core::market_data::traits::Discounting;
+use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
+use finstack_quant_valuations::instruments::rates::deposit::Deposit;
+use std::collections::BTreeSet;
 
 /// Parameters for constructing a [`ParametricCurveTarget`].
 #[derive(Clone)]
@@ -49,9 +53,8 @@ pub(crate) struct ParametricCurveTargetParams {
 /// from rate instrument quotes.
 pub(crate) struct ParametricCurveTarget {
     params: ParametricCurveTargetParams,
-    /// Pre-computed sample times for building the discount curve proxy.
-    /// Computed once from quote pillars in [`Self::solve`] to avoid
-    /// re-sorting/deduplicating on every LM iteration.
+    /// Dates at which the rate instruments can query discount factors, mapped
+    /// once onto the analytical curve's ACT/365F clock.
     sample_times: Vec<f64>,
     /// Reusable scratch context (see [`ContextScratch`]).
     scratch: ContextScratch,
@@ -75,46 +78,60 @@ impl ParametricCurveTarget {
         }
     }
 
-    /// Build the sample time grid from a set of prepared quotes.
+    /// Build an exact date grid for the prepared instruments' discount queries.
     ///
-    /// # Interpolation-error control
+    /// Instrument pricing resolves a concrete `DiscountCurve`. Deposits only
+    /// query their two cashflow dates, so those dates suffice. Swaps and futures
+    /// can query every overnight observation boundary as well as coupon/payment
+    /// dates; include all calendar dates through their final prepared pillar.
+    /// The prepared swap pillar already includes the payment delay. Lookbacks
+    /// before the valuation date remain historical-fixing requirements.
     ///
-    /// [`Self::calculate_residuals`] prices the calibration instruments not
-    /// against the [`ParametricCurve`] itself, but against a knot-interpolated
-    /// `DiscountCurve` rebuilt from this grid. (The instrument pricers resolve
-    /// their discount source via `MarketContext::get_discount`, which performs
-    /// a strict `DiscountCurve` type check and would reject a `ParametricCurve`
-    /// inserted under the same ID — pricing directly against the parametric
-    /// model would require a discounting abstraction the pricers do not yet
-    /// expose.)
-    ///
-    /// Any gap between sample knots is therefore filled by the discount
-    /// curve's interpolation, and that interpolation error contaminates every
-    /// residual. To keep this error well below `validation_tolerance`, the
-    /// grid is densified to **monthly** (1/12-year) knots out to the longest
-    /// instrument maturity. The caller supplies the acceptable per-notional
-    /// fit tolerance; no implicit least-squares tolerance floor is applied.
-    fn build_sample_times(quotes: &[CalibrationQuote]) -> Vec<f64> {
-        let mut times = vec![0.0];
-        for q in quotes {
-            let t = q.pillar_time();
-            if t > 0.0 {
-                times.push(t);
+    /// Every future date used by the canonical rate pricers is consequently an
+    /// exact knot. Residuals depend on analytical discount factors, without an
+    /// interpolation approximation or a tolerance-dependent sampling heuristic.
+    fn build_sample_times(base_date: Date, quotes: &[CalibrationQuote]) -> Result<Vec<f64>> {
+        let mut dates = BTreeSet::from([base_date]);
+        let mut daily_horizon = base_date;
+        for quote in quotes {
+            let CalibrationQuote::Rates(prepared) = quote else {
+                return Err(finstack_quant_core::Error::Validation(
+                    "Parametric calibration requires rate quotes".to_string(),
+                ));
+            };
+            if matches!(prepared.quote.as_ref(), RateQuote::Deposit { .. }) {
+                let deposit = prepared
+                    .instrument
+                    .as_any()
+                    .downcast_ref::<Deposit>()
+                    .ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(format!(
+                            "Prepared deposit quote '{}' does not contain a Deposit instrument",
+                            prepared.quote.id()
+                        ))
+                    })?;
+                dates.insert(deposit.start_date);
+                dates.insert(deposit.maturity);
+            } else {
+                daily_horizon = daily_horizon.max(prepared.pillar_date);
             }
         }
-        times.sort_by(|a, b| a.total_cmp(b));
-        times.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
-        let max_t = times.last().copied().unwrap_or(30.0);
-        // Include monthly knots in addition to the quoted pillars.
-        const KNOT_STEP_YEARS: f64 = 1.0 / 12.0;
-        let mut t = KNOT_STEP_YEARS;
-        while t < max_t {
-            times.push(t);
-            t += KNOT_STEP_YEARS;
+        let mut date = base_date;
+        while date < daily_horizon {
+            date = date.next_day().ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "Parametric calibration date grid exceeds the supported date range".to_string(),
+                )
+            })?;
+            dates.insert(date);
         }
-        times.sort_by(|a, b| a.total_cmp(b));
-        times.dedup_by(|a, b| (*a - *b).abs() < 1e-10);
-        times
+        dates
+            .into_iter()
+            .filter(|date| *date >= base_date)
+            .map(|date| {
+                DayCount::Act365F.year_fraction(base_date, date, DayCountContext::default())
+            })
+            .collect()
     }
 
     /// Clamp NS/NSS parameters to feasible region. Used by both solver-curve and
@@ -158,8 +175,11 @@ impl ParametricCurveTarget {
         let prepared = prepare_rate_calibration_quotes(
             quotes,
             schema_params.base_date,
-            discount_only_curve_ids(schema_params.curve_id.as_ref()),
-            None,
+            discount_and_forward_curve_ids(
+                schema_params.curve_id.as_ref(),
+                schema_params.curve_id.as_ref(),
+            ),
+            Some(DayCount::Act365F),
             residual_notional,
         )?;
         let prepared_quotes = prepared.quotes;
@@ -193,7 +213,7 @@ impl ParametricCurveTarget {
                 base_context: context.clone(),
                 residual_notional,
             },
-            Self::build_sample_times(&prepared_quotes),
+            Self::build_sample_times(schema_params.base_date, &prepared_quotes)?,
         );
         let success_tolerance = config.discount_curve.validation_tolerance;
         let (curve, report) =
@@ -217,6 +237,10 @@ impl ParametricCurveTarget {
 impl GlobalSolveTarget for ParametricCurveTarget {
     type Quote = CalibrationQuote;
     type Curve = ParametricCurve;
+
+    fn residual_key(&self, quote: &Self::Quote, _idx: usize) -> String {
+        quote.quote_id().to_string()
+    }
 
     fn build_time_grid_and_guesses(
         &self,
@@ -255,7 +279,11 @@ impl GlobalSolveTarget for ParametricCurveTarget {
             self.params.curve_id.clone(),
         )
         .base_date(self.params.base_date)
+        .day_count(DayCount::Act365F)
         .knots(knots)
+        // Interpolation is never used by these date-based calibration quotes:
+        // every economically queried date is an exact analytical knot.
+        .interp(InterpStyle::LogLinear)
         .validation(
             finstack_quant_core::market_data::term_structures::ValidationMode::Raw {
                 allow_non_monotonic: true,

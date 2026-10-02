@@ -298,15 +298,6 @@ pub(crate) fn prepare_rate_calibration_quotes_with_ois_override(
     })
 }
 
-/// Convenience: `{ "discount" => discount_id }` curve-ids map.
-pub(crate) fn discount_only_curve_ids(
-    discount_id: &str,
-) -> finstack_quant_core::HashMap<String, String> {
-    let mut m = finstack_quant_core::HashMap::default();
-    m.insert("discount".to_string(), discount_id.to_string());
-    m
-}
-
 /// Convenience: `{ "discount" => discount_id, "forward" => forward_id }` curve-ids map.
 pub(crate) fn discount_and_forward_curve_ids(
     discount_id: &str,
@@ -380,7 +371,7 @@ impl ContextScratch {
         C: Clone + Into<finstack_quant_core::market_data::context::CurveStorage>,
         F: FnOnce(&MarketContext) -> Result<T>,
     {
-        self.with_curve_then(curve, |_| {}, op)
+        self.with_curve_then(curve, |_| Ok(()), op)
     }
 
     /// Like [`Self::with_curve`], but runs `after_insert` on the scratch context
@@ -389,7 +380,7 @@ impl ContextScratch {
     pub(crate) fn with_curve_then<C, S, F, T>(&self, curve: &C, after_insert: S, op: F) -> Result<T>
     where
         C: Clone + Into<finstack_quant_core::market_data::context::CurveStorage>,
-        S: FnOnce(&mut MarketContext),
+        S: FnOnce(&mut MarketContext) -> Result<()>,
         F: FnOnce(&MarketContext) -> Result<T>,
     {
         // `insert_mut` keeps the existing storage intact and only overwrites the
@@ -397,7 +388,7 @@ impl ContextScratch {
         // behind for subsequent calls.
         let mut ctx = self.scratch.borrow_mut();
         ctx.insert_mut(curve.clone());
-        after_insert(&mut ctx);
+        after_insert(&mut ctx)?;
         op(&ctx)
     }
 }

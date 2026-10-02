@@ -1,6 +1,6 @@
 "use client";
 import { useMemo, useState, type Ref } from "react";
-import type { ScenarioTable, TrancheScenarioCell } from "finstack-quant-wasm";
+import type { ScenarioTable, ScenarioCell } from "finstack-quant-wasm";
 import type { ChartKey, ChartMark } from "@tanstack/charts";
 import { serializeHost } from "@/lib/finstack/codec.mjs";
 import {
@@ -20,12 +20,10 @@ import { JsonViewer } from "@/components/finstack/shared/primitives/json-viewer/
 /** Canonical Rust ScenarioCell.price convention: clean settlement price per current outstanding balance. */
 export const scenarioPriceLabel =
   "Clean settlement price (% of current tranche balance)";
-export const scenarioKey = (trancheId: string, cell: TrancheScenarioCell) =>
+export const scenarioKey = (trancheId: string, cell: ScenarioCell) =>
   JSON.stringify([trancheId, cell.cpr, cell.cdr, cell.severity]);
 export interface ScenarioHeatmapProps
-  extends
-    FigureText,
-    FigureInteractions<TrancheScenarioCell, ChartKey, ChartKey> {
+  extends FigureText, FigureInteractions<ScenarioCell, ChartKey, ChartKey> {
   table: ScenarioTable;
   /** Select an exact returned severity, expressed as a decimal; no repricing is triggered. */
   severity: number;
@@ -35,7 +33,7 @@ export interface ScenarioHeatmapProps
   link?: LinkedSelection;
   width?: number;
   height?: number;
-  annotations?: readonly ChartMark<TrancheScenarioCell, ChartKey, ChartKey>[];
+  annotations?: readonly ChartMark<ScenarioCell, ChartKey, ChartKey>[];
   figureRef?: Ref<FigureHandle>;
   formatValue?(price: number): string;
 }

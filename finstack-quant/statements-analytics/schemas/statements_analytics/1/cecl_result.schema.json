@@ -1,0 +1,50 @@
+{
+  "$defs": {
+    "CeclMethodology": {
+      "description": "CECL calculation methodology.\n\n[`CeclMethodology::PdLgdEad`] is the discounted PD-LGD-EAD integration;\n[`CeclMethodology::Warm`] is the undiscounted weighted-average remaining\nmaturity loss-rate method. (A `Vintage` variant existed through 0.6.x but\nwas removed before it was ever implemented — no cohort data model exists\nto support it honestly.)",
+      "oneOf": [
+        {
+          "const": "pd_lgd_ead",
+          "description": "PD-LGD-EAD approach (same formula as IFRS 9, always lifetime).",
+          "type": "string"
+        },
+        {
+          "const": "warm",
+          "description": "Weighted-Average Remaining Maturity (WARM) loss-rate method.\n\n`ECL = warm_annual_loss_rate × Σ EAD(t_mid) × Δt` — the average annual\ncharge-off rate applied to the amortization-adjusted exposure-years\nover the remaining contractual life (`Exposure::ead_at` over\n`remaining_maturity_years`). Undiscounted; PD term structures,\nscenarios, LGD, and EIR are not used. Credit-impaired exposures\nrequiring individual assessment should use\n[`CeclMethodology::PdLgdEad`].\n\n# References\n\n- ASC 326-20-30-3 (methodology flexibility); FASB Staff Q&A (2019),\n  \"Whether the WARM Method Is Acceptable\" — WARM is an acceptable\n  CECL loss-rate method for less complex pools. `docs/REFERENCES.md#asc-326-cecl`\n- Fed/FASB/SEC interagency webinar (April 2019): \"CECL:\n  Weighted-Average Remaining Maturity (WARM) Method.\" `docs/REFERENCES.md#asc-326-cecl`",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/cecl_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "CECL result for a single exposure.",
+  "properties": {
+    "ecl": {
+      "description": "Total lifetime ECL.",
+      "format": "double",
+      "type": "number"
+    },
+    "exposure_id": {
+      "description": "Exposure identifier.",
+      "type": "string"
+    },
+    "horizon": {
+      "description": "ECL horizon in years (always remaining maturity).",
+      "format": "double",
+      "type": "number"
+    },
+    "methodology": {
+      "$ref": "#/$defs/CeclMethodology",
+      "description": "Methodology used."
+    }
+  },
+  "required": [
+    "exposure_id",
+    "ecl",
+    "horizon",
+    "methodology"
+  ],
+  "title": "CeclResult",
+  "type": "object"
+}

@@ -98,6 +98,7 @@ use finstack_quant_core::math::fractional::HurstExponent;
 /// through plain-text serialization. On deserialization it defaults to a
 /// flat curve at 4% (20% vol).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RoughBergomiParams {
     /// Risk-free rate (annual, continuously compounded).
     pub r: f64,
@@ -296,6 +297,20 @@ mod tests {
     fn test_valid_params() {
         let params = RoughBergomiParams::new(0.05, 0.02, make_hurst(0.1), 1.9, -0.9, make_xi());
         assert!(params.is_ok());
+    }
+
+    #[test]
+    fn parameter_json_rejects_invalid_nested_hurst() {
+        let params = RoughBergomiParams::new(0.05, 0.02, make_hurst(0.1), 1.9, -0.9, make_xi())
+            .expect("valid parameters");
+        let mut json = serde_json::to_value(&params).expect("serialize parameters");
+        let restored: RoughBergomiParams =
+            serde_json::from_value(json.clone()).expect("valid nested Hurst exponent");
+        assert_eq!(restored.hurst, params.hurst);
+        for h in [-0.5, 0.0, 1.0, 1.5] {
+            json["hurst"]["h"] = serde_json::json!(h);
+            assert!(serde_json::from_value::<RoughBergomiParams>(json.clone()).is_err());
+        }
     }
 
     #[test]

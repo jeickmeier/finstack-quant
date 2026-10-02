@@ -136,6 +136,20 @@ impl PyEcfSweepSpec {
             .map_err(|e| serde_json_to_py(e, "failed to serialize EcfSweepSpec"))
     }
 
+    /// Validate the sweep on its own (the Rust ``EcfSweepSpec::validate``).
+    ///
+    /// The waterfall-level rule that a positive sweep needs a prepayment
+    /// priority is checked by :meth:`WaterfallSpec.validate`.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``sweep_percentage`` is outside ``[0.0, 1.0]`` or not finite.
+    #[pyo3(text_signature = "($self)")]
+    fn validate(&self) -> PyResult<()> {
+        self.inner.validate().map_err(statements_to_py)
+    }
+
     /// Node reference or DSL formula supplying EBITDA, the ECF starting
     /// point.
     ///
@@ -245,9 +259,12 @@ impl PyPikToggleSpec {
     ///     units as ``liquidity_metric`` — currency amount for a balance,
     ///     unitless for a ratio.
     /// target_instrument_ids : list[str] | None
-    ///     If set, PIK toggles only these instruments; otherwise every
-    ///     PIK-capable instrument. An explicitly empty list is rejected by
-    ///     :meth:`WaterfallSpec.validate`.
+    ///     Explicit nonempty borrowing-debt identifiers whose cash coupons may
+    ///     capitalize into principal. Instrument-level PIK capability is not
+    ///     modeled, so ``None`` and empty lists are rejected by :meth:`validate`
+    ///     and :meth:`WaterfallSpec.validate` (they do not mean "every
+    ///     instrument"); model validation also rejects hedge or option targets.
+    ///     Construction stores this specification unvalidated.
     /// min_periods_in_pik : int
     ///     Hysteresis floor counted in **periods** on the model's own cadence
     ///     (not months): once triggered, PIK stays on for at least this many
@@ -304,6 +321,17 @@ impl PyPikToggleSpec {
             .map_err(|e| serde_json_to_py(e, "failed to serialize PikToggleSpec"))
     }
 
+    /// Validate the toggle on its own (the Rust ``PikToggleSpec::validate``).
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``target_instrument_ids`` is ``None`` or empty.
+    #[pyo3(text_signature = "($self)")]
+    fn validate(&self) -> PyResult<()> {
+        self.inner.validate().map_err(statements_to_py)
+    }
+
     /// Node reference or DSL formula producing the liquidity signal.
     ///
     /// Returns
@@ -332,8 +360,11 @@ impl PyPikToggleSpec {
         self.inner.threshold
     }
 
-    /// Instruments the toggle applies to, or ``None`` for every PIK-capable
-    /// instrument.
+    /// Explicit borrowing-debt targets, or ``None`` in an incomplete specification.
+    ///
+    /// ``None`` and empty lists fail waterfall validation. Model validation
+    /// rejects swaps and options because their cashflows cannot capitalize
+    /// into borrowing principal.
     #[getter]
     fn target_instrument_ids(&self) -> Option<Vec<String>> {
         self.inner.target_instrument_ids.clone()
@@ -473,6 +504,8 @@ impl PyPaymentClassSpec {
 /// payment classes, and separate mandatory / voluntary prepay nodes.
 /// Call `validate()` before passing to a model builder to surface configuration
 /// errors (e.g. `Sweep` ordered after `Equity` when a sweep is configured).
+/// Positive ECF sweeps require a `sweep` priority. Each configured mandatory or
+/// voluntary prepayment node requires its matching priority, and vice versa.
 #[pyclass(
     name = "WaterfallSpec",
     module = "finstack_quant.statements",
@@ -581,8 +614,9 @@ impl PyWaterfallSpec {
 
     /// Validate the spec against internal consistency rules.
     ///
-    /// Raises `ValueError` if the configuration is economically inconsistent
-    /// (e.g. `Sweep` ordered after `Equity` while a positive ECF sweep is set).
+    /// Raises `ValueError` for inconsistent priorities or amounts, including
+    /// a positive ECF sweep without `sweep`, a configured prepayment node
+    /// without its matching priority, or a prepayment priority without its node.
     #[pyo3(text_signature = "($self)")]
     fn validate(&self) -> PyResult<()> {
         self.inner.validate().map_err(statements_to_py)
@@ -857,7 +891,28 @@ impl PyCapitalStructureCashflows {
             .map_err(statements_to_py)
     }
 
-    /// Outstanding debt balance at period end for one instrument.
+    /// Return one instrument's borrowing principal at the inclusive period end.
+    ///
+    /// Parameters
+    /// ----------
+    /// instrument_id : str
+    ///     Capital-structure identifier of the debt or rate hedge to inspect.
+    /// period : str
+    ///     Reporting-period label such as ``"2025Q1"``, matching this result.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Closing borrowing principal in the instrument's native currency.
+    ///     Rate hedges, including interest-rate swaps, return zero; their trade
+    ///     notional is not borrowing principal.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``period`` is not a valid reporting-period label.
+    /// RuntimeError
+    ///     If the instrument-period breakdown is absent.
     #[pyo3(text_signature = "($self, instrument_id, period)")]
     fn get_debt_balance(&self, instrument_id: &str, period: &str) -> PyResult<f64> {
         let pid = super::parse_period_id(period)?;
@@ -875,7 +930,28 @@ impl PyCapitalStructureCashflows {
             .map_err(statements_to_py)
     }
 
-    /// Accrued, unpaid interest at period end for one instrument.
+    /// Return debt interest accrued but unpaid at the inclusive period end.
+    ///
+    /// Parameters
+    /// ----------
+    /// instrument_id : str
+    ///     Capital-structure identifier of the debt or rate hedge to inspect.
+    /// period : str
+    ///     Reporting-period label such as ``"2025Q1"``, matching this result.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Unpaid debt coupon accrual in the instrument's native currency.
+    ///     Rate hedges, including interest-rate swaps, return zero; this debt
+    ///     accrual accessor does not report hedge mark-to-market or leg accruals.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``period`` is not a valid reporting-period label.
+    /// RuntimeError
+    ///     If the instrument-period breakdown is absent.
     #[pyo3(text_signature = "($self, instrument_id, period)")]
     fn get_accrued_interest(&self, instrument_id: &str, period: &str) -> PyResult<f64> {
         let pid = super::parse_period_id(period)?;

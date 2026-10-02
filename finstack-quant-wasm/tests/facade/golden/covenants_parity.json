@@ -1,0 +1,1143 @@
+{
+  "covenant_types": [
+    {
+      "max_debt_to_ebitda": {
+        "threshold": 4.5
+      }
+    },
+    {
+      "min_interest_coverage": {
+        "threshold": 2
+      }
+    },
+    {
+      "min_fixed_charge_coverage": {
+        "threshold": 1.2
+      }
+    },
+    {
+      "max_total_leverage": {
+        "threshold": 6
+      }
+    },
+    {
+      "max_senior_leverage": {
+        "threshold": 4
+      }
+    },
+    {
+      "min_asset_coverage": {
+        "threshold": 1.5
+      }
+    },
+    {
+      "negative": {
+        "restriction": "no additional senior debt"
+      }
+    },
+    {
+      "affirmative": {
+        "requirement": "deliver audited financials within 90 days"
+      }
+    },
+    {
+      "custom": {
+        "metric": "net_working_capital",
+        "test": {
+          "minimum": 25
+        }
+      }
+    },
+    {
+      "custom": {
+        "metric": "capex_to_sales",
+        "test": {
+          "maximum": 0.08
+        }
+      }
+    },
+    {
+      "basket": {
+        "name": "restricted_payments",
+        "limit": 5000000
+      }
+    },
+    {
+      "min_dscr": {
+        "threshold": 1.25
+      }
+    },
+    {
+      "max_net_debt_to_ebitda": {
+        "threshold": 3.5
+      }
+    },
+    {
+      "max_capex": {
+        "threshold": 10000000
+      }
+    },
+    {
+      "min_liquidity": {
+        "threshold": 2500000
+      }
+    }
+  ],
+  "consequences": [
+    "default",
+    {
+      "rate_increase": {
+        "bp_increase": 200
+      }
+    },
+    {
+      "cash_sweep": {
+        "sweep_percentage": 0.5
+      }
+    },
+    "block_distributions",
+    {
+      "require_collateral": {
+        "description": "first lien on receivables"
+      }
+    },
+    {
+      "accelerate_maturity": {
+        "new_maturity": "2027-12-31"
+      }
+    }
+  ],
+  "covenant_modifiers": [
+    {
+      "covenant_type": {
+        "max_debt_to_ebitda": {
+          "threshold": 4.5
+        }
+      },
+      "test_frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "cure_period_days": 30,
+      "consequences": [],
+      "is_active": true,
+      "scope": "maintenance",
+      "springing_condition": null,
+      "label": "max_leverage"
+    },
+    {
+      "covenant_type": {
+        "max_debt_to_ebitda": {
+          "threshold": 4.5
+        }
+      },
+      "test_frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "cure_period_days": 30,
+      "consequences": [],
+      "is_active": true,
+      "scope": "maintenance",
+      "springing_condition": null,
+      "label": "max_leverage"
+    },
+    {
+      "covenant_type": {
+        "max_debt_to_ebitda": {
+          "threshold": 4.5
+        }
+      },
+      "test_frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "cure_period_days": null,
+      "consequences": [],
+      "is_active": true,
+      "scope": "maintenance",
+      "springing_condition": null,
+      "label": "max_leverage"
+    },
+    {
+      "covenant_type": {
+        "max_debt_to_ebitda": {
+          "threshold": 4.5
+        }
+      },
+      "test_frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "cure_period_days": 30,
+      "consequences": [
+        {
+          "rate_increase": {
+            "bp_increase": 200
+          }
+        }
+      ],
+      "is_active": true,
+      "scope": "maintenance",
+      "springing_condition": null,
+      "label": "max_leverage"
+    },
+    {
+      "covenant_type": {
+        "max_debt_to_ebitda": {
+          "threshold": 4.5
+        }
+      },
+      "test_frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "cure_period_days": 30,
+      "consequences": [],
+      "is_active": true,
+      "scope": "incurrence",
+      "springing_condition": null,
+      "label": "max_leverage"
+    },
+    {
+      "covenant_type": {
+        "max_debt_to_ebitda": {
+          "threshold": 4.5
+        }
+      },
+      "test_frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "cure_period_days": 30,
+      "consequences": [],
+      "is_active": true,
+      "scope": "maintenance",
+      "springing_condition": {
+        "metric_id": "revolver_utilization",
+        "test": {
+          "minimum": 0.35
+        }
+      },
+      "label": "max_leverage"
+    }
+  ],
+  "spec_modifiers": {
+    "with_metric": [
+      {
+        "covenant": {
+          "covenant_type": {
+            "max_debt_to_ebitda": {
+              "threshold": 4.5
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "max_leverage"
+        },
+        "metric_id": "debt_to_ebitda"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "max_net_debt_to_ebitda": {
+              "threshold": 3.5
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "max_net_leverage"
+        },
+        "metric_id": "net_debt",
+        "denominator_metric_id": "ebitda"
+      }
+    ],
+    "with_denominator_metric": {
+      "covenant": {
+        "covenant_type": {
+          "max_net_debt_to_ebitda": {
+            "threshold": 3.5
+          }
+        },
+        "test_frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "cure_period_days": 30,
+        "consequences": [],
+        "is_active": true,
+        "scope": "maintenance",
+        "springing_condition": null,
+        "label": "max_net_leverage"
+      },
+      "metric_id": "net_debt",
+      "denominator_metric_id": "adjusted_ebitda"
+    },
+    "with_threshold_schedule": {
+      "covenant": {
+        "covenant_type": {
+          "max_debt_to_ebitda": {
+            "threshold": 4.5
+          }
+        },
+        "test_frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "cure_period_days": 30,
+        "consequences": [],
+        "is_active": true,
+        "scope": "maintenance",
+        "springing_condition": null,
+        "label": "max_leverage"
+      },
+      "metric_id": "debt_to_ebitda",
+      "threshold_schedule": [
+        ["2026-01-01", 4.5],
+        ["2026-07-01", 4]
+      ]
+    },
+    "threshold_for": [null, 4.5, 4.5, 4]
+  },
+  "templates": [
+    [
+      {
+        "covenant": {
+          "covenant_type": {
+            "max_debt_to_ebitda": {
+              "threshold": 5
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [
+            {
+              "rate_increase": {
+                "bp_increase": 200
+              }
+            }
+          ],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "max_debt_ebitda"
+        },
+        "metric_id": "debt_to_ebitda"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "min_interest_coverage": {
+              "threshold": 1.5
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": ["block_distributions"],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "min_interest_coverage"
+        },
+        "metric_id": "interest_coverage"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "min_fixed_charge_coverage": {
+              "threshold": 1.2
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "min_fcc"
+        },
+        "metric_id": "fixed_charge_coverage"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "max_capex": {
+              "threshold": 10000000
+            }
+          },
+          "test_frequency": {
+            "count": 1,
+            "unit": "years"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "max_capex"
+        },
+        "metric_id": "capex"
+      }
+    ],
+    [
+      {
+        "covenant": {
+          "covenant_type": {
+            "max_total_leverage": {
+              "threshold": 7
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "incurrence",
+          "springing_condition": null,
+          "label": "max_total_leverage"
+        },
+        "metric_id": "total_leverage"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "max_senior_leverage": {
+              "threshold": 4.5
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "incurrence",
+          "springing_condition": null,
+          "label": "max_senior_leverage"
+        },
+        "metric_id": "senior_leverage"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "negative": {
+              "restriction": "No additional secured debt without consent"
+            }
+          },
+          "test_frequency": {
+            "count": 1,
+            "unit": "years"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "incurrence",
+          "springing_condition": null,
+          "label": "negative"
+        },
+        "metric_id": "negative_debt"
+      }
+    ],
+    [
+      {
+        "covenant": {
+          "covenant_type": {
+            "min_dscr": {
+              "threshold": 1.25
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [
+            {
+              "cash_sweep": {
+                "sweep_percentage": 1
+              }
+            }
+          ],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "min_dscr"
+        },
+        "metric_id": "dscr"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "custom": {
+              "metric": "debt_yield",
+              "test": {
+                "minimum": 0.08
+              }
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "min_debt_yield"
+        },
+        "metric_id": "debt_yield"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "custom": {
+              "metric": "ltv",
+              "test": {
+                "maximum": 0.65
+              }
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [
+            {
+              "cash_sweep": {
+                "sweep_percentage": 0.5
+              }
+            }
+          ],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "max_ltv"
+        },
+        "metric_id": "ltv"
+      }
+    ],
+    [
+      {
+        "covenant": {
+          "covenant_type": {
+            "min_dscr": {
+              "threshold": 1.3
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 60,
+          "consequences": ["default"],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "min_dscr_default"
+        },
+        "metric_id": "dscr"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "min_dscr": {
+              "threshold": 1.15
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": ["block_distributions"],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "min_dscr_lockup"
+        },
+        "metric_id": "dscr"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "min_liquidity": {
+              "threshold": 5000000
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "min_liquidity"
+        },
+        "metric_id": "liquidity"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "max_net_debt_to_ebitda": {
+              "threshold": 4
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "maintenance",
+          "springing_condition": null,
+          "label": "max_net_debt_ebitda"
+        },
+        "metric_id": "net_debt_to_ebitda",
+        "denominator_metric_id": "ebitda"
+      }
+    ]
+  ],
+  "engine_evaluate": {
+    "pass": {
+      "max_total_leverage": {
+        "covenant_type": "Total Leverage <= 7.00x",
+        "covenant_id": "max_total_leverage",
+        "passed": true,
+        "actual_value": 5,
+        "threshold": 7,
+        "details": null,
+        "headroom": 0.2857142857142857,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "rate_epsilon": 1e-12,
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.9.0"
+        }
+      },
+      "max_senior_leverage": {
+        "covenant_type": "Senior Leverage <= 4.50x",
+        "covenant_id": "max_senior_leverage",
+        "passed": true,
+        "actual_value": 3,
+        "threshold": 4.5,
+        "details": null,
+        "headroom": 0.3333333333333333,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "rate_epsilon": 1e-12,
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.9.0"
+        }
+      },
+      "negative": {
+        "covenant_type": "Negative: No additional secured debt without consent",
+        "covenant_id": "negative",
+        "passed": true,
+        "actual_value": null,
+        "threshold": null,
+        "details": null,
+        "headroom": null,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "rate_epsilon": 1e-12,
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.9.0"
+        }
+      }
+    },
+    "breach": {
+      "max_total_leverage": {
+        "covenant_type": "Total Leverage <= 7.00x",
+        "covenant_id": "max_total_leverage",
+        "passed": false,
+        "actual_value": 7.5,
+        "threshold": 7,
+        "details": null,
+        "headroom": -0.07142857142857142,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "rate_epsilon": 1e-12,
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.9.0"
+        }
+      },
+      "max_senior_leverage": {
+        "covenant_type": "Senior Leverage <= 4.50x",
+        "covenant_id": "max_senior_leverage",
+        "passed": true,
+        "actual_value": 3,
+        "threshold": 4.5,
+        "details": null,
+        "headroom": 0.3333333333333333,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "rate_epsilon": 1e-12,
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.9.0"
+        }
+      },
+      "negative": {
+        "covenant_type": "Negative: No additional secured debt without consent",
+        "covenant_id": "negative",
+        "passed": true,
+        "actual_value": null,
+        "threshold": null,
+        "details": null,
+        "headroom": null,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "rate_epsilon": 1e-12,
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.9.0"
+        }
+      }
+    },
+    "specs": [
+      {
+        "covenant": {
+          "covenant_type": {
+            "max_total_leverage": {
+              "threshold": 7
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "incurrence",
+          "springing_condition": null,
+          "label": "max_total_leverage"
+        },
+        "metric_id": "total_leverage"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "max_senior_leverage": {
+              "threshold": 4.5
+            }
+          },
+          "test_frequency": {
+            "count": 3,
+            "unit": "months"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "incurrence",
+          "springing_condition": null,
+          "label": "max_senior_leverage"
+        },
+        "metric_id": "senior_leverage"
+      },
+      {
+        "covenant": {
+          "covenant_type": {
+            "negative": {
+              "restriction": "No additional secured debt without consent"
+            }
+          },
+          "test_frequency": {
+            "count": 1,
+            "unit": "years"
+          },
+          "cure_period_days": 30,
+          "consequences": [],
+          "is_active": true,
+          "scope": "incurrence",
+          "springing_condition": null,
+          "label": "negative"
+        },
+        "metric_id": "negative_debt"
+      }
+    ],
+    "waivers": [],
+    "breach_history": []
+  },
+  "engine_track_waive_and_round_trip": {
+    "breached": {
+      "max_leverage": {
+        "covenant_type": "Debt/EBITDA <= 4.50x",
+        "covenant_id": "max_leverage",
+        "passed": false,
+        "actual_value": 5,
+        "threshold": 4.5,
+        "details": null,
+        "headroom": -0.1111111111111111,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "rate_epsilon": 1e-12,
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.9.0"
+        }
+      }
+    },
+    "history": [
+      {
+        "covenant_id": "max_leverage",
+        "covenant_type": "Debt/EBITDA <= 4.50x",
+        "breach_date": "2026-03-31",
+        "actual_value": 5,
+        "threshold": 4.5,
+        "cure_deadline": "2026-04-30",
+        "is_cured": false,
+        "consequences": [],
+        "applied_consequences": []
+      }
+    ],
+    "amended": {
+      "max_leverage": {
+        "covenant_type": "Debt/EBITDA <= 4.50x",
+        "covenant_id": "max_leverage",
+        "passed": true,
+        "actual_value": 5,
+        "threshold": 5.5,
+        "details": null,
+        "headroom": 0.09090909090909091,
+        "meta": {
+          "numeric_mode": "f64",
+          "rounding": {
+            "mode": "bankers",
+            "ingest_scale_by_currency": {},
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "rate_epsilon": 1e-12,
+              "generic_epsilon": 1e-10
+            },
+            "version": 1
+          },
+          "fx_policy_applied": null,
+          "version": "0.9.0"
+        }
+      }
+    },
+    "waivers": [
+      {
+        "covenant_id": "max_leverage",
+        "effective_date": "2026-06-01",
+        "expiry_date": null,
+        "amended_threshold": 5.5,
+        "description": "amendment no. 1"
+      }
+    ],
+    "engine": {
+      "specs": [
+        {
+          "covenant": {
+            "covenant_type": {
+              "max_debt_to_ebitda": {
+                "threshold": 4.5
+              }
+            },
+            "test_frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "cure_period_days": 30,
+            "consequences": [],
+            "is_active": true,
+            "scope": "maintenance",
+            "springing_condition": null,
+            "label": "max_leverage"
+          },
+          "metric_id": "debt_to_ebitda"
+        }
+      ],
+      "breach_history": [
+        {
+          "covenant_id": "max_leverage",
+          "covenant_type": "Debt/EBITDA <= 4.50x",
+          "breach_date": "2026-03-31",
+          "actual_value": 5,
+          "threshold": 4.5,
+          "cure_deadline": "2026-04-30",
+          "is_cured": false,
+          "consequences": [],
+          "applied_consequences": []
+        }
+      ],
+      "windows": [],
+      "waivers": [
+        {
+          "covenant_id": "max_leverage",
+          "effective_date": "2026-06-01",
+          "expiry_date": null,
+          "amended_threshold": 5.5,
+          "description": "amendment no. 1"
+        }
+      ]
+    }
+  },
+  "engine_evaluate_series": [
+    {
+      "as_of": "2026-06-30",
+      "reports": {
+        "max_leverage": {
+          "covenant_type": "Debt/EBITDA <= 4.50x",
+          "covenant_id": "max_leverage",
+          "passed": false,
+          "actual_value": 4.8,
+          "threshold": 4.5,
+          "details": null,
+          "headroom": -0.06666666666666662,
+          "meta": {
+            "numeric_mode": "f64",
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "rate_epsilon": 1e-12,
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "fx_policy_applied": null,
+            "version": "0.9.0"
+          }
+        }
+      }
+    },
+    {
+      "as_of": "2026-03-31",
+      "reports": {
+        "max_leverage": {
+          "covenant_type": "Debt/EBITDA <= 4.50x",
+          "covenant_id": "max_leverage",
+          "passed": true,
+          "actual_value": 4,
+          "threshold": 4.5,
+          "details": null,
+          "headroom": 0.1111111111111111,
+          "meta": {
+            "numeric_mode": "f64",
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "rate_epsilon": 1e-12,
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "fx_policy_applied": null,
+            "version": "0.9.0"
+          }
+        }
+      }
+    },
+    {
+      "as_of": "2026-09-30",
+      "reports": {
+        "max_leverage": {
+          "covenant_type": "Debt/EBITDA <= 4.50x",
+          "covenant_id": "max_leverage",
+          "passed": true,
+          "actual_value": 4.4,
+          "threshold": 4.5,
+          "details": null,
+          "headroom": 0.022222222222222143,
+          "meta": {
+            "numeric_mode": "f64",
+            "rounding": {
+              "mode": "bankers",
+              "ingest_scale_by_currency": {},
+              "output_scale_by_currency": {},
+              "tolerances": {
+                "rate_epsilon": 1e-12,
+                "generic_epsilon": 1e-10
+              },
+              "version": 1
+            },
+            "fx_policy_applied": null,
+            "version": "0.9.0"
+          }
+        }
+      }
+    }
+  ],
+  "forecast": {
+    "deterministic": {
+      "covenant_id": "max_leverage",
+      "covenant_description": "Debt/EBITDA <= 4.50x",
+      "comparator": "at_most",
+      "test_dates": ["2026-03-31", "2026-06-30", "2026-09-30"],
+      "projected_values": [4, 4.8, 4.4],
+      "thresholds": [4.5, 4.5, 4.5],
+      "headroom": [0.1111111111111111, -0.06666666666666662, 0.022222222222222143],
+      "breach_probability": [0, 1, 0],
+      "breach_probability_stderr": [0, 0, 0],
+      "first_breach_date": "2026-06-30",
+      "min_headroom_date": "2026-06-30",
+      "min_headroom_value": -0.06666666666666662
+    },
+    "stochastic": {
+      "covenant_id": "max_leverage",
+      "covenant_description": "Debt/EBITDA <= 4.50x",
+      "comparator": "at_most",
+      "test_dates": ["2026-03-31", "2026-06-30", "2026-09-30"],
+      "projected_values": [4, 4.8, 4.4],
+      "thresholds": [4.5, 4.5, 4.5],
+      "headroom": [0.1111111111111111, -0.06666666666666662, 0.022222222222222143],
+      "breach_probability": [0.10822426867134849, 0.650993781376768, 0.4143286668688083],
+      "breach_probability_stderr": [0, 0, 0],
+      "first_breach_date": "2026-06-30",
+      "min_headroom_date": "2026-06-30",
+      "min_headroom_value": -0.06666666666666662
+    },
+    "monte_carlo": {
+      "covenant_id": "max_leverage",
+      "covenant_description": "Debt/EBITDA <= 4.50x",
+      "comparator": "at_most",
+      "test_dates": ["2026-03-31", "2026-06-30", "2026-09-30"],
+      "projected_values": [4, 4.8, 4.4],
+      "thresholds": [4.5, 4.5, 4.5],
+      "headroom": [0.1111111111111111, -0.06666666666666662, 0.022222222222222143],
+      "breach_probability": [0.101, 0.6475, 0.412],
+      "breach_probability_stderr": [
+        0.006351325793827564, 0.007214277219222715, 0.006024308449298748
+      ],
+      "first_breach_date": "2026-06-30",
+      "min_headroom_date": "2026-06-30",
+      "min_headroom_value": -0.06666666666666662
+    },
+    "breaches": [
+      {
+        "covenant_id": "max_leverage",
+        "covenant_description": "Debt/EBITDA <= 4.50x",
+        "breach_date": "2026-06-30",
+        "projected_value": 4.8,
+        "threshold": 4.5,
+        "headroom": -0.06666666666666662,
+        "breach_probability": 1
+      }
+    ],
+    "breaches_stochastic": [
+      {
+        "covenant_id": "max_leverage",
+        "covenant_description": "Debt/EBITDA <= 4.50x",
+        "breach_date": "2026-06-30",
+        "projected_value": 4.8,
+        "threshold": 4.5,
+        "headroom": -0.06666666666666662,
+        "breach_probability": 0.650993781376768
+      },
+      {
+        "covenant_id": "max_leverage",
+        "covenant_description": "Debt/EBITDA <= 4.50x",
+        "breach_date": "2026-09-30",
+        "projected_value": 4.4,
+        "threshold": 4.5,
+        "headroom": 0.022222222222222143,
+        "breach_probability": 0.4143286668688083
+      }
+    ],
+    "with_scope": {
+      "scope": "incurrence",
+      "stochastic": true,
+      "num_paths": 0,
+      "volatility": 0.2,
+      "random_seed": null,
+      "antithetic": false,
+      "breach_probability_threshold": 0.05
+    }
+  }
+}

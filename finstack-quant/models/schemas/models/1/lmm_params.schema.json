@@ -1,0 +1,87 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/lmm_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Parameters for the LMM/BGM model.",
+  "properties": {
+    "accrual_factors": {
+      "description": "Accrual factors τ_i = T_{i+1} − T_i (length N).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "displacements": {
+      "description": "Displacement per forward for negative-rate support (length N).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "initial_forwards": {
+      "description": "Initial forward rates F_i(0) from the curve (length N).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "num_factors": {
+      "description": "Number of Brownian factors (2 or 3).",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "num_forwards": {
+      "description": "Number of forward rates (N).",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "tenors": {
+      "description": "Tenor dates T_0, T_1, ..., T_N (N+1 dates, year fractions).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "vol_times": {
+      "description": "Piecewise-constant vol breakpoints (ascending, length M).",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "vol_values": {
+      "description": "Factor loadings λ_{i,k}(t) per forward, per time period.\n\nOuter: M+1 time periods.\nInner: N forwards, each with up to 3 factor loadings.",
+      "items": {
+        "items": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "type": "array"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "num_forwards",
+    "num_factors",
+    "tenors",
+    "accrual_factors",
+    "displacements",
+    "vol_times",
+    "vol_values",
+    "initial_forwards"
+  ],
+  "title": "LmmParams",
+  "type": "object"
+}

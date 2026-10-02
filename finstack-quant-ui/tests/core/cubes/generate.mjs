@@ -30,7 +30,7 @@ const shifted = {
   forwards: [-0.005, 0.001, 0.002, 0.01],
   interpolation_mode: "vol",
 };
-const handle = new native.Market(
+const handle = native.MarketContext.fromJson(
   JSON.stringify({ ...market, vol_cubes: [cube, shifted] }),
 );
 try {

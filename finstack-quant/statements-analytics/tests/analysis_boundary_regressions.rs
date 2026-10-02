@@ -33,24 +33,21 @@ fn monetary_model(currency: Currency) -> FinancialModelSpec {
 
 #[test]
 fn monetary_goal_seek_preserves_round_trip_and_currency() {
-    let mut model = monetary_model(Currency::USD);
+    let model = monetary_model(Currency::USD);
     let period = PeriodId::annual(2025);
-    assert!(
-        (goal_seek(
-            &mut model,
-            "profit",
-            period,
-            60.0,
-            "revenue",
-            period,
-            true,
-            Some((1.0, 200.0))
-        )
-        .unwrap()
-            - 120.0)
-            .abs()
-            < 1e-8
-    );
+    let solved = goal_seek(
+        &model,
+        "profit",
+        period,
+        60.0,
+        "revenue",
+        period,
+        true,
+        Some((1.0, 200.0)),
+    )
+    .unwrap();
+    assert!((solved.solved_value - 120.0).abs() < 1e-8);
+    let model = solved.model.expect("update_model=true returns the model");
     let model = ModelBuilder::from_spec(model).unwrap().build().unwrap();
     let results = Evaluator::new().evaluate(&model).unwrap();
     let revenue = results.get_money("revenue", &period).unwrap();

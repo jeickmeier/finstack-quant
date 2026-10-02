@@ -29,6 +29,7 @@ use serde::{Deserialize, Serialize};
 /// }
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MetricRegistry {
     /// Namespace for all metrics in this registry (e.g., "fin", "custom")
@@ -50,6 +51,7 @@ pub struct MetricRegistry {
 /// Each definition maps directly to a JSON object in a registry file and is
 /// converted into a [`NodeSpec`](crate::types::NodeSpec) when registered.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MetricDefinition {
     /// Unique identifier within the namespace
@@ -88,6 +90,7 @@ pub struct MetricDefinition {
 
 /// Unit type for metric values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum UnitType {
     /// Percentage (0.15 = 15%)

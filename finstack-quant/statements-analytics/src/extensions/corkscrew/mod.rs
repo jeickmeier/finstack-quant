@@ -86,6 +86,7 @@ pub struct CorkscrewExtension {
 
 /// Configuration for corkscrew analysis.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CorkscrewConfig {
     /// List of balance sheet accounts to validate
@@ -103,6 +104,7 @@ pub struct CorkscrewConfig {
 
 /// Configuration for a single corkscrew account.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CorkscrewAccount {
     /// Node ID for the balance account
@@ -136,6 +138,7 @@ pub struct CorkscrewAccount {
 
 /// Type of balance sheet account.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum AccountType {
     /// Asset account
@@ -160,6 +163,7 @@ fn default_tolerance() -> f64 {
 
 /// Status of a corkscrew validation run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CorkscrewStatus {
     /// Validation completed without fatal errors
@@ -173,6 +177,7 @@ pub enum CorkscrewStatus {
 /// Uses the extension result shape shared by analytical reports: status,
 /// message, structured data, warnings, and errors.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CorkscrewReport {
     /// Overall execution status
     pub status: CorkscrewStatus,

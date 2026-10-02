@@ -160,6 +160,61 @@ impl MetricRegistry {
         self.entries.contains_key(&id)
     }
 
+    /// Resolve caller-supplied metric names against this registry.
+    ///
+    /// Each name resolves to its standard [`MetricId`] when it is one; any
+    /// other name resolves only when this registry has a calculator for it
+    /// (for example the registry-only ids the standard registry lists, such as
+    /// `accrued_interest`). A name that is neither is rejected, so a typo never
+    /// degrades silently into an uncomputable custom metric.
+    ///
+    /// # Arguments
+    ///
+    /// * `names` - Metric identifier strings in caller order; the result keeps
+    ///   that order and any duplicates.
+    ///
+    /// # Returns
+    ///
+    /// One resolved [`MetricId`] per name.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::UnknownMetric`] (from
+    /// `MetricId::parse_strict`, listing the closest standard ids) for the
+    /// first name that is neither a standard id nor registered here, and the
+    /// parse error for a name whose composite encoding is malformed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_valuations::metrics::{standard_registry, MetricId};
+    ///
+    /// let registry = standard_registry();
+    /// let names = ["dv01".to_string(), "accrued_interest".to_string()];
+    /// let ids = registry.resolve_metric_ids(&names)?;
+    /// assert_eq!(ids[0], MetricId::Dv01);
+    /// assert!(registry.resolve_metric_ids(&["dv011".to_string()]).is_err());
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn resolve_metric_ids(
+        &self,
+        names: &[String],
+    ) -> finstack_quant_core::Result<Vec<MetricId>> {
+        names
+            .iter()
+            .map(|name| {
+                MetricId::parse_strict(name).or_else(|strict_error| {
+                    let registered: MetricId = name.parse()?;
+                    if self.has_metric(registered.clone()) {
+                        Ok(registered)
+                    } else {
+                        Err(strict_error)
+                    }
+                })
+            })
+            .collect()
+    }
+
     /// Gets a list of all registered metric IDs.
     ///
     /// # Returns

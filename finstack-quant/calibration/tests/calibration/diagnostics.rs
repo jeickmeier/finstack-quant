@@ -4,7 +4,7 @@ use finstack_quant_calibration::api::errors::EnvelopeError;
 use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, DiscountCurveParams, StepParams,
 };
-use finstack_quant_calibration::api::validate::{dry_run, validate};
+use finstack_quant_calibration::api::validate::{dry_run_json, validate};
 
 fn empty_envelope(id: &str) -> CalibrationEnvelope {
     CalibrationEnvelope {
@@ -188,7 +188,7 @@ fn validate_step_with_undefined_quote_set_errors() {
 fn dry_run_returns_json_for_minimal_envelope() {
     let env = empty_envelope("smoke");
     let json = serde_json::to_string(&env).expect("serialize");
-    let report_json = dry_run(&json).expect("dry_run succeeds");
+    let report_json = dry_run_json(&json).expect("dry_run_json succeeds");
     assert!(report_json.contains("\"errors\""));
     assert!(report_json.contains("\"dependency_graph\""));
 }

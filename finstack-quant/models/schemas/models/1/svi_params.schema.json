@@ -1,0 +1,42 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/svi_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "SVI (Stochastic Volatility Inspired) raw parameterization.",
+  "properties": {
+    "a": {
+      "description": "Overall variance level.",
+      "format": "double",
+      "type": "number"
+    },
+    "b": {
+      "description": "Slope of the wings.",
+      "format": "double",
+      "type": "number"
+    },
+    "m": {
+      "description": "Translation.",
+      "format": "double",
+      "type": "number"
+    },
+    "rho": {
+      "description": "Rotation / asymmetry parameter.",
+      "format": "double",
+      "type": "number"
+    },
+    "sigma": {
+      "description": "Smoothing parameter.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "a",
+    "b",
+    "rho",
+    "m",
+    "sigma"
+  ],
+  "title": "SviParams",
+  "type": "object"
+}

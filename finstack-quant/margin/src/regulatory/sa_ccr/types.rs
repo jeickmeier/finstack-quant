@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
 pub enum SaCcrAssetClass {
@@ -54,6 +55,7 @@ impl std::fmt::Display for SaCcrAssetClass {
 
 /// SA-CCR option type for delta computation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum SaCcrOptionType {
     /// Long call option.
@@ -71,6 +73,7 @@ pub enum SaCcrOptionType {
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum SaCcrSupervisoryCategory {
     /// Single-name credit rated AAA or AA.
@@ -124,6 +127,7 @@ impl SaCcrSupervisoryCategory {
 /// Captures the trade-level attributes required by the SA-CCR formula:
 /// notional, maturity dates, direction, underlier, and option characteristics.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct SaCcrTrade {
     /// Unique trade identifier.
@@ -134,13 +138,25 @@ pub struct SaCcrTrade {
     pub supervisory_category: Option<SaCcrSupervisoryCategory>,
     /// Option expiry for maturity-factor calculation, distinct from the
     /// underlying start/end dates used for supervisory duration.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
     pub option_maturity_date: Option<Date>,
     /// Notional in reporting currency before supervisory duration for IR/credit.
     /// FX, equity and commodity notionals must already use CRE52 adjusted notionals.
     pub notional: f64,
     /// Underlying start date used for IR/credit supervisory duration.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub start_date: Date,
     /// Underlying end date used for supervisory duration; linear trade maturity.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub end_date: Date,
     /// Underlier reference (e.g., currency pair, issuer, equity name, commodity).
     pub underlier: String,
@@ -166,9 +182,14 @@ pub struct SaCcrTrade {
 /// Captures the collateral terms that determine whether the margined
 /// or unmargined RC/PFE formulas apply.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct SaCcrNettingSetConfig {
     /// Valuation date used for forward-start and remaining-maturity calculations.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub as_of: Date,
     /// Netting set identifier.
     pub netting_set_id: NettingSetId,
@@ -308,6 +329,7 @@ impl SaCcrNettingSetConfig {
 
 /// SA-CCR Exposure at Default result.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct EadResult {
     /// Exposure at Default: `alpha * (RC + PFE)`, capped for margined sets
     /// at the same netting set calculated without a margin agreement.

@@ -62,32 +62,10 @@ fn liquidity_defaults_from_file(file: LiquidityDefaultsFile) -> Result<Liquidity
              {version}"
         )));
     }
-    validate_liquidity_config(&file.default_config)?;
+    file.default_config.validate()?;
     Ok(LiquidityDefaults {
         default_config: file.default_config,
     })
-}
-
-fn validate_liquidity_config(config: &LiquidityConfig) -> Result<()> {
-    let mut prev = 0.0;
-    for (idx, threshold) in config.tier_thresholds.iter().copied().enumerate() {
-        validate_positive(&format!("liquidity.tier_thresholds[{idx}]"), threshold)?;
-        if threshold <= prev {
-            return Err(Error::Validation(format!(
-                "liquidity tier threshold {idx} must be greater than prior threshold"
-            )));
-        }
-        prev = threshold;
-    }
-    Ok(())
-}
-
-fn validate_positive(label: &str, value: f64) -> Result<()> {
-    if value.is_finite() && value > 0.0 {
-        Ok(())
-    } else {
-        Err(Error::Validation(format!("{label} must be positive")))
-    }
 }
 
 #[cfg(test)]

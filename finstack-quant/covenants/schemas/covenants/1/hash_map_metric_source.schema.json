@@ -1,0 +1,19 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/covenants/1/hash_map_metric_source.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Map-backed metric source for tests, bindings, and simple callers.",
+  "properties": {
+    "metrics": {
+      "additionalProperties": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "object"
+    }
+  },
+  "required": [
+    "metrics"
+  ],
+  "title": "HashMapMetricSource",
+  "type": "object"
+}

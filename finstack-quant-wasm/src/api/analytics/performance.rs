@@ -1,21 +1,24 @@
-//! WASM `Performance` class — the sole analytics entry point.
+//! WASM `Performance` class — the analytics panel entry point.
 //!
 //! Mirrors the Python `Performance` API (price- or return-panel construction,
 //! every metric exposed as an instance method). Complex result types are
-//! serialized to plain JS objects via `serde_wasm_bindgen` rather than
-//! exposed as classes, keeping the JS facade simple.
+//! serialized to plain JS objects via `crate::utils::to_js_value` rather than
+//! exposed as classes, keeping the JS facade simple. Omitted arguments resolve
+//! to the Rust-owned `finstack_quant_analytics::DEFAULT_*` constants.
 
-use crate::utils::{date_to_iso, to_js_err};
+use crate::utils::input::{
+    js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_opt_string, js_opt_uint, js_string,
+    js_string_seq, js_uint,
+};
+use crate::utils::{date_to_iso, to_js_err, to_js_rows_numeric, to_js_value_numeric};
 use finstack_quant_analytics as fa;
-use finstack_quant_core::dates::{calendar_by_id, FiscalConfig, HolidayCalendar, PeriodKind};
+use finstack_quant_core::dates::{
+    calendar_by_id_strict, FiscalConfig, HolidayCalendar, PeriodKind,
+};
 use js_sys::{Array, Float64Array, Reflect};
 use wasm_bindgen::prelude::*;
 
-use super::support::{parse_f64_matrix, parse_f64_vec, parse_iso_date, parse_iso_dates};
-
-const DEFAULT_FREQ: &str = "daily";
-const DEFAULT_ROLLING_WINDOW: usize = 63;
-const DEFAULT_CONFIDENCE: f64 = 0.95;
+use super::support::{parse_iso_date, parse_iso_dates};
 
 struct PanelInputs {
     dates: Vec<time::Date>,
@@ -25,80 +28,59 @@ struct PanelInputs {
 }
 
 /// Parse a frequency token (`daily`, `weekly`, `monthly`, `quarterly`,
-/// `semi_annual`, `annual` or a pandas offset alias `D`/`B`, `W`, `M`, `Q`,
-/// `A`/`Y`); the descriptive error comes from core.
-fn parse_frequency(frequency: &str) -> Result<PeriodKind, JsValue> {
-    frequency.parse::<PeriodKind>().map_err(to_js_err)
+/// `semi_annual`/`semiannual`, `annual` or a pandas offset alias `D`/`B`, `W`,
+/// `M`/`ME`, `Q`/`QE`, `A`/`Y`/`YE`); the descriptive error comes from core.
+/// An omitted token resolves to `default`, a Rust-owned constant.
+fn parse_frequency(frequency: Option<&str>, default: PeriodKind) -> Result<PeriodKind, JsValue> {
+    frequency
+        .map(str::parse::<PeriodKind>)
+        .transpose()
+        .map_err(to_js_err)
+        .map(|kind| kind.unwrap_or(default))
 }
 
-/// Validate JavaScript numbers before the WASM ABI can truncate or wrap them.
-fn parse_usize(value: f64, name: &str) -> Result<usize, JsValue> {
-    if !value.is_finite() || value < 0.0 || value.fract() != 0.0 || value > f64::from(u32::MAX) {
-        return Err(to_js_err(format!(
-            "{name} must be a finite non-negative integer no greater than 4294967295"
-        )));
-    }
-    Ok(value as usize)
-}
-
-/// `None` when both parts are omitted so the Rust default (calendar year)
-/// applies; a partial start fills the other half with `1`.
+/// Convert the two optional host numbers, then let Rust
+/// (`FiscalConfig::from_parts`) decide what an omitted half means.
 fn make_fiscal_config(
-    month: Option<f64>,
-    day: Option<f64>,
+    month: Option<&JsValue>,
+    day: Option<&JsValue>,
 ) -> Result<Option<FiscalConfig>, JsValue> {
-    if month.is_none() && day.is_none() {
-        return Ok(None);
-    }
-    let month = parse_usize(month.unwrap_or(1.0), "fiscalYearStartMonth")?;
-    let day = parse_usize(day.unwrap_or(1.0), "fiscalYearStartDay")?;
-    FiscalConfig::new(
-        u8::try_from(month).map_err(|_| to_js_err("fiscalYearStartMonth exceeds 255"))?,
-        u8::try_from(day).map_err(|_| to_js_err("fiscalYearStartDay exceeds 255"))?,
-    )
-    .map(Some)
-    .map_err(to_js_err)
-}
-
-/// Lookback returns always need a fiscal config: default January 1.
-fn lookback_fiscal_config(month: Option<f64>, day: Option<f64>) -> Result<FiscalConfig, JsValue> {
-    match make_fiscal_config(month, day)? {
-        Some(config) => Ok(config),
-        None => FiscalConfig::new(1, 1).map_err(to_js_err),
-    }
-}
-
-fn resolve_fiscal_calendar(calendar_id: &str) -> Result<&'static dyn HolidayCalendar, JsValue> {
-    calendar_by_id(calendar_id)
-        .ok_or_else(|| to_js_err(format!("calendar {calendar_id:?} not found")))
+    let month: Option<u8> = js_opt_uint(month, "fiscalYearStartMonth")?;
+    let day: Option<u8> = js_opt_uint(day, "fiscalYearStartDay")?;
+    FiscalConfig::from_parts(month, day).map_err(to_js_err)
 }
 
 fn parse_cagr_day_count(day_count: Option<&str>) -> Result<fa::CagrDayCount, JsValue> {
-    match day_count {
-        None => Ok(fa::CagrDayCount::Act365_25),
-        Some(label) => label.parse::<fa::CagrDayCount>().map_err(to_js_err),
-    }
+    day_count
+        .map(str::parse::<fa::CagrDayCount>)
+        .transpose()
+        .map_err(to_js_err)
+        .map(Option::unwrap_or_default)
 }
 
 fn resolve_optional_calendar(
     calendar_id: Option<&str>,
 ) -> Result<Option<&'static dyn HolidayCalendar>, JsValue> {
-    calendar_id.map(resolve_fiscal_calendar).transpose()
+    calendar_id
+        .map(calendar_by_id_strict)
+        .transpose()
+        .map_err(to_js_err)
 }
 
 fn parse_return_kind(
     return_kind: Option<&str>,
     risk_free_rate: Option<f64>,
 ) -> Result<fa::ReturnKind, JsValue> {
-    return_kind
-        .unwrap_or("excess")
-        .parse::<fa::ReturnKind>()
-        .map(|kind| kind.with_risk_free_rate(risk_free_rate.unwrap_or(0.0)))
-        .map_err(to_js_err)
+    let kind = return_kind
+        .map(str::parse::<fa::ReturnKind>)
+        .transpose()
+        .map_err(to_js_err)?
+        .unwrap_or_default();
+    Ok(kind.with_risk_free_rate(risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE)))
 }
 
 fn parse_dates(dates: JsValue) -> Result<Vec<time::Date>, JsValue> {
-    let strs: Vec<String> = serde_wasm_bindgen::from_value(dates).map_err(to_js_err)?;
+    let strs = js_string_seq(&dates, "dates")?;
     parse_iso_dates(&strs)
 }
 
@@ -110,9 +92,9 @@ fn parse_panel_inputs(
 ) -> Result<PanelInputs, JsValue> {
     Ok(PanelInputs {
         dates: parse_dates(dates)?,
-        values: parse_f64_matrix(values)?,
-        ticker_names: serde_wasm_bindgen::from_value(ticker_names).map_err(to_js_err)?,
-        frequency: parse_frequency(frequency.as_deref().unwrap_or(DEFAULT_FREQ))?,
+        values: js_f64_matrix(&values, "values")?,
+        ticker_names: js_string_seq(&ticker_names, "tickerNames")?,
+        frequency: parse_frequency(frequency.as_deref(), fa::DEFAULT_FREQUENCY)?,
     })
 }
 
@@ -139,30 +121,6 @@ fn matrix_f64_to_js(values: &[Vec<f64>]) -> JsValue {
     outer.into()
 }
 
-/// Convert a ticker-major periodic-return panel to nested JavaScript arrays.
-fn periodic_panel_to_js(panel: Vec<Vec<(time::Date, f64)>>) -> Result<JsValue, JsValue> {
-    let outer = Array::new_with_length(panel.len() as u32);
-    for (ticker_idx, series) in panel.into_iter().enumerate() {
-        let points = Array::new_with_length(series.len() as u32);
-        for (point_idx, (date, value)) in series.into_iter().enumerate() {
-            let point = js_sys::Object::new();
-            Reflect::set(
-                &point,
-                &JsValue::from_str("date"),
-                &JsValue::from_str(&date_to_iso(date)),
-            )?;
-            Reflect::set(
-                &point,
-                &JsValue::from_str("value"),
-                &JsValue::from_f64(value),
-            )?;
-            points.set(point_idx as u32, point.into());
-        }
-        outer.set(ticker_idx as u32, points.into());
-    }
-    Ok(outer.into())
-}
-
 fn result_vec_f64_to_js(result: finstack_quant_core::Result<Vec<f64>>) -> Result<JsValue, JsValue> {
     Ok(vec_f64_to_js(&result.map_err(to_js_err)?))
 }
@@ -170,7 +128,7 @@ fn result_vec_f64_to_js(result: finstack_quant_core::Result<Vec<f64>>) -> Result
 fn dates_to_js_array(dates: &[time::Date]) -> Array {
     let date_array = Array::new_with_length(dates.len() as u32);
     for (i, &d) in dates.iter().enumerate() {
-        date_array.set(i as u32, JsValue::from_str(&date_to_iso(d)));
+        date_array.set(i as u32, JsValue::from(&date_to_iso(d)));
     }
     date_array
 }
@@ -180,52 +138,19 @@ fn dates_to_js_array(dates: &[time::Date]) -> Array {
 fn obj_from_pairs(pairs: &[(&str, JsValue)]) -> Result<JsValue, JsValue> {
     let obj = js_sys::Object::new();
     for (key, value) in pairs {
-        Reflect::set(&obj, &JsValue::from_str(key), value)?;
+        Reflect::set(&obj, &JsValue::from(*key), value)?;
     }
     Ok(obj.into())
 }
 
-fn beta_results_to_js(results: Vec<fa::BetaResult>) -> Result<JsValue, JsValue> {
-    let array = Array::new_with_length(results.len() as u32);
-    for (index, result) in results.into_iter().enumerate() {
-        let value = obj_from_pairs(&[
-            ("beta", JsValue::from_f64(result.beta)),
-            ("std_err", JsValue::from_f64(result.std_err)),
-            ("ci_lower", JsValue::from_f64(result.ci_lower)),
-            ("ci_upper", JsValue::from_f64(result.ci_upper)),
-        ])?;
-        array.set(index as u32, value);
-    }
-    Ok(array.into())
-}
-
-fn greeks_results_to_js(results: Vec<fa::GreeksResult>) -> Result<JsValue, JsValue> {
-    let array = Array::new_with_length(results.len() as u32);
-    for (index, result) in results.into_iter().enumerate() {
-        let value = obj_from_pairs(&[
-            ("alpha", JsValue::from_f64(result.alpha)),
-            ("beta", JsValue::from_f64(result.beta)),
-            ("r_squared", JsValue::from_f64(result.r_squared)),
-            (
-                "adjusted_r_squared",
-                JsValue::from_f64(result.adjusted_r_squared),
-            ),
-        ])?;
-        array.set(index as u32, value);
-    }
-    Ok(array.into())
-}
-
-/// Serialize a `DatedSeries`-like rolling result with parallel `dates` /
-/// numeric vectors as a plain JS object whose numeric vector is a typed array.
-fn dated_series_to_js(
-    values: &[f64],
-    dates: &[time::Date],
-    value_key: &str,
-) -> Result<JsValue, JsValue> {
+/// Serialize a rolling [`fa::DatedSeries`] with its Rust field names:
+/// `{ values: Float64Array, dates: string[], value_column: string }`, where
+/// `value_column` is the Rust `RollingMetric` name of the series.
+fn dated_series_to_js(series: &fa::DatedSeries) -> Result<JsValue, JsValue> {
     obj_from_pairs(&[
-        ("dates", dates_to_js_array(dates).into()),
-        (value_key, vec_f64_to_js(values)),
+        ("values", vec_f64_to_js(&series.values)),
+        ("dates", dates_to_js_array(&series.dates).into()),
+        ("value_column", JsValue::from(series.value_column.as_str())),
     ])
 }
 
@@ -249,7 +174,7 @@ fn rolling_greeks_to_js(rg: &fa::RollingGreeks) -> Result<JsValue, JsValue> {
 /// returned as rejected JsValue errors.
 #[wasm_bindgen(js_name = Performance)]
 pub struct JsPerformance {
-    inner: fa::Performance,
+    pub(super) inner: fa::Performance,
 }
 
 #[wasm_bindgen(js_class = Performance)]
@@ -270,9 +195,11 @@ impl JsPerformance {
         dates: JsValue,
         prices: JsValue,
         ticker_names: JsValue,
-        benchmark_ticker: Option<String>,
-        frequency: Option<String>,
+        benchmark_ticker: Option<JsValue>,
+        frequency: Option<JsValue>,
     ) -> Result<JsPerformance, JsValue> {
+        let benchmark_ticker = js_opt_string(benchmark_ticker.as_ref(), "benchmarkTicker")?;
+        let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
         let panel = parse_panel_inputs(dates, prices, ticker_names, frequency)?;
         let inner = fa::Performance::new(
             panel.dates,
@@ -302,9 +229,11 @@ impl JsPerformance {
         dates: JsValue,
         returns: JsValue,
         ticker_names: JsValue,
-        benchmark_ticker: Option<String>,
-        frequency: Option<String>,
+        benchmark_ticker: Option<JsValue>,
+        frequency: Option<JsValue>,
     ) -> Result<JsPerformance, JsValue> {
+        let benchmark_ticker = js_opt_string(benchmark_ticker.as_ref(), "benchmarkTicker")?;
+        let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
         let panel = parse_panel_inputs(dates, returns, ticker_names, frequency)?;
         let inner = fa::Performance::from_returns(
             panel.dates,
@@ -325,7 +254,9 @@ impl JsPerformance {
     /// @param start - Inclusive ISO-8601 start date for the active analysis window.
     /// @param end - Inclusive ISO-8601 end date for the active analysis window.
     #[wasm_bindgen(js_name = resetDateRange)]
-    pub fn reset_date_range(&mut self, start: &str, end: &str) -> Result<(), JsValue> {
+    pub fn reset_date_range(&mut self, start: JsValue, end: JsValue) -> Result<(), JsValue> {
+        let start: &str = &js_string(&start, "start")?;
+        let end: &str = &js_string(&end, "end")?;
         self.inner
             .reset_date_range(parse_iso_date(start)?, parse_iso_date(end)?);
         Ok(())
@@ -338,7 +269,8 @@ impl JsPerformance {
     /// Rejects `ticker` when it does not match a loaded ticker name.
     /// @param ticker - Existing ticker label to use as the benchmark return series.
     #[wasm_bindgen(js_name = resetBenchTicker)]
-    pub fn reset_bench_ticker(&mut self, ticker: &str) -> Result<(), JsValue> {
+    pub fn reset_bench_ticker(&mut self, ticker: JsValue) -> Result<(), JsValue> {
+        let ticker: &str = &js_string(&ticker, "ticker")?;
         self.inner.reset_bench_ticker(ticker).map_err(to_js_err)
     }
 
@@ -395,8 +327,8 @@ impl JsPerformance {
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @returns ISO-8601 dates for that ticker's active return series, in chronological order.
     #[wasm_bindgen(js_name = activeDatesForTicker)]
-    pub fn active_dates_for_ticker(&self, ticker_idx: f64) -> Result<Vec<String>, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
+    pub fn active_dates_for_ticker(&self, ticker_idx: JsValue) -> Result<Vec<String>, JsValue> {
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         Ok(self
             .inner
             .active_dates_for_ticker(ticker_idx)
@@ -408,23 +340,28 @@ impl JsPerformance {
 
     /// Compound annual growth rate per asset.
     ///
-    /// `dayCount` omitted or `"act365_25"` uses Act/365.25. Other values are
-    /// core DayCount names such as `"act_365f"` or `"bus_252"`. `bus_252`
-    /// requires `calendarId`.
+    /// `dayCount` omitted or `"act365_25"` uses Act/365.25 (the Rust
+    /// `CagrDayCount` default). Other values are core DayCount names such as
+    /// `"act_365f"` or `"bus_252"`. `bus_252` requires `calendarId`. Labels
+    /// only: to reuse a `core.DayCount` handle, pass `dayCount.toString()`
+    /// (Python additionally accepts the `DayCount` object itself).
     ///
     /// # Errors
     ///
-    /// Rejects an unknown day-count or calendar id, a missing calendar when
+    /// Rejects an unknown day-count (kind `validation`), an unknown calendar
+    /// id (kind `not_found`, with suggestions), a missing calendar when
     /// `bus_252` is requested, or a ticker whose active range has no
     /// positive holding period.
     /// @param day_count - Optional day-count: `"act365_25"` or a core name such as `"act_365f"`; defaults to Act/365.25.
-    /// @param calendar_id - Optional holiday-calendar id; required for `bus_252`.
+    /// @param calendar_id - Optional holiday-calendar id, or `+`-joined ids for a union calendar (`"nyse+gblo"`); required for `bus_252`.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     pub fn cagr(
         &self,
-        day_count: Option<String>,
-        calendar_id: Option<String>,
+        day_count: Option<JsValue>,
+        calendar_id: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let day_count = js_opt_string(day_count.as_ref(), "dayCount")?;
+        let calendar_id = js_opt_string(calendar_id.as_ref(), "calendarId")?;
         let day_count = parse_cagr_day_count(day_count.as_deref())?;
         let calendar = resolve_optional_calendar(calendar_id.as_deref())?;
         result_vec_f64_to_js(self.inner.cagr(day_count, calendar))
@@ -434,33 +371,51 @@ impl JsPerformance {
     /// @param annualize - Whether to annualize by the configured frequency; defaults to true.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = meanReturn)]
-    pub fn mean_return(&self, annualize: Option<bool>) -> JsValue {
-        vec_f64_to_js(&self.inner.mean_return(annualize.unwrap_or(true)))
+    pub fn mean_return(&self, annualize: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let annualize = js_opt_bool(annualize.as_ref(), "annualize")?;
+        Ok(vec_f64_to_js(
+            &self
+                .inner
+                .mean_return(annualize.unwrap_or(fa::DEFAULT_ANNUALIZE)),
+        ))
     }
 
     /// Return volatility per asset (annualized by default).
     /// @param annualize - Whether to annualize by the configured frequency; defaults to true.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
-    pub fn volatility(&self, annualize: Option<bool>) -> JsValue {
-        vec_f64_to_js(&self.inner.volatility(annualize.unwrap_or(true)))
+    pub fn volatility(&self, annualize: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let annualize = js_opt_bool(annualize.as_ref(), "annualize")?;
+        Ok(vec_f64_to_js(
+            &self
+                .inner
+                .volatility(annualize.unwrap_or(fa::DEFAULT_ANNUALIZE)),
+        ))
     }
 
     /// Sharpe ratio per asset for the given risk-free rate.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
-    pub fn sharpe(&self, risk_free_rate: Option<f64>) -> JsValue {
-        vec_f64_to_js(&self.inner.sharpe(risk_free_rate.unwrap_or(0.0)))
+    pub fn sharpe(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        Ok(vec_f64_to_js(&self.inner.sharpe(
+            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
+        )))
     }
 
     /// Sortino ratio per asset for the given per-period minimum acceptable return.
     /// @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
-    pub fn sortino(&self, mar: Option<f64>) -> JsValue {
-        vec_f64_to_js(&self.inner.sortino(mar.unwrap_or(0.0)))
+    pub fn sortino(&self, mar: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let mar = js_opt_f64(mar.as_ref(), "mar")?;
+        Ok(vec_f64_to_js(
+            &self.inner.sortino(mar.unwrap_or(fa::DEFAULT_MAR)),
+        ))
     }
 
     /// Calmar ratio (CAGR / |max drawdown|) over the active window, not
     /// Young's 36-month CTA definition.
+    /// With zero drawdown, nonzero CAGR gives signed infinity and zero
+    /// CAGR gives `0`.
     ///
     /// # Errors
     ///
@@ -490,10 +445,11 @@ impl JsPerformance {
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
     #[wasm_bindgen(js_name = valueAtRisk)]
-    pub fn value_at_risk(&self, confidence: Option<f64>) -> Result<JsValue, JsValue> {
+    pub fn value_at_risk(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(
             self.inner
-                .value_at_risk(confidence.unwrap_or(DEFAULT_CONFIDENCE)),
+                .value_at_risk(confidence.unwrap_or(fa::DEFAULT_CONFIDENCE)),
         )
     }
 
@@ -503,10 +459,11 @@ impl JsPerformance {
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
     #[wasm_bindgen(js_name = expectedShortfall)]
-    pub fn expected_shortfall(&self, confidence: Option<f64>) -> Result<JsValue, JsValue> {
+    pub fn expected_shortfall(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(
             self.inner
-                .expected_shortfall(confidence.unwrap_or(DEFAULT_CONFIDENCE)),
+                .expected_shortfall(confidence.unwrap_or(fa::DEFAULT_CONFIDENCE)),
         )
     }
 
@@ -547,8 +504,13 @@ impl JsPerformance {
     /// @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = downsideDeviation)]
-    pub fn downside_deviation(&self, mar: Option<f64>) -> JsValue {
-        vec_f64_to_js(&self.inner.downside_deviation(mar.unwrap_or(0.0)))
+    pub fn downside_deviation(&self, mar: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let mar = js_opt_f64(mar.as_ref(), "mar")?;
+        Ok(vec_f64_to_js(
+            &self
+                .inner
+                .downside_deviation(mar.unwrap_or(fa::DEFAULT_MAR)),
+        ))
     }
 
     /// Longest drawdown duration in calendar days per asset.
@@ -559,7 +521,8 @@ impl JsPerformance {
     /// @returns Per-ticker longest drawdown duration in calendar days, as a JavaScript number array.
     #[wasm_bindgen(js_name = maxDrawdownDuration)]
     pub fn max_drawdown_duration(&self) -> Result<JsValue, JsValue> {
-        // `usize` does not fit a typed array; keep the serde path.
+        // `i64` day counts do not fit a `Float64Array` contract; they cross as a
+        // plain JS number array through the serde path.
         to_js(&self.inner.max_drawdown_duration())
     }
 
@@ -588,15 +551,24 @@ impl JsPerformance {
     /// @param threshold - Per-period threshold return as a decimal; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = omegaRatio)]
-    pub fn omega_ratio(&self, threshold: Option<f64>) -> JsValue {
-        vec_f64_to_js(&self.inner.omega_ratio(threshold.unwrap_or(0.0)))
+    pub fn omega_ratio(&self, threshold: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let threshold = js_opt_f64(threshold.as_ref(), "threshold")?;
+        Ok(vec_f64_to_js(
+            &self.inner.omega_ratio(threshold.unwrap_or(fa::DEFAULT_MAR)),
+        ))
     }
 
     /// Treynor ratio per asset for the given risk-free rate.
+    /// A non-finite risk-free rate gives `NaN`. With absolute beta below
+    /// `1e-10`, nonzero finite excess return gives signed infinity and zero
+    /// excess return gives `0`.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
-    pub fn treynor(&self, risk_free_rate: Option<f64>) -> JsValue {
-        vec_f64_to_js(&self.inner.treynor(risk_free_rate.unwrap_or(0.0)))
+    pub fn treynor(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        Ok(vec_f64_to_js(&self.inner.treynor(
+            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
+        )))
     }
 
     /// Gain-to-pain ratio per asset.
@@ -613,7 +585,9 @@ impl JsPerformance {
         vec_f64_to_js(&self.inner.ulcer_index())
     }
 
-    /// Martin ratio (excess return over ulcer index) per asset.
+    /// Martin ratio (CAGR divided by Ulcer Index) per asset.
+    /// With zero Ulcer Index, nonzero CAGR gives signed infinity and zero
+    /// CAGR gives `0`.
     ///
     /// # Errors
     ///
@@ -639,7 +613,9 @@ impl JsPerformance {
         vec_f64_to_js(&self.inner.pain_index())
     }
 
-    /// Pain ratio (excess return over pain index) per asset.
+    /// Pain ratio ((CAGR - annual risk-free rate) / pain index) per asset.
+    /// Non-finite risk-free rates give `NaN`, including when the pain index
+    /// is zero.
     ///
     /// # Errors
     ///
@@ -648,8 +624,12 @@ impl JsPerformance {
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = painRatio)]
-    pub fn pain_ratio(&self, risk_free_rate: Option<f64>) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.pain_ratio(risk_free_rate.unwrap_or(0.0)))
+    pub fn pain_ratio(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        result_vec_f64_to_js(
+            self.inner
+                .pain_ratio(risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE)),
+        )
     }
 
     /// Tail ratio of upper to lower return quantiles per asset.
@@ -657,10 +637,11 @@ impl JsPerformance {
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
     #[wasm_bindgen(js_name = tailRatio)]
-    pub fn tail_ratio(&self, confidence: Option<f64>) -> Result<JsValue, JsValue> {
+    pub fn tail_ratio(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(
             self.inner
-                .tail_ratio(confidence.unwrap_or(DEFAULT_CONFIDENCE)),
+                .tail_ratio(confidence.unwrap_or(fa::DEFAULT_CONFIDENCE)),
         )
     }
 
@@ -689,13 +670,15 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = parametricVar)]
     pub fn parametric_var(
         &self,
-        confidence: Option<f64>,
-        horizon_periods: Option<f64>,
+        confidence: Option<JsValue>,
+        horizon_periods: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(
-            self.inner
-                .parametric_var(confidence.unwrap_or(DEFAULT_CONFIDENCE), horizon_periods),
-        )
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
+        let horizon_periods = js_opt_f64(horizon_periods.as_ref(), "horizonPeriods")?;
+        result_vec_f64_to_js(self.inner.parametric_var(
+            confidence.unwrap_or(fa::DEFAULT_CONFIDENCE),
+            horizon_periods,
+        ))
     }
 
     /// Cornish-Fisher adjusted value-at-risk per asset.
@@ -709,13 +692,15 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = cornishFisherVar)]
     pub fn cornish_fisher_var(
         &self,
-        confidence: Option<f64>,
-        horizon_periods: Option<f64>,
+        confidence: Option<JsValue>,
+        horizon_periods: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(
-            self.inner
-                .cornish_fisher_var(confidence.unwrap_or(DEFAULT_CONFIDENCE), horizon_periods),
-        )
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
+        let horizon_periods = js_opt_f64(horizon_periods.as_ref(), "horizonPeriods")?;
+        result_vec_f64_to_js(self.inner.cornish_fisher_var(
+            confidence.unwrap_or(fa::DEFAULT_CONFIDENCE),
+            horizon_periods,
+        ))
     }
 
     /// Conditional drawdown-at-risk per asset: mean of exactly the worst
@@ -723,8 +708,12 @@ impl JsPerformance {
     /// @param confidence - Tail confidence as a decimal probability; defaults to 0.95.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     /// @throws Error - Rejects a `confidence` outside the open interval (0, 1).
-    pub fn cdar(&self, confidence: Option<f64>) -> Result<JsValue, JsValue> {
-        result_vec_f64_to_js(self.inner.cdar(confidence.unwrap_or(DEFAULT_CONFIDENCE)))
+    pub fn cdar(&self, confidence: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
+        result_vec_f64_to_js(
+            self.inner
+                .cdar(confidence.unwrap_or(fa::DEFAULT_CONFIDENCE)),
+        )
     }
 
     /// Linearly annualized M-squared per asset. Cash subtraction and addition
@@ -732,8 +721,11 @@ impl JsPerformance {
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker values as a Float64Array in `tickerNames()` order.
     #[wasm_bindgen(js_name = mSquared)]
-    pub fn m_squared(&self, risk_free_rate: Option<f64>) -> JsValue {
-        vec_f64_to_js(&self.inner.m_squared(risk_free_rate.unwrap_or(0.0)))
+    pub fn m_squared(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        Ok(vec_f64_to_js(&self.inner.m_squared(
+            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
+        )))
     }
 
     /// Modified Sharpe ratio using annualized excess return and
@@ -752,16 +744,20 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = modifiedSharpe)]
     pub fn modified_sharpe(
         &self,
-        risk_free_rate: Option<f64>,
-        confidence: Option<f64>,
+        risk_free_rate: Option<JsValue>,
+        confidence: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         result_vec_f64_to_js(self.inner.modified_sharpe(
-            risk_free_rate.unwrap_or(0.0),
-            confidence.unwrap_or(DEFAULT_CONFIDENCE),
+            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
+            confidence.unwrap_or(fa::DEFAULT_CONFIDENCE),
         ))
     }
 
     /// Sterling ratio over the `n` largest drawdowns per asset.
+    /// Non-finite risk-free rates give `NaN`, including when no drawdowns
+    /// are observed.
     ///
     /// # Errors
     ///
@@ -773,17 +769,20 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = sterlingRatio)]
     pub fn sterling_ratio(
         &self,
-        risk_free_rate: Option<f64>,
-        n: Option<f64>,
+        risk_free_rate: Option<JsValue>,
+        n: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let n = n.map(|value| parse_usize(value, "n")).transpose()?;
-        result_vec_f64_to_js(
-            self.inner
-                .sterling_ratio(risk_free_rate.unwrap_or(0.0), n.unwrap_or(5)),
-        )
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        let n = js_opt_uint(n.as_ref(), "n")?;
+        result_vec_f64_to_js(self.inner.sterling_ratio(
+            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
+            n.unwrap_or(fa::DEFAULT_DRAWDOWN_COUNT),
+        ))
     }
 
     /// Burke ratio over the `n` largest drawdowns per asset.
+    /// Non-finite risk-free rates give `NaN`, including when no drawdowns
+    /// are observed.
     ///
     /// # Errors
     ///
@@ -795,14 +794,15 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = burkeRatio)]
     pub fn burke_ratio(
         &self,
-        risk_free_rate: Option<f64>,
-        n: Option<f64>,
+        risk_free_rate: Option<JsValue>,
+        n: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let n = n.map(|value| parse_usize(value, "n")).transpose()?;
-        result_vec_f64_to_js(
-            self.inner
-                .burke_ratio(risk_free_rate.unwrap_or(0.0), n.unwrap_or(5)),
-        )
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        let n = js_opt_uint(n.as_ref(), "n")?;
+        result_vec_f64_to_js(self.inner.burke_ratio(
+            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
+            n.unwrap_or(fa::DEFAULT_DRAWDOWN_COUNT),
+        ))
     }
 
     /// Per-period simple return series per asset, as decimal fractions.
@@ -825,8 +825,8 @@ impl JsPerformance {
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @returns Simple decimal returns for the selected ticker, in date order.
     #[wasm_bindgen(js_name = returnsForTicker)]
-    pub fn returns_for_ticker(&self, ticker_idx: f64) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
+    pub fn returns_for_ticker(&self, ticker_idx: JsValue) -> Result<JsValue, JsValue> {
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let series = self
             .inner
             .returns_for_ticker(ticker_idx)
@@ -861,14 +861,16 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = summary)]
     pub fn summary(
         &self,
-        risk_free_rate: Option<f64>,
-        confidence: Option<f64>,
+        risk_free_rate: Option<JsValue>,
+        confidence: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
         let table = self
             .inner
             .summary(
-                risk_free_rate.unwrap_or(0.0),
-                confidence.unwrap_or(DEFAULT_CONFIDENCE),
+                risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
+                confidence.unwrap_or(fa::DEFAULT_CONFIDENCE),
             )
             .map_err(to_js_err)?;
         to_js(&table)
@@ -886,17 +888,18 @@ impl JsPerformance {
     ///
     /// * `frequency` - Optional calendar frequency token: `"daily"`,
     ///   `"weekly"`, `"monthly"`, `"quarterly"`, `"semi_annual"`, or
-    ///   `"annual"` (pandas offset aliases `D`/`B`, `W`, `M`, `Q`, `A`/`Y` are accepted too); defaults to `"monthly"`.
+    ///   `"annual"` (pandas offset aliases `D`/`B`, `W`, `M`/`ME`, `Q`/`QE`, `A`/`Y`/`YE` are accepted too); defaults to `"monthly"`.
     ///
     /// # Errors
     ///
-    /// Rejects an unsupported frequency or a failure to create a point
-    /// property on the JavaScript result object.
-    /// @returns Ticker-major nested arrays of chronological period-end points with simple decimal returns.
+    /// Rejects an unsupported frequency or a panel that cannot be serialized
+    /// to JavaScript.
+    /// @returns Ticker-major nested arrays of chronological Rust `PeriodicReturn` `{ date, value }` points with simple decimal returns.
     #[wasm_bindgen(js_name = periodicReturns)]
-    pub fn periodic_returns(&self, frequency: Option<String>) -> Result<JsValue, JsValue> {
-        let kind = parse_frequency(frequency.as_deref().unwrap_or("monthly"))?;
-        periodic_panel_to_js(self.inner.periodic_returns(kind))
+    pub fn periodic_returns(&self, frequency: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
+        let kind = parse_frequency(frequency.as_deref(), fa::DEFAULT_PERIODIC_FREQUENCY)?;
+        to_js(&self.inner.periodic_returns(kind))
     }
 
     /// Drawdown series per asset.
@@ -931,7 +934,6 @@ impl JsPerformance {
     ///
     /// Rejects the same degenerate-pair conditions as `correlationMatrix`.
     /// @returns `true` when the estimate was projected to the nearest correlation matrix.
-    /// @throws Error - Rejects when a ticker pair is degenerate or Higham repair fails.
     #[wasm_bindgen(js_name = correlationMatrixRepaired)]
     pub fn correlation_matrix_repaired(&self) -> Result<bool, JsValue> {
         self.inner
@@ -968,8 +970,13 @@ impl JsPerformance {
     /// @param nperiods - Optional periods per year used to decompound annual `rf`; omit to use the engine frequency, or pass `1` for already-periodic `rf`.
     /// @returns One Float64Array per ticker in `tickerNames()` order.
     #[wasm_bindgen(js_name = excessReturns)]
-    pub fn excess_returns(&self, rf: JsValue, nperiods: Option<f64>) -> Result<JsValue, JsValue> {
-        let rf = parse_f64_vec(rf)?;
+    pub fn excess_returns(
+        &self,
+        rf: JsValue,
+        nperiods: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
+        let nperiods = js_opt_f64(nperiods.as_ref(), "nperiods")?;
+        let rf = js_f64_seq(&rf, "rf")?;
         let excess = self
             .inner
             .excess_returns(&rf, nperiods)
@@ -984,7 +991,7 @@ impl JsPerformance {
     /// Rejects if the beta results cannot be serialized to JavaScript.
     /// @returns Per-ticker `{ beta, std_err, ci_lower, ci_upper }` objects in `tickerNames()` order.
     pub fn beta(&self) -> Result<JsValue, JsValue> {
-        beta_results_to_js(self.inner.beta())
+        to_js_rows_numeric(&self.inner.beta())
     }
 
     /// Benchmark regression annualized Jensen alpha/beta statistics per asset.
@@ -994,8 +1001,13 @@ impl JsPerformance {
     /// Rejects if the regression results cannot be serialized to JavaScript.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
     /// @returns Per-ticker `{ alpha, beta, r_squared, adjusted_r_squared }` objects in `tickerNames()` order.
-    pub fn greeks(&self, risk_free_rate: Option<f64>) -> Result<JsValue, JsValue> {
-        greeks_results_to_js(self.inner.greeks(risk_free_rate.unwrap_or(0.0)))
+    pub fn greeks(&self, risk_free_rate: Option<JsValue>) -> Result<JsValue, JsValue> {
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        to_js_rows_numeric(
+            &self
+                .inner
+                .greeks(risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE)),
+        )
     }
 
     /// Rolling benchmark annualized Jensen alpha/beta for one asset over a window.
@@ -1011,20 +1023,19 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = rollingGreeks)]
     pub fn rolling_greeks(
         &self,
-        ticker_idx: f64,
-        window: Option<f64>,
-        risk_free_rate: Option<f64>,
+        ticker_idx: JsValue,
+        window: Option<JsValue>,
+        risk_free_rate: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let window = window
-            .map(|value| parse_usize(value, "window"))
-            .transpose()?;
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let window = js_opt_uint(window.as_ref(), "window")?;
         let rg = self
             .inner
             .rolling_greeks(
                 ticker_idx,
-                window.unwrap_or(DEFAULT_ROLLING_WINDOW),
-                risk_free_rate.unwrap_or(0.0),
+                window.unwrap_or(fa::DEFAULT_ROLLING_WINDOW),
+                risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
             )
             .map_err(to_js_err)?;
         rolling_greeks_to_js(&rg)
@@ -1038,22 +1049,20 @@ impl JsPerformance {
     /// JavaScript result object's properties cannot be created.
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
-    /// @returns `{ dates, volatility }` series for the selected ticker.
+    /// @returns `{ values, dates, value_column }` series for the selected ticker; `value_column` is `"volatility"`.
     #[wasm_bindgen(js_name = rollingVolatility)]
     pub fn rolling_volatility(
         &self,
-        ticker_idx: f64,
-        window: Option<f64>,
+        ticker_idx: JsValue,
+        window: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let window = window
-            .map(|value| parse_usize(value, "window"))
-            .transpose()?;
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let window = js_opt_uint(window.as_ref(), "window")?;
         let series = self
             .inner
-            .rolling_volatility(ticker_idx, window.unwrap_or(DEFAULT_ROLLING_WINDOW))
+            .rolling_volatility(ticker_idx, window.unwrap_or(fa::DEFAULT_ROLLING_WINDOW))
             .map_err(to_js_err)?;
-        dated_series_to_js(&series.values, &series.dates, "volatility")
+        dated_series_to_js(&series)
     }
 
     /// Rolling Sortino ratio series for one asset over a window.
@@ -1065,27 +1074,26 @@ impl JsPerformance {
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
     /// @param mar - Per-period minimum acceptable return as a decimal; defaults to 0.0.
-    /// @returns `{ dates, sortino }` series for the selected ticker.
+    /// @returns `{ values, dates, value_column }` series for the selected ticker; `value_column` is `"sortino"`.
     #[wasm_bindgen(js_name = rollingSortino)]
     pub fn rolling_sortino(
         &self,
-        ticker_idx: f64,
-        window: Option<f64>,
-        mar: Option<f64>,
+        ticker_idx: JsValue,
+        window: Option<JsValue>,
+        mar: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let window = window
-            .map(|value| parse_usize(value, "window"))
-            .transpose()?;
+        let mar = js_opt_f64(mar.as_ref(), "mar")?;
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let window = js_opt_uint(window.as_ref(), "window")?;
         let series = self
             .inner
             .rolling_sortino(
                 ticker_idx,
-                window.unwrap_or(DEFAULT_ROLLING_WINDOW),
-                mar.unwrap_or(0.0),
+                window.unwrap_or(fa::DEFAULT_ROLLING_WINDOW),
+                mar.unwrap_or(fa::DEFAULT_MAR),
             )
             .map_err(to_js_err)?;
-        dated_series_to_js(&series.values, &series.dates, "sortino")
+        dated_series_to_js(&series)
     }
 
     /// Rolling Sharpe ratio series for one asset over a window.
@@ -1097,27 +1105,26 @@ impl JsPerformance {
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param window - Finite positive integer observation count; defaults to 63 periods. Invalid numeric values are rejected.
     /// @param risk_free_rate - Annualized decimal risk-free rate; defaults to 0.0.
-    /// @returns `{ dates, sharpe }` series for the selected ticker.
+    /// @returns `{ values, dates, value_column }` series for the selected ticker; `value_column` is `"sharpe"`.
     #[wasm_bindgen(js_name = rollingSharpe)]
     pub fn rolling_sharpe(
         &self,
-        ticker_idx: f64,
-        window: Option<f64>,
-        risk_free_rate: Option<f64>,
+        ticker_idx: JsValue,
+        window: Option<JsValue>,
+        risk_free_rate: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let window = window
-            .map(|value| parse_usize(value, "window"))
-            .transpose()?;
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let window = js_opt_uint(window.as_ref(), "window")?;
         let series = self
             .inner
             .rolling_sharpe(
                 ticker_idx,
-                window.unwrap_or(DEFAULT_ROLLING_WINDOW),
-                risk_free_rate.unwrap_or(0.0),
+                window.unwrap_or(fa::DEFAULT_ROLLING_WINDOW),
+                risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
             )
             .map_err(to_js_err)?;
-        dated_series_to_js(&series.values, &series.dates, "sharpe")
+        dated_series_to_js(&series)
     }
 
     /// Rolling compounded return series for one asset over a window.
@@ -1129,16 +1136,20 @@ impl JsPerformance {
     /// overlong `window` returns an empty series; a zero window is rejected.
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param window - Finite positive integer observation count. Zero, fractional, non-finite, and out-of-range values are rejected.
-    /// @returns `{ dates, return }` series for the selected ticker.
+    /// @returns `{ values, dates, value_column }` series for the selected ticker; `value_column` is `"return"`.
     #[wasm_bindgen(js_name = rollingReturns)]
-    pub fn rolling_returns(&self, ticker_idx: f64, window: f64) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let window = parse_usize(window, "window")?;
+    pub fn rolling_returns(
+        &self,
+        ticker_idx: JsValue,
+        window: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let window = js_uint(&window, "window")?;
         let series = self
             .inner
             .rolling_returns(ticker_idx, window)
             .map_err(to_js_err)?;
-        dated_series_to_js(&series.values, &series.dates, "return")
+        dated_series_to_js(&series)
     }
 
     /// Details of the `n` largest drawdown episodes for one asset.
@@ -1151,13 +1162,17 @@ impl JsPerformance {
     /// @param n - Finite non-negative integer count of episodes; defaults to 5. Invalid numeric values are rejected.
     /// @returns Drawdown episode objects for the selected ticker, largest first.
     #[wasm_bindgen(js_name = drawdownDetails)]
-    pub fn drawdown_details(&self, ticker_idx: f64, n: Option<f64>) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let n = n.map(|value| parse_usize(value, "n")).transpose()?;
+    pub fn drawdown_details(
+        &self,
+        ticker_idx: JsValue,
+        n: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let n = js_opt_uint(n.as_ref(), "n")?;
         to_js(
             &self
                 .inner
-                .drawdown_details(ticker_idx, n.unwrap_or(5))
+                .drawdown_details(ticker_idx, n.unwrap_or(fa::DEFAULT_DRAWDOWN_COUNT))
                 .map_err(to_js_err)?,
         )
     }
@@ -1173,7 +1188,10 @@ impl JsPerformance {
     /// Rejects a non-numeric `factor_returns` matrix, an unknown
     /// `returnKind`, an out-of-range `ticker_idx`, no factors, too few
     /// observations, non-finite or length-mismatched inputs, a singular
-    /// factor design, or a result that cannot be serialized to JavaScript.
+    /// factor design, a fitted coefficient, annualized intercept, or residual
+    /// volatility that cannot be represented as a finite value, or a result
+    /// that cannot be serialized to JavaScript. Constant responses retain
+    /// undefined `NaN` R-squared statistics.
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param factor_returns - Matrix of aligned already-excess decimal factor-return series, one row per factor.
     /// @param return_kind - `"excess"` or `"total"`; defaults to `"excess"`.
@@ -1182,32 +1200,22 @@ impl JsPerformance {
     #[wasm_bindgen(js_name = multiFactorGreeks)]
     pub fn multi_factor_greeks(
         &self,
-        ticker_idx: f64,
+        ticker_idx: JsValue,
         factor_returns: JsValue,
-        return_kind: Option<String>,
-        risk_free_rate: Option<f64>,
+        return_kind: Option<JsValue>,
+        risk_free_rate: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let factors = parse_f64_matrix(factor_returns)?;
+        let risk_free_rate = js_opt_f64(risk_free_rate.as_ref(), "riskFreeRate")?;
+        let return_kind = js_opt_string(return_kind.as_ref(), "returnKind")?;
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let factors = js_f64_matrix(&factor_returns, "factorReturns")?;
         let refs: Vec<&[f64]> = factors.iter().map(|v| v.as_slice()).collect();
         let kind = parse_return_kind(return_kind.as_deref(), risk_free_rate)?;
         let result = self
             .inner
             .multi_factor_greeks(ticker_idx, &refs, kind)
             .map_err(to_js_err)?;
-        let js = to_js(&result)?;
-        // JSON uses explicit non-finite sentinels; the JS API stays numeric.
-        Reflect::set(
-            &js,
-            &"r_squared".into(),
-            &JsValue::from_f64(result.r_squared),
-        )?;
-        Reflect::set(
-            &js,
-            &"adjusted_r_squared".into(),
-            &JsValue::from_f64(result.adjusted_r_squared),
-        )?;
-        Ok(js)
+        to_js_value_numeric(&result)
     }
 
     /// Standard lookback-window returns (MTD, QTD, YTD, ...) per asset.
@@ -1221,28 +1229,30 @@ impl JsPerformance {
     ///
     /// * `ref_date` - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
     /// * `fiscal_year_start_month` - Optional fiscal-year start month from 1
-    ///   through 12; defaults to January.
+    ///   through 12; defaults to January. With both parts omitted the fiscal
+    ///   year is the calendar year.
     /// * `fiscal_year_start_day` - Optional fiscal-year start day; defaults to
-    ///   the first day of the month.
+    ///   the first day of the month (Rust `FiscalConfig::from_parts`).
     ///
     /// # Errors
     ///
     /// Rejects an invalid ISO `ref_date`, a fiscal month outside `1..=12`, a
     /// fiscal day outside `1..=31`, or a result that cannot be serialized to
     /// JavaScript.
-    /// @param ref_date - ISO-8601 date on which MTD, QTD, YTD, and FYTD windows end.
-    /// @param fiscal_year_start_month - Optional fiscal-year start month from 1 through 12; defaults to January.
-    /// @param fiscal_year_start_day - Optional fiscal-year start day; defaults to the first day.
     /// @returns Per-ticker `{ mtd, qtd, ytd, fytd }` numeric arrays of lookback returns as decimal fractions; `fytd` is never null.
     #[wasm_bindgen(js_name = lookbackReturns)]
     pub fn lookback_returns(
         &self,
-        ref_date: &str,
-        fiscal_year_start_month: Option<f64>,
-        fiscal_year_start_day: Option<f64>,
+        ref_date: JsValue,
+        fiscal_year_start_month: Option<JsValue>,
+        fiscal_year_start_day: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let ref_date: &str = &js_string(&ref_date, "refDate")?;
         let d = parse_iso_date(ref_date)?;
-        let fc = lookback_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
+        let fc = make_fiscal_config(
+            fiscal_year_start_month.as_ref(),
+            fiscal_year_start_day.as_ref(),
+        )?;
         to_js(&self.inner.lookback_returns(d, fc))
     }
 
@@ -1255,57 +1265,32 @@ impl JsPerformance {
     /// or period statistics that cannot be serialized to JavaScript.
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param aggregation_frequency - Optional aggregation frequency token; defaults to monthly.
-    /// @param fiscal_year_start_month - Optional fiscal-year start month from 1 through 12.
-    /// @param fiscal_year_start_day - Optional fiscal-year start day within the selected month.
+    /// @param fiscal_year_start_month - Optional fiscal-year start month from 1 through 12; when only the day is given the month is January.
+    /// @param fiscal_year_start_day - Optional fiscal-year start day within the selected month; when only the month is given the day is the 1st.
     /// @returns Period statistics object for the selected ticker at the requested frequency.
     #[wasm_bindgen(js_name = periodStats)]
     pub fn period_stats(
         &self,
-        ticker_idx: f64,
-        aggregation_frequency: Option<String>,
-        fiscal_year_start_month: Option<f64>,
-        fiscal_year_start_day: Option<f64>,
+        ticker_idx: JsValue,
+        aggregation_frequency: Option<JsValue>,
+        fiscal_year_start_month: Option<JsValue>,
+        fiscal_year_start_day: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let ticker_idx = parse_usize(ticker_idx, "tickerIdx")?;
-        let pk = parse_frequency(aggregation_frequency.as_deref().unwrap_or("monthly"))?;
-        let fc = make_fiscal_config(fiscal_year_start_month, fiscal_year_start_day)?;
+        let aggregation_frequency =
+            js_opt_string(aggregation_frequency.as_ref(), "aggregationFrequency")?;
+        let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
+        let pk = parse_frequency(
+            aggregation_frequency.as_deref(),
+            fa::DEFAULT_PERIODIC_FREQUENCY,
+        )?;
+        let fc = make_fiscal_config(
+            fiscal_year_start_month.as_ref(),
+            fiscal_year_start_day.as_ref(),
+        )?;
         let stats = self
             .inner
             .period_stats(ticker_idx, pk, fc)
             .map_err(to_js_err)?;
-        let js = to_js(&stats)?;
-        restore_non_finite_ratios(&js, &stats)?;
-        Ok(js)
+        to_js_value_numeric(&stats)
     }
-}
-
-/// Restore `PeriodStats` ratios that serde encoded as sentinel strings.
-///
-/// The four ratio fields carry `#[serde(with = "core::wire::non_finite_f64")]`
-/// so the JSON wire form can round-trip `+∞`: `serde_json` writes a bare
-/// `f64::INFINITY` as `null` and then refuses to read `null` back as an `f64`.
-/// JavaScript numbers have no such limitation — `Infinity` is an ordinary
-/// number — but `serde_wasm_bindgen` still runs that adapter and hands JS the
-/// string `"inf"`, which breaks consumers silently (`"inf" > 2` is `false`
-/// where `Infinity > 2` is `true`). Overwrite those four keys with the real
-/// `f64`s; finite values are unchanged by the round trip.
-///
-/// # Arguments
-///
-/// * `js` - Serialized `PeriodStats` object to patch in place.
-/// * `stats` - Source statistics holding the unencoded `f64` ratios.
-///
-/// # Errors
-///
-/// Propagates any failure from `Reflect::set`.
-fn restore_non_finite_ratios(js: &JsValue, stats: &fa::PeriodStats) -> Result<(), JsValue> {
-    for (key, value) in [
-        ("payoff_ratio", stats.payoff_ratio),
-        ("profit_factor", stats.profit_factor),
-        ("cpc_ratio", stats.cpc_ratio),
-        ("kelly_criterion", stats.kelly_criterion),
-    ] {
-        Reflect::set(js, &JsValue::from_str(key), &JsValue::from_f64(value))?;
-    }
-    Ok(())
 }

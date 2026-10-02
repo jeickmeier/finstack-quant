@@ -4,6 +4,10 @@ import {
   features,
   models,
   portfolio,
+  scenarios,
+  type AttributionFactor,
+  type FactorBrinsonResult,
+  type HorizonReport,
   type MaterializationPhases,
   type MaterializationReport,
   type WasmOwned,
@@ -18,8 +22,18 @@ const materializationParseNanos: number = materializationPhases.parse;
 const materializationTimingAvailable: boolean = materializationReport.timing_available;
 const materializationDependencies: number = materializationReport.dependencies;
 
-const discountFromArray = new core.DiscountCurve('USD-OIS', '2025-01-01', numberValues);
-const discountFromTyped = new core.DiscountCurve('USD-OIS-TYPED', '2025-01-01', typedValues);
+const discountFromArray = new core.DiscountCurve({
+  id: 'USD-OIS',
+  baseDate: '2025-01-01',
+  knots: numberValues,
+});
+const discountFromTyped = new core.DiscountCurve({
+  id: 'USD-OIS-TYPED',
+  baseDate: '2025-01-01',
+  knots: typedValues,
+  validationMode: 'negative_rate_friendly',
+  forwardFloor: -0.01,
+});
 
 const forwardFromArray = new core.ForwardCurve({
   id: 'USD-SOFR-3M',
@@ -74,7 +88,7 @@ const projectionGrid: Float64Array | undefined = forwardFromTyped.projectionGrid
 const expiries: Float64Array = fxVolFromTyped.expiries;
 const pillarVols: Float64Array = models.volatility.getFxDeltaPillarVols(fxVolFromArrays, 0);
 const factorReturns = analytics.constrainedLeastSquares([1], 1, [0.01], [1]);
-const factorAttribution: Record<string, unknown> = portfolio.factorBrinsonAttribution(
+const factorAttribution: FactorBrinsonResult = portfolio.factorBrinsonAttribution(
   '{}',
   factorReturns
 );
@@ -108,12 +122,12 @@ features.rankToWeights([1, 2], ['d', 'd'], {});
 
 // Native output retains generated nested shapes and stricter emitted-field presence.
 declare const valuation: ValuationResult;
-const roundingMode: import('../../types/valuation-result').ValuationResult['meta']['rounding']['mode'] =
+const roundingMode: import('../../types/valuation-result.js').ValuationResult['meta']['rounding']['mode'] =
   valuation.meta.rounding.mode;
 const covenantReports: NonNullable<
-  import('../../types/valuation-result').ValuationResult['covenants']
+  import('../../types/valuation-result.js').ValuationResult['covenants']
 > | null = valuation.covenants;
-const explanation: import('../../types/valuation-result').ExplanationTrace | undefined =
+const explanation: import('../../types/valuation-result.js').ExplanationTrace | undefined =
   valuation.explanation;
 // @ts-expect-error Native absence is omitted, never null.
 valuation.explanation = null;
@@ -122,3 +136,30 @@ valuation.covenants = undefined;
 // @ts-expect-error Metadata is a complete canonical structure.
 valuation.meta = {};
 void [roundingMode, covenantReports, explanation];
+
+const scenarioSpec = scenarios.buildScenarioSpec('metadata', []);
+const scenarioName: string | null | undefined = scenarioSpec.name;
+scenarioSpec.name = null;
+scenarioSpec.description = null;
+const horizon: HorizonReport = scenarios.computeHorizonReturn('{}', '{}', '2025-01-15', '{}');
+const horizonReturn: number | null | undefined = horizon.summary.total_return;
+const horizonAnnualized: number | null | undefined = horizon.summary.annualized_return;
+const horizonInitialAmount: string = horizon.initial_value.amount;
+const horizonDays: number | null | undefined = horizon.horizon_days;
+const horizonFactor: AttributionFactor = 'carry';
+const carryContribution: number | null = horizon.summary.factor_contributions[horizonFactor];
+const horizonOperations: number = horizon.scenario_report.operations_applied;
+// @ts-expect-error Undefined compounded returns must be handled by the caller.
+const requiredAnnualized: number = horizon.summary.annualized_return;
+// @ts-expect-error Factor keys use canonical Rust attribution names.
+void horizon.factor_contributions.rates;
+void [
+  scenarioName,
+  horizonReturn,
+  horizonAnnualized,
+  horizonInitialAmount,
+  horizonDays,
+  carryContribution,
+  horizonOperations,
+  requiredAnnualized,
+];

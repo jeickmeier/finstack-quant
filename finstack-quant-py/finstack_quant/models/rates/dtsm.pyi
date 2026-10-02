@@ -280,7 +280,8 @@ class YieldPanel:
         Raises
         ------
         ValueError
-            If the payload is malformed.
+            If the payload is malformed or violates the panel's observation,
+            tenor, yield, or date-alignment requirements.
 
         Examples
         --------
@@ -519,7 +520,8 @@ class FactorTimeSeries:
         Raises
         ------
         ValueError
-            If the payload is malformed.
+            If the payload is malformed or has non-finite values or misaligned
+            factor, residual, date, or fit-statistic dimensions.
 
         Examples
         --------
@@ -700,7 +702,8 @@ class DieboldLi:
         Returns
         -------
         DieboldLi
-            New model carrying ``factors`` and ``tenors``.
+            New model carrying ``factors`` and ``tenors`` with prior VAR state cleared;
+            call ``fit_var`` before forecasting the replacement factors.
 
         Raises
         ------
@@ -728,8 +731,9 @@ class DieboldLi:
         Raises
         ------
         ValueError
-            If factors have not been extracted or fewer than five observations
-            are available.
+            If factors have not been extracted, fewer than five observations are
+            available, or the fitted dynamics have no finite unconditional mean
+            because ``I - Phi`` is singular.
 
         Examples
         --------
@@ -862,7 +866,8 @@ class DieboldLi:
         Raises
         ------
         ValueError
-            If the payload is malformed or ``lambda`` is invalid.
+            If the payload is malformed, ``lambda`` is invalid, or its factor
+            history, tenor grid, or fitted VAR state is inconsistent.
 
         Examples
         --------
@@ -1063,7 +1068,8 @@ class YieldForecast:
         Raises
         ------
         ValueError
-            If the payload is malformed.
+            If the payload is malformed, the horizon is zero, or yields, tenors,
+            factors, and confidence bands violate their invariants.
 
         Examples
         --------
@@ -1505,7 +1511,8 @@ class YieldPca:
         Raises
         ------
         ValueError
-            If the payload is malformed.
+            If the payload is malformed or its loadings, scores, eigenvalues,
+            means, or variance vectors are invalid or misaligned.
 
         Examples
         --------
@@ -1748,7 +1755,8 @@ class YieldPcaView:
         Raises
         ------
         ValueError
-            If the payload is malformed.
+            If the payload is malformed or its loadings, scores, eigenvalues,
+            means, or variance vectors are invalid or misaligned.
 
         Examples
         --------

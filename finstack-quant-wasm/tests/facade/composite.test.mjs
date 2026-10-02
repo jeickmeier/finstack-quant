@@ -123,7 +123,7 @@ test('composite errors preserve typed classification', () => {
     (error) => {
       assert.equal(error.name, 'FinstackError');
       assert.equal(error.kind, 'validation');
-      assert.match(error.message, /expected composite/);
+      assert.match(error.message, /expected instrument type `composite`, got `equity`/);
       return true;
     }
   );
@@ -135,4 +135,18 @@ test('composite errors preserve typed classification', () => {
       return true;
     }
   );
+});
+
+test('composite optional history, previous state, and warmup accept null like Python None', () => {
+  const composite = facade.valuations.composite;
+  const initialized = composite.initialize(spec, market, '2025-01-01', null);
+  assert.equal(initialized.instrument.instrument.type, 'composite');
+  const rebalanced = composite.rebalance(initialized.instrument, market, '2025-01-02', null);
+  assert.equal(rebalanced.instrument.instrument.type, 'composite');
+  assert.deepEqual(
+    composite.executionTrades(initialized.instrument, null),
+    composite.executionTrades(initialized.instrument)
+  );
+  const observations = ['2025-01-01', '2025-01-02'].map((date) => ({ date, state: market }));
+  assert.equal(composite.historyFromSpec(spec, observations, null).length, 2);
 });

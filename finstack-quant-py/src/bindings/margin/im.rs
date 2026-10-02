@@ -324,15 +324,7 @@ impl PySimmSensitivities {
     /// the same base currency; use ``scaled_to_currency`` first otherwise.
     /// Raises ``ValueError`` on a base-currency mismatch.
     fn merge(&mut self, other: &PySimmSensitivities) -> PyResult<()> {
-        if other.inner.base_currency != self.inner.base_currency {
-            return Err(crate::errors::value_error(format!(
-                "cannot merge SIMM sensitivities in {} into a {} container; call \
-                 scaled_to_currency first",
-                other.inner.base_currency, self.inner.base_currency
-            )));
-        }
-        self.inner.merge(&other.inner);
-        Ok(())
+        self.inner.merge(&other.inner).map_err(core_to_py)
     }
 
     /// Return a copy with every amount multiplied by the signed ``factor``

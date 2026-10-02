@@ -1,0 +1,35 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/lvar_bangia_scalar.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Scalar Bangia LVaR outputs for an isolated position where relative spread statistics are already known.",
+  "properties": {
+    "lvar": {
+      "description": "Bangia-adjusted LVaR (non-positive loss number, `lvar <= var <= 0`).",
+      "format": "double",
+      "type": "number"
+    },
+    "lvar_ratio": {
+      "description": "Ratio `lvar / var`. `NaN` when `var == 0`.",
+      "format": "double",
+      "type": "number"
+    },
+    "spread_cost": {
+      "description": "Non-negative magnitude of the Bangia spread-cost add-on.",
+      "format": "double",
+      "type": "number"
+    },
+    "var": {
+      "description": "Input VaR (non-positive loss number), echoed back for convenience.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "var",
+    "spread_cost",
+    "lvar",
+    "lvar_ratio"
+  ],
+  "title": "LvarBangiaScalar",
+  "type": "object"
+}

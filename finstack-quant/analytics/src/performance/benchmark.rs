@@ -25,7 +25,11 @@ impl Performance {
     /// One Treynor ratio per ticker in column order, using the active
     /// benchmark to estimate beta. Returns [`f64::NAN`] when the overlapping
     /// ticker/benchmark window has fewer than 2 observations (beta is not
-    /// estimable from one point) or the benchmark variance is zero.
+    /// estimable from one point), the benchmark variance is zero, or the
+    /// annualized excess return is non-finite (including a non-finite
+    /// `risk_free_rate`). For an estimable beta with magnitude below `1e-10`,
+    /// finite excess return gives signed infinity, or zero when excess return
+    /// is exactly zero.
     pub fn treynor(&self, risk_free_rate: f64) -> Vec<f64> {
         let ann = self.ann();
         self.map_tickers(|i| {
@@ -209,8 +213,9 @@ impl Performance {
     ///
     /// # Errors
     ///
-    /// Propagates errors from the underlying multi-factor greeks calculation
-    /// when factor inputs are mismatched, non-finite, insufficient, or numerically singular.
+    /// Propagates errors when factor inputs are mismatched, non-finite,
+    /// insufficient, or numerically singular, or when computed coefficients,
+    /// annualized alpha, or residual volatility are non-finite.
     pub fn multi_factor_greeks(
         &self,
         ticker_idx: usize,

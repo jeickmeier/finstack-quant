@@ -12,6 +12,8 @@ struct CalendarDef {
     id: String,
     name: String,
     ignore_weekends: Option<bool>,
+    notes: Option<String>,
+    comment: Option<String>,
     rules: Vec<RuleDef>,
 }
 
@@ -34,6 +36,10 @@ enum RuleDef {
     },
     EasterOffset {
         days: i16,
+        #[serde(default)]
+        from_year: Option<i32>,
+        #[serde(default)]
+        to_year: Option<i32>,
     },
     NthWeekday {
         n: i8,
@@ -74,6 +80,8 @@ enum RuleDef {
     },
     VernalEquinoxJp,
     AutumnalEquinoxJp,
+    HongKongPublicHolidays,
+    JapanPublicHolidays,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -288,9 +296,15 @@ impl RuleDef {
                 };
                 wrap_effective(inner, *from_year, *to_year)
             }
-            RuleDef::EasterOffset { days } => {
-                format!("Rule::EasterOffset({})", days)
-            }
+            RuleDef::EasterOffset {
+                days,
+                from_year,
+                to_year,
+            } => wrap_effective(
+                format!("Rule::EasterOffset({})", days),
+                *from_year,
+                *to_year,
+            ),
             RuleDef::NthWeekday {
                 n,
                 weekday,
@@ -353,6 +367,8 @@ impl RuleDef {
             }
             RuleDef::VernalEquinoxJp => "Rule::VernalEquinoxJP".to_string(),
             RuleDef::AutumnalEquinoxJp => "Rule::AutumnalEquinoxJP".to_string(),
+            RuleDef::HongKongPublicHolidays => "Rule::HongKongPublicHolidays".to_string(),
+            RuleDef::JapanPublicHolidays => "Rule::JapanPublicHolidays".to_string(),
         }
     }
 }
@@ -418,9 +434,18 @@ pub(crate) fn generate() -> io::Result<()> {
         output.push_str("];\n\n");
 
         // Generate calendar constant
+        output.push_str(&format!("/// {}\n", cal.name));
+        for note in [cal.notes.as_deref(), cal.comment.as_deref()]
+            .into_iter()
+            .flatten()
+        {
+            output.push_str("///\n");
+            for line in note.lines() {
+                output.push_str(&format!("/// {line}\n"));
+            }
+        }
         output.push_str(&format!(
-            "/// {}\npub static {}: Calendar = Calendar::new(\n    \"{}\",\n    \"{}\",\n    {},\n    {}_RULES,\n);\n\n",
-            cal.name,
+            "pub static {}: Calendar = Calendar::new(\n    \"{}\",\n    \"{}\",\n    {},\n    {}_RULES,\n);\n\n",
             const_name,
             id,
             cal.name,

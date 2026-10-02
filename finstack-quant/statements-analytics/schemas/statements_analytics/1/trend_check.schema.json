@@ -1,0 +1,74 @@
+{
+  "$defs": {
+    "CheckSeverity": {
+      "description": "Severity level for a check finding, ordered from least to most severe.",
+      "oneOf": [
+        {
+          "const": "info",
+          "description": "Informational finding — no action required.",
+          "type": "string"
+        },
+        {
+          "const": "warning",
+          "description": "Warning — review recommended.",
+          "type": "string"
+        },
+        {
+          "const": "error",
+          "description": "Error — indicates a likely problem that should be addressed.",
+          "type": "string"
+        }
+      ]
+    },
+    "NodeId": {
+      "description": "Type-safe identifier for a node in a financial model.\n\nSerializes as a plain string and is interoperable with `&str` via\n[`Borrow`] and [`AsRef`].",
+      "type": "string"
+    },
+    "TrendDirection": {
+      "description": "Direction in which a metric should ideally move.",
+      "oneOf": [
+        {
+          "const": "increasing_is_good",
+          "description": "Higher values are better (e.g. EBITDA, coverage).",
+          "type": "string"
+        },
+        {
+          "const": "decreasing_is_good",
+          "description": "Lower values are better (e.g. leverage, cost ratios).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/trend_check.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Flags a metric that has been deteriorating for `lookback_periods` consecutive periods.",
+  "properties": {
+    "direction": {
+      "$ref": "#/$defs/TrendDirection",
+      "description": "Which direction is \"good\"."
+    },
+    "lookback_periods": {
+      "description": "Number of consecutive deteriorating periods before flagging.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "node": {
+      "$ref": "#/$defs/NodeId",
+      "description": "Node to monitor."
+    },
+    "severity": {
+      "$ref": "#/$defs/CheckSeverity",
+      "description": "Severity to assign to the finding."
+    }
+  },
+  "required": [
+    "node",
+    "direction",
+    "lookback_periods",
+    "severity"
+  ],
+  "title": "TrendCheck",
+  "type": "object"
+}

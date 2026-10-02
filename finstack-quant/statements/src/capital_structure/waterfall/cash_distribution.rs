@@ -2,6 +2,7 @@
 //! the [`StagedInstrumentFlow`] working struct.
 
 use crate::capital_structure::cashflows::CashflowBreakdown;
+use crate::capital_structure::principal::PrincipalAllocation;
 use crate::error::Result;
 use crate::evaluator::{CapitalStructureClaimCategory, CapitalStructureWarning, EvalWarning};
 use finstack_quant_core::money::Money;
@@ -15,26 +16,47 @@ pub(super) struct StagedInstrumentFlow {
     pub instrument_id: String,
     /// Cashflow breakdown (mutated during allocation)
     pub breakdown: CashflowBreakdown,
-    /// Balance at the start of this period
-    pub opening_balance: Money,
-    /// Extra principal from the ECF sweep rung.
-    pub sweep_principal: Money,
-    /// Extra principal from the mandatory prepay rung.
-    pub mandatory_principal: Money,
-    /// Extra principal from the voluntary prepay rung.
-    pub voluntary_principal: Money,
+    /// Dated principal claims and the economic balance available to repay.
+    pub principal: PrincipalAllocation,
     /// Payment-class rank (`0` = most senior). Empty `payment_classes` uses `0`.
     pub class_rank: u32,
-    /// Scheduled (contractual) principal payment
+    /// Scheduled principal claim, replaced by its paid amount at Amortization.
     pub scheduled_principal: Money,
-    /// Net new funding (revolver draws + initial-exchange notional) for this
-    /// period. The payable balance is `opening_balance + net_new_funding`, and
-    /// the period-close balance adds it back so in-period draws are preserved.
-    pub net_new_funding: Money,
     /// Cash coupon moved into the PIK bucket by the PIK toggle this period.
     /// Tracked so toggle-driven capitalization can be accumulated in
     /// `CapitalStructureState::cumulative_toggled_pik`.
     pub toggled_pik_moved: Money,
+}
+
+/// Apply a prepayment at its position in the priority stack.
+///
+/// Earlier payments consume principal capacity; later scheduled claims and
+/// prepayments reserve none. This preserves payment-class seniority within
+/// each rung even when a later sweep targets a particular instrument.
+pub(super) fn apply_prepayment(
+    staged: &mut [StagedInstrumentFlow],
+    remaining_cash: &mut Money,
+    requested: Money,
+    target: Option<&str>,
+) -> Result<()> {
+    let budget = Money::new(
+        requested.amount().min(remaining_cash.amount()).max(0.0),
+        remaining_cash.currency(),
+    )?;
+    let mut unallocated = budget;
+    let allocations = allocate_by_class(staged, &mut unallocated, |s| {
+        if target.is_some_and(|id| id != s.instrument_id) {
+            return 0.0;
+        }
+        s.principal.get_prepayment_capacity().amount()
+    })?;
+    *remaining_cash = remaining_cash.checked_sub(budget.checked_sub(unallocated)?)?;
+    for (s, allocated) in staged.iter_mut().zip(allocations) {
+        let payment = Money::new(allocated, remaining_cash.currency())?;
+        s.principal.pay_prepayment(payment)?;
+        s.breakdown.principal_payment = s.breakdown.principal_payment.checked_add(payment)?;
+    }
+    Ok(())
 }
 
 /// Cap a single category (fees, interest) across instruments using a pro-rata

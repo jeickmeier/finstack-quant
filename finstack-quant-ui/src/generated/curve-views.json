@@ -15,13 +15,14 @@
       "min_forward_rate",
       "min_forward_tenor",
       "rate_calibration",
+      "transform",
       "type"
     ],
     "source": {
       "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
       "pointer": "#/$defs/CurveState/oneOf/0",
       "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "da7fddd2836331a2ec414df9c2d7e269c8062597fdf2fc104628456017e41eb0",
+      "sha256": "9d94c1f60b29790dfd5f61081a5866361b934b1c64df46b902e84ec2104f0ec4",
       "description": "Discount curve state"
     }
   },
@@ -40,13 +41,14 @@
       "rate_calibration",
       "reset_lag",
       "tenor",
+      "transform",
       "type"
     ],
     "source": {
       "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
       "pointer": "#/$defs/CurveState/oneOf/1",
       "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "a51492f6f0a6e2562202f3a70f4f05467c179261fd031f6d06aa35bb29ace7e2",
+      "sha256": "118ecce0c20c24d0799c14c56d427331d21bf9cfcc035989c578ef15b0c0619f",
       "description": "Forward curve state"
     }
   },

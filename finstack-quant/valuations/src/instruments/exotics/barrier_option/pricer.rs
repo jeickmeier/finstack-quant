@@ -40,6 +40,29 @@ pub(crate) fn collect_barrier_inputs(
             "Barrier discount factor must be positive and finite".into(),
         ));
     }
+    let spot = resolve_spot(inst, curves)?;
+    let q = resolve_optional_dividend_yield(curves, inst.div_yield_id.as_ref())?;
+    let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
+        &inst.instrument_pricing_overrides.market_quotes,
+        curves,
+        inst.vol_surface_id.as_str(),
+        t,
+        inst.strike,
+    )?;
+    Ok(BlackScholesInputsDf {
+        spot,
+        df,
+        q,
+        sigma,
+        t,
+    })
+}
+
+/// Positive underlying spot from `spot_id`, in the option currency when quoted as a price.
+pub(crate) fn resolve_spot(
+    inst: &BarrierOption,
+    curves: &MarketContext,
+) -> finstack_quant_core::Result<f64> {
     let spot = match curves.get_price(&inst.spot_id)? {
         finstack_quant_core::market_data::scalars::MarketScalar::Unitless(value) => *value,
         finstack_quant_core::market_data::scalars::MarketScalar::Price(value) => {
@@ -56,21 +79,7 @@ pub(crate) fn collect_barrier_inputs(
         spot,
         "BarrierOption asset spot",
     )?;
-    let q = resolve_optional_dividend_yield(curves, inst.div_yield_id.as_ref())?;
-    let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-        &inst.instrument_pricing_overrides.market_quotes,
-        curves,
-        inst.vol_surface_id.as_str(),
-        t,
-        inst.strike,
-    )?;
-    Ok(BlackScholesInputsDf {
-        spot,
-        df,
-        q,
-        sigma,
-        t,
-    })
+    Ok(spot)
 }
 
 /// Remaining known knock-out rebate, independent of spot, volatility and notional.

@@ -148,7 +148,7 @@
         }
       },
       "categories": [],
-      "meta": { "version": "0.2.0", "wasmVersion": "0.8.0", "schemaIds": [] }
+      "meta": { "version": "0.2.0", "wasmVersion": "0.9.0", "schemaIds": [] }
     }
   ]
 }

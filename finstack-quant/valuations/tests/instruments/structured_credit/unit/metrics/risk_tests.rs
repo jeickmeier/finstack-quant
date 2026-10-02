@@ -282,6 +282,7 @@ mod discount_margin_tests {
         ])
         .unwrap();
         StructuredCredit::new_abs("ABS-DM", pool, tranches, closing(), maturity(), "USD-OIS")
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse")
     }
 
@@ -511,6 +512,7 @@ mod breakeven_cdr_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-BE", pool, tranches, closing(), maturity(), "USD-OIS")
+                .expect("valid structured-credit dates")
                 .with_calendar_id("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -613,6 +615,7 @@ mod scenario_table_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-SCN", pool, tranches, closing(), maturity(), "USD-OIS")
+                .expect("valid structured-credit dates")
                 .with_calendar_id("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         sc.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.40, 0);
@@ -772,6 +775,7 @@ mod oas_tests {
         .unwrap();
         let mut sc =
             StructuredCredit::new_abs("ABS-OAS", pool, tranches, closing(), maturity(), "USD-OIS")
+                .expect("valid structured-credit dates")
                 .with_calendar_id("nyse");
         sc.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.10);
         sc.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.02);

@@ -204,13 +204,22 @@ pub struct PeriodDiagnostics {
 
 /// Deal-level accounting produced alongside the tranche cashflows.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct SimulationDiagnostics {
     /// Per-period deal accounting, in payment order.
     #[serde(default)]
     pub periods: Vec<PeriodDiagnostics>,
     /// Reserve-account balance at the end of each simulated period.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub reserve_balance_path: DatedFlows,
     /// Reserve interest earned each period, before routing to its destination.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub reserve_interest_paid: DatedFlows,
     /// Collateral draws funded from the reserve account over the simulation.
     pub draws_from_reserve: Money,
@@ -223,9 +232,17 @@ pub struct SimulationDiagnostics {
     /// Payment date on which an early-amortization event (or a coverage-test
     /// acceleration) ended the revolving period, when one fired.
     #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
     pub early_amortization_date: Option<Date>,
     /// Lender draws applied to notes, as `(tranche id, payment date, amount)`.
     #[serde(default)]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Vec<(String, finstack_quant_core::wire::DateWire, Money)>")
+    )]
     pub tranche_draws: Vec<(String, Date, Money)>,
 }
 

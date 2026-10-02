@@ -36,9 +36,14 @@ fn det_rand(seed_a: usize, seed_b: usize) -> f64 {
 fn monthly_dates(n: usize) -> Vec<String> {
     let end = Date::from_calendar_date(2024, Month::March, 15).unwrap();
     let periods_back = i32::try_from(n.saturating_sub(1)).unwrap();
-    let start = end.add_months(-periods_back);
+    let start = end.add_months(-periods_back).expect("valid date shift");
     (0..n)
-        .map(|index| start.add_months(i32::try_from(index).unwrap()).to_string())
+        .map(|index| {
+            start
+                .add_months(i32::try_from(index).unwrap())
+                .expect("valid date shift")
+                .to_string()
+        })
         .collect()
 }
 

@@ -1,0 +1,342 @@
+//! Curve-input entry points for the direct Hull-White calibrators.
+//!
+//! The solvers in this module's siblings take discount-factor closures on the
+//! ACT/365F model clock. Hosts hold calibrated [`DiscountCurve`] objects, so
+//! these functions own the curve-to-closure adaptation
+//! ([`ModelDiscountCurve`]) once for every caller: each curve is mapped from
+//! its own base date and day count to ACT/365F model years and normalized at
+//! the discount curve's base date.
+//!
+//! The curve forms use the regular synthetic schedules implied by the quote
+//! maturity and payment frequency, with no calendar or settlement adjustment.
+//! Convention-driven contractual schedules go through the plan-driven
+//! `hull_white` and `cap_floor_hull_white` engine steps.
+
+use super::{
+    bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn,
+    calibrate_hull_white_to_cap_floors_with_fn, calibrate_hull_white_to_swaptions_with_fn,
+    CapFloorCalibrationConfig, CapFloorQuote, HullWhiteCalibrationParams, HullWhiteParams,
+    PiecewiseSigmaCalibrationConfig, SwapFrequency, SwaptionQuote,
+};
+use crate::CalibrationReport;
+use finstack_quant_core::market_data::term_structures::DiscountCurve;
+use finstack_quant_core::Result;
+use finstack_quant_models::rates::clock::ModelDiscountCurve;
+
+/// Run `solve` with discount-factor closures for the discount and projection curves.
+///
+/// Both curves are normalized at the discount curve's base date and read on
+/// the ACT/365F model clock, each mapped from its own base date and day
+/// count; a lookup that fails yields `NaN`, which the solvers reject as an
+/// invalid discount factor.
+fn with_model_curves<T>(
+    discount: &DiscountCurve,
+    forward: Option<&DiscountCurve>,
+    solve: impl FnOnce(&(dyn Fn(f64) -> f64 + Sync), &(dyn Fn(f64) -> f64 + Sync)) -> Result<T>,
+) -> Result<T> {
+    let as_of = discount.base_date();
+    let model_discount = ModelDiscountCurve::new(discount, as_of)?;
+    let model_forward = ModelDiscountCurve::new(forward.unwrap_or(discount), as_of)?;
+    let discount_df = |t: f64| model_discount.get_df(t).unwrap_or(f64::NAN);
+    let forward_df = |t: f64| model_forward.get_df(t).unwrap_or(f64::NAN);
+    solve(&discount_df, &forward_df)
+}
+
+/// Calibrate scalar Hull-White `(κ, σ)` to ATM swaption quotes on a discount curve.
+///
+/// Curve-input form of [`calibrate_hull_white_to_swaptions_with_fn`] with the
+/// synthetic constant-period fixed-leg schedule (no contractual schedules).
+/// The curve is mapped from its day count to ACT/365F model years, normalized
+/// at its base date.
+///
+/// # Arguments
+///
+/// * `discount` - Discount curve the swap annuities and forward swap rates are
+///   read from. Its base date is the valuation date; times are ACT/365F years
+///   from that date.
+/// * `quotes` - At least two ATM swaption quotes (expiry and tenor in ACT/365F
+///   years from the discount curve's base date, volatility as a decimal:
+///   absolute rate volatility for normal quotes, Black volatility for
+///   lognormal quotes).
+/// * `frequency` - Fixed-leg payment frequency used to construct the synthetic
+///   swap schedules.
+/// * `initial_guess` - Optional positive solver seed for `(κ, σ)`; `None` uses
+///   the built-in starting point.
+/// * `fit_tolerance` - Required positive maximum reconstructed quote error:
+///   decimal rate volatility for normal quotes, relative volatility for Black
+///   quotes.
+///
+/// # Errors
+///
+/// Returns a validation error for a non-positive `fit_tolerance`, fewer than
+/// two quotes, an invalid quote or an unusable discount curve, and a
+/// calibration error when the solver does not converge. A converged fit
+/// outside `fit_tolerance` is not an error: it returns a report with
+/// `success = false`.
+pub fn calibrate_hull_white_to_swaptions(
+    discount: &DiscountCurve,
+    quotes: &[SwaptionQuote],
+    frequency: SwapFrequency,
+    initial_guess: Option<HullWhiteCalibrationParams>,
+    fit_tolerance: f64,
+) -> Result<(HullWhiteCalibrationParams, CalibrationReport)> {
+    with_model_curves(discount, None, |df, _| {
+        calibrate_hull_white_to_swaptions_with_fn(
+            df,
+            quotes,
+            frequency,
+            None,
+            initial_guess,
+            fit_tolerance,
+        )
+    })
+}
+
+/// Calibrate scalar Hull-White `(κ, σ)` to cap/floor quotes on market curves.
+///
+/// Curve-input form of [`calibrate_hull_white_to_cap_floors_with_fn`] with
+/// the synthetic caplet schedule implied by `config.frequency` (no
+/// contractual schedules). Both curves are normalized at
+/// `discount.base_date()` and mapped from their own day counts to ACT/365F
+/// model years.
+///
+/// # Arguments
+///
+/// * `discount` - Discounting curve; its base date is the valuation date and
+///   times are ACT/365F years from that date.
+/// * `forward` - Curve projecting the caplet forwards from ratios of its
+///   discount factors, with its own base date and day count, normalized at
+///   the discount curve's base date. `None` projects on `discount`
+///   (single-curve).
+/// * `quotes` - Normal (Bachelier) cap or floor quotes (maturity in ACT/365F
+///   years from the discount curve's base date, strike and volatility as
+///   decimals). A single quote requires `config.fixed_kappa`.
+/// * `config` - Fit tolerance in normal-vol units, caplet payment frequency,
+///   optional fixed mean reversion and optional solver seed.
+///
+/// # Errors
+///
+/// Returns a validation error when no quotes are supplied, a single quote is
+/// given without `config.fixed_kappa`, the tolerance is not positive or a
+/// curve is unusable, and a calibration error when the solver does not
+/// converge. A converged fit outside the configured tolerance is not an
+/// error: it returns a report with `success = false`.
+pub fn calibrate_hull_white_to_cap_floors(
+    discount: &DiscountCurve,
+    forward: Option<&DiscountCurve>,
+    quotes: &[CapFloorQuote],
+    config: CapFloorCalibrationConfig,
+) -> Result<(HullWhiteCalibrationParams, CalibrationReport)> {
+    with_model_curves(discount, forward, |discount_df, forward_df| {
+        calibrate_hull_white_to_cap_floors_with_fn(discount_df, forward_df, quotes, None, config)
+    })
+}
+
+/// Bootstrap a piecewise-constant Hull-White sigma schedule to cap/floor quotes on market curves.
+///
+/// Curve-input form of [`bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn`]
+/// with the synthetic caplet schedule implied by `config.frequency` (no
+/// contractual schedules). Both curves use ACT/365F model time normalized at
+/// `discount.base_date()`.
+///
+/// # Arguments
+///
+/// * `discount` - Discounting curve; its base date is the valuation date and
+///   times are ACT/365F years from that date.
+/// * `forward` - Curve projecting the caplet forwards, mapped from its own
+///   base date and day count and normalized at the discount curve's base
+///   date. `None` projects on `discount`.
+/// * `quotes` - Normal (Bachelier) cap or floor quotes with distinct
+///   maturities in ACT/365F years from the discount curve's base date and
+///   volatility in decimal rate units; each maturity adds one constant-sigma
+///   interval.
+/// * `config` - Fixed mean reversion, positive sigma search bracket (absolute
+///   rate volatility), fit tolerance and caplet payment frequency.
+///
+/// # Errors
+///
+/// Returns a validation error when no quotes are supplied, maturities repeat,
+/// the configuration bounds are invalid or a curve is unusable, and an error
+/// when an interval's sigma cannot be bracketed or solved. A solved schedule
+/// outside the configured tolerance is not an error: it returns a report with
+/// `success = false`.
+pub fn bootstrap_hull_white_sigma_schedule_to_cap_floors(
+    discount: &DiscountCurve,
+    forward: Option<&DiscountCurve>,
+    quotes: &[CapFloorQuote],
+    config: PiecewiseSigmaCalibrationConfig,
+) -> Result<(HullWhiteParams, CalibrationReport)> {
+    with_model_curves(discount, forward, |discount_df, forward_df| {
+        bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
+            discount_df,
+            forward_df,
+            quotes,
+            None,
+            config,
+        )
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use finstack_quant_core::dates::{Date, DayCount};
+    use finstack_quant_core::math::interp::InterpStyle;
+    use time::Month;
+
+    fn flat_curve(id: &str, rate: f64) -> DiscountCurve {
+        let base = Date::from_calendar_date(2026, Month::January, 2).expect("date");
+        let knots: Vec<(f64, f64)> = [0.0, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0]
+            .iter()
+            .map(|&t: &f64| (t, (-rate * t).exp()))
+            .collect();
+        DiscountCurve::builder(id)
+            .base_date(base)
+            .day_count(DayCount::Act365F)
+            .knots(knots)
+            .build()
+            .expect("curve")
+    }
+
+    fn cap_quotes() -> Vec<CapFloorQuote> {
+        [(1.0, 0.0070), (2.0, 0.0075), (5.0, 0.0080)]
+            .iter()
+            .map(|&(maturity, vol)| {
+                CapFloorQuote::try_new(maturity, 0.03, vol, true, true).expect("quote")
+            })
+            .collect()
+    }
+
+    #[test]
+    fn curve_form_matches_the_closure_form() {
+        let curve = flat_curve("USD-OIS", 0.03);
+        let config = PiecewiseSigmaCalibrationConfig {
+            fit_tolerance: 1e-6,
+            fixed_kappa: 0.03,
+            sigma_min: 1e-5,
+            sigma_max: 0.1,
+            frequency: SwapFrequency::SemiAnnual,
+        };
+        let (from_curve, _) =
+            bootstrap_hull_white_sigma_schedule_to_cap_floors(&curve, None, &cap_quotes(), config)
+                .expect("curve form");
+        let model = ModelDiscountCurve::new(&curve, curve.base_date()).expect("model curve");
+        let df = |t: f64| model.get_df(t).unwrap_or(f64::NAN);
+        let (from_closure, _) = bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn(
+            &df,
+            &df,
+            &cap_quotes(),
+            None,
+            config,
+        )
+        .expect("closure form");
+        assert_eq!(from_curve, from_closure);
+    }
+
+    #[test]
+    fn omitted_forward_projects_on_the_discount_curve() {
+        let curve = flat_curve("USD-OIS", 0.03);
+        let config = CapFloorCalibrationConfig {
+            fit_tolerance: 1e-4,
+            frequency: SwapFrequency::SemiAnnual,
+            fixed_kappa: Some(0.03),
+            initial_guess: None,
+        };
+        let quote = [cap_quotes()[1]];
+        let (single, _) =
+            calibrate_hull_white_to_cap_floors(&curve, None, &quote, config).expect("single curve");
+        let (explicit, _) =
+            calibrate_hull_white_to_cap_floors(&curve, Some(&curve), &quote, config)
+                .expect("explicit forward");
+        assert_eq!(single, explicit);
+    }
+
+    #[test]
+    fn curve_adapter_preserves_distinct_dates_and_day_counts() {
+        let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
+        let forward_base = Date::from_calendar_date(2024, Month::January, 1).expect("valid date");
+        let discount = DiscountCurve::builder("DISCOUNT")
+            .base_date(as_of)
+            .day_count(DayCount::Act360)
+            .knots([(0.0, 1.0), (20.0, (-0.03_f64 * 20.0).exp())])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .expect("valid curve");
+        let forward = DiscountCurve::builder("FORWARD")
+            .base_date(forward_base)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (20.0, (-0.04_f64 * 20.0).exp())])
+            .interp(InterpStyle::LogLinear)
+            .build()
+            .expect("valid curve");
+        let quotes = [CapFloorQuote::try_new(5.0, 0.04, 0.009, true, true).expect("valid quote")];
+        let config = CapFloorCalibrationConfig {
+            fit_tolerance: 1e-5,
+            frequency: SwapFrequency::Quarterly,
+            fixed_kappa: Some(0.03),
+            initial_guess: None,
+        };
+        let discount_df = |time: f64| (-0.03 * time * 365.0 / 360.0).exp();
+        let forward_df = |time: f64| (-0.04 * time).exp();
+        let (expected, _) = calibrate_hull_white_to_cap_floors_with_fn(
+            &discount_df,
+            &forward_df,
+            &quotes,
+            None,
+            config,
+        )
+        .expect("reference fit");
+        let (actual, report) =
+            calibrate_hull_white_to_cap_floors(&discount, Some(&forward), &quotes, config)
+                .expect("curve fit");
+        assert!(report.success);
+        assert!((actual.sigma - expected.sigma).abs() < 1e-12);
+    }
+
+    #[test]
+    fn swaption_curve_form_requires_two_quotes() {
+        let curve = flat_curve("USD-OIS", 0.03);
+        let quote = [SwaptionQuote::try_new(1.0, 5.0, 0.0065, true).expect("quote")];
+        let error = calibrate_hull_white_to_swaptions(
+            &curve,
+            &quote,
+            SwapFrequency::SemiAnnual,
+            None,
+            1e-4,
+        )
+        .expect_err("one quote cannot fit two parameters");
+        assert!(error.to_string().contains("at least 2 swaption quotes"));
+    }
+
+    #[test]
+    fn swap_frequency_parses_its_wire_labels() {
+        for frequency in [
+            SwapFrequency::Annual,
+            SwapFrequency::SemiAnnual,
+            SwapFrequency::Quarterly,
+        ] {
+            assert_eq!(
+                frequency.to_string().parse::<SwapFrequency>().ok(),
+                Some(frequency)
+            );
+        }
+        assert!("monthly".parse::<SwapFrequency>().is_err());
+    }
+
+    #[test]
+    fn configs_deserialize_with_the_default_frequency() {
+        let scalar: CapFloorCalibrationConfig =
+            serde_json::from_str(r#"{"fit_tolerance": 1e-4}"#).expect("scalar config");
+        assert_eq!(scalar.frequency, SwapFrequency::SemiAnnual);
+        assert!(scalar.fixed_kappa.is_none() && scalar.initial_guess.is_none());
+        let piecewise: PiecewiseSigmaCalibrationConfig = serde_json::from_str(
+            r#"{"fit_tolerance": 1e-4, "fixed_kappa": 0.03, "sigma_min": 1e-4, "sigma_max": 0.1}"#,
+        )
+        .expect("piecewise config");
+        assert_eq!(piecewise.frequency, SwapFrequency::SemiAnnual);
+        assert!(serde_json::from_str::<CapFloorCalibrationConfig>(
+            r#"{"fit_tolerance": 1e-4, "kappa": 0.03}"#
+        )
+        .is_err());
+    }
+}

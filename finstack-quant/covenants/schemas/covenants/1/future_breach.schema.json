@@ -1,0 +1,62 @@
+{
+  "$defs": {
+    "DateWire": {
+      "description": "ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.",
+      "format": "date",
+      "type": "string"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/covenants/1/future_breach.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A projected covenant breach.",
+  "properties": {
+    "breach_date": {
+      "$ref": "#/$defs/DateWire",
+      "description": "Date of the breach"
+    },
+    "breach_probability": {
+      "description": "Probability of breach (if stochastic)",
+      "format": "double",
+      "type": "number"
+    },
+    "covenant_description": {
+      "description": "Human-readable covenant description.",
+      "type": "string"
+    },
+    "covenant_id": {
+      "description": "Stable covenant instance identifier.",
+      "type": "string"
+    },
+    "headroom": {
+      "description": "Headroom (negative means breach), if meaningful and finite.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "projected_value": {
+      "description": "Projected value, if finite.",
+      "format": "double",
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "threshold": {
+      "description": "Threshold value",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "covenant_id",
+    "covenant_description",
+    "breach_date",
+    "threshold",
+    "breach_probability"
+  ],
+  "title": "FutureBreach",
+  "type": "object"
+}

@@ -1,0 +1,57 @@
+{
+  "$defs": {
+    "CorkscrewStatus": {
+      "description": "Status of a corkscrew validation run.",
+      "oneOf": [
+        {
+          "const": "success",
+          "description": "Validation completed without fatal errors",
+          "type": "string"
+        },
+        {
+          "const": "failed",
+          "description": "Validation surfaced fatal errors",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/corkscrew_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Report produced by `CorkscrewExtension::execute`.",
+  "properties": {
+    "data": {
+      "additionalProperties": true,
+      "description": "Structured output (e.g. per-account validations as JSON)",
+      "type": "object"
+    },
+    "errors": {
+      "description": "Errors (fatal in strict mode, otherwise reported)",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "message": {
+      "description": "Human-readable summary",
+      "type": "string"
+    },
+    "status": {
+      "$ref": "#/$defs/CorkscrewStatus",
+      "description": "Overall execution status"
+    },
+    "warnings": {
+      "description": "Warnings (non-fatal)",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "message"
+  ],
+  "title": "CorkscrewReport",
+  "type": "object"
+}

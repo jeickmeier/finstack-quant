@@ -31,15 +31,6 @@ impl PyTenorUnit {
     pub(crate) const fn from_inner(inner: TenorUnit) -> Self {
         Self { inner }
     }
-
-    const fn designator(self) -> char {
-        match self.inner {
-            TenorUnit::Days => 'D',
-            TenorUnit::Weeks => 'W',
-            TenorUnit::Months => 'M',
-            TenorUnit::Years => 'Y',
-        }
-    }
 }
 
 #[pymethods]
@@ -86,7 +77,7 @@ impl PyTenorUnit {
     /// Support ``pickle`` by reconstructing through ``TenorUnit.from_char``.
     fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
         let from_char = py.get_type::<Self>().getattr("from_char")?;
-        Ok((from_char, (self.designator().to_string(),)))
+        Ok((from_char, (self.inner.designator().to_string(),)))
     }
 
     fn __repr__(&self) -> String {
@@ -100,7 +91,7 @@ impl PyTenorUnit {
     }
 
     fn __str__(&self) -> String {
-        self.designator().to_string()
+        self.inner.designator().to_string()
     }
 }
 
@@ -386,7 +377,7 @@ impl PyTenor {
             calendar.map(extract_calendar).transpose()?;
         let conv = match business_day_convention {
             Some(c) => extract_business_day_convention(c)?,
-            None => BusinessDayConvention::ModifiedFollowing,
+            None => BusinessDayConvention::default(),
         };
         let end = self.inner.add_to_date(d, cal, conv).map_err(core_to_py)?;
         date_to_py(py, end)
@@ -438,7 +429,7 @@ impl PyTenor {
             calendar.map(extract_calendar).transpose()?;
         let conv = match business_day_convention {
             Some(c) => extract_business_day_convention(c)?,
-            None => BusinessDayConvention::ModifiedFollowing,
+            None => BusinessDayConvention::default(),
         };
         let day_count = crate::bindings::core::dates::daycount::extract_day_count(day_count)?;
         self.inner

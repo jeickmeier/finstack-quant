@@ -41,6 +41,7 @@ pl_summary_report_text = _sa.pl_summary_report_text
 credit_assessment_report_text = _sa.credit_assessment_report_text
 credit_assessment = _sa.credit_assessment
 DependencyTracer = _sa.DependencyTracer
+DependencyTree = _sa.DependencyTree
 explain_formula = _sa.explain_formula
 explain_formula_text = _sa.explain_formula_text
 run_checks = _sa.run_checks
@@ -152,6 +153,7 @@ __all__: list[str] = [
     "CreditScorecardExtension",
     "DcfSensitivityResult",
     "DependencyTracer",
+    "DependencyTree",
     "DimensionScore",
     "EclBucket",
     "EclResult",

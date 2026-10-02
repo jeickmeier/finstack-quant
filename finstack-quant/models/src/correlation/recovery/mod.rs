@@ -25,9 +25,8 @@
 //! - the bounded transform maps the shocked recovery smoothly into
 //!   `[min_R, max_R]`
 //!
-//! The sign convention for `Z` is caller-defined. In the current implementation,
-//! the preset calibrations use a negative `ρ_R`, so negative factor realizations
-//! increase recovery and positive realizations decrease it.
+//! Low `Z` is the canonical stress state. Preset calibrations use positive
+//! `ρ_R`, so negative factor realizations decrease recovery.
 //!
 //! # References
 //!
@@ -184,7 +183,8 @@ impl RecoverySpec {
     /// Create market-correlated recovery specification.
     ///
     /// # Arguments
-    /// * `mean` - Mean recovery rate in [0.0, 1.0]. Typical: 0.40
+    /// * `mean` - Recovery at zero factor in [0.0, 1.0]. Endpoints produce
+    ///   constant zero or full recovery. Typical: 0.40.
     /// * `vol` - Recovery volatility, clamped to [0.0, 0.5]. Typical: 0.20-0.30
     /// * `corr` - Correlation with factor, clamped to [-1.0, 1.0]. Typical: +0.30 to +0.50
     ///   (positive under the canonical low-factor-stress convention)
@@ -329,6 +329,16 @@ fn validate_recovery_input(field: &str, value: f64, min: f64, max: f64) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn building_preserves_every_accepted_recovery_location() {
+        for mean in [0.0, 0.01, 0.03, 0.40, 0.98, 1.0] {
+            let spec = RecoverySpec::market_correlated(mean, 0.0, 0.4).expect("valid recovery");
+            let model = spec.build();
+            assert!((model.conditional_recovery(0.0) - mean).abs() < 1e-12);
+            assert!((model.expected_recovery() - mean).abs() < 1e-12);
+        }
+    }
 
     #[test]
     fn test_recovery_spec_default() {

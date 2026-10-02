@@ -14,7 +14,7 @@ use super::statistics::{
 };
 use super::validation::validation_err;
 use crate::factor::credit::hierarchy::{
-    CalibrationDiagnostics, CreditHierarchySpec, FactorCorrelationMatrix, FactorHistories,
+    CreditCalibrationDiagnostics, CreditHierarchySpec, FactorCorrelationMatrix, FactorHistories,
     FactorVolModel, FitQuality, FoldUpRecord, IdiosyncraticVolModel, IssuerBetaMode, IssuerBetaRow,
     IssuerBetas, IssuerTags, LevelAnchor, LevelsAtAnchor, VolState,
 };
@@ -217,8 +217,8 @@ pub(crate) fn assemble_factor_model_config(
             // Ledoit-Wolf shrinkage over complete-case observations. Unlike
             // Ridge/FullSampleRepaired, both ρ and the covariance diagonal
             // come from the shrunk estimator; `vol_state` keeps the
-            // vol-model variances (precedent: Ridge already stores a Σ whose
-            // diagonal differs from vol_state by α).
+            // unregularized vol-model variances for diagnostics. Horizon
+            // forecasts scale the calibrated covariance itself.
             let (corr_rows, cov_ann) =
                 ledoit_wolf_cov_and_corr(factor_id_order, factor_returns, annualization_factor)?;
             let corr =
@@ -251,9 +251,9 @@ pub(crate) fn assemble_factor_model_config(
         pricing_mode: PricingMode::DeltaBased,
         risk_measure: Default::default(),
         bump_config: None,
-        // Warn rather than the silent Residual default: a calibrated
-        // artifact knows its factor universe, so a runtime issuer matching
-        // a bucket outside it is a data gap worth surfacing.
+        // Calibrated artifacts explicitly select Warn: a runtime issuer
+        // matching a bucket outside their factor universe is surfaced as a
+        // data gap without rejecting the exploratory analysis.
         unmatched_policy: Some(crate::factor::UnmatchedPolicy::Warn),
     };
 
@@ -334,7 +334,7 @@ pub(super) fn build_diagnostics(
     fold_ups: Vec<FoldUpRecord>,
     fit_quality: &BTreeMap<IssuerId, FitQuality>,
     tag_taxonomy: BTreeMap<String, BTreeSet<String>>,
-) -> CalibrationDiagnostics {
+) -> CreditCalibrationDiagnostics {
     let mut mode_counts: BTreeMap<String, usize> = BTreeMap::new();
     mode_counts.insert("issuer_beta".to_owned(), 0);
     mode_counts.insert("bucket_only".to_owned(), 0);
@@ -380,7 +380,7 @@ pub(super) fn build_diagnostics(
         Some(hist)
     };
 
-    CalibrationDiagnostics {
+    CreditCalibrationDiagnostics {
         mode_counts,
         bucket_sizes_per_level,
         fold_ups,

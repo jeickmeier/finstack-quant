@@ -1,12 +1,49 @@
 {
   "artifacts": [
     {
+      "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
+      "bytes": 1125089,
+      "kind": "output",
+      "path": "schemas/scenarios/1/application_envelope.schema.json",
+      "summary": "Scenario application result: mutated market, model and instruments with the report.",
+      "title": "ApplicationEnvelope",
+      "type_name": "ApplicationEnvelope"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/scenarios/1/horizon_result.schema.json",
+      "bytes": 119320,
+      "kind": "output",
+      "path": "schemas/scenarios/1/horizon_result.schema.json",
+      "summary": "Horizon total return: factor-decomposed P&L with scenario context.",
+      "title": "HorizonResult",
+      "type_name": "HorizonResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/scenarios/1/horizon_summary.schema.json",
+      "bytes": 21117,
+      "kind": "output",
+      "path": "schemas/scenarios/1/horizon_summary.schema.json",
+      "summary": "Derived total, annualized and per-factor returns of a horizon result.",
+      "title": "HorizonSummary",
+      "type_name": "HorizonSummary"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/scenarios/1/scenario.schema.json",
-      "bytes": 106220,
+      "bytes": 103280,
       "kind": "input",
       "path": "schemas/scenarios/1/scenario.schema.json",
       "summary": "Ordered shock and roll operations over market, statement and valuation targets.",
-      "title": "Finstack Quant Scenario Specification"
+      "title": "Finstack Quant Scenario Specification",
+      "type_name": "ScenarioEnvelope"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/scenarios/1/template_metadata.schema.json",
+      "bytes": 4822,
+      "kind": "output",
+      "path": "schemas/scenarios/1/template_metadata.schema.json",
+      "summary": "Descriptive metadata of a built-in scenario template.",
+      "title": "TemplateMetadata",
+      "type_name": "TemplateMetadata"
     }
   ],
   "schema_index_version": 1

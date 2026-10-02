@@ -26,37 +26,30 @@ const HORIZONS: [(&str, &str); 3] = [
 /// `(fixture, horizons, reason)` for theta runs that are expected to fail.
 /// A listed run that succeeds fails the test, so entries cannot go stale.
 const EXPECTED_FAILURES: &[(&str, &[&str], &str)] = &[
-    // Instrument-held observation state: not market-held fixings.
+    // Market-held observations the rolled repricing does not yet receive.
     (
-        "golden/quantlib/asian_option/spx_arithmetic_asian_call_1y_quantlib",
-        &["6M"],
-        S16B,
+        "golden/bloomberg/cap_floor/usd_cap_5y_atm_black",
+        &["1M", "6M"],
+        CAP_FIXINGS,
     ),
+    (
+        "golden/regression_goldens/structured_credit/abs_credit_card_senior",
+        &["1M", "6M"],
+        SC_FIXINGS,
+    ),
+    (
+        "golden/regression_goldens/structured_credit/clo_mezzanine_base_case",
+        &["1M", "6M"],
+        SC_FIXINGS,
+    ),
+    ("registry/variance_swap", &["1M", "6M"], PRICE_SERIES),
+    ("registry/fx_variance_swap", &["1M", "6M"], PRICE_SERIES),
+    // Instrument-held state that `Instrument::theta_observed_state` does not roll.
     (
         "golden/quantlib/asian_option/spx_geometric_asian_call_1y_quantlib",
         &["6M"],
-        S16B,
+        "the rolled trade is a seasoned geometric Asian, which has no analytical pricer",
     ),
-    (
-        "golden/quantlib/fx_barrier_option/eurusd_up_in_call_rebate_at_expiry_3m_quantlib",
-        &["1D", "1M"],
-        S16B,
-    ),
-    (
-        "golden/quantlib/fx_barrier_option/eurusd_up_out_call_3m_quantlib",
-        &["1D", "1M"],
-        S16B,
-    ),
-    (
-        "golden/quantlib/fx_barrier_option/eurusd_up_out_call_rebate_at_hit_3m_quantlib",
-        &["1D", "1M"],
-        S16B,
-    ),
-    ("registry/asian_option", &["6M"], S16B),
-    ("registry/autocallable", &["6M"], S16B),
-    ("registry/cliquet_option", &["6M"], S16B),
-    ("registry/fx_barrier_option", &["1D", "1M", "6M"], S16B),
-    ("registry/fx_touch_option", &["1D", "1M", "6M"], S16B),
     ("registry/trs_equity", &["1M", "6M"], HELD),
     ("registry/trs_fixed_income_index", &["1M", "6M"], HELD),
     ("registry/range_accrual", &["6M"], HELD),
@@ -96,7 +89,9 @@ const EXPECTED_FAILURES: &[(&str, &[&str], &str)] = &[
     ),
 ];
 
-const S16B: &str = "instrument-held observation state (barrier breach, Asian/autocall/cliquet fixings) inside the roll; rolled by Instrument::theta_observed_state (S16b, a1101cd59 on fix/wasm-binding-audit)";
+const CAP_FIXINGS: &str = "the CapFloor theta calculator reprices without the caplet fixings the horizon crosses; its schedule records no projected fixings";
+const SC_FIXINGS: &str = "the structured-credit schedule records no projected fixings, so the SOFR-3M resets the roll crosses are not materialized";
+const PRICE_SERIES: &str = "observed price series are not extended over the roll and variance swaps have no theta_observed_state";
 const HELD: &str = "instrument-held period state (TRS period-start level, range-accrual in-range count) is not rolled; needs a theta_observed_state extension";
 const NO_SCHEDULE: &str =
     "physically settled forward has no standalone cashflow schedule for period cash";

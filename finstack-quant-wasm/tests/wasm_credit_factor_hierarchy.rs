@@ -8,6 +8,7 @@
 use finstack_quant_wasm::api::models::factor::{
     JsCreditCalibrator, JsCreditFactorModel, JsFactorCovarianceForecast,
 };
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 // ---- helpers ----------------------------------------------------------------
@@ -99,8 +100,8 @@ fn minimal_inputs_json() -> String {
 fn credit_factor_model_round_trips_through_json() {
     let json =
         include_str!("../../finstack-quant/models/tests/data/canonical/credit_factor_model.json");
-    let model =
-        JsCreditFactorModel::from_json(json).expect("from_json must succeed on golden artifact");
+    let model = JsCreditFactorModel::from_json(JsValue::from(json))
+        .expect("from_json must succeed on golden artifact");
     let out = model.to_json().expect("to_json must succeed");
 
     let parsed_in: serde_json::Value = serde_json::from_str(json).unwrap();
@@ -119,10 +120,10 @@ fn calibrate_then_decompose_round_trip() {
     let config_json = minimal_config_json();
     let inputs_json = minimal_inputs_json();
 
-    let calibrator =
-        JsCreditCalibrator::new(&config_json).expect("JsCreditCalibrator::new must succeed");
+    let calibrator = JsCreditCalibrator::new(Some(JsValue::from(&config_json)))
+        .expect("JsCreditCalibrator::new must succeed");
     let model = calibrator
-        .calibrate(&inputs_json)
+        .calibrate(JsValue::from(&inputs_json))
         .expect("calibrate must succeed on minimal inputs");
     let model_json = model.to_json().expect("to_json must succeed");
 
@@ -135,22 +136,62 @@ fn calibrate_then_decompose_round_trip() {
     assert_eq!(model.schema(), "finstack_quant.credit_factor_model/1");
 }
 
+/// Level indices are strict whole numbers: `1.5` and `-1` throw instead of
+/// truncating or wrapping to another hierarchy level.
+#[wasm_bindgen_test]
+fn level_values_reject_non_integer_indices() {
+    let calibrator = JsCreditCalibrator::new(Some(JsValue::from(&minimal_config_json())))
+        .expect("JsCreditCalibrator::new must succeed");
+    let model = calibrator
+        .calibrate(JsValue::from(&minimal_inputs_json()))
+        .expect("calibrate must succeed on minimal inputs");
+    let spreads = r#"{"ISSUER-A": 0.0150, "ISSUER-B": 0.0175, "ISSUER-C": 0.0200}"#;
+    let levels = finstack_quant_wasm::api::models::factor::decompose_levels(
+        &model,
+        JsValue::from(spreads),
+        JsValue::from(0.0100),
+        JsValue::from("2024-03-31"),
+        None,
+    )
+    .expect("decompose_levels");
+    assert!(levels.level_values(JsValue::from(0)).is_ok());
+    for bad in [JsValue::from(1.5), JsValue::from(-1), JsValue::from("0")] {
+        assert!(levels.level_values(bad).is_err());
+    }
+}
+
 #[wasm_bindgen_test]
 fn covariance_forecast_returns_structured_objects() {
-    let calibrator = JsCreditCalibrator::new(&minimal_config_json()).expect("calibrator");
-    let model = calibrator.calibrate(&minimal_inputs_json()).expect("model");
+    let calibrator =
+        JsCreditCalibrator::new(Some(JsValue::from(&minimal_config_json()))).expect("calibrator");
+    let model = calibrator
+        .calibrate(JsValue::from(&minimal_inputs_json()))
+        .expect("model");
     let forecast = JsFactorCovarianceForecast::new(&model);
 
-    let covariance = forecast.covariance_at("one_step").expect("covariance");
+    let covariance = forecast
+        .covariance_at(JsValue::from("one_step"))
+        .expect("covariance");
     let covariance: serde_json::Value = serde_wasm_bindgen::from_value(covariance).unwrap();
     assert!(covariance["factor_ids"].is_array());
     assert!(covariance["data"].is_array());
 
     let config = forecast
-        .factor_model_at("one_step", "\"variance\"")
+        .factor_model_at(
+            JsValue::from("one_step"),
+            Some(JsValue::from("\"variance\"")),
+        )
         .expect("factor model");
     let config: serde_json::Value = serde_wasm_bindgen::from_value(config).unwrap();
     assert!(config["factors"].is_array());
     assert!(config["covariance"].is_object());
     assert_eq!(config["risk_measure"], "variance");
+
+    // Omitted risk measure resolves to the Rust `RiskMeasure::default()`.
+    let defaulted = forecast
+        .factor_model_at(JsValue::from("one_step"), None)
+        .expect("default risk measure");
+    let defaulted: serde_json::Value = serde_wasm_bindgen::from_value(defaulted).unwrap();
+    assert_eq!(defaulted["risk_measure"], "variance");
+    assert!(JsCreditCalibrator::new(None).is_ok());
 }

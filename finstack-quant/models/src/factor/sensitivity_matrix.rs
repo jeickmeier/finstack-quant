@@ -4,13 +4,22 @@
 //! delta-based and full-repricing factor sensitivity engines.
 
 use crate::factor::FactorId;
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Positions x factors sensitivity matrix stored in row-major order.
 ///
-/// Serializes with serde as `{position_ids, factor_ids, data, n_factors}`
-/// where `data` is the flat row-major slice; this is the wire form host
-/// bindings use for `to_json` / `from_json`.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+/// Serializes as `{position_ids, factor_ids, data}`, where `data` contains one
+/// nested row per position and one finite entry per factor. Deserialization
+/// validates the complete shape through [`SensitivityMatrix::from_rows`] before
+/// flattening rows into engine storage. Host bindings exchange the
+/// reporting-currency-tagged row layout owned by the portfolio crate, which
+/// converts back into a matrix through the same constructor.
+///
+/// # Invariants
+///
+/// - The storage holds exactly `n_positions() * n_factors()` values.
+#[derive(Debug, Clone, PartialEq)]
 pub struct SensitivityMatrix {
     position_ids: Vec<String>,
     factor_ids: Vec<FactorId>,
@@ -18,8 +27,128 @@ pub struct SensitivityMatrix {
     n_factors: usize,
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SensitivityMatrixWire {
+    position_ids: Vec<String>,
+    factor_ids: Vec<FactorId>,
+    data: Vec<Vec<f64>>,
+}
+
+impl Serialize for SensitivityMatrix {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let rows: Vec<&[f64]> = (0..self.n_positions())
+            .map(|index| self.position_deltas(index))
+            .collect();
+        let mut state = serializer.serialize_struct("SensitivityMatrix", 3)?;
+        state.serialize_field("position_ids", &self.position_ids)?;
+        state.serialize_field("factor_ids", &self.factor_ids)?;
+        state.serialize_field("data", &rows)?;
+        state.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for SensitivityMatrix {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let wire = SensitivityMatrixWire::deserialize(deserializer)?;
+        Self::from_rows(wire.position_ids, wire.factor_ids, wire.data)
+            .map_err(serde::de::Error::custom)
+    }
+}
+
 impl SensitivityMatrix {
+    /// Build a matrix from one row of factor sensitivities per position.
+    ///
+    /// Row `i` holds the sensitivities of `position_ids[i]` to each factor in
+    /// `factor_ids` order, in the same monetary units as the engine output
+    /// (PV change per factor bump). Values are stored unchanged and must be
+    /// finite.
+    ///
+    /// # Arguments
+    ///
+    /// * `position_ids` - Ordered position identifiers, one per row.
+    /// * `factor_ids` - Ordered factor identifiers, one per column.
+    /// * `rows` - Row-major finite sensitivities, `rows[position][factor]`;
+    ///   there must be one row per position and each row must hold one value
+    ///   per factor. An empty factor axis requires empty rows, and an empty
+    ///   position axis requires no rows.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when the row count
+    /// differs from the number of positions, when a row's length differs from
+    /// the number of factors (the error names the offending row), when an
+    /// entry is non-finite, or when the dimensions' product overflows `usize`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_models::factor::{FactorId, SensitivityMatrix};
+    ///
+    /// let matrix = SensitivityMatrix::from_rows(
+    ///     vec!["A".into(), "B".into()],
+    ///     vec![FactorId::new("Rates"), FactorId::new("Credit")],
+    ///     vec![vec![1.0, 2.0], vec![3.0, -1.0]],
+    /// )?;
+    /// assert_eq!(matrix.delta(1, 0), 3.0);
+    /// assert!(SensitivityMatrix::from_rows(
+    ///     vec!["A".into(), "B".into()],
+    ///     vec![FactorId::new("Rates")],
+    ///     vec![vec![1.0]],
+    /// )
+    /// .is_err());
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn from_rows(
+        position_ids: Vec<String>,
+        factor_ids: Vec<FactorId>,
+        rows: Vec<Vec<f64>>,
+    ) -> finstack_quant_core::Result<Self> {
+        let n_positions = position_ids.len();
+        let n_factors = factor_ids.len();
+        let length = n_positions.checked_mul(n_factors).ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "sensitivity matrix dimensions overflow usize".to_string(),
+            )
+        })?;
+        if rows.len() != n_positions {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "sensitivity data has {} row(s) but position_ids declares {n_positions} \
+                 position(s)",
+                rows.len()
+            )));
+        }
+        for (position_index, row) in rows.iter().enumerate() {
+            if row.len() != n_factors {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "sensitivity data row {position_index} has {} element(s) but factor_ids \
+                     declares {n_factors} factor(s)",
+                    row.len()
+                )));
+            }
+            if let Some(factor_index) = row.iter().position(|value| !value.is_finite()) {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "sensitivity for position '{}' on factor '{}' must be finite",
+                    position_ids[position_index], factor_ids[factor_index]
+                )));
+            }
+        }
+        let mut data = Vec::with_capacity(length);
+        data.extend(rows.into_iter().flatten());
+        Ok(Self {
+            position_ids,
+            factor_ids,
+            data,
+            n_factors,
+        })
+    }
+
     /// Create a zero-initialized matrix with the provided axes.
+    ///
+    /// # Arguments
+    ///
+    /// * `position_ids` - Ordered position identifiers defining the matrix rows.
+    /// * `factor_ids` - Ordered factor identifiers defining the matrix columns.
     #[must_use]
     pub fn zeros(position_ids: Vec<String>, factor_ids: Vec<FactorId>) -> Self {
         let n_positions = position_ids.len();
@@ -84,6 +213,13 @@ impl SensitivityMatrix {
     }
 
     /// Set a matrix element.
+    ///
+    /// # Arguments
+    ///
+    /// * `position_idx` - Zero-based position row index.
+    /// * `factor_idx` - Zero-based factor column index.
+    /// * `value` - Sensitivity in the matrix's exposure and factor bump units.
+    ///
     /// # Panics
     ///
     /// Panics when either index is out of bounds (hard assert; see
@@ -128,11 +264,106 @@ impl SensitivityMatrix {
     }
 
     /// Return a materialized column for a factor.
+    ///
+    /// # Arguments
+    ///
+    /// * `factor_idx` - Zero-based column index into [`Self::factor_ids`]. Must
+    ///   be strictly less than [`Self::n_factors`].
+    ///
+    /// # Panics
+    ///
+    /// Panics when `factor_idx` is out of bounds (hard assert; see
+    /// [`Self::delta`]).
     #[must_use]
     pub fn factor_deltas(&self, factor_idx: usize) -> Vec<f64> {
         (0..self.n_positions())
             .map(|position_idx| self.delta(position_idx, factor_idx))
             .collect()
+    }
+
+    fn check_position(&self, position_idx: usize) -> finstack_quant_core::Result<()> {
+        if position_idx < self.n_positions() {
+            return Ok(());
+        }
+        Err(finstack_quant_core::Error::Validation(format!(
+            "position_idx {position_idx} out of bounds for {} positions",
+            self.n_positions()
+        )))
+    }
+
+    fn check_factor(&self, factor_idx: usize) -> finstack_quant_core::Result<()> {
+        if factor_idx < self.n_factors {
+            return Ok(());
+        }
+        Err(finstack_quant_core::Error::Validation(format!(
+            "factor_idx {factor_idx} out of bounds for {} factors",
+            self.n_factors
+        )))
+    }
+
+    /// Read a matrix element, rejecting an out-of-range index.
+    ///
+    /// Fallible form of [`Self::delta`] for callers that take indices from
+    /// outside (the Python and WASM bindings).
+    ///
+    /// # Arguments
+    ///
+    /// * `position_idx` - Zero-based row index into [`Self::position_ids`].
+    /// * `factor_idx` - Zero-based column index into [`Self::factor_ids`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] naming the index and
+    /// the axis length when either index is out of bounds.
+    pub fn try_delta(
+        &self,
+        position_idx: usize,
+        factor_idx: usize,
+    ) -> finstack_quant_core::Result<f64> {
+        self.check_position(position_idx)?;
+        self.check_factor(factor_idx)?;
+        Ok(self.data[position_idx * self.n_factors + factor_idx])
+    }
+
+    /// Return one position's row across all factors, rejecting an out-of-range index.
+    ///
+    /// Fallible form of [`Self::position_deltas`].
+    ///
+    /// # Arguments
+    ///
+    /// * `position_idx` - Zero-based row index into [`Self::position_ids`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `position_idx`
+    /// is out of bounds.
+    pub fn try_position_deltas(&self, position_idx: usize) -> finstack_quant_core::Result<&[f64]> {
+        self.check_position(position_idx)?;
+        let start = position_idx * self.n_factors;
+        Ok(&self.data[start..start + self.n_factors])
+    }
+
+    /// Return one factor's column across all positions, rejecting an out-of-range index.
+    ///
+    /// Fallible form of [`Self::factor_deltas`].
+    ///
+    /// # Arguments
+    ///
+    /// * `factor_idx` - Zero-based column index into [`Self::factor_ids`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `factor_idx` is
+    /// out of bounds.
+    pub fn try_factor_deltas(&self, factor_idx: usize) -> finstack_quant_core::Result<Vec<f64>> {
+        self.check_factor(factor_idx)?;
+        Ok(self
+            .data
+            .iter()
+            .skip(factor_idx)
+            .step_by(self.n_factors)
+            .copied()
+            .collect())
     }
 
     /// Return the underlying row-major storage.
@@ -145,6 +376,66 @@ impl SensitivityMatrix {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn serde_roundtrip_preserves_axes_and_nested_rows() {
+        let matrix = SensitivityMatrix::from_rows(
+            vec!["A".into(), "B".into()],
+            vec![FactorId::new("Rates"), FactorId::new("Credit")],
+            vec![vec![2.0, -3.0], vec![4.0, 5.0]],
+        )
+        .expect("valid rows");
+        let value = serde_json::to_value(&matrix).expect("serialize");
+        assert_eq!(value["data"], serde_json::json!([[2.0, -3.0], [4.0, 5.0]]));
+        assert!(value.get("n_factors").is_none());
+        let restored: SensitivityMatrix = serde_json::from_value(value).expect("deserialize");
+        assert_eq!(restored, matrix);
+        assert_eq!(restored.delta(1, 0), 4.0);
+    }
+
+    #[test]
+    fn deserialization_rejects_inconsistent_shape_and_obsolete_storage_fields() {
+        for data in [
+            serde_json::json!([]),
+            serde_json::json!([[], []]),
+            serde_json::json!([[]]),
+            serde_json::json!([[2.0, 3.0]]),
+            serde_json::json!([2.0]),
+        ] {
+            let value = serde_json::json!({
+                "position_ids": ["A"], "factor_ids": ["Rates"], "data": data,
+            });
+            assert!(serde_json::from_value::<SensitivityMatrix>(value).is_err());
+        }
+        let value = serde_json::json!({
+            "position_ids": ["A"], "factor_ids": ["Rates"], "data": [[2.0]],
+            "n_factors": 1,
+        });
+        assert!(serde_json::from_value::<SensitivityMatrix>(value).is_err());
+    }
+
+    #[test]
+    fn from_rows_rejects_nonfinite_entries_before_risk_evaluation() {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let result = SensitivityMatrix::from_rows(
+                vec!["A".into()],
+                vec![FactorId::new("Rates")],
+                vec![vec![value]],
+            );
+            assert!(result.is_err());
+        }
+    }
+
+    #[test]
+    fn zero_factor_rows_survive_serde_roundtrip() {
+        let matrix = SensitivityMatrix::zeros(vec!["A".into(), "B".into()], vec![]);
+        let value = serde_json::to_value(&matrix).expect("serialize");
+        assert_eq!(value["data"], serde_json::json!([[], []]));
+        assert_eq!(
+            serde_json::from_value::<SensitivityMatrix>(value).expect("deserialize"),
+            matrix
+        );
+    }
 
     #[test]
     fn test_matrix_construction() {
@@ -199,6 +490,109 @@ mod tests {
         assert!((column[0] - 100.0).abs() < 1e-12);
         assert!((column[1] - 200.0).abs() < 1e-12);
     }
+    #[test]
+    fn from_rows_stores_rows_in_row_major_order() {
+        let matrix = SensitivityMatrix::from_rows(
+            vec!["A".into(), "B".into()],
+            vec![FactorId::new("F1"), FactorId::new("F2")],
+            vec![vec![1.0, 2.0], vec![3.0, -1.0]],
+        )
+        .expect("well-formed rows");
+        assert_eq!(matrix.as_slice(), &[1.0, 2.0, 3.0, -1.0]);
+        assert_eq!(matrix.n_factors(), 2);
+        assert_eq!(matrix.position_deltas(1), &[3.0, -1.0]);
+    }
+
+    #[test]
+    fn from_rows_accepts_the_empty_matrix() {
+        let matrix = SensitivityMatrix::from_rows(vec![], vec![], vec![]).expect("empty");
+        assert_eq!(matrix.n_positions(), 0);
+        assert_eq!(matrix.n_factors(), 0);
+    }
+
+    #[test]
+    fn from_rows_rejects_too_few_rows() {
+        let err = SensitivityMatrix::from_rows(
+            vec!["A".into(), "B".into()],
+            vec![FactorId::new("F1")],
+            vec![vec![1.0]],
+        )
+        .expect_err("one row for two positions");
+        assert!(matches!(err, finstack_quant_core::Error::Validation(_)));
+        assert!(err.to_string().contains("1 row(s)"), "{err}");
+        assert!(err.to_string().contains("2 position(s)"), "{err}");
+    }
+
+    #[test]
+    fn from_rows_rejects_too_many_rows() {
+        let err = SensitivityMatrix::from_rows(
+            vec!["A".into()],
+            vec![FactorId::new("F1")],
+            vec![vec![1.0], vec![2.0]],
+        )
+        .expect_err("two rows for one position");
+        assert!(err.to_string().contains("2 row(s)"), "{err}");
+    }
+
+    #[test]
+    fn from_rows_rejects_a_ragged_row_and_names_it() {
+        for bad_row in [vec![3.0], vec![3.0, 4.0, 5.0]] {
+            let err = SensitivityMatrix::from_rows(
+                vec!["A".into(), "B".into()],
+                vec![FactorId::new("F1"), FactorId::new("F2")],
+                vec![vec![1.0, 2.0], bad_row.clone()],
+            )
+            .expect_err("ragged row");
+            let message = err.to_string();
+            assert!(message.contains("row 1"), "{message}");
+            assert!(
+                message.contains(&format!("{} element(s)", bad_row.len())),
+                "{message}"
+            );
+            assert!(message.contains("2 factor(s)"), "{message}");
+        }
+    }
+
+    #[test]
+    fn try_accessors_reject_out_of_range_indices_and_match_the_panicking_forms() {
+        let matrix = SensitivityMatrix::from_rows(
+            vec!["A".into(), "B".into()],
+            vec![
+                FactorId::new("F1"),
+                FactorId::new("F2"),
+                FactorId::new("F3"),
+            ],
+            vec![vec![1.0, 2.0, 3.0], vec![4.0, 5.0, 6.0]],
+        )
+        .expect("matrix");
+        assert_eq!(matrix.try_delta(1, 2).expect("in range"), 6.0);
+        assert_eq!(
+            matrix.try_position_deltas(1).expect("row"),
+            &[4.0, 5.0, 6.0]
+        );
+        assert_eq!(matrix.try_factor_deltas(1).expect("column"), vec![2.0, 5.0]);
+        assert_eq!(
+            matrix.try_factor_deltas(2).expect("column"),
+            matrix.factor_deltas(2)
+        );
+
+        // Row-major storage: (0, 3) would silently read (1, 0) without the check.
+        let err = matrix.try_delta(0, 3).expect_err("factor out of range");
+        assert!(err
+            .to_string()
+            .contains("factor_idx 3 out of bounds for 3 factors"));
+        let err = matrix.try_delta(2, 0).expect_err("position out of range");
+        assert!(err
+            .to_string()
+            .contains("position_idx 2 out of bounds for 2 positions"));
+        assert!(matrix.try_position_deltas(2).is_err());
+        assert!(matrix.try_factor_deltas(3).is_err());
+
+        let empty = SensitivityMatrix::zeros(vec![], vec![]);
+        assert!(empty.try_position_deltas(0).is_err());
+        assert!(empty.try_factor_deltas(0).is_err());
+    }
+
     /// The zero-factor edge case is exactly where a `debug_assert!` would
     /// have silently returned an empty slice for any out-of-range index in
     /// release builds.

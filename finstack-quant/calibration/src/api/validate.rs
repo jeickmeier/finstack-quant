@@ -11,8 +11,11 @@
 //! step would surface as a [`EnvelopeError::MissingDependency`] rather than a
 //! cycle.
 //!
-//! [`dry_run`] is a JSON-string wrapper for cross-binding consumption
-//! (Python / WASM). The dependency graph is included in that report.
+//! [`dry_run`] parses a JSON envelope and returns the typed report;
+//! [`dry_run_json`] is its JSON-string wire twin for cross-binding
+//! consumption (Python / WASM). [`parse_envelope`] and [`validate_fail_fast`]
+//! are the shared strict-load and fail-fast policies every host entry point
+//! uses.
 
 // `EnvelopeError` is intentionally large (carries available-IDs lists, etc.)
 // because the cross-binding consumers want all the diagnostic context in
@@ -23,7 +26,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::api::errors::EnvelopeError;
-use crate::api::schema::{CalibrationEnvelope, CalibrationStep, CALIBRATION_CONTRACT};
+use crate::api::market_datum::MarketDatum;
+use crate::api::prior_market::PriorMarketObject;
+use crate::api::schema::{CalibrationEnvelope, StepParams, CALIBRATION_CONTRACT};
 use crate::quotes::market_quote::MarketQuote;
 #[cfg(test)]
 use crate::quotes::{cds::CdsQuote, rates::RateQuote};
@@ -32,10 +37,12 @@ use finstack_quant_core::contract::ContractError;
 use finstack_quant_core::contract::{
     Diagnostic, LoadLimits, LoadPhase, Severity, ValidationReport as ContractValidationReport,
 };
+use finstack_quant_valuations::market::conventions::ConventionRegistry;
 
 /// Result of [`validate`]. Always contains the dependency graph; `errors` is
 /// empty when the envelope is structurally valid.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CalibrationValidationReport {
     /// All errors found in a single pass; empty if the envelope is valid.
     pub errors: Vec<EnvelopeError>,
@@ -45,8 +52,9 @@ pub struct CalibrationValidationReport {
 
 /// Static dependency graph derived from a [`CalibrationEnvelope`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DependencyGraph {
-    /// Curve / surface IDs available at the start of execution, contributed
+    /// Market-object IDs available at the start of execution, contributed
     /// by `market_data` and `prior_market`.
     pub initial_ids: Vec<String>,
     /// Per-step inputs and outputs in declared order.
@@ -55,6 +63,7 @@ pub struct DependencyGraph {
 
 /// A single step's view of the dependency graph.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct DependencyNode {
     /// Zero-based index in `plan.steps`.
     pub step_index: usize,
@@ -62,10 +71,11 @@ pub struct DependencyNode {
     pub step_id: String,
     /// Step kind (`"discount"`, `"forward"`, ...).
     pub kind: String,
-    /// Curve / surface IDs the step depends on. Each must be either in
+    /// Market-object IDs the step depends on, including quote-derived curve
+    /// roles and selected spot/carry inputs. Each must be either in
     /// `initial_ids` or produced by an earlier step.
     pub reads: Vec<String>,
-    /// Curve / surface ID(s) the step produces.
+    /// Market-object IDs the step produces, including scalar and series outputs.
     pub writes: Vec<String>,
 }
 
@@ -73,7 +83,7 @@ pub struct DependencyNode {
 ///
 /// Always returns a [`CalibrationValidationReport`]; inspect `errors` to see what failed.
 /// The validator is solver-free — runs in microseconds, suitable as a
-/// pre-flight check before invoking [`engine::execute`](super::engine::execute).
+/// pre-flight check before invoking [`engine::calibrate`](super::engine::calibrate).
 ///
 /// # Arguments
 ///
@@ -82,7 +92,7 @@ pub struct DependencyNode {
 pub fn validate(envelope: &CalibrationEnvelope) -> CalibrationValidationReport {
     let mut errors = Vec::new();
     let initial_ids = collect_initial_ids(envelope);
-    let nodes = build_nodes(&envelope.plan.steps);
+    let nodes = build_nodes(envelope, &mut errors);
 
     check_step_id_uniqueness(envelope, &mut errors);
     check_quote_sets(envelope, &mut errors);
@@ -127,9 +137,11 @@ fn contract_diagnostic(error: &EnvelopeError) -> Diagnostic {
         EnvelopeError::QuoteDataInvalid { .. } | EnvelopeError::DuplicateMarketDatumId { .. } => {
             "/market_data".to_string()
         }
-        EnvelopeError::QuoteIdNotInMarketData { quote_set, .. } => {
+        EnvelopeError::QuoteIdNotInMarketData { quote_set, .. }
+        | EnvelopeError::QuoteSetConflict { quote_set } => {
             format!("/plan/quote_sets/{}", escape_json_pointer(quote_set))
         }
+        EnvelopeError::ConflictingMarketDatum { .. } => "/market_data".to_string(),
         EnvelopeError::JsonSerialize { .. }
         | EnvelopeError::StrictLoad { .. }
         | EnvelopeError::SolverNotConverged { .. } => "/".to_string(),
@@ -148,20 +160,61 @@ fn escape_json_pointer(segment: &str) -> String {
     segment.replace('~', "~0").replace('/', "~1")
 }
 
-/// Wrap [`validate`] to take a JSON string.
+/// Return the first static validation error of `envelope`, if any.
 ///
-/// Returns the report serialized as pretty-printed JSON. Returns an
-/// [`EnvelopeError::StrictLoad`] if strict contract ingestion rejects the
-/// envelope.
+/// This is the fail-fast policy shared by [`validate_calibration_json`],
+/// [`engine::calibrate`](super::engine::calibrate) and host bindings;
+/// [`validate`] reports every error instead.
+///
+/// # Arguments
+///
+/// * `envelope` - Typed calibration envelope to check with the same static,
+///   solver-free rules as [`validate`].
+///
+/// # Errors
+///
+/// Returns the first [`EnvelopeError`] of [`validate`]'s report (duplicate
+/// step ids, undefined or unresolved quote sets, duplicate or invalid market
+/// data, missing dependencies).
+pub fn validate_fail_fast(envelope: &CalibrationEnvelope) -> Result<(), EnvelopeError> {
+    match validate(envelope).errors.into_iter().next() {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
+}
+
+/// Parse a JSON envelope and run [`validate`] without invoking a solver.
 ///
 /// # Arguments
 ///
 /// * `envelope_json` - UTF-8 JSON calibration-envelope document to parse and
 ///   run through static, solver-free validation.
-pub fn dry_run(envelope_json: &str) -> Result<String, EnvelopeError> {
-    let envelope = parse_envelope(envelope_json)?;
-    let report = validate(&envelope);
-    serialize_pretty_json(&report, "CalibrationValidationReport")
+///
+/// # Errors
+///
+/// Returns [`EnvelopeError::StrictLoad`] if strict contract ingestion
+/// rejects the envelope. Static findings are returned in the report, never
+/// as an error.
+pub fn dry_run(envelope_json: &str) -> Result<CalibrationValidationReport, EnvelopeError> {
+    Ok(validate(&parse_envelope(envelope_json)?))
+}
+
+/// JSON-string wire twin of [`dry_run`].
+///
+/// Returns the report serialized as pretty-printed JSON.
+///
+/// # Arguments
+///
+/// * `envelope_json` - UTF-8 JSON calibration-envelope document to parse and
+///   run through static, solver-free validation.
+///
+/// # Errors
+///
+/// Returns [`EnvelopeError::StrictLoad`] if strict contract ingestion
+/// rejects the envelope, or [`EnvelopeError::JsonSerialize`] if the report
+/// cannot be serialized.
+pub fn dry_run_json(envelope_json: &str) -> Result<String, EnvelopeError> {
+    dry_run(envelope_json)?.to_json_pretty()
 }
 
 /// Validate a calibration envelope JSON string and return its canonical form.
@@ -170,18 +223,23 @@ pub fn dry_run(envelope_json: &str) -> Result<String, EnvelopeError> {
 /// centralizes the parse and pretty-serialization path so Python and WASM do
 /// not each reimplement the same validation logic.
 ///
-/// Static validation is fail-fast: the first envelope error is returned.
-/// [`dry_run`] lists every static error without solving.
+/// Static validation is fail-fast ([`validate_fail_fast`]): the first
+/// envelope error is returned. [`dry_run`] lists every static error without
+/// solving.
 ///
 /// # Arguments
 ///
 /// * `envelope_json` - UTF-8 JSON calibration-envelope document to parse,
 ///   statically validate, and reserialize in canonical pretty JSON form.
+///
+/// # Errors
+///
+/// Returns [`EnvelopeError::StrictLoad`] if strict loading rejects the
+/// document, the first static validation error, or
+/// [`EnvelopeError::JsonSerialize`] if the envelope cannot be serialized.
 pub fn validate_calibration_json(envelope_json: &str) -> Result<String, EnvelopeError> {
     let envelope = parse_envelope(envelope_json)?;
-    if let Some(error) = validate(&envelope).errors.into_iter().next() {
-        return Err(error);
-    }
+    validate_fail_fast(&envelope)?;
     serialize_pretty_json(&envelope, "CalibrationEnvelope")
 }
 
@@ -206,13 +264,22 @@ pub(crate) fn serialize_pretty_json<T: Serialize>(
     })
 }
 
-/// Parse a JSON envelope, enforcing its calibration schema marker.
+/// Strictly parse a JSON envelope, enforcing its calibration schema marker.
+///
+/// Uses [`LoadLimits::default`] and the calibration contract; this is the one
+/// strict-load path every host entry point shares.
 ///
 /// # Arguments
 ///
 /// * `json` - UTF-8 JSON calibration-envelope document in the canonical v1
 ///   flat-market shape.
-pub(crate) fn parse_envelope(json: &str) -> Result<CalibrationEnvelope, EnvelopeError> {
+///
+/// # Errors
+///
+/// Returns [`EnvelopeError::StrictLoad`] (carrying structured diagnostics)
+/// for malformed JSON, a missing, malformed or unsupported schema marker,
+/// unknown fields, resource limits, or an invalid v1 envelope structure.
+pub fn parse_envelope(json: &str) -> Result<CalibrationEnvelope, EnvelopeError> {
     parse_envelope_with_report(json).map(|(envelope, _report)| envelope)
 }
 
@@ -248,21 +315,156 @@ fn collect_initial_ids(envelope: &CalibrationEnvelope) -> HashSet<String> {
     ids
 }
 
-fn build_nodes(steps: &[CalibrationStep]) -> Vec<DependencyNode> {
-    steps
+fn build_nodes(
+    envelope: &CalibrationEnvelope,
+    errors: &mut Vec<EnvelopeError>,
+) -> Vec<DependencyNode> {
+    let quote_by_id: HashMap<&str, &MarketDatum> = envelope
+        .market_data
         .iter()
-        .enumerate()
-        .map(|(idx, step)| {
-            let io = step.params.io();
-            DependencyNode {
-                step_index: idx,
-                step_id: step.id.clone(),
-                kind: io.kind.to_string(),
-                reads: io.reads,
-                writes: io.writes,
-            }
+        .filter(|datum| datum.is_quote())
+        .map(|datum| (datum.id(), datum))
+        .collect();
+    let credit_indices: HashMap<_, _> = envelope
+        .market_data
+        .iter()
+        .filter_map(|datum| match datum {
+            MarketDatum::CreditIndex(index) => Some((index.id.as_str(), index)),
+            _ => None,
         })
-        .collect()
+        .collect();
+    let mut discount_ids: BTreeSet<String> = envelope
+        .prior_market
+        .iter()
+        .filter(|object| matches!(object, PriorMarketObject::DiscountCurve(_)))
+        .map(|object| object.id().to_string())
+        .collect();
+    let mut nodes = Vec::with_capacity(envelope.plan.steps.len());
+
+    for (step_index, step) in envelope.plan.steps.iter().enumerate() {
+        let mut io = step.params.io();
+        let mut index_ids = Vec::new();
+        match &step.params {
+            StepParams::VolSurface(params) if params.dividend_yield_override.is_none() => {
+                add_equity_carry_reads(envelope, &params.underlying_ticker, true, &mut io.reads);
+            }
+            StepParams::SviSurface(params) if params.dividend_yield_override.is_none() => {
+                add_equity_carry_reads(
+                    envelope,
+                    &params.underlying_ticker,
+                    params.discount_curve_id.is_some(),
+                    &mut io.reads,
+                );
+            }
+            _ => {}
+        }
+        if let StepParams::BaseCorrelation(params) = &step.params {
+            index_ids.push(params.index_id.clone());
+        }
+        if let StepParams::StudentT(params) = &step.params {
+            if params.discount_curve_id.is_none() {
+                // Preflight requires exactly one discount curve. Track all
+                // candidates here so an earlier writer cannot be bypassed by
+                // an already available curve in the initial snapshot.
+                io.reads.extend(discount_ids.iter().cloned());
+            }
+        }
+        if let Some(quote_ids) = envelope.plan.quote_sets.get(&step.quote_set) {
+            for quote_id in quote_ids {
+                match (&step.params, quote_by_id.get(quote_id.as_str()).copied()) {
+                    (StepParams::XccyBasis(_), Some(MarketDatum::XccyQuote(quote))) => {
+                        match ConventionRegistry::try_global()
+                            .and_then(|registry| registry.require_xccy(&quote.convention))
+                        {
+                            Ok(convention) => {
+                                io.reads.push(convention.base_index_id.to_string());
+                                io.reads.push(convention.quote_index_id.to_string());
+                            }
+                            Err(error) => errors.push(EnvelopeError::QuoteDataInvalid {
+                                step_id: step.id.clone(),
+                                quote_id: quote_id.to_string(),
+                                reason: error.to_string(),
+                            }),
+                        }
+                    }
+                    (StepParams::StudentT(params), Some(MarketDatum::CdsTrancheQuote(quote)))
+                        if quote.id().as_str() == params.tranche_instrument_id =>
+                    {
+                        io.reads.push(quote.index.clone());
+                        index_ids.push(quote.index.clone());
+                    }
+                    _ => {}
+                }
+            }
+        }
+        for index_id in index_ids {
+            if let Some(index) = credit_indices.get(index_id.as_str()) {
+                io.reads.push(index.index_credit_curve_id.clone());
+                if let Some(issuer_curves) = &index.issuer_credit_curve_ids {
+                    io.reads.extend(issuer_curves.values().cloned());
+                }
+            }
+        }
+        io.reads.sort();
+        io.reads.dedup();
+        io.writes.sort();
+        io.writes.dedup();
+        match &step.params {
+            StepParams::Discount(params) => {
+                discount_ids.insert(params.curve_id.to_string());
+            }
+            StepParams::XccyBasis(params) => {
+                discount_ids.insert(params.curve_id.to_string());
+            }
+            _ => {}
+        }
+        nodes.push(DependencyNode {
+            step_index,
+            step_id: step.id.clone(),
+            kind: io.kind.to_string(),
+            reads: io.reads,
+            writes: io.writes,
+        });
+    }
+    nodes
+}
+
+fn add_equity_carry_reads(
+    envelope: &CalibrationEnvelope,
+    ticker: &str,
+    accepts_schedule: bool,
+    reads: &mut Vec<String>,
+) {
+    let scalar_id = format!("{ticker}-DIVYIELD");
+    if !accepts_schedule
+        || envelope
+            .market_data
+            .iter()
+            .any(|datum| matches!(datum, MarketDatum::Price(price) if price.id == scalar_id))
+    {
+        reads.push(scalar_id);
+        return;
+    }
+    let fallback_id = format!("{ticker}-DIVS");
+    let schedules: Vec<String> = envelope
+        .market_data
+        .iter()
+        .filter_map(|datum| match datum {
+            MarketDatum::DividendSchedule(datum)
+                if datum.schedule.get_underlying() == Some(ticker)
+                    || datum.schedule.get_id().as_str() == ticker
+                    || datum.schedule.get_id().as_str() == fallback_id =>
+            {
+                Some(datum.schedule.get_id().to_string())
+            }
+            _ => None,
+        })
+        .collect();
+    if schedules.is_empty() {
+        reads.push(scalar_id);
+    } else {
+        reads.extend(schedules);
+    }
 }
 
 fn check_step_id_uniqueness(envelope: &CalibrationEnvelope, errors: &mut Vec<EnvelopeError>) {
@@ -541,7 +743,7 @@ mod tests {
         assert!(matches!(error, EnvelopeError::UndefinedQuoteSet { .. }));
 
         let duplicate = duplicate_price_envelope();
-        let error = crate::api::engine::execute(&duplicate)
+        let error = crate::api::engine::calibrate(&duplicate)
             .expect_err("execute path must not bypass envelope validation");
         assert!(matches!(
             error,
@@ -585,9 +787,121 @@ mod tests {
     fn dry_run_returns_pretty_json() {
         let env = empty_envelope("smoke");
         let json = serde_json::to_string(&env).expect("serialize");
-        let report_json = dry_run(&json).expect("dry_run");
+        let report_json = dry_run_json(&json).expect("dry_run_json");
         assert!(report_json.contains("\"errors\""));
         assert!(report_json.contains("\"dependency_graph\""));
+        let report = dry_run(&json).expect("dry_run");
+        assert!(report.errors.is_empty());
+        assert_eq!(
+            report.to_json_pretty().expect("pretty report"),
+            report_json,
+            "the JSON twin must serialize the typed report"
+        );
+    }
+
+    fn deposit(id: &str, rate: f64) -> MarketDatum {
+        MarketDatum::RateQuote(RateQuote::Deposit {
+            id: QuoteId::new(id),
+            index: IndexId::new("USD-SOFR-1M"),
+            pillar: Pillar::Tenor("1M".parse().expect("tenor")),
+            rate,
+        })
+    }
+
+    #[test]
+    fn from_attached_steps_derives_quote_sets_and_dedups_market_data() {
+        let shared = deposit("USD-DEP-1M", 0.05);
+        let envelope = CalibrationEnvelope::from_attached_steps(
+            "attached".to_string(),
+            None,
+            Default::default(),
+            Default::default(),
+            vec![
+                (discount_step("a", "set", "USD-OIS"), vec![shared.clone()]),
+                (discount_step("b", "set", "USD-OIS-2"), vec![shared]),
+                (discount_step("c", "other", "USD-OIS-3"), Vec::new()),
+            ],
+        )
+        .expect("identical attached quotes are collected once");
+        assert_eq!(envelope.plan.id, "attached");
+        assert_eq!(envelope.plan.steps.len(), 3);
+        assert_eq!(
+            envelope.plan.quote_sets.get("set"),
+            Some(&vec![QuoteId::new("USD-DEP-1M")])
+        );
+        assert!(!envelope.plan.quote_sets.contains_key("other"));
+        assert_eq!(envelope.market_data.len(), 1);
+        assert!(envelope.prior_market.is_empty());
+    }
+
+    #[test]
+    fn from_attached_steps_rejects_quote_set_conflict() {
+        let error = CalibrationEnvelope::from_attached_steps(
+            "p".to_string(),
+            None,
+            Default::default(),
+            Default::default(),
+            vec![
+                (
+                    discount_step("a", "set", "USD-OIS"),
+                    vec![deposit("Q1", 0.05)],
+                ),
+                (
+                    discount_step("b", "set", "USD-OIS-2"),
+                    vec![deposit("Q2", 0.05)],
+                ),
+            ],
+        )
+        .expect_err("same set name with different ids must conflict");
+        assert_eq!(
+            error,
+            EnvelopeError::QuoteSetConflict {
+                quote_set: "set".to_string()
+            }
+        );
+        assert_eq!(error.kind_str(), "quote_set_conflict");
+    }
+
+    #[test]
+    fn from_attached_steps_rejects_conflicting_payloads() {
+        let error = CalibrationEnvelope::from_attached_steps(
+            "p".to_string(),
+            None,
+            Default::default(),
+            Default::default(),
+            vec![
+                (
+                    discount_step("a", "set_a", "USD-OIS"),
+                    vec![deposit("Q1", 0.05)],
+                ),
+                (
+                    discount_step("b", "set_b", "USD-OIS-2"),
+                    vec![deposit("Q1", 0.06)],
+                ),
+            ],
+        )
+        .expect_err("one id with two payloads must conflict");
+        assert_eq!(
+            error,
+            EnvelopeError::ConflictingMarketDatum {
+                id: "Q1".to_string()
+            }
+        );
+        assert!(error.to_string().contains("conflicting attached payloads"));
+    }
+
+    #[test]
+    fn validate_fail_fast_returns_first_static_error() {
+        let mut env = empty_envelope("fail-fast");
+        env.plan
+            .steps
+            .push(discount_step("a", "missing_a", "USD-OIS"));
+        env.plan
+            .steps
+            .push(discount_step("b", "missing_b", "EUR-OIS"));
+        let first = validate(&env).errors.into_iter().next().expect("errors");
+        assert_eq!(validate_fail_fast(&env), Err(first));
+        assert_eq!(validate_fail_fast(&empty_envelope("ok")), Ok(()));
     }
 
     #[test]
@@ -751,7 +1065,7 @@ mod tests {
             }));
 
         let json = serde_json::to_string(&env).expect("serialize");
-        let report_json = dry_run(&json).expect("dry_run");
+        let report_json = dry_run_json(&json).expect("dry_run_json");
         assert!(report_json.contains("\"kind\": \"quote_data_invalid\""));
         assert!(report_json.contains("\"quote_id\": \"CDS-ACME-5Y\""));
     }
@@ -817,7 +1131,7 @@ mod tests {
     fn calibration_result_strict_loader_enforces_current_missing_zero_future_and_malformed_schema()
     {
         // schema-rejection-test
-        let envelope = crate::api::engine::execute(&empty_envelope("result"))
+        let envelope = crate::api::engine::calibrate(&empty_envelope("result"))
             .expect("empty calibration executes");
         let base = serde_json::to_value(envelope).expect("result serializes");
         let cases = [
@@ -899,7 +1213,7 @@ mod tests {
 
     #[test]
     fn calibration_result_strict_loader_validates_nested_final_market() {
-        let envelope = crate::api::engine::execute(&empty_envelope("result-market"))
+        let envelope = crate::api::engine::calibrate(&empty_envelope("result-market"))
             .expect("empty calibration executes");
         let base = serde_json::to_value(envelope).expect("result serializes");
 
@@ -967,7 +1281,7 @@ mod tests {
 
     #[test]
     fn calibration_result_nested_market_depth_is_bounded() {
-        let envelope = crate::api::engine::execute(&empty_envelope("result-depth"))
+        let envelope = crate::api::engine::calibrate(&empty_envelope("result-depth"))
             .expect("empty calibration executes");
         let mut value = serde_json::to_value(envelope).expect("result serializes");
         value["result"]["final_market"]["hierarchy"] = nested_json(20);

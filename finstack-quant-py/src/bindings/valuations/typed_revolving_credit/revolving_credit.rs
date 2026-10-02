@@ -169,12 +169,7 @@ impl PyRevolvingCredit {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        match parse_typed_instrument_json(json)? {
-            InstrumentJson::RevolvingCredit(inner) => Ok(Self { inner }),
-            _ => Err(value_error(
-                "expected instrument type \"revolving_credit\", got a different instrument type",
-            )),
-        }
+        parse_typed_instrument_json(json).map(|inner| Self { inner })
     }
 
     /// Serialize to a canonical ``finstack_quant.instrument/1`` envelope.

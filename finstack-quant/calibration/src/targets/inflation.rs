@@ -192,14 +192,14 @@ impl InflationCurveTarget {
             let first = maturity
                 .replace_day(1)
                 .map_err(|_| finstack_quant_core::InputError::InvalidDateRange)?;
-            let anchor = first.add_months(-i32::from(months));
+            let anchor = first.add_months(-i32::from(months))?;
             if conventions.interpolation == InflationInterpolation::Linear && maturity.day() > 1 {
-                anchor.add_months(1)
+                anchor.add_months(1)?
             } else {
                 anchor
             }
         } else {
-            Self::apply_lag(maturity, lag)
+            Self::apply_lag(maturity, lag)?
         };
         let pillar_time = DayCount::Act365F.year_fraction(
             self.reference_date()?,
@@ -211,32 +211,46 @@ impl InflationCurveTarget {
         Ok(CalibrationQuote::Inflation(pq))
     }
 
-    /// Parse an observation lag string (e.g. "3M").
+    /// Parse a lag that can also be represented by the delivered curve.
     fn parse_lag(&self, spec: &str) -> Result<InflationLag> {
         if spec.trim().is_empty() {
             return Ok(InflationLag::None);
         }
-        spec.parse::<InflationLag>()
+        let lag = spec.parse::<InflationLag>()?;
+        match lag {
+            InflationLag::Months(_) | InflationLag::None => Ok(lag),
+            _ => Err(finstack_quant_core::Error::Validation(format!(
+                "Inflation calibration observation_lag '{spec}' is unsupported: use a month lag or no lag; inflation curves cannot represent day-based observation lags"
+            ))),
+        }
+    }
+
+    /// Preserve the calibration lag for instruments that inherit curve metadata.
+    fn indexation_lag_months(&self) -> Result<u32> {
+        Ok(match self.parse_lag(&self.params.observation_lag)? {
+            InflationLag::Months(months) => u32::from(months),
+            _ => 0,
+        })
     }
 
     /// Apply an observation lag to a date.
     fn apply_lag(
         date: finstack_quant_core::dates::Date,
         lag: InflationLag,
-    ) -> finstack_quant_core::dates::Date {
+    ) -> finstack_quant_core::Result<finstack_quant_core::dates::Date> {
         match lag {
             InflationLag::Months(m) => date.add_months(-(m as i32)),
-            InflationLag::Days(d) => date - time::Duration::days(d as i64),
-            _ => date,
+            InflationLag::Days(d) => date.add_days(-i64::from(d)),
+            _ => Ok(date),
         }
     }
 
     /// Date represented by the lagged reference CPI at zero curve time.
     fn reference_date(&self) -> Result<finstack_quant_core::dates::Date> {
-        Ok(Self::apply_lag(
+        Self::apply_lag(
             self.params.base_date,
             self.parse_lag(&self.params.observation_lag)?,
-        ))
+        )
     }
 
     /// Resolve the effective base CPI level (from index or params).
@@ -389,6 +403,7 @@ impl BootstrapTarget for InflationCurveTarget {
         InflationCurve::builder(self.params.curve_id.to_string())
             .base_cpi(base_cpi)
             .base_date(self.reference_date()?)
+            .indexation_lag_months(self.indexation_lag_months()?)
             .knots(full_knots)
             .interp(self.params.interpolation)
             .build()
@@ -496,6 +511,7 @@ Global solve requires strictly increasing times.",
         InflationCurve::builder(self.params.curve_id.to_string())
             .base_cpi(base_cpi)
             .base_date(self.reference_date()?)
+            .indexation_lag_months(self.indexation_lag_months()?)
             .knots(knots)
             .interp(self.params.interpolation)
             .build()

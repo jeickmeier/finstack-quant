@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 /// `ci_95` are stored as [`Money`], while the auxiliary statistics remain raw
 /// `f64` values in the same currency unit as `mean.amount()`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MoneyEstimate {
     /// Discounted mean present value.
@@ -114,6 +115,7 @@ impl std::fmt::Display for MoneyEstimate {
 /// chunk_size)` reproduces the run bit-for-bit regardless of thread count or
 /// host (see the determinism notes on [`crate::monte_carlo::engine::McEngine::price`]).
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct RunMetadata {
     /// Root RNG seed, when the calling pricer derived the stream from one.
     ///
@@ -140,6 +142,7 @@ pub struct RunMetadata {
 /// The estimate always reflects all simulated discounted path values used by the
 /// pricing run. When `paths` is present, it contains the captured subset only.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MonteCarloResult {
     /// Discounted pricing estimate for the full simulation.
     pub estimate: MoneyEstimate,

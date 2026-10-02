@@ -40,7 +40,11 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
     # attribution
     ("finstack_quant.attribution", "attribute_pnl", "wrapper"),
     ("finstack_quant.attribution", "attribute_return_contribution", "wrapper"),
+    ("finstack_quant.attribution", "attribute_pnl_envelope", "wrapper"),
     ("finstack_quant.attribution", "attribute_pnl_envelope_json", "json"),
+    # calibration
+    ("finstack_quant.calibration", "dry_run", "wrapper"),
+    ("finstack_quant.calibration", "dry_run_json", "json"),
     ("finstack_quant.statements", "normalize", "list"),
     ("finstack_quant.statements", "normalize_json", "json"),
     # scenarios
@@ -70,6 +74,7 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
     # paired `_json` twin is the only string-returning surface.
     ("finstack_quant.portfolio", "brinson_fachler", "wrapper"),
     ("finstack_quant.portfolio", "carino_link", "wrapper"),
+    ("finstack_quant.portfolio", "carino_link_from_sector_periods", "wrapper"),
     ("finstack_quant.portfolio", "campisi_attribution", "wrapper"),
     ("finstack_quant.portfolio", "campisi_carino_link", "wrapper"),
     ("finstack_quant.portfolio", "campisi_carino_link_from_snapshots", "wrapper"),
@@ -87,6 +92,7 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
     ("finstack_quant.portfolio", "scenario_pnl_batch", "wrapper"),
     ("finstack_quant.portfolio", "brinson_fachler_json", "json"),
     ("finstack_quant.portfolio", "carino_link_json", "json"),
+    ("finstack_quant.portfolio", "carino_link_from_sector_periods_json", "json"),
     ("finstack_quant.portfolio", "campisi_attribution_json", "json"),
     ("finstack_quant.portfolio", "campisi_carino_link_json", "json"),
     ("finstack_quant.portfolio", "campisi_carino_link_from_snapshots_json", "json"),
@@ -107,11 +113,14 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
 # Result classes that must carry the full accessor contract:
 # typed getters + to_json + from_json + to_dataframe.
 RESULT_CLASSES: list[tuple[str, str]] = [
+    ("finstack_quant.attribution", "AttributionResultEnvelope"),
     ("finstack_quant.attribution", "PnlAttribution"),
     ("finstack_quant.attribution", "ReturnContributionResult"),
     ("finstack_quant.scenarios", "ApplicationReport"),
     ("finstack_quant.scenarios", "ScenarioSpec"),
     ("finstack_quant.statements_analytics", "TornadoEntry"),
+    ("finstack_quant.statements_analytics", "GoalSeekResult"),
+    ("finstack_quant.statements_analytics", "DependencyTree"),
     ("finstack_quant.models.factor.credit", "FactorCovarianceMatrix"),
     ("finstack_quant.models.factor.credit", "FactorModelConfig"),
     ("finstack_quant.scenarios", "HorizonResult"),
@@ -167,7 +176,7 @@ def test_entry_point_is_not_a_bare_json_string(module_name: str, attr: str, shap
     """
     _resolve(module_name, attr)
     if shape == "json":
-        assert attr.endswith(("_json", "_from_spec")), (
+        assert attr.endswith("_json"), (
             f"{module_name}.{attr} returns a JSON string but its name does not "
             "mark it as a wire surface; rename it with a '_json' suffix"
         )

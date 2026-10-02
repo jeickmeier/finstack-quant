@@ -59,7 +59,7 @@ fn make_float_spec(fallback: FloatingRateFallback, spread_bp: Decimal) -> Floati
 }
 
 #[test]
-fn term_coupon_reads_its_fixing_at_the_value_date() {
+fn term_coupon_uses_the_actual_reset_date_fixing() {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
@@ -107,11 +107,7 @@ fn term_coupon_reads_its_fixing_at_the_value_date() {
         .day_count()
         .year_fraction(base, first_float.date, DayCountContext::default())
         .expect("valid payment year fraction");
-    // The coupon fixes Mon 2025-01-13 for the 3M deposit value-dated two
-    // business days later, Wed 2025-01-15 (the accrual start).
-    let value_date = Date::from_calendar_date(2025, Month::January, 15).expect("valid date");
-    let value_fixing = fwd.rate_on_date(value_date).expect("value-date forward");
-    let fixing_date_forward = fwd.rate(reset_t);
+    let reset_fixing = fwd.rate(reset_t);
     let integrated_average = fwd.rate_period(reset_t, payment_t);
     let built_rate = first_float
         .rate
@@ -121,68 +117,8 @@ fn term_coupon_reads_its_fixing_at_the_value_date() {
         reset_date,
         Date::from_calendar_date(2025, Month::January, 13).expect("valid reset date")
     );
-    assert!((value_fixing - fixing_date_forward).abs() > 1e-6);
-    assert!((value_fixing - integrated_average).abs() > 1e-6);
-    assert!((built_rate - value_fixing).abs() < RATE_TOLERANCE);
-}
-
-/// Forward-curve calibration places the projection grid on quote accrual
-/// starts, so on such a curve the FRA / deposit forward over an accrual period
-/// (discount-factor implied) and a lagged swap coupon over the same period
-/// (its term fixing, read at the value date) are one and the same rate.
-#[test]
-fn lagged_term_coupon_matches_grid_forward_over_its_accrual_period() {
-    use finstack_quant_core::market_data::context::MarketContext;
-    use finstack_quant_core::market_data::term_structures::ForwardCurve;
-
-    let base = Date::from_calendar_date(2025, Month::January, 2).unwrap();
-    let start = Date::from_calendar_date(2025, Month::April, 15).unwrap();
-    let end = Date::from_calendar_date(2025, Month::July, 15).unwrap();
-    let mut spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
-    spec.rate_spec.reset_lag_days = 2;
-    let time = |date| {
-        DayCount::Act360
-            .year_fraction(base, date, DayCountContext::default())
-            .expect("valid year fraction")
-    };
-    let (t_start, t_end) = (time(start), time(end));
-    let fwd = ForwardCurve::builder("USD-SOFR-3M", 0.25)
-        .base_date(base)
-        .day_count(DayCount::Act360)
-        .knots([(0.0, 0.03), (1.0, 0.06)])
-        .projection_grid(vec![0.0, t_start, t_end, 1.0])
-        .build()
-        .expect("ForwardCurve builder should succeed");
-    let grid_forward = fwd.rate_between(t_start, t_end).expect("grid forward");
-    let market = MarketContext::new().insert(fwd);
-
-    let mut builder = CashFlowSchedule::builder();
-    let _ = builder
-        .principal(
-            Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-            start,
-            end,
-        )
-        .floating_cf(spec);
-    let schedule = builder
-        .build(Some(&market))
-        .expect("floating schedule should build");
-    let coupon = schedule
-        .get_flows()
-        .iter()
-        .find(|cf| cf.kind == CFKind::FloatReset)
-        .expect("expected a floating coupon");
-
-    // Accrual starts Tue 2025-04-15, fixes Fri 2025-04-11, value-dated 04-15.
-    assert_eq!(
-        coupon.reset_date,
-        Some(Date::from_calendar_date(2025, Month::April, 11).expect("valid date"))
-    );
-    let built_rate = coupon.rate.expect("floating coupon should store its rate");
-    assert!(
-        (built_rate - grid_forward).abs() < 1e-14,
-        "coupon {built_rate} vs grid forward {grid_forward}"
-    );
+    assert!((reset_fixing - integrated_average).abs() > 1e-6);
+    assert!((built_rate - reset_fixing).abs() < RATE_TOLERANCE);
 }
 
 #[test]
@@ -225,21 +161,20 @@ fn term_index_rate_is_invariant_to_payment_frequency() {
         .get_forward("USD-SOFR-3M")
         .expect("curve should exist");
 
-    // A term-index coupon observes the fixing on its reset date: the curve
-    // tenor forward from that fixing's value date (two business days later,
-    // the index spot lag). The payment frequency has no effect on it.
-    assert_eq!(reset_date, issue);
-    let value_date = Date::from_calendar_date(2025, Month::January, 17).expect("valid date");
-    let expected_reset_fixing = fwd_curve
-        .rate_on_date(value_date)
-        .expect("value-date forward");
+    // A term-index coupon fixes its curve tenor at the reset date. The payment
+    // frequency has no effect on that fixing.
+    let reset_t = fwd_curve
+        .day_count()
+        .year_fraction(issue, reset_date, DayCountContext::default())
+        .expect("valid reset year fraction");
+    let expected_reset_fixing = fwd_curve.rate(reset_t);
 
     let built_rate = first_float
         .rate
         .expect("floating coupon should store built rate");
     assert!(
         (built_rate - expected_reset_fixing).abs() < RATE_TOLERANCE,
-        "built rate should use the reset-date fixing's value-date forward: expected {}, got {}",
+        "built rate should use the reset-date fixing: expected {}, got {}",
         expected_reset_fixing,
         built_rate
     );
@@ -1667,11 +1602,10 @@ fn test_overnight_compounding_weekend_start_no_lost_days() {
     );
 }
 
-/// An accrual period containing no business-day fixings (Unadjusted BDC, stub
-/// entirely on a weekend) must be a validation error, not a silent 0% index
-/// with spread-only accrual.
+/// A weekend-only stub requires the preceding business-day fixing and carries
+/// that rate over its calendar weight instead of accruing at a zero index.
 #[test]
-fn test_overnight_empty_fixing_window_errors() {
+fn test_weekend_only_stub_requires_and_carries_preceding_fixing() {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::ForwardCurve;
 
@@ -1725,11 +1659,29 @@ fn test_overnight_empty_fixing_window_errors() {
     let _ = b.principal(init, issue, maturity).floating_cf(spec);
     let err = b
         .build(Some(&market))
-        .expect_err("empty fixing window must not silently accrue at 0% index");
+        .expect_err("preceding historical fixing must be supplied");
     assert!(
-        err.to_string().contains("no business-day fixings"),
-        "error should describe the empty fixing window: {err}"
+        err.to_string().contains("2025-01-03")
+            && err.to_string().contains("historical fixings are missing"),
+        "error should identify the required Friday fixing: {err}"
     );
+
+    let friday = Date::from_calendar_date(2025, Month::January, 3).unwrap();
+    let fwd = ForwardCurve::builder("USD-SOFR-ON", 1.0 / 360.0)
+        .base_date(friday)
+        .day_count(DayCount::Act360)
+        .knots([(0.0, 0.05), (1.0, 0.05)])
+        .build()
+        .unwrap();
+    let projected = b
+        .build(Some(&MarketContext::new().insert(fwd)))
+        .expect("Friday fixing can be projected from its base date");
+    let coupon = projected
+        .get_flows()
+        .iter()
+        .find(|flow| flow.kind == CFKind::FloatReset)
+        .expect("one weekend coupon");
+    assert!((coupon.amount.amount() - 1_000_000.0 * 0.06 / 360.0).abs() < 1e-7);
 }
 
 /// With the default `Error` fallback, a coupon whose projection start is
@@ -2079,7 +2031,8 @@ fn test_fully_seasoned_overnight_coupon_from_fixings_only() {
 
 /// A missing historical business-day fixing is rejected. Weekend and holiday
 /// carry is encoded by observation weights, not by carrying across publication
-/// gaps on dates where the benchmark should have fixed.
+/// gaps on dates where the benchmark should have fixed. An explicitly
+/// configured projection fallback must not replace supplied historical data.
 #[test]
 fn test_seasoned_overnight_coupon_rejects_missing_business_day_fixing() {
     let issue = Date::from_calendar_date(2025, Month::June, 2).unwrap();
@@ -2127,17 +2080,33 @@ fn test_seasoned_overnight_coupon_rejects_missing_business_day_fixing() {
     ];
     let market = make_market_with_fixings(curve_base, 0.09, &fixings);
 
-    let err = build_single_overnight_coupon(
-        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
-        issue,
-        maturity,
-        &market,
-    )
-    .expect_err("missing historical business-day fixing must fail");
-    assert!(
-        err.to_string().contains("2025-06-11"),
-        "error should identify the missing fixing date: {err}"
-    );
+    for fallback in [
+        FloatingRateFallback::Error,
+        FloatingRateFallback::SpreadOnly,
+        FloatingRateFallback::FixedRate(dec!(0.01)),
+    ] {
+        let mut spec = make_overnight_float_spec(
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            fallback,
+            dec!(0.0),
+        );
+        spec.schedule.stub = StubKind::ShortBack;
+        let mut builder = CashFlowSchedule::builder();
+        let _ = builder
+            .principal(
+                Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
+                issue,
+                maturity,
+            )
+            .floating_cf(spec);
+        let err = builder
+            .build(Some(&market))
+            .expect_err("supplied history must remain complete under every fallback policy");
+        assert!(
+            err.to_string().contains("2025-06-11"),
+            "error should identify the missing fixing date: {err}"
+        );
+    }
 }
 
 /// An observation exactly on the curve base date prefers a published fixing
@@ -2467,7 +2436,8 @@ fn test_term_reset_on_curve_base_projects_without_same_day_fixing() {
 }
 
 /// A seasoned term-rate reset with a fixing series that lacks the exact reset
-/// date fails with a descriptive error (term resets do not carry forward).
+/// date fails under every projection fallback policy (term resets do not
+/// carry forward or replace supplied historical data).
 #[test]
 fn test_seasoned_term_reset_missing_exact_fixing_errors() {
     let issue = Date::from_calendar_date(2025, Month::January, 15).unwrap();
@@ -2482,18 +2452,82 @@ fn test_seasoned_term_reset_missing_exact_fixing_errors() {
     )];
     let market = make_market_with_fixings(curve_base, 0.03, &fixings);
 
-    let spec = make_float_spec(FloatingRateFallback::Error, dec!(0.0));
-    let mut b = CashFlowSchedule::builder();
-    let _ = b.principal(init, issue, maturity).floating_cf(spec);
+    for fallback in [
+        FloatingRateFallback::Error,
+        FloatingRateFallback::SpreadOnly,
+        FloatingRateFallback::FixedRate(dec!(0.01)),
+    ] {
+        let spec = make_float_spec(fallback, dec!(0.0));
+        let mut b = CashFlowSchedule::builder();
+        let _ = b.principal(init, issue, maturity).floating_cf(spec);
 
-    let err = b
-        .build(Some(&market))
-        .expect_err("missing exact-date term fixing must fail");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("USD-SOFR-3M") && msg.contains("2025-04-15"),
-        "error should name the index and the missing fixing date: {msg}"
-    );
+        let err = b
+            .build(Some(&market))
+            .expect_err("supplied history must remain complete under every fallback policy");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("USD-SOFR-3M") && msg.contains("2025-04-15"),
+            "error should name the index and the missing fixing date: {msg}"
+        );
+    }
+}
+
+/// Equivalent curve-clock representations preserve a dated overnight quote,
+/// the coupon rate, and cash paid on the index's separate ACT/360 basis.
+/// Raw curve rates and knot times must both change to preserve dated growth.
+#[test]
+fn overnight_projection_is_invariant_to_the_curve_day_count_clock() {
+    use finstack_quant_core::market_data::context::MarketContext;
+    use finstack_quant_core::market_data::term_structures::ForwardCurve;
+
+    let issue = Date::from_calendar_date(2025, Month::January, 6).unwrap();
+    let maturity = Date::from_calendar_date(2025, Month::January, 7).unwrap();
+    for (curve_day_count, next_day_time) in [
+        (DayCount::Act360, 1.0 / 360.0),
+        (DayCount::Act365F, 1.0 / 365.0),
+    ] {
+        // The same ACT/360 quotes have raw curve-basis values r * alpha_index / alpha_curve.
+        let quote_scale = (1.0 / 360.0) / next_day_time;
+        let curve = ForwardCurve::builder("USD-SOFR-3M", next_day_time)
+            .base_date(issue)
+            .day_count(curve_day_count)
+            .knots([
+                (0.0, 0.04 * quote_scale),
+                (next_day_time, 0.05 * quote_scale),
+            ])
+            .build()
+            .expect("same dated curve in either clock");
+        let market = MarketContext::new().insert(curve);
+        let mut spec = make_overnight_float_spec(
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            FloatingRateFallback::Error,
+            dec!(0.0),
+        );
+        spec.rate_spec.overnight_basis = Some(DayCount::Act360);
+        spec.schedule.stub = StubKind::ShortBack;
+        let mut builder = CashFlowSchedule::builder();
+        let _ = builder
+            .principal(
+                Money::new(100_000_000.0, Currency::USD).expect("valid money fixture"),
+                issue,
+                maturity,
+            )
+            .floating_cf(spec);
+        let schedule = builder.build(Some(&market)).expect("overnight coupon");
+        let coupon = schedule
+            .get_flows()
+            .iter()
+            .find(|cf| cf.kind == CFKind::FloatReset)
+            .expect("one floating coupon");
+        assert!(
+            (coupon.rate.expect("coupon rate") - 0.045).abs() < RATE_TOLERANCE,
+            "curve clock {curve_day_count:?} changed the calendar-day projection"
+        );
+        assert!(
+            (coupon.amount.amount() - 12_500.0).abs() < 1e-7,
+            "curve clock {curve_day_count:?} changed the ACT/360 coupon cash amount"
+        );
+    }
 }
 
 fn make_overnight_spec_with_day_count(

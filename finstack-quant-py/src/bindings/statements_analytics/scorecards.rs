@@ -115,7 +115,7 @@ impl PyScorecardMetric {
         self.inner.description.as_deref()
     }
 
-    /// Rating label to ``(min, max)`` band, in definition order.
+    /// Rating label to ``(min, max)`` band, sorted by rating label.
     #[getter]
     fn thresholds(&self) -> std::collections::BTreeMap<String, (f64, f64)> {
         self.inner

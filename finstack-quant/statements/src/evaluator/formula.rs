@@ -23,16 +23,18 @@
 
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
-use crate::evaluator::formula_helpers::{collect_historical_values_sorted, is_truthy};
+use crate::evaluator::formula_helpers::{
+    collect_cs_values_sorted, collect_historical_values_sorted, is_truthy,
+};
 use crate::evaluator::results::EvalWarning;
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_core::expr::{Expr, ExprNode, Function};
 use finstack_quant_core::math::ZERO_TOLERANCE;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
 pub(crate) use crate::evaluator::formula_helpers::{
-    collect_all_historical_values, collect_period_range_values, collect_rolling_window_values,
+    collect_all_historical_values, collect_rolling_window_values,
 };
 
 fn annotate_error(err: Error, node_id: Option<&str>) -> Error {
@@ -188,7 +190,6 @@ pub(crate) fn build_context_for_period(
         std::sync::Arc::clone(&context.history),
         std::sync::Arc::clone(&context.historical_capital_structure_cashflows),
     );
-    period_context.period_kind = context.period_kind;
     period_context.node_value_types = std::sync::Arc::clone(&context.node_value_types);
     period_context.capital_structure_cashflows = if target_period == context.period_id {
         context.capital_structure_cashflows.clone()
@@ -215,6 +216,19 @@ pub(crate) fn build_context_for_period(
     Ok(period_context)
 }
 
+/// Visible statement and capital-structure dates for historical expressions.
+/// Standalone contexts may contain cashflow snapshots without statement rows.
+fn expression_periods(context: &EvaluationContext) -> BTreeSet<PeriodId> {
+    context
+        .history
+        .keys()
+        .chain(context.historical_capital_structure_cashflows.keys())
+        .filter(|period| **period < context.period_id)
+        .copied()
+        .chain(std::iter::once(context.period_id))
+        .collect()
+}
+
 /// Collect expression values over all available periods in chronological order.
 ///
 /// Complex expressions (not a simple column or literal) are re-evaluated once
@@ -226,36 +240,53 @@ pub(crate) fn collect_expression_values_sorted(
 ) -> Result<Rc<BTreeMap<PeriodId, f64>>> {
     match &expr.node {
         ExprNode::Column(name) => return collect_historical_values_sorted(name, context),
+        ExprNode::CsRef {
+            component,
+            instrument_or_total,
+        } => return collect_cs_values_sorted(component, instrument_or_total, context),
         ExprNode::Literal(value) => {
-            let mut values = BTreeMap::new();
-            for period in context.history.keys() {
-                if *period >= context.period_id {
-                    continue;
-                }
-                values.insert(*period, *value);
-            }
-            values.insert(context.period_id, *value);
+            let values = expression_periods(context)
+                .into_iter()
+                .map(|period| (period, *value))
+                .collect();
             return Ok(Rc::new(values));
         }
         _ => {}
     }
 
-    let periods: Vec<PeriodId> = context
-        .history
-        .keys()
-        .filter(|period| **period < context.period_id)
-        .copied()
-        .chain(std::iter::once(context.period_id))
-        .collect();
-
     let mut values = BTreeMap::new();
-    for period in periods {
+    for period in expression_periods(context) {
         let mut period_context = build_context_for_period(period, context)?;
         let value = evaluate_formula(expr, &mut period_context, node_id)?;
         values.insert(period, value);
     }
 
     Ok(Rc::new(values))
+}
+
+/// Evaluate only the expression observations inside a closed period range.
+///
+/// Filtering must precede evaluation: an instrument absent from an old,
+/// unrelated quarter must not invalidate its current-quarter cashflow sum.
+pub(crate) fn collect_expression_range_values(
+    expr: &Expr,
+    context: &EvaluationContext,
+    start: PeriodId,
+    end: PeriodId,
+    node_id: Option<&str>,
+) -> Result<Vec<f64>> {
+    if let ExprNode::Column(name) = &expr.node {
+        let sorted = collect_historical_values_sorted(name, context)?;
+        return Ok(sorted.range(start..=end).map(|(_, value)| *value).collect());
+    }
+    let periods = expression_periods(context);
+    periods
+        .range(start..=end)
+        .map(|period| {
+            let mut historical = build_context_for_period(*period, context)?;
+            evaluate_formula(expr, &mut historical, node_id)
+        })
+        .collect()
 }
 
 /// Returns `true` if the expression tree contains any time-series or
@@ -329,26 +360,14 @@ pub(crate) fn collect_expression_window_values(
             return collect_rolling_window_values(name, context, window_size);
         }
         ExprNode::Literal(value) => {
-            let visible_historical = context
-                .history
-                .keys()
-                .filter(|period| **period < context.period_id)
-                .count();
-            let total = visible_historical + 1;
+            let total = expression_periods(context).len();
             return Ok(vec![*value; window_size.min(total)]);
         }
         _ => {}
     }
 
     if !has_aggregate(expr) {
-        let mut periods: Vec<PeriodId> = context
-            .history
-            .keys()
-            .filter(|period| **period < context.period_id)
-            .copied()
-            .chain(std::iter::once(context.period_id))
-            .collect();
-        periods.sort_unstable();
+        let periods = expression_periods(context);
 
         let mut values = Vec::with_capacity(window_size);
         for period in periods.iter().rev().take(window_size) {
@@ -1108,7 +1127,7 @@ mod tests {
         )
         .expect("growth_rate evaluation");
 
-        assert!((value - 0.10).abs() < 1e-6, "value={value}");
+        assert!((value - 0.4641).abs() < 1e-6, "value={value}");
 
         let explicit = evaluate_function(
             &Function::GrowthRate,
@@ -1119,8 +1138,8 @@ mod tests {
         .expect("explicit periods");
 
         // Between Q1 2025 and Q1 2025 minus 2 quarters (Q3 2024)
-        // Values: 146.41 vs 121 → CAGR over 2 periods ≈ 10%
-        assert!((explicit - 0.10).abs() < 1e-6, "explicit={explicit}");
+        // Values: 146.41 vs 121 over two quarters, annualized: 1.21^2 - 1.
+        assert!((explicit - 0.4641).abs() < 1e-6, "explicit={explicit}");
     }
 
     #[test]
@@ -1273,8 +1292,10 @@ mod tests {
         context.historical_capital_structure_cashflows = std::sync::Arc::new(hist_cs);
         context.capital_structure_cashflows = Some(build_cs_snapshot(p2, 90.0, 4.0));
 
-        let values = collect_historical_values_sorted("__cs__debt_balance__total", &context)
-            .expect("cs history");
+        let expression = crate::dsl::parse_and_compile("cs.debt_balance.total")
+            .expect("capital-structure reference should compile");
+        let values =
+            collect_expression_values_sorted(&expression, &context, None).expect("cs history");
         assert_eq!(values.get(&p1), Some(&100.0));
         assert_eq!(values.get(&p2), Some(&90.0));
     }
@@ -1293,16 +1314,10 @@ mod tests {
         context.historical_capital_structure_cashflows = std::sync::Arc::new(hist_cs);
         context.capital_structure_cashflows = Some(build_cs_snapshot(p2, 90.0, 4.0));
 
-        let value = evaluate_function(
-            &Function::Lag,
-            &[
-                Expr::column("__cs__interest_expense__total"),
-                Expr::literal(1.0),
-            ],
-            &mut context,
-            Some("lag_cs"),
-        )
-        .expect("lag over cs should succeed");
+        let expression = crate::dsl::parse_and_compile("lag(cs.interest_expense.total, 1)")
+            .expect("capital-structure lag should compile");
+        let value = evaluate_formula(&expression, &mut context, Some("lag_cs"))
+            .expect("lag over cs should succeed");
         assert_eq!(value, 5.0);
     }
 }

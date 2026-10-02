@@ -1353,7 +1353,8 @@ class AlmgrenChrissModel:
         Raises
         ------
         ValueError
-            If the payload is malformed.
+            If the payload is malformed or the impact parameters violate the
+            constructor's finiteness and range requirements.
 
         Examples
         --------
@@ -1546,7 +1547,7 @@ class KyleLambdaModel:
         Raises
         ------
         ValueError
-            If the payload is malformed.
+            If the payload is malformed or ``lambda`` is negative or non-finite.
 
         Examples
         --------
@@ -1672,7 +1673,9 @@ def liquidity_tier(
     Raises
     ------
     ValueError
-        If ``thresholds`` is given but not strictly ascending or non-finite.
+        If ``thresholds`` is given but a value is non-finite or not positive,
+        or the values are not strictly ascending (the Rust
+        ``LiquidityConfig::try_new`` rule WASM ``liquidityTier`` shares).
 
     Examples
     --------

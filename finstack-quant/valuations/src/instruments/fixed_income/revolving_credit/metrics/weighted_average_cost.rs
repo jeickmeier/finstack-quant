@@ -17,7 +17,7 @@ use super::drawn_balance_as_of;
 ///
 /// **Note**: This is an approximation that assumes constant balances and flat fees.
 /// Floating facilities are projected at the time-weighted average of the index
-/// forward over the remaining reset grid (one point per payment period), so the
+/// forward over the remaining payment periods (one point per period), so the
 /// curve's term structure enters only through that average. It ignores:
 /// - Intra-period event effects
 /// - Fee tiering (uses current utilization only)
@@ -88,30 +88,92 @@ impl MetricCalculator for ApproxWeightedAverageCostCalculator {
     }
 }
 
-/// Time-weighted average of `forward`'s rate over the facility's reset grid
-/// from `as_of` to maturity, one point per payment period on an ACT/365F
-/// clock. Falls back to the spot forward once `as_of` reaches maturity.
+/// Time-weighted average of the contractual index rate over remaining payment
+/// periods. Each sample uses the later of valuation and accrual start on the
+/// curve clock, annualized on the full contractual coupon; remaining calendar
+/// time supplies its weight. Matured facilities have no remaining interest cost.
 fn average_forward_rate(
     forward: &ForwardCurve,
     facility: &RevolvingCredit,
     as_of: Date,
 ) -> finstack_quant_core::Result<f64> {
     if as_of >= facility.maturity {
-        return Ok(forward.rate(0.0));
+        return Ok(0.0);
     }
-    let horizon =
-        DayCount::Act365F.year_fraction(as_of, facility.maturity, DayCountContext::default())?;
-    let step = facility.frequency.to_years().max(1.0 / 365.0);
-    let (mut weighted, mut weight, mut t) = (0.0, 0.0, 0.0);
-    while t < horizon {
-        let dt = step.min(horizon - t);
-        weighted += forward.rate(t) * dt;
+    let periods = super::super::utils::build_payment_periods(facility)?;
+    let (mut weighted, mut weight) = (0.0, 0.0);
+    for period in periods.iter().filter(|period| period.accrual_end > as_of) {
+        let remaining_start = period.accrual_start.max(as_of);
+        let dt = DayCount::Act365F.year_fraction(
+            remaining_start,
+            period.accrual_end,
+            DayCountContext::default(),
+        )?;
+        let rate = crate::cashflow::builder::rate_helpers::project_index_rate(
+            remaining_start,
+            forward,
+            period.accrual_start,
+            period.accrual_end,
+            period.accrual_year_fraction,
+        )?;
+        weighted += rate * dt;
         weight += dt;
-        t += step;
     }
-    Ok(if weight > 0.0 {
-        weighted / weight
-    } else {
-        forward.rate(0.0)
-    })
+    Ok(if weight > 0.0 { weighted / weight } else { 0.0 })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruments::fixed_income::loan_terms::RateSpec;
+    use crate::instruments::fixed_income::revolving_credit::{DrawRepaySpec, RevolvingCreditFees};
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::{BusinessDayConvention, Tenor};
+    use finstack_quant_core::money::Money;
+    use time::macros::date;
+
+    #[test]
+    fn average_rate_preserves_economics_across_curve_clocks() {
+        let start = date!(2025 - 01 - 02);
+        let end = date!(2025 - 07 - 02);
+        let facility = RevolvingCredit::builder()
+            .id("RC-COST-BASIS".into())
+            .commitment(Money::from((1_000_000_i64, Currency::USD)))
+            .drawn(Money::from((1_000_000_i64, Currency::USD)))
+            .issue_date(start)
+            .maturity(end)
+            .rate(RateSpec::Fixed { rate: 0.04 })
+            .day_count(DayCount::Act360)
+            .frequency(Tenor::quarterly())
+            .business_day_convention(BusinessDayConvention::Unadjusted)
+            .fees(RevolvingCreditFees::default())
+            .draw_repay_spec(DrawRepaySpec::Deterministic(vec![]))
+            .discount_curve_id("USD-OIS".into())
+            .recovery_rate(0.0)
+            .build()
+            .expect("facility");
+        // The curve is based inside the first coupon: annualization must
+        // retain its full contractual dates even when the start is historical.
+        let as_of = date!(2025 - 02 - 03);
+        for (day_count, rate) in [
+            (DayCount::Act360, 0.04),
+            (DayCount::Act365F, 0.04 * 365.0 / 360.0),
+        ] {
+            let curve = ForwardCurve::builder("TERM", 0.25)
+                .base_date(as_of)
+                .day_count(day_count)
+                .knots([(0.0, rate), (1.0, rate)])
+                .build()
+                .expect("forward curve");
+            let projected = average_forward_rate(&curve, &facility, as_of).expect("average rate");
+            assert!(
+                (projected - 0.04).abs() < 1e-14,
+                "{day_count:?}: {projected}"
+            );
+            assert_eq!(
+                average_forward_rate(&curve, &facility, end).expect("matured"),
+                0.0
+            );
+        }
+    }
 }

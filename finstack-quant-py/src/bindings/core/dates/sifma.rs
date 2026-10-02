@@ -8,6 +8,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyModule;
 
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::errors::core_to_py;
 
 /// Public names registered by this module.
 pub const EXPORTS: &[&str] = &[
@@ -170,9 +171,9 @@ fn py_sifma_settlement_date_for_class<'py>(
 
 /// Estimated SIFMA settlement date for one settlement class.
 ///
-/// Unlike :func:`sifma_settlement_date_for_class` this always returns a date:
-/// months SIFMA has not published are projected from the published rule, so
-/// forward schedules can be built beyond the calendar.
+/// Projects the class-specific business-day anchor using the SIFMA holiday
+/// calendar. Use :func:`sifma_settlement_date_for_class` for published
+/// operational settlement dates.
 ///
 /// Parameters
 /// ----------
@@ -186,12 +187,13 @@ fn py_sifma_settlement_date_for_class<'py>(
 /// Returns
 /// -------
 /// datetime.date
-///     The published date when one exists, otherwise the projected date.
+///     The estimated date for projections, even when a published date exists.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If ``month`` is outside 1-12.
+///     If ``month`` is outside 1-12, the year or selected date is outside
+///     Python years 1-9999, or the month has too few business days.
 #[pyfunction(name = "estimated_sifma_settlement_date_for_class")]
 #[pyo3(text_signature = "(month, year, settlement_class)")]
 fn py_estimated_sifma_settlement_date_for_class<'py>(
@@ -206,7 +208,8 @@ fn py_estimated_sifma_settlement_date_for_class<'py>(
             crate::bindings::date_utils::month_from_u8(month)?,
             year,
             settlement_class.inner,
-        ),
+        )
+        .map_err(core_to_py)?,
     )
 }
 

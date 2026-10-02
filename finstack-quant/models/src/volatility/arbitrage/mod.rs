@@ -61,11 +61,12 @@ pub use types::{
     ArbitrageReport, ArbitrageSeverity, ArbitrageType, ArbitrageViolation, ViolationLocation,
 };
 
-use finstack_quant_core::market_data::surfaces::VolSurface;
+use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface, VolSurfaceAxis};
 use std::collections::BTreeMap;
 
 /// Configuration for the arbitrage detection suite.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ArbitrageCheckConfig {
     /// Run butterfly (strike convexity) check.
@@ -152,32 +153,11 @@ fn local_vol_density_violations(
     forward_prices: &[f64],
     tolerance: f64,
 ) -> Vec<ArbitrageViolation> {
-    let all_equal = forward_prices
-        .windows(2)
-        .all(|w| (w[0] - w[1]).abs() < 1e-14);
-
-    if all_equal {
-        return LocalVolDensityCheck {
-            forward: forward_prices[0],
-            tolerance,
-        }
-        .check(surface);
+    LocalVolDensityCheck {
+        forwards: forward_prices.to_vec(),
+        tolerance,
     }
-
-    let mut violations = Vec::new();
-    for (i, &expiry) in surface.expiries().iter().enumerate() {
-        let checker = LocalVolDensityCheck {
-            forward: forward_prices[i],
-            tolerance,
-        };
-        violations.extend(
-            checker
-                .check(surface)
-                .into_iter()
-                .filter(|v| (v.location.expiry - expiry).abs() < 1e-12),
-        );
-    }
-    violations
+    .check(surface)
 }
 
 /// Run butterfly, calendar-spread, and local-vol density checks on a surface.
@@ -202,10 +182,14 @@ fn local_vol_density_violations(
 ///
 /// Returns an error if required forwards are missing, non-finite, non-positive,
 /// or have the wrong length, or if tolerance is non-finite or negative.
+/// Only unshifted Black quotes on a strike axis are supported; normal,
+/// displaced-Black, and tenor-axis surfaces return a convention error.
 pub fn check_surface(
     surface: &VolSurface,
     config: &ArbitrageCheckConfig,
 ) -> finstack_quant_core::Result<ArbitrageReport> {
+    surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
+    surface.require_quote_type(VolQuoteType::BlackLognormal)?;
     validate_tolerance(config.tolerance)?;
     if config.forward_prices.is_none()
         && (config.check_butterfly
@@ -216,7 +200,6 @@ pub fn check_surface(
             "forward prices are required when arbitrage checks are enabled".into(),
         ));
     }
-    let start = std::time::Instant::now();
     let mut all_violations: Vec<ArbitrageViolation> = Vec::new();
 
     let forwards = if let Some(forwards) = &config.forward_prices {
@@ -269,9 +252,17 @@ pub fn check_surface(
         passed,
         counts_by_type,
         counts_by_severity,
-        elapsed_us: start.elapsed().as_micros() as u64,
     })
 }
+
+/// Violation tolerance the host bindings apply to the raw-grid checks
+/// ([`check_butterfly_grid`], [`check_calendar_spread_grid`],
+/// [`check_surface_grid`]) when the caller does not choose one.
+///
+/// Expressed in the units of each check's own violation magnitude (call-price
+/// convexity or total variance), so quote-level noise on a market grid is not
+/// reported as an arbitrage.
+pub const DEFAULT_GRID_TOLERANCE: f64 = 1e-6;
 
 /// Run a butterfly arbitrage check on volatility rows.
 ///
@@ -926,7 +917,6 @@ mod tests {
         assert_eq!(report.vol_surface_id, deserialized.vol_surface_id);
         assert_eq!(report.passed, deserialized.passed);
         assert_eq!(report.violations.len(), deserialized.violations.len());
-        assert_eq!(report.elapsed_us, deserialized.elapsed_us);
     }
 
     #[test]

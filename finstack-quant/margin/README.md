@@ -330,9 +330,17 @@ See [`docs/SERDE_STABILITY.md`](../../docs/SERDE_STABILITY.md) and
   `SaCcrTrade`/`SaCcrNettingSetConfig`/`SaCcrEngine`/`EadResult`/`saccr_ead`, `CONSTANTS`,
   and a `schema` submodule.
 - **WASM** — the `margin` namespace in
-  [`exports/margin.js`](../../finstack-quant-wasm/exports/margin.js) is a much
-  smaller JSON-oriented surface: `csaUsdRegulatoryJson`, `csaEurRegulatoryJson`,
-  `validateCsaJson`, `calculateVm`, `computeBilateralXva`.
+  [`exports/margin.js`](../../finstack-quant-wasm/exports/margin.js) binds the
+  same surface. Engines and builders are classes (`VmCalculator`,
+  `SimmSensitivities`, `SimmCalculator`, `ScheduleImCalculator`,
+  `HaircutImCalculator`, `FrtbSensitivities`, `FrtbSbaEngine`, `SaCcrEngine`).
+  Specs, configs, results and enum labels are plain JSON values typed by the
+  schema-generated TypeScript; the Python factories and methods on those
+  classes are free functions named `<type><Method>` (`csaSpecUsdRegulatory`,
+  `csaSpecWithIm`, `imDecayProfileFactor`, `marginUtilizationShortfall`, …).
+  `constants()` returns `MarginConstants::current()`, and `computeMva`,
+  `imProfileFromSimm`, `frtbSbaCharge`, `saccrEad` and `computeBilateralXva`
+  are the module functions. The `schema` submodule is not bound.
 
 ## Verification
 

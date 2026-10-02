@@ -54,10 +54,12 @@ pub struct FxSwap {
     pub domestic_discount_curve_id: CurveId,
     /// Foreign discount curve id (base currency)
     pub foreign_discount_curve_id: CurveId,
-    /// Optional near leg FX rate (quote per base). If None, source from market.
+    /// Optional near leg FX rate (quote per base). If absent, use the market
+    /// outright forward from the valuation date to near settlement.
     #[builder(optional)]
     pub near_rate: Option<f64>,
-    /// Optional far leg FX rate (quote per base). If None, source from forwards.
+    /// Optional far leg FX rate (quote per base). If absent, use the market
+    /// outright forward from the valuation date to far settlement.
     #[builder(optional)]
     pub far_rate: Option<f64>,
     /// Optional base currency calendar for spot/settlement adjustment metadata.
@@ -123,10 +125,12 @@ struct FxSwapUnchecked {
     domestic_discount_curve_id: CurveId,
     /// Foreign discount curve id (base currency).
     foreign_discount_curve_id: CurveId,
-    /// Optional near leg FX rate (quote per base). If None, source from market.
+    /// Optional near leg FX rate (quote per base). If absent, use the market
+    /// outright forward from the valuation date to near settlement.
     #[serde(default)]
     near_rate: Option<f64>,
-    /// Optional far leg FX rate (quote per base). If None, source from forwards.
+    /// Optional far leg FX rate (quote per base). If absent, use the market
+    /// outright forward from the valuation date to far settlement.
     #[serde(default)]
     far_rate: Option<f64>,
     /// Optional base currency calendar for spot/settlement adjustment metadata.
@@ -384,13 +388,6 @@ impl crate::instruments::common_impl::traits::Instrument for FxSwap {
 
         self.validate()?;
 
-        if self.near_date > self.far_date {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "FxSwap near_date ({}) must be <= far_date ({})",
-                self.near_date, self.far_date
-            )));
-        }
-
         // End-of-day policy: far-leg settlement remains live on its event date.
         if crate::instruments::fx::shared::event_has_occurred(self.far_date, as_of) {
             return Ok(finstack_quant_core::money::Money::from((
@@ -399,15 +396,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxSwap {
             )));
         }
 
-        // Currency safety check before expensive calculations
-        if self.notional.currency() != self.base_currency {
-            return Err(finstack_quant_core::Error::CurrencyMismatch {
-                expected: self.base_currency,
-                actual: self.notional.currency(),
-            });
-        }
-
-        // Build pricing context (handles rate validation and CIP forward calculation)
+        // Build pricing context after validating the contract terms.
         let ctx = FxSwapPricingContext::build(self, curves, as_of)?;
 
         let total_pv = ctx.total_pv();
@@ -433,12 +422,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {
     ) -> finstack_quant_core::Result<CashFlowSchedule> {
         use super::pricing_helper::FxSwapPricingContext;
 
-        if self.notional.currency() != self.base_currency {
-            return Err(finstack_quant_core::Error::CurrencyMismatch {
-                expected: self.base_currency,
-                actual: self.notional.currency(),
-            });
-        }
+        self.validate()?;
         if crate::instruments::fx::shared::event_has_occurred(self.far_date, as_of) {
             return Ok(crate::cashflow::traits::schedule_from_classified_flows(
                 Vec::new(),

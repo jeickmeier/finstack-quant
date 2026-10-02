@@ -1,14 +1,13 @@
 //! Pricer bindings — European, Path-Dependent, LSMC.
 
-use super::engine::{py_mc_defaults, resolve_currency};
+use super::engine::resolve_currency;
 use super::results::PyMoneyEstimate;
 use crate::errors::core_to_py;
+use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
 use finstack_quant_models::monte_carlo::pricer::basis::BasisKind;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 use finstack_quant_models::monte_carlo::pricer::lsmc::LsmcPricer;
-use finstack_quant_models::monte_carlo::pricer::path_dependent::{
-    PathDependentPricer, PathDependentPricerConfig,
-};
+use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
 use pyo3::prelude::*;
 
 /// Render a bool the way Python's `repr` does.
@@ -32,6 +31,22 @@ pub struct PyEuropeanPricer {
 
 #[pymethods]
 impl PyEuropeanPricer {
+    /// Create a European pricer with at least two independent path estimators.
+    ///
+    /// Parameters
+    /// ----------
+    /// num_paths : int, optional
+    ///     Independent path estimators in ``[2, 10_000_000]``. ``None`` uses
+    ///     the registry default; the upper limit is checked when pricing.
+    /// seed : int, optional
+    ///     Deterministic Philox seed; ``None`` uses the registry default.
+    /// use_parallel : bool, optional
+    ///     Whether to use the rayon pool; ``None`` uses the registry default.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the path count is less than two or embedded defaults cannot be loaded.
     #[new]
     #[pyo3(signature = (num_paths=None, seed=None, use_parallel=None))]
     fn new(
@@ -39,12 +54,9 @@ impl PyEuropeanPricer {
         seed: Option<u64>,
         use_parallel: Option<bool>,
     ) -> PyResult<Self> {
-        let defaults = &py_mc_defaults()?.european_pricer;
-        let inner = EuropeanPricer::new(num_paths.unwrap_or(defaults.num_paths))
-            .map_err(core_to_py)?
-            .with_seed(seed.unwrap_or(defaults.seed))
-            .with_parallel(use_parallel.unwrap_or(defaults.use_parallel));
-        Ok(Self { inner })
+        convenience::european_pricer(num_paths, seed, use_parallel)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
     }
 
     /// Independent Monte Carlo path count used by this pricer.
@@ -82,7 +94,7 @@ impl PyEuropeanPricer {
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMoneyEstimate> {
         let ccy = resolve_currency(currency)?;
-        let num_steps = num_steps.unwrap_or(py_mc_defaults()?.european_pricer.num_steps);
+        let num_steps = convenience::european_num_steps(num_steps).map_err(core_to_py)?;
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_gbm_call(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy)
@@ -110,7 +122,7 @@ impl PyEuropeanPricer {
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMoneyEstimate> {
         let ccy = resolve_currency(currency)?;
-        let num_steps = num_steps.unwrap_or(py_mc_defaults()?.european_pricer.num_steps);
+        let num_steps = convenience::european_num_steps(num_steps).map_err(core_to_py)?;
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_gbm_put(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy)
@@ -146,7 +158,9 @@ impl PyPathDependentPricer {
     /// Parameters
     /// ----------
     /// num_paths : int, optional
-    ///     Independent path estimators. Defaults to the registry value.
+    ///     Path budget of at least two. Without Sobol, counts independent
+    ///     estimators, with each antithetic pair counted once; with Sobol,
+    ///     counts points across independent scrambles. Defaults to the registry value.
     /// seed : int, optional
     ///     Root Philox seed. Defaults to the registry value.
     /// use_parallel : bool, optional
@@ -168,7 +182,7 @@ impl PyPathDependentPricer {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the embedded defaults registry cannot be loaded or the
+    ///     If the path budget is less than two, embedded defaults cannot be loaded, or the
     ///     configuration is inconsistent (``use_sobol`` with ``use_parallel``).
     #[new]
     #[pyo3(signature = (
@@ -183,23 +197,16 @@ impl PyPathDependentPricer {
         use_sobol: Option<bool>,
         use_brownian_bridge: Option<bool>,
     ) -> PyResult<Self> {
-        let defaults = &py_mc_defaults()?.path_dependent_pricer;
-        let mut config = PathDependentPricerConfig::new(num_paths.unwrap_or(defaults.num_paths))
-            .with_seed(seed.unwrap_or(defaults.seed))
-            .with_parallel(use_parallel.unwrap_or(defaults.use_parallel));
-        if let Some(antithetic) = antithetic {
-            config = config.with_antithetic(antithetic);
-        }
-        if let Some(use_sobol) = use_sobol {
-            config = config.with_sobol(use_sobol);
-        }
-        if let Some(bridge) = use_brownian_bridge {
-            config = config.with_brownian_bridge(bridge);
-        }
-        config.validate().map_err(core_to_py)?;
-        Ok(Self {
-            inner: PathDependentPricer::new(config),
-        })
+        convenience::path_dependent_pricer(
+            num_paths,
+            seed,
+            use_parallel,
+            antithetic,
+            use_sobol,
+            use_brownian_bridge,
+        )
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
     }
 
     /// Price an Asian call under GBM dynamics.
@@ -220,7 +227,7 @@ impl PyPathDependentPricer {
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMoneyEstimate> {
         let ccy = resolve_currency(currency)?;
-        let num_steps = num_steps.unwrap_or(py_mc_defaults()?.path_dependent_pricer.num_steps);
+        let num_steps = convenience::path_dependent_num_steps(num_steps).map_err(core_to_py)?;
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_gbm_asian_call(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy)
@@ -247,7 +254,7 @@ impl PyPathDependentPricer {
         currency: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyMoneyEstimate> {
         let ccy = resolve_currency(currency)?;
-        let num_steps = num_steps.unwrap_or(py_mc_defaults()?.path_dependent_pricer.num_steps);
+        let num_steps = convenience::path_dependent_num_steps(num_steps).map_err(core_to_py)?;
         let pricer = &self.inner;
         py.detach(|| {
             pricer.price_gbm_asian_put(spot, strike, rate, div_yield, vol, expiry, num_steps, ccy)
@@ -302,20 +309,55 @@ impl PyPathDependentPricer {
 }
 
 /// Longstaff-Schwartz Monte Carlo pricer for American options.
+///
+/// Independent paths must be in ``[1, 10_000_000]`` and time steps in
+/// ``[1, 100_000]``. Each pricing pass retains at most ``64_000_000`` spot
+/// values: ``num_paths * (2 if antithetic else 1) * (num_steps + 1)``,
+/// including time zero and both rows of each antithetic pair. Construction
+/// checks storage without partners; pricing checks the selected pairing
+/// before allocating paths.
 #[pyclass(
     name = "LsmcPricer",
     module = "finstack_quant.models.monte_carlo",
     frozen
 )]
 pub struct PyLsmcPricer {
-    inner: LsmcPricer,
-    num_steps: usize,
-    basis: BasisKind,
-    basis_degree: usize,
+    inner: LsmcConvenience,
 }
 
 #[pymethods]
 impl PyLsmcPricer {
+    /// Configure the path generation and regression basis for early exercise.
+    ///
+    /// Parameters
+    /// ----------
+    /// num_paths : int, optional
+    ///     Independent path count in ``[2, 10_000_000]``. ``None`` uses the
+    ///     registry default; subject to the retained-storage limit above.
+    /// seed : int, optional
+    ///     Deterministic Philox seed; ``None`` uses the registry default.
+    /// use_parallel : bool, optional
+    ///     Whether path generation uses the rayon pool; ``None`` uses the
+    ///     registry default.
+    /// num_steps : int, optional
+    ///     Time-grid steps and exercise dates in ``[1, 100_000]``. ``None``
+    ///     uses the registry default; subject to the retained-storage limit.
+    /// basis : str, optional
+    ///     ``"laguerre"``, ``"polynomial"``, or ``"normalized_polynomial"``;
+    ///     ``None`` selects the registry default.
+    /// basis_degree : int, optional
+    ///     Positive regression degree, validated when pricing; Laguerre
+    ///     supports degrees one through four. ``None`` uses the registry default.
+    /// antithetic : bool, optional
+    ///     Pair each path with its sign-flipped shocks. ``None`` uses the
+    ///     registry default; both rows count toward retained storage at pricing.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the basis family is unknown, the path or step count is outside
+    ///     the documented range, or paths without antithetic partners exceed
+    ///     ``64_000_000`` retained spot values including time zero.
     #[new]
     #[pyo3(signature = (
         num_paths=None,
@@ -335,53 +377,46 @@ impl PyLsmcPricer {
         basis_degree: Option<usize>,
         antithetic: Option<bool>,
     ) -> PyResult<Self> {
-        let defaults = &py_mc_defaults()?.lsmc;
-        let basis = BasisKind::parse(basis.unwrap_or(defaults.basis.as_str()))
-            .map_err(crate::errors::value_error)?;
-        let num_steps = num_steps.unwrap_or(defaults.num_steps);
-        let inner = LsmcPricer::gbm_american(
-            num_paths.unwrap_or(defaults.num_paths),
-            num_steps,
-            seed.unwrap_or(defaults.seed),
-            use_parallel.unwrap_or(defaults.use_parallel),
-            antithetic.unwrap_or(defaults.antithetic),
-        )
-        .map_err(core_to_py)?;
-        Ok(Self {
-            inner,
+        LsmcConvenience::new(
+            num_paths,
+            seed,
+            use_parallel,
             num_steps,
             basis,
-            basis_degree: basis_degree.unwrap_or(defaults.basis_degree),
-        })
+            basis_degree,
+            antithetic,
+        )
+        .map(|inner| Self { inner })
+        .map_err(core_to_py)
     }
 
     /// Independent Monte Carlo path count used by this pricer.
     #[getter]
     fn num_paths(&self) -> usize {
-        self.inner.config().num_paths
+        self.inner.pricer().config().num_paths
     }
     /// Seed value used for path generation.
     #[getter]
     fn seed(&self) -> u64 {
-        self.inner.config().seed
+        self.inner.pricer().config().seed
     }
     /// Whether path generation runs on the rayon pool.
     #[getter]
     fn use_parallel(&self) -> bool {
-        self.inner.config().use_parallel
+        self.inner.pricer().config().use_parallel
     }
     /// Whether each path is paired with its sign-flipped counterpart.
     #[getter]
     fn antithetic(&self) -> bool {
-        self.inner.config().antithetic
+        self.inner.pricer().config().antithetic
     }
     #[getter]
     fn basis(&self) -> &'static str {
-        self.basis.as_str()
+        self.inner.basis().as_str()
     }
     #[getter]
     fn basis_degree(&self) -> usize {
-        self.basis_degree
+        self.inner.basis_degree()
     }
 
     /// Price an American put under GBM dynamics.
@@ -397,14 +432,22 @@ impl PyLsmcPricer {
     /// currency : Currency or str, optional
     ///     Currency stamped on the estimate; defaults to the registry value.
     /// num_steps : int, optional
-    ///     Per-call override of the exercise grid; defaults to the instance
-    ///     ``num_steps``.
+    ///     Per-call exercise-grid override in ``[1, 100_000]``; defaults to
+    ///     the instance ``num_steps``. Subject to the retained-storage limit.
     /// basis : str, optional
     ///     Per-call override of the regression basis family; defaults to the
     ///     instance ``basis``.
     /// basis_degree : int, optional
     ///     Per-call override of the basis degree; defaults to the instance
     ///     ``basis_degree``.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the requested grid or path count exceeds the documented range,
+    ///     or retained spots exceed ``64_000_000`` values including time zero
+    ///     and both rows of each antithetic pair; also raised for invalid market
+    ///     inputs, currency, basis family, or basis degree.
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, currency=None, num_steps=None, basis=None, basis_degree=None))]
     fn price_american_put(
@@ -447,6 +490,10 @@ impl PyLsmcPricer {
     /// Releases the GIL during the Monte Carlo run. Accepts the same per-call
     /// ``num_steps`` / ``basis`` / ``basis_degree`` overrides as
     /// ``price_american_put``.
+    ///
+    /// Raises ``ValueError`` for the same workload limits: at most ``100_000``
+    /// steps, ``10_000_000`` independent paths, and ``64_000_000`` retained spot
+    /// values including time zero and both rows of each antithetic pair.
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (spot, strike, rate, div_yield, vol, expiry, currency=None, num_steps=None, basis=None, basis_degree=None))]
     fn price_american_call(
@@ -495,6 +542,11 @@ impl PyLsmcPricer {
     /// Releases the GIL during both Monte Carlo passes. Accepts the same
     /// per-call ``num_steps`` / ``basis`` / ``basis_degree`` overrides as
     /// ``price_american_put``.
+    ///
+    /// Each pass applies the same workload limits and raises ``ValueError``
+    /// above ``100_000`` steps, ``10_000_000`` independent paths, or
+    /// ``64_000_000`` retained spot values including time zero and both rows
+    /// of each antithetic pair.
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         spot, strike, rate, div_yield, vol, expiry, pricing_seed, currency=None,
@@ -541,6 +593,8 @@ impl PyLsmcPricer {
     ///
     /// See ``price_american_put_unbiased`` for the bias-mitigation rationale
     /// and the meaning of ``pricing_seed``; the same per-call overrides apply.
+    /// Each pass raises ``ValueError`` for the same workload limits, including
+    /// ``64_000_000`` retained spot values with time zero and antithetic rows.
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         spot, strike, rate, div_yield, vol, expiry, pricing_seed, currency=None,
@@ -586,13 +640,13 @@ impl PyLsmcPricer {
     fn __repr__(&self) -> String {
         format!(
             "LsmcPricer(num_paths={}, seed={}, use_parallel={}, antithetic={}, num_steps={}, basis='{}', basis_degree={})",
-            self.inner.config().num_paths,
-            self.inner.config().seed,
-            py_bool(self.inner.config().use_parallel),
-            py_bool(self.inner.config().antithetic),
-            self.num_steps,
-            self.basis.as_str(),
-            self.basis_degree,
+            self.inner.pricer().config().num_paths,
+            self.inner.pricer().config().seed,
+            py_bool(self.inner.pricer().config().use_parallel),
+            py_bool(self.inner.pricer().config().antithetic),
+            self.inner.num_steps(),
+            self.inner.basis().as_str(),
+            self.inner.basis_degree(),
         )
     }
 }
@@ -608,26 +662,9 @@ impl PyLsmcPricer {
         basis: Option<&str>,
         basis_degree: Option<usize>,
     ) -> PyResult<(LsmcPricer, usize, BasisKind, usize)> {
-        let config = self.inner.config();
-        let num_steps = num_steps.unwrap_or(self.num_steps);
-        let pricer = LsmcPricer::gbm_american(
-            config.num_paths,
-            num_steps,
-            config.seed,
-            config.use_parallel,
-            config.antithetic,
-        )
-        .map_err(core_to_py)?;
-        let basis = match basis {
-            Some(name) => BasisKind::parse(name).map_err(crate::errors::value_error)?,
-            None => self.basis,
-        };
-        Ok((
-            pricer,
-            num_steps,
-            basis,
-            basis_degree.unwrap_or(self.basis_degree),
-        ))
+        self.inner
+            .call_config(num_steps, basis, basis_degree)
+            .map_err(core_to_py)
     }
 }
 

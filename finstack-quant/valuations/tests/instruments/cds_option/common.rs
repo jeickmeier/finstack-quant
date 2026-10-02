@@ -89,10 +89,10 @@ pub fn standard_market(as_of: Date) -> MarketContext {
 pub fn replayable_standard_market(as_of: Date) -> MarketContext {
     let source = MarketContext::new().insert(flat_discount("USD-OIS", as_of, 0.03));
     let pillars = [
-        (as_of.add_months(12), 500.0),
-        (as_of.add_months(36), 500.0),
-        (as_of.add_months(60), 500.0),
-        (as_of.add_months(120), 500.0),
+        (as_of.add_months(12).expect("valid date shift"), 500.0),
+        (as_of.add_months(36).expect("valid date shift"), 500.0),
+        (as_of.add_months(60).expect("valid date shift"), 500.0),
+        (as_of.add_months(120).expect("valid date shift"), 500.0),
     ];
     let hazard = crate::instruments::test_support::credit::calibrated_hazard_curve_from_spec(
         crate::instruments::test_support::credit::CalibratedHazardSpec {
@@ -272,8 +272,12 @@ impl CdsOptionBuilder {
     }
 
     pub fn build(self, as_of: Date) -> CdsOption {
-        let expiry = as_of.add_months(self.expiry_months);
-        let underlying_maturity = as_of.add_months(self.cds_maturity_months);
+        let expiry = as_of
+            .add_months(self.expiry_months)
+            .expect("valid date shift");
+        let underlying_maturity = as_of
+            .add_months(self.cds_maturity_months)
+            .expect("valid date shift");
 
         let strike = match self.clean_price_strike_pct {
             Some(pct) => CdsOptionStrike::CleanPricePct(

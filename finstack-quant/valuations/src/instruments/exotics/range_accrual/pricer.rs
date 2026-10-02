@@ -204,21 +204,22 @@ impl RangeAccrualMcPricer {
         }
         validate_historical_observations(inst, as_of)?;
 
-        let observation_times = inst
+        let future_dates: Vec<Date> = inst
             .terms
             .observation_dates
+            .iter()
+            .copied()
+            .filter(|&date| date > as_of)
+            .collect();
+        let observation_times = future_dates
             .iter()
             .map(|&date| {
                 inst.terms
                     .day_count
-                    .signed_year_fraction(as_of, date, DayCountContext::default())
+                    .year_fraction(as_of, date, DayCountContext::default())
             })
             .collect::<Result<Vec<_>>>()?;
-        let future_obs_count = observation_times
-            .iter()
-            .filter(|&&t_obs| t_obs > 0.0)
-            .count();
-        if future_obs_count == 0 {
+        if future_dates.is_empty() {
             return compute_known_value(inst, curves, as_of, final_date);
         }
 
@@ -255,21 +256,47 @@ impl RangeAccrualMcPricer {
             initial_spot,
         )?;
 
-        // Keep discounting in payoff currency while financing the asset in its
-        // own currency. The same horizon growth drives analytical probabilities.
-        let growth = asset_growth(inst, curves, as_of, final_date, sigma)?;
-        let q = r - growth.ln() / t;
-        let gbm_params = GbmParams::new(r, q, sigma)?;
-        let process = GbmProcess::new(gbm_params);
-
-        let steps_per_year = self.config.steps_per_year;
-        let num_steps = ((t * steps_per_year).round() as usize).max(self.config.min_steps);
-
-        // Filter out past observations; conversion errors were propagated above.
-        let observation_times: Vec<f64> = observation_times
-            .into_iter()
-            .filter(|&t_obs| t_obs > 0.0)
-            .collect();
+        // Match the asset's dated forward at every observation. The payment
+        // horizon sets discounting; it does not replace earlier financing.
+        let mut drift_dates = future_dates.clone();
+        drift_dates.push(final_date);
+        drift_dates.sort_unstable();
+        drift_dates.dedup();
+        let mut drift_times = vec![0.0];
+        let mut cumulative_growth = vec![0.0];
+        for date in drift_dates {
+            let time =
+                inst.terms
+                    .day_count
+                    .year_fraction(as_of, date, DayCountContext::default())?;
+            let growth = asset_growth(inst, curves, as_of, date, sigma)?.ln();
+            let last = drift_times.len() - 1;
+            if time.total_cmp(&drift_times[last]) != std::cmp::Ordering::Equal {
+                drift_times.push(time);
+                cumulative_growth.push(growth);
+            }
+        }
+        let drift = finstack_quant_models::monte_carlo::process::gbm::DriftSchedule::new(
+            drift_times,
+            cumulative_growth,
+        )?;
+        let observation_multipliers = future_dates
+            .iter()
+            .zip(&observation_times)
+            .map(|(&date, &time)| {
+                Ok(
+                    (asset_growth(inst, curves, as_of, date, sigma)?.ln() - drift.cumulative(time))
+                        .exp(),
+                )
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let process = GbmProcess::new(GbmParams::new(r, 0.0, sigma)?)
+            .with_drift_schedule(std::sync::Arc::new(drift));
+        let mut config = crate::instruments::common_impl::helpers::merged_path_config(
+            &self.config,
+            &inst.instrument_pricing_overrides,
+        )?;
+        let time_grid = config.build_time_grid(t, &observation_times)?;
 
         // Create payoff with effective bounds and historical fixing info
         let payoff = RangeAccrualPayoff::new_with_history(
@@ -281,7 +308,8 @@ impl RangeAccrualMcPricer {
             inst.terms.notional.currency(),
             inst.terms.past_observations_in_range.unwrap_or(0),
             inst.terms.total_past_observations.unwrap_or(0),
-        )?;
+        )?
+        .with_observation_multipliers(&observation_multipliers)?;
 
         // Derive deterministic seed from instrument ID and scenario
         use finstack_quant_models::monte_carlo::seed;
@@ -296,17 +324,12 @@ impl RangeAccrualMcPricer {
             seed::derive_seed(&inst.id, "base")
         };
 
-        let mut config = crate::instruments::common_impl::helpers::merged_path_config(
-            &self.config,
-            &inst.instrument_pricing_overrides,
-        )?;
         config.seed = seed;
         let pricer = PathDependentPricer::new(config);
-        let result = pricer.price(
+        let result = pricer.price_with_grid(
             &process,
             initial_spot,
-            t,
-            num_steps,
+            time_grid,
             &payoff,
             inst.terms.notional.currency(),
             discount_factor,
@@ -496,6 +519,25 @@ pub fn npv_analytic(inst: &RangeAccrual, market: &MarketContext, as_of: Date) ->
             initial_spot,
         )?;
         let forward = initial_spot * asset_growth(inst, market, as_of, date, sigma)?;
+
+        // A zero quote at one strike does not establish a point mass. Require
+        // an explicit flat zero override or an entirely zero quoted surface.
+        let quotes = &inst.instrument_pricing_overrides.market_quotes;
+        let deterministic = sigma == 0.0
+            && match quotes.implied_volatility {
+                Some(vol) => vol == 0.0,
+                None => market
+                    .get_surface(inst.terms.vol_surface_id.as_str())
+                    .is_ok_and(|surface| surface.vols().iter().all(|&vol| vol == 0.0)),
+            };
+        if deterministic {
+            total_expected_in_range += if (effective_lower..=effective_upper).contains(&forward) {
+                1.0
+            } else {
+                0.0
+            };
+            continue;
+        }
 
         // Digital Call Probability P(S_t > K) via finite-width call spread.
         //
@@ -844,5 +886,267 @@ mod tests {
         let expected = "cannot use equity static replication";
         assert!(direct.to_string().contains(expected));
         assert!(registered.to_string().contains(expected));
+    }
+
+    fn deterministic_range(as_of: Date) -> RangeAccrual {
+        let mut inst = RangeAccrual::example_absolute_bounds().expect("range");
+        inst.terms.start_date = as_of;
+        inst.terms.observation_dates = vec![date(2025, 7, 2)];
+        inst.terms.payment_date = Some(date(2026, 1, 1));
+        inst.terms.notional = Money::from((1_000_000_i64, Currency::USD));
+        inst.terms.coupon_rate = 0.1;
+        inst.terms.spot_id = "SPX-SPOT".into();
+        inst.terms.vol_surface_id = "SPX-VOL".into();
+        inst.terms.div_yield_id = None;
+        inst.instrument_pricing_overrides.model_config.mc_paths = Some(16);
+        inst
+    }
+
+    #[test]
+    fn range_mc_uses_dated_carry_and_only_discounts_at_payment() {
+        let as_of = date(2025, 1, 1);
+        let mut inst = deterministic_range(as_of);
+        inst.terms.lower_bound = 99.0;
+        inst.terms.upper_bound = 101.0;
+        inst.instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.0);
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([(0.0, 1.0), (0.5, 1.0), (1.0, 0.9), (2.0, 0.8)])
+            .build()
+            .expect("curve");
+        let curves = market(as_of).insert(curve);
+        for (payment, df) in [(date(2026, 1, 1), 0.9), (date(2027, 1, 1), 0.8)] {
+            inst.terms.payment_date = Some(payment);
+            let expected = 1_000_000.0 * 0.1 * 182.0 / 360.0 * df;
+            let mc = RangeAccrualMcPricer::new()
+                .price_internal(&inst, &curves, as_of)
+                .expect("MC")
+                .amount();
+            let analytical = npv_analytic(&inst, &curves, as_of)
+                .expect("analytical")
+                .amount();
+            assert!((mc - expected).abs() < 1e-8, "{mc} vs {expected}");
+            assert!((analytical - expected).abs() < 1e-8);
+        }
+    }
+
+    #[test]
+    fn deterministic_range_boundaries_are_inclusive_without_changing_stochastic_smiles() {
+        let as_of = date(2025, 1, 1);
+        let mut inst = deterministic_range(as_of);
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .knots([(0.0, 1.0), (2.0, 1.0)])
+            .build()
+            .expect("curve");
+        let surface = VolSurface::builder("SPX-VOL")
+            .expiries(&[0.5, 1.0])
+            .strikes(&[90.0, 100.0, 110.0])
+            .row(&[0.0, 0.0, 0.0])
+            .row(&[0.0, 0.0, 0.0])
+            .build()
+            .expect("surface");
+        let curves = market(as_of).insert(curve).insert_surface(surface);
+        let full_coupon = 1_000_000.0 * 0.1 * 182.0 / 360.0;
+        for (lower, upper, fraction) in [
+            (100.0, 110.0, 1.0),
+            (90.0, 100.0, 1.0),
+            (100.01, 110.0, 0.0),
+            (90.0, 99.99, 0.0),
+            (99.99, 100.01, 1.0),
+        ] {
+            inst.terms.lower_bound = lower;
+            inst.terms.upper_bound = upper;
+            let actual = npv_analytic(&inst, &curves, as_of)
+                .expect("analytical")
+                .amount();
+            assert!(
+                (actual - full_coupon * fraction).abs() < 1e-8,
+                "{actual} vs fraction {fraction}"
+            );
+        }
+        // An isolated zero ATM quote is not a deterministic distribution.
+        let smile = VolSurface::builder("SPX-VOL")
+            .expiries(&[0.5, 1.0])
+            .strikes(&[90.0, 100.0, 110.0])
+            .row(&[0.2, 0.0, 0.2])
+            .row(&[0.2, 0.0, 0.2])
+            .build()
+            .expect("surface");
+        inst.terms.lower_bound = 100.0;
+        inst.terms.upper_bound = 110.0;
+        let smile_price = npv_analytic(&inst, &curves.clone().insert_surface(smile), as_of)
+            .expect("smile price")
+            .amount();
+        assert!(
+            smile_price < full_coupon * 0.9,
+            "isolated zero quote incorrectly paid full coupon"
+        );
+        inst.instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(1e-4);
+        let positive_vol_price = npv_analytic(&inst, &curves, as_of)
+            .expect("small vol")
+            .amount();
+        assert!(positive_vol_price > full_coupon * 0.4 && positive_vol_price < full_coupon * 0.6);
+    }
+
+    #[test]
+    fn equal_model_time_range_observations_use_their_own_dated_forward() {
+        let as_of = date(2025, 1, 1);
+        let first = date(2025, 1, 30);
+        let second = date(2025, 1, 31);
+        let mut inst = deterministic_range(as_of);
+        inst.terms.day_count = finstack_quant_core::dates::DayCount::ThirtyE360;
+        inst.terms.observation_dates = vec![first, second];
+        inst.terms.payment_date = Some(second);
+        inst.instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.0);
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([(0.0, 1.0), (1.0, (-0.05_f64).exp())])
+            .build()
+            .expect("curve");
+        let first_forward = 100.0 / curve.df_between_dates(as_of, first).expect("first DF");
+        let payment_df = curve.df_between_dates(as_of, second).expect("payment DF");
+        inst.terms.lower_bound = first_forward - 0.0001;
+        inst.terms.upper_bound = first_forward + 0.0001;
+        let curves = market(as_of).insert(curve);
+        let expected = 1_000_000.0 * 0.1 * (29.0 / 360.0) * 0.5 * payment_df;
+        let mc = RangeAccrualMcPricer::new()
+            .price_internal(&inst, &curves, as_of)
+            .expect("MC")
+            .amount();
+        let analytical = npv_analytic(&inst, &curves, as_of)
+            .expect("analytical")
+            .amount();
+        assert!((mc - expected).abs() < 1e-8, "{mc} vs {expected}");
+        assert!(
+            (analytical - expected).abs() < 1e-8,
+            "{analytical} vs {expected}"
+        );
+    }
+
+    #[test]
+    fn positive_vol_quanto_range_matches_lognormal_probability() {
+        let as_of = date(2025, 1, 1);
+        let mut inst = deterministic_range(as_of);
+        inst.terms.lower_bound = 100.0;
+        inst.terms.upper_bound = 120.0;
+        inst.terms.div_yield_id = Some("SPX-DIV".into());
+        inst.instrument_pricing_overrides.model_config.mc_paths = Some(40_000);
+        let sigma = 0.20;
+        let sigma_fx = 0.15;
+        let q = 0.01;
+        let t = 182.0 / 360.0;
+        let payment_curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([(0.0, 1.0), (182.0 / 365.0, 0.99), (1.0, 0.90)])
+            .build()
+            .expect("USD curve");
+        let asset_curve = DiscountCurve::builder("EUR-OIS")
+            .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([(0.0, 1.0), (182.0 / 365.0, 0.98), (1.0, 0.92)])
+            .build()
+            .expect("EUR curve");
+        let fx_surface = VolSurface::builder("EURUSD-VOL")
+            .expiries(&[0.1, 2.0])
+            .strikes(&[0.5, 2.0])
+            .row(&[sigma_fx; 2])
+            .row(&[sigma_fx; 2])
+            .build()
+            .expect("FX vol");
+        let curves = market(as_of)
+            .insert(payment_curve)
+            .insert(asset_curve)
+            .insert_surface(fx_surface)
+            .insert_price("SPX-DIV", MarketScalar::Unitless(q))
+            .insert_price("EURUSD", MarketScalar::Unitless(1.1));
+        let pricer = RangeAccrualMcPricer {
+            config: PathDependentPricerConfig {
+                steps_per_year: 4.0,
+                min_steps: 1,
+                use_parallel: false,
+                use_sobol: false,
+                antithetic: false,
+                ..Default::default()
+            },
+        };
+        let full_coupon = 1_000_000.0 * 0.1 * t * 0.90;
+        for correlation in [-0.6, 0.6] {
+            inst.terms.quanto = Some(
+                crate::instruments::QuantoSpec::new(
+                    correlation,
+                    "EURUSD-VOL",
+                    Currency::EUR,
+                    "EUR-OIS",
+                    "EURUSD",
+                )
+                .expect("quanto"),
+            );
+            // Q^USD forward for an EUR asset: S/DF_EUR * exp[-(q+rho*sigma*sigmaFX)*T].
+            let forward = 100.0 / 0.98 * (-(q + correlation * sigma * sigma_fx) * t).exp();
+            let std = sigma * t.sqrt();
+            let z_lower = ((100.0_f64 / forward).ln() + 0.5 * sigma * sigma * t) / std;
+            let z_upper = ((120.0_f64 / forward).ln() + 0.5 * sigma * sigma * t) / std;
+            let probability = finstack_quant_core::math::norm_cdf(z_upper)
+                - finstack_quant_core::math::norm_cdf(z_lower);
+            let expected = full_coupon * probability;
+            let analytical = npv_analytic(&inst, &curves, as_of)
+                .expect("quanto analytical")
+                .amount();
+            assert!(
+                (analytical - expected).abs() < 0.01,
+                "rho={correlation}: analytic={analytical}, expected={expected}"
+            );
+            let mc = pricer
+                .price_internal(&inst, &curves, as_of)
+                .expect("quanto MC")
+                .amount();
+            let sampling_stderr =
+                full_coupon * (probability * (1.0 - probability) / 40_000.0).sqrt();
+            assert!((mc - expected).abs() < 5.0 * sampling_stderr,
+                "rho={correlation}: MC={mc}, expected={expected}, binomial stderr={sampling_stderr}");
+        }
+    }
+
+    #[test]
+    fn deterministic_range_includes_nonflat_dated_forward_at_either_bound() {
+        let as_of = date(2025, 1, 1);
+        let mut inst = deterministic_range(as_of);
+        let curve = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(finstack_quant_core::dates::DayCount::Act365F)
+            .knots([(0.0, 1.0), (182.0 / 365.0, 0.8), (1.0, 0.75)])
+            .build()
+            .expect("curve");
+        let zero_surface = VolSurface::builder("SPX-VOL")
+            .expiries(&[0.1, 2.0])
+            .strikes(&[90.0, 150.0])
+            .row(&[0.0; 2])
+            .row(&[0.0; 2])
+            .build()
+            .expect("zero vol");
+        let curves = market(as_of).insert(curve).insert_surface(zero_surface);
+        // S/DF at the observation is exactly 100 / .8 = 125; payment DF is .75.
+        let expected = 1_000_000.0 * 0.1 * (182.0 / 360.0) * 0.75;
+        for (lower, upper) in [(125.0, 135.0), (115.0, 125.0)] {
+            inst.terms.lower_bound = lower;
+            inst.terms.upper_bound = upper;
+            let actual = npv_analytic(&inst, &curves, as_of)
+                .expect("dated boundary")
+                .amount();
+            assert!(
+                (actual - expected).abs() < 1e-8,
+                "[{lower}, {upper}]: {actual} vs {expected}"
+            );
+        }
     }
 }

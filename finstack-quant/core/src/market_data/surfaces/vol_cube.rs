@@ -1,17 +1,17 @@
 //! SABR volatility cube for swaption pricing.
 //!
 //! Stores SABR parameters on a two-dimensional grid indexed by option expiry and
-//! underlying swap tenor. The cube interpolates SABR parameters bilinearly across
-//! the grid and evaluates implied volatilities via the Hagan (2002) approximation.
+//! underlying swap tenor. The models-layer evaluator interpolates the stored
+//! parameters and evaluates implied volatilities via the Hagan approximation.
 //!
 //! # Financial Context
 //!
 //! Swaption volatility is naturally three-dimensional: the implied vol depends on
 //! the option expiry, the underlying swap tenor, and the strike. Rather than
 //! storing pre-computed vols on a full 3D grid, the cube stores calibrated SABR
-//! parameters at each (expiry, tenor) node and evaluates the smile on the fly.
-//! This reduces memory footprint and ensures arbitrage-free strike interpolation
-//! within each smile.
+//! parameters at each (expiry, tenor) node for on-demand smile evaluation.
+//! This reduces memory footprint; absence of arbitrage requires separate
+//! model-level checks and is not guaranteed by storing SABR parameters.
 //!
 //! # Grid Layout
 //!
@@ -27,7 +27,7 @@
 //!
 //! After interpolation a post-clamp ensures parameter validity:
 //! - alpha > 1e-8
-//! - nu > 1e-8
+//! - nu >= 0, preserving the deterministic-volatility limit
 //! - rho in (-0.9999, 0.9999)
 //! - beta in [0, 1]
 //!
@@ -145,7 +145,7 @@ impl VolCube {
     ///
     /// Returns an error if:
     /// - Either axis is empty, non-finite, or not strictly increasing
-    /// - `params.len()` or `forwards.len()` does not equal `expiries.len() * tenors.len()`
+    /// - The axis-size product overflows, or `params.len()` or `forwards.len()` does not equal `expiries.len() * tenors.len()`
     /// - Any forward is non-finite
     ///
     /// # Arguments
@@ -167,7 +167,10 @@ impl VolCube {
         if expiries.iter().any(|&value| value <= 0.0) || tenors.iter().any(|&value| value <= 0.0) {
             return Err(InputError::NonPositiveValue.into());
         }
-        let n = expiries.len() * tenors.len();
+        let n = expiries
+            .len()
+            .checked_mul(tenors.len())
+            .ok_or(InputError::DimensionMismatch)?;
         if params.len() != n || forwards.len() != n {
             return Err(InputError::DimensionMismatch.into());
         }
@@ -215,22 +218,43 @@ impl VolCube {
 
     /// SABR parameters at grid indices `(exp_idx, tenor_idx)`.
     ///
-    /// # Panics
+    /// # Arguments
     ///
-    /// Panics if indices are out of bounds.
-    pub fn params_at(&self, exp_idx: usize, tenor_idx: usize) -> &SabrParameterData {
-        let n_tenors = self.tenors.len();
-        &self.params[exp_idx * n_tenors + tenor_idx]
+    /// * `exp_idx` - Zero-based index into the expiry axis (`expiries()`).
+    /// * `tenor_idx` - Zero-based index into the swap-tenor axis (`tenors()`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] when either index lies outside
+    /// `grid_shape()`.
+    pub fn params_at(&self, exp_idx: usize, tenor_idx: usize) -> crate::Result<&SabrParameterData> {
+        Ok(&self.params[self.node_index(exp_idx, tenor_idx)?])
     }
 
-    /// Forward rate at grid indices `(exp_idx, tenor_idx)`.
+    /// Forward rate (decimal) at grid indices `(exp_idx, tenor_idx)`.
     ///
-    /// # Panics
+    /// # Arguments
     ///
-    /// Panics if indices are out of bounds.
-    pub fn forward_at(&self, exp_idx: usize, tenor_idx: usize) -> f64 {
-        let n_tenors = self.tenors.len();
-        self.forwards[exp_idx * n_tenors + tenor_idx]
+    /// * `exp_idx` - Zero-based index into the expiry axis (`expiries()`).
+    /// * `tenor_idx` - Zero-based index into the swap-tenor axis (`tenors()`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] when either index lies outside
+    /// `grid_shape()`.
+    pub fn forward_at(&self, exp_idx: usize, tenor_idx: usize) -> crate::Result<f64> {
+        Ok(self.forwards[self.node_index(exp_idx, tenor_idx)?])
+    }
+
+    /// Row-major node index of `(exp_idx, tenor_idx)`, checked against the grid shape.
+    fn node_index(&self, exp_idx: usize, tenor_idx: usize) -> crate::Result<usize> {
+        let (n_exp, n_ten) = self.grid_shape();
+        if exp_idx >= n_exp || tenor_idx >= n_ten {
+            return Err(crate::Error::Validation(format!(
+                "grid index ({exp_idx}, {tenor_idx}) outside shape ({n_exp}, {n_ten})"
+            )));
+        }
+        Ok(exp_idx * n_ten + tenor_idx)
     }
 
     /// Return the row-major SABR parameter nodes.

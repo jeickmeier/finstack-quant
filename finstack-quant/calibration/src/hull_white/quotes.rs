@@ -11,6 +11,7 @@ use super::*;
 /// Deserialization rejects unknown fields and applies the same validation as
 /// [`SwaptionQuote::try_new`].
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "SwaptionQuoteRaw")]
 pub struct SwaptionQuote {
     /// Swaption expiry in years (T₀).
@@ -23,12 +24,13 @@ pub struct SwaptionQuote {
     pub is_normal_vol: bool,
 }
 
-/// Contractual fixed-leg schedule for one swaption calibration quote.
+/// Contractual fixed and floating schedules for one swaption calibration quote.
 ///
 /// Payment times are year fractions from the discount curve's base date.
 /// Accrual factors use the underlying swap's fixed-leg day count, and
 /// `swap_start_time` and `maturity_time` are the adjusted swap start and
-/// unlagged accrual-end times used in the par-rate numerator. This separates
+/// unlagged accrual-end times. Both legs' payment dates determine the par rate.
+/// This separates
 /// settlement, payment lags, and business-day adjustments from accrual
 /// fractions instead of approximating dates by cumulative accruals.
 #[derive(Debug, Clone)]
@@ -41,16 +43,47 @@ pub struct SwaptionSchedule {
     pub accruals: Vec<f64>,
     /// Underlying swap accrual-end time in ACT/365F model years from valuation date.
     pub maturity_time: f64,
+    /// Contiguous floating periods covering the contractual underlying swap.
+    /// Floating payments and fixings retain their own lags and calendars.
+    pub floating_periods: Vec<SwaptionFloatingPeriod>,
+    /// Whether the floating coupons compound unshifted overnight rates.
+    /// `false` means simple term rates; lookbacks, observation shifts and rate
+    /// cutoffs are outside this schedule's contract.
+    pub floating_is_compounded: bool,
+}
+
+/// Contractual timing of one simple or unshifted overnight swap coupon.
+#[derive(Debug, Clone, Copy)]
+pub struct SwaptionFloatingPeriod {
+    /// Simple term-rate fixing in ACT/365F model years, at or after expiry.
+    /// For compounded overnight coupons this is the accrual start.
+    pub fixing_time: f64,
+    /// Coupon accrual-start time in ACT/365F years from valuation date.
+    pub start_time: f64,
+    /// Coupon accrual-end time in ACT/365F years from valuation date.
+    pub end_time: f64,
+    /// Payment time in ACT/365F years, at or after accrual start for simple
+    /// coupons and at or after accrual end for compounded coupons. Simple
+    /// payments can precede the unadjusted end after business-day adjustment.
+    pub payment_time: f64,
+    /// Positive contractual index day-count fraction, independent of model time.
+    pub accrual: f64,
 }
 
 /// Wire shape for [`SwaptionQuote`]: rejects unknown fields, then routes
 /// through [`SwaptionQuote::try_new`] for value validation.
 #[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct SwaptionQuoteRaw {
+    /// Swaption expiry in years (T₀); finite and positive.
     expiry: f64,
+    /// Underlying swap tenor in years (e.g. 5.0 for a 5Y swap); finite and positive.
     tenor: f64,
+    /// Market-quoted volatility as a decimal: absolute rate volatility for
+    /// normal quotes, Black volatility for lognormal quotes; finite and positive.
     volatility: f64,
+    /// `true` for normal (Bachelier) vol, `false` for lognormal (Black-76) vol.
     is_normal_vol: bool,
 }
 
@@ -65,19 +98,21 @@ impl TryFrom<SwaptionQuoteRaw> for SwaptionQuote {
 /// Market quote for an interest-rate cap/floor used in HW1F calibration.
 ///
 /// The quote represents a flat volatility for a full cap/floor from today to
-/// `maturity`, with caplet/floorlet periods generated from the calibration
-/// frequency. Normal vols are represented in decimal rate units: `0.0088`
+/// `maturity`. Engine steps resolve contractual periods from the term index;
+/// low-level calls can supply a schedule or use a synthetic frequency-based
+/// schedule. Normal vols are represented in decimal rate units: `0.0088`
 /// means 88bp normal volatility.
 ///
 /// Quotes are interpreted as standard market cap/floor quotes: the
 /// spot-start caplet (whose rate fixes at `t = 0` and therefore carries no
 /// optionality) is excluded from both the market and model legs, and each
-/// caplet's option expiry is its fixing date (period start), not its payment
-/// date.
+/// caplet's option expiry is its contractual fixing date, not its payment
+/// date. Synthetic schedules fix at period start and pay at period end.
 ///
 /// Deserialization rejects unknown fields and applies the same validation as
 /// [`CapFloorQuote::try_new`].
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "CapFloorQuoteRaw")]
 pub struct CapFloorQuote {
     /// Cap/floor maturity in years.
@@ -96,12 +131,19 @@ pub struct CapFloorQuote {
 /// Wire shape for [`CapFloorQuote`]: rejects unknown fields, then routes
 /// through [`CapFloorQuote::try_new`] for value validation.
 #[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct CapFloorQuoteRaw {
+    /// Cap/floor maturity in years from the curve base date; finite and positive.
     maturity: f64,
+    /// Strike rate as a decimal (for example `0.03` for 3%).
     strike: f64,
+    /// Market-quoted flat volatility; normal vols use decimal rate units
+    /// (`0.0088` is 88 bp). Finite and positive.
     volatility: f64,
+    /// `true` for a cap, `false` for a floor.
     is_cap: bool,
+    /// `true` for normal (Bachelier) vol. Lognormal cap/floor quotes are rejected.
     is_normal_vol: bool,
 }
 
@@ -150,18 +192,27 @@ impl CapFloorQuote {
 }
 
 /// Configuration for cap/floor HW1F calibration.
-#[derive(Debug, Clone, Copy)]
+///
+/// On the wire only `fit_tolerance` is required: an omitted `frequency` is
+/// [`SwapFrequency::default`] (semi-annual) and the two optional parameters
+/// default to `null`. Unknown fields are rejected.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CapFloorCalibrationConfig {
-    /// Required positive maximum implied-quote error in quoted volatility units.
-    /// Normal quotes use decimal rate volatility; Black quotes use relative volatility.
+    /// Required positive maximum implied-normal-volatility error in decimal rate units.
+    /// Cap/floor quotes use the normal (Bachelier) convention only.
     /// This acceptance budget is independent of the numerical solver tolerance.
     pub fit_tolerance: f64,
-    /// Payment frequency used to decompose full caps/floors into caplets.
+    /// Synthetic caplet frequency used only when contractual schedules are absent.
+    #[serde(default)]
     pub frequency: SwapFrequency,
     /// Optional source mean reversion. Required when calibrating from a
     /// single cap/floor quote because one quote cannot identify both κ and σ.
+    #[serde(default)]
     pub fixed_kappa: Option<f64>,
     /// Optional initial guess when solving both κ and σ.
+    #[serde(default)]
     pub initial_guess: Option<HullWhiteCalibrationParams>,
 }
 
@@ -234,6 +285,22 @@ impl SwapFrequency {
             Self::Annual => "annual",
             Self::SemiAnnual => "semi_annual",
             Self::Quarterly => "quarterly",
+        }
+    }
+}
+
+impl std::str::FromStr for SwapFrequency {
+    type Err = finstack_quant_core::Error;
+
+    /// Parse the snake_case wire label: `annual`, `semi_annual` or `quarterly`.
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "annual" => Ok(Self::Annual),
+            "semi_annual" => Ok(Self::SemiAnnual),
+            "quarterly" => Ok(Self::Quarterly),
+            _ => Err(finstack_quant_core::Error::Validation(format!(
+                "invalid swap frequency '{value}': expected 'annual', 'semi_annual' or 'quarterly'"
+            ))),
         }
     }
 }

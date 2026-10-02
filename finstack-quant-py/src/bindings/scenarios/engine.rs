@@ -7,14 +7,14 @@ use crate::bindings::pandas_utils::{
     serde_to_py,
 };
 use crate::bindings::statements::types::PyFinancialModelSpec;
-use crate::errors::{display_to_py, scenarios_to_py, value_error};
+use crate::errors::{display_to_py, scenarios_to_py};
 use finstack_quant_scenarios::engine::{ApplicationEnvelope, ApplicationReport};
 use finstack_quant_scenarios::ScenarioSpec;
 use finstack_quant_valuations::instruments::Instrument;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 
-use super::extract::{extract_config, extract_instruments, extract_scenario_spec, scenario_engine};
+use super::extract::{extract_config, extract_instruments, extract_scenario_spec};
 
 /// Report describing what a scenario application changed.
 ///
@@ -293,22 +293,10 @@ impl PyApplicationResult {
         self.instruments
             .as_ref()
             .map(|inventory| {
-                inventory
+                finstack_quant_scenarios::engine::instrument_envelopes(inventory)
+                    .map_err(display_to_py)?
                     .iter()
-                    .map(|instrument| {
-                        let payload = instrument.to_instrument_json().ok_or_else(|| {
-                            value_error(format!(
-                                "Instrument '{}' does not support canonical serialization",
-                                instrument.id()
-                            ))
-                        })?;
-                        serde_json::to_string(
-                            &finstack_quant_valuations::instruments::InstrumentEnvelope::new(
-                                payload,
-                            ),
-                        )
-                        .map_err(display_to_py)
-                    })
+                    .map(|envelope| serde_json::to_string(envelope).map_err(display_to_py))
                     .collect()
             })
             .transpose()
@@ -400,7 +388,7 @@ fn apply_with_context(
     market: &mut finstack_quant_core::market_data::context::MarketContext,
     inputs: ApplyInputs<'_>,
 ) -> finstack_quant_scenarios::Result<ApplicationReport> {
-    let engine = scenario_engine(Some(inputs.config));
+    let engine = finstack_quant_scenarios::ScenarioEngine::with_config(inputs.config);
     let mut ctx = finstack_quant_scenarios::ExecutionContext {
         market,
         model: inputs.model,
@@ -410,20 +398,6 @@ fn apply_with_context(
         as_of: inputs.as_of,
     };
     engine.apply(inputs.spec, &mut ctx)
-}
-
-fn require_instruments(
-    spec: &ScenarioSpec,
-    instruments: &Option<Vec<Box<dyn Instrument>>>,
-) -> PyResult<()> {
-    if spec.mutates_instruments() && instruments.is_none() {
-        return Err(value_error(
-            "scenario contains instrument-scoped operations (instrument_price_pct_by_*, \
-             instrument_spread_bp_by_*, asset_correlation_pts, prepay_default_correlation_pts) \
-             but no `instruments` were supplied; pass instruments=[...] or remove those operations",
-        ));
-    }
-    Ok(())
 }
 
 /// Apply a scenario to a market context and financial model.
@@ -456,8 +430,9 @@ fn require_instruments(
 /// Raises
 /// ------
 /// ValueError
-///     If any input fails to parse or validate, or the scenario mutates
-///     instruments and ``instruments`` is ``None``.
+///     If any input fails to parse or validate, or the scenario contains
+///     instrument-scoped operations and ``instruments`` is ``None`` (the Rust
+///     engine rejects it after validating the scenario).
 /// KeyError
 ///     If the scenario references market data, statement nodes, tenors or
 ///     instruments that do not exist.
@@ -479,7 +454,6 @@ fn apply_scenario(
     let mut model = extract_model_ref(model)?.into_owned();
     let date = crate::bindings::date_utils::extract_date(as_of)?;
     let mut instruments = extract_instruments(instruments)?;
-    require_instruments(&spec, &instruments)?;
     let config = extract_config(config)?;
 
     // Release the GIL for scenario application: shifts + re-pricing can run for seconds.
@@ -531,8 +505,9 @@ fn apply_scenario(
 /// Raises
 /// ------
 /// ValueError
-///     If any input fails to parse or validate, or the scenario mutates
-///     instruments and ``instruments`` is ``None``.
+///     If any input fails to parse or validate, or the scenario contains
+///     instrument-scoped operations and ``instruments`` is ``None`` (the Rust
+///     engine rejects it after validating the scenario).
 /// KeyError
 ///     If the scenario references market data, tenors or instruments that do
 ///     not exist.
@@ -561,7 +536,6 @@ fn apply_scenario_to_market(
     let mut market = extract_market(py, market)?;
     let date = crate::bindings::date_utils::extract_date(as_of)?;
     let mut instruments = extract_instruments(instruments)?;
-    require_instruments(&spec, &instruments)?;
     let config = extract_config(config)?;
 
     let (report, market) = py.detach(|| {

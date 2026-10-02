@@ -29,12 +29,13 @@
 //!   `[(t_next − t_j)^α − (t_next − t_{j+1})^α] / (α·Δt_j)` multiplies the
 //!   stored noise increment — exact in expectation, accurate away from the
 //!   singularity.
-//! - **Noise, near field** (`j == step`, the singular last interval): the
-//!   variance-exact weight `Δt^{α−1}/√(2α−1)`, i.e.
-//!   `√(∫₀^{Δt} s^{2(α−1)} ds / Δt)`, so the contribution
-//!   `σᵥ√V·∫ K dW̃` has the exact second moment. A midpoint kernel
-//!   `(Δt/2)^{α−1}` underweights this singular interval by a factor
-//!   `2^{1−α}√(2α−1)` (≈ 40% of the noise standard deviation at H = 0.1).
+//! - **Noise, near field** (`j == step`, the singular last interval): sample
+//!   the kernel integral jointly with the ordinary Brownian increment. With
+//!   `I₁ = ∫K ds` and `I₂ = ∫K² ds`, use
+//!   `∫K dW = (I₁/Δt) ΔW + sqrt(I₂ − I₁²/Δt) Z_bridge`, where the bridge
+//!   normal is independent. This preserves both the exact variance `I₂` and
+//!   covariance `Cov(∫K dW, ΔW) = I₁`. Rescaling ΔW to match `I₂` alone
+//!   incorrectly makes the kernel integral perfectly correlated with ΔW.
 //!
 //! # Work Buffer Layout
 //!
@@ -49,10 +50,11 @@
 //!
 //! # Noise Layout
 //!
-//! The discretization expects `z` with two entries:
+//! The discretization expects `z` with three independent standard normals:
 //!
 //! - `z[0]` — independent standard normal for the uncorrelated spot component
-//! - `z[1]` — standard normal for the variance (used in the Volterra integral)
+//! - `z[1]` — normal for the ordinary variance Brownian increment
+//! - `z[2]` — independent Brownian bridge normal for the singular kernel integral
 //!
 //! Spot and variance noises are correlated via the Cholesky decomposition:
 //!
@@ -88,8 +90,8 @@ use super::super::traits::Discretization;
 ///
 /// At each time step the Volterra integral is evaluated by summing over all
 /// previous steps with the singular kernel `(t − s)^{α−1} / Γ(α)`, using
-/// exact per-interval kernel integrals for the drift and a variance-exact
-/// near-field weight for the singular last-interval noise term (see the
+/// exact per-interval kernel integrals for the drift and jointly sampled
+/// Brownian/kernel increments for the singular last-interval noise (see the
 /// [module-level documentation](self)). This is O(n²) per path.
 /// Grids above 200 steps log a construction-time warning to make this cost
 /// visible before the simulation starts.
@@ -111,10 +113,12 @@ pub struct RoughHestonHybrid {
     /// fixed grid and α, so they are identical across every simulated path and
     /// are computed once here instead of via O(n²) `powf` calls per path.
     kernel_int: Vec<f64>,
-    /// Precomputed lower-triangular noise weights (interval-average kernel in
-    /// the far field; variance-exact `Δtⱼ^{α−1}/√(2α−1)` on the diagonal),
-    /// using the same triangular indexing as [`Self::kernel_int`].
+    /// Precomputed interval-average noise weights, using the same triangular
+    /// indexing as [`Self::kernel_int`].
     noise_weight: Vec<f64>,
+    /// Conditional standard deviation of the near-field kernel integral,
+    /// after conditioning on the ordinary Brownian increment.
+    bridge_std: Vec<f64>,
 }
 
 impl RoughHestonHybrid {
@@ -124,26 +128,36 @@ impl RoughHestonHybrid {
     ///
     /// # Arguments
     ///
-    /// * `times` - Monotonically increasing time grid starting at 0. Must have
-    ///   at least two points.
-    /// * `hurst` - Hurst exponent H ∈ (0, 0.5).
+    /// * `times` - Finite, strictly increasing times in years starting at 0.
+    ///   Must have at least two points.
+    /// * `hurst` - Finite Hurst exponent H ∈ (0, 0.5).
     ///
     /// # Errors
     ///
     /// Returns [`finstack_quant_core::Error::Validation`] if the time grid is too
-    /// short or the Hurst exponent is out of range.
+    /// short, non-finite, does not start at zero, or is not strictly increasing,
+    /// or if the Hurst exponent is non-finite or out of range.
     pub fn new(times: &[f64], hurst: f64) -> finstack_quant_core::Result<Self> {
         if times.len() < 2 {
             return Err(finstack_quant_core::Error::Validation(
                 "RoughHestonHybrid requires at least 2 time points".to_string(),
             ));
         }
-        if hurst <= 0.0 || hurst >= 0.5 {
+        if !hurst.is_finite() || hurst <= 0.0 || hurst >= 0.5 {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "RoughHestonHybrid Hurst exponent must be in (0, 0.5), got {hurst}"
             )));
         }
 
+        if times[0] != 0.0
+            || times.iter().any(|time| !time.is_finite())
+            || times.windows(2).any(|pair| pair[1] <= pair[0])
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "RoughHestonHybrid time grid must be finite, start at zero, and increase strictly"
+                    .into(),
+            ));
+        }
         let alpha = hurst + 0.5;
         let gamma_alpha = finstack_quant_core::math::ln_gamma(alpha).exp();
         let inv_gamma_alpha = 1.0 / gamma_alpha;
@@ -167,8 +181,13 @@ impl RoughHestonHybrid {
         // per-step hot path into O(n²) multiply-adds. `t_next` uses the same
         // `t + dt` expression as the runtime loop (t = times[k], dt = dt_grid[k]),
         // so the accumulated values stay bit-identical to the direct evaluation.
-        let alpha_m1 = alpha - 1.0;
-        let near_denom = (2.0 * alpha - 1.0).sqrt();
+        // Var(∫K dW | ΔW) = dt^(2α−1) [1/(2α−1) − 1/α²].
+        // The factored form avoids cancellation as H approaches 0.5.
+        let bridge_factor = (0.5 - hurst) / (alpha * (2.0 * hurst).sqrt());
+        let bridge_std = dt_grid
+            .iter()
+            .map(|dt| dt.powf(hurst) * bridge_factor)
+            .collect();
         let tri_len = num_steps * (num_steps + 1) / 2;
         let mut kernel_int = Vec::with_capacity(tri_len);
         let mut noise_weight = Vec::with_capacity(tri_len);
@@ -178,11 +197,7 @@ impl RoughHestonHybrid {
                 let a = t_next - times[j]; // lag to interval start (> 0)
                 let b = (t_next - times[j + 1]).max(0.0); // lag to interval end
                 let ki = (a.powf(alpha) - b.powf(alpha)) / alpha;
-                let nw = if j == step {
-                    dt_grid[j].powf(alpha_m1) / near_denom
-                } else {
-                    ki / dt_grid[j]
-                };
+                let nw = ki / dt_grid[j];
                 kernel_int.push(ki);
                 noise_weight.push(nw);
             }
@@ -193,6 +208,7 @@ impl RoughHestonHybrid {
             inv_gamma_alpha,
             kernel_int,
             noise_weight,
+            bridge_std,
         })
     }
 }
@@ -242,6 +258,9 @@ impl Discretization<RoughHestonProcess> for RoughHestonHybrid {
             volterra_sum += work[j] * self.kernel_int[w];
             volterra_sum += work[n + j] * self.noise_weight[w];
         }
+        // The extra near-field innovation is independent of both ordinary
+        // Brownian increments. Only ΔW is retained for the far-field history.
+        volterra_sum += p.sigma_v * v_current.sqrt() * self.bridge_std[step] * z[2];
         let v_next = (p.v0 + self.inv_gamma_alpha * volterra_sum).max(0.0);
 
         let z_spot = p.rho * z_vol + (1.0 - p.rho * p.rho).max(0.0).sqrt() * z[0];
@@ -314,7 +333,7 @@ mod tests {
         let disc = RoughHestonHybrid::new(&times, 0.1).expect("valid");
 
         let mut x = vec![100.0, 0.04];
-        let z = vec![0.0, 0.0];
+        let z = vec![0.0, 0.0, 0.0];
         let mut work = vec![0.0; disc.work_size(&process)];
 
         disc.step(&process, 0.0, 0.1, &mut x, &z, &mut work);
@@ -345,20 +364,18 @@ mod tests {
         let z_vol = 0.3;
 
         let mut x = vec![s0, v0];
-        let z = vec![z_indep, z_vol];
+        let z = vec![z_indep, z_vol, 0.0];
         let mut work = vec![0.0; disc.work_size(&process)];
 
         disc.step(&process, 0.0, dt, &mut x, &z, &mut work);
 
-        // Manually compute expected variance (M8 hybrid weights):
-        // drift gets the exact kernel integral ∫₀^dt s^{α−1} ds = dt^α / α,
-        // the singular last-interval noise gets the variance-exact weight
-        // dt^{α−1} / √(2α−1).
+        // With the bridge normal set to zero, conditioning on ΔW leaves the
+        // interval-average kernel weight; the drift integral is exact.
         let dw_tilde = z_vol * dt.sqrt();
         let drift_rate = p.kappa * (p.theta - v0);
         let noise = p.sigma_v * v0.sqrt() * dw_tilde;
         let kernel_int = dt.powf(alpha) / alpha;
-        let noise_weight = dt.powf(alpha - 1.0) / (2.0 * alpha - 1.0).sqrt();
+        let noise_weight = dt.powf(alpha - 1.0) / alpha;
         let inv_gamma = 1.0 / finstack_quant_core::math::ln_gamma(alpha).exp();
         let expected_v =
             (v0 + inv_gamma * (drift_rate * kernel_int + noise * noise_weight)).max(0.0);
@@ -390,7 +407,7 @@ mod tests {
         let disc = RoughHestonHybrid::new(&times, 0.1).expect("valid");
 
         let mut x = vec![100.0, 0.04];
-        let z = vec![0.1, 0.1]; // Small constant shocks
+        let z = vec![0.1, 0.1, 0.1]; // Small constant shocks
         let mut work = vec![0.0; disc.work_size(&process)];
 
         for i in 0..n {
@@ -418,7 +435,7 @@ mod tests {
         let disc = RoughHestonHybrid::new(&times, 0.1).expect("valid");
 
         let mut x = vec![100.0, 0.04];
-        let z = vec![0.2, 0.15];
+        let z = vec![0.2, 0.15, -0.1];
         let mut work = vec![0.0; disc.work_size(&process)];
 
         for i in 0..n {
@@ -449,50 +466,38 @@ mod tests {
         );
     }
 
-    /// The singular last-interval noise weight must be variance-exact:
-    /// the one-step noise contribution to V is `(1/Γ(α))·σᵥ√v₀·∫₀^Δt s^{α−1} dW`,
-    /// whose standard deviation per unit normal is
-    /// `(1/Γ(α))·σᵥ√v₀·√(Δt^{2α−1}/(2α−1))` . A midpoint
-    /// kernel `(Δt/2)^{α−1}·√Δt` understates this by `2^{1−α}√(2α−1)`.
+    /// Match both analytic moments of the jointly Gaussian Brownian/kernel
+    /// integrals. Matching the kernel variance alone overstates leverage.
     #[test]
-    fn near_field_noise_weight_is_variance_exact() {
+    fn near_field_noise_has_exact_variance_and_brownian_covariance() {
         let process = make_process();
         let p = process.params();
-        let h = p.hurst.value();
-        let alpha = h + 0.5;
+        let alpha = p.hurst.value() + 0.5;
         let dt = 0.01_f64;
-        let times = vec![0.0, dt];
-        let disc = RoughHestonHybrid::new(&times, h).expect("valid");
-
-        // V_1 with z_vol = 1 minus V_1 with z_vol = 0 isolates the noise term.
-        let run = |z_vol: f64| -> f64 {
-            let mut x = vec![100.0, p.v0];
-            let z = vec![0.0, z_vol];
+        let disc = RoughHestonHybrid::new(&[0.0, dt], p.hurst.value()).expect("valid");
+        let run = |z: [f64; 3]| {
+            let mut x = [100.0, p.v0];
             let mut work = vec![0.0; disc.work_size(&process)];
             disc.step(&process, 0.0, dt, &mut x, &z, &mut work);
-            x[1]
+            x
         };
-        let noise_per_unit_z = run(1.0) - run(0.0);
-
-        let inv_gamma = 1.0 / finstack_quant_core::math::ln_gamma(alpha).exp();
-        let exact = inv_gamma
-            * p.sigma_v
-            * p.v0.sqrt()
-            * (dt.powf(2.0 * alpha - 1.0) / (2.0 * alpha - 1.0)).sqrt();
-        assert!(
-            (noise_per_unit_z - exact).abs() < 1e-14,
-            "one-step noise contribution per unit normal must equal the \
-             exact kernel L² norm: got {noise_per_unit_z}, exact {exact}"
+        let base = run([0.0, 0.0, 0.0]);
+        let brownian = run([0.0, 1.0, 0.0]);
+        let bridge = run([0.0, 0.0, 1.0]);
+        let b = brownian[1] - base[1];
+        let c = bridge[1] - base[1];
+        let scale = p.sigma_v * p.v0.sqrt() / finstack_quant_core::math::ln_gamma(alpha).exp();
+        let exact_variance = scale * scale * dt.powf(2.0 * alpha - 1.0) / (2.0 * alpha - 1.0);
+        let exact_covariance = scale * dt.powf(alpha) / alpha;
+        assert!((b * b + c * c - exact_variance).abs() < 1e-14);
+        assert!((b * dt.sqrt() - exact_covariance).abs() < 1e-14);
+        assert_eq!(
+            bridge[0], base[0],
+            "bridge does not change the spot Brownian increment"
         );
-
-        // And it must exceed the midpoint-kernel weight it replaces.
-        let midpoint =
-            inv_gamma * p.sigma_v * p.v0.sqrt() * (0.5 * dt).powf(alpha - 1.0) * dt.sqrt();
-        assert!(
-            noise_per_unit_z > midpoint,
-            "exact near-field weight ({noise_per_unit_z}) must exceed the \
-             midpoint approximation ({midpoint})"
-        );
+        let log_spot_coefficient = (brownian[0] / base[0]).ln();
+        let exact_leverage = p.rho * p.v0.sqrt() * exact_covariance;
+        assert!((log_spot_coefficient * b - exact_leverage).abs() < 1e-14);
     }
 
     /// MC mean of the variance process vs an independent fine-grid
@@ -534,14 +539,14 @@ mod tests {
         // MC mean of V_T.
         let num_paths = 20_000usize;
         let mut rng = PhiloxRng::new(98765);
-        let mut normals = vec![0.0; 2 * n];
+        let mut normals = vec![0.0; 3 * n];
         let mut sum_v = 0.0;
         for _ in 0..num_paths {
             rng.fill_std_normals(&mut normals);
             let mut x = vec![100.0, v0];
             let mut work = vec![0.0; disc.work_size(&process)];
             for k in 0..n {
-                let z = [normals[2 * k], normals[2 * k + 1]];
+                let z = [normals[3 * k], normals[3 * k + 1], normals[3 * k + 2]];
                 disc.step(
                     &process,
                     times[k],
@@ -617,24 +622,30 @@ mod tests {
         .expect("valid");
         let process = RoughHestonProcess::new(params);
 
-        // The Euler scheme for rough Heston converges slowly in the step
-        // count at small H; check both that the error shrinks under grid
-        // refinement and that the fine grid lands within tolerance.
+        // Positive-part Euler converges slowly at small H. On this fixture,
+        // 200 steps give about 4.5% pricing bias (roughly ten sampling standard
+        // errors); the one-step raw variance is negative with probability
+        // about 21%, so clipping already raises its mean from 0.04 to 0.04586.
+        // Use 1600 steps to resolve that discretization bias, preserving the
+        // original price tolerance and plain Monte Carlo estimator. The
+        // O(n²) Volterra history makes this deliberately an ignored slow test.
         let num_paths = 100_000usize;
         let mut rel_errs = Vec::new();
-        for &n in &[50usize, 200] {
+        let mut estimates = Vec::new();
+        for &n in &[50usize, 1600] {
             let times = uniform_grid(n, t_end);
             let disc = RoughHestonHybrid::new(&times, h).expect("valid");
 
             let mut rng = PhiloxRng::new(192837);
-            let mut normals = vec![0.0; 2 * n];
+            let mut normals = vec![0.0; 3 * n];
             let mut sum_payoff = 0.0;
+            let mut sum_payoff_squared = 0.0;
             for _ in 0..num_paths {
                 rng.fill_std_normals(&mut normals);
                 let mut x = vec![s0, v0];
                 let mut work = vec![0.0; disc.work_size(&process)];
                 for k in 0..n {
-                    let z = [normals[2 * k], normals[2 * k + 1]];
+                    let z = [normals[3 * k], normals[3 * k + 1], normals[3 * k + 2]];
                     disc.step(
                         &process,
                         times[k],
@@ -644,22 +655,31 @@ mod tests {
                         &mut work,
                     );
                 }
-                sum_payoff += (x[0] - strike).max(0.0);
+                let payoff = (x[0] - strike).max(0.0);
+                sum_payoff += payoff;
+                sum_payoff_squared += payoff * payoff;
             }
             let mc_price = (sum_payoff / num_paths as f64) * (-r * t_end).exp();
+            let mean_payoff = sum_payoff / num_paths as f64;
+            let sample_variance = (sum_payoff_squared
+                - num_paths as f64 * mean_payoff * mean_payoff)
+                / (num_paths - 1) as f64;
+            let stderr = (sample_variance / num_paths as f64).sqrt() * (-r * t_end).exp();
+            estimates.push((n, mc_price, stderr));
             rel_errs.push((mc_price - reference).abs() / reference);
+            eprintln!("rough Heston MC n={n}, paths={num_paths}: price={mc_price}, stderr={stderr}, Fourier={reference}");
         }
 
         assert!(
             rel_errs[1] < rel_errs[0],
-            "MC error must shrink under step refinement: n=50 → {}, n=200 → {}",
+            "MC error must shrink under step refinement: n=50 → {}, n=1600 → {}; estimates (steps,price,stderr)={estimates:?}",
             rel_errs[0],
             rel_errs[1]
         );
         assert!(
             rel_errs[1] < 3e-2,
             "MC ATM call must match Fourier price {reference} within 3% at \
-             n=200 (rel err {})",
+             n=1600 (rel err {}); estimates (steps,price,stderr)={estimates:?}",
             rel_errs[1]
         );
     }
@@ -672,7 +692,7 @@ mod tests {
 
         for &z_val in &[-3.0, -2.0, 2.0, 3.0] {
             let mut x = vec![100.0, 0.04];
-            let z = vec![z_val, z_val * 0.5];
+            let z = vec![z_val, z_val * 0.5, -z_val * 0.25];
             let mut work = vec![0.0; disc.work_size(&process)];
 
             disc.step(&process, 0.0, 0.01, &mut x, &z, &mut work);

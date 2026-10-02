@@ -109,6 +109,7 @@ pub struct Position {
 /// This struct allows positions to be serialized and deserialized by storing
 /// the instrument definition as JSON rather than a trait object.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PositionSpec {
     /// Position identifier
     pub position_id: PositionId,

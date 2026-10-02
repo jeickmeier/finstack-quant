@@ -1,0 +1,23 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/exercise_style.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Exercise schedule convention for option models.",
+  "oneOf": [
+    {
+      "const": "european",
+      "description": "Exercise only at expiry.",
+      "type": "string"
+    },
+    {
+      "const": "american",
+      "description": "Exercise at any eligible time through expiry.",
+      "type": "string"
+    },
+    {
+      "const": "bermudan",
+      "description": "Exercise on a finite schedule of eligible dates.",
+      "type": "string"
+    }
+  ],
+  "title": "ExerciseStyle"
+}

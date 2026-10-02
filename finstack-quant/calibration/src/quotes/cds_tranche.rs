@@ -5,8 +5,6 @@ use super::validate;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations::market::conventions::ids::CdsConventionKey;
 use serde::{Deserialize, Serialize};
-#[cfg(feature = "ts_export")]
-use ts_rs::TS;
 
 /// Market quote for a CDS index tranche.
 ///
@@ -46,14 +44,11 @@ use ts_rs::TS;
 /// # Ok(())
 /// # }
 /// ```
-#[cfg_attr(feature = "ts_export", derive(TS))]
-#[cfg_attr(feature = "ts_export", ts(export))]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CdsTrancheQuote {
     /// Unique identifier.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub id: QuoteId,
     /// Index identifier (e.g. CDX.NA.HY).
     pub index: String,
@@ -64,7 +59,6 @@ pub struct CdsTrancheQuote {
     /// Detachment point (decimal, e.g. 0.07).
     pub detachment: f64,
     /// Maturity date.
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     #[serde(with = "finstack_quant_core::wire::date")]
     #[cfg_attr(
         feature = "json-schema",
@@ -76,7 +70,6 @@ pub struct CdsTrancheQuote {
     /// Contractual running coupon of the tranche, in basis points.
     pub coupon_bp: f64,
     /// Convention key (currency + doc clause).
-    #[cfg_attr(feature = "ts_export", ts(type = "string"))]
     pub convention: CdsConventionKey,
 }
 

@@ -134,7 +134,7 @@ pub fn validate_covenant_engine_json(json: &str) -> Result<String> {
 /// Returns an error if the engine or metric map is malformed, any metric value
 /// is not a JSON number, `as_of` is not an ISO-8601 date, the engine fails
 /// validation, or a required metric is absent or unsuitable for its covenant.
-pub fn evaluate_engine_map(
+pub fn evaluate_engine(
     engine_json: &str,
     metrics_json: &str,
     as_of: &str,
@@ -143,23 +143,7 @@ pub fn evaluate_engine_map(
         finstack_quant_core::Error::Validation(format!("Invalid covenant engine JSON: {e}"))
     })?;
     engine.validate()?;
-    let metrics: Vec<(String, f64)> = serde_json::from_str::<
-        serde_json::Map<String, serde_json::Value>,
-    >(metrics_json)
-    .map_err(|e| finstack_quant_core::Error::Validation(format!("Invalid metric map JSON: {e}")))?
-    .into_iter()
-    .map(|(key, value)| {
-        value
-            .as_f64()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Metric '{key}' must be a finite JSON number"
-                ))
-            })
-            .map(|number| (key, number))
-    })
-    .collect::<Result<_>>()?;
-    let source = HashMapMetricSource::from_pairs(metrics);
+    let source = HashMapMetricSource::from_json(metrics_json)?;
     engine.evaluate(&source, parse_iso_date(as_of)?)
 }
 

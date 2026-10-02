@@ -1,0 +1,44 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/portfolio_loss_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Portfolio credit-loss distribution and tail statistics.",
+  "properties": {
+    "confidence": {
+      "description": "Loss-positive confidence used for `var` and `expected_shortfall`, in\n`(0, 1)`.",
+      "format": "double",
+      "type": "number"
+    },
+    "expected_loss": {
+      "description": "Arithmetic mean path loss.",
+      "format": "double",
+      "type": "number"
+    },
+    "expected_shortfall": {
+      "description": "Probability-weighted mean of the worst `1 - confidence` share of losses.",
+      "format": "double",
+      "type": "number"
+    },
+    "losses": {
+      "description": "Loss for each path in ascending path-index order.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "var": {
+      "description": "Loss-positive nearest-rank VaR at the configured confidence.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "losses",
+    "expected_loss",
+    "var",
+    "expected_shortfall",
+    "confidence"
+  ],
+  "title": "PortfolioLossResult",
+  "type": "object"
+}

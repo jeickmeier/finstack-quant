@@ -12,7 +12,7 @@ mod vega;
 
 pub(crate) use bermudan_greeks::{
     BermudanDeltaCalculator, BermudanGammaCalculator, BermudanVegaCalculator,
-    ExerciseProbabilityCalculator,
+    ExpectedExerciseTimeCalculator,
 };
 pub(crate) use delta::DeltaCalculator;
 pub(crate) use gamma::GammaCalculator;
@@ -82,7 +82,8 @@ pub(crate) fn register_bermudan_swaption_metrics(
             // different vol axis than the Black-vol `Vega` reported for
             // European swaptions. Sharing the `vega` key would silently mix
             // incomparable units in cross-instrument aggregation.
-            (HwSigmaVega, BermudanVegaCalculator)
+            (HwSigmaVega, BermudanVegaCalculator),
+            (ExpectedExerciseTime, ExpectedExerciseTimeCalculator)
             // Note: UnifiedDv01Calculator and BucketedDv01 are NOT
             // registered here because BermudanSwaption::value() returns Err.
             // Use BermudanDeltaCalculator for rate sensitivity instead.
@@ -90,12 +91,6 @@ pub(crate) fn register_bermudan_swaption_metrics(
             // but will fail for BermudanSwaption for the same reason.
         ]
     }
-    // Register custom ExerciseProbability metric separately
-    registry.register_metric(
-        crate::metrics::MetricId::custom("exercise_probability"),
-        std::sync::Arc::new(ExerciseProbabilityCalculator),
-        &[InstrumentType::BermudanSwaption],
-    )?;
     Ok(())
 }
 

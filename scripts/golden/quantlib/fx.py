@@ -109,6 +109,7 @@ def build_fx_forward() -> dict[str, Any]:
                 "quotes": [["EUR", "USD", spot]],
                 "pinned_quotes": [],
                 "provider_quotes": [],
+                "provider_pinned_quotes": [],
             },
         ),
         "instrument": {

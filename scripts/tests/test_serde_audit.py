@@ -186,7 +186,7 @@ def test_portfolio_margin_manual_impl_resolves_across_files() -> None:
     )
     declaration = next(item for item in declarations if item.name == "PortfolioMarginResult")
 
-    assert declaration.capabilities == frozenset({"Serialize", "Deserialize"})
+    assert declaration.capabilities == frozenset({"Serialize", "Deserialize", "JsonSchema"})
 
 
 def test_production_recursive_glob_discovers_cashflow_envelope() -> None:
@@ -523,16 +523,16 @@ def test_documented_one_way_inventory_is_exact() -> None:
         1,
     )[0]
     inventory_listing = inventory.split(
-        "The current public inventory contains 24 one-way types:",
+        "The current public inventory contains 6 one-way types:",
         1,
     )[1]
     documented_names = set(re.findall(r"`([A-Z][A-Za-z0-9]+)`", inventory_listing))
     audited_names = {identity[2] for identity in _MODULE.ONE_WAY_OUTPUT_IDENTITIES}
 
-    assert "current public inventory contains 24 one-way types" in inventory
+    assert "current public inventory contains 6 one-way types" in inventory
     assert documented_names == audited_names
-    assert len(_MODULE.ONE_WAY_OUTPUT_IDENTITIES) == 24
-    assert len(_MODULE.ONE_WAY_EXCEPTIONS) == 23
+    assert len(_MODULE.ONE_WAY_OUTPUT_IDENTITIES) == 6
+    assert len(_MODULE.ONE_WAY_EXCEPTIONS) == 5
     assert all(entry.rationale and entry.category for entry in _MODULE.ONE_WAY_EXCEPTIONS)
     assert all(
         entry.category != "serde-without-schema"
@@ -543,21 +543,15 @@ def test_documented_one_way_inventory_is_exact() -> None:
     reviewed_identities = {(entry.crate, entry.path, entry.type_name) for entry in _MODULE.REVIEWED_EXCEPTIONS}
     assert reviewed_identities.isdisjoint(_MODULE.MAINTAINED_CONTRACTS)
     assert Counter(entry.category for entry in _MODULE.REVIEWED_EXCEPTIONS) == {
-        "allocation-output": 3,
-        "analysis-report": 2,
         "attribution-report": 5,
-        "binding-view": 8,
         "generic-error-result-alias": 7,
-        "in-process-execution-envelope": 1,
-        "in-process-serde-spec": 16,
-        "internal-registry-document": 3,
-        "non-maintained-serde-output": 35,
-        "runtime-result": 15,
+        "in-process-serde-spec": 2,
+        "internal-registry-document": 2,
+        "non-maintained-serde-output": 2,
+        "runtime-result": 9,
         "runtime-spec": 3,
-        "scenario-view": 2,
-        "validation-report": 3,
     }
-    assert len(_MODULE.REVIEWED_EXCEPTIONS) == 103
+    assert len(_MODULE.REVIEWED_EXCEPTIONS) == 30
 
 
 def test_maintained_contract_capability_matrix_is_complete() -> None:

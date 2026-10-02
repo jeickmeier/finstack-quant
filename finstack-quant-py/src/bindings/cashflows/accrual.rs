@@ -77,13 +77,13 @@ impl PyAccrualMethod {
     }
 }
 
-/// Ex-coupon convention: the instrument trades ex-coupon from
-/// ``days_before_coupon`` days before each payment date.
+/// Coupon record-date convention: settlement on the record date retains the
+/// coupon; settlement after it and before payment trades ex-coupon.
 ///
 /// Parameters
 /// ----------
 /// days_before_coupon : int
-///     Number of days before the coupon date that go ex (max 366).
+///     Number of days from the coupon record date to payment (max 366).
 /// calendar_id : str, optional
 ///     Business-day calendar for counting the window; when omitted, calendar
 ///     days are used.
@@ -122,7 +122,7 @@ impl PyExCouponRule {
         }
     }
 
-    /// Days before the coupon date that go ex.
+    /// Days from the coupon record date to payment.
     #[getter]
     fn days_before_coupon(&self) -> u32 {
         self.inner.days_before_coupon
@@ -134,7 +134,7 @@ impl PyExCouponRule {
         self.inner.calendar_id.as_ref().map(ToString::to_string)
     }
 
-    /// Ex-coupon date for a coupon paid on ``payment_date``.
+    /// Coupon record date for a coupon paid on ``payment_date``.
     ///
     /// Parameters
     /// ----------
@@ -144,13 +144,14 @@ impl PyExCouponRule {
     /// Returns
     /// -------
     /// datetime.date
-    ///     Ex-coupon date; from this date (inclusive) until ``payment_date``
-    ///     (exclusive), the instrument trades ex-coupon.
+    ///     Record date; settlement on this date retains the coupon. Settlement
+    ///     strictly after it and before ``payment_date`` trades ex-coupon.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``days_before_coupon`` exceeds 366.
+    ///     If ``days_before_coupon`` exceeds 366, the date cannot be parsed,
+    ///     or the record date is outside the supported date range.
     /// KeyError
     ///     If the configured calendar id cannot be resolved.
     #[pyo3(text_signature = "(self, payment_date)")]
@@ -164,6 +165,39 @@ impl PyExCouponRule {
             .ex_date(extract_date(payment_date)?)
             .map_err(core_to_py)?;
         date_to_py(py, d)
+    }
+
+    /// Whether settlement forfeits the imminent coupon.
+    ///
+    /// Parameters
+    /// ----------
+    /// payment_date : datetime.date or str
+    ///     Coupon payment date used to calculate its record date.
+    /// settlement_date : datetime.date or str
+    ///     Ownership-transfer date; convert trade dates to settlement first.
+    ///
+    /// Returns
+    /// -------
+    /// bool
+    ///     True strictly after the record date and before payment. Settlement
+    ///     on the record date retains the coupon and returns False.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If either date is invalid, the offset exceeds 366, or the record
+    ///     date is outside the supported date range.
+    /// KeyError
+    ///     If the configured calendar identifier cannot be resolved.
+    #[pyo3(text_signature = "(self, payment_date, settlement_date)")]
+    fn is_ex_coupon(
+        &self,
+        payment_date: &Bound<'_, PyAny>,
+        settlement_date: &Bound<'_, PyAny>,
+    ) -> PyResult<bool> {
+        self.inner
+            .is_ex_coupon(extract_date(payment_date)?, extract_date(settlement_date)?)
+            .map_err(core_to_py)
     }
 
     /// Serialize to JSON.
@@ -416,6 +450,10 @@ impl PyAccrualIndex {
     ///
     /// Raises
     /// ------
+    /// ValueError
+    ///     If the date cannot be parsed, the period accrual fraction is invalid,
+    ///     compounded accrual has a non-finite period rate or a rate at or below
+    ///     -100%, or the resulting accrued interest is non-finite.
     /// KeyError
     ///     If a configured ex-coupon calendar id cannot be resolved.
     #[pyo3(text_signature = "(self, as_of)")]
@@ -458,7 +496,9 @@ impl PyAccrualIndex {
 /// ------
 /// ValueError
 ///     If the schedule fails validation, mixes currencies across coupon
-///     flows, or carries a non-finite accrual factor.
+///     flows, carries a non-finite accrual factor, compounded accrual has
+///     a non-finite period rate or a rate at or below -100%, or the resulting
+///     accrued interest is non-finite.
 /// KeyError
 ///     If a configured ex-coupon calendar id cannot be resolved.
 #[pyfunction(name = "accrued_interest_amount")]
@@ -484,7 +524,7 @@ fn py_accrued_interest_amount(
 
 /// Register the `finstack_quant.cashflows.accrual` submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "accrual")?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "accrual")?;
     module.setattr(
         "__doc__",
         "Schedule-driven accrued interest: methods, ex-coupon rules, accrual index.",
@@ -507,13 +547,10 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     )?;
     module.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &module,
-        "accrual",
-        "finstack_quant.cashflows",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
     Ok(())
 }

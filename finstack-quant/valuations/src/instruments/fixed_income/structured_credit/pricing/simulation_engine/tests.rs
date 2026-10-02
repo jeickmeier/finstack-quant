@@ -111,8 +111,8 @@ mod cases {
         .expect("state");
         let mut source = DeterministicPoolFlowSource;
         let first = deal.first_payment_date;
-        let second = first.add_months(3);
-        let third = second.add_months(3);
+        let second = first.add_months(3).expect("valid date shift");
+        let third = second.add_months(3).expect("valid date shift");
         let mut interest_generated = 0.0;
         for (date, par, breached) in [
             (first, 100_000_000.0, true),
@@ -269,8 +269,8 @@ mod cases {
             &waterfall,
             SimulationPeriod {
                 accrual_start: first,
-                accrual_end: first.add_months(3),
-                payment: first.add_months(3),
+                accrual_end: first.add_months(3).expect("valid date shift"),
+                payment: first.add_months(3).expect("valid date shift"),
                 valuation: deal.closing_date,
                 redemption: false,
             },
@@ -559,20 +559,26 @@ mod cases {
             &curve,
             &market,
             accrual_start,
-            0.05,
-            Some(100.0),
+            period_helpers::CollateralCoupon {
+                fallback_all_in_rate: 0.05,
+                spread_bp: Some(100.0),
+                day_count: DayCount::Act360,
+                index_floor_rate: None,
+            },
             0.0,
-            None,
         )
         .expect("unshifted rate");
         let shifted = collateral_asset_rate_for_period(
             &curve,
             &market,
             accrual_start,
-            0.05,
-            Some(100.0),
+            period_helpers::CollateralCoupon {
+                fallback_all_in_rate: 0.05,
+                spread_bp: Some(100.0),
+                day_count: DayCount::Act360,
+                index_floor_rate: None,
+            },
             0.01,
-            None,
         )
         .expect("shifted rate");
 
@@ -588,10 +594,13 @@ mod cases {
             &curve,
             &market,
             accrual_start,
-            0.05,
-            Some(400.0),
+            period_helpers::CollateralCoupon {
+                fallback_all_in_rate: 0.05,
+                spread_bp: Some(400.0),
+                day_count: DayCount::Act360,
+                index_floor_rate: Some(0.01),
+            },
             -0.05,
-            Some(0.01),
         )
         .expect("index-floored rate");
         assert!(
@@ -604,10 +613,13 @@ mod cases {
             &curve,
             &market,
             accrual_start,
-            0.05,
-            Some(100.0),
+            period_helpers::CollateralCoupon {
+                fallback_all_in_rate: 0.05,
+                spread_bp: Some(100.0),
+                day_count: DayCount::Act360,
+                index_floor_rate: None,
+            },
             -0.50,
-            None,
         )
         .expect("floored rate");
         assert!(
@@ -617,167 +629,52 @@ mod cases {
     }
 
     #[test]
-    fn collateral_term_rate_is_tenor_forward_at_fixing_value_date() {
+    fn collateral_term_rate_is_discount_factor_implied() {
         let base = Date::from_calendar_date(2025, Month::January, 1).expect("valid base date");
         let curve = finstack_quant_core::market_data::term_structures::ForwardCurve::builder(
             "USD-3M", 0.25,
         )
         .base_date(base)
-        .day_count(DayCount::Act360)
+        .day_count(DayCount::Act365F)
         .reset_lag(2)
         .knots([(0.0, 0.01), (1.0, 0.21)])
         .build()
         .expect("forward curve should build");
-        // Accrual starts Tue 2025-04-01; the index fixes two business days
-        // earlier (Fri 2025-03-28) for the deposit value-dated 2025-04-01.
         let start_date = Date::from_calendar_date(2025, Month::April, 1).expect("valid start date");
-        let fixing_date =
-            Date::from_calendar_date(2025, Month::March, 28).expect("valid fixing date");
-        let expected = curve.rate_on_date(start_date).expect("value-date forward");
+        let calendar = crate::cashflow::builder::calendar::resolve_calendar_strict("weekends_only")
+            .expect("calendar");
+        let fixing_date = start_date
+            .add_business_days(-curve.reset_lag(), calendar)
+            .expect("fixing date");
+        let reset_end =
+            crate::instruments::fixed_income::structured_credit::utils::rate_helpers::try_tenor_to_period_end(
+                fixing_date,
+                curve.tenor(),
+                curve.day_count(),
+            )
+            .expect("reset end");
+        let t1 = curve
+            .day_count()
+            .year_fraction(base, fixing_date, DayCountContext::default())
+            .expect("valid start time");
+        let t2 = curve
+            .day_count()
+            .year_fraction(base, reset_end, DayCountContext::default())
+            .expect("valid end time");
+        let accrual = (reset_end - fixing_date).whole_days() as f64 / 360.0;
+        let growth = curve.df(t1).expect("start projection DF")
+            / curve.df(t2).expect("end projection DF")
+            - 1.0;
+        let expected = growth / accrual;
 
-        let actual = term_rate_for_period(&curve, &MarketContext::new(), start_date)
-            .expect("term projection should succeed");
-        let recorded =
-            super::super::period_helpers::projected_collateral_fixing(&curve, start_date)
-                .expect("recorded fixing");
+        let actual =
+            term_rate_for_period(&curve, &MarketContext::new(), start_date, DayCount::Act360)
+                .expect("term projection should succeed");
 
-        assert_eq!(actual, expected);
-        assert_eq!(recorded.date, fixing_date);
-        assert_eq!(recorded.value, Some(expected));
-        // Neither the fixing-date forward nor the DF-implied rate over
-        // [fixing, fixing + tenor] (the former collateral projection).
-        let old = crate::instruments::common_impl::pricing::time::rate_between_on_dates(
-            &curve,
-            fixing_date,
-            Date::from_calendar_date(2025, Month::June, 28).expect("reset end"),
-        )
-        .expect("DF-implied forward");
-        assert!((actual - old).abs() > 1e-6);
-        assert!((actual - curve.rate_on_date(fixing_date).expect("fixing-date rate")).abs() > 1e-6);
-    }
-
-    fn sofr_tranche_coupon(fixing_calendar_id: &str) -> RateSpec {
-        RateSpec::Floating(crate::cashflow::builder::FloatingRateSpec {
-            forward_curve_id: finstack_quant_core::types::CurveId::new("USD-3M"),
-            spread_bp: rust_decimal::Decimal::ZERO,
-            gearing: rust_decimal::Decimal::ONE,
-            gearing_includes_spread: true,
-            index_floor_bp: None,
-            all_in_cap_bp: None,
-            all_in_floor_bp: None,
-            index_cap_bp: None,
-            overnight_index_constraints: Default::default(),
-            reset_frequency: finstack_quant_core::dates::Tenor::quarterly(),
-            index_tenor: None,
-            reset_lag_days: 2,
-            fixing_calendar_id: Some(fixing_calendar_id.into()),
-            compounding: None,
-            overnight_basis: None,
-            fallback: Default::default(),
-        })
-    }
-
-    /// One term fixing has one projected value whether a tranche coupon or a
-    /// collateral coupon observes it, even when their accrual starts differ
-    /// (unadjusted vs payment date) and their fixing calendars differ across a
-    /// US holiday; otherwise theta's fixing materialization sees conflicting
-    /// pre-roll projections of the same fixing.
-    #[test]
-    fn tranche_and_collateral_project_one_value_per_fixing() {
-        let base = Date::from_calendar_date(2026, Month::April, 30).expect("base");
-        let curve = ForwardCurve::builder("USD-3M", 0.25)
-            .base_date(base)
-            .day_count(DayCount::Act360)
-            .reset_lag(2)
-            .knots([(0.0, 0.03), (1.0, 0.06)])
-            .build()
-            .expect("forward curve");
-        let market = MarketContext::new().insert(curve.clone());
-        let date = |m, d| Date::from_calendar_date(2026, m, d).expect("valid date");
-        // (tranche accrual start, tranche calendar, collateral accrual start, shared fixing)
-        let cases = [
-            // Tranche accrues from Sat 05-30 (unadjusted), collateral from Mon 06-01.
-            (
-                date(Month::May, 30),
-                "weekends_only",
-                date(Month::June, 1),
-                date(Month::May, 28),
-            ),
-            // USNY closes for Labor Day (Mon 09-07): the tranche accruing
-            // Wed 09-09 and the collateral accruing Tue 09-08 both fix Fri 09-04.
-            (
-                date(Month::September, 9),
-                "usny",
-                date(Month::September, 8),
-                date(Month::September, 4),
-            ),
-        ];
-        for (tranche_start, calendar, collateral_start, fixing_date) in cases {
-            let coupon = sofr_tranche_coupon(calendar);
-            let tranche = coupon
-                .projected_term_fixing(tranche_start, &market)
-                .expect("tranche fixing")
-                .expect("floating term coupon");
-            let collateral =
-                super::super::period_helpers::projected_collateral_fixing(&curve, collateral_start)
-                    .expect("collateral fixing");
-            assert_eq!(tranche.date, fixing_date);
-            assert_eq!(collateral.date, fixing_date);
-            assert_eq!(tranche.series_id, collateral.series_id);
-            assert_eq!(tranche.value, collateral.value);
-            let tranche_rate = coupon
-                .try_rate_for_period(tranche_start, base, &market)
-                .expect("tranche coupon");
-            let collateral_rate =
-                term_rate_for_period(&curve, &market, collateral_start).expect("collateral rate");
-            assert_eq!(Some(tranche_rate), tranche.value);
-            assert_eq!(collateral_rate, tranche_rate);
-        }
-    }
-
-    /// A fixing dated the valuation date is projected until published and
-    /// read from the series once it is, identically for tranche and pool.
-    #[test]
-    fn same_day_fixing_uses_published_value_on_both_paths() {
-        let base = Date::from_calendar_date(2026, Month::May, 28).expect("base");
-        let curve = ForwardCurve::builder("USD-3M", 0.25)
-            .base_date(base)
-            .day_count(DayCount::Act360)
-            .reset_lag(2)
-            .knots([(0.0, 0.03), (1.0, 0.06)])
-            .build()
-            .expect("forward curve");
-        let accrual_start = Date::from_calendar_date(2026, Month::June, 1).expect("start");
-        let coupon = sofr_tranche_coupon("weekends_only");
-        let projected_market = MarketContext::new().insert(curve.clone());
-        let projected = crate::cashflow::builder::rate_helpers::project_term_fixing(base, &curve)
-            .expect("projection");
-        assert_eq!(
-            coupon
-                .try_rate_for_period(accrual_start, base, &projected_market)
-                .expect("unpublished tranche"),
-            projected
-        );
-        assert_eq!(
-            term_rate_for_period(&curve, &projected_market, accrual_start)
-                .expect("unpublished collateral"),
-            projected
-        );
-
-        let series = ScalarTimeSeries::new(fixing_series_id("USD-3M"), vec![(base, 0.0425)], None)
-            .expect("fixing series");
-        let published_market = projected_market.insert_series(series);
-        assert_eq!(
-            coupon
-                .try_rate_for_period(accrual_start, base, &published_market)
-                .expect("published tranche"),
-            0.0425
-        );
-        assert_eq!(
-            term_rate_for_period(&curve, &published_market, accrual_start)
-                .expect("published collateral"),
-            0.0425
-        );
+        assert!((expected - curve.rate_period(t1, t2)).abs() > 1e-6);
+        assert!((actual - expected).abs() < 1e-14);
+        let curve_basis_rate = curve.rate_between(t1, t2).expect("curve-basis rate");
+        assert!((actual - curve_basis_rate).abs() > 1e-5);
     }
 
     #[test]
@@ -793,8 +690,9 @@ mod cases {
         .expect("forward curve should build");
         let start_date =
             Date::from_calendar_date(2024, Month::December, 1).expect("valid start date");
-        let error = term_rate_for_period(&curve, &MarketContext::new(), start_date)
-            .expect_err("straddling term period should require a fixing");
+        let error =
+            term_rate_for_period(&curve, &MarketContext::new(), start_date, DayCount::Act360)
+                .expect_err("straddling term period should require a fixing");
 
         assert!(error.to_string().contains("FIXING:USD-3M"));
     }
@@ -816,10 +714,13 @@ mod cases {
             &curve,
             &MarketContext::new(),
             accrual_start,
-            0.071,
-            Some(125.0),
+            period_helpers::CollateralCoupon {
+                fallback_all_in_rate: 0.071,
+                spread_bp: Some(125.0),
+                day_count: DayCount::Act360,
+                index_floor_rate: None,
+            },
             0.0, // no OAS rate shift in this unit test,
-            None,
         )
         .expect("stored current coupon is authoritative for an already-reset period");
 
@@ -846,7 +747,7 @@ mod cases {
                 .expect("fixing series");
         let context = MarketContext::new().insert_series(series);
 
-        let rate = term_rate_for_period(&curve, &context, accrual_start)
+        let rate = term_rate_for_period(&curve, &context, accrual_start, DayCount::Act360)
             .expect("future accrual with historical fixing");
         assert!((rate - 0.041).abs() < 1e-14);
     }
@@ -866,7 +767,7 @@ mod cases {
             .expect("3M curve");
         let curve_6m = ForwardCurve::builder("USD-6M", 0.5)
             .base_date(base)
-            .day_count(DayCount::Act360)
+            .day_count(DayCount::Act365F)
             .reset_lag(0)
             .knots([(0.0, 0.03), (1.0, 0.12)])
             .build()
@@ -904,8 +805,10 @@ mod cases {
         let tranches = TrancheStructure::new(vec![tranche]).expect("tranche structure");
         let state = SimulationState::new(&pool, &tranches, base, base, 0).expect("state");
 
-        let rate_3m = term_rate_for_period(&curve_3m, &context, period_start).expect("3M rate");
-        let rate_6m = term_rate_for_period(&curve_6m, &context, period_start).expect("6M rate");
+        let rate_3m = term_rate_for_period(&curve_3m, &context, period_start, DayCount::Act360)
+            .expect("3M rate");
+        let rate_6m = term_rate_for_period(&curve_6m, &context, period_start, DayCount::Act360)
+            .expect("6M rate");
         let actual =
             current_collateral_wac(&state, &context, period_start).expect("collateral WAC");
         assert!((actual - (rate_3m + rate_6m) / 2.0).abs() < 1e-14);
@@ -916,6 +819,9 @@ mod cases {
             &curve_6m,
             period_start,
             shared_end,
+            DayCount::Act360
+                .year_fraction(period_start, shared_end, DayCountContext::default())
+                .expect("shared accrual"),
         )
         .expect("old shared-window rate");
         assert!((rate_6m - old_shared_6m).abs() > 1e-6);
@@ -1076,6 +982,7 @@ mod cases {
             maturity,
             "USD-OIS",
         )
+        .expect("valid structured-credit dates")
         .with_calendar_id("nyse")
         .with_cleanup_call_decimal(0.10)
         .expect("cleanup call");
@@ -1225,6 +1132,7 @@ mod cases {
                 maturity,
                 "USD-OIS",
             )
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
             instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.20);
             instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -1329,6 +1237,7 @@ mod cases {
             maturity,
             "USD-OIS",
         )
+        .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
         // Heavy prepayment + heavy default running together.
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.40);
@@ -1419,6 +1328,7 @@ mod cases {
             maturity,
             "USD-OIS",
         )
+        .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.10);
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.05);
@@ -1676,7 +1586,9 @@ mod cases {
         let (mut weighted, mut total) = (0.0_f64, 0.0_f64);
         let mut payoff_month = 0usize;
         for m in 1..=months {
-            let pay = closing.add_months(i32::try_from(m).expect("month fits i32"));
+            let pay = closing
+                .add_months(i32::try_from(m).expect("month fits i32"))
+                .expect("valid date shift");
             let flows = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
                 state: &mut state,
                 pay_date: pay,
@@ -1785,7 +1697,9 @@ mod cases {
                 .max(0.0)
                 .min(balance_before);
 
-            let pay = closing.add_months(i32::try_from(m).expect("month"));
+            let pay = closing
+                .add_months(i32::try_from(m).expect("month"))
+                .expect("valid date shift");
             let flows = calculate_pool_flows_with_rates(RatedPoolFlowRequest {
                 state: &mut state,
                 pay_date: pay,
@@ -1887,6 +1801,7 @@ mod cases {
             maturity,
             "USD-OIS",
         )
+        .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -1985,6 +1900,7 @@ mod cases {
                 maturity,
                 "USD-OIS",
             )
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
             deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
             deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
@@ -2146,6 +2062,7 @@ mod cases {
             maturity,
             "USD-OIS",
         )
+        .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         // Sustained defaults erode the pool and therefore the OC ratio.
@@ -2216,6 +2133,7 @@ mod cases {
             maturity,
             "USD-OIS",
         )
+        .expect("valid structured-credit dates")
         .with_calendar_id("nyse");
         instrument.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         instrument.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.03);
@@ -2648,6 +2566,7 @@ mod cases {
             maturity,
             "USD-OIS",
         )
+        .expect("valid structured-credit dates")
         .with_calendar_id("nyse")
         .with_cleanup_call_decimal(0.10)
         .expect("cleanup call");
@@ -2908,6 +2827,7 @@ mod cases {
                 maturity,
                 "USD-OIS",
             )
+            .expect("valid structured-credit dates")
             .with_calendar_id("nyse");
             // CDR 20%: defaults occur in every period including the final
             // year, so with a 12-month lag the queue is non-empty at the

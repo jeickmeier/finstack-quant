@@ -103,14 +103,12 @@ impl PyPeriodAggregation {
     /// ValueError
     ///     If ``currency`` is not a valid ISO 4217 code.
     #[pyo3(text_signature = "(self, period, currency)")]
-    fn get(&self, period: &str, currency: &Bound<'_, PyAny>) -> PyResult<Option<PyMoney>> {
+    fn get_amount(&self, period: &str, currency: &Bound<'_, PyAny>) -> PyResult<Option<PyMoney>> {
         let currency = extract_currency(currency)?;
         Ok(self
             .inner
-            .iter()
-            .find(|(id, _)| id.to_string() == period)
-            .and_then(|(_, per_currency)| per_currency.get(&currency))
-            .map(|amount| PyMoney::from_inner(*amount)))
+            .get_amount(period, currency)
+            .map(PyMoney::from_inner))
     }
 
     /// Nested ``{period_id_label: {currency_code: Money}}`` dictionary.
@@ -165,7 +163,7 @@ impl PyPeriodAggregation {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the JSON is malformed.
+    ///     If the JSON is malformed or a currency key differs from its Money currency.
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -372,7 +370,7 @@ fn py_calendar_year_ladder(
 
 /// Register the `finstack_quant.cashflows.aggregation` submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "aggregation")?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "aggregation")?;
     module.setattr(
         "__doc__",
         "Currency-preserving aggregation of dated cashflows into periods and totals.",
@@ -393,13 +391,10 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     )?;
     module.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &module,
-        "aggregation",
-        "finstack_quant.cashflows",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
     Ok(())
 }

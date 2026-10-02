@@ -306,7 +306,9 @@ as-of date and model key, dispatch through the standard registry.
 | Function | Returns |
 |----------|---------|
 | `parse_instrument_from_json` | `InstrumentJson` |
+| `parse_typed_instrument_json::<T>` | concrete instrument `T` (via `TryFrom<InstrumentJson>`) |
 | `parse_boxed_instrument_from_json` | `ParsedInstrument` |
+| `instrument_from_spec` | `InstrumentJson` |
 | `instrument_envelope_from_spec` | `String` (canonical envelope JSON) |
 | `validate_instrument_json`, `validate_typed_instrument_json` | `String` (re-serialized envelope) |
 | `pretty_instrument_json` | `String` |

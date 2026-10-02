@@ -62,20 +62,12 @@ fn to_json<T: serde::Serialize>(value: &T, what: &str) -> PyResult<String> {
 }
 
 fn parse_composite_envelope(json: &str) -> PyResult<CompositeInstrument> {
-    match finstack_quant_valuations::pricer::json::parse_instrument_from_json(json)
-        .map_err(core_to_py)?
-    {
-        InstrumentJson::Composite(instrument) => Ok(*instrument),
-        other => Err(crate::errors::value_error(format!(
-            "expected composite instrument envelope, found '{}'",
-            other.type_tag()
-        ))),
-    }
+    finstack_quant_valuations::pricer::parse_typed_instrument_json(json).map_err(core_to_py)
 }
 
 fn composite_envelope_json(instrument: &CompositeInstrument) -> PyResult<String> {
     to_json(
-        &InstrumentEnvelope::new(InstrumentJson::Composite(Box::new(instrument.clone()))),
+        &InstrumentEnvelope::new(InstrumentJson::from(instrument.clone())),
         "composite instrument envelope",
     )
 }
@@ -649,9 +641,9 @@ impl PyRebalanceRule {
                 .transpose()?,
             frequency: crate::bindings::core::dates::tenor::extract_tenor(frequency)?,
             calendar_id: calendar_id.to_string(),
-            business_day_convention: super::instruments::enum_from_str(
+            business_day_convention: super::convert::bdc_from_str(
                 business_day_convention,
-                "business-day convention",
+                "business_day_convention",
             )?,
         };
         inner.validate().map_err(core_to_py)?;
@@ -1349,7 +1341,9 @@ impl PyCompositeRebalanceResult {
     /// Parameters
     /// ----------
     /// json : str
-    ///     Strict JSON produced by ``to_json``.
+    ///     Strict JSON produced by ``to_json`` (or by the WASM
+    ///     ``valuations.composite.initialize`` / ``rebalance``): ``instrument``
+    ///     is the canonical ``finstack_quant.instrument/1`` composite envelope.
     ///
     /// Returns
     /// -------
@@ -1359,12 +1353,11 @@ impl PyCompositeRebalanceResult {
     /// Raises
     /// ------
     /// ValueError
-    ///     If JSON is malformed or the embedded composite state is invalid.
+    ///     If JSON is malformed, the envelope is not a composite, or the
+    ///     embedded composite state is invalid.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: CompositeRebalanceResult = parse_json(json, "CompositeRebalanceResult")?;
-        inner.instrument.validate_invariants().map_err(core_to_py)?;
-        Ok(Self { inner })
+        parse_json(json, "CompositeRebalanceResult").map(|inner| Self { inner })
     }
 
     /// Return the newly resolved priceable composite instrument.
@@ -1426,7 +1419,8 @@ impl PyCompositeRebalanceResult {
     /// Returns
     /// -------
     /// str
-    ///     JSON containing the resolved instrument data and primitive trades.
+    ///     JSON ``{"instrument": <canonical composite instrument envelope>,
+    ///     "trades": [...]}``; the same shape the WASM composite functions return.
     ///
     /// Raises
     /// ------
@@ -1810,13 +1804,7 @@ pub(crate) const EXPORTS: &[&str] = &[
 
 /// Register the ``finstack_quant.valuations.composite`` submodule.
 pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "composite")?;
-    let qual = crate::bindings::module_utils::set_submodule_package_by_package(
-        parent,
-        &module,
-        "composite",
-        "finstack_quant.valuations",
-    )?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "composite")?;
     module.setattr(
         "__doc__",
         "Resolved cross-asset composite instruments, primitive exposures, and dated history. Pricing uses frozen quantities; initialize covers fixed_quantity without a separate initialize_fixed binding.",
@@ -1833,5 +1821,9 @@ pub(crate) fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult
     module.add_function(wrap_pyfunction!(py_history, &module)?)?;
     module.add_function(wrap_pyfunction!(py_history_from_spec, &module)?)?;
     module.setattr("__all__", PyList::new(py, EXPORTS)?)?;
-    crate::bindings::module_utils::register_submodule_at(py, parent, &module, &qual)
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &module,
+        crate::bindings::module_utils::Exposure::Python,
+    )
 }

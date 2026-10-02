@@ -45,12 +45,7 @@
 //!
 
 use super::RecoveryModel;
-use finstack_quant_core::math::GaussHermiteQuadrature;
-
-/// Quadrature order for precomputing the Jensen-corrected unconditional mean
-/// `E_Z[R(Z)]`. Order 20 is more than sufficient for a smooth logistic-bounded
-/// recovery integrand and matches the other copula integrands in this crate.
-const EXPECTED_RECOVERY_QUAD_ORDER: usize = 20;
+use finstack_quant_core::math::{integration::adaptive_simpson, norm_cdf, norm_pdf};
 
 /// Market-correlated stochastic recovery model.
 ///
@@ -77,7 +72,7 @@ pub struct CorrelatedRecovery {
     min_recovery: f64,
     /// Maximum recovery (ceiling)
     max_recovery: f64,
-    /// Cached `E_Z[R(Z)]` computed once at construction by Gauss-Hermite
+    /// Cached `E_Z[R(Z)]` computed once at construction by adaptive
     /// quadrature against `N(0, 1)`. Used by [`RecoveryModel::expected_recovery`]
     /// so `lgd()` reflects the Jensen-corrected unconditional mean, not the
     /// biased R(0) location parameter.
@@ -88,7 +83,8 @@ impl CorrelatedRecovery {
     /// Create a correlated recovery model.
     ///
     /// # Arguments
-    /// * `mean` - Mean recovery rate, clamped to [0.05, 0.95]. Typical: 0.40
+    /// * `mean` - Recovery at zero factor, clamped to [0.0, 1.0]. Endpoints
+    ///   give constant zero or full recovery. Typical: 0.40.
     /// * `vol` - Recovery volatility, clamped to [0.0, 0.50]. Typical: 0.20-0.30
     /// * `corr` - Correlation with market factor, clamped to [-1.0, 1.0]. Typical: +0.30 to +0.50
     ///
@@ -109,7 +105,7 @@ impl CorrelatedRecovery {
     #[must_use]
     pub fn new(mean: f64, vol: f64, corr: f64) -> Self {
         let mut model = Self {
-            mean_recovery: mean.clamp(0.05, 0.95),
+            mean_recovery: mean.clamp(0.0, 1.0),
             recovery_volatility: vol.clamp(0.0, 0.50),
             factor_correlation: corr.clamp(-1.0, 1.0),
             min_recovery: 0.0,
@@ -123,15 +119,17 @@ impl CorrelatedRecovery {
     /// Create with custom bounds.
     ///
     /// # Arguments
-    /// * `mean` - Mean recovery rate
-    /// * `vol` - Recovery volatility
-    /// * `corr` - Correlation with market factor
+    /// * `mean` - Recovery at zero factor, bounded to the chosen recovery
+    ///   interval; either boundary gives a constant recovery model.
+    /// * `vol` - Recovery-volatility scale, clamped to `[0.0, 0.50]`.
+    /// * `corr` - Factor sensitivity, clamped to `[-1.0, 1.0]`.
     /// * `min` - Minimum recovery (floor), clamped to [0.0, 0.5]
     /// * `max` - Maximum recovery (ceiling), clamped to [0.5, 1.0]
     ///
     /// # Returns
     ///
     /// A bounded stochastic recovery model with caller-specified recovery bounds.
+    /// Equal bounds produce constant recovery at that value.
     #[must_use]
     pub fn with_bounds(mean: f64, vol: f64, corr: f64, min: f64, max: f64) -> Self {
         let mut model = Self::new(mean, vol, corr);
@@ -209,42 +207,75 @@ impl CorrelatedRecovery {
         self.factor_correlation
     }
 
-    /// Compute `E_Z[R(Z)]` via Gauss-Hermite quadrature against `N(0, 1)`.
+    /// Compute `E_Z[R(Z)]` by adaptive integration against `N(0, 1)`.
     ///
-    /// The logistic transform is smooth and bounded in `[0, 1]`, so a
-    /// moderate-order Gauss-Hermite rule achieves machine precision. When the
-    /// model is effectively deterministic (ρ_R·σ_R = 0) we short-circuit to
-    /// avoid a spurious quadrature call.
+    /// Steep curves near a recovery bound are integrated in logit coordinates
+    /// so their transition remains resolved even as its Gaussian width tends
+    /// to zero. The discarded logistic tails contribute less than `3e-16`.
     fn compute_unconditional_expected_recovery(&self) -> f64 {
-        if self.factor_correlation == 0.0 || self.recovery_volatility == 0.0 {
-            return self.logistic_bounded_recovery(0.0);
+        let location = self.logistic_bounded_recovery(0.0);
+        let width = self.max_recovery - self.min_recovery;
+        let shock_scale = (self.factor_correlation * self.recovery_volatility).abs();
+        if shock_scale == 0.0
+            || width == 0.0
+            || location <= self.min_recovery
+            || location >= self.max_recovery
+        {
+            return location;
         }
 
-        // Fallback to R(0) if the requested quadrature order is unsupported —
-        // this keeps the constructor infallible while logging the anomaly.
-        let quad = match GaussHermiteQuadrature::new(EXPECTED_RECOVERY_QUAD_ORDER) {
-            Ok(q) => q,
-            Err(err) => {
-                tracing::warn!(
-                    order = EXPECTED_RECOVERY_QUAD_ORDER,
-                    %err,
-                    "CorrelatedRecovery: falling back to R(0) for expected_recovery; \
-                     GaussHermiteQuadrature rejected the requested order"
-                );
-                return self.logistic_bounded_recovery(0.0);
-            }
-        };
-        quad.integrate(|z| self.conditional_recovery(z))
+        let p = (self
+            .mean_recovery
+            .clamp(self.min_recovery, self.max_recovery)
+            - self.min_recovery)
+            / width;
+        let local_slope = (width * p * (1.0 - p)).max(f64::MIN_POSITIVE);
+        let logit_slope = shock_scale / local_slope;
+        if logit_slope <= 1.0 {
+            // Ten Gaussian standard deviations leave less than 2e-23 mass.
+            return adaptive_simpson(
+                |z| self.conditional_recovery(z) * norm_pdf(z),
+                -10.0,
+                10.0,
+                1e-12,
+                24,
+            )
+            .unwrap_or(f64::NAN);
+        }
+
+        let center = (p / (1.0 - p)).ln();
+        let integral = adaptive_simpson(
+            |logit| {
+                let z = (logit - center) / logit_slope;
+                let recovery = self.logistic_bounded_recovery(local_slope * (logit - center));
+                (recovery - self.min_recovery) * norm_pdf(z) / logit_slope
+            },
+            -36.0,
+            36.0,
+            1e-12,
+            24,
+        );
+        self.min_recovery
+            + integral.unwrap_or(f64::NAN)
+            + width * norm_cdf((center - 36.0) / logit_slope)
     }
 
     fn logistic_bounded_recovery(&self, shock: f64) -> f64 {
-        let width = (self.max_recovery - self.min_recovery).max(f64::EPSILON);
+        let width = self.max_recovery - self.min_recovery;
+        if width == 0.0 {
+            return self.min_recovery;
+        }
         let mean = self
             .mean_recovery
-            .clamp(self.min_recovery + 1e-9, self.max_recovery - 1e-9);
-        let p = ((mean - self.min_recovery) / width).clamp(1e-9, 1.0 - 1e-9);
+            .clamp(self.min_recovery, self.max_recovery);
+        // The bounded logistic has degenerate, constant distributions at
+        // either endpoint. Handle them before forming log-odds or a slope.
+        if mean <= self.min_recovery || mean >= self.max_recovery {
+            return mean;
+        }
+        let p = (mean - self.min_recovery) / width;
         let center = (p / (1.0 - p)).ln();
-        let local_slope = (width * p * (1.0 - p)).max(1e-9);
+        let local_slope = (width * p * (1.0 - p)).max(f64::MIN_POSITIVE);
         let squashed = 1.0 / (1.0 + (-(center + shock / local_slope)).exp());
         self.min_recovery + width * squashed
     }
@@ -275,6 +306,60 @@ impl RecoveryModel for CorrelatedRecovery {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn dense_gaussian_mean(model: &CorrelatedRecovery) -> f64 {
+        let step = 0.0001;
+        let density = |z: f64| (-0.5 * z * z).exp() / (2.0 * std::f64::consts::PI).sqrt();
+        let integrand = |z: f64| model.conditional_recovery(z) * density(z);
+        let interior: f64 = (1..200_000)
+            .map(|i| {
+                let weight = if i % 2 == 0 { 2.0 } else { 4.0 };
+                weight * integrand(-10.0 + f64::from(i) * step)
+            })
+            .sum();
+        step / 3.0 * (integrand(-10.0) + interior + integrand(10.0))
+    }
+
+    #[test]
+    fn custom_equal_and_narrow_bounds_preserve_recovery_without_panicking() {
+        for (min, max, mean) in [(0.5, 0.5, 0.4), (0.5 - 1e-10, 0.5 + 1e-10, 0.5)] {
+            let model = CorrelatedRecovery::with_bounds(mean, 0.25, 0.4, min, max);
+            for factor in [-10.0, 0.0, 10.0] {
+                let recovery = model.conditional_recovery(factor);
+                assert!(recovery.is_finite() && (min..=max).contains(&recovery));
+            }
+            assert!((model.conditional_recovery(0.0) - mean.clamp(min, max)).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn zero_and_full_recovery_are_constant_at_every_factor() {
+        for mean in [0.0, 1.0] {
+            let model = CorrelatedRecovery::new(mean, 0.25, 0.4);
+            for factor in [-10.0, 0.0, 10.0] {
+                assert_eq!(model.conditional_recovery(factor).to_bits(), mean.to_bits());
+            }
+            assert_eq!(model.expected_recovery().to_bits(), mean.to_bits());
+        }
+    }
+
+    #[test]
+    fn near_boundary_expected_recovery_matches_dense_gaussian_integration() {
+        for mean in [0.01, 0.99] {
+            let model = CorrelatedRecovery::new(mean, 0.25, 0.4);
+            let dense_mean = dense_gaussian_mean(&model);
+            assert!((model.expected_recovery() - dense_mean).abs() < 1e-10);
+        }
+    }
+
+    #[test]
+    fn extremely_steep_recovery_has_finite_symmetric_expectation() {
+        let lower = CorrelatedRecovery::new(f64::MIN_POSITIVE, 0.25, 0.4);
+        assert!((lower.expected_recovery() - 0.5).abs() < 1e-12);
+        let lower = CorrelatedRecovery::new(0.01, 0.25, 0.4);
+        let upper = CorrelatedRecovery::new(0.99, 0.25, 0.4);
+        assert!((lower.expected_recovery() + upper.expected_recovery() - 1.0).abs() < 1e-12);
+    }
 
     #[test]
     fn test_correlated_recovery_creation() {
@@ -354,12 +439,10 @@ mod tests {
             "Deterministic recovery: E[R] must equal R(0)"
         );
 
-        // Cross-check against an independent Gauss-Hermite computation.
-        let independent_quad = GaussHermiteQuadrature::new(20)
-            .expect("order 20 is a supported Gauss-Hermite quadrature");
-        let e_r_check = independent_quad.integrate(|z| model.conditional_recovery(z));
+        // Cross-check against an independent dense composite Simpson rule.
+        let e_r_check = dense_gaussian_mean(&model);
         assert!(
-            (e_r - e_r_check).abs() < 1e-12,
+            (e_r - e_r_check).abs() < 1e-10,
             "cached E[R]={e_r} should match independently computed value {e_r_check}"
         );
     }

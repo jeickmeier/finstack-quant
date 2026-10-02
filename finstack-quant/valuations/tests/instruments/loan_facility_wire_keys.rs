@@ -16,9 +16,9 @@
 //! - a convertible's coupon is `cashflow_spec`, and both of its share-price
 //!   triggers are one `PriceTrigger`.
 //!
-//! Each retired spelling is rejected by `deny_unknown_fields`, and the PV of
-//! each migrated input is pinned bit-for-bit (exact `Money` amount string) to
-//! the value the equivalent pre-migration input gave.
+//! Each retired spelling is rejected by `deny_unknown_fields`. Unchanged
+//! pricing references retain exact `Money` strings; corrected floating-rate
+//! inputs compare against an independently constructed canonical rate spec.
 
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::PricingOptions;
@@ -76,6 +76,7 @@ fn set_path(root: &mut Value, path: &[Value], value: Value) {
 /// instrument and market patches applied.
 pub(crate) fn pricing_case_inputs(case: &Value) -> (Value, MarketContext) {
     let root = workspace_root();
+    let ty = case["type"].as_str().expect("type");
     let mut instrument = read_source(&root, &case["instrumentSource"]);
     for patch in case["instrumentPatches"].as_array().expect("patches") {
         set_path(
@@ -91,6 +92,24 @@ pub(crate) fn pricing_case_inputs(case: &Value) -> (Value, MarketContext) {
             patch["path"].as_array().expect("path"),
             patch["value"].clone(),
         );
+    }
+    if matches!(ty, "revolving_credit" | "asset_backed_facility") {
+        // These wire-migration references use a flat 4% contractual ACT/360
+        // index. State that convention explicitly instead of interpreting a
+        // 4% ACT/365F curve quote as the same annualized fixing. The source
+        // market is shared with unrelated pricing cases and stays unchanged.
+        let forward = market["curves"]
+            .as_array_mut()
+            .expect("curves")
+            .iter_mut()
+            .find(|curve| curve["type"] == "forward" && curve["id"] == "USD-SOFR-3M")
+            .expect("facility forward curve");
+        assert!(forward["knot_points"]
+            .as_array()
+            .expect("forward knots")
+            .iter()
+            .all(|knot| knot[1].as_f64() == Some(0.04)));
+        forward["day_count"] = Value::String("act_360".to_string());
     }
     let market: MarketContext = serde_json::from_value(market).expect("market");
     (instrument, market)
@@ -289,15 +308,6 @@ fn checks() -> Vec<Check> {
             )],
             "77527928.198651577739903836763",
         ),
-        (
-            "abf_float",
-            "asset_backed_facility",
-            vec![(
-                s("rate"),
-                json!({"floating": {"forward_curve_id": "USD-SOFR-3M", "spread_bp": "275", "gearing": "1", "gearing_includes_spread": true, "reset_frequency": {"count": 3, "unit": "months"}, "reset_lag_days": 0}}),
-            )],
-            "78803034.559481118830452616678",
-        ),
         ("cb_base", "convertible_bond", vec![], "1012.328767123288"),
         (
             "cb_zero",
@@ -396,6 +406,59 @@ fn migrated_inputs_reprice_to_recorded_reference() {
         "PV moved:\n{}",
         mismatches.join("\n")
     );
+}
+
+/// A 275 bp contractual margin has exactly the same price through the wire
+/// vocabulary and the canonical Rust rate spec. Historical decimal PV strings
+/// cannot certify a wire migration after projection arithmetic is corrected.
+#[test]
+fn floating_facility_wire_rate_matches_canonical_rate_spec() {
+    use finstack_quant_cashflows::builder::FloatingRateSpec;
+    use finstack_quant_core::dates::Tenor;
+    use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
+    use rust_decimal::Decimal;
+    use serde_json::json;
+
+    let canonical = RateSpec::Floating(FloatingRateSpec {
+        forward_curve_id: "USD-SOFR-3M".into(),
+        spread_bp: Decimal::from(275),
+        gearing: Decimal::ONE,
+        gearing_includes_spread: true,
+        index_floor_bp: None,
+        all_in_floor_bp: None,
+        all_in_cap_bp: None,
+        index_cap_bp: None,
+        overnight_index_constraints: Default::default(),
+        reset_frequency: Tenor::quarterly(),
+        index_tenor: None,
+        reset_lag_days: 0,
+        fixing_calendar_id: None,
+        compounding: None,
+        overnight_basis: None,
+        fallback: Default::default(),
+    });
+    let wire = json!({
+        "floating": {
+            "forward_curve_id": "USD-SOFR-3M",
+            "spread_bp": "275",
+            "gearing": "1",
+            "gearing_includes_spread": true,
+            "reset_frequency": {"count": 3, "unit": "months"},
+            "reset_lag_days": 0
+        }
+    });
+    let cases = pricing_cases();
+    let path = json!(["instrument", "spec", "rate"]);
+    let wire_pv = price_case(&cases, "asset_backed_facility", &[(path.clone(), wire)]);
+    let canonical_pv = price_case(
+        &cases,
+        "asset_backed_facility",
+        &[(
+            path,
+            serde_json::to_value(canonical).expect("canonical rate"),
+        )],
+    );
+    assert_eq!(wire_pv, canonical_pv, "275 bp facility wire economics");
 }
 
 /// Serialize `instrument`, insert `retired` with `value` into the object at

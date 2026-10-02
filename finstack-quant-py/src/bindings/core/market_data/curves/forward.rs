@@ -167,6 +167,11 @@ impl PyForwardCurve {
 
     /// Forward rate (decimal) at a year fraction or date.
     ///
+    /// The stored rate is annualized on the curve's day-count basis. Convert
+    /// its accrual growth to the contractual index basis before calculating a
+    /// coupon whose accrual convention differs; Rust instrument pricing performs
+    /// that conversion from the contractual schedule.
+    ///
     /// Parameters
     /// ----------
     /// t : float | datetime.date | str
@@ -175,6 +180,7 @@ impl PyForwardCurve {
     /// Returns
     /// -------
     /// float
+    ///     Simple forward rate as a decimal, annualized on the curve day count.
     ///
     /// Raises
     /// ------
@@ -190,12 +196,16 @@ impl PyForwardCurve {
 
     /// Discount-factor-implied simple forward rate (decimal) over ``(t1, t2)``.
     ///
+    /// The denominator is the curve-time span ``t2 - t1``. To express the
+    /// implied growth on a different contractual index basis, multiply by that
+    /// span and divide by the index's accrual fraction for the same dated period.
+    ///
     /// Parameters
     /// ----------
     /// t1 : float
-    ///     Start year fraction.
+    ///     Start year fraction from the curve base date using its day count.
     /// t2 : float
-    ///     End year fraction; must be finite and greater than ``t1``.
+    ///     End year fraction on the same curve basis; must be finite and greater than ``t1``.
     ///
     /// Returns
     /// -------
@@ -212,12 +222,17 @@ impl PyForwardCurve {
 
     /// Average forward rate (decimal) over ``[t1, t2]`` from the stored knots.
     ///
+    /// This integral average remains annualized on the curve's day count.
+    /// For an overnight observation on another index basis, multiply by
+    /// ``t2 - t1`` and divide by its contractual observation accrual fraction.
+    /// Use ``rate_between`` to infer a simple term-period rate from projection DFs.
+    ///
     /// Parameters
     /// ----------
     /// t1 : float
-    ///     Start year fraction.
+    ///     Start year fraction from the curve base date using its day count.
     /// t2 : float
-    ///     End year fraction.
+    ///     End year fraction on the same curve basis.
     ///
     /// Returns
     /// -------

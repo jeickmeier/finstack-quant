@@ -26,7 +26,7 @@
         },
         "day_count": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/day_count.schema.json",
-          "description": "Day count convention for accrual and option time."
+          "description": "Day count convention for accrual. Option quote time always uses ACT/365F."
         },
         "discount_curve_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
@@ -43,14 +43,6 @@
         "inflation_index_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Inflation index/curve identifier (e.g., US-CPI-U)."
-        },
-        "inflation_nominal_correlation": {
-          "description": "Correlation between the inflation index and the nominal short rate,\nused in the YoY convexity/timing adjustment. `None` ⇒ treated as 0\n(the timing term vanishes; the pure inflation-vol Jensen convexity\n`σ_I²·τ` is still applied).",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
         },
         "instrument_pricing_overrides": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
@@ -86,14 +78,6 @@
           "$ref": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json",
           "description": "Metric-time pricing configuration."
         },
-        "nominal_rate_volatility": {
-          "description": "Nominal short-rate volatility `σ_n` (annualized, absolute), used in the\nYoY timing term. `None` ⇒ the `ρ·σ_n` timing term is dropped.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "notional": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/money.schema.json",
           "description": "Notional amount in quote currency."
@@ -122,6 +106,11 @@
         "vol_surface_id": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/id.schema.json",
           "description": "Volatility surface identifier."
+        },
+        "volatility_expiry": {
+          "$ref": "#/$defs/InflationVolatilityExpiry",
+          "default": "reference_date",
+          "description": "Clock used by the volatility surface's annualized quotes. This is\nindependent of CPI publication policy; changing it requires matching\nquotes, not merely relabelling the old surface."
         }
       },
       "required": [
@@ -156,7 +145,7 @@
       ]
     },
     "InflationLag": {
-      "description": "Publication lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate a lag to ensure the reference index is published\nby the settlement date.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
+      "description": "Contractual observation lag for inflation index reference dates.\n\nInflation indices are published with a delay (typically 2-4 weeks). Securities\nusing these indices incorporate an observation lag to ensure the reference\nindex is published by settlement. This lag does not specify the actual\npublication date; use [`InflationIndex::with_publication_dates`] for that.\n\n# Standard Lags by Market\n\n- **US TIPS**: 3-month lag (reference index from 3 months prior)\n- **UK Index-Linked Gilts**: 3-month lag (8-month for older issues)\n- **French OATi**: 3-month lag\n- **German index-linked**: 3-month lag\n\n# Rationale\n\nThe lag ensures:\n1. Reference index is published before settlement\n2. Index value is known at coupon payment date\n3. No estimation or forecasting required for payment calculation\n\n# Examples\n\n```rust\nuse finstack_quant_core::market_data::scalars::InflationLag;\n\nlet tips_lag = InflationLag::Months(3);  // US TIPS standard\nlet gilt_lag = InflationLag::Months(3);  // UK modern gilts\nlet no_lag = InflationLag::None;         // Inflation swaps (forecast-based)\n```",
       "oneOf": [
         {
           "additionalProperties": false,
@@ -193,6 +182,21 @@
         {
           "const": "none",
           "description": "No lag applied.\n\nUsed for inflation swaps where forecast indices are used.",
+          "type": "string"
+        }
+      ]
+    },
+    "InflationVolatilityExpiry": {
+      "description": "Expiry convention of the annualized inflation-option volatility surface.",
+      "oneOf": [
+        {
+          "const": "reference_date",
+          "description": "ACT/365F time to the lagged contractual end date. If CPI is still\nunpublished after this date, the quote clock is inconsistent and pricing\nfails instead of treating the unknown payoff as deterministic.",
+          "type": "string"
+        },
+        {
+          "const": "publication_date",
+          "description": "ACT/365F time to publication of the final required CPI anchor. Requires\nexplicit publication dates for every outstanding monthly anchor and\na volatility surface quoted on this publication-expiry clock.",
           "type": "string"
         }
       ]
@@ -307,7 +311,8 @@
           "start_date": "2024-01-15",
           "strike": "0.03",
           "stub": "short_front",
-          "vol_surface_id": "USD-INFL-VOL"
+          "vol_surface_id": "USD-INFL-VOL",
+          "volatility_expiry": "reference_date"
         },
         "type": "inflation_cap_floor"
       },

@@ -277,7 +277,7 @@ fn bench_global_discount_quote_count(c: &mut Criterion) {
         &format!("{n}q"),
     );
     group.bench_with_input(BenchmarkId::new("numeric_jac", n), &n, |b, _| {
-        b.iter(|| engine::execute(black_box(&env)).unwrap());
+        b.iter(|| engine::calibrate(black_box(&env)).unwrap());
     });
 
     group.finish();
@@ -305,10 +305,10 @@ fn bench_global_discount_jacobian(c: &mut Criterion) {
     );
 
     group.bench_function("numeric_jac_16q", |b| {
-        b.iter(|| engine::execute(black_box(&env_numeric)).unwrap());
+        b.iter(|| engine::calibrate(black_box(&env_numeric)).unwrap());
     });
     group.bench_function("analytical_jac_16q", |b| {
-        b.iter(|| engine::execute(black_box(&env_analytic)).unwrap());
+        b.iter(|| engine::calibrate(black_box(&env_analytic)).unwrap());
     });
 
     group.finish();
@@ -336,10 +336,10 @@ fn bench_global_vs_bootstrap(c: &mut Criterion) {
     );
 
     group.bench_with_input(BenchmarkId::new("bootstrap", n), &n, |b, _| {
-        b.iter(|| engine::execute(black_box(&env_bootstrap)).unwrap());
+        b.iter(|| engine::calibrate(black_box(&env_bootstrap)).unwrap());
     });
     group.bench_with_input(BenchmarkId::new("global_solve", n), &n, |b, _| {
-        b.iter(|| engine::execute(black_box(&env_global)).unwrap());
+        b.iter(|| engine::calibrate(black_box(&env_global)).unwrap());
     });
 
     group.finish();
@@ -362,7 +362,7 @@ fn bench_global_hazard_tenor_count(c: &mut Criterion) {
         &format!("{m}t"),
     );
     group.bench_with_input(BenchmarkId::new("global_solve", m), &m, |b, _| {
-        b.iter(|| engine::execute(black_box(&env)).unwrap());
+        b.iter(|| engine::calibrate(black_box(&env)).unwrap());
     });
 
     let cds_quotes = make_cds_quotes(m);
@@ -373,7 +373,7 @@ fn bench_global_hazard_tenor_count(c: &mut Criterion) {
         &format!("bs_{m}t"),
     );
     group.bench_with_input(BenchmarkId::new("bootstrap", m), &m, |b, _| {
-        b.iter(|| engine::execute(black_box(&env)).unwrap());
+        b.iter(|| engine::calibrate(black_box(&env)).unwrap());
     });
 
     group.finish();

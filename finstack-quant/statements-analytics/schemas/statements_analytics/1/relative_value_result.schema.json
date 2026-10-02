@@ -1,0 +1,96 @@
+{
+  "$defs": {
+    "CompanyId": {
+      "description": "Opaque company identifier within a peer set.",
+      "type": "string"
+    },
+    "DimensionScore": {
+      "description": "Decomposed score for a single dimension.",
+      "properties": {
+        "label": {
+          "description": "Label of the dimension.",
+          "type": "string"
+        },
+        "percentile": {
+          "description": "Percentile rank of the subject's Y within peers (0-1). Whether a\nhigh percentile means rich or cheap depends on the dimension's\n[`ScoringDimension::direction`].",
+          "format": "double",
+          "type": "number"
+        },
+        "r_squared": {
+          "description": "R-squared of the regression (confidence measure).",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "regression_residual": {
+          "description": "Raw regression residual in Y units (actual − fitted). Positive\nmeans the subject's Y is above the peer fair-value line; the\ncomposite uses the standardized, direction-adjusted form.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weight": {
+          "description": "Dimension weight in composite.",
+          "format": "double",
+          "type": "number"
+        },
+        "z_score": {
+          "description": "Z-score of the subject's Y relative to the peer distribution\n(raw, before the direction convention is applied).",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "label",
+        "percentile",
+        "z_score",
+        "weight"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/relative_value_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Composite relative value result.",
+  "properties": {
+    "company_id": {
+      "$ref": "#/$defs/CompanyId",
+      "description": "Company being scored."
+    },
+    "composite_score": {
+      "description": "Composite rich/cheap score.\n\nPositive = cheap (trading below fair value across dimensions).\nNegative = rich (trading above fair value).\nMagnitude indicates conviction (bounded by number of dimensions\nand their weights).",
+      "format": "double",
+      "type": "number"
+    },
+    "confidence": {
+      "description": "Confidence in the composite score (average R-squared across\nregression-based dimensions, weighted by dimension weight).",
+      "format": "double",
+      "type": "number"
+    },
+    "dimensions": {
+      "description": "Per-dimension decomposition.",
+      "items": {
+        "$ref": "#/$defs/DimensionScore"
+      },
+      "type": "array"
+    },
+    "peer_count": {
+      "description": "Number of peers used in the analysis.",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "required": [
+    "company_id",
+    "composite_score",
+    "dimensions",
+    "confidence",
+    "peer_count"
+  ],
+  "title": "RelativeValueResult",
+  "type": "object"
+}

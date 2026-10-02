@@ -10,6 +10,7 @@ use crate::warning::Warning;
 use finstack_quant_core::market_data::bumps::MarketBump;
 use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_core::HashSet;
+use finstack_quant_valuations::instruments::Instrument;
 
 /// Dispatch one operation to its adapter and produce effects.
 ///
@@ -282,19 +283,11 @@ pub(super) fn generate_replace_curve_effects_parallel(
 ) -> Result<Vec<Vec<ScenarioEffect>>> {
     let market = &*ctx.market;
     let as_of = ctx.as_of;
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        use rayon::prelude::*;
-        ops.par_iter()
-            .map(|op| adapters::curves::generate_replace_curve_effects(op, market, as_of, env))
-            .collect()
-    }
-    #[cfg(target_arch = "wasm32")]
-    {
-        ops.iter()
-            .map(|op| adapters::curves::generate_replace_curve_effects(op, market, as_of, env))
-            .collect()
-    }
+    // Several failing ops report the first failing op in op order, the same
+    // error the serial path returns.
+    finstack_quant_core::parallel::try_map_ordered(ops, |op| {
+        adapters::curves::generate_replace_curve_effects(op, market, as_of, env)
+    })
 }
 
 /// Mutable sinks shared while applying one operation's effects.
@@ -325,10 +318,24 @@ pub(super) fn apply_generated_effects(
 ) -> Result<()> {
     for effect in effects {
         match effect {
+            ScenarioEffect::PriceBump { id, pct } => {
+                flush_pending_bumps(sink.pending_bumps, ctx.market)?;
+                ctx.market
+                    .apply_price_bump_pct_in_place(id.as_str(), pct / 100.0)?;
+                sink.changes
+                    .record_market_target(ScenarioMarketTarget::EquityPrice {
+                        spot_id: PriceId::new(id.as_str()),
+                    });
+                *sink.applied += 1;
+            }
+            ScenarioEffect::SurfaceBump { id, spec } => {
+                flush_pending_bumps(sink.pending_bumps, ctx.market)?;
+                ctx.market.apply_surface_bump_in_place(id.as_str(), spec)?;
+                sink.changes
+                    .record_market_target(ScenarioMarketTarget::VolSurface { vol_surface_id: id });
+                *sink.applied += 1;
+            }
             ScenarioEffect::MarketBump(b) => {
-                if would_conflict_with_pending(sink.pending_bumps, &b) {
-                    flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                }
                 match market_target_for_bump(op, &b) {
                     Some(target) => sink.changes.record_market_target(target),
                     None => sink.changes.all_dirty = true,
@@ -352,8 +359,7 @@ pub(super) fn apply_generated_effects(
                     types.as_deref(),
                     attrs.as_ref(),
                     pct,
-                    "price",
-                    &mut ctx.instruments,
+                    inventory(&mut ctx.instruments)?,
                     adapters::instruments::apply_instrument_type_price_shock,
                     adapters::instruments::apply_instrument_attr_price_shock,
                 );
@@ -368,8 +374,7 @@ pub(super) fn apply_generated_effects(
                     types.as_deref(),
                     attrs.as_ref(),
                     bp,
-                    "spread",
-                    &mut ctx.instruments,
+                    inventory(&mut ctx.instruments)?,
                     adapters::instruments::apply_instrument_type_spread_shock,
                     adapters::instruments::apply_instrument_attr_spread_shock,
                 );
@@ -380,16 +385,22 @@ pub(super) fn apply_generated_effects(
             }
             ScenarioEffect::AssetCorrelationShock { delta_pts } => {
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                let (count, indices, ws) =
-                    apply_correlation_effect(CorrelationKind::Asset, delta_pts, ctx);
+                let (count, indices, ws) = apply_correlation_effect(
+                    CorrelationKind::Asset,
+                    delta_pts,
+                    inventory(&mut ctx.instruments)?,
+                );
                 *sink.applied += count;
                 sink.changes.record_instrument_indices(indices);
                 sink.warnings.extend(ws);
             }
             ScenarioEffect::PrepayDefaultCorrelationShock { delta_pts } => {
                 flush_pending_bumps(sink.pending_bumps, ctx.market)?;
-                let (count, indices, ws) =
-                    apply_correlation_effect(CorrelationKind::PrepayDefault, delta_pts, ctx);
+                let (count, indices, ws) = apply_correlation_effect(
+                    CorrelationKind::PrepayDefault,
+                    delta_pts,
+                    inventory(&mut ctx.instruments)?,
+                );
                 *sink.applied += count;
                 sink.changes.record_instrument_indices(indices);
                 sink.warnings.extend(ws);
@@ -404,6 +415,21 @@ pub(super) fn apply_generated_effects(
     Ok(())
 }
 
+/// The instrument inventory an instrument-scoped effect mutates.
+///
+/// [`super::ScenarioEngine::apply`] rejects instrument-scoped operations
+/// without an inventory before any effect runs, so a missing inventory here is
+/// an engine invariant violation.
+fn inventory<'a>(
+    instruments: &'a mut Option<&mut Vec<Box<dyn Instrument>>>,
+) -> Result<&'a mut Vec<Box<dyn Instrument>>> {
+    instruments.as_deref_mut().ok_or_else(|| {
+        crate::error::Error::internal(
+            "instrument-scoped effect reached the engine without an instrument inventory",
+        )
+    })
+}
+
 /// Flush any accumulated [`MarketBump`]s through `MarketContext::bump` in a
 /// single batched call. No-op when the buffer is empty.
 pub(super) fn flush_pending_bumps(
@@ -416,62 +442,6 @@ pub(super) fn flush_pending_bumps(
     let drained: Vec<MarketBump> = std::mem::take(pending);
     *market = market.bump(drained)?;
     Ok(())
-}
-
-/// Returns `true` when applying `incoming` would collide with a pending bump.
-///
-/// `MarketContext::bump_observed` keys [`MarketBump::Curve`] effects in a
-/// `HashMap<CurveId, BumpSpec>`, so two same-target bumps in one batch would
-/// overwrite instead of composing `pre * (1+a) * (1+b)`.
-fn would_conflict_with_pending(pending: &[MarketBump], incoming: &MarketBump) -> bool {
-    pending.iter().any(|p| match (p, incoming) {
-        (
-            MarketBump::FxPct {
-                base: ba,
-                quote: qa,
-                ..
-            },
-            MarketBump::FxPct {
-                base: bb,
-                quote: qb,
-                ..
-            },
-        ) => ba == bb && qa == qb,
-        (MarketBump::Curve { id: a, .. }, MarketBump::Curve { id: b, .. })
-        | (
-            MarketBump::VolBucketPct {
-                vol_surface_id: a,
-                ..
-            },
-            MarketBump::VolBucketPct {
-                vol_surface_id: b,
-                ..
-            },
-        )
-        | (
-            MarketBump::BaseCorrBucketPts { surface_id: a, .. },
-            MarketBump::BaseCorrBucketPts { surface_id: b, .. },
-        ) => a == b,
-        (
-            MarketBump::Curve { id: a, .. },
-            MarketBump::VolBucketPct {
-                vol_surface_id: b,
-                ..
-            },
-        )
-        | (
-            MarketBump::VolBucketPct {
-                vol_surface_id: a,
-                ..
-            },
-            MarketBump::Curve { id: b, .. },
-        )
-        | (MarketBump::Curve { id: a, .. }, MarketBump::BaseCorrBucketPts { surface_id: b, .. })
-        | (MarketBump::BaseCorrBucketPts { surface_id: a, .. }, MarketBump::Curve { id: b, .. }) => {
-            a == b
-        }
-        _ => false,
-    })
 }
 
 #[cfg(test)]

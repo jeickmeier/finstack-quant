@@ -86,6 +86,50 @@ pub fn parse_instrument_from_json(json: &str) -> finstack_quant_core::Result<Ins
     Ok(instrument)
 }
 
+/// Build and validate an instrument payload from a bare spec object.
+///
+/// # Arguments
+///
+/// * `type_tag` - Canonical instrument discriminator expected by the caller's
+///   API route, such as `"fx_option"`.
+/// * `spec` - Bare instrument spec object for `type_tag`. Tagged payloads and
+///   envelopes are rejected.
+///
+/// # Returns
+///
+/// The tagged [`InstrumentJson`] payload after type-specific deserialization
+/// and validation has succeeded. Convert it to the concrete Rust type with
+/// `TryFrom`.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `spec` is not a bare object, does not
+/// deserialize as a `type_tag` instrument, or fails instrument validation.
+pub fn instrument_from_spec(
+    type_tag: &str,
+    spec: Value,
+) -> finstack_quant_core::Result<InstrumentJson> {
+    let object = spec.as_object().ok_or_else(|| {
+        Error::Validation("instrument constructor requires a bare spec object".to_string())
+    })?;
+    if (object.contains_key("type") && object.contains_key("spec"))
+        || (object.contains_key("schema") && object.contains_key("instrument"))
+    {
+        return Err(Error::Validation(
+            "instrument constructor requires a bare spec object, not a tagged payload or envelope"
+                .to_string(),
+        ));
+    }
+
+    let instrument: InstrumentJson = serde_json::from_value(serde_json::json!({
+        "type": type_tag,
+        "spec": spec,
+    }))
+    .map_err(|error| Error::Validation(format!("invalid {type_tag} instrument spec: {error}")))?;
+    instrument.validate_for_pricing()?;
+    Ok(instrument)
+}
+
 /// Build and validate a canonical instrument envelope from a bare spec object.
 ///
 /// # Arguments
@@ -108,26 +152,33 @@ pub fn instrument_envelope_from_spec(
     type_tag: &str,
     spec: Value,
 ) -> finstack_quant_core::Result<String> {
-    let object = spec.as_object().ok_or_else(|| {
-        Error::Validation("instrument constructor requires a bare spec object".to_string())
-    })?;
-    if (object.contains_key("type") && object.contains_key("spec"))
-        || (object.contains_key("schema") && object.contains_key("instrument"))
-    {
-        return Err(Error::Validation(
-            "instrument constructor requires a bare spec object, not a tagged payload or envelope"
-                .to_string(),
-        ));
-    }
-
-    let instrument: InstrumentJson = serde_json::from_value(serde_json::json!({
-        "type": type_tag,
-        "spec": spec,
-    }))
-    .map_err(|error| Error::Validation(format!("invalid {type_tag} instrument spec: {error}")))?;
-    instrument.validate_for_pricing()?;
+    let instrument = instrument_from_spec(type_tag, spec)?;
     serde_json::to_string(&InstrumentEnvelope::new(instrument))
         .map_err(|error| Error::Validation(format!("invalid instrument JSON: {error}")))
+}
+
+/// Parse a canonical envelope into one concrete instrument type.
+///
+/// This is the typed twin of [`validate_typed_instrument_json`]: the envelope
+/// is parsed and validated by [`parse_instrument_from_json`], then converted
+/// with the registry-generated `TryFrom<InstrumentJson>` impl of `T`.
+///
+/// # Arguments
+///
+/// * `json` - Required canonical v1 instrument envelope whose `type` must be
+///   the discriminator of `T` (for example `"bond"` for
+///   [`crate::instruments::Bond`]).
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `json` is malformed, fails instrument
+/// validation, or carries another instrument type
+/// (``expected instrument type `bond`, got `term_loan` ``).
+pub fn parse_typed_instrument_json<T>(json: &str) -> finstack_quant_core::Result<T>
+where
+    T: TryFrom<InstrumentJson, Error = Error>,
+{
+    T::try_from(parse_instrument_from_json(json)?)
 }
 
 /// Validate a canonical envelope for one exact instrument type.
@@ -148,9 +199,9 @@ pub fn validate_typed_instrument_json(
     let instrument = parse_instrument_from_json(json)?;
     let actual = instrument.type_tag();
     if actual != type_tag {
-        return Err(Error::Validation(format!(
-            "expected instrument type `{type_tag}`, got `{actual}`"
-        )));
+        return Err(crate::instruments::json_loader::instrument_type_mismatch(
+            type_tag, actual,
+        ));
     }
     serde_json::to_string(&InstrumentEnvelope::new(instrument))
         .map_err(|error| Error::Validation(format!("invalid instrument JSON: {error}")))
@@ -165,7 +216,9 @@ pub fn validate_typed_instrument_json(
 /// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON merged
 ///   into `instrument.spec.metric_pricing_overrides` by the
 ///   canonical pricing path before instrument validation; `None` retains the
-///   envelope configuration.
+///   envelope configuration. Only supplied fields replace stored values;
+///   omitted fields, including individual `bump_config` fields, are retained.
+///   Explicit `null` clears an optional field to its default behavior.
 ///
 /// # Errors
 ///
@@ -208,7 +261,9 @@ pub fn list_standard_metrics_grouped() -> BTreeMap<String, Vec<String>> {
 }
 
 /// Canonical per-key metric interpretation for host presentation.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct MetricMetadata {
     /// Original canonical wire key, retained without renaming.
     pub key: String,
@@ -318,7 +373,9 @@ pub fn list_models_grouped() -> BTreeMap<String, Vec<String>> {
 ///
 /// * `instrument_json` - Required canonical v1 instrument envelope.
 /// * `metric_pricing_overrides` - Optional `MetricPricingOverrides` JSON merged
-///   into `instrument.spec.metric_pricing_overrides` before validation.
+///   into `instrument.spec.metric_pricing_overrides` before validation. Only
+///   supplied fields replace stored values; omitted fields, including individual
+///   `bump_config` fields, are retained. Explicit `null` clears optional fields.
 ///
 /// # Errors
 ///
@@ -333,6 +390,41 @@ pub fn parse_boxed_instrument_from_json(
     Ok(ParsedInstrument::new(
         instrument.into_boxed_assuming_validated()?,
     ))
+}
+
+/// Parse a JSON array of canonical instrument envelopes into validated
+/// instruments, in input order.
+///
+/// This is the inventory counterpart of [`parse_boxed_instrument_from_json`]:
+/// the whole array is capped at [`MAX_JSON_BYTES`], parse failures carry the
+/// same `invalid instrument envelope JSON` prefix, and every instrument is
+/// validated before it is boxed.
+///
+/// # Arguments
+///
+/// * `json` - UTF-8 JSON array whose elements are canonical v1 instrument
+///   envelopes (`{"schema": ..., "instrument": {...}}`). An empty array yields
+///   an empty inventory.
+///
+/// # Errors
+///
+/// Returns `Error::Validation` when `json` exceeds the size cap, is not an
+/// array of well-formed envelopes, or any instrument fails domain validation.
+pub fn parse_boxed_instruments_from_json(
+    json: &str,
+) -> finstack_quant_core::Result<Vec<Box<dyn Instrument>>> {
+    if json.len() > MAX_JSON_BYTES {
+        return Err(Error::Validation(format!(
+            "Instrument JSON input exceeds the {} MiB size limit",
+            MAX_JSON_BYTES / (1024 * 1024)
+        )));
+    }
+    let envelopes: Vec<InstrumentEnvelope> = serde_json::from_str(json)
+        .map_err(|error| Error::Validation(format!("invalid instrument envelope JSON: {error}")))?;
+    envelopes
+        .into_iter()
+        .map(InstrumentEnvelope::into_boxed)
+        .collect()
 }
 
 /// Parse a concrete model key used by the JSON pricing helpers.
@@ -437,19 +529,7 @@ pub fn price_instrument(
     let metric_registry = metric_registry
         .as_deref()
         .unwrap_or_else(|| crate::metrics::standard_registry());
-    let metric_ids: Vec<MetricId> = metrics
-        .iter()
-        .map(|metric| {
-            MetricId::parse_strict(metric).or_else(|strict_error| {
-                let registered: MetricId = metric.parse()?;
-                if metric_registry.has_metric(registered.clone()) {
-                    Ok(registered)
-                } else {
-                    Err(strict_error)
-                }
-            })
-        })
-        .collect::<finstack_quant_core::Result<_>>()?;
+    let metric_ids = metric_registry.resolve_metric_ids(metrics)?;
     let pricing_options = if let Some(json) = market_history_json {
         let history: crate::metrics::risk::MarketHistory = serde_json::from_str(json)
             .map_err(|e| Error::Validation(format!("invalid market history JSON: {e}")))?;
@@ -617,7 +697,15 @@ fn instrument_json_for_pricing<'a>(
     let instrument_id = extract_spec_id_lossy(instrument_json);
     let id = instrument_id.as_deref();
 
-    let overrides: MetricPricingOverrides = serde_json::from_str(overrides_json).map_err(|e| {
+    let pricing_patch: Value = serde_json::from_str(overrides_json).map_err(|e| {
+        Error::Validation(with_id_suffix(
+            format!("invalid metric_pricing_overrides JSON: {e}"),
+            id,
+        ))
+    })?;
+    // Validate the canonical shape without materializing absent defaults into
+    // the patch: field presence determines which stored overrides are replaced.
+    let _: MetricPricingOverrides = serde_json::from_value(pricing_patch.clone()).map_err(|e| {
         Error::Validation(with_id_suffix(
             format!("invalid metric_pricing_overrides JSON: {e}"),
             id,
@@ -626,16 +714,9 @@ fn instrument_json_for_pricing<'a>(
     let mut document: Value = serde_json::from_str(instrument_json).map_err(|e| {
         Error::Validation(with_id_suffix(format!("invalid instrument JSON: {e}"), id))
     })?;
-    let pricing_patch = serde_json::to_value(&overrides).map_err(|e| {
-        Error::Validation(with_id_suffix(
-            format!("invalid metric_pricing_overrides JSON: {e}"),
-            id,
-        ))
-    })?;
-
     let patch = pricing_patch.as_object().cloned().ok_or_else(|| {
         Error::Validation(with_id_suffix(
-            "metric pricing overrides must serialize to an object".to_string(),
+            "metric pricing overrides must be an object".to_string(),
             id,
         ))
     })?;
@@ -658,7 +739,20 @@ fn instrument_json_for_pricing<'a>(
             id,
         ))
     })?;
-    metric_pricing_overrides.extend(patch);
+    for (key, value) in patch {
+        if key == "bump_config" {
+            if let (Some(existing), Some(provided)) = (
+                metric_pricing_overrides
+                    .get_mut(&key)
+                    .and_then(Value::as_object_mut),
+                value.as_object(),
+            ) {
+                existing.extend(provided.clone());
+                continue;
+            }
+        }
+        metric_pricing_overrides.insert(key, value);
+    }
 
     serde_json::to_string(&document)
         .map(Cow::Owned)
@@ -907,6 +1001,21 @@ mod tests {
     }
 
     #[test]
+    fn parse_typed_instrument_json_returns_the_concrete_type() {
+        let fx_spot = instrument_envelope_from_spec("fx_spot", fx_spot_spec_value())
+            .expect("canonical fx spot");
+        let spot: crate::instruments::FxSpot =
+            parse_typed_instrument_json(&fx_spot).expect("typed fx spot");
+        assert_eq!(spot.id.as_str(), "EURUSD-SPOT");
+        let err = parse_typed_instrument_json::<crate::instruments::FxForward>(&fx_spot)
+            .expect_err("wrong envelope type should be rejected");
+        assert!(matches!(err, Error::Validation(_)));
+        assert!(err
+            .to_string()
+            .contains("expected instrument type `fx_forward`, got `fx_spot`"));
+    }
+
+    #[test]
     fn instrument_json_for_pricing_error_includes_instrument_id() {
         // Malformed metric_pricing_overrides on a well-formed instrument JSON.
         let json = bond_instrument_json();
@@ -956,6 +1065,41 @@ mod tests {
             parsed["instrument"]["spec"]["metric_pricing_overrides"]["breakeven_config"]["target"],
             "z_spread"
         );
+    }
+
+    #[test]
+    fn partial_metric_patch_preserves_absent_fields_and_nested_bumps() {
+        let mut document: Value = serde_json::from_str(&bond_instrument_json()).expect("json");
+        document["instrument"]["spec"]["metric_pricing_overrides"] = serde_json::json!({
+            "theta_period": {"count": 1, "unit": "weeks"},
+            "bump_config": {"rate_bump_bp": 2.0, "vol_bump_decimal": 0.02, "adaptive_bumps": true}
+        });
+        let json = document.to_string();
+        for patch in ["{}", r#"{"theta_day_basis":"trading_252"}"#] {
+            let merged = instrument_json_for_pricing(&json, Some(patch)).expect("merge");
+            let parsed: Value = serde_json::from_str(&merged).expect("json");
+            let overrides = &parsed["instrument"]["spec"]["metric_pricing_overrides"];
+            assert_eq!(
+                overrides["theta_period"],
+                document["instrument"]["spec"]["metric_pricing_overrides"]["theta_period"]
+            );
+            assert_eq!(
+                overrides["bump_config"],
+                document["instrument"]["spec"]["metric_pricing_overrides"]["bump_config"]
+            );
+        }
+
+        let merged = instrument_json_for_pricing(
+            &json,
+            Some(r#"{"bump_config":{"rate_bump_bp":3.0},"theta_period":null}"#),
+        )
+        .expect("merge");
+        let parsed: Value = serde_json::from_str(&merged).expect("json");
+        let overrides = &parsed["instrument"]["spec"]["metric_pricing_overrides"];
+        assert!(overrides["theta_period"].is_null());
+        assert_eq!(overrides["bump_config"]["rate_bump_bp"], 3.0);
+        assert_eq!(overrides["bump_config"]["vol_bump_decimal"], 0.02);
+        assert_eq!(overrides["bump_config"]["adaptive_bumps"], true);
     }
 
     #[test]
@@ -1152,6 +1296,40 @@ mod tests {
             .expect_err("bad options")
             .to_string()
             .contains("invalid metric_pricing_overrides JSON"));
+    }
+
+    #[test]
+    fn instrument_inventory_parses_envelopes_in_order_and_shares_error_text() {
+        let json = bond_instrument_json();
+        let inventory =
+            parse_boxed_instruments_from_json(&format!("[{json},{json}]")).expect("inventory");
+        assert_eq!(inventory.len(), 2);
+        assert_eq!(inventory[0].id(), "TEST-BOND");
+        assert!(parse_boxed_instruments_from_json("[]")
+            .expect("empty inventory")
+            .is_empty());
+
+        let bare: Value = serde_json::from_str::<Value>(&json).expect("json")["instrument"].clone();
+        let single = parse_boxed_instrument_from_json(&bare.to_string(), None)
+            .err()
+            .expect("bare instrument must be rejected")
+            .to_string();
+        let many = parse_boxed_instruments_from_json(&format!("[{bare}]"))
+            .err()
+            .expect("bare instrument must be rejected")
+            .to_string();
+        assert!(
+            single.contains("invalid instrument envelope JSON"),
+            "{single}"
+        );
+        assert!(many.contains("invalid instrument envelope JSON"), "{many}");
+
+        let oversized = format!("[{}]", " ".repeat(MAX_JSON_BYTES));
+        let error = parse_boxed_instruments_from_json(&oversized)
+            .err()
+            .expect("oversized inventory must be rejected")
+            .to_string();
+        assert!(error.contains("size limit"), "{error}");
     }
 
     #[test]

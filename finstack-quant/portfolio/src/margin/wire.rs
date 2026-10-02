@@ -27,9 +27,15 @@ fn amounts_close(lhs: f64, rhs: f64) -> bool {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct NettingSetMarginWire {
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(rename = "NettingSetMargin"))]
+pub(super) struct NettingSetMarginWire {
     netting_set_id: NettingSetId,
     csa_id: Option<String>,
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     as_of: Date,
     initial_margin: Money,
     variation_margin: Money,
@@ -110,13 +116,21 @@ impl<'de> serde::Deserialize<'de> for NettingSetMargin {
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct DegradedPositionWire {
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(rename = "DegradedPosition"))]
+pub(super) struct DegradedPositionWire {
     position_id: String,
     message: String,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
-struct PortfolioMarginResultWire {
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[cfg_attr(feature = "json-schema", schemars(rename = "PortfolioMarginResult"))]
+pub(super) struct PortfolioMarginResultWire {
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     as_of: Date,
     base_currency: Currency,
     total_initial_margin: Money,

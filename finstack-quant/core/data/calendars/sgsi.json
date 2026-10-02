@@ -3,11 +3,31 @@
   "name": "Singapore Holiday Calendar",
   "ignore_weekends": false,
   "rules": [
-    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "next_monday" },
-    { "type": "fixed", "name": "Labour Day", "month": "may", "day": 1, "observed": "next_monday" },
-    { "type": "fixed", "name": "National Day", "month": "august", "day": 9, "observed": "next_monday" },
-    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "next_monday" },
-    { "type": "span", "name": "Chinese New Year", "start": { "type": "chinese_new_year" }, "len": 2 },
-    { "type": "easter_offset", "name": "Good Friday", "days": -3 }
-  ]
+    { "type": "fixed", "name": "New Year's Day", "month": "january", "day": 1, "observed": "mon_if_sun" },
+    { "type": "fixed", "name": "Labour Day", "month": "may", "day": 1, "observed": "mon_if_sun" },
+    { "type": "fixed", "name": "National Day", "month": "august", "day": 9, "observed": "mon_if_sun" },
+    { "type": "fixed", "name": "Christmas Day", "month": "december", "day": 25, "observed": "mon_if_sun" },
+    { "type": "span", "name": "Chinese New Year", "start": { "type": "chinese_new_year"}, "len": 2 },
+    { "type": "easter_offset", "name": "Good Friday", "days": -3 },
+    { "type": "exact_date", "name": "Chinese New Year substitute", "year": 2024, "month": "february", "day": 12 },
+    { "type": "exact_date", "name": "Hari Raya Puasa", "year": 2024, "month": "april", "day": 10 },
+    { "type": "exact_date", "name": "Vesak Day", "year": 2024, "month": "may", "day": 22 },
+    { "type": "exact_date", "name": "Hari Raya Haji", "year": 2024, "month": "june", "day": 17 },
+    { "type": "exact_date", "name": "Deepavali", "year": 2024, "month": "october", "day": 31 },
+    { "type": "exact_date", "name": "Hari Raya Puasa", "year": 2025, "month": "march", "day": 31 },
+    { "type": "exact_date", "name": "Polling Day", "year": 2025, "month": "may", "day": 3 },
+    { "type": "exact_date", "name": "Vesak Day", "year": 2025, "month": "may", "day": 12 },
+    { "type": "exact_date", "name": "Hari Raya Haji", "year": 2025, "month": "june", "day": 7 },
+    { "type": "exact_date", "name": "Deepavali", "year": 2025, "month": "october", "day": 20 },
+    { "type": "exact_date", "name": "Hari Raya Puasa", "year": 2026, "month": "march", "day": 21 },
+    { "type": "exact_date", "name": "Hari Raya Haji", "year": 2026, "month": "may", "day": 27 },
+    { "type": "exact_date", "name": "Vesak Day substitute", "year": 2026, "month": "june", "day": 1 },
+    { "type": "exact_date", "name": "Deepavali substitute", "year": 2026, "month": "november", "day": 9 },
+    { "type": "exact_date", "name": "Chinese New Year substitute", "year": 2027, "month": "february", "day": 8 },
+    { "type": "exact_date", "name": "Hari Raya Puasa", "year": 2027, "month": "march", "day": 10 },
+    { "type": "exact_date", "name": "Hari Raya Haji", "year": 2027, "month": "may", "day": 17 },
+    { "type": "exact_date", "name": "Vesak Day", "year": 2027, "month": "may", "day": 20 },
+    { "type": "exact_date", "name": "Deepavali", "year": 2027, "month": "october", "day": 28 }
+  ],
+  "notes": "Singapore public holidays with Sunday-only statutory substitution (Saturday does not automatically close Monday). Moving religious holidays and Chinese New Year substitutes are complete only for 2024-2027, using Ministry of Manpower annual announcements; outside those years the recurring rule result is incomplete. Sources: <https://www.mom.gov.sg/newsroom/press-releases/2023/0524-public-holidays-for-2024> ; <https://www.mom.gov.sg/employment-practices/public-holidays> ; <https://www.mom.gov.sg/newsroom/press-releases/2026/0618-public-holidays-for-2027>"
 }

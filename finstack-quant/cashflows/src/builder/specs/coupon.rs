@@ -424,11 +424,11 @@ impl OvernightIndexConstraintApplication {
 /// observations. Observation dates strictly before the forward curve base
 /// date then resolve from that series instead of the curve:
 ///
-/// - **Overnight observations** (compounded/averaged paths) use LOCF lookup
-///   (last observation carried forward), matching RFR publication
-///   conventions where a fixing carries over non-publication days
-///   (ARRC 2020 SOFR conventions; ISDA 2021 Supp. 70 §7.1(g)). A partially
-///   seasoned compounding window seamlessly mixes realized fixings and
+/// - **Overnight observations** (compounded/averaged paths) use exact-date
+///   lookup on the index's fixing business days. Weekend and holiday carry
+///   comes from each observation's accrual-day weight, so a missing required
+///   business-day fixing is an error rather than reuse of an older fixing.
+///   A partially seasoned compounding window mixes realized fixings and
 ///   curve-projected forwards with identical `(rate, days)` weighting.
 /// - **Term-rate resets** use exact-date lookup on the (business-day
 ///   adjusted) reset date — a term rate fixes on a specific published date.
@@ -551,26 +551,33 @@ pub struct FloatingRateSpec {
     pub index_cap_bp: Option<Decimal>,
 
     /// Index floor/cap application policy for overnight-compounded coupons.
+    ///
+    /// With changing principal, the builder retains daily compounded-rate
+    /// increments. Any bound applied to the final period index or all-in
+    /// rate contributes a uniform annual-rate adjustment over the coupon's
+    /// contractual accrual time; interim cumulative prefixes are not bounded.
     #[serde(
         default,
         skip_serializing_if = "OvernightIndexConstraintApplication::is_default"
     )]
     pub overnight_index_constraints: OvernightIndexConstraintApplication,
 
-    /// Reset frequency for rate fixings.
+    /// Fallback term-index tenor when [`Self::index_tenor`] is absent.
     ///
-    /// This is the cadence at which the rate refixes. When
-    /// [`Self::index_tenor`] is `None`, it is also the tenor used only to
-    /// build the diagnostic index-maturity date in projection error context.
+    /// The bare cashflow builder observes one term fixing at each coupon
+    /// period's accrual start, with the configured reset lag. This field does
+    /// not create additional resets inside a payment period. The resolved
+    /// forward curve owns the quoted index tenor; overnight methods observe
+    /// their compiled daily fixing schedule independently of this field.
     pub reset_frequency: Tenor,
 
-    /// Diagnostic tenor for term-index projection error context.
+    /// Explicit term-index tenor when no forward curve resolves.
     ///
     /// The named forward curve is already the term index (for example a 3M
     /// EURIBOR curve). Projection is `fwd.rate(reset_date)`, not a FRA-style
     /// average over `[reset, reset + tenor]`. This field (or
-    /// [`Self::reset_frequency`] when `None`) is used only to compute
-    /// `index_maturity` for error messages. Ignored for overnight-compounded
+    /// [`Self::reset_frequency`] when `None`) supplies the compiled term tenor
+    /// when no forward curve resolves. Ignored for overnight-compounded
     /// legs. When set, the builder warns at build time if it disagrees with
     /// the resolved curve's tenor by more than 10% — the curve remains
     /// authoritative.
@@ -700,10 +707,12 @@ impl FloatingRateSpec {
 
     /// USD SOFR compounded in arrears (ARRC / ISDA 2021 conventions).
     ///
-    /// Index id `USD-SOFR`, quarterly resets, daily compounding in arrears on
+    /// Index id `USD-SOFR`, daily compounding in arrears on
     /// an Act/360 basis, no reset lag (the ARRC convention places the lag on
-    /// payment, see [`super::ScheduleParams::usd_sofr_swap`]), USNY fixing
-    /// calendar, unit gearing, no floors or caps, `Error` fallback.
+    /// payment, see [`super::ScheduleParams::usd_sofr_swap`]), `sofr` fixing
+    /// calendar, unit gearing, no floors or caps, `Error` fallback. The fixing
+    /// calendar follows Treasury repo value dates, including Good Friday
+    /// closures, independently of the schedule's payment calendar.
     ///
     /// # Arguments
     ///
@@ -729,13 +738,13 @@ impl FloatingRateSpec {
         Self {
             compounding: Some(FloatingLegCompounding::sofr()),
             overnight_basis: Some(DayCount::Act360),
-            ..Self::preset("USD-SOFR", spread_bp, Tenor::quarterly(), None, 0, "usny")
+            ..Self::preset("USD-SOFR", spread_bp, Tenor::quarterly(), None, 0, "sofr")
         }
     }
 
     /// GBP SONIA compounded in arrears (BoE / ISDA 2021 conventions).
     ///
-    /// Index id `GBP-SONIA`, annual resets, daily compounding in arrears on an
+    /// Index id `GBP-SONIA`, daily compounding in arrears on an
     /// Act/365F basis, no reset lag, GBLO fixing calendar, unit gearing, no
     /// floors or caps, `Error` fallback. Pair with
     /// [`super::ScheduleParams::gbp_sonia_swap`].
@@ -766,8 +775,9 @@ impl FloatingRateSpec {
 
     /// EUR 3-month EURIBOR term rate (ISDA 2006 EUR conventions).
     ///
-    /// Index id `EUR-EURIBOR-3M`, quarterly resets fixed in advance with a
-    /// two-business-day reset lag on the TARGET2 calendar, explicit 3M index
+    /// Index id `EUR-EURIBOR-3M`, one fixing per coupon period at its lagged
+    /// accrual start, with a two-business-day reset lag on the TARGET2
+    /// calendar, explicit 3M index
     /// tenor, unit gearing, no floors or caps, `Error` fallback.
     ///
     /// # Arguments

@@ -550,64 +550,6 @@ pub(crate) fn prepare_deal_simulation(
     }))
 }
 
-/// Term-index fixings the deal's floating coupons observe on or after the
-/// valuation date, each at the index the simulation projects for it.
-///
-/// Floating tranche coupons fix at their reset dates; floating pool assets
-/// (deterministic pools, not instrument collateral, whose own schedules record
-/// theirs) fix off each collection period's start. The values are the
-/// unshifted projections on `market`, so a time roll or theta that holds the
-/// market fixed observes what the `as_of` pricing projected.
-///
-/// # Errors
-///
-/// Propagates deal-preparation failures, missing projection curves and
-/// unknown fixing calendars.
-pub(crate) fn deal_projected_fixings(
-    instrument: &StructuredCredit,
-    market: &MarketContext,
-    as_of: Date,
-) -> Result<Vec<crate::cashflow::fixings::ProjectedFixing>> {
-    let Some(prepared) = prepare_deal_simulation(instrument, as_of)? else {
-        return Ok(Vec::new());
-    };
-    let mut fixings = Vec::new();
-    for tranche in &instrument.tranches.tranches {
-        for period in &prepared.periods {
-            fixings.extend(
-                tranche
-                    .coupon
-                    .projected_term_fixing(period.accrual_start, market)?,
-            );
-        }
-    }
-    if instrument.pool.instruments.is_none() {
-        // Collection period `k` accrues from the previous payment date.
-        let period_starts: Vec<Date> = std::iter::once(prepared.state_anchor)
-            .chain(prepared.periods.iter().map(|period| period.payment_date))
-            .take(prepared.periods.len())
-            .collect();
-        let mut curve_ids: Vec<&str> = instrument
-            .pool
-            .assets
-            .iter()
-            .filter_map(|asset| asset.forward_curve_id.as_deref())
-            .collect();
-        curve_ids.sort_unstable();
-        curve_ids.dedup();
-        for curve_id in curve_ids {
-            let fwd = market.get_forward(curve_id)?;
-            for start in &period_starts {
-                fixings.push(super::period_helpers::projected_collateral_fixing(
-                    fwd.as_ref(),
-                    *start,
-                )?);
-            }
-        }
-    }
-    Ok(fixings)
-}
-
 /// Tranche cashflows plus the deal-level accounting of one simulation run.
 #[derive(Debug, Clone)]
 pub struct SimulationRun {
@@ -677,18 +619,27 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
         let deal_call = instrument
             .call_assumption
             .as_ref()
-            .filter(|call| matches!(call.scope, CallScope::Deal))
-            .filter(|call| {
-                // The scheduled date, or the term-out clock from an
-                // early-amortization event when that comes first.
-                let after_event = call
-                    .after_early_amortization_months
-                    .zip(state.early_amortization_date)
-                    .is_some_and(|(months, event)| {
-                        pay_date >= event.add_months(i32::try_from(months).unwrap_or(i32::MAX))
-                    });
-                pay_date >= call.date || after_event
-            });
+            .filter(|call| matches!(call.scope, CallScope::Deal));
+        let deal_call = if let Some(call) = deal_call {
+            // The scheduled date, or the term-out clock from an
+            // early-amortization event when that comes first.
+            let after_event = if let Some((months, event)) = call
+                .after_early_amortization_months
+                .zip(state.early_amortization_date)
+            {
+                pay_date
+                    >= event.add_months(i32::try_from(months).map_err(|_| {
+                        finstack_quant_core::Error::Validation(
+                            "call term-out months exceed supported range".into(),
+                        )
+                    })?)?
+            } else {
+                false
+            };
+            (pay_date >= call.date || after_event).then_some(call)
+        } else {
+            None
+        };
         let cleanup = instrument.cleanup_call_decimal.is_some_and(|threshold| {
             let pool_factor = if state.original_pool_balance.amount() > 0.0 {
                 state.pool_outstanding.amount() / state.original_pool_balance.amount()
@@ -906,7 +857,7 @@ fn drain_pending_recoveries_at_end(
             state.cumulative_realized_loss += (par.amount() - amount.amount()).max(0.0);
         }
         let release_date = adjust(
-            default_date.add_months(lag_months).max(last_date),
+            default_date.add_months(lag_months)?.max(last_date),
             convention,
             calendar,
         )?;

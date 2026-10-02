@@ -159,7 +159,7 @@ impl TreePricer {
             .as_ref()
             .is_some_and(|schedule| schedule.has_options())
             || bond.return_floor.is_some();
-        has_options && (tree.config.rate_vol > 0.0 || tree.config.hazard_vol > 0.0)
+        has_options && (tree.get_config().rate_vol > 0.0 || tree.get_config().hazard_vol > 0.0)
     }
 
     fn uses_sampled_bullet(tree: &RatesCreditTree, bond: &Bond) -> bool {
@@ -168,7 +168,7 @@ impl TreePricer {
             .as_ref()
             .is_some_and(|schedule| schedule.has_options())
             || bond.return_floor.is_some();
-        !has_options && (tree.config.rate_vol > 0.0 || tree.config.hazard_vol > 0.0)
+        !has_options && (tree.get_config().rate_vol > 0.0 || tree.get_config().hazard_vol > 0.0)
     }
 
     fn uses_deterministic_short_rate(&self) -> bool {

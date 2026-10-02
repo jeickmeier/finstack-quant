@@ -25,6 +25,7 @@ pub(crate) fn invalid_annualization_factor(annualize: bool, ann_factor: f64) -> 
 /// `Bus252` requires a holiday calendar on the facade; missing calendar is
 /// an error.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CagrDayCount {
     /// Actual calendar days divided by 365.25 (default).
@@ -71,7 +72,9 @@ impl std::fmt::Display for CagrDayCount {
 /// ```
 ///
 /// where `years` is the year fraction between `start` and `end` under
-/// `day_count`.
+/// `day_count`. Annualizes accumulated log growth before reconstructing the
+/// rate, so small or large terminal wealth does not lose precision or overflow
+/// before the annualized result is calculated.
 ///
 /// # Arguments
 ///
@@ -105,7 +108,6 @@ pub(crate) fn cagr(
         return Err(crate::error::InputError::Invalid.into());
     }
 
-    let total = 1.0 + crate::returns::comp_total(returns);
     let years = annualized_years(start, end, day_count, calendar)?;
     if years <= 0.0 {
         tracing::debug!(
@@ -117,7 +119,11 @@ pub(crate) fn cagr(
         );
         return Err(crate::error::InputError::Invalid.into());
     }
-    Ok(total.powf(1.0 / years) - 1.0)
+    let mut engine = crate::returns::WealthEngine::new();
+    for &r in returns {
+        engine.step(r);
+    }
+    Ok((engine.log_growth() / years).exp_m1())
 }
 
 fn annualized_years(
@@ -401,10 +407,10 @@ pub(crate) fn sortino(returns: &[f64], annualize: bool, ann_factor: f64, mar: f6
 /// geo_mean = (Π(1 + r_i))^(1/n) − 1
 /// ```
 ///
-/// Computed in log-space with Kahan summation for numerical stability.
-/// Returns [`f64::NEG_INFINITY`] if any return is `<= -1.0`, which
-/// represents a full wipeout (or worse) and avoids the upward bias that
-/// a positive clamp would introduce near total loss.
+/// Computed in log-space with compensated summation for numerical stability.
+/// An exact `-1.0` return produces `-1.0` (total wipeout); a return below
+/// `-1.0` produces [`f64::NEG_INFINITY`]. Positive growth factors are never
+/// classified as total wipeout, however close the return is to `-1.0`.
 ///
 /// # Arguments
 ///
@@ -412,27 +418,32 @@ pub(crate) fn sortino(returns: &[f64], annualize: bool, ann_factor: f64, mar: f6
 ///
 /// # Returns
 ///
-/// The geometric mean return. Returns [`f64::NAN`] for an empty slice.
+/// The geometric mean return. Returns [`f64::NAN`] for an empty slice or
+/// non-finite return data.
 #[must_use]
 pub(crate) fn geometric_mean(returns: &[f64]) -> f64 {
     if returns.is_empty() {
         return f64::NAN;
     }
     let mut saw_total_wipeout = false;
+    let mut engine = crate::returns::WealthEngine::new();
     for &r in returns {
+        if !r.is_finite() {
+            return f64::NAN;
+        }
         if r < -1.0 {
             return f64::NEG_INFINITY;
         }
-        if (r + 1.0).abs() < f64::EPSILON {
+        if r <= -1.0 {
             saw_total_wipeout = true;
         }
+        engine.step(r);
     }
     if saw_total_wipeout {
         return -1.0;
     }
     let n = returns.len() as f64;
-    let log_sum = kahan_sum(returns.iter().map(|&r| (1.0 + r).ln()));
-    (log_sum / n).exp() - 1.0
+    (engine.log_growth() / n).exp_m1()
 }
 
 /// Omega ratio: probability-weighted gain-to-loss ratio above a threshold.
@@ -959,10 +970,13 @@ mod tests {
             );
             return Err(crate::error::InputError::Invalid.into());
         }
-        let total = 1.0 + crate::returns::comp_total(returns);
         let years = returns.len() as f64 / ann_factor;
         if years > 0.0 {
-            Ok(total.powf(1.0 / years) - 1.0)
+            let mut engine = crate::returns::WealthEngine::new();
+            for &r in returns {
+                engine.step(r);
+            }
+            Ok((engine.log_growth() / years).exp_m1())
         } else {
             Err(crate::error::InputError::Invalid.into())
         }

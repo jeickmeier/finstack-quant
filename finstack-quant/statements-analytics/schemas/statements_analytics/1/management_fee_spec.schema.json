@@ -1,0 +1,40 @@
+{
+  "$defs": {
+    "ManagementFeeBase": {
+      "description": "Basis for management fee calculation.",
+      "oneOf": [
+        {
+          "const": "egi",
+          "description": "Fee is applied to EGI.",
+          "type": "string"
+        },
+        {
+          "const": "effective_rent",
+          "description": "Fee is applied to effective rent only (excludes other income).",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/statements_analytics/1/management_fee_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Management fee specification.",
+  "properties": {
+    "base": {
+      "$ref": "#/$defs/ManagementFeeBase",
+      "default": "egi",
+      "description": "Fee base for calculation."
+    },
+    "rate": {
+      "description": "Management fee rate as a decimal fraction (e.g., 0.03 for 3%).",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "rate"
+  ],
+  "title": "ManagementFeeSpec",
+  "type": "object"
+}

@@ -1,0 +1,100 @@
+{
+  "$defs": {
+    "BetaRecovery": {
+      "additionalProperties": false,
+      "description": "Beta distribution parameterization for recovery rates.\n\nThe Beta distribution is defined on \\[0,1\\] and parameterized here by\nits mean and standard deviation, which map to shape parameters:\n\n```text\nalpha = mean * ((mean * (1 - mean) / variance) - 1)\nbeta = (1 - mean) * ((mean * (1 - mean) / variance) - 1)\n```\n\nConstraint: variance < mean * (1 - mean), ensuring alpha > 0 and beta > 0.\n\n# References\n\n- Altman, E. I., Resti, A., & Sironi, A. (2005). \"Recovery Risk.\" Risk Books. `docs/REFERENCES.md#altman-et-al-2005-recovery`\n- Schuermann, T. (2004). \"What Do We Know About Loss Given Default?\"\n  Wharton Financial Institutions Center Working Paper 04-01. `docs/REFERENCES.md#schuermann-2004-lgd`",
+      "properties": {
+        "alpha": {
+          "format": "double",
+          "type": "number"
+        },
+        "beta_param": {
+          "format": "double",
+          "type": "number"
+        },
+        "mean": {
+          "format": "double",
+          "type": "number"
+        },
+        "std_dev": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "mean",
+        "std_dev",
+        "alpha",
+        "beta_param"
+      ],
+      "type": "object"
+    },
+    "SeniorityClass": {
+      "description": "Debt seniority classification for recovery rate modeling.\n\nRecovery rates vary significantly by position in the capital structure.\nThese classes align with rating agency (Moody's, S&P) reporting categories.",
+      "oneOf": [
+        {
+          "const": "1st_lien_secured",
+          "description": "First-lien secured debt with explicit collateral priority.",
+          "type": "string"
+        },
+        {
+          "const": "2nd_lien_secured",
+          "description": "Second-lien secured debt, junior to first-lien secured claims.",
+          "type": "string"
+        },
+        {
+          "const": "senior_secured",
+          "description": "First-lien secured debt (bank loans, secured bonds).",
+          "type": "string"
+        },
+        {
+          "const": "senior_unsecured",
+          "description": "Senior unsecured bonds and loans.",
+          "type": "string"
+        },
+        {
+          "const": "subordinated",
+          "description": "Subordinated debt (mezzanine, second-lien).",
+          "type": "string"
+        },
+        {
+          "const": "junior_subordinated",
+          "description": "Junior subordinated and deeply subordinated instruments.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/seniority_calibration.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Historical recovery calibration by seniority class.",
+  "properties": {
+    "classes": {
+      "description": "Per-seniority Beta recovery parameters.",
+      "items": {
+        "maxItems": 2,
+        "minItems": 2,
+        "prefixItems": [
+          {
+            "$ref": "#/$defs/SeniorityClass"
+          },
+          {
+            "$ref": "#/$defs/BetaRecovery"
+          }
+        ],
+        "type": "array"
+      },
+      "type": "array"
+    },
+    "source": {
+      "description": "Source label (e.g., \"Moody's 1982-2023\").",
+      "type": "string"
+    }
+  },
+  "required": [
+    "source",
+    "classes"
+  ],
+  "title": "SeniorityCalibration",
+  "type": "object"
+}

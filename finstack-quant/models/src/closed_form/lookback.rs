@@ -33,7 +33,7 @@
 //! The formulas handle the special case where r = q (rate equals dividend yield) using
 //! L'Hôpital's rule limiting forms to avoid division by zero.
 
-use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
+use finstack_quant_core::math::special_functions::{log_norm_cdf, norm_cdf, norm_pdf};
 
 /// Absolute carry threshold for the L'Hôpital limit of the reflection term.
 /// Below this threshold, evaluating the general 0/0 expression loses precision.
@@ -103,14 +103,16 @@ pub fn fixed_strike_lookback_call(
                 + log_ratio * norm_cdf(d1)
                 + 0.5 * vol2 * time * norm_cdf(d1))
     } else {
-        let ratio_power = (spot / strike).powf(-2.0 * b / vol2);
         let d_corr = d1 - 2.0 * b * sqrt_t / vol;
-        spot * df
-            * (vol2 / (2.0 * b))
-            * (-ratio_power * norm_cdf(d_corr) + (b * time).exp() * norm_cdf(d1))
+        // Combine the reflection power and Gaussian tail before exponentiating:
+        // separately they can overflow and underflow even when their product is finite.
+        let reflected =
+            (-rate * time - 2.0 * b / vol2 * (spot / strike).ln() + log_norm_cdf(d_corr)).exp();
+        let direct = (-div_yield * time + log_norm_cdf(d1)).exp();
+        spot * (vol2 / (2.0 * b)) * (direct - reflected)
     };
 
-    (intrinsic_pv + term1 + term2 + term3).max(0.0)
+    (intrinsic_pv + term1 + term2 + term3).clamp(0.0, f64::INFINITY)
 }
 
 /// Price a fixed-strike lookback put option (continuous monitoring).
@@ -177,14 +179,14 @@ pub fn fixed_strike_lookback_put(
                 - log_ratio * norm_cdf(-d1)
                 - 0.5 * vol2 * time * norm_cdf(-d1))
     } else {
-        let ratio_power = (spot / strike).powf(-2.0 * b / vol2);
         let d_corr = d1 - 2.0 * b * sqrt_t / vol;
-        spot * df
-            * (vol2 / (2.0 * b))
-            * (ratio_power * norm_cdf(-d_corr) - (b * time).exp() * norm_cdf(-d1))
+        let reflected =
+            (-rate * time - 2.0 * b / vol2 * (spot / strike).ln() + log_norm_cdf(-d_corr)).exp();
+        let direct = (-div_yield * time + log_norm_cdf(-d1)).exp();
+        spot * (vol2 / (2.0 * b)) * (reflected - direct)
     };
 
-    (intrinsic_pv + term1 + term2 + term3).max(0.0)
+    (intrinsic_pv + term1 + term2 + term3).clamp(0.0, f64::INFINITY)
 }
 
 /// Price a floating-strike lookback call option (continuous monitoring).
@@ -258,13 +260,13 @@ pub fn floating_strike_lookback_call(
                 - 0.5 * vol2 * time * norm_cdf(-a1))
     } else {
         let d3 = a1 - 2.0 * b * sqrt_t / vol;
-        let ratio_power = (spot / s_min).powf(-2.0 * b / vol2);
-        spot * df
-            * (vol2 / (2.0 * b))
-            * (ratio_power * norm_cdf(-d3) - (b * time).exp() * norm_cdf(-a1))
+        let reflected =
+            (-rate * time - 2.0 * b / vol2 * (spot / s_min).ln() + log_norm_cdf(-d3)).exp();
+        let direct = (-div_yield * time + log_norm_cdf(-a1)).exp();
+        spot * (vol2 / (2.0 * b)) * (reflected - direct)
     };
 
-    (term1 + term2 + term3).max(0.0)
+    (term1 + term2 + term3).clamp(0.0, f64::INFINITY)
 }
 
 /// Price a floating-strike lookback put option (continuous monitoring).
@@ -312,12 +314,49 @@ pub fn floating_strike_lookback_put(
     let s_max = spot_max.max(spot);
     let maximum_premium =
         fixed_strike_lookback_call(spot, s_max, time, rate, div_yield, vol, s_max);
-    (maximum_premium + s_max * (-rate * time).exp() - spot * (-div_yield * time).exp()).max(0.0)
+    (maximum_premium + s_max * (-rate * time).exp() - spot * (-div_yield * time).exp())
+        .clamp(0.0, f64::INFINITY)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn low_volatility_with_carry_preserves_locked_in_lookback_payoffs() {
+        // These nonzero-carry reflection powers exceed exp(1,000). Their
+        // Gaussian tails offset them, and the historical extrema still lock
+        // in value. Testing only r = q does not exercise the reflection terms.
+        for vol in [0.003, 0.001, 1e-5] {
+            let positive_df = (-0.05_f64).exp();
+            let negative_df = 0.05_f64.exp();
+            let prices_and_limits = [
+                (
+                    fixed_strike_lookback_call(100.0, 90.0, 1.0, 0.05, 0.0, vol, 110.0),
+                    20.0 * positive_df,
+                ),
+                (
+                    fixed_strike_lookback_put(100.0, 110.0, 1.0, -0.05, 0.0, vol, 90.0),
+                    20.0 * negative_df,
+                ),
+                (
+                    floating_strike_lookback_call(100.0, 1.0, -0.05, 0.0, vol, 90.0),
+                    100.0 - 90.0 * negative_df,
+                ),
+                (
+                    floating_strike_lookback_put(100.0, 1.0, 0.05, 0.0, vol, 110.0),
+                    110.0 * positive_df - 100.0,
+                ),
+            ];
+            for (actual, expected) in prices_and_limits {
+                assert!(actual.is_finite());
+                assert!(
+                    (actual - expected).abs() < 1e-10,
+                    "vol={vol}: price {actual} must preserve locked-in value {expected}"
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_fixed_strike_lookback_call_positive() {
@@ -680,7 +719,7 @@ mod tests {
                 state = state
                     .wrapping_mul(6_364_136_223_846_793_005)
                     .wrapping_add(1_442_695_040_888_963_407);
-                ((state >> 11) as f64 + 0.5) / (1u64 << 53) as f64
+                ((state >> 12) as f64 + 0.5) / (1u64 << 52) as f64
             };
             let mut sum = 0.0;
             for _ in 0..n_paths {

@@ -227,8 +227,22 @@ fn run_brinson_fachler(
     })
 }
 
-/// Parse period JSON and run the canonical Rust Carino linking.
+/// Parse precomputed period results and run the canonical Rust Carino linking.
 fn run_carino_link(
+    py: Python<'_>,
+    periods_json: &str,
+) -> PyResult<finstack_quant_portfolio::CarinoLinkedAttribution> {
+    let periods_json = periods_json.to_owned();
+    py.detach(move || {
+        let periods: Vec<finstack_quant_portfolio::BrinsonPeriodResult> =
+            serde_json::from_str(&periods_json)
+                .map_err(|err| serde_json_to_py(err, "invalid Brinson period results JSON"))?;
+        finstack_quant_portfolio::carino_link(&periods).map_err(portfolio_to_py)
+    })
+}
+
+/// Parse raw sector periods and run the canonical Rust attribute-then-link.
+fn run_carino_link_from_sector_periods(
     py: Python<'_>,
     periods_json: &str,
 ) -> PyResult<finstack_quant_portfolio::CarinoLinkedAttribution> {
@@ -236,7 +250,7 @@ fn run_carino_link(
     py.detach(move || {
         let periods: Vec<Vec<finstack_quant_portfolio::SectorPeriod>> =
             serde_json::from_str(&periods_json)
-                .map_err(|err| serde_json_to_py(err, "invalid Carino periods JSON"))?;
+                .map_err(|err| serde_json_to_py(err, "invalid Carino sector periods JSON"))?;
         finstack_quant_portfolio::carino_link_from_sector_periods(&periods).map_err(portfolio_to_py)
     })
 }
@@ -286,19 +300,32 @@ fn brinson_fachler_json(py: Python<'_>, sectors_json: &Bound<'_, PyAny>) -> PyRe
     serde_json::to_string(&result).map_err(|err| serde_json_to_py(err, "serialize Brinson result"))
 }
 
-/// Compute Carino-linked multi-period Brinson attribution from period JSON.
+/// Carino-link already-computed single-period Brinson-Fachler results.
+///
+/// Binds Rust ``carino_link``, like :func:`campisi_carino_link` and
+/// :func:`grid_carino_link`; use :func:`carino_link_from_sector_periods` to
+/// link raw sector inputs instead.
 ///
 /// Parameters
 /// ----------
-/// periods_json : str | dict | list | pandas.DataFrame
-///     JSON array of periods, where each period is an array of ``SectorPeriod``
-///     objects.
+/// periods_json : str | list[dict]
+///     Chronological JSON array of ``BrinsonPeriodResult`` objects (for
+///     example ``json.loads(brinson_fachler_json(...))`` per period) with
+///     identical sector ordering in every period.
 ///
 /// Returns
 /// -------
 /// CarinoLinkedAttribution
 ///     Typed result with linked sector effects and compounded returns. Use
 ///     :func:`carino_link_json` for the raw wire string.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If the JSON is malformed.
+/// PortfolioError
+///     If the sequence is empty or changes sector ordering, or a period
+///     return is non-finite or at most ``-1``.
 #[pyfunction]
 #[pyo3(text_signature = "(periods_json)")]
 fn carino_link(
@@ -312,7 +339,7 @@ fn carino_link(
     })
 }
 
-/// Compute Carino-linked multi-period Brinson attribution and return wire JSON.
+/// Carino-link precomputed Brinson period results and return wire JSON.
 ///
 /// Wire twin of :func:`carino_link`; same inputs, JSON-string output.
 ///
@@ -329,6 +356,67 @@ fn carino_link_json(py: Python<'_>, periods_json: &Bound<'_, PyAny>) -> PyResult
     serde_json::to_string(&result).map_err(|err| serde_json_to_py(err, "serialize Carino result"))
 }
 
+/// Compute Carino-linked multi-period Brinson attribution from raw sector
+/// periods.
+///
+/// Binds Rust ``carino_link_from_sector_periods``: runs
+/// :func:`brinson_fachler` on each period, then Carino-links the results.
+///
+/// Parameters
+/// ----------
+/// periods_json : str | list[list[dict]]
+///     Chronological JSON array of periods, each an array of ``SectorPeriod``
+///     objects (``sector``, ``portfolio_weight``, ``benchmark_weight``,
+///     ``portfolio_return``, ``benchmark_return``).
+///
+/// Returns
+/// -------
+/// CarinoLinkedAttribution
+///     Typed result with linked sector effects and compounded returns. Use
+///     :func:`carino_link_from_sector_periods_json` for the raw wire string.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If the JSON is malformed.
+/// PortfolioError
+///     If any period fails Brinson validation, the sequence is empty or
+///     changes sector ordering, or a period return is non-finite or at most
+///     ``-1``.
+#[pyfunction]
+#[pyo3(text_signature = "(periods_json)")]
+fn carino_link_from_sector_periods(
+    py: Python<'_>,
+    periods_json: &Bound<'_, PyAny>,
+) -> PyResult<PyCarinoLinkedAttribution> {
+    let periods_json = crate::bindings::extract::extract_records_json(py, periods_json, "periods")?;
+    let periods_json: &str = &periods_json;
+    Ok(PyCarinoLinkedAttribution {
+        inner: run_carino_link_from_sector_periods(py, periods_json)?,
+    })
+}
+
+/// Carino-link raw sector periods and return wire JSON.
+///
+/// Wire twin of :func:`carino_link_from_sector_periods`; same inputs,
+/// JSON-string output.
+///
+/// Returns
+/// -------
+/// str
+///     JSON-serialized ``CarinoLinkedAttribution``.
+#[pyfunction]
+#[pyo3(text_signature = "(periods_json)")]
+fn carino_link_from_sector_periods_json(
+    py: Python<'_>,
+    periods_json: &Bound<'_, PyAny>,
+) -> PyResult<String> {
+    let periods_json = crate::bindings::extract::extract_records_json(py, periods_json, "periods")?;
+    let periods_json: &str = &periods_json;
+    let result = run_carino_link_from_sector_periods(py, periods_json)?;
+    serde_json::to_string(&result).map_err(|err| serde_json_to_py(err, "serialize Carino result"))
+}
+
 /// Register Brinson attribution functions on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyBrinsonPeriodResult>()?;
@@ -337,5 +425,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(brinson_fachler_json, m)?)?;
     m.add_function(wrap_pyfunction!(carino_link, m)?)?;
     m.add_function(wrap_pyfunction!(carino_link_json, m)?)?;
+    m.add_function(wrap_pyfunction!(carino_link_from_sector_periods, m)?)?;
+    m.add_function(wrap_pyfunction!(carino_link_from_sector_periods_json, m)?)?;
     Ok(())
 }

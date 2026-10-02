@@ -16,6 +16,7 @@ import pytest
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.valuations.composite import CompositeLegSpec
 from finstack_quant.valuations.instruments import (
     AssetBackedFacility,
     AssetBackedFacilityBuilder,
@@ -179,10 +180,18 @@ def test_projection_reconciles_with_the_lender_cashflows_and_the_price() -> None
     assert facility.metric(_market(), CLOSE, "abf_facility_irr") == pytest.approx(irr)
 
     typed = facility.price(_market(), CLOSE, metrics=["dv01"])
-    generic = price_instrument(facility.to_json(), _market(), CLOSE, metrics=["dv01"])
-    assert float(typed.price) == pytest.approx(float(generic.price))
-    assert typed.metrics["dv01"] == pytest.approx(generic.metrics["dv01"])
+    for instrument in (facility, facility.to_json()):
+        generic = price_instrument(instrument, _market(), CLOSE, metrics=["dv01"])
+        assert float(typed.price) == pytest.approx(float(generic.price))
+        assert typed.metrics["dv01"] == pytest.approx(generic.metrics["dv01"])
     assert float(typed.price) > 0.0
+
+
+def test_facility_is_accepted_as_a_typed_composite_leg() -> None:
+    facility = _facility()
+    typed = CompositeLegSpec(facility.id, facility, 1.0)
+    serialized = CompositeLegSpec(facility.id, facility.to_json(), 1.0)
+    assert json.loads(typed.to_json()) == json.loads(serialized.to_json())
 
 
 def test_synthesized_deal_is_a_two_class_structure_with_a_borrowing_base_test() -> None:

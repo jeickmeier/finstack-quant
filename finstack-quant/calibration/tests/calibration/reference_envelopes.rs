@@ -29,7 +29,7 @@ pub(crate) fn load_envelope(file_name: &str) -> CalibrationEnvelope {
 }
 
 pub(crate) fn execute(envelope: &CalibrationEnvelope) -> MarketContext {
-    let result = engine::execute(envelope).expect("calibration engine succeeded");
+    let result = engine::calibrate(envelope).expect("calibration engine succeeded");
     MarketContext::try_from(result.result.final_market)
         .expect("rehydrate MarketContext from final_market state")
 }
@@ -49,7 +49,7 @@ fn sparse_surface_report_matches_published_grid_and_enforces_tolerance() {
         }
         _ => unreachable!("equity surface example"),
     };
-    let result = engine::execute(&envelope).expect("diagnostic calibration");
+    let result = engine::calibrate(&envelope).expect("diagnostic calibration");
     let report = &result.result.step_reports[&envelope.plan.steps[1].id];
     let market = MarketContext::try_from(result.result.final_market).expect("market");
     let surface = market.get_surface("AAPL-EQUITY-VOL").expect("surface");
@@ -75,7 +75,7 @@ fn sparse_surface_report_matches_published_grid_and_enforces_tolerance() {
     assert!(worst > 0.001);
     assert!(!report.success);
     envelope.plan.settings.fail_on_bad_fit = true;
-    assert!(engine::execute(&envelope).is_err());
+    assert!(engine::calibrate(&envelope).is_err());
 }
 
 #[test]
@@ -110,11 +110,11 @@ fn distressed_hazard_quotes_do_not_expand_explicit_bounds() {
     envelope.plan.settings.hazard_curve.hazard_hard_max = 0.1;
     envelope.plan.settings.fail_on_bad_fit = true;
     assert!(
-        engine::execute(&envelope).is_err(),
+        engine::calibrate(&envelope).is_err(),
         "20% spread cannot fit a hazard bounded at 10% with 40% recovery"
     );
     envelope.plan.settings.hazard_curve.hazard_hard_max = 1.0;
-    let result = engine::execute(&envelope).expect("explicitly adequate bounds");
+    let result = engine::calibrate(&envelope).expect("explicitly adequate bounds");
     let report = &result.result.step_reports[&envelope.plan.steps[1].id];
     assert_eq!(
         report.success_tolerance,

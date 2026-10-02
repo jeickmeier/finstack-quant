@@ -446,12 +446,15 @@ impl CompositeMarketObservation {
     ///   volatility history must end on the rebalance date.
     /// * `market` - Complete market context whose curves, prices, and FX
     ///   matrix are materialized for this date.
-    #[must_use]
-    pub fn new(date: Date, market: &MarketContext) -> Self {
-        Self {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the FX provider cannot supply a coherent snapshot.
+    pub fn new(date: Date, market: &MarketContext) -> Result<Self> {
+        Ok(Self {
             date,
-            state: MarketContextState::from(market),
-        }
+            state: MarketContextState::try_from(market)?,
+        })
     }
 
     pub(crate) fn restore(&self) -> Result<MarketContext> {

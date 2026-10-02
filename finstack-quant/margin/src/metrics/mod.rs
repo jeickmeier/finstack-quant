@@ -38,6 +38,7 @@ fn ensure_same_currency(what: &str, left: Money, right: Money) -> Result<()> {
 ///
 /// Ratio of posted margin to required margin.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "MarginUtilizationWire", into = "MarginUtilizationWire")]
 pub struct MarginUtilization {
     /// Posted margin amount
@@ -51,6 +52,7 @@ pub struct MarginUtilization {
 // Only primitive amounts are serialized. The ratio is derived on decode, so
 // positive collateral against zero requirement never writes invalid JSON infinity.
 #[derive(serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct MarginUtilizationWire {
     posted: Money,
@@ -153,6 +155,7 @@ impl MarginUtilization {
 ///
 /// Amount of collateral above the required level.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct ExcessCollateral {
     /// Collateral value
     pub collateral_value: Money,
@@ -237,6 +240,7 @@ impl ExcessCollateral {
 ///
 /// Cost of funding posted margin collateral.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MarginFundingCost {
     /// Posted margin amount
     pub margin_posted: Money,
@@ -284,6 +288,7 @@ impl MarginFundingCost {
 ///
 /// Change in PV for a 1bp change in haircut.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct Haircut01 {
     /// Collateral value
     pub collateral_value: Money,

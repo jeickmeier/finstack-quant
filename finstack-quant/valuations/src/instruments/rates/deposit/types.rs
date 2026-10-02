@@ -476,8 +476,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
         let effective_start = self.effective_start_date()?;
         let effective_end = self.effective_end_date()?;
 
-        // True single-period deposit: two flows with simple interest
-        // Use effective dates for proper accrual calculation
+        // Classify principal and simple interest separately at maturity.
+        // Use effective dates for proper accrual calculation.
         let yf = self.day_count.year_fraction(
             effective_start,
             effective_end,
@@ -491,6 +491,7 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
         })?;
         let r = decimal_to_f64(r, "Deposit fixed_rate")?;
         let redemption = self.notional * (1.0 + r * yf);
+        let interest = redemption.checked_sub(self.notional)?;
         let flows = vec![
             crate::cashflow::primitives::CashFlow::new(
                 effective_start,
@@ -503,7 +504,15 @@ impl finstack_quant_cashflows::CashflowScheduleSource for Deposit {
             crate::cashflow::primitives::CashFlow::new(
                 effective_end,
                 None,
-                redemption,
+                self.notional,
+                crate::cashflow::primitives::CFKind::Notional,
+                0.0,
+                None,
+            ),
+            crate::cashflow::primitives::CashFlow::new(
+                effective_end,
+                None,
+                interest,
                 crate::cashflow::primitives::CFKind::Fixed,
                 yf,
                 Some(r),
@@ -586,7 +595,103 @@ mod tests {
             .cashflow_schedule(&MarketContext::new(), date!(2025 - 01 - 01))
             .expect("deposit full schedule");
 
-        assert_eq!(schedule.get_flows().len(), 2);
+        assert_eq!(schedule.get_flows().len(), 3);
         assert_eq!(schedule.get_flows()[0].kind, CFKind::Notional);
+        assert_eq!(schedule.get_flows()[1].kind, CFKind::Fixed);
+        assert_eq!(schedule.get_flows()[2].kind, CFKind::Notional);
+        assert_eq!(schedule.get_flows()[2].amount, deposit.notional);
+        let yf = DayCount::Act360
+            .year_fraction(
+                deposit.start_date,
+                deposit.maturity,
+                finstack_quant_core::dates::DayCountContext::default(),
+            )
+            .expect("deposit accrual");
+        let redemption = schedule.get_flows()[1]
+            .amount
+            .checked_add(schedule.get_flows()[2].amount)
+            .expect("maturity cash");
+        assert_eq!(redemption, deposit.notional * (1.0 + 0.045 * yf));
+    }
+
+    #[test]
+    fn settled_deposit_prices_are_zero_across_money_and_raw_routes() {
+        use crate::instruments::{Instrument, PricingOptions};
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+
+        let maturity = date!(2025 - 01 - 15);
+        let after_maturity = date!(2025 - 01 - 16);
+        let market = MarketContext::new().insert(
+            DiscountCurve::builder("DISC")
+                .base_date(date!(2025 - 01 - 06))
+                .knots([(0.0, 1.0), (1.0, 0.95)])
+                .build()
+                .expect("discount curve"),
+        );
+        for currency in [Currency::USD, Currency::EUR] {
+            let deposit = Deposit::builder()
+                .id("SETTLED-DEPOSIT".into())
+                .notional(Money::from((1_000_000_i64, currency)))
+                .start_date(date!(2025 - 01 - 06))
+                .maturity(maturity)
+                .fixed_rate_opt(Some(Decimal::try_from(0.05).expect("rate")))
+                .day_count(DayCount::Act360)
+                .discount_curve_id("DISC".into())
+                .build()
+                .expect("deposit");
+            assert!(
+                deposit
+                    .value(&market, date!(2025 - 01 - 14))
+                    .expect("live value")
+                    .amount()
+                    > 0.0
+            );
+            for as_of in [maturity, after_maturity] {
+                assert_eq!(
+                    deposit.value(&market, as_of).expect("settled value"),
+                    Money::from((0_i64, currency))
+                );
+                assert_eq!(
+                    deposit
+                        .value_raw(&market, as_of)
+                        .expect("settled raw value"),
+                    0.0
+                );
+                assert_eq!(
+                    deposit
+                        .value_raw_with_currency(&market, as_of)
+                        .expect("settled raw currency"),
+                    (0.0, currency)
+                );
+                assert_eq!(
+                    deposit
+                        .base_value_raw_with_currency(&market, as_of)
+                        .expect("settled raw kernel"),
+                    (0.0, currency)
+                );
+                assert_eq!(
+                    deposit
+                        .price_with_metrics(&market, as_of, &[], PricingOptions::default())
+                        .expect("settled metric valuation")
+                        .value,
+                    Money::from((0_i64, currency))
+                );
+            }
+
+            let mut invalid = deposit.clone();
+            invalid.maturity = invalid.start_date;
+            assert!(invalid.value(&market, after_maturity).is_err());
+            assert!(invalid.value_raw(&market, after_maturity).is_err());
+            assert!(invalid
+                .base_value_raw_with_currency(&market, after_maturity)
+                .is_err());
+            let mut missing_rate = deposit;
+            missing_rate.fixed_rate = None;
+            assert!(missing_rate.value(&market, after_maturity).is_err());
+            assert!(missing_rate.value_raw(&market, after_maturity).is_err());
+            assert!(missing_rate
+                .base_value_raw_with_currency(&market, after_maturity)
+                .is_err());
+        }
     }
 }

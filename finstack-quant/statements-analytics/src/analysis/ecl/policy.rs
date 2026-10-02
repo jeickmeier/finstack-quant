@@ -1,8 +1,6 @@
 //! Embedded accounting-policy registry for ECL defaults.
 
-use super::{
-    CeclConfig, CeclMethodology, EclConfig, LgdType, MacroScenario, ReversionMethod, StagingConfig,
-};
+use super::{CeclConfig, CeclMethodology, EclConfig, LgdType, ReversionMethod, StagingConfig};
 use finstack_quant_core::embedded_registry::EmbeddedJsonRegistry;
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
@@ -110,9 +108,6 @@ impl Ifrs9PolicyRecord {
 #[serde(deny_unknown_fields)]
 struct Ifrs9EclRecord {
     bucket_width_years: f64,
-    base_scenario_id: String,
-    base_scenario_weight: f64,
-    base_scenario_lgd_override: Option<f64>,
     lgd_type: LgdType,
 }
 
@@ -122,20 +117,6 @@ impl Ifrs9EclRecord {
             self.bucket_width_years,
             "IFRS 9 bucket width years",
         )?;
-        finstack_quant_core::validation::validate_non_blank(
-            &self.base_scenario_id,
-            "IFRS 9 base scenario id",
-        )?;
-        finstack_quant_core::validation::validate_f64_unit_interval(
-            self.base_scenario_weight,
-            "IFRS 9 base scenario weight",
-        )?;
-        if let Some(lgd) = self.base_scenario_lgd_override {
-            finstack_quant_core::validation::validate_f64_unit_interval(
-                lgd,
-                "IFRS 9 base scenario LGD override",
-            )?;
-        }
         Ok(())
     }
 }
@@ -144,7 +125,7 @@ impl Ifrs9EclRecord {
 #[serde(deny_unknown_fields)]
 struct StagingPolicyRecord {
     pd_delta_absolute: f64,
-    pd_delta_relative: f64,
+    pd_delta_relative: Option<f64>,
     rating_downgrade_notches: u32,
     #[serde(default)]
     rating_scale_labels: Option<Vec<String>>,
@@ -162,10 +143,12 @@ impl StagingPolicyRecord {
             self.pd_delta_absolute,
             "PD absolute delta threshold",
         )?;
-        finstack_quant_core::validation::validate_f64_positive(
-            self.pd_delta_relative,
-            "PD relative threshold",
-        )?;
+        if let Some(threshold) = self.pd_delta_relative {
+            finstack_quant_core::validation::validate_f64_non_negative(
+                threshold,
+                "PD relative threshold",
+            )?;
+        }
         Ok(())
     }
 
@@ -204,9 +187,6 @@ struct CeclPolicyRecord {
     impaired_time_to_recovery_years: f64,
     #[serde(default = "default_cecl_discount_expected_losses")]
     discount_expected_losses: bool,
-    base_scenario_id: String,
-    base_scenario_weight: f64,
-    base_scenario_lgd_override: Option<f64>,
     methodology: CeclMethodology,
 }
 
@@ -237,20 +217,6 @@ impl CeclPolicyRecord {
             self.impaired_time_to_recovery_years,
             "CECL impaired time to recovery years",
         )?;
-        finstack_quant_core::validation::validate_non_blank(
-            &self.base_scenario_id,
-            "CECL base scenario id",
-        )?;
-        finstack_quant_core::validation::validate_f64_unit_interval(
-            self.base_scenario_weight,
-            "CECL base scenario weight",
-        )?;
-        if let Some(lgd) = self.base_scenario_lgd_override {
-            finstack_quant_core::validation::validate_f64_unit_interval(
-                lgd,
-                "CECL base scenario LGD override",
-            )?;
-        }
         if let ReversionMethod::Linear { reversion_years } = self.reversion_method {
             finstack_quant_core::validation::validate_f64_positive(
                 reversion_years,
@@ -288,11 +254,6 @@ impl Default for EclConfig {
 fn ecl_config_from_policy(policy: &Ifrs9PolicyRecord) -> EclConfig {
     EclConfig {
         bucket_width_years: policy.ecl.bucket_width_years,
-        scenarios: vec![MacroScenario {
-            id: policy.ecl.base_scenario_id.clone(),
-            weight: policy.ecl.base_scenario_weight,
-            lgd_override: policy.ecl.base_scenario_lgd_override,
-        }],
         staging: policy.staging.config(),
         lgd_type: policy.ecl.lgd_type,
         ttc_lgd: None,
@@ -328,11 +289,6 @@ fn cecl_config_from_policy(policy: &CeclPolicyRecord) -> CeclConfig {
         impaired_qualitative_triggers_enabled: policy.impaired_qualitative_triggers_enabled,
         impaired_time_to_recovery_years: policy.impaired_time_to_recovery_years,
         discount_expected_losses: policy.discount_expected_losses,
-        scenarios: vec![MacroScenario {
-            id: policy.base_scenario_id.clone(),
-            weight: policy.base_scenario_weight,
-            lgd_override: policy.base_scenario_lgd_override,
-        }],
         methodology: policy.methodology,
         warm_annual_loss_rate: None,
     }
@@ -375,7 +331,7 @@ mod tests {
     fn embedded_registry_preserves_ifrs9_defaults() {
         let staging = StagingConfig::default();
         assert_eq!(staging.pd_delta_absolute, 0.01);
-        assert_eq!(staging.pd_delta_relative, 2.0);
+        assert_eq!(staging.pd_delta_relative, Some(2.0));
         assert_eq!(staging.dpd_stage2_threshold, 30);
         assert_eq!(staging.dpd_stage3_threshold, 90);
         assert_eq!(staging.cure_periods_stage2_to_1, 3);
@@ -383,8 +339,6 @@ mod tests {
 
         let config = EclConfig::default();
         assert_eq!(config.bucket_width_years, 0.25);
-        assert_eq!(config.scenarios[0].id, "base");
-        assert_eq!(config.scenarios[0].weight, 1.0);
         assert_eq!(config.lgd_type, LgdType::PointInTime);
     }
 

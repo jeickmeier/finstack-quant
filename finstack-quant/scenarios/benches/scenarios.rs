@@ -1079,8 +1079,8 @@ fn bench_instrument_spread_shock(c: &mut Criterion) {
 
     let base_date = date!(2025 - 01 - 01);
 
-    // Note: This benchmark tests the operation application even without actual instruments
-    // In production, instruments would be provided via ExecutionContext
+    // Note: an empty inventory measures operation dispatch, not instrument mutation.
+    // The engine rejects instrument-scoped operations without any inventory.
 
     // Spread shock by instrument type
     let type_scenario = ScenarioSpec {
@@ -1104,15 +1104,15 @@ fn bench_instrument_spread_shock(c: &mut Criterion) {
         b.iter(|| {
             let mut market = create_base_market();
             let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut inventory = Vec::new();
             let mut ctx = ExecutionContext {
                 market: &mut market,
                 model: Some(&mut model),
-                instruments: None, // Would contain CDS/Bond instruments in real scenario
+                instruments: Some(&mut inventory),
                 rate_bindings: None,
                 calendar: None,
                 as_of: base_date,
             };
-            // This will generate a warning but tests the path
             black_box(
                 engine
                     .apply(black_box(&type_scenario), black_box(&mut ctx))
@@ -1174,10 +1174,11 @@ fn bench_comprehensive_credit_scenario(c: &mut Criterion) {
         b.iter(|| {
             let mut market = create_base_market();
             let mut model = FinancialModelSpec::new("test", vec![]);
+            let mut inventory = Vec::new();
             let mut ctx = ExecutionContext {
                 market: &mut market,
                 model: Some(&mut model),
-                instruments: None,
+                instruments: Some(&mut inventory),
                 rate_bindings: None,
                 calendar: None,
                 as_of: base_date,

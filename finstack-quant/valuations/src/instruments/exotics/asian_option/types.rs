@@ -389,6 +389,48 @@ impl crate::instruments::common_impl::traits::Instrument for AsianOption {
         self.fixing_dates.first().copied()
     }
 
+    /// Record the held `as_of` spot for fixing dates the roll passes.
+    ///
+    /// Scheduled fixings in `(as_of, rolled_date]` with no recorded value are
+    /// added at the `as_of` level of `spot_id`, since theta holds spot fixed.
+    ///
+    /// # Arguments
+    /// * `market` - Market at `as_of` supplying the `spot_id` level held over the roll.
+    /// * `as_of` - Valuation date the roll starts from.
+    /// * `rolled_date` - Date theta reprices at.
+    fn theta_observed_state(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        rolled_date: finstack_quant_core::dates::Date,
+    ) -> finstack_quant_core::Result<
+        Option<Box<dyn crate::instruments::common_impl::traits::Instrument>>,
+    > {
+        let rolled_fixings: Vec<_> = self
+            .fixing_dates
+            .iter()
+            .copied()
+            .filter(|date| {
+                *date > as_of
+                    && *date <= rolled_date
+                    && !self.past_fixings.iter().any(|(fixed, _)| fixed == date)
+            })
+            .collect();
+        if rolled_fixings.is_empty() {
+            return Ok(None);
+        }
+        let spot = match market.get_price(&self.spot_id)? {
+            finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
+            finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => m.amount(),
+        };
+        let mut observed = self.clone();
+        observed
+            .past_fixings
+            .extend(rolled_fixings.into_iter().map(|date| (date, spot)));
+        observed.past_fixings.sort_by_key(|(date, _)| *date);
+        Ok(Some(Box::new(observed)))
+    }
+
     crate::impl_focused_pricing_overrides!();
 }
 

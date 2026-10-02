@@ -196,7 +196,7 @@ def test_numpy_inputs_reject_wrong_shapes() -> None:
             np.ones((3, 3), dtype=np.float64),
         )
 
-    with pytest.raises(ValueError, match="position_pnls has shape \\(3, 10\\) but there are 2 position ids"):
+    with pytest.raises(ValueError, match="position_pnls must have 2 rows, got 3"):
         historical_var_decomposition(
             ["A", "B"],
             np.ones((3, 10), dtype=np.float64),

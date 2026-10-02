@@ -97,7 +97,6 @@ impl PyAssetBackedFacility {
     fn builder() -> PyAssetBackedFacilityBuilder {
         PyAssetBackedFacilityBuilder {
             inner: Some(AssetBackedFacility::builder()),
-            credit_model: None,
         }
     }
 
@@ -155,12 +154,7 @@ impl PyAssetBackedFacility {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        match parse_typed_instrument_json(json)? {
-            InstrumentJson::AssetBackedFacility(inner) => Ok(Self { inner: *inner }),
-            _ => Err(value_error(
-                "expected instrument type \"asset_backed_facility\", got a different instrument type",
-            )),
-        }
+        parse_typed_instrument_json(json).map(|inner| Self { inner })
     }
 
     /// Serialize to the canonical instrument envelope.
@@ -478,8 +472,10 @@ impl PyAssetBackedFacility {
     /// Final repayment date (maturity, or the revolving end plus the term-out
     /// window) as ``datetime.date``.
     #[getter]
+    ///
+    /// Raises ``ValueError`` if the term-out window exceeds the supported calendar range.
     fn repayment_date<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        date_to_py(py, self.inner.repayment_date())
+        date_to_py(py, self.inner.repayment_date().map_err(core_to_py)?)
     }
 
     /// Legal final maturity as ``datetime.date``.
@@ -879,8 +875,6 @@ impl PyFacilityProjection {
 )]
 pub struct PyAssetBackedFacilityBuilder {
     inner: Option<FacilityBuilderInner>,
-    /// Collateral behavior assembled by the per-field setters; applied on ``build``.
-    credit_model: Option<CreditModelConfig>,
 }
 
 fn take_facility(b: &mut PyAssetBackedFacilityBuilder) -> PyResult<FacilityBuilderInner> {
@@ -1504,10 +1498,8 @@ impl PyAssetBackedFacilityBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let model: CreditModelConfig =
             crate::bindings::module_utils::py_to_serde(py, value, "credit_model")?;
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model = Some(model);
+        let b = take_facility(&mut slf)?;
+        slf.inner = Some(b.credit_model(model));
         Ok(slf)
     }
 
@@ -1539,12 +1531,8 @@ impl PyAssetBackedFacilityBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "prepayment_spec")?
         };
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model
-            .get_or_insert_with(CreditModelConfig::default)
-            .prepayment_spec = spec;
+        let b = take_facility(&mut slf)?;
+        slf.inner = Some(b.prepayment_spec(spec));
         Ok(slf)
     }
 
@@ -1576,12 +1564,8 @@ impl PyAssetBackedFacilityBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "default_spec")?
         };
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model
-            .get_or_insert_with(CreditModelConfig::default)
-            .default_spec = spec;
+        let b = take_facility(&mut slf)?;
+        slf.inner = Some(b.default_spec(spec));
         Ok(slf)
     }
 
@@ -1613,12 +1597,8 @@ impl PyAssetBackedFacilityBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "recovery_spec")?
         };
-        if slf.inner.is_none() {
-            return Err(value_error("builder already consumed by build()"));
-        }
-        slf.credit_model
-            .get_or_insert_with(CreditModelConfig::default)
-            .recovery_spec = spec;
+        let b = take_facility(&mut slf)?;
+        slf.inner = Some(b.recovery_spec(spec));
         Ok(slf)
     }
 
@@ -1665,10 +1645,7 @@ impl PyAssetBackedFacilityBuilder {
     ///     or the facility fails validation.
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyAssetBackedFacility> {
-        let mut b = take_facility(&mut slf)?;
-        if let Some(model) = slf.credit_model.take() {
-            b = b.credit_model(model);
-        }
+        let b = take_facility(&mut slf)?;
         let inner = b.build().map_err(core_to_py)?;
         inner.validate().map_err(core_to_py)?;
         Ok(PyAssetBackedFacility { inner })

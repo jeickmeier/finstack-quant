@@ -18,6 +18,7 @@ use num_complex::Complex64;
 /// - Merton, R. C. (1976). "Option Pricing When Underlying Stock Returns
 ///   Are Discontinuous." *J. Financial Economics*, 3, 125-144. `docs/REFERENCES.md#merton-1976-jump`
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MertonJumpCf {
     /// Risk-free rate.
     pub r: f64,
@@ -31,6 +32,46 @@ pub struct MertonJumpCf {
     pub mu_j: f64,
     /// Standard deviation of log-jump size.
     pub sigma_j: f64,
+}
+
+impl MertonJumpCf {
+    /// Validate the risk-neutral jump-diffusion parameters before pricing.
+    ///
+    /// Rates and the log-jump mean must be finite. Diffusion volatility,
+    /// jump intensity (arrivals per year), and log-jump standard deviation
+    /// must be finite and non-negative. The jump compensator must be finite.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation message for invalid parameters or an overflowing
+    /// risk-neutral jump compensator.
+    pub fn validate(&self) -> Result<(), String> {
+        for (name, value) in [
+            ("rate", self.r),
+            ("div_yield", self.q),
+            ("mu_jump", self.mu_j),
+        ] {
+            if !value.is_finite() {
+                return Err(format!("Merton {name} must be finite, got {value}"));
+            }
+        }
+        for (name, value) in [
+            ("sigma", self.sigma),
+            ("lambda", self.lambda),
+            ("sigma_jump", self.sigma_j),
+        ] {
+            if !value.is_finite() || value < 0.0 {
+                return Err(format!(
+                    "Merton {name} must be finite and non-negative, got {value}"
+                ));
+            }
+        }
+        let compensator = self.lambda * (self.mu_j + 0.5 * self.sigma_j * self.sigma_j).exp_m1();
+        if !compensator.is_finite() {
+            return Err("Merton risk-neutral jump compensator must be finite".to_string());
+        }
+        Ok(())
+    }
 }
 
 impl CharacteristicFunction for MertonJumpCf {

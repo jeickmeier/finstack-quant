@@ -6,7 +6,7 @@ use pyo3::types::{PyDict, PyList, PyType};
 
 use finstack_quant_portfolio::optimization::{
     CandidatePosition, OptimizationStatus, PortfolioOptimizationResult,
-    PortfolioOptimizationResultWire, PortfolioOptimizationSpec, TradeType, TradeUniverse,
+    PortfolioOptimizationResultWire, PortfolioOptimizationSpec, TradeUniverse,
 };
 use finstack_quant_portfolio::types::PositionId;
 
@@ -46,6 +46,8 @@ impl PyCandidatePosition {
     /// ----------
     /// id : str
     ///     Identifier that becomes the position id if the optimizer trades it.
+    ///     Must be unique among candidates and absent from existing positions;
+    ///     optimization raises ``PortfolioError`` for a collision.
     /// entity_id : str
     ///     Owning entity for the candidate.
     /// instrument : Bond | InterestRateSwap | ... | str
@@ -127,7 +129,8 @@ impl PyCandidatePosition {
         serialize_json(&self.inner)
     }
 
-    /// Candidate identifier (becomes the position id when traded).
+    /// Candidate identifier, unique among candidates and absent from existing
+    /// positions; becomes the position id when traded.
     #[getter]
     fn id(&self) -> String {
         self.inner.id.as_str().to_owned()
@@ -248,7 +251,8 @@ impl PyTradeUniverse {
         PyPositionFilter::from_inner(self.inner.tradeable_filter.clone())
     }
 
-    /// Filter selecting positions frozen at their current weight, if any.
+    /// Filter selecting positions whose exact quantities and weights remain
+    /// fixed under every weighting scheme, including zero-PV holdings, if any.
     #[getter]
     fn held_filter(&self) -> Option<PyPositionFilter> {
         self.inner
@@ -652,8 +656,10 @@ impl PyPortfolioOptimizationResult {
     /// Returns
     /// -------
     /// dict[str, float]
-    ///     Units / face / notional, depending on the weighting scheme — these
-    ///     are quantities, not weights.
+    ///     Quantities in each position's unit convention, including percentage
+    ///     points for ``percentage``. Held existing positions retain their exact
+    ///     current quantity under every weighting scheme, including zero-PV
+    ///     holdings.
     #[getter]
     fn implied_quantities(&self) -> HashMap<String, f64> {
         self.inner
@@ -710,10 +716,8 @@ impl PyPortfolioOptimizationResult {
     #[pyo3(text_signature = "(self)")]
     fn new_position_trades(&self) -> Vec<PyTradeSpec> {
         self.inner
-            .trades
-            .iter()
-            .filter(|t| t.trade_type == TradeType::NewPosition)
-            .cloned()
+            .new_position_trades()
+            .into_iter()
             .map(PyTradeSpec::from_inner)
             .collect()
     }
@@ -780,17 +784,9 @@ impl PyPortfolioOptimizationResult {
     #[pyo3(text_signature = "(self)")]
     fn binding_constraints(&self) -> Vec<(String, f64)> {
         self.inner
-            .binding_constraints
-            .iter()
-            .map(|name| {
-                let slack = self
-                    .inner
-                    .constraint_slacks
-                    .get(name)
-                    .copied()
-                    .unwrap_or(0.0);
-                (name.clone(), slack)
-            })
+            .binding_constraints()
+            .into_iter()
+            .map(|(name, slack)| (name.to_owned(), slack))
             .collect()
     }
 

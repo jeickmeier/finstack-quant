@@ -36,6 +36,14 @@ fn d(year: i32, month: u8, day: u8) -> Date {
 
 const TOL: f64 = DAYCOUNT_TOLERANCE;
 
+fn annual_coupon(start: Date, end: Date) -> DayCountContext<'static> {
+    DayCountContext {
+        frequency: Some(Tenor::annual()),
+        coupon_period: Some((start, end)),
+        ..Default::default()
+    }
+}
+
 #[test]
 fn year_fraction_rejects_inverted_dates_but_signed_accepts_them() {
     let start = d(2025, 7, 1);
@@ -382,7 +390,11 @@ fn thirty360_italian_leap_feb29_to_mar31() {
 fn act365l_period_contains_feb29_uses_366() {
     // Jan 1 to Mar 1 in 2024 (leap year) = 60 actual days, contains Feb 29
     let yf = DayCount::Act365L
-        .year_fraction(d(2024, 1, 1), d(2024, 3, 1), DayCountContext::default())
+        .year_fraction(
+            d(2024, 1, 1),
+            d(2024, 3, 1),
+            annual_coupon(d(2024, 1, 1), d(2024, 3, 1)),
+        )
         .unwrap();
     assert!(
         (yf - 60.0 / 366.0).abs() < TOL,
@@ -395,7 +407,11 @@ fn act365l_period_contains_feb29_uses_366() {
 fn act365l_period_no_feb29_uses_365() {
     // Jan 1 to Mar 1 in 2025 (non-leap) = 59 actual days, no Feb 29
     let yf = DayCount::Act365L
-        .year_fraction(d(2025, 1, 1), d(2025, 3, 1), DayCountContext::default())
+        .year_fraction(
+            d(2025, 1, 1),
+            d(2025, 3, 1),
+            annual_coupon(d(2025, 1, 1), d(2025, 3, 1)),
+        )
         .unwrap();
     assert!(
         (yf - 59.0 / 365.0).abs() < TOL,
@@ -411,7 +427,11 @@ fn act365l_period_ending_on_feb29() {
     // window per the )
     // 59 actual days, Feb 29 in (start, end] -> 366 denom
     let yf = DayCount::Act365L
-        .year_fraction(d(2024, 1, 1), d(2024, 2, 29), DayCountContext::default())
+        .year_fraction(
+            d(2024, 1, 1),
+            d(2024, 2, 29),
+            annual_coupon(d(2024, 1, 1), d(2024, 2, 29)),
+        )
         .unwrap();
     assert!(
         (yf - 59.0 / 366.0).abs() < TOL,
@@ -425,7 +445,11 @@ fn act365l_period_before_feb29_in_leap_year() {
     // Jan 1 to Feb 28 in 2024 - does NOT contain Feb 29 (end is exclusive of Feb 29)
     // 58 actual days, Feb 29 NOT in [Jan 1, Feb 28] -> 365 denom
     let yf = DayCount::Act365L
-        .year_fraction(d(2024, 1, 1), d(2024, 2, 28), DayCountContext::default())
+        .year_fraction(
+            d(2024, 1, 1),
+            d(2024, 2, 28),
+            annual_coupon(d(2024, 1, 1), d(2024, 2, 28)),
+        )
         .unwrap();
     assert!(
         (yf - 58.0 / 365.0).abs() < TOL,
@@ -438,7 +462,11 @@ fn act365l_period_before_feb29_in_leap_year() {
 fn act365l_full_year_leap() {
     // Full leap year: 366 days / 366 = 1.0
     let yf = DayCount::Act365L
-        .year_fraction(d(2024, 1, 1), d(2025, 1, 1), DayCountContext::default())
+        .year_fraction(
+            d(2024, 1, 1),
+            d(2025, 1, 1),
+            annual_coupon(d(2024, 1, 1), d(2025, 1, 1)),
+        )
         .unwrap();
     assert!((yf - 1.0).abs() < TOL, "Expected 1.0, got {}", yf);
 }
@@ -447,7 +475,11 @@ fn act365l_full_year_leap() {
 fn act365l_full_year_non_leap() {
     // Full non-leap year: 365 days / 365 = 1.0
     let yf = DayCount::Act365L
-        .year_fraction(d(2025, 1, 1), d(2026, 1, 1), DayCountContext::default())
+        .year_fraction(
+            d(2025, 1, 1),
+            d(2026, 1, 1),
+            annual_coupon(d(2025, 1, 1), d(2026, 1, 1)),
+        )
         .unwrap();
     assert!((yf - 1.0).abs() < TOL, "Expected 1.0, got {}", yf);
 }
@@ -457,7 +489,11 @@ fn act365l_spanning_leap_year_boundary() {
     // Dec 1, 2023 to Mar 1, 2024 - spans into leap year, contains Feb 29
     // 91 actual days, contains Feb 29 -> 366 denom
     let yf = DayCount::Act365L
-        .year_fraction(d(2023, 12, 1), d(2024, 3, 1), DayCountContext::default())
+        .year_fraction(
+            d(2023, 12, 1),
+            d(2024, 3, 1),
+            annual_coupon(d(2023, 12, 1), d(2024, 3, 1)),
+        )
         .unwrap();
     assert!(
         (yf - 91.0 / 366.0).abs() < TOL,
@@ -471,7 +507,11 @@ fn act365l_spanning_non_leap_year_boundary() {
     // Dec 1, 2024 to Mar 1, 2025 - spans year boundary, 2025 not leap
     // 90 actual days, no Feb 29 in range -> 365 denom
     let yf = DayCount::Act365L
-        .year_fraction(d(2024, 12, 1), d(2025, 3, 1), DayCountContext::default())
+        .year_fraction(
+            d(2024, 12, 1),
+            d(2025, 3, 1),
+            annual_coupon(d(2024, 12, 1), d(2025, 3, 1)),
+        )
         .unwrap();
     assert!(
         (yf - 90.0 / 365.0).abs() < TOL,
@@ -485,7 +525,11 @@ fn act365l_single_day_feb29() {
     // (Feb 28, Feb 29] = 1 day; Feb 29 is the period END and so is included
     // by the ICMA Rule 251 window -> 366 denom.
     let yf = DayCount::Act365L
-        .year_fraction(d(2024, 2, 28), d(2024, 2, 29), DayCountContext::default())
+        .year_fraction(
+            d(2024, 2, 28),
+            d(2024, 2, 29),
+            annual_coupon(d(2024, 2, 28), d(2024, 2, 29)),
+        )
         .unwrap();
     assert!((yf - 1.0 / 366.0).abs() < TOL, "Expected 1/366, got {}", yf);
 }
@@ -494,12 +538,112 @@ fn act365l_single_day_feb29() {
 fn act365l_single_day_not_feb29() {
     // Mar 1 to Mar 2 = 1 day, no Feb 29
     let yf = DayCount::Act365L
-        .year_fraction(d(2024, 3, 1), d(2024, 3, 2), DayCountContext::default())
+        .year_fraction(
+            d(2024, 3, 1),
+            d(2024, 3, 2),
+            annual_coupon(d(2024, 3, 1), d(2024, 3, 2)),
+        )
         .unwrap();
     assert!((yf - 1.0 / 365.0).abs() < TOL, "Expected 1/365, got {}", yf);
 }
 
 // Act/Act ISDA - Gregorian Leap-Year Boundaries
+
+#[test]
+fn act365l_partial_accrual_retains_annual_and_non_annual_coupon_denominators() {
+    for (start, end, query, frequency, denominator) in [
+        (
+            d(2023, 7, 1),
+            d(2024, 7, 1),
+            d(2023, 12, 1),
+            Tenor::annual(),
+            366.0,
+        ),
+        (
+            d(2023, 10, 15),
+            d(2024, 4, 15),
+            d(2023, 12, 15),
+            Tenor::semi_annual(),
+            366.0,
+        ),
+        (
+            d(2024, 10, 15),
+            d(2025, 4, 15),
+            d(2024, 12, 15),
+            Tenor::semi_annual(),
+            365.0,
+        ),
+        (
+            d(2024, 1, 1),
+            d(2024, 4, 1),
+            d(2024, 2, 1),
+            Tenor::quarterly(),
+            366.0,
+        ),
+        (
+            d(2024, 3, 1),
+            d(2025, 3, 1),
+            d(2024, 5, 1),
+            Tenor::annual(),
+            365.0,
+        ),
+    ] {
+        let ctx = DayCountContext {
+            frequency: Some(frequency),
+            coupon_period: Some((start, end)),
+            ..Default::default()
+        };
+        let accrued = DayCount::Act365L.year_fraction(start, query, ctx).unwrap();
+        let remaining = DayCount::Act365L.year_fraction(query, end, ctx).unwrap();
+        let full = DayCount::Act365L.year_fraction(start, end, ctx).unwrap();
+        assert!((accrued - (query - start).whole_days() as f64 / denominator).abs() < 1e-14);
+        assert!((remaining - (end - query).whole_days() as f64 / denominator).abs() < 1e-14);
+        assert!((accrued + remaining - full).abs() < 1e-14);
+        assert!(
+            (DayCount::Act365L
+                .signed_year_fraction(query, start, ctx)
+                .unwrap()
+                + accrued)
+                .abs()
+                < 1e-14
+        );
+    }
+}
+
+#[test]
+fn act365l_requires_enclosing_coupon_context() {
+    let start = d(2023, 10, 15);
+    let end = d(2024, 4, 15);
+    for ctx in [
+        DayCountContext::default(),
+        DayCountContext {
+            frequency: Some(Tenor::semi_annual()),
+            ..Default::default()
+        },
+        DayCountContext {
+            coupon_period: Some((start, end)),
+            ..Default::default()
+        },
+        DayCountContext {
+            frequency: Some(Tenor::semi_annual()),
+            coupon_period: Some((end, start)),
+            ..Default::default()
+        },
+    ] {
+        assert!(DayCount::Act365L.year_fraction(start, end, ctx).is_err());
+    }
+    let ctx = DayCountContext {
+        frequency: Some(Tenor::semi_annual()),
+        coupon_period: Some((start, end)),
+        ..Default::default()
+    };
+    assert!(DayCount::Act365L
+        .year_fraction(d(2023, 10, 14), end, ctx)
+        .is_err());
+    assert!(DayCount::Act365L
+        .year_fraction(start, d(2024, 4, 16), ctx)
+        .is_err());
+}
 
 #[test]
 fn actact_isda_applies_gregorian_century_leap_rule() {
@@ -643,7 +787,7 @@ fn actact_isma_multiple_frequencies() {
 #[test]
 fn actact_isma_eom_regular_period_is_exactly_half() {
     // Regression for the the frequency-only
-    // quasi-coupon grid was anchored at `start.add_months(-frequency)` and stepped
+    // quasi-coupon grid was anchored at `start.add_months(-frequency).expect("valid date shift")` and stepped
     // cumulatively, so month-end starts drifted (grid Aug 28 instead of
     // Aug 31) and a regular EOM semi-annual period returned
     // 181/184 × 0.5 ≈ 0.49185. Anchoring k-multiples on `start` itself must
@@ -893,6 +1037,107 @@ fn actact_isma_reference_period_handles_long_first_stub() {
         expected,
         yf
     );
+}
+
+#[test]
+fn actact_isma_reference_grid_preserves_roll_day_across_february() {
+    for (start, end, reference_start, reference_end, expected) in [
+        // Long last coupon: Jan 30 / Feb 28 / Mar 30, ending before Mar 30.
+        (
+            d(2025, 1, 30),
+            d(2025, 3, 15),
+            d(2025, 1, 30),
+            d(2025, 2, 28),
+            1.0 / 12.0 + 15.0 / 30.0 / 12.0,
+        ),
+        // A reference beginning at the clamp retains Mar 30's original roll.
+        (
+            d(2025, 1, 15),
+            d(2025, 3, 30),
+            d(2025, 2, 28),
+            d(2025, 3, 30),
+            15.0 / 31.0 / 12.0 + 2.0 / 12.0,
+        ),
+        // Backward traversal crosses February without changing Jan 30 to Jan 28.
+        (
+            d(2025, 1, 15),
+            d(2025, 4, 30),
+            d(2025, 3, 30),
+            d(2025, 4, 30),
+            15.0 / 31.0 / 12.0 + 3.0 / 12.0,
+        ),
+        // EOM continues to preserve the final day of every nominal month.
+        (
+            d(2025, 1, 31),
+            d(2025, 4, 15),
+            d(2025, 1, 31),
+            d(2025, 2, 28),
+            2.0 / 12.0 + 15.0 / 30.0 / 12.0,
+        ),
+    ] {
+        let direct = act_act_isma_year_fraction_with_reference_period(
+            start,
+            end,
+            reference_start,
+            reference_end,
+        )
+        .unwrap();
+        let contextual = DayCount::ActActIsma
+            .year_fraction(
+                start,
+                end,
+                DayCountContext {
+                    frequency: Some(Tenor::monthly()),
+                    coupon_period: Some((reference_start, reference_end)),
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        assert!(
+            (direct - expected).abs() < 1e-14,
+            "{start} -> {end}: expected {expected}, got {direct}"
+        );
+        assert_eq!(direct, contextual);
+    }
+}
+
+#[test]
+fn actact_isma_rejects_reference_endpoints_outside_nominal_month_grid() {
+    let start = d(2024, 7, 15);
+    let end = d(2025, 1, 15);
+    let reference_start = d(2025, 1, 15);
+    let reference_end = d(2025, 7, 15);
+    assert_eq!(
+        act_act_isma_year_fraction_with_reference_period(
+            start,
+            end,
+            reference_start,
+            reference_end,
+        )
+        .unwrap(),
+        0.5,
+    );
+    // An adjusted payment date changes the inferred roll from the 15th to
+    // the 16th, which must not silently change the preceding coupon factor.
+    let adjusted_end = d(2025, 7, 16);
+    assert!(act_act_isma_year_fraction_with_reference_period(
+        start,
+        end,
+        reference_start,
+        adjusted_end,
+    )
+    .is_err());
+    assert!(DayCount::ActActIsma
+        .year_fraction(
+            start,
+            end,
+            DayCountContext {
+                frequency: Some(Tenor::semi_annual()),
+                coupon_period: Some((reference_start, adjusted_end)),
+                ..Default::default()
+            },
+        )
+        .is_err());
 }
 
 #[test]

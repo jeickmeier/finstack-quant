@@ -71,10 +71,12 @@ impl PyDiscountCurve {
     ///     and must be positive. A ``(0.0, 1.0)`` anchor is conventional.
     /// interp : str, optional
     ///     Interpolation style (``"monotone_convex"``, ``"linear"``,
-    ///     ``"log_linear"``, ``"cubic"``, ...). Default ``"monotone_convex"``.
+    ///     ``"log_linear"``, ``"cubic_hermite"``,
+    ///     ``"piecewise_quadratic_forward"``). Default ``"monotone_convex"``.
     /// extrapolation : str, optional
-    ///     Extrapolation policy (``"flat_forward"``, ``"flat_zero"``, ``"linear"``,
-    ///     ``"error"``). Default ``"flat_forward"``.
+    ///     Extrapolation policy (``"flat_forward"``, ``"flat_zero"``, or
+    ///     ``"none"``, which returns NaN outside the pillar range). Default
+    ///     ``"flat_forward"``.
     /// day_count : str, optional
     ///     Day-count convention used to convert query dates to curve time.
     ///     Default is fixed at ``"act_365f"`` (not inferred from the ID).
@@ -102,7 +104,7 @@ impl PyDiscountCurve {
         clippy::too_many_arguments,
         reason = "keyword-only curve options mirror the Rust builder setters"
     )]
-    #[pyo3(signature = (id, base_date, knots, *, interp=None, extrapolation=None, day_count=None, validation_mode="market_standard", forward_floor=None))]
+    #[pyo3(signature = (id, base_date, knots, *, interp=None, extrapolation=None, day_count=None, validation_mode=None, forward_floor=None))]
     fn new(
         id: &str,
         base_date: &Bound<'_, PyAny>,
@@ -110,7 +112,7 @@ impl PyDiscountCurve {
         interp: Option<&str>,
         extrapolation: Option<&str>,
         day_count: Option<&str>,
-        validation_mode: &str,
+        validation_mode: Option<&str>,
         forward_floor: Option<f64>,
     ) -> PyResult<Self> {
         let base = py_to_date(base_date)?;

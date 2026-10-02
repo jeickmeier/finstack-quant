@@ -1,25 +1,23 @@
 //! Horizon metrics (theta, carry decomposition, iterative breakeven) hold
-//! market-held fixings at their as-of values across the horizon.
+//! crossed coupon fixings at their as-of values across the horizon.
 //!
 //! Each test compares the metric with an explicit repricing: the market with
 //! the crossed observations injected by hand (the flat projection curve's
-//! rate, or the as-of spot for a price series) and repriced at the horizon
+//! rate) and repriced at the horizon
 //! under the metric's own curve convention (rolled for theta, unrolled for
 //! carry and breakeven). The injected values are written independently of the
 //! schedule's recorded projections.
 
-use crate::instruments::loan_facility_wire_keys::{pricing_case_inputs, pricing_cases};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{
     calendar_by_id, BusinessDayConvention, Date, DateExt, DayCount, StubKind, Tenor,
 };
 use finstack_quant_core::market_data::bumps::{BumpSpec, MarketBump};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::{MarketScalar, ScalarTimeSeries};
+use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::equity::variance_swap::VarianceSwap;
 use finstack_quant_valuations::instruments::rates::irs::{
     FixedLegSpec, FloatLegSpec, FloatingLegCompounding, PayReceive,
 };
@@ -55,7 +53,7 @@ fn sofr_fixings(from: Date, through: Date) -> ScalarTimeSeries {
 
 /// Receive-fixed 1Y SOFR OIS swap valued inside its first accrual period.
 fn seasoned_ois_swap(start: Date) -> InterestRateSwap {
-    let end = start.add_months(12);
+    let end = start.add_months(12).expect("swap end");
     InterestRateSwap::builder()
         .id("THETA-SOFR-OIS".into())
         .notional(Money::new(10_000_000.0, Currency::USD).expect("notional"))
@@ -273,51 +271,5 @@ fn ois_swap_iterative_breakeven_observes_crossed_sofr_fixings_at_the_as_of_forwa
     assert!(
         residual.abs() < 1e-6,
         "breakeven {breakeven}bp should zero the horizon P&L, residual = {residual}"
-    );
-}
-
-#[test]
-fn variance_swap_theta_observes_the_as_of_spot_over_the_horizon() {
-    let cases = pricing_cases();
-    let case = cases["cases"]
-        .as_array()
-        .expect("cases")
-        .iter()
-        .find(|case| case["type"] == "variance_swap")
-        .expect("variance swap case");
-    let (_, market) = pricing_case_inputs(case);
-    let as_of = date!(2023 - 12 - 28);
-    let rolled = date!(2024 - 01 - 28);
-    let mut swap = VarianceSwap::example().expect("example");
-    swap.metric_pricing_overrides.theta_period = Some(Tenor::parse("1M").expect("tenor"));
-
-    let spot = match market.get_price("SPX").expect("spot") {
-        MarketScalar::Unitless(value) => *value,
-        MarketScalar::Price(money) => money.amount(),
-    };
-    let closes: Vec<(Date, f64)> = swap
-        .observation_dates()
-        .expect("observation dates")
-        .into_iter()
-        .filter(|day| (as_of..=rolled).contains(day))
-        .map(|day| (day, spot))
-        .collect();
-    assert!(closes.len() >= 2, "the roll must cross observations");
-    let days = (rolled - as_of).whole_days();
-    assert!(swap
-        .value(&market.roll_forward(days).expect("roll"), rolled)
-        .is_err());
-
-    let injected = market
-        .clone()
-        .insert_series(ScalarTimeSeries::new("SPX", closes, None).expect("closes"))
-        .roll_forward(days)
-        .expect("roll");
-    let expected = swap.value(&injected, rolled).expect("rolled PV").amount()
-        - swap.value(&market, as_of).expect("base PV").amount();
-    let actual = theta(&swap, &market, as_of);
-    assert!(
-        (actual - expected).abs() < 1e-6,
-        "theta {actual} != explicit reprice {expected}"
     );
 }

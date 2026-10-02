@@ -68,10 +68,26 @@ pub enum Error {
         /// Human-readable requirement violated by the value.
         requirement: String,
     },
+    /// A factor-draw vector does not hold one entry per factor.
+    #[error(
+        "independent draws length mismatch: expected {expected} (one per factor), got {actual}"
+    )]
+    FactorDrawLengthMismatch {
+        /// Number of factors in the model.
+        expected: usize,
+        /// Number of draws supplied by the caller.
+        actual: usize,
+    },
     /// Student-t degrees of freedom is invalid.
     #[error("Invalid Student-t degrees of freedom {value}: must be finite and > 2.0")]
     InvalidStudentTDegreesOfFreedom {
         /// The offending degrees-of-freedom value.
+        value: f64,
+    },
+    /// Random-factor-loading volatility is non-finite or outside its range.
+    #[error("Invalid RFL loading volatility {value}: must be finite and in [0, 0.5]")]
+    InvalidLoadingVolatility {
+        /// The offending loading standard deviation.
         value: f64,
     },
 }
@@ -79,30 +95,13 @@ pub enum Error {
 impl From<Error> for finstack_quant_core::Error {
     /// Fold a correlation error into the canonical core error taxonomy.
     ///
-    /// Iterative failures (`DidNotConverge`, `EigenDecompositionFailed`) map
-    /// to [`finstack_quant_core::InputError::SolverConvergenceFailed`] so
-    /// hosts classify them as computation errors; every other variant is an
-    /// input-validation failure and maps to
+    /// Matrix failures use core's `From<CorrelationError>` (iterative
+    /// failures such as `DidNotConverge` become computation errors); every
+    /// other variant is an input-validation failure and maps to
     /// [`finstack_quant_core::Error::Validation`] with the full message.
     fn from(error: Error) -> Self {
         match error {
-            Error::Matrix(
-                matrix @ (MatrixError::DidNotConverge { .. }
-                | MatrixError::EigenDecompositionFailed),
-            ) => {
-                let (iterations, residual) = match matrix {
-                    MatrixError::DidNotConverge { max_iter, tol } => (max_iter, tol),
-                    _ => (0, f64::NAN),
-                };
-                finstack_quant_core::Error::Input(
-                    finstack_quant_core::InputError::SolverConvergenceFailed {
-                        iterations,
-                        residual,
-                        last_x: f64::NAN,
-                        reason: matrix.to_string(),
-                    },
-                )
-            }
+            Error::Matrix(matrix) => matrix.into(),
             other => finstack_quant_core::Error::Validation(other.to_string()),
         }
     }

@@ -204,6 +204,12 @@ impl PyCreditAssessment {
 /// -------
 /// CreditAssessment
 ///     Point-in-time ratios at ``period`` plus the ascending ``series``.
+///     Ratios are ``None`` when their inputs have mixed scalar/money
+///     representations, different currencies, or non-finite arithmetic.
+///     Trailing-year ratios require all annual, semiannual, quarterly or monthly
+///     periods, including fiscal periods, or the complete Gregorian daily year
+///     ending after the assessment date. Weekly and fiscal-daily ratios are
+///     unavailable because the result does not contain their date calendar.
 ///
 /// Raises
 /// ------
@@ -242,7 +248,9 @@ fn credit_assessment(results: &Bound<'_, PyAny>, period: &str) -> PyResult<PyCre
 /// Returns
 /// -------
 /// str
-///     Formatted credit assessment report text.
+///     Formatted credit assessment report text. Trailing-year ratios require a
+///     complete annual, semiannual, quarterly, monthly or Gregorian daily year;
+///     weekly and fiscal-daily ratios are reported as unavailable.
 ///
 /// Raises
 /// ------

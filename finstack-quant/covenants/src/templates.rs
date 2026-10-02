@@ -44,7 +44,7 @@ fn incurrence(cov_type: CovenantType, frequency: Tenor, metric: &str) -> Covenan
 /// Standard leveraged buyout covenant package.
 ///
 /// Typical for sponsor-backed leveraged loans with:
-/// - Max Total Leverage (Debt/EBITDA) with step-down
+/// - Max Debt/EBITDA (constant threshold, tested quarterly)
 /// - Min Interest Coverage
 /// - Min Fixed Charge Coverage
 /// - Max Capex

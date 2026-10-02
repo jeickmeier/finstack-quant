@@ -82,7 +82,7 @@ try {
   await page.waitForFunction(() => window.calibrationProbe.diagnostics);
   assert.deepEqual(
     JSON.parse(await page.evaluate(() => window.calibrationProbe.diagnostics)),
-    JSON.parse(native.dryRun(JSON.stringify(input))),
+    JSON.parse(native.dryRunJson(JSON.stringify(input))),
   );
   await page.getByRole("button", { name: "Calibrate", exact: true }).click();
   await page.waitForFunction(() => window.calibrationProbe.result);
@@ -132,7 +132,7 @@ try {
   );
   assert.equal(
     await page.evaluate(() => window.calibrationProbe.diagnostics),
-    native.dryRun(JSON.stringify(missing)),
+    native.dryRunJson(JSON.stringify(missing)),
   );
   for (const [name, envelope] of [
     ["Target failure", target],

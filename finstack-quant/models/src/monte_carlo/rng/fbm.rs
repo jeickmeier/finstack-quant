@@ -365,14 +365,14 @@ impl FractionalNoiseGenerator for WindowedConditionalFbm {
     }
 }
 
-/// Number of steps below which the auto factory uses exact Cholesky generation.
-pub const FBM_AUTO_CHOLESKY_MAX_STEPS: usize = 199;
-
 /// Create a fBM generator for the given time grid and Hurst exponent.
 ///
-/// Uses [`CholeskyFbm`] for grids with at most
-/// [`FBM_AUTO_CHOLESKY_MAX_STEPS`] steps and [`WindowedConditionalFbm`] otherwise. Use the
-/// concrete constructors directly when an explicit algorithm is required.
+/// Uses exact [`CholeskyFbm`] generation for every grid size. Refining the
+/// grid therefore preserves the fractional Brownian covariance, including
+/// cumulative-level variances. Setup costs O(n³), storage and each path O(n²).
+/// The approximate [`WindowedConditionalFbm`] requires explicit selection:
+/// truncating long-range dependence can materially alter level variances,
+/// even when individual increment variances are accurate.
 ///
 /// # Arguments
 ///
@@ -388,17 +388,7 @@ pub fn create_fbm_generator(
     times: &[f64],
     hurst: f64,
 ) -> Result<Box<dyn FractionalNoiseGenerator>> {
-    let n = if times.len() >= 2 { times.len() - 1 } else { 0 };
-
-    if n <= FBM_AUTO_CHOLESKY_MAX_STEPS {
-        Ok(Box::new(CholeskyFbm::new(times, hurst)?))
-    } else {
-        Ok(Box::new(WindowedConditionalFbm::new(
-            times,
-            hurst,
-            WindowedConditionalFbmConfig::default(),
-        )?))
-    }
+    Ok(Box::new(CholeskyFbm::new(times, hurst)?))
 }
 
 /// Validate that a time grid is strictly increasing with at least two finite
@@ -674,10 +664,37 @@ mod tests {
     }
 
     #[test]
-    fn factory_auto_selects_windowed_for_large_grid() {
-        let times = uniform_grid(1.0, 300);
-        let gen = create_fbm_generator(&times, 0.1).unwrap();
-        assert_eq!(gen.num_steps(), 300);
+    fn factory_preserves_level_covariance_across_grid_refinement() {
+        // Exact, sampling-free covariance reconstruction at two path times.
+        // The former switch at 200 steps inflated Var[B_H(1)] to 3.29.
+        for n in [199, 200, 300] {
+            for h in [0.1, 0.7] {
+                let times = uniform_grid(1.0, n);
+                let gen = create_fbm_generator(&times, h).unwrap();
+                let middle = n / 2;
+                let mut terminal_var = 0.0;
+                let mut middle_var = 0.0;
+                let mut cross_cov = 0.0;
+                let mut normals = vec![0.0; n];
+                let mut out = vec![0.0; n];
+                for basis in 0..n {
+                    normals[basis] = 1.0;
+                    gen.generate(&normals, &mut out);
+                    normals[basis] = 0.0;
+                    let terminal: f64 = out.iter().sum();
+                    let midway: f64 = out[..middle].iter().sum();
+                    terminal_var += terminal * terminal;
+                    middle_var += midway * midway;
+                    cross_cov += terminal * midway;
+                }
+                let time = times[middle];
+                let expected_middle = time.powf(2.0 * h);
+                let expected_cross = 0.5 * (expected_middle + 1.0 - (1.0 - time).powf(2.0 * h));
+                assert!((terminal_var - 1.0).abs() < 1e-10, "H={h}, n={n}");
+                assert!((middle_var - expected_middle).abs() < 1e-10);
+                assert!((cross_cov - expected_cross).abs() < 1e-10);
+            }
+        }
     }
 
     #[test]

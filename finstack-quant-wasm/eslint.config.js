@@ -14,6 +14,7 @@ export default [
       'node_modules/**',
       'pkg/**',
       'pkg-node/**',
+      'target/**',
       'dist/**',
       '**/dist/**',
       'build/**',

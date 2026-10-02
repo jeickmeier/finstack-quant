@@ -36,7 +36,7 @@
     },
     {
       "additionalProperties": false,
-      "description": "Explicit schedule of remaining principal amounts after given dates.\nEach pair stores `(date, remaining_principal_after_date)`.",
+      "description": "Explicit schedule of remaining principal amounts after given economic dates.\nTargets include PIK capitalized and principal events effective on that date.\nA target may exceed initial or earlier remaining principal when funded by\nintervening draws or PIK, but must not exceed the live balance on its date.\nEach pair stores `(date, remaining_principal_after_date)`.",
       "properties": {
         "step_remaining": {
           "additionalProperties": false,
@@ -120,18 +120,18 @@
     },
     {
       "additionalProperties": false,
-      "description": "Equal principal installments on every payment date in `(start, end]`,\nrepaying the outstanding principal in full by `end`.",
+      "description": "Equal principal installments on coupon accrual boundaries in `(start, end]`.\nThe installment is fixed from outstanding after all start-date movements,\nincluding PIK and explicit principal events. The final installment pays\nthe live remaining balance, including subsequent PIK or principal changes.\nPrincipal changes economically on each accrual boundary; cash settles on\nthat coupon's adjusted, lagged payment date.",
       "properties": {
         "linear_between": {
           "additionalProperties": false,
           "properties": {
             "end": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-              "description": "Amortization end (full repayment), on or before maturity."
+              "description": "Economic end of amortization (full repayment), which must be an\nactual coupon accrual boundary on or before the effective terminal\naccrual date. Cash settlement may follow this date due to payment lag."
             },
             "start": {
               "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
-              "description": "Amortization start; installments fall on payment dates strictly\nafter it."
+              "description": "Economic amortization start, on or after issue; installments fall\non coupon accrual boundaries strictly after it."
             }
           },
           "required": [
@@ -148,7 +148,7 @@
     },
     {
       "additionalProperties": false,
-      "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).",
+      "description": "Custom principal exchanges on specific dates (absolute cash amounts).\nPositive amounts reduce outstanding (i.e., principal paid by issuer).\nEach payment must be covered by the live balance, including prior draws\nand PIK. Lifetime repayments may therefore exceed initial principal.",
       "properties": {
         "custom_principal": {
           "additionalProperties": false,

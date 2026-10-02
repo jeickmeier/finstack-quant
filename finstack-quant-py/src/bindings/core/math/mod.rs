@@ -11,17 +11,10 @@ use pyo3::types::PyList;
 
 /// Register the `math` submodule on the parent `core` module.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "math")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "math")?;
     m.setattr(
         "__doc__",
         "Numerical helpers: linear algebra, statistics, special functions, summation.",
-    )?;
-
-    let qual = crate::bindings::module_utils::set_submodule_package_by_package(
-        parent,
-        &m,
-        "math",
-        "finstack_quant.core",
     )?;
 
     consecutive::register(py, &m)?;
@@ -41,7 +34,11 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qual)?;
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &m,
+        crate::bindings::module_utils::Exposure::Compiled,
+    )?;
 
     Ok(())
 }

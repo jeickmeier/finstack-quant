@@ -816,7 +816,8 @@ impl PyAlmgrenChrissModel {
 
     /// Deserialize from JSON produced by ``to_json``.
     ///
-    /// Raises ``ValueError`` when the payload is malformed.
+    /// Raises ``ValueError`` when the payload is malformed or the impact
+    /// parameters violate the constructor's finiteness and range requirements.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)
@@ -938,7 +939,8 @@ impl PyKyleLambdaModel {
 
     /// Deserialize from JSON produced by ``to_json``.
     ///
-    /// Raises ``ValueError`` when the payload is malformed.
+    /// Raises ``ValueError`` when the payload is malformed or ``lambda`` is
+    /// negative or non-finite.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)
@@ -1066,26 +1068,15 @@ fn days_to_liquidate(position_quantity: f64, adv: f64, participation_rate: f64) 
 /// Raises
 /// ------
 /// ValueError
-///     If ``thresholds`` is given but is not strictly ascending or contains a
-///     non-finite value.
+///     If ``thresholds`` is given but a value is non-finite or not positive,
+///     or the values are not strictly ascending.
 #[pyfunction]
 #[pyo3(signature = (days_to_liquidate, thresholds = None))]
 #[pyo3(text_signature = "(days_to_liquidate, thresholds=None)")]
 fn liquidity_tier(days_to_liquidate: f64, thresholds: Option<[f64; 4]>) -> PyResult<&'static str> {
-    let thresholds = match thresholds {
-        Some(values) => {
-            if values.iter().any(|value| !value.is_finite())
-                || values.windows(2).any(|pair| pair[0] >= pair[1])
-            {
-                return Err(value_error(format!(
-                    "thresholds must be four finite, strictly ascending day counts, got {values:?}"
-                )));
-            }
-            values
-        }
-        None => liquidity::LiquidityConfig::default().tier_thresholds,
-    };
-    Ok(liquidity::classify_tier(days_to_liquidate, &thresholds).as_binding_str())
+    liquidity::liquidity_tier(days_to_liquidate, thresholds)
+        .map(|tier| tier.as_binding_str())
+        .map_err(core_to_py)
 }
 
 /// Liquidity-adjusted VaR following Bangia, Diebold, Schuermann & Stroughair (1999).
@@ -1260,13 +1251,7 @@ fn kyle_lambda(
 
 /// Register the `models.liquidity` Python domain.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "liquidity")?;
-    let qualified_name = crate::bindings::module_utils::set_submodule_package_by_package(
-        parent,
-        &m,
-        "liquidity",
-        "finstack_quant.models",
-    )?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "liquidity")?;
     m.setattr(
         "__doc__",
         "Product-independent liquidity estimation, risk, and market-impact models.",
@@ -1305,6 +1290,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule_at(py, parent, &m, &qualified_name)?;
+    crate::bindings::module_utils::attach_submodule(
+        parent,
+        &m,
+        crate::bindings::module_utils::Exposure::Python,
+    )?;
     Ok(())
 }

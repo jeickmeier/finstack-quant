@@ -529,6 +529,11 @@ export interface DDb1Fcc5C6A61E550E867 {
  * - **American options**: Binomial tree (Leisen-Reimer) with cost-of-carry derived from
  *   the forward/spot relationship
  *
+ * Analytical delta measures currency per unit change in the resolved forward,
+ * holding discount factors and volatility fixed. At zero volatility or expiry,
+ * the intrinsic-payoff derivative is used; delta is defined as zero exactly at
+ * the strike, where the mathematical derivative does not exist.
+ *
  * # American Option Assumptions
  *
  * For American exercise, the model requires a spot price to build the binomial tree.
@@ -1121,6 +1126,7 @@ export interface DD760Eef55C5Bd7D5B1F6 {
  * Models the relationship between the accreted notional and the recovery
  * rate in default. As PIK accrual increases the notional relative to the
  * original base, recovery declines according to the chosen [`RecoveryModel`].
+ * Deserialization enforces the same parameter invariants as the constructors.
  */
 export interface D_16451E0Bf3B6B78178D8 {
   /**
@@ -1175,6 +1181,8 @@ export interface D_16451E0Bf3B6B78178D8 {
  * Models the relationship between a firm's leverage and its instantaneous
  * hazard rate, enabling a feedback loop where PIK accrual increases the
  * notional (and hence leverage), which drives the hazard rate higher.
+ * Deserialization validates the parameters and rejects incomplete or
+ * inconsistent tabular calibrations before they can be evaluated.
  */
 export interface DCc8Ed166Abbb10Ad4451 {
   /**

@@ -1,6 +1,6 @@
 //! Python bindings for the calibration engine.
 //!
-//! Wraps `finstack_quant_calibration::api::engine::execute` behind a typed
+//! Wraps `finstack_quant_calibration::api::engine::calibrate` behind a typed
 //! envelope-in / rich-result-out API. Envelopes can be authored as typed
 //! objects (`CalibrationEnvelope`, `CalibrationPlan`, `CalibrationStep`,
 //! quote classes), as dicts, or as canonical JSON strings.
@@ -27,7 +27,6 @@ use finstack_quant_calibration::api::engine::{self, ExecuteError};
 use finstack_quant_calibration::api::errors::EnvelopeError;
 use finstack_quant_calibration::api::schema::CalibrationEnvelope;
 use finstack_quant_calibration::api::validate as validate_api;
-use finstack_quant_core::contract::LoadLimits;
 use pyo3::create_exception;
 use pyo3::exceptions::PyRuntimeError;
 use pyo3::prelude::*;
@@ -38,9 +37,9 @@ create_exception!(
     CalibrationEnvelopeError,
     PyRuntimeError,
     "Raised when calibration ingestion, validation, context construction, or solving fails.\n\n\
-     Carries `kind`, `stage`, `step_id`, `solver_diagnostics`, `details` (JSON string) and \
-     `diagnostics` (list of strict-load diagnostic dicts with `pointer`, `message`, `code`, \
-     `expected_version`, ...) attributes for programmatic handling."
+     Carries `kind`, `stage`, `step_id`, `solver_diagnostics` (dict or None), `details` \
+     (JSON string) and `diagnostics` (list of strict-load diagnostic dicts with `pointer`, \
+     `message`, `code`, `expected_version`, ...) attributes for programmatic handling."
 );
 
 /// Attach the Rust-owned host-error payload to `CalibrationEnvelopeError`.
@@ -58,6 +57,21 @@ pub(crate) fn execute_error_to_py(py: Python<'_>, err: ExecuteError) -> PyErr {
             ))
         }
     };
+    let solver_diagnostics = match host
+        .solver_diagnostics
+        .as_ref()
+        .map(|diagnostics| crate::bindings::pandas_utils::serde_to_py(py, diagnostics))
+        .transpose()
+    {
+        Ok(dict) => dict,
+        Err(convert_err) => {
+            return PyRuntimeError::new_err(format!(
+                "failed to convert calibration solver diagnostics ({}): underlying calibration error: {}",
+                convert_err.value(py),
+                host.message
+            ))
+        }
+    };
     let attrs: [(&str, PyResult<()>); 6] = [
         ("kind", value.setattr("kind", host.kind)),
         ("stage", value.setattr("stage", host.stage.as_str())),
@@ -65,7 +79,7 @@ pub(crate) fn execute_error_to_py(py: Python<'_>, err: ExecuteError) -> PyErr {
         ("step_id", value.setattr("step_id", host.step_id)),
         (
             "solver_diagnostics",
-            value.setattr("solver_diagnostics", host.solver_diagnostics),
+            value.setattr("solver_diagnostics", solver_diagnostics),
         ),
         ("diagnostics", value.setattr("diagnostics", diagnostics)),
     ];
@@ -108,14 +122,17 @@ pub(crate) fn envelope_error_to_py(py: Python<'_>, err: EnvelopeError) -> PyErr 
     execute_error_to_py(py, ExecuteError::from(err))
 }
 
-/// Strictly parse envelope JSON, surfacing contract diagnostics.
-pub(crate) fn parse_envelope_json(py: Python<'_>, json: &str) -> PyResult<CalibrationEnvelope> {
-    CalibrationEnvelope::from_slice_strict(json.as_bytes(), &LoadLimits::default())
-        .map(|(envelope, _report)| envelope)
-        .map_err(|error| envelope_error_to_py(py, EnvelopeError::strict_load(&error)))
+/// Strictly parse envelope JSON through the Rust loader, surfacing contract
+/// diagnostics.
+pub(crate) fn parse_envelope(py: Python<'_>, json: &str) -> PyResult<CalibrationEnvelope> {
+    validate_api::parse_envelope(json).map_err(|error| envelope_error_to_py(py, error))
 }
 
 /// Extract a typed envelope from `CalibrationEnvelope | CalibrationPlan | dict | str`.
+///
+/// A `str` goes to the Rust strict loader unchanged, so malformed JSON yields
+/// the same `contract/parse-error` diagnostic as the WASM twin; only other
+/// objects (dicts) are serialized with `json.dumps` first.
 pub(crate) fn extract_envelope(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
@@ -126,8 +143,11 @@ pub(crate) fn extract_envelope(
     if let Ok(plan) = obj.cast::<PyCalibrationPlan>() {
         return Ok(plan.borrow().to_envelope(Vec::new(), Vec::new()));
     }
+    if let Ok(json) = obj.extract::<std::borrow::Cow<'_, str>>() {
+        return parse_envelope(py, &json);
+    }
     let json = py_to_json_string(py, obj, "calibration envelope")?;
-    parse_envelope_json(py, &json)
+    parse_envelope(py, &json)
 }
 
 /// Validate a calibration envelope and return its canonical (pretty-printed) JSON.
@@ -182,9 +202,7 @@ fn validate_calibration(
     envelope: &Bound<'_, PyAny>,
 ) -> PyResult<PyCalibrationEnvelope> {
     let envelope = extract_envelope(py, envelope)?;
-    if let Some(error) = validate_api::validate(&envelope).errors.into_iter().next() {
-        return Err(envelope_error_to_py(py, error));
-    }
+    validate_api::validate_fail_fast(&envelope).map_err(|error| envelope_error_to_py(py, error))?;
     Ok(PyCalibrationEnvelope::from_inner(envelope))
 }
 
@@ -264,7 +282,7 @@ fn calibrate(py: Python<'_>, envelope: &Bound<'_, PyAny>) -> PyResult<PyCalibrat
     // Release the GIL for the duration of the solver: calibration can run for seconds.
     // `ExecuteError` is a large enum; box it so the closure result stays small.
     let result = py
-        .detach(move || engine::execute(&envelope).map_err(Box::new))
+        .detach(move || engine::calibrate(&envelope).map_err(Box::new))
         .map_err(|e| execute_error_to_py(py, *e))?;
     Ok(PyCalibrationResult::from_inner(result))
 }
@@ -319,7 +337,7 @@ fn calibrate_bermudan_lmm_base_vol(
 
 /// Register the root-level calibration submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "calibration")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "calibration")?;
     m.add_class::<PyCalibrationConfig>()?;
     m.add_class::<PyCalibrationDiagnostics>()?;
     m.add_class::<PyCalibrationEnvelope>()?;
@@ -379,13 +397,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             ],
         )?,
     )?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "calibration",
-        crate::bindings::module_utils::ROOT_PACKAGE,
-        crate::bindings::module_utils::ParentNameSource::Name,
+        crate::bindings::module_utils::Exposure::Python,
     )?;
     Ok(())
 }

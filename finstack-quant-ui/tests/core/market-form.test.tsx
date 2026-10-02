@@ -44,7 +44,7 @@ afterEach(cleanup);
 const validate = async (json: string) =>
   unwrap(await harness.proxy.validateMarket(json));
 function canonical(json: string) {
-  const market = new native.Market(json);
+  const market = native.MarketContext.fromJson(json);
   try {
     return market.toJson();
   } finally {

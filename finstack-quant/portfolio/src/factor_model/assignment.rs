@@ -7,6 +7,7 @@ use finstack_quant_models::factor::{FactorId, MarketDependency};
 
 /// Assignment results for a portfolio-level factor mapping pass.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct FactorAssignmentReport {
     /// Per-position matched dependencies and factor identifiers.
     pub assignments: Vec<PositionAssignment>,
@@ -20,6 +21,7 @@ pub struct FactorAssignmentReport {
 /// (e.g. the credit matcher) emit one `(dependency, factor_id, beta)` triple
 /// per level, so a single dependency may appear in several mappings.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PositionAssignment {
     /// Portfolio position identifier.
     pub position_id: PositionId,
@@ -29,6 +31,7 @@ pub struct PositionAssignment {
 
 /// Single unmatched dependency surfaced during assignment.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct UnmatchedEntry {
     /// Portfolio position identifier.
     pub position_id: PositionId,

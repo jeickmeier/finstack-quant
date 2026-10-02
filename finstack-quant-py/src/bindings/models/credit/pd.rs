@@ -401,11 +401,7 @@ impl PyMasterScale {
     /// Raises ``ValueError`` when any PD is non-finite or outside [0, 1].
     #[pyo3(text_signature = "($self, pds)")]
     fn map_pds<'py>(&self, py: Python<'py>, pds: Vec<f64>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = pds
-            .iter()
-            .map(|pd| self.inner.map_pd(*pd))
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(pd_calibration_to_py)?;
+        let rows = self.inner.map_pds(&pds).map_err(pd_calibration_to_py)?;
         serde_rows_to_dataframe_with_schema(py, &rows, RESULT_COLUMNS)
     }
 
@@ -502,7 +498,7 @@ impl PyMasterScale {
 
 /// Build the `finstack_quant.models.credit.pd` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let m = PyModule::new(py, "pd")?;
+    let m = crate::bindings::module_utils::new_submodule(parent, "pd")?;
     m.setattr(
         "__doc__",
         "Probability of default: PiT/TtC conversion (Merton-Vasicek), central-tendency calibration, Basel IRB floor, and rating master scales.",
@@ -531,13 +527,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         ],
     )?;
     m.setattr("__all__", all)?;
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &m,
-        "pd",
-        "finstack_quant.models.credit",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

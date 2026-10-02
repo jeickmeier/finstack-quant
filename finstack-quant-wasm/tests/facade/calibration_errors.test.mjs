@@ -32,7 +32,7 @@ if (!existsSync(WASM_BG)) {
 }
 
 const facade = await import('../../index.js');
-const { default: init, calibration, valuations } = facade;
+const { default: init, calibration, core, valuations } = facade;
 await init({ module_or_path: readFileSync(WASM_BG) });
 
 function captureError(operation) {
@@ -52,17 +52,151 @@ function assertStructuredError(error) {
   assert.ok(error.solver_diagnostics === undefined || typeof error.solver_diagnostics === 'object');
   assert.equal(typeof error.details, 'string');
   assert.deepEqual(error.cause, JSON.parse(error.details));
+  assert.ok(Array.isArray(error.diagnostics));
+  assert.deepEqual(error.diagnostics, error.cause.diagnostics ?? []);
 }
+
+function swapEnvelope(spread) {
+  return {
+    schema: 'finstack_quant.calibration/1',
+    plan: {
+      id: 'swap-spread',
+      quote_sets: { quotes: ['USD-SWAP-2Y'] },
+      settings: {},
+      steps: [
+        {
+          id: 'USD-OIS',
+          kind: 'discount',
+          curve_id: 'USD-OIS',
+          currency: 'USD',
+          base_date: '2026-09-30',
+          quote_set: 'quotes',
+        },
+      ],
+    },
+    market_data: [
+      {
+        kind: 'rate_quote',
+        type: 'swap',
+        id: 'USD-SWAP-2Y',
+        index: 'USD-SOFR-OIS',
+        pillar: { tenor: { count: 2, unit: 'years' } },
+        rate: 0.04,
+        spread_decimal: spread,
+      },
+    ],
+  };
+}
+
+test('object calibration inputs reject non-finite optional spreads before JSON conversion', () => {
+  for (const [spread, text] of [
+    [NaN, 'NaN'],
+    [Infinity, 'inf'],
+    [-Infinity, '-inf'],
+  ]) {
+    for (const operation of [
+      calibration.calibrate,
+      calibration.validateCalibrationJson,
+      calibration.dryRun,
+    ]) {
+      // The Rust `json_text` boundary rejects a non-finite number before any JSON is built.
+      assert.throws(
+        () => operation(swapEnvelope(spread)),
+        (error) => {
+          assert.ok(error instanceof TypeError);
+          assert.equal(error.kind, 'invalid_type');
+          assert.match(
+            error.message,
+            new RegExp(
+              `^(\\w+): \\1\\.market_data\\[0\\]\\.spread_decimal is ${text}, ` +
+                'which JSON cannot represent$'
+            )
+          );
+          return true;
+        }
+      );
+    }
+  }
+});
+
+test('object calibration inputs preserve finite and absent optional spreads', () => {
+  for (const spread of [null, 0, 0.001, -0.001]) {
+    const envelope = swapEnvelope(spread);
+    const canonical = JSON.parse(calibration.validateCalibrationJson(envelope));
+    assert.equal(canonical.market_data[0].spread_decimal, spread);
+    assert.equal(calibration.calibrate(envelope).result.report.success, true);
+  }
+});
 
 test('calibration is owned only by the calibration namespace', () => {
   for (const name of [
     'calibrate',
     'calibrateBermudanLmmBaseVol',
     'dryRun',
+    'dryRunJson',
     'validateCalibrationJson',
   ]) {
     assert.equal(typeof calibration[name], 'function');
     assert.equal(valuations[name], undefined);
+  }
+});
+
+test('calibrated final market restores through the reusable market handle', () => {
+  const result = calibration.calibrate({
+    schema: 'finstack_quant.calibration/1',
+    plan: { id: 'market-round-trip', quote_sets: {}, steps: [], settings: {} },
+  });
+  const state = result.result.final_market;
+  for (const input of [JSON.stringify(state), state]) {
+    const market = core.MarketContext.fromJson(input);
+    try {
+      assert.deepEqual(JSON.parse(market.toJson()), state);
+    } finally {
+      market.free();
+    }
+  }
+});
+
+test('market re-ingestion rejects hierarchy nesting beyond canonical limits', () => {
+  const result = calibration.calibrate({
+    schema: 'finstack_quant.calibration/1',
+    plan: { id: 'market-depth', quote_sets: {}, steps: [], settings: {} },
+  });
+  const state = result.result.final_market;
+  let node = {};
+  for (let level = 0; level < 50; level += 1) {
+    node = { children: { [`Level${level}`]: node } };
+  }
+  state.hierarchy = { roots: { Rates: node } };
+  assert.throws(
+    () => core.MarketContext.fromJson(JSON.stringify(state)),
+    (error) => {
+      assert.equal(error.name, 'ContractValidationError');
+      assert.equal(error.kind, 'validation');
+      assert.equal(error.code, 'limit_exceeded');
+      assert.match(error.message, /JSON depth.*96/);
+      return true;
+    }
+  );
+});
+
+test('market re-ingestion requires an explicit supported schema version', () => {
+  const result = calibration.calibrate({
+    schema: 'finstack_quant.calibration/1',
+    plan: { id: 'market-version', quote_sets: {}, steps: [], settings: {} },
+  });
+  const unversioned = { ...result.result.final_market };
+  delete unversioned.schema_version;
+  for (const state of [unversioned, { ...unversioned, schema_version: 2 }]) {
+    assert.throws(
+      () => core.MarketContext.fromJson(state),
+      (error) => {
+        assert.equal(error.name, 'ContractValidationError');
+        assert.equal(error.kind, 'validation');
+        assert.match(`${error.message} ${JSON.stringify(error.report ?? null)}`, /version/);
+        return true;
+      }
+    );
   }
 });
 
@@ -75,6 +209,59 @@ test('malformed calibration input exposes canonical ingestion details', () => {
   assert.equal(error.step_id, undefined);
   assert.equal(error.solver_diagnostics, undefined);
   assert.equal(error.cause.category, 'strict_load');
+});
+
+test('every envelope entry point reports malformed JSON with the same parse diagnostic', () => {
+  for (const name of ['calibrate', 'dryRun', 'dryRunJson', 'validateCalibrationJson']) {
+    const error = captureError(() => calibration[name]('not json'));
+    assertStructuredError(error);
+    assert.equal(error.kind, 'strict_load', name);
+    assert.equal(error.diagnostics[0].code, 'contract/parse-error', name);
+    assert.equal(error.diagnostics[0].pointer, null, name);
+  }
+});
+
+test('dryRun returns the typed report and dryRunJson its wire twin', () => {
+  const envelope = {
+    schema: 'finstack_quant.calibration/1',
+    plan: {
+      id: 'dry',
+      quote_sets: {},
+      settings: {},
+      steps: [
+        {
+          id: 'discount_step',
+          quote_set: 'missing_quotes',
+          kind: 'discount',
+          curve_id: 'USD-OIS',
+          currency: 'USD',
+          base_date: '2026-05-08',
+        },
+      ],
+    },
+  };
+  const report = calibration.dryRun(envelope);
+  assert.equal(typeof report, 'object');
+  assert.equal(report.errors[0].kind, 'undefined_quote_set');
+  assert.equal(report.dependency_graph.nodes[0].step_id, 'discount_step');
+  assert.deepEqual(report, JSON.parse(calibration.dryRunJson(envelope)));
+});
+
+test('unusable solver settings are rejected by validation and execution', () => {
+  const EMPTY = JSON.parse(readFileSync(EQUITY_VOL_EXAMPLE, 'utf8'));
+  for (const solver of [{ tolerance: 0 }, { tolerance: -1 }, { max_iterations: 0 }]) {
+    const envelope = structuredClone(EMPTY);
+    envelope.plan.settings.solver = solver;
+    for (const name of ['calibrate', 'validateCalibrationJson', 'dryRun']) {
+      const error = captureError(() => calibration[name](envelope));
+      assertStructuredError(error);
+      assert.match(
+        error.message,
+        /solver (tolerance|max_iterations)/,
+        `${name} ${JSON.stringify(solver)}`
+      );
+    }
+  }
 });
 
 test('Hull-White calibration requires an explicit quoted-volatility fit budget', () => {
@@ -100,6 +287,42 @@ test('Hull-White calibration requires an explicit quoted-volatility fit budget',
   assertStructuredError(error);
   assert.equal(error.stage, 'ingestion');
   assert.match(error.message, /fit_tolerance/);
+});
+
+test('cap/floor Hull-White inputs require index conventions and reject frequency overrides', () => {
+  const envelope = {
+    schema: 'finstack_quant.calibration/1',
+    plan: {
+      id: 'cap-conventions',
+      quote_sets: { caps: [] },
+      settings: {},
+      steps: [
+        {
+          id: 'HW-CAPS',
+          quote_set: 'caps',
+          kind: 'cap_floor_hull_white',
+          discount_curve_id: 'EUR-OIS',
+          forward_curve_id: 'EUR-EURIBOR-3M',
+          currency: 'EUR',
+          base_date: '2026-09-30',
+          fit_tolerance: 1e-4,
+        },
+      ],
+    },
+  };
+  const missingIndex = captureError(() => calibration.dryRun(envelope));
+  assertStructuredError(missingIndex);
+  assert.match(missingIndex.message, /index_id/);
+
+  envelope.plan.steps[0].index_id = 'EUR-EURIBOR-3M';
+  const report = calibration.dryRun(envelope);
+  assert.ok(Array.isArray(report.errors));
+  assert.deepEqual(report, JSON.parse(calibration.dryRunJson(envelope)));
+
+  envelope.plan.steps[0].payment_frequency = 'quarterly';
+  const override = captureError(() => calibration.dryRun(envelope));
+  assertStructuredError(override);
+  assert.match(override.message, /payment_frequency/);
 });
 
 test('step-scoped validation error keeps kind distinct from step id', () => {
@@ -186,4 +409,28 @@ test('parametric calibration rejects a separate discount curve', () => {
   assertStructuredError(error);
   assert.equal(error.stage, 'ingestion');
   assert.match(error.message, /discount_curve_id/);
+});
+
+test('discount solve settings reject the removed curve-shape keys', () => {
+  for (const key of ['interp_style', 'extrapolation_policy']) {
+    const error = captureError(() =>
+      calibration.validateCalibrationJson({
+        schema: 'finstack_quant.calibration/1',
+        plan: { id: 'p', steps: [], settings: { discount_curve: { [key]: 'linear' } } },
+      })
+    );
+    assert.equal(error.name, 'CalibrationEnvelopeError');
+    assert.equal(error.kind, 'strict_load');
+    assert.match(error.message, new RegExp(`unknown field \`${key}\``));
+  }
+});
+
+test('market freshness age is accepted as a plain number', () => {
+  const envelope = {
+    schema: 'finstack_quant.calibration/1',
+    plan: { id: 'p', steps: [], settings: { market_freshness: { max_age_seconds: 3600 } } },
+  };
+  assert.deepEqual(calibration.dryRun(envelope).errors, []);
+  const canonical = JSON.parse(calibration.validateCalibrationJson(envelope));
+  assert.equal(canonical.plan.settings.market_freshness.max_age_seconds, 3600);
 });

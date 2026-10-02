@@ -1,0 +1,21 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/hull_white_calibration_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Validated constant-parameter Hull-White one-factor model.",
+  "properties": {
+    "kappa": {
+      "format": "double",
+      "type": "number"
+    },
+    "sigma": {
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "kappa",
+    "sigma"
+  ],
+  "title": "HullWhiteCalibrationParams",
+  "type": "object"
+}

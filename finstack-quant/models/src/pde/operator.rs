@@ -1,8 +1,9 @@
 //! Tridiagonal spatial operator and Thomas algorithm.
 //!
 //! Discretizes a 1D PDE on a [`Grid1D`] into a tridiagonal matrix using
-//! second-order accurate finite difference stencils on (possibly non-uniform)
-//! grids. The Thomas algorithm solves the resulting system in O(n) time.
+//! central finite differences on (possibly non-uniform) grids, with monotone
+//! one-sided convection in drift-dominated cells. The Thomas algorithm solves
+//! the resulting system in O(n) time.
 
 use super::boundary::BoundaryCondition;
 use super::grid::Grid1D;
@@ -68,6 +69,38 @@ fn check_pivot(d: f64, term_a: f64, term_b: f64, row: usize, n: usize) -> Result
     Ok(())
 }
 
+/// Monotone diffusion/convection stencil shared by the 1D and ADI operators.
+/// Central differences retain second-order accuracy where both off-diagonals
+/// are non-negative; convection-dominated cells use the appropriate one-sided
+/// difference so the spatial operator preserves non-negative payoffs.
+/// The one-sided branch adds approximately `|b| * h / 2` numerical diffusion;
+/// low-volatility prices require spatial refinement to control that bias.
+pub(super) fn node_stencil(a: f64, b: f64, h_m: f64, h_p: f64) -> (f64, f64, f64) {
+    let h_sum = h_m + h_p;
+    let central_is_monotone = if b >= 0.0 {
+        b * h_p <= 2.0 * a
+    } else {
+        -b * h_m <= 2.0 * a
+    };
+
+    let mut lower = 2.0 * a / (h_m * h_sum);
+    let mut main = -2.0 * a / (h_m * h_p);
+    let mut upper = 2.0 * a / (h_p * h_sum);
+
+    if central_is_monotone {
+        lower -= b * h_p / (h_m * h_sum);
+        main += b * (h_p - h_m) / (h_m * h_p);
+        upper += b * h_m / (h_p * h_sum);
+    } else if b >= 0.0 {
+        main -= b / h_p;
+        upper += b / h_p;
+    } else {
+        main += b / h_m;
+        lower -= b / h_m;
+    }
+    (lower, main, upper)
+}
+
 /// Tridiagonal matrix representing the spatial discretization of a 1D PDE.
 ///
 /// For `n` interior grid points, the matrix is `n × n` with sub-diagonal,
@@ -100,7 +133,8 @@ impl TridiagOperator {
     /// Assemble the tridiagonal operator from PDE coefficients at time `t`.
     ///
     /// Discretizes `a(x,t) u'' + b(x,t) u' + c(x,t) u + f(x,t)` on the
-    /// given grid using second-order accurate stencils for non-uniform spacing.
+    /// given grid. Central differences are second-order on smoothly varying
+    /// grids; drift-dominated cells use first-order monotone convection.
     /// Boundary conditions modify the first and last rows.
     pub fn assemble(problem: &dyn PdeProblem1D, grid: &Grid1D, t: f64) -> Self {
         let n = grid.n_interior();
@@ -114,25 +148,14 @@ impl TridiagOperator {
             let x = grid.points()[i];
             let h_m = grid.h_left(i);
             let h_p = grid.h_right(i);
-            let h_sum = h_m + h_p;
-
             let a = problem.diffusion(x, t);
             let b = problem.convection(x, t);
             let c = problem.reaction(x, t);
 
-            // Second derivative stencil: a * u''
-            // u[i-1]: 2a / (h_m * h_sum)
-            // u[i]:  -2a / (h_m * h_p)
-            // u[i+1]: 2a / (h_p * h_sum)
-
-            // First derivative stencil (central, non-uniform): b * u'
-            // u[i-1]: -b * h_p / (h_m * h_sum)
-            // u[i]:    b * (h_p - h_m) / (h_m * h_p)
-            // u[i+1]:  b * h_m / (h_p * h_sum)
-
-            lower[k] = 2.0 * a / (h_m * h_sum) - b * h_p / (h_m * h_sum);
-            main[k] = -2.0 * a / (h_m * h_p) + b * (h_p - h_m) / (h_m * h_p) + c;
-            upper[k] = 2.0 * a / (h_p * h_sum) + b * h_m / (h_p * h_sum);
+            let (lo, mi, up) = node_stencil(a, b, h_m, h_p);
+            lower[k] = lo;
+            main[k] = mi + c;
+            upper[k] = up;
             source[k] = problem.source(x, t);
         }
 
@@ -480,15 +503,15 @@ fn apply_lower_boundary(
             lower[0] = 0.0;
             correction
         }
-        BoundaryCondition::Linear => {
-            // d²u/dx² = 0 at boundary → u[0] = 2*u[1] - u[2]
-            // Substitute into stencil for first interior point (k=0, grid i=1):
-            // lower[0]*u[0] → lower[0]*(2*u[1] - u[2])
-            // main[0] += 2*lower[0]
-            // upper[0] -= lower[0]
-            main[0] += 2.0 * lower[0];
+        BoundaryCondition::Linear | BoundaryCondition::LinearInExp => {
             if upper.len() > 1 {
-                upper[0] -= lower[0];
+                // Continue the slope between the first two interior nodes
+                // over the boundary cell, whose width need not match theirs.
+                let ratio = bc.extrapolation_ratio(grid.h_left(1), grid.h_right(1), true);
+                main[0] += (1.0 + ratio) * lower[0];
+                upper[0] -= ratio * lower[0];
+            } else {
+                main[0] += lower[0];
             }
             lower[0] = 0.0;
             0.0
@@ -525,11 +548,15 @@ fn apply_upper_boundary(
             upper[last] = 0.0;
             correction
         }
-        BoundaryCondition::Linear => {
-            // d²u/dx² = 0 → u[n] = 2*u[n-1] - u[n-2]
-            main[last] += 2.0 * upper[last];
+        BoundaryCondition::Linear | BoundaryCondition::LinearInExp => {
             if last > 0 {
-                lower[last] -= upper[last];
+                let interior = grid.n() - 2;
+                let ratio =
+                    bc.extrapolation_ratio(grid.h_right(interior), grid.h_left(interior), false);
+                main[last] += (1.0 + ratio) * upper[last];
+                lower[last] -= ratio * upper[last];
+            } else {
+                main[last] += upper[last];
             }
             upper[last] = 0.0;
             0.0

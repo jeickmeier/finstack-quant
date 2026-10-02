@@ -324,3 +324,22 @@ fn finite_results_survive_json_and_overflow_is_an_error() {
         Some(0.)
     );
 }
+
+#[test]
+fn ewma_vol_is_bit_identical_across_build_targets() {
+    // Pinned to the bits the wasm32 build produced before the switch to
+    // `libm::hypot`; native `f64::hypot` gave ...148120 / ...015707 for the
+    // last two points. The same vector is pinned in the Python and WASM host
+    // tests.
+    let values = [Some(0.01), Some(-0.02), Some(0.03), Some(0.0), Some(0.01)];
+    let vol = ts(&values, "ewma_vol", json!({"span": 3})).unwrap();
+    let expected = [
+        None,
+        Some(0.015000000000000003_f64),
+        Some(0.020463381929681126),
+        Some(0.015761900266148116),
+        Some(0.011301963325015705),
+    ];
+    let bits = |v: &[Option<f64>]| v.iter().map(|x| x.map(f64::to_bits)).collect::<Vec<_>>();
+    assert_eq!(bits(&vol), bits(&expected), "{vol:?}");
+}

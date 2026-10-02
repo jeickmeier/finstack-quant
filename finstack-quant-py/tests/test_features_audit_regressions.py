@@ -113,3 +113,18 @@ def test_ewma_and_window_boundaries() -> None:
         None,
         1.0,
     ]
+
+
+def test_ewma_vol_is_bit_identical_to_the_wasm_build() -> None:
+    # The Rust kernel uses libm::hypot on every target; the same vector is
+    # pinned in finstack-quant-wasm/tests/facade/features_audit.test.mjs.
+    vol = f.transform_timeseries(
+        [0.01, -0.02, 0.03, 0.0, 0.01], ["A"] * 5, ["1", "2", "3", "4", "5"], "ewma_vol", {"span": 3}
+    )
+    assert vol == [
+        None,
+        0.015000000000000003,
+        0.020463381929681126,
+        0.015761900266148116,
+        0.011301963325015705,
+    ]

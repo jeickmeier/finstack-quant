@@ -1,0 +1,48 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/schwartz_smith_params.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Schwartz-Smith process parameters.",
+  "properties": {
+    "kappa": {
+      "description": "Mean reversion speed for short-term deviation (κ_X)",
+      "format": "double",
+      "type": "number"
+    },
+    "lambda_x": {
+      "default": 0.0,
+      "description": "Constant risk-premium drift shift for the short-term factor (λ_X).\n\nUnder the risk-neutral measure the short-term factor follows\n`dX = (−κ_X X − λ_X) dt + σ_X dW*` (Schwartz & Smith 2000): a constant\ndrift shift at unchanged κ_X. Defaults to 0 (physical measure).",
+      "format": "double",
+      "type": "number"
+    },
+    "mu_y": {
+      "description": "Drift of long-term trend (μ_Y)",
+      "format": "double",
+      "type": "number"
+    },
+    "rho_xy": {
+      "description": "Correlation between X and Y (ρ)",
+      "format": "double",
+      "type": "number"
+    },
+    "sigma_x": {
+      "description": "Volatility of short-term component (σ_X)",
+      "format": "double",
+      "type": "number"
+    },
+    "sigma_y": {
+      "description": "Volatility of long-term component (σ_Y)",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "kappa",
+    "sigma_x",
+    "mu_y",
+    "sigma_y",
+    "rho_xy"
+  ],
+  "title": "SchwartzSmithParams",
+  "type": "object"
+}

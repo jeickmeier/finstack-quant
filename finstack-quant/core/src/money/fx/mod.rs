@@ -44,7 +44,9 @@ pub use matrix::FxMatrix;
 pub use provider::FxProvider;
 pub(crate) use provider::{reciprocal_rate_or_err, validate_fx_rate};
 pub use providers::{BumpedFxProvider, SimpleFxProvider};
-pub use types::{FxConfig, FxConversionPolicy, FxMatrixState, FxPolicyMeta, FxQuery, FxRateResult};
+pub use types::{
+    CurrencyPair, FxConfig, FxConversionPolicy, FxMatrixState, FxPolicyMeta, FxQuery, FxRateResult,
+};
 
 #[cfg(test)]
 mod tests {
@@ -64,6 +66,21 @@ mod tests {
             matrix.with_bumped_rate(Currency::EUR, Currency::USD, -1.0, date!(2025 - 01 - 01));
 
         assert!(result.is_err(), "100% negative bump should be rejected");
+    }
+
+    #[test]
+    fn currency_pair_parses_both_forms_and_rejects_multibyte_keys() {
+        for text in ["EUR/USD", "EURUSD", "eurusd", "eur/usd"] {
+            let pair: CurrencyPair = text.parse().expect("valid pair");
+            assert_eq!((pair.base, pair.quote), (Currency::EUR, Currency::USD));
+        }
+        // Six bytes but not six characters: must error, never slice mid-char.
+        for text in ["é€x", "EURUS", "EURUSDX", "", "EUR-USD"] {
+            let err = text.parse::<CurrencyPair>().expect_err("malformed pair");
+            assert_eq!(err.kind(), crate::error::ErrorKind::Validation);
+        }
+        let err = "EUR/XYZ".parse::<CurrencyPair>().expect_err("bad quote");
+        assert!(err.to_string().contains("\"XYZ\""), "{err}");
     }
 
     #[test]

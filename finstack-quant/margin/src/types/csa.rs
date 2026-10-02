@@ -180,7 +180,8 @@ impl CsaSpec {
     ///
     /// # Errors
     ///
-    /// Returns an error if the embedded margin registry cannot be loaded.
+    /// Returns an error if the embedded margin registry cannot be loaded or
+    /// the resulting spec fails [`CsaSpec::validate`].
     pub fn usd_regulatory() -> Result<Self> {
         Self::regulatory_for_currency(Currency::USD, "USD-REGULATORY-CSA", "USD-OIS")
     }
@@ -189,7 +190,8 @@ impl CsaSpec {
     ///
     /// # Errors
     ///
-    /// Returns an error if the embedded margin registry cannot be loaded.
+    /// Returns an error if the embedded margin registry cannot be loaded or
+    /// the resulting spec fails [`CsaSpec::validate`].
     pub fn eur_regulatory() -> Result<Self> {
         Self::regulatory_for_currency(Currency::EUR, "EUR-REGULATORY-CSA", "EUR-ESTR")
     }
@@ -207,7 +209,9 @@ impl CsaSpec {
     ///
     /// # Errors
     ///
-    /// Returns an error if the embedded margin registry cannot be loaded.
+    /// Returns an error if the embedded margin registry cannot be loaded or
+    /// the resulting spec fails [`CsaSpec::validate`] (for example, an empty
+    /// `id`).
     pub fn regulatory_for_currency(
         currency: Currency,
         id: &str,
@@ -361,7 +365,7 @@ impl CsaSpec {
                 MarginCallTiming::regulatory_standard()?,
             ),
         };
-        Ok(Self {
+        let spec = Self {
             id: id.to_string(),
             base_currency: currency,
             calendar_id: super::default_margin_calendar(currency).to_string(),
@@ -370,7 +374,9 @@ impl CsaSpec {
             eligible_collateral,
             call_timing,
             collateral_curve_id: CurveId::new(collateral_curve),
-        })
+        };
+        spec.validate()?;
+        Ok(spec)
     }
 
     /// Check if this CSA requires initial margin.
@@ -443,6 +449,16 @@ mod tests {
         assert_eq!(csa.base_currency, Currency::USD);
         assert_eq!(csa.vm_params.threshold, Money::from((0_i64, Currency::USD)));
         assert!(csa.requires_im());
+    }
+
+    #[test]
+    fn regulatory_constructors_return_validated_specs() {
+        let error = CsaSpec::regulatory_for_currency(Currency::USD, "", "USD-OIS")
+            .expect_err("an empty CSA id must fail at construction");
+        assert!(
+            error.to_string().contains("CSA id must not be empty"),
+            "{error}"
+        );
     }
 
     #[test]

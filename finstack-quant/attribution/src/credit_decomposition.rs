@@ -424,7 +424,7 @@ mod tests {
     use finstack_quant_core::money::Money;
     use finstack_quant_core::types::{CurveId, IssuerId};
     use finstack_quant_models::factor::credit::hierarchy::{
-        AdderVolSource, CalibrationDiagnostics, CreditFactorModel, CreditFactorModelSchema,
+        AdderVolSource, CreditCalibrationDiagnostics, CreditFactorModel, CreditFactorModelSchema,
         CreditHierarchySpec, DateRange, FactorCorrelationMatrix, GenericFactorSpec,
         HierarchyDimension, IssuerBetaMode, IssuerBetaPolicy, IssuerBetaRow, IssuerBetas,
         IssuerTags, LevelsAtAnchor, VolState,
@@ -503,7 +503,7 @@ mod tests {
                 idiosyncratic: std::collections::BTreeMap::new(),
             },
             factor_histories: None,
-            diagnostics: CalibrationDiagnostics {
+            diagnostics: CreditCalibrationDiagnostics {
                 mode_counts: std::collections::BTreeMap::new(),
                 bucket_sizes_per_level: vec![],
                 fold_ups: vec![],
@@ -554,8 +554,12 @@ mod tests {
     fn spec(t0: Date, t1: Date, bond: Bond) -> AttributionSpec {
         AttributionSpec {
             instrument: InstrumentJson::Bond(bond),
-            market_t0: (&MarketContext::new()).into(),
-            market_t1: (&MarketContext::new()).into(),
+            market_t0: (&MarketContext::new())
+                .try_into()
+                .expect("coherent market snapshot"),
+            market_t1: (&MarketContext::new())
+                .try_into()
+                .expect("coherent market snapshot"),
             as_of_t0: t0,
             as_of_t1: t1,
             method: AttributionMethod::MetricsBased,

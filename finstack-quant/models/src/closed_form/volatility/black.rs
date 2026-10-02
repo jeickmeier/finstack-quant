@@ -9,10 +9,11 @@
 //! risk-free rate, continuous dividend yield, volatility, and expiry. Those
 //! functions include the continuous discount factors in the returned spot price.
 //!
-//! Degenerate Black-76 and shifted-Black inputs return intrinsic value for
-//! prices and zero or digital-limit values for Greeks. Spot Black-Scholes
+//! Zero volatility or expiry returns intrinsic value for Black-76 prices and
+//! zero or digital-limit values for Greeks. Invalid inputs return `NaN`; use
+//! the checked price/Greeks entrypoints for validation errors. Spot Black-Scholes
 //! functions return `NaN` when any input is non-finite and otherwise return
-//! intrinsic value at zero expiry or zero volatility.
+//! intrinsic value at zero expiry or discounted deterministic payoff at zero volatility.
 //!
 //! # References
 //!
@@ -23,7 +24,7 @@
 //! - Hull, J. C., *Options, Futures, and Other Derivatives*. `docs/REFERENCES.md#hull-options-futures`
 //!
 
-use crate::closed_form::vanilla::bs_price_unchecked;
+use crate::closed_form::vanilla::bs_price;
 use crate::types::OptionType;
 use finstack_quant_core::math::{norm_cdf, norm_pdf};
 
@@ -37,6 +38,15 @@ struct BlackState {
 #[inline]
 fn all_finite(values: &[f64]) -> bool {
     values.iter().all(|value| value.is_finite())
+}
+
+#[inline]
+fn valid_black_inputs(forward: f64, strike: f64, sigma: f64, t: f64) -> bool {
+    all_finite(&[forward, strike, sigma, t])
+        && forward > 0.0
+        && strike > 0.0
+        && sigma >= 0.0
+        && t >= 0.0
 }
 
 #[inline]
@@ -67,8 +77,8 @@ fn black_state(forward: f64, strike: f64, sigma: f64, t: f64) -> Option<BlackSta
 /// # Returns
 ///
 /// Returns `F N(d1) - K N(d2)` before multiplying by any annuity, notional, or
-/// discount factor. If `t <= 0`, `sigma <= 0`, `forward <= 0`, or `strike <= 0`,
-/// returns intrinsic value `(forward - strike).max(0.0)`.
+/// discount factor. At zero expiry or volatility returns intrinsic value
+/// `(forward - strike).max(0.0)`. Invalid or non-finite inputs return `NaN`.
 ///
 /// # Examples
 ///
@@ -80,6 +90,9 @@ fn black_state(forward: f64, strike: f64, sigma: f64, t: f64) -> Option<BlackSta
 /// assert!((call - put - 0.01).abs() < 1e-12);
 /// ```
 pub fn black_call(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
+    if !valid_black_inputs(forward, strike, sigma, t) {
+        return f64::NAN;
+    }
     match black_state(forward, strike, sigma, t) {
         Some(state) => forward * norm_cdf(state.d1) - strike * norm_cdf(state.d2),
         None => (forward - strike).max(0.0),
@@ -99,9 +112,12 @@ pub fn black_call(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 /// # Returns
 ///
 /// Returns `K N(-d2) - F N(-d1)` before multiplying by any annuity, notional, or
-/// discount factor. If the lognormal domain is degenerate, returns intrinsic
-/// value `(strike - forward).max(0.0)`.
+/// discount factor. At zero expiry or volatility returns intrinsic value
+/// `(strike - forward).max(0.0)`. Invalid or non-finite inputs return `NaN`.
 pub fn black_put(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
+    if !valid_black_inputs(forward, strike, sigma, t) {
+        return f64::NAN;
+    }
     match black_state(forward, strike, sigma, t) {
         Some(state) => strike * norm_cdf(-state.d2) - forward * norm_cdf(-state.d1),
         None => (strike - forward).max(0.0),
@@ -124,8 +140,9 @@ pub fn black_put(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 ///
 /// Returns `S exp(-qT) N(d1) - K exp(-rT) N(d2)`, including continuous discount
 /// factors. Returns `NaN` if any input is non-finite. For finite degenerate
-/// inputs (`t <= 0`, `sigma <= 0`, `spot <= 0`, or `strike <= 0`), returns
-/// intrinsic value `(spot - strike).max(0.0)`.
+/// inputs outside the checked Black-Scholes domain, returns `NaN`. At zero
+/// expiry returns spot intrinsic; at zero volatility returns discounted
+/// deterministic payoff using `S exp(-qT)` and `K exp(-rT)`.
 ///
 /// # Examples
 ///
@@ -176,7 +193,9 @@ pub fn black_scholes_spot_call(
 ///
 /// Returns `K exp(-rT) N(-d2) - S exp(-qT) N(-d1)`, including continuous
 /// discount factors. Returns `NaN` if any input is non-finite. For finite
-/// degenerate inputs, returns intrinsic value `(strike - spot).max(0.0)`.
+/// inputs outside the checked Black-Scholes domain, returns `NaN`. At zero
+/// expiry returns spot intrinsic; at zero volatility returns discounted
+/// deterministic payoff using `S exp(-qT)` and `K exp(-rT)`.
 #[must_use]
 pub fn black_scholes_spot_put(
     spot: f64,
@@ -197,8 +216,7 @@ pub fn black_scholes_spot_put(
     )
 }
 
-/// Spot Black-Scholes-Merton price with this module's degenerate-input
-/// conventions layered over the canonical [`bs_price_unchecked`] kernel.
+/// Spot Black-Scholes-Merton price delegated to the canonical checked kernel.
 #[inline]
 fn black_scholes_spot(
     spot: f64,
@@ -209,16 +227,7 @@ fn black_scholes_spot(
     t: f64,
     option_type: OptionType,
 ) -> f64 {
-    if !all_finite(&[spot, strike, rate, dividend_yield, sigma, t]) {
-        return f64::NAN;
-    }
-    if t <= 0.0 || sigma <= 0.0 || spot <= 0.0 || strike <= 0.0 {
-        return match option_type {
-            OptionType::Call => (spot - strike).max(0.0),
-            OptionType::Put => (strike - spot).max(0.0),
-        };
-    }
-    bs_price_unchecked(spot, strike, rate, dividend_yield, sigma, t, option_type)
+    bs_price(spot, strike, rate, dividend_yield, sigma, t, option_type).unwrap_or(f64::NAN)
 }
 
 /// Black-76 vega with respect to lognormal volatility.
@@ -234,8 +243,12 @@ fn black_scholes_spot(
 /// # Returns
 ///
 /// Returns `d price / d sigma` on the same unit-annuity scale as
-/// [`black_call`]. Returns `0.0` for degenerate lognormal domains.
+/// [`black_call`]. Returns `0.0` at zero expiry or volatility and `NaN` for
+/// invalid or non-finite inputs.
 pub fn black_vega(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
+    if !valid_black_inputs(forward, strike, sigma, t) {
+        return f64::NAN;
+    }
     match black_state(forward, strike, sigma, t) {
         Some(state) => forward * t.sqrt() * norm_pdf(state.d1),
         None => 0.0,
@@ -246,9 +259,9 @@ pub fn black_vega(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 ///
 /// # Returns
 ///
-/// Returns `N(d1)` in the valid lognormal domain. At zero expiry or another
-/// degenerate domain, returns the intrinsic digital limit: `1.0` when
-/// `forward >= strike`, otherwise `0.0`.
+/// Returns `N(d1)` in the valid lognormal domain. At zero expiry or volatility,
+/// returns the intrinsic digital limit: `1.0` when `forward >= strike`,
+/// otherwise `0.0`. Invalid or non-finite inputs return `NaN`.
 ///
 /// # Arguments
 ///
@@ -258,6 +271,9 @@ pub fn black_vega(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 /// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
 /// * `t` - Time to expiry in years.
 pub fn black_delta_call(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
+    if !valid_black_inputs(forward, strike, sigma, t) {
+        return f64::NAN;
+    }
     match black_state(forward, strike, sigma, t) {
         Some(state) => norm_cdf(state.d1),
         None => {
@@ -285,7 +301,13 @@ pub fn black_delta_call(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 /// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
 /// * `t` - Time to expiry in years.
 pub fn black_delta_put(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
-    black_delta_call(forward, strike, sigma, t) - 1.0
+    if !valid_black_inputs(forward, strike, sigma, t) {
+        return f64::NAN;
+    }
+    match black_state(forward, strike, sigma, t) {
+        Some(state) => -norm_cdf(-state.d1),
+        None => black_delta_call(forward, strike, sigma, t) - 1.0,
+    }
 }
 
 /// Black-76 gamma with respect to the forward.
@@ -293,7 +315,7 @@ pub fn black_delta_put(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 /// # Returns
 ///
 /// Returns `n(d1) / (F sigma sqrt(T))` in the valid lognormal domain and `0.0`
-/// for degenerate inputs.
+/// at zero expiry or volatility. Invalid or non-finite inputs return `NaN`.
 ///
 /// # Arguments
 ///
@@ -303,6 +325,9 @@ pub fn black_delta_put(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 /// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
 /// * `t` - Time to expiry in years.
 pub fn black_gamma(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
+    if !valid_black_inputs(forward, strike, sigma, t) {
+        return f64::NAN;
+    }
     match black_state(forward, strike, sigma, t) {
         Some(state) => norm_pdf(state.d1) / (forward * state.st),
         None => 0.0,
@@ -313,7 +338,7 @@ pub fn black_gamma(forward: f64, strike: f64, sigma: f64, t: f64) -> f64 {
 ///
 /// Applies [`black_call`] to `forward + shift` and `strike + shift`. The shifted
 /// forward and strike must be positive for the lognormal formula; otherwise the
-/// underlying Black-76 degenerate-input intrinsic rule applies.
+/// result is `NaN`, including at zero expiry or volatility.
 ///
 /// # Arguments
 ///
@@ -344,21 +369,4 @@ pub fn black_shifted_call(forward: f64, strike: f64, sigma: f64, t: f64, shift: 
 #[inline]
 pub fn black_shifted_put(forward: f64, strike: f64, sigma: f64, t: f64, shift: f64) -> f64 {
     black_put(forward + shift, strike + shift, sigma, t)
-}
-
-/// Shifted Black vega with unit annuity.
-///
-/// Applies [`black_vega`] to `forward + shift` and `strike + shift`.
-///
-/// # Arguments
-///
-/// * `forward` - Unshifted forward rate or price in the option's native units.
-/// * `strike` - Unshifted option strike in the same units as `forward`.
-/// * `sigma` - Annualized lognormal volatility as a decimal, for example `0.20`.
-/// * `t` - Time to expiry in years.
-/// * `shift` - Additive displacement applied to both forward and strike before
-///   Black-76 pricing.
-#[inline]
-pub fn black_shifted_vega(forward: f64, strike: f64, sigma: f64, t: f64, shift: f64) -> f64 {
-    black_vega(forward + shift, strike + shift, sigma, t)
 }

@@ -6,8 +6,8 @@ import type {
   MetricMetadata,
   MoneyValue,
   ScenarioTable,
-  StatementResultJson,
-  FormulaExplanationJson,
+  StatementResult,
+  Explanation,
   CheckReport,
 } from "finstack-quant-wasm";
 /** Complete immutable facade request; JSON strings retain wide integer tokens. */
@@ -107,10 +107,10 @@ export interface WorkerApi {
   validateStatementFormula(formula: string): Promise<Envelope<string>>;
   evaluateStatement(
     request: StatementRequest,
-  ): Promise<Envelope<StatementResultJson>>;
+  ): Promise<Envelope<StatementResult>>;
   explainStatement(
     request: StatementExplanationRequest,
-  ): Promise<Envelope<FormulaExplanationJson>>;
+  ): Promise<Envelope<Explanation>>;
   explainStatementText(
     request: StatementExplanationRequest,
   ): Promise<Envelope<string>>;
@@ -119,6 +119,7 @@ export interface WorkerApi {
     request: StatementChecksRequest,
   ): Promise<Envelope<CheckReport>>;
   renderStatementChecks(reportJson: string): Promise<Envelope<string>>;
+  /** Static diagnostics as the exact `CalibrationValidationReport` wire JSON (native `dryRunJson`). */
   dryRun(envelopeJson: string): Promise<Envelope<string>>;
   calibrate(envelopeJson: string): Promise<Envelope<CalibrationResultEnvelope>>;
   sampleCube(request: CubeSampleRequest): Promise<Envelope<number[]>>;

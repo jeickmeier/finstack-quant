@@ -2,7 +2,6 @@
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
-use std::str::FromStr;
 
 use finstack_quant_core::config::RoundingMode;
 use finstack_quant_core::currency::Currency;
@@ -37,8 +36,10 @@ fn decimal_type<'py>(py: Python<'py>) -> PyResult<&'py Bound<'py, PyType>> {
 /// Parameters
 /// ----------
 /// amount : decimal.Decimal | float | int | str
-///     Finite monetary amount. ``Decimal`` and ``str`` (``"1234.56"``) are
-///     parsed exactly; ``float``/``int`` go through IEEE 754.
+///     Finite monetary amount. ``Decimal`` and ``str`` (``"1234.56"``) never
+///     pass through ``float`` and must be exactly representable as a Rust
+///     ``Decimal`` (96-bit mantissa, at most 28 fractional digits);
+///     ``float``/``int`` go through IEEE 754.
 /// currency : Currency | str
 ///     ISO-4217 currency (object or alphabetic code string).
 /// config : FinstackConfig | None
@@ -48,7 +49,8 @@ fn decimal_type<'py>(py: Python<'py>) -> PyResult<&'py Bound<'py, PyType>> {
 /// Raises
 /// ------
 /// ValueError
-///     If *amount* is not finite / not parsable or *currency* is invalid.
+///     If *amount* is not finite, parsable, or exactly representable as a
+///     96-bit Decimal with at most 28 fractional digits, or *currency* is invalid.
 ///
 /// Examples
 /// --------
@@ -88,12 +90,7 @@ pub(crate) fn decimal_from_py(obj: &Bound<'_, PyAny>) -> PyResult<rust_decimal::
         return Err(PyTypeError::new_err("expected decimal.Decimal"));
     }
     let s: String = obj.str()?.extract()?;
-    parse_decimal_str(&s)
-}
-
-fn parse_decimal_str(s: &str) -> PyResult<rust_decimal::Decimal> {
-    rust_decimal::Decimal::from_str(s.trim())
-        .map_err(|e| value_error(format!("Invalid Decimal value {s:?}: {e}")))
+    finstack_quant_core::decimal::parse_decimal(&s).map_err(core_to_py)
 }
 
 /// Convert a Rust decimal into Python ``decimal.Decimal`` without using `f64`.
@@ -116,9 +113,11 @@ pub(crate) fn is_python_decimal(obj: &Bound<'_, PyAny>) -> PyResult<bool> {
 }
 
 /// Build a [`Money`] from a Python amount that may be `float`, `int`,
-/// `decimal.Decimal` or a decimal string. `Decimal`/`str` inputs preserve
-/// full precision; numeric inputs follow IEEE 754 semantics and later
-/// ``amount`` accessors expose an ``f64`` view.
+/// `decimal.Decimal` or a decimal string. `Decimal`/`str` inputs never pass
+/// through `f64` and are parsed by `finstack_quant_core::decimal::parse_decimal`,
+/// which rejects values beyond Decimal's 96-bit mantissa or 28-digit scale;
+/// numeric inputs follow IEEE 754 semantics and later ``amount`` accessors
+/// expose an ``f64`` view.
 pub(crate) fn money_from_amount(obj: &Bound<'_, PyAny>, ccy: Currency) -> PyResult<Money> {
     money_from_amount_with_config(obj, ccy, None)
 }
@@ -146,7 +145,7 @@ fn money_from_amount_with_config(
         return from_decimal(d).map_err(core_to_py);
     }
     if let Ok(text) = obj.cast::<PyString>() {
-        let d = parse_decimal_str(text.to_str()?)?;
+        let d = finstack_quant_core::decimal::parse_decimal(text.to_str()?).map_err(core_to_py)?;
         return from_decimal(d).map_err(core_to_py);
     }
     let amount: f64 = obj.extract().map_err(|_| PyTypeError::new_err(TYPE_MSG))?;
@@ -166,8 +165,9 @@ impl PyMoney {
     ///
     /// ``amount`` may be a ``float``, ``int``, ``decimal.Decimal`` or a decimal
     /// string such as ``"1234.56"``. ``Decimal``/``str`` inputs are parsed
-    /// without going through ``f64``. When ``config`` is given the amount is
-    /// rounded on ingest with that config's rounding mode and ingest scale.
+    /// without going through ``f64`` and must be exactly representable as a
+    /// Rust ``Decimal``. When ``config`` is given the amount is rounded on
+    /// ingest with that config's rounding mode and ingest scale.
     #[new]
     #[pyo3(signature = (amount, currency, config=None))]
     #[pyo3(text_signature = "(amount, currency, config=None)")]
@@ -190,9 +190,11 @@ impl PyMoney {
             .map_err(core_to_py)
     }
 
-    /// Construct from a ``decimal.Decimal`` amount, preserving full precision.
+    /// Construct from a ``decimal.Decimal`` amount without going through ``float``.
     ///
-    /// This requires an actual ``decimal.Decimal`` instance.
+    /// This requires an actual ``decimal.Decimal`` instance that is exactly
+    /// representable as a Rust ``Decimal`` (96-bit mantissa, at most 28
+    /// fractional digits); anything else raises ``ValueError``.
     #[classmethod]
     #[pyo3(text_signature = "(cls, amount, currency)")]
     fn from_decimal(
@@ -209,7 +211,7 @@ impl PyMoney {
 
     /// Construct from exact decimal text, rejecting inexact amounts.
     ///
-    /// Unlike general ``Money`` construction or JSON deserialization, this
+    /// Unlike JSON deserialization, this
     /// entry point never routes the amount through ``float`` or tolerates
     /// lossy re-rendering: the text must be exactly representable as a Rust
     /// ``Decimal`` (96-bit mantissa, at most 28 fractional digits). For
@@ -282,8 +284,8 @@ impl PyMoney {
     ///
     /// ``decimals`` defaults to the currency's ISO minor units and is bounded
     /// by the native maximum of 1,000,000; ``group`` is an optional thousands
-    /// separator (``","``); ``rounding`` is a ``RoundingMode`` or its name
-    /// (default bankers).
+    /// separator (``","``); ``rounding`` is a ``RoundingMode`` or its exact
+    /// lowercase name (default: the Rust ``RoundingMode::default()``, bankers).
     #[pyo3(signature = (decimals=None, show_currency=true, group=None, rounding=None))]
     #[pyo3(text_signature = "(self, decimals=None, show_currency=True, group=None, rounding=None)")]
     fn format_with(
@@ -305,7 +307,7 @@ impl PyMoney {
         };
         let rounding = match rounding {
             Some(mode) => extract_rounding_mode(mode)?,
-            None => RoundingMode::Bankers,
+            None => RoundingMode::default(),
         };
         let opts = FormatOpts::new(decimals, show_currency, group, rounding).map_err(core_to_py)?;
         Ok(self.inner.format_with(opts))
@@ -447,9 +449,6 @@ impl PyMoney {
             return ratio.into_bound_py_any(py);
         }
         let scalar: f64 = other.extract()?;
-        if scalar == 0.0 {
-            return Err(value_error("division by zero"));
-        }
         self.inner
             .checked_div_f64(scalar)
             .map(Self::from_inner)
@@ -528,7 +527,7 @@ impl PyMoney {
 
 /// Register the `finstack_quant.core.money` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
-    let module = PyModule::new(py, "money")?;
+    let module = crate::bindings::module_utils::new_submodule(parent, "money")?;
     module.setattr(
         "__doc__",
         "Currency-tagged money bindings (finstack-quant-core).",
@@ -538,13 +537,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let all = PyList::new(py, ["Money"])?;
     module.setattr("__all__", all)?;
 
-    crate::bindings::module_utils::register_submodule(
-        py,
+    crate::bindings::module_utils::attach_submodule(
         parent,
         &module,
-        "money",
-        "finstack_quant.core",
-        crate::bindings::module_utils::ParentNameSource::Package,
+        crate::bindings::module_utils::Exposure::Compiled,
     )?;
 
     Ok(())

@@ -1,0 +1,355 @@
+{
+ "spec": {
+  "values": [
+   100.0,
+   101.0,
+   null,
+   104.0,
+   50.0,
+   55.0,
+   60.5,
+   54.45
+  ],
+  "entity": [
+   "A",
+   "A",
+   "A",
+   "A",
+   "B",
+   "B",
+   "B",
+   "B"
+  ],
+  "order": [
+   "2026-01-01",
+   "2026-01-02",
+   "2026-01-03",
+   "2026-01-04",
+   "2026-01-01",
+   "2026-01-02",
+   "2026-01-03",
+   "2026-01-04"
+  ],
+  "time_key": [
+   "2026-01-01",
+   "2026-01-02",
+   "2026-01-03",
+   "2026-01-04",
+   "2026-01-01",
+   "2026-01-02",
+   "2026-01-03",
+   "2026-01-04"
+  ],
+  "operations": [
+   {
+    "family": "timeseries",
+    "name": "ret",
+    "op": "returns",
+    "params": {
+     "periods": 1
+    }
+   },
+   {
+    "family": "cross_sectional",
+    "name": "rank",
+    "op": "rank"
+   },
+   {
+    "family": "timeseries",
+    "name": "ma",
+    "op": "rolling_mean",
+    "params": {
+     "window": 2,
+     "min_periods": 1
+    },
+    "input": "values"
+   }
+  ]
+ },
+ "expected": {
+  "columns": [
+   {
+    "name": "ret",
+    "values": [
+     null,
+     0.010000000000000009,
+     null,
+     0.02970297029702973,
+     null,
+     0.10000000000000009,
+     0.10000000000000009,
+     -0.09999999999999998
+    ]
+   },
+   {
+    "name": "rank",
+    "values": [
+     null,
+     0.0,
+     null,
+     1.0,
+     null,
+     1.0,
+     0.0,
+     0.0
+    ]
+   },
+   {
+    "name": "ma",
+    "values": [
+     100.0,
+     100.5,
+     101.0,
+     104.0,
+     50.0,
+     52.5,
+     57.75,
+     57.474999999999994
+    ]
+   }
+  ]
+ },
+ "columns": {
+  "ret": [
+   null,
+   0.010000000000000009,
+   null,
+   0.02970297029702973,
+   null,
+   0.10000000000000009,
+   0.10000000000000009,
+   -0.09999999999999998
+  ],
+  "rank": [
+   null,
+   0.0,
+   null,
+   1.0,
+   null,
+   1.0,
+   0.0,
+   0.0
+  ],
+  "ma": [
+   100.0,
+   100.5,
+   101.0,
+   104.0,
+   50.0,
+   52.5,
+   57.75,
+   57.474999999999994
+  ]
+ },
+ "missing_column_error": {
+  "exception": "KeyError",
+  "message": "no panel transform column 'nope'; available: [\"ret\", \"rank\", \"ma\"]"
+ },
+ "reserved_name_error": {
+  "exception": "ValueError",
+  "message": "Validation error: panel transform operation name must not be the reserved name 'values'"
+ },
+ "ops": {
+  "TimeSeriesOp": {
+   "values": [
+    "returns",
+    "log_returns",
+    "diff",
+    "lag",
+    "rolling_mean",
+    "rolling_sum",
+    "rolling_std",
+    "rolling_min",
+    "rolling_max",
+    "rolling_zscore",
+    "rolling_rank",
+    "rolling_quantile",
+    "rolling_skew",
+    "rolling_kurtosis",
+    "rolling_slope",
+    "rolling_sharpe",
+    "rolling_winsorize",
+    "drawdown",
+    "hampel_filter",
+    "exponential_decay_weights",
+    "ewma_mean",
+    "ewma_vol",
+    "ewma_zscore"
+   ],
+   "param_keys": {
+    "returns": [
+     "periods"
+    ],
+    "log_returns": [
+     "periods"
+    ],
+    "diff": [
+     "periods"
+    ],
+    "lag": [
+     "periods"
+    ],
+    "rolling_mean": [
+     "window",
+     "min_periods"
+    ],
+    "rolling_sum": [
+     "window",
+     "min_periods"
+    ],
+    "rolling_std": [
+     "window",
+     "min_periods"
+    ],
+    "rolling_min": [
+     "window",
+     "min_periods"
+    ],
+    "rolling_max": [
+     "window",
+     "min_periods"
+    ],
+    "rolling_zscore": [
+     "window",
+     "min_periods"
+    ],
+    "rolling_rank": [
+     "window",
+     "min_periods"
+    ],
+    "rolling_quantile": [
+     "window",
+     "min_periods",
+     "quantile"
+    ],
+    "rolling_skew": [
+     "window",
+     "min_periods"
+    ],
+    "rolling_kurtosis": [
+     "window",
+     "min_periods"
+    ],
+    "rolling_slope": [
+     "window",
+     "min_periods"
+    ],
+    "rolling_sharpe": [
+     "window",
+     "min_periods",
+     "risk_free"
+    ],
+    "rolling_winsorize": [
+     "window",
+     "min_periods",
+     "lower",
+     "upper"
+    ],
+    "drawdown": [],
+    "hampel_filter": [
+     "window",
+     "min_periods",
+     "threshold"
+    ],
+    "exponential_decay_weights": [
+     "window",
+     "half_life"
+    ],
+    "ewma_mean": [
+     "span"
+    ],
+    "ewma_vol": [
+     "span"
+    ],
+    "ewma_zscore": [
+     "span"
+    ]
+   },
+   "unknown_error": {
+    "exception": "ValueError",
+    "message": "Validation error: unsupported time-series transform op 'nope'; accepted ops: returns, log_returns, diff, lag, rolling_mean, rolling_sum, rolling_std, rolling_min, rolling_max, rolling_zscore, rolling_rank, rolling_quantile, rolling_skew, rolling_kurtosis, rolling_slope, rolling_sharpe, rolling_winsorize, drawdown, hampel_filter, exponential_decay_weights, ewma_mean, ewma_vol, ewma_zscore"
+   }
+  },
+  "CrossSectionalOp": {
+   "values": [
+    "zscore",
+    "rank",
+    "percentile_rank",
+    "quantile_bucket",
+    "demean",
+    "robust_zscore",
+    "minmax_scale",
+    "clip",
+    "clip_by_sigma",
+    "normal_score_transform",
+    "long_short_weights",
+    "cap_weights",
+    "fill_missing",
+    "is_finite",
+    "nan_mask",
+    "winsorize"
+   ],
+   "param_keys": {
+    "zscore": [],
+    "rank": [],
+    "percentile_rank": [],
+    "quantile_bucket": [
+     "buckets"
+    ],
+    "demean": [],
+    "robust_zscore": [],
+    "minmax_scale": [],
+    "clip": [
+     "lower",
+     "upper"
+    ],
+    "clip_by_sigma": [
+     "sigma"
+    ],
+    "normal_score_transform": [],
+    "long_short_weights": [],
+    "cap_weights": [
+     "max_abs"
+    ],
+    "fill_missing": [
+     "value"
+    ],
+    "is_finite": [],
+    "nan_mask": [],
+    "winsorize": [
+     "lower",
+     "upper"
+    ]
+   },
+   "unknown_error": {
+    "exception": "ValueError",
+    "message": "Validation error: unsupported cross-sectional transform op 'nope'; accepted ops: zscore, rank, percentile_rank, quantile_bucket, demean, robust_zscore, minmax_scale, clip, clip_by_sigma, normal_score_transform, long_short_weights, cap_weights, fill_missing, is_finite, nan_mask, winsorize"
+   }
+  },
+  "PairwiseOp": {
+   "values": [
+    "rolling_cov",
+    "rolling_corr",
+    "rolling_beta"
+   ],
+   "param_keys": {
+    "rolling_cov": [
+     "window",
+     "min_periods"
+    ],
+    "rolling_corr": [
+     "window",
+     "min_periods"
+    ],
+    "rolling_beta": [
+     "window",
+     "min_periods"
+    ]
+   },
+   "unknown_error": {
+    "exception": "ValueError",
+    "message": "Validation error: unsupported pairwise time-series transform op 'nope'; accepted ops: rolling_cov, rolling_corr, rolling_beta"
+   }
+  }
+ }
+}

@@ -1,0 +1,102 @@
+{
+  "_doc": "Python outputs for the Performance array constructors and JSON round trip; asserted by tests/test_analytics_wasm_parity.py and finstack-quant-wasm/tests/facade/analytics_parity.test.mjs.",
+  "ticker_names": [
+    "A",
+    "B"
+  ],
+  "prices": {
+    "dates": [
+      "2024-01-01",
+      "2024-01-02",
+      "2024-01-03",
+      "2024-01-04",
+      "2024-01-05"
+    ],
+    "values": [
+      [
+        100.0,
+        101.0,
+        100.5,
+        102.0,
+        103.0
+      ],
+      [
+        50.0,
+        50.5,
+        50.2,
+        50.9,
+        51.4
+      ]
+    ],
+    "benchmark_ticker": "B",
+    "frequency": "daily",
+    "sharpe": [
+      13.747646837007892,
+      12.540601335427349
+    ],
+    "json": {
+      "price_dates": [
+        "2024-01-01",
+        "2024-01-02",
+        "2024-01-03",
+        "2024-01-04",
+        "2024-01-05"
+      ],
+      "returns": [
+        [
+          0.010000000000000009,
+          -0.004950495049504955,
+          0.014925373134328401,
+          0.009803921568627416
+        ],
+        [
+          0.010000000000000009,
+          -0.005940594059405835,
+          0.013944223107569709,
+          0.00982318271119853
+        ]
+      ],
+      "return_spans": [
+        {
+          "start": 0,
+          "end": 4
+        },
+        {
+          "start": 0,
+          "end": 4
+        }
+      ],
+      "ticker_names": [
+        "A",
+        "B"
+      ],
+      "benchmark_idx": 1,
+      "frequency": "daily",
+      "start_idx": 0,
+      "end_idx": 4
+    }
+  },
+  "returns": {
+    "dates": [
+      "2024-01-01",
+      "2024-01-02",
+      "2024-01-03"
+    ],
+    "values": [
+      [
+        0.01,
+        -0.005,
+        0.015
+      ],
+      [
+        0.01,
+        -0.006,
+        0.014
+      ]
+    ],
+    "volatility": [
+      0.16522711641858306,
+      0.168
+    ]
+  }
+}

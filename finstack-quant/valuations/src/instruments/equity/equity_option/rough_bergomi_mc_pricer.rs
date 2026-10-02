@@ -17,6 +17,7 @@ use crate::pricer::expect_inst;
 use crate::pricer::PricingError;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
+use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_core::money::Money;
 
 /// Monte Carlo pricer for the rough Bergomi model.
@@ -39,7 +40,8 @@ use finstack_quant_core::money::Money;
 ///
 /// The forward variance curve ξ₀(t) is built from the ATM-forward implied
 /// vol term structure of the option's vol surface (total-variance
-/// differencing across the surface's expiry strip).
+/// differencing across the surface's expiry strip). This is an ATM proxy,
+/// not a variance-swap strip or an exact stochastic-volatility calibration.
 pub(crate) struct EquityOptionRoughBergomiMcPricer {
     /// Number of Monte Carlo paths.
     num_paths: usize,
@@ -104,9 +106,11 @@ impl RoughBergomiScalars {
 /// across its expiry strip (clipped to the option maturity `t`, with `t`
 /// itself always included). Total variances `w(u) = σ²(u, K(u))·u` are
 /// differenced into per-interval forward variances
-/// `ξ_i = (w_{i} − w_{i−1})/(u_i − u_{i−1})`, each placed at the interval
-/// midpoint. A flat surface therefore reproduces `ForwardVarianceCurve::flat(σ²)`
-/// exactly.
+/// `ξ_i = (w_{i} − w_{i−1})/(u_i − u_{i−1})`, held constant on the corresponding
+/// interval. Integrating this curve reproduces every sampled total variance.
+/// A flat surface therefore reproduces `ForwardVarianceCurve::flat(σ²)` exactly.
+/// ATM implied total variance is a proxy for expected integrated variance; it
+/// does not replace variance-swap estimation or iterative model calibration.
 ///
 /// When the instrument carries an `implied_volatility` override, that flat σ
 /// wins (standard revaluation convention) and ξ₀ = σ² flat.
@@ -131,6 +135,8 @@ fn build_xi0_from_surface(
     }
 
     let surface = market.get_surface(equity_option.vol_surface_id.as_str())?;
+    surface.require_quote_type(VolQuoteType::BlackLognormal)?;
+    surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
 
     // Maturity strip: surface expiries strictly inside (0, t), plus t itself.
     let mut strip: Vec<f64> = surface
@@ -143,7 +149,7 @@ fn build_xi0_from_surface(
 
     // Total variances at the ATM-forward strike, then forward-variance
     // differencing over consecutive intervals (starting from w(0) = 0).
-    let mut points = Vec::with_capacity(strip.len());
+    let mut intervals = Vec::with_capacity(strip.len());
     let mut prev_u = 0.0;
     let mut prev_w = 0.0;
     for &u in &strip {
@@ -160,12 +166,12 @@ fn build_xi0_from_surface(
                 equity_option.vol_surface_id
             )));
         }
-        points.push(((prev_u + u) / 2.0, xi));
+        intervals.push((u, xi));
         prev_u = u;
         prev_w = w;
     }
 
-    ForwardVarianceCurve::from_points(&points)
+    ForwardVarianceCurve::from_intervals(&intervals)
 }
 
 /// Run the fractional MC simulation loop for a concrete payoff type.
@@ -474,5 +480,155 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
                 .insert(crate::metrics::MetricId::custom("mc_stderr"), stderr);
         }
         Ok(result)
+    }
+}
+
+#[cfg(test)]
+mod variance_strip_tests {
+    use super::*;
+    use finstack_quant_core::market_data::surfaces::VolSurface;
+
+    fn market_and_option() -> (MarketContext, EquityOption) {
+        let option = EquityOption::example().expect("example");
+        // Positive interval variances rise from .04 to .12, then fall to .02.
+        let surface = VolSurface::builder(option.vol_surface_id.as_str())
+            .expiries(&[0.25, 1.0, 1.5])
+            .strikes(&[80.0, 100.0, 120.0])
+            .row(&[0.2; 3])
+            .row(&[0.1_f64.sqrt(); 3])
+            .row(&[(0.11_f64 / 1.5).sqrt(); 3])
+            .build()
+            .expect("surface");
+        (MarketContext::new().insert_surface(surface), option)
+    }
+
+    #[test]
+    fn bootstrap_conserves_every_input_total_variance() {
+        let (market, option) = market_and_option();
+        let curve =
+            build_xi0_from_surface(&market, &option, 100.0, 0.0, 0.0, 1.5).expect("variance strip");
+        for (time, total) in [(0.25, 0.01), (1.0, 0.1), (1.5, 0.11)] {
+            assert!((curve.integrated_variance(time) - total).abs() < 1e-14);
+        }
+    }
+
+    #[test]
+    fn variance_strip_rejects_shifted_normal_and_tenor_surfaces() {
+        let (market, option) = market_and_option();
+        let surface = market.get_surface(option.vol_surface_id.as_str()).unwrap();
+        for unsupported in [
+            surface
+                .as_ref()
+                .clone()
+                .with_displacements(&[20.0; 3])
+                .unwrap(),
+            surface
+                .as_ref()
+                .clone()
+                .with_quote_type(VolQuoteType::Normal)
+                .unwrap(),
+            surface
+                .as_ref()
+                .clone()
+                .with_secondary_axis(VolSurfaceAxis::Tenor),
+        ] {
+            let market = market.clone().insert_surface(unsupported);
+            assert!(build_xi0_from_surface(&market, &option, 100.0, 0.0, 0.0, 1.5).is_err());
+        }
+    }
+
+    #[test]
+    fn bootstrap_preserves_clipped_and_single_interval_totals() {
+        let (market, option) = market_and_option();
+        let surface = market
+            .get_surface(option.vol_surface_id.as_str())
+            .expect("surface");
+        for maturity in [0.1, 0.6, 1.2] {
+            let curve = build_xi0_from_surface(&market, &option, 100.0, 0.0, 0.0, maturity)
+                .expect("variance strip");
+            let vol = finstack_quant_models::volatility::get_surface_vol_clamped(
+                &surface, maturity, 100.0,
+            );
+            assert!((curve.integrated_variance(maturity) - vol * vol * maturity).abs() < 1e-14);
+        }
+    }
+
+    #[test]
+    fn volatility_override_remains_flat() {
+        let (market, mut option) = market_and_option();
+        option
+            .instrument_pricing_overrides
+            .market_quotes
+            .implied_volatility = Some(0.3);
+        let curve =
+            build_xi0_from_surface(&market, &option, 100.0, 0.0, 0.0, 1.5).expect("override");
+        for time in [0.0, 0.25, 1.0, 1.5, 2.0] {
+            assert!((curve.value(time) - 0.09).abs() < 1e-14);
+            assert!((curve.integrated_variance(time) - 0.09 * time).abs() < 1e-14);
+        }
+    }
+
+    #[test]
+    fn small_eta_prices_match_deterministic_variance_with_grid_refinement() {
+        use crate::pricer::Pricer;
+        use finstack_quant_core::currency::Currency;
+        use finstack_quant_core::dates::DayCount;
+        use finstack_quant_core::market_data::scalars::MarketScalar;
+        use finstack_quant_core::market_data::term_structures::DiscountCurve;
+        use time::macros::date;
+
+        let as_of = date!(2025 - 01 - 01);
+        let expiry = date!(2026 - 01 - 01);
+        let (market, _) = market_and_option();
+        let option = EquityOption::european(
+            "XI0-DETERMINISTIC-LIMIT",
+            "SPX",
+            100.0,
+            expiry,
+            1.0,
+            Currency::USD,
+            OptionType::Call,
+        )
+        .expect("option");
+        let discount = DiscountCurve::builder("USD-OIS")
+            .base_date(as_of)
+            .day_count(DayCount::Act365F)
+            .knots([(0.0, 1.0), (2.0, 1.0)])
+            .build()
+            .expect("discount");
+        let market = market
+            .insert(discount)
+            .insert_price("EQUITY-SPOT", MarketScalar::Unitless(100.0))
+            .insert_price("EQUITY-DIVYIELD", MarketScalar::Unitless(0.0))
+            .insert_price("ROUGH_BERGOMI_ETA", MarketScalar::Unitless(1e-10))
+            .insert_price("ROUGH_BERGOMI_HURST", MarketScalar::Unitless(0.1))
+            .insert_price("ROUGH_BERGOMI_RHO", MarketScalar::Unitless(0.0));
+        let curve =
+            build_xi0_from_surface(&market, &option, 100.0, 0.0, 0.0, 1.0).expect("variance strip");
+        let call_price = |variance: f64| {
+            100.0 * (2.0 * finstack_quant_core::math::norm_cdf(0.5 * variance.sqrt()) - 1.0)
+        };
+        let exact = call_price(0.1);
+        let mut previous_bias = f64::INFINITY;
+        for steps in [31, 127] {
+            // The left-point Euler grid need not contain the .25y curve break.
+            // Measure its quadrature bias separately from MC sampling error.
+            let dt = 1.0 / steps as f64;
+            let discretized_variance: f64 =
+                (0..steps).map(|i| curve.value(i as f64 * dt) * dt).sum();
+            let discrete_price = call_price(discretized_variance);
+            let bias = (discrete_price - exact).abs();
+            assert!(bias < previous_bias, "Euler bias must fall on refinement");
+            previous_bias = bias;
+            let result = EquityOptionRoughBergomiMcPricer::new(15_000, steps)
+                .price_dyn(&option, &market, as_of)
+                .expect("rough Bergomi price");
+            let stderr = result.measures[&crate::metrics::MetricId::custom("mc_stderr")];
+            assert!(
+                (result.value.amount() - discrete_price).abs() <= 5.0 * stderr,
+                "price={}, discrete_limit={discrete_price}, stderr={stderr}, grid_bias={bias}",
+                result.value.amount()
+            );
+        }
     }
 }

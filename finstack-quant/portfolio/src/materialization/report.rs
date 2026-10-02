@@ -12,30 +12,25 @@ use wasm_bindgen::{JsCast, JsValue};
 /// nanoseconds, so their effective precision remains host-defined and a phase
 /// shorter than the host clock resolution may legitimately report zero.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MaterializationPhases {
     /// Outer bundle parsing time.
-    #[cfg_attr(feature = "ts_export", ts(type = "number"))]
     pub parse: u64,
     /// Post-parse count-limit, contract, reference, dependency-shape, and
     /// content-hash validation time.
-    #[cfg_attr(feature = "ts_export", ts(type = "number"))]
     pub validate_versions: u64,
     /// Unique instrument decoding and dependency extraction time.
-    #[cfg_attr(feature = "ts_export", ts(type = "number"))]
     pub decode_instruments: u64,
     /// Ordered runtime position construction time.
-    #[cfg_attr(feature = "ts_export", ts(type = "number"))]
     pub build_positions: u64,
     /// Portfolio index rebuilding and final invariant validation time.
-    #[cfg_attr(feature = "ts_export", ts(type = "number"))]
     pub index_build: u64,
 }
 
 /// Outcome metadata for one successful portfolio materialization.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "ts_export", derive(ts_rs::TS))]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct MaterializationReport {
     /// Bounded non-fatal diagnostics retained during loading.

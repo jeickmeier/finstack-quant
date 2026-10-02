@@ -258,3 +258,121 @@ fn sofr_swap_preset_adjusts_accrual_boundaries() {
         92.0 / 360.0
     );
 }
+
+#[test]
+fn preceding_adjusted_february_termination_matches_coupon_emission() {
+    use finstack_quant_cashflows::builder::periods::{
+        build_periods, build_single_period, period_accrual, BuildPeriodsParams,
+    };
+    use finstack_quant_cashflows::builder::{
+        CashFlowSchedule, CouponType, FixedCouponSpec, ScheduleParams,
+    };
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind};
+
+    let issue = d(2024, 9, 1);
+    let maturity = d(2025, 3, 1);
+    let mut schedule = ScheduleParams::semiannual_30360();
+    schedule.day_count = DayCount::ThirtyE360Isda;
+    schedule.stub = StubKind::None;
+    schedule.business_day_convention = BusinessDayConvention::Preceding;
+    schedule.adjust_accrual_dates = true;
+    let params = BuildPeriodsParams::from_schedule(&schedule, issue, maturity, None);
+    let periods = build_periods(params).expect("periods");
+    let single = build_single_period(params).expect("single period");
+    assert_eq!(periods.len(), 1);
+    assert_eq!(single.accrual_start, d(2024, 8, 30));
+    assert_eq!(single.accrual_end, d(2025, 2, 28));
+    let expected = 178.0 / 360.0;
+    assert!((single.accrual_year_fraction - expected).abs() < 1e-12);
+    assert_eq!(
+        periods[0].accrual_year_fraction,
+        single.accrual_year_fraction
+    );
+    // A partial interval must not inherit the final February exception.
+    let partial = period_accrual(&single, single.accrual_start, d(2025, 1, 31), &params)
+        .expect("partial accrual");
+    assert!((partial - 150.0 / 360.0).abs() < 1e-12);
+
+    let mut builder = CashFlowSchedule::builder();
+    let _ = builder
+        .principal(
+            Money::new(1_000_000.0, Currency::USD).expect("money"),
+            issue,
+            maturity,
+        )
+        .fixed_cf(FixedCouponSpec {
+            coupon_type: CouponType::Cash,
+            rate: rust_decimal::Decimal::new(5, 2),
+            schedule,
+        });
+    let built = builder.build(None).expect("cashflows");
+    let coupon = built
+        .get_flows()
+        .iter()
+        .find(|flow| flow.accrual.is_some())
+        .expect("coupon");
+    assert_eq!(coupon.accrual_factor, single.accrual_year_fraction);
+    assert!((coupon.amount.amount() - 1_000_000.0 * 0.05 * expected).abs() < 1e-8);
+}
+
+#[test]
+fn public_period_builders_reject_negative_lags_without_panicking() {
+    use finstack_quant_cashflows::builder::periods::{
+        build_periods, build_single_period, BuildPeriodsParams,
+    };
+    use finstack_quant_cashflows::builder::ScheduleParams;
+
+    let schedule = ScheduleParams::quarterly_act360();
+    let base = BuildPeriodsParams::from_schedule(&schedule, d(2025, 1, 15), d(2025, 4, 15), None);
+    for lag in [-2, i32::MIN] {
+        let reset = BuildPeriodsParams {
+            reset_lag_days: Some(lag),
+            ..base
+        };
+        assert!(build_periods(reset).is_err());
+        assert!(build_single_period(reset).is_err());
+        let payment = BuildPeriodsParams {
+            payment_lag_days: lag,
+            ..base
+        };
+        assert!(build_periods(payment).is_err());
+        assert!(build_single_period(payment).is_err());
+    }
+    for end in [base.start, d(2024, 12, 15)] {
+        let invalid = BuildPeriodsParams { end, ..base };
+        assert!(build_periods(invalid).is_err());
+        assert!(build_single_period(invalid).is_err());
+    }
+}
+
+#[test]
+fn icma_eom_requires_a_month_end_reference_anchor() {
+    use finstack_quant_cashflows::builder::periods::{build_periods, BuildPeriodsParams};
+    use finstack_quant_cashflows::builder::ScheduleParams;
+    use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
+
+    let mut schedule = ScheduleParams::quarterly_act360();
+    schedule.frequency = Tenor::monthly();
+    schedule.day_count = DayCount::ActActIsma;
+    schedule.business_day_convention = BusinessDayConvention::Unadjusted;
+    schedule.end_of_month = true;
+    schedule.stub = StubKind::ShortBack;
+    let params = BuildPeriodsParams::from_schedule(&schedule, d(2025, 1, 15), d(2025, 5, 15), None);
+    let error = build_periods(params).expect_err("ambiguous EOM grid");
+    assert!(error.to_string().contains("regular grid anchor"));
+
+    schedule.stub = StubKind::ShortFront;
+    let params = BuildPeriodsParams::from_schedule(&schedule, d(2025, 1, 15), d(2025, 5, 31), None);
+    let periods = build_periods(params).expect("month-end anchored ICMA front stub");
+    assert_eq!(
+        periods.first().expect("front stub").accrual_start,
+        d(2025, 1, 15)
+    );
+    assert_eq!(
+        periods.last().expect("last coupon").accrual_end,
+        d(2025, 5, 31)
+    );
+    for period in &periods[1..] {
+        assert!((period.accrual_year_fraction - 1.0 / 12.0).abs() < 1e-12);
+    }
+}

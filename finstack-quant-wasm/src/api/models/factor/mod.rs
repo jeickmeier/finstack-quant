@@ -12,8 +12,19 @@
 //! - `"unconditional"` — long-run (identical to `"one_step"` for `Sample` vol
 //!   model).
 //! - JSON string `'{"n_steps": N}'` — variance scaled by `N`.
+//! - JSON string `'{"years": Y}'` — variance scaled by the fractional year `Y`.
+//! - JSON string `'{"n_steps": N, "periods_per_year": P}'` — the same as
+//!   `'{"years": N / P}'`.
 
+use crate::utils::input::{
+    from_js_json, js_f64, js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_string,
+    js_string_seq, js_uint, json_text, opt_json_text,
+};
 use crate::utils::{to_js_err, to_js_value};
+
+use finstack_quant_models::factor::credit::VolHorizon;
+use finstack_quant_models::factor::risk::{DecompositionConfig, PositionRiskDecomposition};
+use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
 use wasm_bindgen::prelude::*;
 
 // Horizon helper (shared by CreditCalibrator and FactorCovarianceForecast)
@@ -28,26 +39,10 @@ fn parse_vol_horizon(
     finstack_quant_models::factor::credit::VolHorizon::parse(s).map_err(to_js_err)
 }
 
-//
-// `serde_json` silently serializes NaN/Inf as `null`, so risk outputs are
-// checked for finiteness at the boundary and rejected with an error naming
-// the offending field instead of emitting `null`.
-
-/// Reject a non-finite numeric output, naming the field in the error.
-fn ensure_finite(field: &str, v: f64) -> Result<(), JsValue> {
-    if v.is_finite() {
-        Ok(())
-    } else {
-        Err(JsValue::from_str(&format!(
-            "non-finite value ({v}) in output field '{field}'"
-        )))
-    }
-}
-
 /// Calibrated credit factor hierarchy artifact.
 ///
-/// Produced by [`JsCreditCalibrator`] or loaded from JSON via
-/// [`JsCreditFactorModel::from_json`]. Immutable once constructed.
+/// Produced by `CreditCalibrator` or loaded from JSON via
+/// `CreditFactorModel.fromJson`. Immutable once constructed.
 #[wasm_bindgen(js_name = CreditFactorModel)]
 pub struct JsCreditFactorModel {
     /// Underlying Rust value (not exposed to JS).
@@ -61,13 +56,15 @@ impl JsCreditFactorModel {
     /// Validates the required `schema` marker and all structural constraints.
     ///
     /// # Errors
-    /// Throws if the JSON is malformed or fails validation.
-    /// @param s - JSON-serialized CreditFactorModel to deserialize.
+    /// Throws a `validation` error if the JSON is malformed or fails
+    /// validation.
+    /// @param json - JSON-serialized CreditFactorModel to deserialize.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(s: &str) -> Result<JsCreditFactorModel, JsValue> {
-        let inner: finstack_quant_models::factor::credit::hierarchy::CreditFactorModel =
-            serde_json::from_str(s).map_err(to_js_err)?;
-        inner.validate().map_err(to_js_err)?;
+    pub fn from_json(json: JsValue) -> Result<JsCreditFactorModel, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
+        let inner =
+            finstack_quant_models::factor::credit::hierarchy::CreditFactorModel::from_json(json)
+                .map_err(to_js_err)?;
         Ok(Self { inner })
     }
 
@@ -78,7 +75,7 @@ impl JsCreditFactorModel {
     /// Throws a JavaScript exception if the model cannot be serialized to JSON.
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
+        self.inner.to_json().map_err(to_js_err)
     }
 
     /// Return the exact namespaced contract marker.
@@ -90,9 +87,9 @@ impl JsCreditFactorModel {
     }
 }
 
-/// Deterministic calibrator that produces a [`JsCreditFactorModel`].
+/// Deterministic calibrator that produces a `CreditFactorModel`.
 ///
-/// Configuration and inputs are passed as JSON strings.
+/// Configuration and inputs are passed as JSON strings or plain objects.
 #[wasm_bindgen(js_name = CreditCalibrator)]
 pub struct JsCreditCalibrator {
     inner: finstack_quant_models::factor::credit::calibration::CreditCalibrator,
@@ -104,11 +101,15 @@ impl JsCreditCalibrator {
     ///
     /// # Errors
     /// Throws if `config_json` is not a valid `CreditCalibrationConfig`.
-    /// @param config_json - Credit-factor calibration configuration JSON controlling model fitting.
+    /// @param config_json - Optional credit-factor calibration configuration JSON; omitted or `null` uses the Rust `CreditCalibrationConfig::default()`.
     #[wasm_bindgen(constructor)]
-    pub fn new(config_json: &str) -> Result<JsCreditCalibrator, JsValue> {
+    pub fn new(config_json: Option<JsValue>) -> Result<JsCreditCalibrator, JsValue> {
+        let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
         let config: finstack_quant_models::factor::credit::calibration::CreditCalibrationConfig =
-            serde_json::from_str(config_json).map_err(to_js_err)?;
+            match config_json.as_deref() {
+                Some(json) => serde_json::from_str(json).map_err(to_js_err)?,
+                None => Default::default(),
+            };
         Ok(Self {
             inner: finstack_quant_models::factor::credit::calibration::CreditCalibrator::new(
                 config,
@@ -123,7 +124,8 @@ impl JsCreditCalibrator {
     /// # Errors
     /// Throws if inputs are structurally invalid or calibration fails.
     /// @param inputs_json - Credit-factor calibration input JSON containing issuers, spreads, and observations.
-    pub fn calibrate(&self, inputs_json: &str) -> Result<JsCreditFactorModel, JsValue> {
+    pub fn calibrate(&self, inputs_json: JsValue) -> Result<JsCreditFactorModel, JsValue> {
+        let inputs_json: &str = &json_text(&inputs_json, "inputsJson")?;
         let inputs: finstack_quant_models::factor::credit::calibration::CreditCalibrationInputs =
             serde_json::from_str(inputs_json).map_err(to_js_err)?;
         let model = self.inner.calibrate(inputs).map_err(to_js_err)?;
@@ -155,13 +157,13 @@ impl JsLevelsAtDate {
     /// # Errors
     ///
     /// Throws when the JSON is malformed or a numeric field is non-finite.
-    /// @param json - Canonical `LevelsAtDate` JSON.
     /// @returns A validated `LevelsAtDate` handle.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsLevelsAtDate, JsValue> {
-        let inner: finstack_quant_models::factor::credit::decomposition::LevelsAtDate =
-            serde_json::from_str(json).map_err(to_js_err)?;
-        inner.validate().map_err(to_js_err)?;
+    pub fn from_json(json: JsValue) -> Result<JsLevelsAtDate, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
+        let inner =
+            finstack_quant_models::factor::credit::decomposition::LevelsAtDate::from_json(json)
+                .map_err(to_js_err)?;
         Ok(Self { inner })
     }
 
@@ -172,8 +174,7 @@ impl JsLevelsAtDate {
     /// the offending field instead of silently serializing `null`.
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
-        self.inner.validate().map_err(to_js_err)?;
-        serde_json::to_string(&self.inner).map_err(to_js_err)
+        self.inner.to_json().map_err(to_js_err)
     }
 
     /// Observation date as an ISO-8601 string.
@@ -203,18 +204,14 @@ impl JsLevelsAtDate {
     ///
     /// # Errors
     ///
-    /// Throws when `level_index` is outside the available levels or the map
+    /// Throws when `level_index` is non-finite, fractional, negative, exceeds the
+    /// wasm32 integer range, is outside the available levels, or the map
     /// cannot be converted to a JavaScript object.
-    /// @param levelIndex - Zero-based hierarchy level index.
     /// @returns A bucket-name to factor-level mapping in basis points.
     #[wasm_bindgen(js_name = levelValues)]
-    pub fn level_values(&self, level_index: usize) -> Result<JsValue, JsValue> {
-        let level = self.inner.by_level.get(level_index).ok_or_else(|| {
-            JsValue::from_str(&format!(
-                "levelIndex {level_index} out of range (nLevels={})",
-                self.inner.by_level.len()
-            ))
-        })?;
+    pub fn level_values(&self, level_index: JsValue) -> Result<JsValue, JsValue> {
+        let level_index: usize = js_uint(&level_index, "levelIndex")?;
+        let level = self.inner.level(level_index).map_err(to_js_err)?;
         to_js_value(&level.values)
     }
 
@@ -230,7 +227,7 @@ impl JsLevelsAtDate {
     }
 }
 
-/// Component-wise difference between two [`JsLevelsAtDate`] snapshots.
+/// Component-wise difference between two `LevelsAtDate` snapshots.
 ///
 /// Produced by [`decompose_period`].
 #[wasm_bindgen(js_name = PeriodDecomposition)]
@@ -251,13 +248,15 @@ impl JsPeriodDecomposition {
     /// # Errors
     ///
     /// Throws when the JSON is malformed or a numeric field is non-finite.
-    /// @param json - Canonical `PeriodDecomposition` JSON.
     /// @returns A validated `PeriodDecomposition` handle.
     #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: &str) -> Result<JsPeriodDecomposition, JsValue> {
-        let inner: finstack_quant_models::factor::credit::decomposition::PeriodDecomposition =
-            serde_json::from_str(json).map_err(to_js_err)?;
-        inner.validate().map_err(to_js_err)?;
+    pub fn from_json(json: JsValue) -> Result<JsPeriodDecomposition, JsValue> {
+        let json: &str = &json_text(&json, "json")?;
+        let inner =
+            finstack_quant_models::factor::credit::decomposition::PeriodDecomposition::from_json(
+                json,
+            )
+            .map_err(to_js_err)?;
         Ok(Self { inner })
     }
 
@@ -268,8 +267,7 @@ impl JsPeriodDecomposition {
     /// the offending field instead of silently serializing `null`.
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
-        self.inner.validate().map_err(to_js_err)?;
-        serde_json::to_string(&self.inner).map_err(to_js_err)
+        self.inner.to_json().map_err(to_js_err)
     }
 
     /// Earlier snapshot date as an ISO-8601 string.
@@ -305,18 +303,14 @@ impl JsPeriodDecomposition {
     ///
     /// # Errors
     ///
-    /// Throws when `level_index` is outside the available levels or the map
+    /// Throws when `level_index` is non-finite, fractional, negative, exceeds the
+    /// wasm32 integer range, is outside the available levels, or the map
     /// cannot be converted to a JavaScript object.
-    /// @param levelIndex - Zero-based hierarchy level index.
     /// @returns A bucket-name to factor-change mapping in basis points.
     #[wasm_bindgen(js_name = levelDeltas)]
-    pub fn level_deltas(&self, level_index: usize) -> Result<JsValue, JsValue> {
-        let level = self.inner.by_level.get(level_index).ok_or_else(|| {
-            JsValue::from_str(&format!(
-                "levelIndex {level_index} out of range (nLevels={})",
-                self.inner.by_level.len()
-            ))
-        })?;
+    pub fn level_deltas(&self, level_index: JsValue) -> Result<JsValue, JsValue> {
+        let level_index: usize = js_uint(&level_index, "levelIndex")?;
+        let level = self.inner.level(level_index).map_err(to_js_err)?;
         to_js_value(&level.deltas)
     }
 
@@ -353,22 +347,21 @@ impl JsPeriodDecomposition {
 ///
 /// # Errors
 ///
-/// Throws if an issuer has no model row and no `runtime_tags` entry, if
-/// `as_of` cannot be parsed, or if a spread is outside the decimal band.
-///
-/// @param model - Calibrated CreditFactorModel used for the peel.
-/// @param observedSpreadsJson - JSON `{issuer_id: spread}` map in decimal (`0.012` = 120 bp). Returned levels are bp.
-/// @param observedGeneric - Observed generic-market spread in decimal, aligned with the model factors.
-/// @param asOf - ISO-8601 valuation date used to stamp the snapshot.
-/// @param runtimeTagsJson - Optional runtime-tag JSON for issuers missing from the artifact.
+/// Throws a `not_found` error if an issuer has no model row and no
+/// `runtime_tags` entry, and a `validation` error if `as_of` cannot be parsed
+/// or a spread is outside the decimal band.
 #[wasm_bindgen(js_name = decomposeLevels)]
 pub fn decompose_levels(
     model: &JsCreditFactorModel,
-    observed_spreads_json: &str,
-    observed_generic: f64,
-    as_of: &str,
-    runtime_tags_json: Option<String>,
+    observed_spreads_json: JsValue,
+    observed_generic: JsValue,
+    as_of: JsValue,
+    runtime_tags_json: Option<JsValue>,
 ) -> Result<JsLevelsAtDate, JsValue> {
+    let observed_generic = js_f64(&observed_generic, "observedGeneric")?;
+    let observed_spreads_json: &str = &json_text(&observed_spreads_json, "observedSpreadsJson")?;
+    let as_of: &str = &js_string(&as_of, "asOf")?;
+    let runtime_tags_json = opt_json_text(runtime_tags_json.as_ref(), "runtimeTagsJson")?;
     let observed_spreads: std::collections::BTreeMap<finstack_quant_core::types::IssuerId, f64> =
         serde_json::from_str(observed_spreads_json).map_err(to_js_err)?;
 
@@ -446,8 +439,9 @@ impl JsFactorCovarianceForecast {
     ///
     /// Returns a structured `FactorCovarianceMatrix` JavaScript object.
     ///
-    /// `horizon_json` accepts `"one_step"`, `"unconditional"`, or
-    /// `'{"n_steps": N}'`.
+    /// `horizon_json` accepts `"one_step"`, `"unconditional"`,
+    /// `'{"n_steps": N}'`, `'{"years": Y}'`, or
+    /// `'{"n_steps": N, "periods_per_year": P}'` (years = N / P).
     ///
     /// # Errors
     /// Throws if the horizon string is invalid or the model data is
@@ -455,12 +449,12 @@ impl JsFactorCovarianceForecast {
     /// @returns Structured covariance matrix with ordered factor axes and row-major data.
     /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
     #[wasm_bindgen(js_name = covarianceAt)]
-    pub fn covariance_at(&self, horizon_json: &str) -> Result<JsValue, JsValue> {
+    pub fn covariance_at(&self, horizon_json: JsValue) -> Result<JsValue, JsValue> {
+        let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
         let h = parse_vol_horizon(horizon_json)?;
         let forecast =
             finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
         let cov = forecast.covariance_at(h).map_err(to_js_err)?;
-        cov.validate().map_err(to_js_err)?;
         crate::utils::to_js_value(&cov)
     }
 
@@ -470,17 +464,22 @@ impl JsFactorCovarianceForecast {
     /// # Errors
     /// Throws if the issuer is not present in the model's vol state or the
     /// calibrated variance is negative.
+    /// @returns Issuer idiosyncratic volatility (standard deviation) in basis points of spread, scaled to the horizon.
     /// @param issuer_id - Stable issuer identifier used to select the required domain object.
     /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
     #[wasm_bindgen(js_name = idiosyncraticVol)]
-    pub fn idiosyncratic_vol(&self, issuer_id: &str, horizon_json: &str) -> Result<f64, JsValue> {
+    pub fn idiosyncratic_vol(
+        &self,
+        issuer_id: JsValue,
+        horizon_json: JsValue,
+    ) -> Result<f64, JsValue> {
+        let issuer_id: &str = &js_string(&issuer_id, "issuerId")?;
+        let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
         let h = parse_vol_horizon(horizon_json)?;
         let id = finstack_quant_core::types::IssuerId::new(issuer_id);
         let forecast =
             finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
-        let vol = forecast.idiosyncratic_vol(&id, h).map_err(to_js_err)?;
-        ensure_finite("idiosyncratic_vol", vol)?;
-        Ok(vol)
+        forecast.idiosyncratic_vol(&id, h).map_err(to_js_err)
     }
 
     /// Build a structured portfolio-level `FactorModelConfig` using `Σ(t, h)`
@@ -491,22 +490,25 @@ impl JsFactorCovarianceForecast {
     /// rejects the assembled configuration.
     /// @returns Structured factor-model configuration ready for portfolio risk workflows.
     /// @param horizon_json - JSON-serialized forecast horizon defining the future covariance date or period.
-    /// @param risk_measure_json - Risk-measure configuration JSON applied when constructing the horizon factor model.
+    /// @param risk_measure_json - Optional `RiskMeasure` wire value for the horizon factor model: `"variance"`, `"volatility"`, an object such as `{ var: { confidence: 0.99 } }`, or the same value as JSON text; omitted or `null` uses the Rust `RiskMeasure::default()` (`"variance"`).
     #[wasm_bindgen(js_name = factorModelAt)]
     pub fn factor_model_at(
         &self,
-        horizon_json: &str,
-        risk_measure_json: &str,
+        horizon_json: JsValue,
+        risk_measure_json: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
+        let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
         let h = parse_vol_horizon(horizon_json)?;
+        // `js_opt_wire`: the unit variants are bare wire strings (`"variance"`),
+        // which are not JSON text.
         let measure: finstack_quant_models::factor::RiskMeasure =
-            serde_json::from_str(risk_measure_json).map_err(to_js_err)?;
+            crate::utils::wire::js_opt_wire(risk_measure_json.as_ref(), "riskMeasureJson")?
+                .unwrap_or_default();
         let forecast =
             finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
         let config = forecast
             .factor_model_config_at(h, measure)
             .map_err(to_js_err)?;
-        config.covariance.validate().map_err(to_js_err)?;
         crate::utils::to_js_value(&config)
     }
 }
@@ -518,184 +520,639 @@ impl JsFactorCovarianceForecast {
 
 // Position-level VaR / ES decomposition and risk budgeting
 
-/// Decompose portfolio VaR into position contributions via parametric Euler
-/// allocation. Inputs mirror the Python binding's signature.
+/// Decompose portfolio VaR and ES into position contributions via parametric
+/// Euler allocation.
 ///
-/// `covariance_json` must deserialize to an `n x n` row-major nested array.
-/// @param position_ids_json - JSON array of position identifiers.
-/// @param weights_json - Position or asset weight-vector JSON.
-/// @param covariance_json - Covariance-matrix JSON.
-/// @param confidence - Tail confidence as a decimal probability, such as 0.95 for 95%.
+/// Returns the canonical `PositionRiskDecomposition` (the object Python's
+/// `parametric_var_decomposition` returns): portfolio VaR/ES (losses
+/// negative), `method`, and per-position `var_contributions` and
+/// `es_contributions` rows.
+/// @param position_ids - Position identifiers, one per weight.
+/// @param weights - Position weights or exposures in portfolio currency.
+/// @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
+/// @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::parametric_95()` preset (0.95).
 /// @param compute_incremental - Optional; when `true`, also computes
-///   incremental VaR (one full repricing per position). Defaults to `false`,
-///   mirroring the Python `compute_incremental=` keyword.
+///   incremental VaR (one full repricing per position). Defaults to `false`.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if any JSON input is malformed; identifier,
-/// weight, or covariance dimensions disagree; the covariance matrix is not
-/// finite, symmetric, and positive semidefinite; `confidence` is not finite and
-/// in `(0.5, 1)`; or the result cannot be converted to a JavaScript value.
+/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
+/// `validation` error if identifier, weight, or covariance dimensions
+/// disagree; the covariance matrix is not finite, symmetric, and positive
+/// semidefinite; or `confidence` is not finite and in `(0.5, 1)`.
 #[wasm_bindgen(js_name = parametricVarDecomposition)]
 pub fn parametric_var_decomposition(
-    position_ids_json: &str,
-    weights_json: &str,
-    covariance_json: &str,
-    confidence: f64,
-    compute_incremental: Option<bool>,
+    position_ids: JsValue,
+    weights: JsValue,
+    covariance: JsValue,
+    confidence: Option<JsValue>,
+    compute_incremental: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
     use finstack_quant_models::factor::risk::{
-        parametric_var_decomposition_view, DecompositionConfig, ParametricPositionDecomposer,
+        flatten_square_matrix, DecompositionConfig, ParametricPositionDecomposer,
     };
+    let ids = js_string_seq(&position_ids, "positionIds")?;
+    let weights = js_f64_seq(&weights, "weights")?;
+    let covariance = js_f64_matrix(&covariance, "covariance")?;
+    let compute_incremental = js_opt_bool(compute_incremental.as_ref(), "computeIncremental")?;
 
-    let ids: Vec<String> = serde_json::from_str(position_ids_json).map_err(to_js_err)?;
-    let weights: Vec<f64> = serde_json::from_str(weights_json).map_err(to_js_err)?;
-    let covariance: Vec<Vec<f64>> = serde_json::from_str(covariance_json).map_err(to_js_err)?;
-    let n = weights.len();
     let cov_flat =
-        finstack_quant_models::factor::risk::flatten_square_matrix(covariance, n, "covariance")
-            .map_err(to_js_err)?;
-    let mut config = DecompositionConfig::parametric(confidence);
-    if compute_incremental.unwrap_or(false) {
+        flatten_square_matrix(covariance, weights.len(), "covariance").map_err(to_js_err)?;
+    let mut config = confidence.map_or_else(
+        DecompositionConfig::parametric_95,
+        DecompositionConfig::parametric,
+    );
+    if compute_incremental == Some(true) {
         config = config.with_incremental();
     }
-
-    let decomposer = ParametricPositionDecomposer;
-    let result = decomposer
+    let result = ParametricPositionDecomposer
         .decompose_positions(&weights, &cov_flat, &ids, &config)
         .map_err(to_js_err)?;
-    let out = parametric_var_decomposition_view(&result);
-    crate::utils::to_js_value(&out)
+    crate::utils::to_js_value(&result)
 }
 
 /// Decompose portfolio Expected Shortfall into position contributions via
 /// parametric Euler allocation.
 ///
-/// Returns an ES-shaped structured object mirroring the Python
-/// ``parametric_es_decomposition`` return value: a top-level
-/// ``{portfolio_var, portfolio_es, confidence, n_positions, contributions}``
-/// object whose ``contributions`` entries are
-/// ``{position_id, component_es, marginal_es, pct_contribution}``.
-/// @param position_ids_json - JSON array of position identifiers.
-/// @param weights_json - Position or asset weight-vector JSON.
-/// @param covariance_json - Covariance-matrix JSON.
-/// @param confidence - Tail confidence as a decimal probability, such as 0.95 for 95%.
+/// Returns the `ParametricEsDecompositionView` reporting view (the object
+/// Python's `parametric_es_decomposition` returns): a top-level
+/// `{portfolio_var, portfolio_es, confidence, n_positions, contributions}`
+/// object whose `contributions` entries are
+/// `{position_id, component_es, marginal_es, pct_contribution}`.
+/// @param position_ids - Position identifiers, one per weight.
+/// @param weights - Position weights or exposures in portfolio currency.
+/// @param covariance - Square position-return covariance matrix as nested rows (`n x n`, row-major).
+/// @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::parametric_95()` preset (0.95).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if any JSON input is malformed; identifier,
-/// weight, or covariance dimensions disagree; the covariance matrix is not
-/// finite, symmetric, and positive semidefinite; `confidence` is not finite and
-/// in `(0.5, 1)`; or the result cannot be converted to a JavaScript value.
+/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
+/// `validation` error if identifier, weight, or covariance dimensions
+/// disagree; the covariance matrix is not finite, symmetric, and positive
+/// semidefinite; or `confidence` is not finite and in `(0.5, 1)`.
 #[wasm_bindgen(js_name = parametricEsDecomposition)]
 pub fn parametric_es_decomposition(
-    position_ids_json: &str,
-    weights_json: &str,
-    covariance_json: &str,
-    confidence: f64,
+    position_ids: JsValue,
+    weights: JsValue,
+    covariance: JsValue,
+    confidence: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
     use finstack_quant_models::factor::risk::{
-        parametric_es_decomposition_view, DecompositionConfig, ParametricPositionDecomposer,
+        flatten_square_matrix, parametric_es_decomposition_view, DecompositionConfig,
+        ParametricPositionDecomposer,
     };
+    let ids = js_string_seq(&position_ids, "positionIds")?;
+    let weights = js_f64_seq(&weights, "weights")?;
+    let covariance = js_f64_matrix(&covariance, "covariance")?;
 
-    let ids: Vec<String> = serde_json::from_str(position_ids_json).map_err(to_js_err)?;
-    let weights: Vec<f64> = serde_json::from_str(weights_json).map_err(to_js_err)?;
-    let covariance: Vec<Vec<f64>> = serde_json::from_str(covariance_json).map_err(to_js_err)?;
-    let n = weights.len();
     let cov_flat =
-        finstack_quant_models::factor::risk::flatten_square_matrix(covariance, n, "covariance")
-            .map_err(to_js_err)?;
-    let config = DecompositionConfig::parametric(confidence);
-
+        flatten_square_matrix(covariance, weights.len(), "covariance").map_err(to_js_err)?;
+    let config = confidence.map_or_else(
+        DecompositionConfig::parametric_95,
+        DecompositionConfig::parametric,
+    );
     let decomposition = ParametricPositionDecomposer
         .decompose_positions(&weights, &cov_flat, &ids, &config)
         .map_err(to_js_err)?;
-
-    let out = parametric_es_decomposition_view(&decomposition);
-    crate::utils::to_js_value(&out)
+    crate::utils::to_js_value(&parametric_es_decomposition_view(&decomposition))
 }
 
-/// Decompose portfolio VaR/ES from per-position scenario P&Ls via historical
-/// simulation.
+/// Decompose portfolio VaR and ES from per-position scenario P&Ls via
+/// historical simulation.
 ///
-/// `position_pnls_json` is a nested array shaped `[n_positions][n_scenarios]`.
-/// @param position_ids_json - JSON array of position identifiers.
-/// @param position_pnls_json - Per-position P&L JSON.
-/// @param confidence - Tail confidence as a decimal probability, such as 0.95 for 95%.
+/// Returns the canonical `PositionRiskDecomposition`, including the
+/// historical `es_contributions` rows (marginal and incremental VaR are
+/// `null`).
+/// @param position_ids - Position identifiers, one per P&L row.
+/// @param position_pnls - Position-major P&L matrix: one row per position, one column per scenario (losses negative).
+/// @param confidence - Optional tail confidence as a decimal probability in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::historical_95()` preset (0.95).
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if either JSON input is malformed, position or
-/// scenario dimensions disagree, `confidence` is not finite and in `(0.5, 1)`,
-/// too few scenarios resolve the requested tail, a P-and-L value is non-finite,
-/// or the result cannot be converted to a JavaScript value.
+/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
+/// `validation` error if the matrix does not have one row per position or its
+/// rows have different scenario counts, `confidence` is not finite and in
+/// `(0.5, 1)`, too few scenarios resolve the requested tail, or a P&L value is
+/// non-finite.
 #[wasm_bindgen(js_name = historicalVarDecomposition)]
 pub fn historical_var_decomposition(
-    position_ids_json: &str,
-    position_pnls_json: &str,
-    confidence: f64,
+    position_ids: JsValue,
+    position_pnls: JsValue,
+    confidence: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
     use finstack_quant_models::factor::risk::{
-        flatten_position_pnls, parametric_var_decomposition_view, DecompositionConfig,
-        HistoricalPositionDecomposer,
+        flatten_position_pnls, DecompositionConfig, HistoricalPositionDecomposer,
     };
+    let ids = js_string_seq(&position_ids, "positionIds")?;
+    let position_pnls = js_f64_matrix(&position_pnls, "positionPnls")?;
 
-    let ids: Vec<String> = serde_json::from_str(position_ids_json).map_err(to_js_err)?;
-    let position_pnls: Vec<Vec<f64>> =
-        serde_json::from_str(position_pnls_json).map_err(to_js_err)?;
-    let n = ids.len();
-    let config = DecompositionConfig::historical(confidence);
-
-    let (flat, n_scenarios) = flatten_position_pnls(position_pnls, n).map_err(to_js_err)?;
+    let (flat, n_scenarios) = flatten_position_pnls(position_pnls, ids.len()).map_err(to_js_err)?;
+    let config = confidence.map_or_else(
+        DecompositionConfig::historical_95,
+        DecompositionConfig::historical,
+    );
     let result = HistoricalPositionDecomposer
         .decompose_from_pnls(&flat, &ids, n_scenarios, &config)
         .map_err(to_js_err)?;
-    let out = parametric_var_decomposition_view(&result);
-    crate::utils::to_js_value(&out)
+    crate::utils::to_js_value(&result)
 }
 
 /// Evaluate a per-position risk budget against actual component VaRs.
 ///
-/// Validation (array-length agreement, duplicate position-id rejection) and
-/// the default `utilizationThreshold` live in the canonical Rust
-/// `evaluate_risk_budget_arrays` / `DEFAULT_UTILIZATION_THRESHOLD` path
-/// shared with the Python binding.
-/// @param position_ids_json - JSON array of position identifiers.
-/// @param actual_var_json - Actual component-VaR JSON.
-/// @param target_var_pct_json - Target VaR-share JSON.
+/// Returns the canonical `RiskBudgetResult` (the object Python's
+/// `evaluate_risk_budget` returns): per-position `positions` rows,
+/// `total_overbudget` and `has_breach`. Validation (array-length agreement,
+/// duplicate position-id rejection) and the default `utilizationThreshold`
+/// live in the canonical Rust `evaluate_risk_budget_arrays` /
+/// `DEFAULT_UTILIZATION_THRESHOLD` path shared with the Python binding.
+/// @param position_ids - Position identifiers, one per budget row.
+/// @param actual_var - Actual component VaR per position, in portfolio currency (loss-signed as the engine reports it).
+/// @param target_var_pct - Target share of portfolio VaR per position; non-empty targets must sum to one.
 /// @param portfolio_var - Total portfolio VaR used to convert risk-budget shares into absolute amounts.
 /// @param utilization_threshold - Optional actual-to-target risk ratio that
 ///   flags a budget breach; omit for the Rust default of 1.2.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if any JSON input is malformed, actual or
-/// target arrays do not match the identifier count, a position id is
-/// duplicated, non-empty target shares do not sum to one within tolerance,
-/// nonzero component risk is paired with zero `portfolioVar`, or the result
-/// cannot be converted to a JavaScript value.
+/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
+/// `validation` error if actual or target arrays do not match the identifier
+/// count, a position id is duplicated, target shares are non-finite or outside
+/// [0, 1], non-empty target shares do not sum to one within 0.05, risk inputs
+/// are non-finite, the utilization threshold is non-finite or non-positive, or
+/// nonzero component risk is paired with zero `portfolioVar`.
 #[wasm_bindgen(js_name = evaluateRiskBudget)]
 pub fn evaluate_risk_budget(
-    position_ids_json: &str,
-    actual_var_json: &str,
-    target_var_pct_json: &str,
-    portfolio_var: f64,
-    utilization_threshold: Option<f64>,
+    position_ids: JsValue,
+    actual_var: JsValue,
+    target_var_pct: JsValue,
+    portfolio_var: JsValue,
+    utilization_threshold: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
+    let portfolio_var = js_f64(&portfolio_var, "portfolioVar")?;
+    let utilization_threshold = js_opt_f64(utilization_threshold.as_ref(), "utilizationThreshold")?;
     use finstack_quant_models::factor::risk::{
-        evaluate_risk_budget_arrays, risk_budget_result_view, DEFAULT_UTILIZATION_THRESHOLD,
+        evaluate_risk_budget_arrays, DEFAULT_UTILIZATION_THRESHOLD,
     };
-
-    let ids: Vec<String> = serde_json::from_str(position_ids_json).map_err(to_js_err)?;
-    let actual_var: Vec<f64> = serde_json::from_str(actual_var_json).map_err(to_js_err)?;
-    let target_var_pct: Vec<f64> = serde_json::from_str(target_var_pct_json).map_err(to_js_err)?;
+    let ids = js_string_seq(&position_ids, "positionIds")?;
+    let actual_var = js_f64_seq(&actual_var, "actualVar")?;
+    let target_var_pct = js_f64_seq(&target_var_pct, "targetVarPct")?;
     let threshold = utilization_threshold.unwrap_or(DEFAULT_UTILIZATION_THRESHOLD);
 
     let result =
         evaluate_risk_budget_arrays(ids, &actual_var, &target_var_pct, portfolio_var, threshold)
             .map_err(to_js_err)?;
-    let out = risk_budget_result_view(&result, portfolio_var, threshold);
-    crate::utils::to_js_value(&out)
+    let js = crate::utils::to_js_value(&result)?;
+    let positions = js_sys::Reflect::get(&js, &JsValue::from("positions"))?;
+    crate::utils::restore_non_finite_rows::<
+        finstack_quant_models::factor::risk::PositionBudgetEntry,
+    >(&positions)?;
+    Ok(js)
+}
+
+// Accessors of the calibrated model (twins of the Python getters)
+
+#[wasm_bindgen(js_class = CreditFactorModel)]
+impl JsCreditFactorModel {
+    /// Calibration date of the model, in ISO-8601 form.
+    #[wasm_bindgen(getter, js_name = asOf)]
+    pub fn as_of(&self) -> String {
+        self.inner.as_of.to_string()
+    }
+
+    /// First and last date of the calibration window, as `[start, end]` ISO-8601 strings.
+    #[wasm_bindgen(getter, js_name = calibrationWindow)]
+    pub fn calibration_window(&self) -> Vec<String> {
+        vec![
+            self.inner.calibration_window.start.to_string(),
+            self.inner.calibration_window.end.to_string(),
+        ]
+    }
+
+    /// Issuer-beta policy the model was calibrated with: `"dynamic"` or `"globally_off"`.
+    #[wasm_bindgen(getter)]
+    pub fn policy(&self) -> String {
+        self.inner.policy.kind().to_owned()
+    }
+
+    /// Sampling frequency of the calibration panel, as its canonical label.
+    #[wasm_bindgen(getter, js_name = panelFrequency)]
+    pub fn panel_frequency(&self) -> Result<String, JsValue> {
+        finstack_quant_core::wire::serde_label(&self.inner.panel_frequency).map_err(to_js_err)
+    }
+
+    /// Bucket weighting used for the level returns, as its canonical label.
+    #[wasm_bindgen(getter, js_name = bucketWeighting)]
+    pub fn bucket_weighting(&self) -> Result<String, JsValue> {
+        finstack_quant_core::wire::serde_label(&self.inner.bucket_weighting).map_err(to_js_err)
+    }
+
+    /// Factor-model configuration (factors, covariance, matching, risk measure) as a `FactorModelConfig` object.
+    #[wasm_bindgen(getter)]
+    pub fn config(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.config)
+    }
+
+    /// Calibrated factor covariance as a `FactorCovarianceMatrix` object (`factor_ids`, row-major `data`).
+    #[wasm_bindgen(getter)]
+    pub fn covariance(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.config.covariance)
+    }
+
+    /// Calibration diagnostics (fit quality, fold-ups, dropped factors) as a plain object.
+    #[wasm_bindgen(getter)]
+    pub fn diagnostics(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.diagnostics)
+    }
+
+    /// Static factor correlation matrix the covariance forecasts are built on, as a plain object.
+    #[wasm_bindgen(getter, js_name = staticCorrelation)]
+    pub fn static_correlation(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner.static_correlation)
+    }
+
+    /// Number of hierarchy levels.
+    #[wasm_bindgen(getter, js_name = nLevels)]
+    pub fn n_levels(&self) -> usize {
+        self.inner.hierarchy.levels.len()
+    }
+
+    /// Number of calibrated issuers.
+    #[wasm_bindgen(getter, js_name = nIssuers)]
+    pub fn n_issuers(&self) -> usize {
+        self.inner.issuer_betas.len()
+    }
+
+    /// Number of factors in the model configuration.
+    #[wasm_bindgen(getter, js_name = nFactors)]
+    pub fn n_factors(&self) -> usize {
+        self.inner.config.factors.len()
+    }
+
+    /// Display labels of the hierarchy levels, broadest first.
+    /// @returns Labels such as `"Rating"`, `"Region"`, `"Sector"` or a custom dimension key.
+    #[wasm_bindgen(js_name = levelNames)]
+    pub fn level_names(&self) -> Vec<String> {
+        self.inner.level_names()
+    }
+
+    /// Identifiers of the calibrated issuers, in issuer-beta row order.
+    /// @returns The issuer identifiers.
+    #[wasm_bindgen(js_name = issuerIds)]
+    pub fn issuer_ids(&self) -> Vec<String> {
+        self.inner.issuer_ids()
+    }
+
+    /// Identifiers of the factors, in covariance order.
+    /// @returns The factor identifiers.
+    #[wasm_bindgen(js_name = factorIds)]
+    pub fn factor_ids(&self) -> Vec<String> {
+        self.inner.factor_ids()
+    }
+}
+
+#[wasm_bindgen(js_class = CreditCalibrator)]
+impl JsCreditCalibrator {
+    /// Calibration configuration in canonical JSON form, as a `CreditCalibrationConfig` object.
+    #[wasm_bindgen(getter)]
+    pub fn config(&self) -> Result<JsValue, JsValue> {
+        to_js_value(self.inner.config())
+    }
+}
+
+/// Forecast horizon for the covariance and idiosyncratic-vol forecasts.
+///
+/// The forecast methods take the horizon descriptor; pass `horizon.toString()`.
+#[wasm_bindgen(js_name = VolHorizon)]
+pub struct JsVolHorizon {
+    pub(crate) inner: VolHorizon,
+}
+
+#[wasm_bindgen(js_class = VolHorizon)]
+impl JsVolHorizon {
+    /// One-period horizon: the calibrated annualized variance unchanged.
+    /// @returns The one-step horizon.
+    #[wasm_bindgen(js_name = oneStep)]
+    pub fn one_step() -> JsVolHorizon {
+        Self {
+            inner: VolHorizon::OneStep,
+        }
+    }
+
+    /// Long-run horizon: the unconditional variance of the vol model.
+    /// @returns The unconditional horizon.
+    pub fn unconditional() -> JsVolHorizon {
+        Self {
+            inner: VolHorizon::Unconditional,
+        }
+    }
+
+    /// Horizon of `n` annualized model periods; variance scales linearly with `n`.
+    /// @param n - Number of model periods; a safe non-negative integer (`0` gives zero variance).
+    /// @returns The n-step horizon.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if `n` is not a safe non-negative integer.
+    #[wasm_bindgen(js_name = nSteps)]
+    pub fn n_steps(n: JsValue) -> Result<JsVolHorizon, JsValue> {
+        Ok(Self {
+            inner: VolHorizon::NSteps(js_uint(&n, "n")?),
+        })
+    }
+
+    /// Fractional-year horizon, for example `10 / 252` for ten trading days.
+    /// @param years - Horizon length in years; finite and non-negative.
+    /// @returns The fractional-year horizon.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if `years` is non-finite or negative.
+    pub fn years(years: JsValue) -> Result<JsVolHorizon, JsValue> {
+        VolHorizon::years(js_f64(&years, "years")?)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Parse a horizon descriptor.
+    /// @param s - `"one_step"`, `"unconditional"`, or a JSON object string such as `'{"n_steps": 5}'` or `'{"years": 0.25}'`.
+    /// @returns The parsed horizon.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `validation` error if the descriptor is not recognized.
+    pub fn parse(s: JsValue) -> Result<JsVolHorizon, JsValue> {
+        VolHorizon::parse(&js_string(&s, "s")?)
+            .map(|inner| Self { inner })
+            .map_err(to_js_err)
+    }
+
+    /// Variant label: `"one_step"`, `"unconditional"`, `"n_steps"` or `"years"`.
+    #[wasm_bindgen(getter)]
+    pub fn kind(&self) -> String {
+        self.inner.kind().to_owned()
+    }
+
+    /// Step count when `kind` is `"n_steps"`, otherwise `undefined`.
+    #[wasm_bindgen(getter)]
+    pub fn n(&self) -> Option<usize> {
+        match self.inner {
+            VolHorizon::NSteps(n) => Some(n),
+            _ => None,
+        }
+    }
+
+    /// Horizon in years when `kind` is `"years"`, otherwise `undefined`.
+    #[wasm_bindgen(getter, js_name = yearsValue)]
+    pub fn years_value(&self) -> Option<f64> {
+        match self.inner {
+            VolHorizon::Years(years) => Some(years),
+            _ => None,
+        }
+    }
+
+    /// Canonical descriptor accepted by `parse` and by the forecast methods.
+    /// @returns `"one_step"`, `"unconditional"`, `{"n_steps": N}` or `{"years": Y}`.
+    #[wasm_bindgen(js_name = toString)]
+    #[allow(clippy::inherent_to_string)]
+    pub fn to_string(&self) -> String {
+        self.inner.descriptor()
+    }
+}
+
+// FactorCovarianceMatrix / FactorModelConfig computations. Both types cross
+// the boundary as plain objects, so their Rust methods are free functions here.
+
+/// Variance of one factor in a factor covariance matrix.
+/// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+/// @param factor_id - Factor whose diagonal variance is requested; an unknown identifier returns 0.
+/// @returns The factor's variance.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `matrix` is malformed or not a valid
+/// covariance matrix.
+#[wasm_bindgen(js_name = factorVariance)]
+pub fn factor_variance(matrix: JsValue, factor_id: JsValue) -> Result<f64, JsValue> {
+    let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
+    Ok(matrix.variance(&FactorId::new(js_string(&factor_id, "factorId")?)))
+}
+
+/// Covariance between two factors in a factor covariance matrix.
+/// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+/// @param lhs - First factor identifier; an unknown identifier returns 0.
+/// @param rhs - Second factor identifier; an unknown identifier returns 0.
+/// @returns The covariance of the two factors.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `matrix` is malformed or not a valid
+/// covariance matrix.
+#[wasm_bindgen(js_name = factorCovariance)]
+pub fn factor_covariance(matrix: JsValue, lhs: JsValue, rhs: JsValue) -> Result<f64, JsValue> {
+    let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
+    Ok(matrix.covariance(
+        &FactorId::new(js_string(&lhs, "lhs")?),
+        &FactorId::new(js_string(&rhs, "rhs")?),
+    ))
+}
+
+/// Correlation between two factors in a factor covariance matrix.
+/// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+/// @param lhs - First factor identifier; an unknown identifier or a non-positive variance returns 0.
+/// @param rhs - Second factor identifier; an unknown identifier or a non-positive variance returns 0.
+/// @returns The correlation of the two factors, from -1 through 1.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `matrix` is malformed or not a valid
+/// covariance matrix.
+#[wasm_bindgen(js_name = factorCorrelation)]
+pub fn factor_correlation(matrix: JsValue, lhs: JsValue, rhs: JsValue) -> Result<f64, JsValue> {
+    let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
+    Ok(matrix.correlation(
+        &FactorId::new(js_string(&lhs, "lhs")?),
+        &FactorId::new(js_string(&rhs, "rhs")?),
+    ))
+}
+
+/// Factor covariance matrix as one row per factor (the twin of Python `to_numpy`).
+/// @param matrix - `FactorCovarianceMatrix` object or JSON (`factor_ids`, row-major `data`).
+/// @returns An array of `number[]` rows, `nFactors` by `nFactors`, in `factor_ids` order.
+///
+/// # Errors
+///
+/// Throws a `validation` error if `matrix` is malformed or not a valid
+/// covariance matrix.
+#[wasm_bindgen(js_name = factorCovarianceRows)]
+pub fn factor_covariance_rows(matrix: JsValue) -> Result<JsValue, JsValue> {
+    let matrix: FactorCovarianceMatrix = from_js_json(&matrix, "matrix")?;
+    to_js_value(&matrix.to_rows())
+}
+
+/// Validate a factor-model configuration: factor ordering, matching rules and the risk measure.
+/// @param config - `FactorModelConfig` object or JSON, as returned by `CreditFactorModel.config` or `factorModelAt`.
+///
+/// # Errors
+///
+/// Throws a `validation` error naming the first inconsistency.
+#[wasm_bindgen(js_name = validateFactorModelConfig)]
+pub fn validate_factor_model_config(config: JsValue) -> Result<(), JsValue> {
+    let config: FactorModelConfig = from_js_json(&config, "config")?;
+    config.validate().map_err(to_js_err)
+}
+
+// Position-risk configuration, stress attribution and lookups
+
+/// Configuration of position-level VaR / ES decomposition.
+#[wasm_bindgen(js_name = DecompositionConfig)]
+pub struct JsDecompositionConfig {
+    pub(crate) inner: DecompositionConfig,
+}
+
+json_round_trip!(JsDecompositionConfig, DecompositionConfig);
+
+#[wasm_bindgen(js_class = DecompositionConfig)]
+impl JsDecompositionConfig {
+    /// Parametric (delta-normal) decomposition at a confidence level.
+    /// @param confidence - Tail confidence as a decimal probability in `(0.5, 1)`, such as 0.99.
+    /// @returns The parametric configuration.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if `confidence` is not a number; the range is
+    /// checked when the configuration is used.
+    pub fn parametric(confidence: JsValue) -> Result<JsDecompositionConfig, JsValue> {
+        Ok(Self {
+            inner: DecompositionConfig::parametric(js_f64(&confidence, "confidence")?),
+        })
+    }
+
+    /// Parametric decomposition at 95% confidence.
+    /// @returns The parametric 95% preset.
+    #[wasm_bindgen(js_name = parametric95)]
+    pub fn parametric_95() -> JsDecompositionConfig {
+        Self {
+            inner: DecompositionConfig::parametric_95(),
+        }
+    }
+
+    /// Parametric decomposition at 99% confidence.
+    /// @returns The parametric 99% preset.
+    #[wasm_bindgen(js_name = parametric99)]
+    pub fn parametric_99() -> JsDecompositionConfig {
+        Self {
+            inner: DecompositionConfig::parametric_99(),
+        }
+    }
+
+    /// Historical-simulation decomposition at a confidence level.
+    /// @param confidence - Tail confidence as a decimal probability in `(0.5, 1)`, such as 0.99.
+    /// @returns The historical configuration.
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if `confidence` is not a number; the range is
+    /// checked when the configuration is used.
+    pub fn historical(confidence: JsValue) -> Result<JsDecompositionConfig, JsValue> {
+        Ok(Self {
+            inner: DecompositionConfig::historical(js_f64(&confidence, "confidence")?),
+        })
+    }
+
+    /// Historical-simulation decomposition at 95% confidence.
+    /// @returns The historical 95% preset.
+    #[wasm_bindgen(js_name = historical95)]
+    pub fn historical_95() -> JsDecompositionConfig {
+        Self {
+            inner: DecompositionConfig::historical_95(),
+        }
+    }
+
+    /// Copy of this configuration that also computes incremental VaR (one full repricing per position).
+    /// @returns The configuration with `computeIncremental` set.
+    #[wasm_bindgen(js_name = withIncremental)]
+    pub fn with_incremental(&self) -> JsDecompositionConfig {
+        Self {
+            inner: self.inner.clone().with_incremental(),
+        }
+    }
+
+    /// Tail confidence as a decimal probability.
+    #[wasm_bindgen(getter)]
+    pub fn confidence(&self) -> f64 {
+        self.inner.confidence
+    }
+
+    /// Decomposition method: `"parametric"` or `"historical"`.
+    #[wasm_bindgen(getter)]
+    pub fn method(&self) -> Result<String, JsValue> {
+        finstack_quant_core::wire::serde_label(&self.inner.method).map_err(to_js_err)
+    }
+
+    /// Whether leave-one-out incremental VaR is computed.
+    #[wasm_bindgen(getter, js_name = computeIncremental)]
+    pub fn compute_incremental(&self) -> bool {
+        self.inner.compute_incremental
+    }
+}
+
+/// Default utilization threshold of `evaluateRiskBudget`. Twin of the Rust and
+/// Python constant `DEFAULT_UTILIZATION_THRESHOLD`.
+/// @returns The threshold as a fraction of the risk budget.
+#[wasm_bindgen(js_name = defaultUtilizationThreshold)]
+pub fn default_utilization_threshold() -> f64 {
+    finstack_quant_models::factor::risk::DEFAULT_UTILIZATION_THRESHOLD
+}
+
+/// Attribute the portfolio loss in tail scenarios to positions.
+///
+/// Returns the canonical `StressAttribution` (the object Python's
+/// `build_stress_attribution` returns): the VaR threshold, the tail scenarios
+/// and each position's average tail P&L and share of the tail loss.
+/// @param position_ids - Position identifiers, one per row of `positionPnls`.
+/// @param position_pnls - Position-major P&L matrix as nested rows: one row per position, one column per scenario, in reporting-currency amounts.
+/// @param confidence - Optional tail confidence in `(0.5, 1)`; omitted or `null` uses the Rust `DecompositionConfig::historical_95()` preset (0.95).
+/// @returns The `StressAttribution` object.
+///
+/// # Errors
+///
+/// Throws a `TypeError` if an argument has the wrong JavaScript type, and a
+/// `validation` error if the dimensions disagree, a P&L is non-finite,
+/// `confidence` is outside `(0.5, 1)`, or the tail holds no scenario.
+#[wasm_bindgen(js_name = buildStressAttribution)]
+pub fn build_stress_attribution(
+    position_ids: JsValue,
+    position_pnls: JsValue,
+    confidence: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    use finstack_quant_models::factor::risk::{build_stress_attribution, flatten_position_pnls};
+    let ids = js_string_seq(&position_ids, "positionIds")?;
+    let position_pnls = js_f64_matrix(&position_pnls, "positionPnls")?;
+    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?
+        .unwrap_or_else(|| DecompositionConfig::historical_95().confidence);
+    let (flat, n_scenarios) = flatten_position_pnls(position_pnls, ids.len()).map_err(to_js_err)?;
+    let result =
+        build_stress_attribution(&ids, &flat, n_scenarios, confidence).map_err(to_js_err)?;
+    to_js_value(&result)
+}
+
+/// One position's component VaR from a position risk decomposition.
+/// @param decomp - `PositionRiskDecomposition` object or JSON, as returned by `parametricVarDecomposition` or `historicalVarDecomposition`.
+/// @param position_id - Position identifier exactly as it appears in the decomposition.
+/// @returns The position's Euler-allocated component VaR (losses negative).
+///
+/// # Errors
+///
+/// Throws a `validation` error if `decomp` is malformed, and a `not_found`
+/// error if the position is not in the decomposition.
+#[wasm_bindgen(js_name = positionComponentVar)]
+pub fn position_component_var(decomp: JsValue, position_id: JsValue) -> Result<f64, JsValue> {
+    let decomp: PositionRiskDecomposition = from_js_json(&decomp, "decomp")?;
+    let position_id = js_string(&position_id, "positionId")?;
+    decomp.try_component_var(&position_id).map_err(to_js_err)
 }
 
 #[cfg(test)]
@@ -730,9 +1187,12 @@ mod tests {
         for _ in 0..n {
             out.push(current);
             current = if current == current.end_of_month() {
-                current.add_months(-1).end_of_month()
+                current
+                    .add_months(-1)
+                    .expect("valid date shift")
+                    .end_of_month()
             } else {
-                current.add_months(-1)
+                current.add_months(-1).expect("valid date shift")
             };
         }
         out.reverse();

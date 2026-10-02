@@ -327,8 +327,10 @@ impl Payoff for AutocallablePayoff {
         let redemption_ratio = if let Some(idx) = self.autocalled_at {
             self.payment_df_ratios[idx]
         } else {
-            let payment_df_ratio = self.payment_df_ratios.last().copied().unwrap_or(1.0);
-            self.final_payoff_ratio(self.final_spot, self.min_spot_observed) * payment_df_ratio
+            // The MC engine discounts the path value from expiry, the terminal
+            // redemption date. Payment-date ratios apply only to coupons and
+            // early redemption; the last coupon can settle before expiry.
+            self.final_payoff_ratio(self.final_spot, self.min_spot_observed)
         };
         Money::new(
             (redemption_ratio + self.discounted_coupon_ratio) * self.notional,

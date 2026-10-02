@@ -313,6 +313,7 @@ fn value_position(input: &EvaluationInput<'_>, position: &Position) -> Result<Po
                 return Err(Error::ValuationError {
                     position_id: position.position_id.clone(),
                     message: error.to_string(),
+                    kind: error.kind(),
                 });
             }
             Err(pricing_error) => {
@@ -331,6 +332,7 @@ fn value_position(input: &EvaluationInput<'_>, position: &Position) -> Result<Po
                          {failed_path} also failed ({pricing_error})",
                             position.instrument.id()
                         ),
+                        kind: error.kind(),
                     })?;
                 // When metrics were requested, the position is degraded: something
                 // risk-related is missing. When none were, nothing risk-related is
@@ -388,8 +390,8 @@ struct PositionMetricRequest {
 /// * `input` - Evaluation input supplying the profile whose metric menu is
 ///   split and the pricing options whose `metric_registry` (or the shared
 ///   standard registry when absent) decides applicability.
-/// * `position` - Position whose instrument type decides the split; only its
-///   instrument's [`Instrument::key`] is consulted.
+/// * `position` - Position whose instrument decides the split through
+///   [`Instrument::applicable_metrics`].
 ///
 /// # Returns
 ///
@@ -423,8 +425,8 @@ fn requested_metrics(input: &EvaluationInput<'_>, position: &Position) -> Positi
 ///
 /// # Arguments
 ///
-/// * `instrument` - Instrument whose registered metric calculators decide the
-///   subset; only its [`Instrument::key`] instrument type is consulted.
+/// * `instrument` - Instrument whose [`Instrument::applicable_metrics`] decides
+///   the subset; a composite answers leg by leg.
 /// * `menu` - Candidate identifiers, in menu order; the returned subset
 ///   preserves that order.
 /// * `options` - Pricing options whose `metric_registry`, when present,
@@ -438,7 +440,7 @@ pub(crate) fn supported_metrics(
         Some(registry) => registry,
         None => finstack_quant_valuations::metrics::standard_registry(),
     };
-    registry.applicable_subset(menu, instrument.key())
+    instrument.applicable_metrics(menu, registry)
 }
 
 fn raw_position_endpoint(

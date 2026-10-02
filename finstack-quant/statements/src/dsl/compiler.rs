@@ -3,6 +3,7 @@
 use crate::dsl::ast::{BinOp as StmtBinOp, StmtExpr, UnaryOp as StmtUnaryOp};
 use crate::error::Result;
 use crate::types::{NodeId, NodeValueType};
+use finstack_quant_core::currency::Currency;
 use finstack_quant_core::expr::{BinOp as CoreBinOp, Expr, Function, UnaryOp as CoreUnaryOp};
 use indexmap::IndexMap;
 
@@ -39,8 +40,7 @@ pub fn compile(ast: &StmtExpr) -> Result<Expr> {
 
         StmtExpr::NodeRef(name) => Ok(Expr::column(name.as_str().to_string())),
 
-        // Capital structure references are encoded as special column names
-        // Format: __cs__component__instrument_or_total
+        // Preserve capital-structure references as dedicated expression nodes.
         StmtExpr::CsRef {
             component,
             instrument_or_total,
@@ -114,19 +114,26 @@ pub fn validate_dimensions(
     ast: &StmtExpr,
     node_types: &IndexMap<NodeId, NodeValueType>,
 ) -> Result<()> {
-    infer_dimension(ast, node_types, None)?;
+    infer_dimension(ast, node_types, None, &IndexMap::new())?;
     Ok(())
 }
 
 /// Infer a formula's output type from known node types and capital-structure
-/// reporting currency.
+/// currencies. Totals use the reporting currency; named instruments retain
+/// their native currencies, matching cashflow evaluation.
 pub(crate) fn infer_value_type(
     ast: &StmtExpr,
     node_types: &IndexMap<NodeId, NodeValueType>,
-    capital_structure_currency: Option<finstack_quant_core::currency::Currency>,
+    capital_structure_currency: Option<Currency>,
+    instrument_currencies: &IndexMap<String, Currency>,
 ) -> Result<Option<NodeValueType>> {
     Ok(
-        match infer_dimension(ast, node_types, capital_structure_currency)? {
+        match infer_dimension(
+            ast,
+            node_types,
+            capital_structure_currency,
+            instrument_currencies,
+        )? {
             Dimension::Unknown => None,
             Dimension::Scalar => Some(NodeValueType::Scalar),
             Dimension::Monetary(currency) => Some(NodeValueType::Monetary { currency }),
@@ -137,7 +144,8 @@ pub(crate) fn infer_value_type(
 fn infer_dimension(
     ast: &StmtExpr,
     node_types: &IndexMap<NodeId, NodeValueType>,
-    capital_structure_currency: Option<finstack_quant_core::currency::Currency>,
+    capital_structure_currency: Option<Currency>,
+    instrument_currencies: &IndexMap<String, Currency>,
 ) -> Result<Dimension> {
     match ast {
         StmtExpr::Literal(_) => Ok(Dimension::Scalar),
@@ -145,32 +153,77 @@ fn infer_dimension(
             .get(name)
             .map(node_value_type_to_dimension)
             .unwrap_or(Dimension::Unknown)),
-        StmtExpr::CsRef { .. } => Ok(capital_structure_currency
-            .map(Dimension::Monetary)
-            .unwrap_or(Dimension::Unknown)),
+        StmtExpr::CsRef {
+            instrument_or_total,
+            ..
+        } => {
+            let currency = if instrument_or_total == "total" {
+                capital_structure_currency
+            } else {
+                instrument_currencies.get(instrument_or_total).copied()
+            };
+            Ok(currency
+                .map(Dimension::Monetary)
+                .unwrap_or(Dimension::Unknown))
+        }
         StmtExpr::UnaryOp { op, operand } => {
-            let dim = infer_dimension(operand, node_types, capital_structure_currency)?;
+            let dim = infer_dimension(
+                operand,
+                node_types,
+                capital_structure_currency,
+                instrument_currencies,
+            )?;
             match op {
                 StmtUnaryOp::Neg => Ok(dim),
-                StmtUnaryOp::Not => Ok(Dimension::Scalar),
+                StmtUnaryOp::Not => require_scalar_arguments("logical negation", &[dim]),
             }
         }
         StmtExpr::BinOp { op, left, right } => {
-            let left_dim = infer_dimension(left, node_types, capital_structure_currency)?;
-            let right_dim = infer_dimension(right, node_types, capital_structure_currency)?;
+            let left_dim = infer_dimension(
+                left,
+                node_types,
+                capital_structure_currency,
+                instrument_currencies,
+            )?;
+            let right_dim = infer_dimension(
+                right,
+                node_types,
+                capital_structure_currency,
+                instrument_currencies,
+            )?;
             infer_bin_op_dimension(*op, left_dim, right_dim)
         }
-        StmtExpr::Call { func, args } => {
-            infer_call_dimension(func, args, node_types, capital_structure_currency)
-        }
+        StmtExpr::Call { func, args } => infer_call_dimension(
+            func,
+            args,
+            node_types,
+            capital_structure_currency,
+            instrument_currencies,
+        ),
         StmtExpr::IfThenElse {
             condition,
             then_expr,
             else_expr,
         } => {
-            infer_dimension(condition, node_types, capital_structure_currency)?;
-            let then_dim = infer_dimension(then_expr, node_types, capital_structure_currency)?;
-            let else_dim = infer_dimension(else_expr, node_types, capital_structure_currency)?;
+            let condition_dim = infer_dimension(
+                condition,
+                node_types,
+                capital_structure_currency,
+                instrument_currencies,
+            )?;
+            require_scalar_arguments("if condition", &[condition_dim])?;
+            let then_dim = infer_dimension(
+                then_expr,
+                node_types,
+                capital_structure_currency,
+                instrument_currencies,
+            )?;
+            let else_dim = infer_dimension(
+                else_expr,
+                node_types,
+                capital_structure_currency,
+                instrument_currencies,
+            )?;
             compatible_dimensions("if branches", then_dim, else_dim)
         }
     }
@@ -249,26 +302,47 @@ fn divide_dimensions(left: Dimension, right: Dimension) -> Result<Dimension> {
 }
 
 fn require_scalar_operands(context: &str, left: Dimension, right: Dimension) -> Result<Dimension> {
-    match (left, right) {
-        (Dimension::Unknown, _)
-        | (_, Dimension::Unknown)
-        | (Dimension::Scalar, Dimension::Scalar) => Ok(Dimension::Scalar),
-        _ => Err(crate::error::Error::build(format!(
+    require_scalar_arguments(context, &[left, right])
+}
+
+fn require_scalar_arguments(context: &str, dimensions: &[Dimension]) -> Result<Dimension> {
+    // An unresolved argument cannot excuse a known monetary argument, nor can
+    // it prove that the resulting expression is dimensionless. In particular,
+    // monetary variance has unrepresented squared units and stays Unknown.
+    if dimensions
+        .iter()
+        .any(|dimension| matches!(dimension, Dimension::Monetary(_)))
+    {
+        return Err(crate::error::Error::build(format!(
             "Dimensional mismatch in {context}: operands must be scalar"
-        ))),
+        )));
     }
+    Ok(if dimensions.contains(&Dimension::Unknown) {
+        Dimension::Unknown
+    } else {
+        Dimension::Scalar
+    })
 }
 
 fn infer_call_dimension(
     func: &str,
     args: &[StmtExpr],
     node_types: &IndexMap<NodeId, NodeValueType>,
-    capital_structure_currency: Option<finstack_quant_core::currency::Currency>,
+    capital_structure_currency: Option<Currency>,
+    instrument_currencies: &IndexMap<String, Currency>,
 ) -> Result<Dimension> {
     let arg_dims: Vec<_> = args
         .iter()
-        .map(|arg| infer_dimension(arg, node_types, capital_structure_currency))
+        .map(|arg| {
+            infer_dimension(
+                arg,
+                node_types,
+                capital_structure_currency,
+                instrument_currencies,
+            )
+        })
         .collect::<Result<Vec<_>>>()?;
+    let auxiliary_dims = arg_dims.get(1..).unwrap_or_default();
     match func {
         // Value-variadic: every argument is a value carried in the same units,
         // so a mismatch between them is a genuine modelling error worth
@@ -278,6 +352,14 @@ fn infer_call_dimension(
         "mean" | "sum" | "min" | "max" | "coalesce" | "clamp" => {
             combine_arg_dimensions(func, arg_dims)
         }
+        "quantile" => {
+            require_scalar_arguments("quantile level", auxiliary_dims)?;
+            Ok(first_arg_dimension(&arg_dims))
+        }
+        "rank" => {
+            require_scalar_arguments("rank ascending flag", auxiliary_dims)?;
+            Ok(Dimension::Scalar)
+        }
         // Dimension-preserving in the *first* (series or value) argument only:
         // the result carries that argument's units. This covers same-unit
         // transforms such as `diff` (difference of amounts),
@@ -286,7 +368,8 @@ fn infer_call_dimension(
         //
         // The rule, stated once: an argument that is a count, window size,
         // period offset, smoothing factor, digit count or month number is
-        // dimensionless and NEVER participates in dimension unification.
+        // required to be dimensionless and never participates in dimension
+        // unification with the first argument.
         // Folding such an argument in with `combine_arg_dimensions` would
         // wrongly reject `lag(usd_balance, 1)`, `rolling_sum(usd_flow, 4)` or
         // `round(usd_amount, 2)` as a monetary/scalar mix. Functions here that
@@ -296,20 +379,30 @@ fn infer_call_dimension(
         | "rolling_sum" | "rolling_min" | "rolling_max" | "rolling_median" | "rolling_std"
         | "ewm_mean" | "ewm_std" | "median" | "std" | "ttm" | "ltm" | "ytd" | "qtd"
         | "fiscal_ytd" | "annualize" | "round" | "floor" | "ceil" => {
+            require_scalar_arguments(func, auxiliary_dims)?;
             Ok(first_arg_dimension(&arg_dims))
         }
-        // Genuinely scalar: ratios, counts, signs, and rates carry no currency
-        // unit regardless of input. Transcendentals (`pow`, `ln`, `exp`,
-        // `log10`, `sqrt`) only make dimensional sense on scalars, and the
-        // missing-value predicate returns a 0/1 flag.
-        "sign" | "pct_change" | "cumprod" | "rolling_count" | "rank" | "quantile"
-        | "annualize_rate" | "growth_rate" | "pow" | "ln" | "exp" | "log10" | "sqrt"
-        | "is_missing" => Ok(Dimension::Scalar),
-        // Everything else defers to `Unknown`. This deliberately includes the
-        // variance family (`var` / `rolling_var` / `ewm_var`), which yields
-        // squared units that this three-valued dimension system (Unknown /
-        // Scalar / Monetary) cannot represent — deferring neither falsely
-        // rejects nor falsely passes downstream combinations.
+        // Ratios, counts, signs and predicates genuinely remove the leading
+        // argument's units. Their offsets/windows/flags must still be scalar.
+        "sign" | "pct_change" | "rolling_count" | "growth_rate" | "is_missing" => {
+            require_scalar_arguments(func, auxiliary_dims)?;
+            Ok(Dimension::Scalar)
+        }
+        // Products, rate compounding and nonlinear math cannot turn money
+        // into a dimensionless output merely by dropping its currency tag.
+        "cumprod" | "annualize_rate" | "pow" | "ln" | "exp" | "log10" | "sqrt" => {
+            require_scalar_arguments(func, &arg_dims)
+        }
+        "var" | "rolling_var" | "ewm_var" => {
+            require_scalar_arguments(func, auxiliary_dims)?;
+            // Scalar variance stays scalar; monetary variance has squared
+            // units that NodeValueType cannot represent. Do not erase those
+            // units by asserting that all variance results are scalar.
+            Ok(match first_arg_dimension(&arg_dims) {
+                Dimension::Scalar => Dimension::Scalar,
+                Dimension::Unknown | Dimension::Monetary(_) => Dimension::Unknown,
+            })
+        }
         _ => Ok(Dimension::Unknown),
     }
 }
@@ -576,9 +669,9 @@ fn compile_function_call(func_name: &str, args: &[StmtExpr]) -> Result<Expr> {
                 }
             }
             Function::Rank => {
-                if compiled_args.is_empty() {
+                if compiled_args.is_empty() || compiled_args.len() > 2 {
                     return Err(crate::error::Error::eval(
-                        "rank() requires at least 1 argument",
+                        "rank() requires 1 or 2 arguments (series, [ascending])",
                     ));
                 }
             }
@@ -794,7 +887,7 @@ mod tests {
         ] {
             let ast = parse_formula(formula).expect("should parse");
             assert_eq!(
-                infer_dimension(&ast, &node_types, None).expect("should infer"),
+                infer_dimension(&ast, &node_types, None, &IndexMap::new()).expect("should infer"),
                 Dimension::Monetary(finstack_quant_core::currency::Currency::USD),
                 "{formula} must carry its series argument's currency"
             );
@@ -803,7 +896,7 @@ mod tests {
         for formula in ["lag(ratio, 1)", "shift(ratio, 1)", "rolling_sum(ratio, 4)"] {
             let ast = parse_formula(formula).expect("should parse");
             assert_eq!(
-                infer_dimension(&ast, &node_types, None).expect("should infer"),
+                infer_dimension(&ast, &node_types, None, &IndexMap::new()).expect("should infer"),
                 Dimension::Scalar,
                 "{formula} must stay scalar"
             );
@@ -858,8 +951,81 @@ mod tests {
         // Same-currency arguments still resolve to that currency.
         let ast = parse_formula("coalesce(lag(usd_amount, 1), usd_amount)").expect("should parse");
         assert_eq!(
-            infer_dimension(&ast, &node_types, None).expect("should infer"),
+            infer_dimension(&ast, &node_types, None, &IndexMap::new()).expect("should infer"),
             Dimension::Monetary(finstack_quant_core::currency::Currency::USD),
+        );
+    }
+
+    #[test]
+    fn capital_structure_dimensions_distinguish_totals_from_native_instruments() {
+        let node_types = IndexMap::from([
+            (
+                NodeId::new("usd"),
+                NodeValueType::Monetary {
+                    currency: Currency::USD,
+                },
+            ),
+            (
+                NodeId::new("eur"),
+                NodeValueType::Monetary {
+                    currency: Currency::EUR,
+                },
+            ),
+        ]);
+        let instrument_currencies = IndexMap::from([("euro".to_owned(), Currency::EUR)]);
+        for component in [
+            "interest_expense",
+            "interest_expense_cash",
+            "interest_expense_pik",
+            "interest_income",
+            "principal_payment",
+            "debt_balance",
+            "fees",
+            "accrued_interest",
+        ] {
+            for (reference, expected) in [("total", Currency::USD), ("euro", Currency::EUR)] {
+                let ast = parse_formula(&format!("lag(cs.{component}.{reference}, 1)"))
+                    .expect("valid capital-structure reference");
+                assert_eq!(
+                    infer_value_type(
+                        &ast,
+                        &node_types,
+                        Some(Currency::USD),
+                        &instrument_currencies,
+                    )
+                    .expect("reference currency"),
+                    Some(NodeValueType::Monetary { currency: expected }),
+                );
+            }
+        }
+        for formula in [
+            "cs.interest_expense.euro == usd",
+            "cs.interest_expense.total == eur",
+            "cs.debt_balance.euro + cs.debt_balance.total",
+        ] {
+            let ast = parse_formula(formula).expect("valid formula");
+            assert!(
+                infer_value_type(
+                    &ast,
+                    &node_types,
+                    Some(Currency::USD),
+                    &instrument_currencies,
+                )
+                .is_err(),
+                "{formula} must reject EUR/USD operations"
+            );
+        }
+        let ast = parse_formula("cs.debt_balance.unknown").expect("valid reference");
+        assert_eq!(
+            infer_value_type(
+                &ast,
+                &node_types,
+                Some(Currency::USD),
+                &instrument_currencies,
+            )
+            .expect("unresolved reference"),
+            None,
+            "an unknown instrument must never inherit the reporting currency"
         );
     }
 

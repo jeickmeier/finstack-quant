@@ -9,5 +9,7 @@ mod audit_regressions;
 mod cashflows;
 #[path = "coupon_spec_strictness.rs"]
 mod coupon_spec_strictness;
+#[path = "principal_credit_regressions.rs"]
+mod principal_credit_regressions;
 #[path = "production_fixing_roll.rs"]
 mod production_fixing_roll;

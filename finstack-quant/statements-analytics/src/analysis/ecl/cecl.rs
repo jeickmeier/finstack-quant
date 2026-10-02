@@ -32,6 +32,7 @@ use super::types::{Exposure, PdTermStructure};
 
 /// How the PD curve reverts from forecast to historical after the R&S period.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ReversionMethod {
     /// Immediate: PD jumps to historical at the R&S boundary.
@@ -52,6 +53,7 @@ pub enum ReversionMethod {
 /// was removed before it was ever implemented — no cohort data model exists
 /// to support it honestly.)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CeclMethodology {
     /// PD-LGD-EAD approach (same formula as IFRS 9, always lifetime).
@@ -78,6 +80,7 @@ pub enum CeclMethodology {
 
 /// Configuration for CECL (US GAAP ASC 326) calculation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CeclConfig {
     /// Time bucket width in years (same as IFRS 9). Default: 0.25.
@@ -118,9 +121,6 @@ pub struct CeclConfig {
     #[serde(default = "default_discount_expected_losses")]
     pub discount_expected_losses: bool,
 
-    /// Macro scenario specifications (same structure as IFRS 9).
-    pub scenarios: Vec<MacroScenario>,
-
     /// CECL methodology selection.
     pub methodology: CeclMethodology,
 
@@ -152,8 +152,8 @@ impl CeclConfig {
     /// # Errors
     ///
     /// Returns [`Error::Validation`] for an invalid bucket width, forecast
-    /// horizon, historical annual PD, impaired recovery horizon, scenario
-    /// weights, or linear-reversion horizon.
+    /// horizon, historical annual PD, impaired recovery horizon, or
+    /// linear-reversion horizon.
     pub fn validate(&self) -> Result<()> {
         if !self.bucket_width_years.is_finite() || self.bucket_width_years < 1e-4 {
             return Err(Error::Validation(
@@ -180,7 +180,6 @@ impl CeclConfig {
                 "impaired_time_to_recovery_years must be finite and non-negative".to_string(),
             ));
         }
-        super::engine::validate_scenario_weights(&self.scenarios)?;
         if let ReversionMethod::Linear { reversion_years } = self.reversion_method {
             if !reversion_years.is_finite() || reversion_years <= 0.0 {
                 return Err(Error::Validation(
@@ -217,6 +216,7 @@ impl CeclConfig {
 
 /// CECL result for a single exposure.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CeclResult {
     /// Exposure identifier.
     pub exposure_id: String,
@@ -248,8 +248,12 @@ impl<'a> CeclEngine<'a> {
     ///
     /// # Arguments
     ///
-    /// * `config` - Configuration object controlling validation, rounding, or solver behavior
-    /// * `pd_sources` - Probability-of-default sources keyed to the configured scenarios.
+    /// * `config` - CECL integration bucket width, supportable forecast horizon,
+    ///   historical annual PD, reversion, impairment, and methodology settings.
+    /// * `pd_sources` - Authoritative scenario IDs, probability weights, and
+    ///   optional LGD overrides paired with current reporting-date PD curves.
+    ///   For PD-LGD-EAD, weights must be finite, non-negative, and sum to 1
+    ///   within `1e-6`; WARM ignores these sources.
     pub fn new(
         config: CeclConfig,
         pd_sources: Vec<(&'a MacroScenario, &'a dyn PdTermStructure)>,
@@ -664,23 +668,38 @@ mod tests {
     }
 
     #[test]
-    fn test_cecl_validation_invalid_weights() {
+    fn cecl_rejects_invalid_source_weights() {
+        let curve = make_pd_curve();
+        let scenario = MacroScenario {
+            id: "base".into(),
+            weight: 0.8,
+            lgd_override: None,
+        };
+        assert!(CeclEngine::new(CeclConfig::default(), vec![(&scenario, &curve)]).is_err());
+    }
+
+    #[test]
+    fn cecl_source_lgd_override_controls_allowance() {
+        let curve = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.20)]).unwrap();
+        let scenario = MacroScenario {
+            id: "downside".into(),
+            weight: 1.0,
+            lgd_override: Some(0.90),
+        };
         let config = CeclConfig {
-            scenarios: vec![
-                MacroScenario {
-                    id: "a".into(),
-                    weight: 0.5,
-                    lgd_override: None,
-                },
-                MacroScenario {
-                    id: "b".into(),
-                    weight: 0.3,
-                    lgd_override: None,
-                },
-            ],
+            forecast_horizon_years: 1.0,
             ..CeclConfig::default()
         };
-        assert!(config.validate().is_err());
+        let engine = CeclEngine::new(config, vec![(&scenario, &curve)]).unwrap();
+        let exposure = Exposure {
+            ead: 100.0,
+            eir: 0.0,
+            lgd: 0.40,
+            remaining_maturity_years: 1.0,
+            ..make_exposure()
+        };
+        let result = engine.compute_cecl(&exposure).unwrap();
+        assert!((result.ecl - 18.0).abs() < 1e-12);
     }
 
     #[test]

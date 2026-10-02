@@ -116,6 +116,9 @@ impl From<String> for QuoteId {
 /// adjust as the valuation date changes. Futures or bespoke runs may use `Date` to pin a specific
 /// maturity date.
 ///
+/// The JSON wire form is externally tagged: `{"tenor": {"count": 5, "unit": "years"}}`
+/// or `{"date": "2029-06-20"}`. A bare string such as `"5Y"` is rejected.
+///
 /// # Examples
 ///
 /// Using a tenor pillar:

@@ -257,7 +257,7 @@ fi
 description = "Run full-workspace Rust tests via cargo-nextest (use rust-test-crate while iterating)"
 run = [
   "cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' --no-fail-fast",
-  "cargo nextest run -p finstack-quant-wasm --lib --test dts_contract --no-fail-fast",
+  "cargo nextest run -p finstack-quant-wasm --lib --test dts_contract --test wasm --no-fail-fast",
 ]
 
 [tasks.rust-doc]
@@ -285,7 +285,7 @@ cargo test -p "$pkg" --doc --no-fail-fast
 description = "Run Rust tests including ignored/slow ones"
 run = [
   "cargo nextest run --workspace --exclude finstack-quant-py --exclude finstack-quant-wasm --lib --test '*' --run-ignored only --no-fail-fast",
-  "cargo nextest run -p finstack-quant-wasm --lib --test dts_contract --run-ignored only --no-tests pass --no-fail-fast",
+  "cargo nextest run -p finstack-quant-wasm --lib --test dts_contract --test wasm --run-ignored only --no-tests pass --no-fail-fast",
 ]
 
 [tasks.rust-test-cov]
@@ -307,9 +307,9 @@ flag "--all-features" help="Enable all crate features for clippy"
 flag "--lib" help="Clippy the library target only"
 '''
 run = '''
-set -e
+status=0
 pkg="${usage_package?}"
-cargo fmt --all -- --check
+cargo fmt --all -- --check || status=1
 features=""
 targets="--lib --tests --bins --examples"
 if [ "${usage_all_features:-false}" = "true" ]; then
@@ -318,7 +318,8 @@ fi
 if [ "${usage_lib:-false}" = "true" ]; then
   targets="--lib"
 fi
-cargo clippy -p "$pkg" $targets $features -- -D warnings
+cargo clippy -p "$pkg" $targets $features --keep-going -- -D warnings || status=1
+exit "$status"
 '''
 
 [tasks.rust-fix-crate]
@@ -362,11 +363,16 @@ run = "cargo clippy --workspace --lib --bins --tests --examples --all-features -
 # workspace (including `--all-features`) so feature-gated code is covered in one
 # pass at commit time.
 # Omit `--benches`: Criterion targets are compiled by `rust-bench`, not lint.
+# Both checks always run. A format failure does not skip clippy, and
+# `--keep-going` keeps linting the rest of the workspace after the first
+# crate error. The task still exits non-zero if either check fails.
 description = "Lint full workspace (use rust-lint-crate while iterating; run before commit/CI; skips benches)"
-run = [
-  "cargo fmt --all -- --check",
-  "cargo clippy --workspace --lib --bins --tests --examples --all-features -- -D warnings",
-]
+run = '''
+status=0
+cargo fmt --all -- --check || status=1
+cargo clippy --workspace --lib --bins --tests --examples --all-features --keep-going -- -D warnings || status=1
+exit "$status"
+'''
 
 [tasks.rust-audit]
 description = "Audit Rust dependencies via cargo-deny"
@@ -586,7 +592,7 @@ env = { CARGO_INCREMENTAL = "0" }
 run = "wasm-pack build finstack-quant-wasm --target web"
 
 [tasks.wasm-test]
-description = "Run WASM package tests (wasm-bindgen + Node facade)"
+description = "Run WASM package tests (wasm-bindgen + Node facade) and the facade JSDoc sync check"
 # Facade builds use profile.wasm-test (opt-level 1, no LTO). Published packages
 # stay on wasm-build / wasm-pkg.
 run = [
@@ -594,11 +600,15 @@ run = [
   "wasm-pack build finstack-quant-wasm --target web --profile wasm-test --no-opt --out-dir pkg",
   "wasm-pack build finstack-quant-wasm --target nodejs --profile wasm-test --no-opt --out-dir pkg-node",
   "npm --prefix finstack-quant-wasm run test:facade",
+  "npm --prefix finstack-quant-wasm run docs:check-sync",
 ]
 
 [tasks.wasm-test-built]
-description = "Run Node facade tests against the already built web and Node WASM packages"
-run = "npm --prefix finstack-quant-wasm run test:facade"
+description = "Run Node facade tests and the facade JSDoc sync check against the already built web and Node WASM packages"
+run = [
+  "npm --prefix finstack-quant-wasm run test:facade",
+  "npm --prefix finstack-quant-wasm run docs:check-sync",
+]
 
 [tasks.wasm-test-cov]
 description = "Run WASM binding tests with HTML coverage report"
@@ -624,6 +634,7 @@ run = [
   "npm --prefix finstack-quant-wasm run format",
   "npm --prefix finstack-quant-wasm run lint",
   "mise run wasm-check-serializer",
+  "mise run wasm-check-errors",
 ]
 
 [tasks.wasm-check-serializer]
@@ -646,6 +657,27 @@ fi
 echo 'WASM serializer check passed: all JsValue returns route through to_js_value.'
 """
 
+[tasks.wasm-check-errors]
+description = "Fail if a binding throws a bare string instead of a structured FinstackError"
+# A JS error built from a string (`JsValue::from_str`, `JsValue::from(format!(..))`,
+# `js_sys::Error::new`) has no `name`/`kind`, unlike every error routed through
+# `crate::utils::to_js_err`. Build object keys with `JsValue::from`. Helpers must
+# return a typed Rust error, not `Result<_, String>`; the allowlist below is a
+# ratchet for helpers whose logic later moves into Rust (it only shrinks).
+run = '''
+set -eu
+code() { grep -rnE --include='*.rs' -e "$1" finstack-quant-wasm/src/api | grep -vE '^[^:]+:[0-9]+:[[:space:]]*//' || true; }
+bare=$(code 'JsValue::from_str|js_sys::Error::new|Err\(JsValue::from|JsValue::from\(format!')
+string_errs=$(code '-> Result<[^>]*, String>' | grep -vE -e 'src/api/models/volatility\.rs' || true)
+if [ -n "$bare$string_errs" ]; then
+  echo 'Bindings must throw through crate::utils::to_js_err (structured FinstackError with kind).'
+  if [ -n "$bare" ]; then echo "$bare"; fi
+  if [ -n "$string_errs" ]; then echo "$string_errs"; fi
+  exit 1
+fi
+echo 'WASM error check passed: every binding error is a structured FinstackError.'
+'''
+
 [tasks.wasm-doc]
 description = "Enforce complete WASM and TypeScript IntelliSense documentation"
 # --no-sync: pure static checks; plain `uv run` rebuilds the PyO3 extension.
@@ -664,34 +696,31 @@ run = [
 ]
 
 [tasks.wasm-gen-contracts]
-description = "Generate Rust-derived WASM host result schema and declarations"
+description = "Generate the WASM host result schema and every schema-derived TypeScript declaration"
 run = [
   "cargo run -p finstack-quant-wasm --example generate_contracts --features contract-generation -- --write",
   "node finstack-quant-wasm/scripts/generate-contract-types.mjs",
 ]
 
 [tasks.wasm-check-contracts]
-description = "Check Rust-derived WASM host result schema and declarations"
+description = "Check the WASM host result schema and every schema-derived TypeScript declaration"
 run = [
   "cargo run -p finstack-quant-wasm --example generate_contracts --features contract-generation -- --check",
   "node finstack-quant-wasm/scripts/generate-contract-types.mjs --check",
 ]
 
 [tasks.wasm-gen-bindings]
-description = "Export TypeScript types from Rust (writes finstack-quant-wasm/types/generated/)"
+description = "Generate TypeScript types from the Rust JSON schemas (writes finstack-quant-wasm/types/)"
 run = [
   "mise run wasm-gen-contracts",
-  "cargo test -p finstack-quant-calibration --test ts_export --features ts_export -- --test-threads=1",
-  "cargo test -p finstack-quant-portfolio --test ts_export --features ts_export",
   "uv run --no-sync python scripts/sync_generated_ts_index.py",
 ]
 
 [tasks.wasm-check-bindings]
-description = "Verify Rust-exported TypeScript types without mutating the workspace"
+description = "Verify the schema-generated TypeScript types without mutating the workspace"
 run = [
   "mise run wasm-check-contracts",
-  "uv run --no-sync pytest scripts/tests/test_check_generated_ts.py -q",
-  "uv run --no-sync python scripts/check_generated_ts.py",
+  "uv run --no-sync python scripts/sync_generated_ts_index.py --check",
 ]
 
 # ─────────────────────────────────────────────────────────────────
@@ -727,6 +756,10 @@ run = [
   set -eu
   cargo build \
     -p finstack-quant-core --bin gen_core_schemas \
+    -p finstack-quant-analytics --bin gen_analytics_schemas \
+    -p finstack-quant-statements-analytics --bin gen_statements_analytics_schemas \
+    -p finstack-quant-covenants --bin gen_covenants_schemas \
+    -p finstack-quant-features --bin gen_features_schemas \
     -p finstack-quant-attribution --bin gen_attribution_schemas \
     -p finstack-quant-calibration --bin gen_calibration_schemas \
     -p finstack-quant-cashflows --bin gen_cashflow_schemas \
@@ -739,6 +772,10 @@ run = [
   target_dir="${CARGO_TARGET_DIR:-target}"
   for bin in \
     gen_core_schemas \
+    gen_analytics_schemas \
+    gen_statements_analytics_schemas \
+    gen_covenants_schemas \
+    gen_features_schemas \
     gen_attribution_schemas \
     gen_calibration_schemas \
     gen_cashflow_schemas \
@@ -755,14 +792,19 @@ run = [
   "uv run --no-sync python scripts/check_schema_generation.py",
   """
   cargo nextest run --no-fail-fast -E '\
+    (binary_id(finstack-quant-analytics::analytics) & test(/schema_contract::/)) | \
+    (binary_id(finstack-quant-covenants::covenants) & test(/schema_contract::/)) | \
     (binary_id(finstack-quant-cashflows::cashflows) & test(/schema_roundtrip::/)) | \
     (binary_id(finstack-quant-portfolio::portfolio) & test(/materialization_schema/)) | \
+    (binary_id(finstack-quant-portfolio::portfolio) & test(/portfolio_schema_contract::/)) | \
     (binary_id(finstack-quant-margin::margin) & test(/schema_parity/)) | \
     (binary_id(finstack-quant-attribution::attribution) & test(/attribution::schema_contract::/)) | \
     (binary_id(finstack-quant-calibration::calibration) & test(/schema_parity/)) | \
     (binary_id(finstack-quant-statements::statements) & test(/schema_contract/)) | \
+    (binary_id(finstack-quant-statements-analytics::statements_analytics) & test(/analysis_schema_contract::/)) | \
     (binary_id(finstack-quant-scenarios::scenarios) & test(/schema_contract/)) | \
     (binary_id(finstack-quant-models::models) & test(/factor_schema_contract/)) | \
+    (binary_id(finstack-quant-models::models) & test(/model_schema_contract::/)) | \
     (binary_id(finstack-quant-valuations::valuations) & test(/schema_parity/)) | \
     (package(finstack-quant-valuations) & kind(lib) & test(/test_instrument_schema_union_parity/)) | \
     (binary_id(finstack-quant-valuations::valuations) & test(/schema_audit/))'
@@ -775,6 +817,10 @@ run = '''
 set -eu
 cargo build \
   -p finstack-quant-core --bin gen_core_schemas \
+  -p finstack-quant-analytics --bin gen_analytics_schemas \
+  -p finstack-quant-statements-analytics --bin gen_statements_analytics_schemas \
+  -p finstack-quant-covenants --bin gen_covenants_schemas \
+  -p finstack-quant-features --bin gen_features_schemas \
   -p finstack-quant-attribution --bin gen_attribution_schemas \
   -p finstack-quant-calibration --bin gen_calibration_schemas \
   -p finstack-quant-cashflows --bin gen_cashflow_schemas \
@@ -787,6 +833,10 @@ cargo build \
 target_dir="${CARGO_TARGET_DIR:-target}"
 for bin in \
   gen_core_schemas \
+  gen_analytics_schemas \
+  gen_statements_analytics_schemas \
+  gen_covenants_schemas \
+  gen_features_schemas \
   gen_attribution_schemas \
   gen_calibration_schemas \
   gen_cashflow_schemas \

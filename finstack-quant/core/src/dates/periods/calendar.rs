@@ -34,7 +34,7 @@ impl PeriodCalendar for FiscalCalendar {
     }
 
     fn max_index(&self, year: i32, kind: PeriodKind) -> crate::Result<u16> {
-        let days = (fiscal_year_start(year + 1, self.config)?
+        let days = (fiscal_year_start(checked_year_offset(year, 1)?, self.config)?
             - fiscal_year_start(year, self.config)?)
         .whole_days() as u16;
         Ok(match kind {
@@ -56,17 +56,53 @@ pub(super) fn build_periods_with_calendar<C: PeriodCalendar>(
     actuals_until: Option<&str>,
 ) -> crate::Result<PeriodPlan> {
     let (start, end) = parse_range_with_calendar(range, &calendar)?;
-    let mut ids = enumerate_ids(start, end, &calendar)?;
-
+    // Reject unsupported dates and excessive work before allocating any periods.
+    calendar.bounds(start.year, start.kind, start.index)?;
+    calendar.bounds(end.year, end.kind, end.index)?;
     let actual_cut = actuals_until
         .map(|value| parse_id_with_calendar(value, &calendar))
         .transpose()?;
-    let periods = ids
-        .drain(..)
-        .map(|pid| make_period_with_calendar(pid, &calendar, actual_cut.as_ref()))
-        .collect::<crate::Result<Vec<_>>>()?;
+    if let Some(cut) = actual_cut {
+        if cut.kind != start.kind || cut.fiscal != start.fiscal {
+            return Err(invalid_period(
+                actuals_until.unwrap_or_default(),
+                "actuals cutoff must use the same period kind and calendar as the range",
+            ));
+        }
+        calendar.bounds(cut.year, cut.kind, cut.index)?;
+    }
+    let mut count = 0usize;
+    for year in start.year..=end.year {
+        let first = if year == start.year { start.index } else { 1 };
+        let last = if year == end.year {
+            end.index
+        } else {
+            calendar.max_index(year, start.kind)?
+        };
+        count += usize::from(last - first + 1);
+        if count > MAX_PERIODS {
+            return Err(invalid_period(
+                range,
+                "range exceeds the 100000-period limit",
+            ));
+        }
+    }
+    let mut periods = Vec::with_capacity(count);
+    let mut current = start;
+    for index in 0..count {
+        periods.push(make_period_with_calendar(
+            current,
+            &calendar,
+            actual_cut.as_ref(),
+        )?);
+        if index + 1 < count {
+            current = step_with_calendar(current, &calendar, true)?;
+        }
+    }
     Ok(PeriodPlan { periods })
 }
+
+const MAX_PERIODS: usize = 100_000;
 
 fn make_period_with_calendar<C: PeriodCalendar>(
     pid: PeriodId,
@@ -86,14 +122,13 @@ fn make_period_with_calendar<C: PeriodCalendar>(
 // Period bounds helpers are fallible to avoid sentinel dates and silent corruption.
 
 pub(super) fn daily_bounds(year: i32, ordinal: u16) -> crate::Result<(Date, Date)> {
-    use time::Duration;
     let start = Date::from_ordinal_date(year, ordinal).map_err(|_| {
         invalid_period(
             &format!("{year}D{ordinal}"),
             &format!("ordinal must be in 1..={}", days_in_year(year)),
         )
     })?;
-    let end = start + Duration::days(1);
+    let end = start.add_days(1)?;
     Ok((start, end))
 }
 
@@ -105,7 +140,11 @@ pub(super) fn quarter_bounds(year: i32, q: u8) -> crate::Result<(Date, Date)> {
         _ => (Month::October, Month::January),
     };
     let start = crate::dates::create_date(year, sm, 1)?;
-    let end_year = if q == 4 { year + 1 } else { year };
+    let end_year = if q == 4 {
+        checked_year_offset(year, 1)?
+    } else {
+        year
+    };
     let end = crate::dates::create_date(end_year, em, 1)?;
     Ok((start, end))
 }
@@ -115,7 +154,7 @@ pub(super) fn month_bounds(year: i32, m: u8) -> crate::Result<(Date, Date)> {
         .map_err(|_| invalid_period(&format!("{year}M{m:02}"), "month must be in 1..=12"))?;
     let start = crate::dates::create_date(year, sm, 1)?;
     let (ey, em) = if m == 12 {
-        (year + 1, Month::January)
+        (checked_year_offset(year, 1)?, Month::January)
     } else {
         (
             year,
@@ -140,7 +179,6 @@ pub(super) fn iso_weeks_in_year(year: i32) -> u8 {
 
 /// Calculate ISO 8601 week bounds for a given ISO week-year and week number.
 pub(super) fn week_bounds(year: i32, w: u8) -> crate::Result<(Date, Date)> {
-    use time::Duration;
     use time::Weekday;
 
     let weeks = iso_weeks_in_year(year);
@@ -156,23 +194,25 @@ pub(super) fn week_bounds(year: i32, w: u8) -> crate::Result<(Date, Date)> {
             "ISO week-year out of the supported date range",
         )
     })?;
-    let end = start + Duration::days(7);
+    let end = start.add_days(7)?;
     Ok((start, end))
 }
 
 pub(super) fn half_bounds(year: i32, h: u8) -> crate::Result<(Date, Date)> {
     let jan1 = crate::dates::create_date(year, Month::January, 1)?;
     let jul1 = crate::dates::create_date(year, Month::July, 1)?;
-    let jan1_next = crate::dates::create_date(year + 1, Month::January, 1)?;
     match h {
         1 => Ok((jan1, jul1)),
-        _ => Ok((jul1, jan1_next)),
+        _ => Ok((
+            jul1,
+            crate::dates::create_date(checked_year_offset(year, 1)?, Month::January, 1)?,
+        )),
     }
 }
 
 pub(super) fn annual_bounds(year: i32) -> crate::Result<(Date, Date)> {
     let start = crate::dates::create_date(year, Month::January, 1)?;
-    let end = crate::dates::create_date(year + 1, Month::January, 1)?;
+    let end = crate::dates::create_date(checked_year_offset(year, 1)?, Month::January, 1)?;
     Ok((start, end))
 }
 
@@ -181,8 +221,6 @@ pub(super) fn fiscal_daily_bounds(
     ordinal: u16,
     config: FiscalConfig,
 ) -> crate::Result<(Date, Date)> {
-    use time::Duration;
-
     if ordinal == 0 {
         return Err(invalid_period(
             &format!("FY{fiscal_year}D{ordinal}"),
@@ -190,8 +228,8 @@ pub(super) fn fiscal_daily_bounds(
         ));
     }
     let fy_start = fiscal_year_start(fiscal_year, config)?;
-    let fy_end = fiscal_year_start(fiscal_year + 1, config)?;
-    let start = fy_start + Duration::days(i64::from(ordinal - 1));
+    let fy_end = fiscal_year_start(checked_year_offset(fiscal_year, 1)?, config)?;
+    let start = fy_start.add_days(i64::from(ordinal - 1))?;
     if start >= fy_end {
         return Err(invalid_period(
             &format!("FY{fiscal_year}D{ordinal}"),
@@ -201,7 +239,7 @@ pub(super) fn fiscal_daily_bounds(
             ),
         ));
     }
-    Ok((start, (start + Duration::days(1)).min(fy_end)))
+    Ok((start, start.add_days(1)?))
 }
 
 pub(super) fn fiscal_quarter_bounds(
@@ -214,8 +252,12 @@ pub(super) fn fiscal_quarter_bounds(
     let quarter_start_month_offset = (q - 1) * 3;
     let quarter_end_month_offset = q * 3;
 
-    let start = fy_start.add_months(quarter_start_month_offset as i32);
-    let end = fy_start.add_months(quarter_end_month_offset as i32);
+    let start = fy_start.add_months(quarter_start_month_offset as i32)?;
+    let end = if q == 4 {
+        fiscal_year_start(checked_year_offset(fiscal_year, 1)?, config)?
+    } else {
+        fy_start.add_months(quarter_end_month_offset as i32)?
+    };
 
     Ok((start, end))
 }
@@ -227,8 +269,12 @@ pub(super) fn fiscal_month_bounds(
 ) -> crate::Result<(Date, Date)> {
     let fy_start = fiscal_year_start(fiscal_year, config)?;
 
-    let start = fy_start.add_months((m - 1) as i32);
-    let end = fy_start.add_months(m as i32);
+    let start = fy_start.add_months((m - 1) as i32)?;
+    let end = if m == 12 {
+        fiscal_year_start(checked_year_offset(fiscal_year, 1)?, config)?
+    } else {
+        fy_start.add_months(m as i32)?
+    };
 
     Ok((start, end))
 }
@@ -242,19 +288,23 @@ pub(super) fn fiscal_week_bounds(
     w: u8,
     config: FiscalConfig,
 ) -> crate::Result<(Date, Date)> {
-    use time::Duration;
-
+    if w == 0 {
+        return Err(invalid_period(
+            &format!("FY{fiscal_year}W{w:02}"),
+            "fiscal week must be at least 1",
+        ));
+    }
     let fy_start = fiscal_year_start(fiscal_year, config)?;
-    let fy_end = fiscal_year_start(fiscal_year + 1, config)?;
+    let fy_end = fiscal_year_start(checked_year_offset(fiscal_year, 1)?, config)?;
 
-    let start = fy_start + Duration::days(((w - 1) as i64) * 7);
+    let start = fy_start.add_days(i64::from(w - 1) * 7)?;
     if start >= fy_end {
         return Err(invalid_period(
             &format!("FY{fiscal_year}W{w:02}"),
             &format!("fiscal week starts after the end of FY{fiscal_year}"),
         ));
     }
-    let end = (start + Duration::days(7)).min(fy_end);
+    let end = start.add_days(7.min((fy_end - start).whole_days()))?;
 
     Ok((start, end))
 }
@@ -269,8 +319,12 @@ pub(super) fn fiscal_half_bounds(
     let half_start_month_offset = (h - 1) * 6;
     let half_end_month_offset = h * 6;
 
-    let start = fy_start.add_months(half_start_month_offset as i32);
-    let end = fy_start.add_months(half_end_month_offset as i32);
+    let start = fy_start.add_months(half_start_month_offset as i32)?;
+    let end = if h == 2 {
+        fiscal_year_start(checked_year_offset(fiscal_year, 1)?, config)?
+    } else {
+        fy_start.add_months(half_end_month_offset as i32)?
+    };
 
     Ok((start, end))
 }
@@ -280,18 +334,18 @@ pub(super) fn fiscal_annual_bounds(
     config: FiscalConfig,
 ) -> crate::Result<(Date, Date)> {
     let start = fiscal_year_start(fiscal_year, config)?;
-    let end = fiscal_year_start(fiscal_year + 1, config)?;
+    let end = fiscal_year_start(checked_year_offset(fiscal_year, 1)?, config)?;
     Ok((start, end))
 }
 
 /// Calculate the start date of a fiscal year
 fn fiscal_year_start(fiscal_year: i32, config: FiscalConfig) -> crate::Result<Date> {
-    let calendar_year = if config.start_month == 1 {
+    let calendar_year = if config.start_month == 1 && config.start_day == 1 {
         fiscal_year
     } else {
-        // Non-January fiscal years start in the previous calendar year
+        // All fiscal years except January 1 start in the previous calendar year
         // (FY2025 starting Oct 1 begins 2024-10-01).
-        fiscal_year - 1
+        checked_year_offset(fiscal_year, -1)?
     };
 
     let month = Month::try_from(config.start_month).map_err(|_| {

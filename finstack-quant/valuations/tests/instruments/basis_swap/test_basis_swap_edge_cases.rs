@@ -97,6 +97,70 @@ fn make_leg(forward_curve: &str, start: Date, end: Date, spread_bp: Decimal) -> 
 }
 
 #[test]
+fn adjusted_payment_dates_control_simple_leg_pv_and_settlement() {
+    use finstack_quant_core::market_data::scalars::ScalarTimeSeries;
+
+    let start = d(2025, 7, 31);
+    let end = d(2025, 8, 31); // Sunday; September 1 is US Labor Day.
+    let ctx = market()
+        .insert_series(
+            ScalarTimeSeries::new("FIXING:USD-SOFR-3M", vec![(start, 0.04)], None).unwrap(),
+        )
+        .insert_series(
+            ScalarTimeSeries::new("FIXING:USD-SOFR-1M", vec![(start, 0.03)], None).unwrap(),
+        );
+    let discount = ctx.get_discount("USD-OIS").unwrap();
+    let notional = 10_000_000.0;
+    // Explicit contractual dates form an independent oracle, including lag
+    // applied after the BDC and no second adjustment by the PV calculation.
+    for (bdc, lag, payment) in [
+        (BusinessDayConvention::Following, 0, d(2025, 9, 2)),
+        (BusinessDayConvention::Following, 2, d(2025, 9, 4)),
+        (BusinessDayConvention::ModifiedFollowing, 0, d(2025, 8, 29)),
+        (BusinessDayConvention::ModifiedFollowing, 2, d(2025, 9, 3)),
+    ] {
+        let mut primary = make_leg("USD-SOFR-3M", start, end, Decimal::ZERO);
+        primary.frequency = Tenor::monthly();
+        primary.business_day_convention = bdc;
+        primary.payment_lag_days = lag;
+        let mut reference = primary.clone();
+        reference.forward_curve_id = CurveId::new("USD-SOFR-1M");
+        let swap = BasisSwap::new(
+            "PAYMENT-DATE",
+            Money::new(notional, USD).unwrap(),
+            primary,
+            reference,
+        )
+        .unwrap();
+        for as_of in [
+            d(2025, 8, 28),
+            d(2025, 8, 29),
+            d(2025, 8, 31),
+            d(2025, 9, 1),
+            d(2025, 9, 2),
+            d(2025, 9, 3),
+            d(2025, 9, 4),
+        ] {
+            // Accrual stays July 31--August 31 under this contract, even
+            // when ModifiedFollowing pays before its unadjusted end.
+            let expected = if as_of < payment {
+                notional
+                    * (0.04 - 0.03)
+                    * (31.0 / 360.0)
+                    * discount.df_between_dates(as_of, payment).unwrap()
+            } else {
+                0.0
+            };
+            let actual = swap.value(&ctx, as_of).unwrap().amount();
+            assert!(
+                (actual - expected).abs() < 1e-7,
+                "{bdc:?}, lag {lag}, as_of {as_of}: {actual} vs {expected}"
+            );
+        }
+    }
+}
+
+#[test]
 fn zero_notional_is_rejected() {
     assert!(BasisSwap::new(
         "ZERO-NOTIONAL",

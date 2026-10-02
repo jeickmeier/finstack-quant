@@ -16,22 +16,26 @@ use super::helpers::{
 };
 use crate::errors::core_to_py;
 
-/// Extract a row-major volatility grid from a flat list, a nested list of
-/// rows, or any object exposing ``tolist()`` (e.g. a 2-D numpy array).
-fn extract_vol_grid(obj: &Bound<'_, PyAny>) -> PyResult<Vec<f64>> {
+enum VolInput {
+    Flat(Vec<f64>),
+    Rows(Vec<Vec<f64>>),
+}
+
+/// Preserve nested rows until the canonical Rust constructor validates their shape.
+fn extract_vol_grid(obj: &Bound<'_, PyAny>) -> PyResult<VolInput> {
     if let Ok(rows) = obj.extract::<Vec<Vec<f64>>>() {
-        return Ok(rows.into_iter().flatten().collect());
+        return Ok(VolInput::Rows(rows));
     }
     if let Ok(flat) = obj.extract::<Vec<f64>>() {
-        return Ok(flat);
+        return Ok(VolInput::Flat(flat));
     }
     if obj.hasattr("tolist")? {
         let listed = obj.call_method0("tolist")?;
         if let Ok(rows) = listed.extract::<Vec<Vec<f64>>>() {
-            return Ok(rows.into_iter().flatten().collect());
+            return Ok(VolInput::Rows(rows));
         }
         if let Ok(flat) = listed.extract::<Vec<f64>>() {
-            return Ok(flat);
+            return Ok(VolInput::Flat(flat));
         }
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
@@ -92,7 +96,9 @@ impl PyVolSurface {
     /// interpolation_mode : str, optional
     ///     ``"vol"`` (default, bilinear in vol) or ``"total_variance"``.
     /// quote_type : str, optional
-    ///     ``"black_lognormal"`` (default) or ``"normal"``.
+    ///     ``"black_lognormal"`` (default), ``"shifted_black_lognormal"``, or ``"normal"``.
+    /// displacements : list[float] | None, optional
+    ///     Shifted-Black rate displacements, one per expiry; absent for other conventions.
     ///
     /// Raises
     /// ------
@@ -108,7 +114,8 @@ impl PyVolSurface {
     /// >>> VolSurface("EQ-VOL", [1.0], [90.0, 100.0], [0.22, 0.20]).strikes
     /// [90.0, 100.0]
     #[new]
-    #[pyo3(signature = (id, expiries, strikes, vols, *, secondary_axis="strike", interpolation_mode="vol", quote_type="black_lognormal"))]
+    #[pyo3(signature = (id, expiries, strikes, vols, *, secondary_axis="strike", interpolation_mode="vol", quote_type="black_lognormal", displacements=None))]
+    #[allow(clippy::too_many_arguments)]
     fn new(
         id: &str,
         expiries: Vec<f64>,
@@ -117,22 +124,35 @@ impl PyVolSurface {
         secondary_axis: &str,
         interpolation_mode: &str,
         quote_type: &str,
+        displacements: Option<Vec<f64>>,
     ) -> PyResult<Self> {
         let axis = parse_vol_surface_axis(secondary_axis)?;
         let mode = parse_vol_interpolation_mode(interpolation_mode)?;
         let quote = parse_vol_quote_type(quote_type)?;
         let grid = extract_vol_grid(vols)?;
-        let surface = VolSurface::from_grid_opts(
-            id,
-            &expiries,
-            &strikes,
-            &grid,
-            VolGridOpts {
-                secondary_axis: axis,
-                quote_type: quote,
-                interpolation_mode: mode,
-            },
-        )
+        let opts = VolGridOpts {
+            secondary_axis: axis,
+            interpolation_mode: mode,
+            quote_type: quote,
+        };
+        let surface = match grid {
+            VolInput::Flat(values) => VolSurface::from_grid_opts(
+                id,
+                &expiries,
+                &strikes,
+                &values,
+                opts,
+                displacements.as_deref(),
+            ),
+            VolInput::Rows(rows) => VolSurface::from_rows_opts(
+                id,
+                &expiries,
+                &strikes,
+                &rows,
+                opts,
+                displacements.as_deref(),
+            ),
+        }
         .map_err(core_to_py)?;
 
         Ok(Self {
@@ -227,10 +247,45 @@ impl PyVolSurface {
         self.inner.secondary_axis().to_string()
     }
 
-    /// Quoting convention of the stored volatilities (``"black_lognormal"`` or ``"normal"``).
+    /// Stored quote convention: ``"black_lognormal"``, ``"shifted_black_lognormal"``, or ``"normal"``.
     #[getter]
     fn quote_type(&self) -> String {
         self.inner.quote_type().to_string()
+    }
+
+    /// Return the per-expiry shifted-Black displacements in rate units.
+    ///
+    /// Returns
+    /// -------
+    /// list[float] | None
+    ///     One displacement per expiry, or ``None`` for unshifted quotes.
+    fn get_displacements(&self) -> Option<Vec<f64>> {
+        self.inner.get_displacements().map(<[f64]>::to_vec)
+    }
+
+    /// Return a shifted-Black surface retaining one displacement per expiry.
+    ///
+    /// Parameters
+    /// ----------
+    /// displacements : list[float]
+    ///     Finite displacements in strike/rate units, aligned to the expiry axis.
+    ///
+    /// Returns
+    /// -------
+    /// VolSurface
+    ///     New validated surface with shifted-Black quote metadata.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the displacement count differs from the expiry count or a shift is non-finite.
+    fn with_displacements(&self, displacements: Vec<f64>) -> PyResult<Self> {
+        self.inner
+            .as_ref()
+            .clone()
+            .with_displacements(&displacements)
+            .map(|surface| Self::from_inner(Arc::new(surface)))
+            .map_err(core_to_py)
     }
 
     /// Interpolation contract between grid points (``"vol"`` or ``"total_variance"``).
@@ -336,17 +391,9 @@ impl PyFxDeltaVolSurface {
         rr_10d: Option<Vec<f64>>,
         bf_10d: Option<Vec<f64>>,
     ) -> PyResult<Self> {
-        let wings_10d = match (rr_10d, bf_10d) {
-            (Some(rr), Some(bf)) => Some((rr, bf)),
-            (None, None) => None,
-            _ => {
-                return Err(crate::errors::value_error(
-                    "rr_10d and bf_10d must both be provided or both omitted",
-                ));
-            }
-        };
-        let surface = FxDeltaVolSurface::new(id, expiries, atm_vols, rr_25d, bf_25d, wings_10d)
-            .map_err(core_to_py)?;
+        let surface =
+            FxDeltaVolSurface::new(id, expiries, atm_vols, rr_25d, bf_25d, rr_10d, bf_10d)
+                .map_err(core_to_py)?;
         Ok(Self {
             inner: Arc::new(surface),
         })
@@ -480,7 +527,7 @@ impl PySabrParameterData {
     /// rho : float
     ///     Forward/volatility correlation in ``(-1, 1)``.
     /// nu : float
-    ///     Volatility of volatility; strictly positive.
+    ///     Volatility of volatility; nonnegative, with zero giving deterministic volatility.
     /// shift : float, optional
     ///     Displacement added to forward and strike (decimal rate units, e.g. ``0.03``).
     ///
@@ -520,7 +567,7 @@ impl PySabrParameterData {
         self.inner.rho
     }
 
-    /// Volatility of volatility (strictly positive).
+    /// Volatility of volatility (nonnegative; zero gives deterministic volatility).
     #[getter]
     fn nu(&self) -> f64 {
         self.inner.nu
@@ -590,8 +637,14 @@ impl PySabrParameterData {
     }
 }
 
-/// Parse one cube node: a ``SabrParameterData`` or a dict with keys
-/// ``alpha``, ``beta``, ``rho``, ``nu`` and optional ``shift``.
+/// Parse one cube node: a ``SabrParameterData`` or a dict in the Rust
+/// ``SabrParameterData`` wire shape (``alpha``, ``beta``, ``rho``, ``nu`` and
+/// optional ``shift``).
+///
+/// The dict is converted to its JSON value and decoded by the Rust
+/// `Deserialize` impl, which rejects missing and unknown keys and validates the
+/// parameter ranges. JSON cannot carry a non-finite number, so one is rejected
+/// at this boundary with its key named, as the WASM JSON input walker does.
 fn extract_sabr_node(obj: &Bound<'_, PyAny>, idx: usize) -> PyResult<SabrParameterData> {
     if let Ok(typed) = obj.extract::<PyRef<'_, PySabrParameterData>>() {
         return Ok(typed.inner);
@@ -601,27 +654,25 @@ fn extract_sabr_node(obj: &Bound<'_, PyAny>, idx: usize) -> PyResult<SabrParamet
             "params_row_major[{idx}]: expected SabrParameterData or dict"
         ))
     })?;
-    let get = |key: &str| -> PyResult<f64> {
-        dict.get_item(key)?
-            .ok_or_else(|| {
-                crate::errors::value_error(format!(
-                    "params_row_major[{idx}]: missing required key {key:?}"
-                ))
-            })?
-            .extract::<f64>()
-    };
-
-    let alpha = get("alpha")?;
-    let beta = get("beta")?;
-    let rho = get("rho")?;
-    let nu = get("nu")?;
-
-    let shift = dict
-        .get_item("shift")?
-        .filter(|value| !value.is_none())
-        .map(|value| value.extract::<f64>())
-        .transpose()?;
-    SabrParameterData::new_with_shift(alpha, beta, rho, nu, shift).map_err(core_to_py)
+    let mut node = serde_json::Map::with_capacity(dict.len());
+    for (key, value) in dict.iter() {
+        let key: String = key.extract()?;
+        let value = if value.is_none() {
+            serde_json::Value::Null
+        } else {
+            let number: f64 = value.extract()?;
+            serde_json::Number::from_f64(number)
+                .map(serde_json::Value::Number)
+                .ok_or_else(|| {
+                    crate::errors::value_error(format!(
+                        "params_row_major[{idx}].{key}: expected a finite number, got {number}"
+                    ))
+                })?
+        };
+        node.insert(key, value);
+    }
+    serde_json::from_value::<SabrParameterData>(serde_json::Value::Object(node))
+        .map_err(|e| crate::errors::value_error(format!("params_row_major[{idx}]: {e}")))
 }
 
 /// SABR volatility cube on an expiry x tenor grid.
@@ -670,11 +721,12 @@ impl PyVolCube {
     /// params_row_major : list[SabrParameterData | dict]
     ///     ``len(expiries) * len(tenors)`` SABR nodes, row-major by expiry.
     ///     Dicts use keys ``"alpha"``, ``"beta"``, ``"rho"``, ``"nu"`` and
-    ///     optionally ``"shift"``.
+    ///     optionally ``"shift"``; missing or unknown keys are rejected.
     /// forwards_row_major : list[float]
     ///     Forward swap rates (decimal) in the same row-major order.
     /// interpolation_mode : str, optional
-    ///     ``"vol"`` (default) or ``"total_variance"``.
+    ///     ``"vol"`` or ``"total_variance"``; ``None`` keeps the Rust
+    ///     ``VolCube::from_grid`` default (``"vol"``).
     ///
     /// Raises
     /// ------
@@ -691,16 +743,18 @@ impl PyVolCube {
     /// >>> VolCube("USD-SWPT", [1.0], [5.0, 10.0], [node, node], [0.03, 0.035]).grid_shape
     /// (1, 2)
     #[new]
-    #[pyo3(signature = (id, expiries, tenors, params_row_major, forwards_row_major, interpolation_mode="vol"))]
+    #[pyo3(signature = (id, expiries, tenors, params_row_major, forwards_row_major, interpolation_mode=None))]
     fn new(
         id: &str,
         expiries: Vec<f64>,
         tenors: Vec<f64>,
         params_row_major: Vec<Bound<'_, PyAny>>,
         forwards_row_major: Vec<f64>,
-        interpolation_mode: &str,
+        interpolation_mode: Option<&str>,
     ) -> PyResult<Self> {
-        let mode = parse_vol_interpolation_mode(interpolation_mode)?;
+        let mode = interpolation_mode
+            .map(parse_vol_interpolation_mode)
+            .transpose()?;
 
         let sabr_params: Vec<SabrParameterData> = params_row_major
             .iter()
@@ -708,9 +762,12 @@ impl PyVolCube {
             .map(|(i, node)| extract_sabr_node(node, i))
             .collect::<PyResult<Vec<_>>>()?;
 
-        let cube = VolCube::from_grid(id, &expiries, &tenors, &sabr_params, &forwards_row_major)
-            .map_err(core_to_py)?
-            .with_interpolation_mode(mode);
+        let mut cube =
+            VolCube::from_grid(id, &expiries, &tenors, &sabr_params, &forwards_row_major)
+                .map_err(core_to_py)?;
+        if let Some(mode) = mode {
+            cube = cube.with_interpolation_mode(mode);
+        }
 
         Ok(Self {
             inner: Arc::new(cube),
@@ -732,19 +789,14 @@ impl PyVolCube {
     ///
     /// Raises
     /// ------
-    /// IndexError
-    ///     If an index is outside the grid.
+    /// ValueError
+    ///     If an index is outside the grid (checked by Rust ``VolCube``).
     #[pyo3(text_signature = "(self, exp_idx, tenor_idx)")]
     fn params_at(&self, exp_idx: usize, tenor_idx: usize) -> PyResult<PySabrParameterData> {
-        let (n_exp, n_ten) = self.inner.grid_shape();
-        if exp_idx >= n_exp || tenor_idx >= n_ten {
-            return Err(pyo3::exceptions::PyIndexError::new_err(format!(
-                "grid index ({exp_idx}, {tenor_idx}) outside shape ({n_exp}, {n_ten})"
-            )));
-        }
-        Ok(PySabrParameterData::from_inner(
-            *self.inner.params_at(exp_idx, tenor_idx),
-        ))
+        self.inner
+            .params_at(exp_idx, tenor_idx)
+            .map(|params| PySabrParameterData::from_inner(*params))
+            .map_err(core_to_py)
     }
 
     /// Forward swap rate (decimal) at grid indices.
@@ -762,17 +814,13 @@ impl PyVolCube {
     ///
     /// Raises
     /// ------
-    /// IndexError
-    ///     If an index is outside the grid.
+    /// ValueError
+    ///     If an index is outside the grid (checked by Rust ``VolCube``).
     #[pyo3(text_signature = "(self, exp_idx, tenor_idx)")]
     fn forward_at(&self, exp_idx: usize, tenor_idx: usize) -> PyResult<f64> {
-        let (n_exp, n_ten) = self.inner.grid_shape();
-        if exp_idx >= n_exp || tenor_idx >= n_ten {
-            return Err(pyo3::exceptions::PyIndexError::new_err(format!(
-                "grid index ({exp_idx}, {tenor_idx}) outside shape ({n_exp}, {n_ten})"
-            )));
-        }
-        Ok(self.inner.forward_at(exp_idx, tenor_idx))
+        self.inner
+            .forward_at(exp_idx, tenor_idx)
+            .map_err(core_to_py)
     }
 
     /// Export nodes in long form.

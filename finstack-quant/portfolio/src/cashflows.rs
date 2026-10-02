@@ -34,6 +34,7 @@ use std::str::FromStr;
 /// call. Set [`allow_partial`](Self::allow_partial) to keep a partial
 /// ladder with those issues recorded on [`PortfolioCashflows::issues`].
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CashflowAggregationOptions {
     /// When `false` (default), a non-empty [`PortfolioCashflows::issues`]
     /// list fails the call. When `true`, remaining positions still
@@ -49,6 +50,7 @@ pub struct CashflowAggregationOptions {
 /// Collapse uses spot at `as_of` for due-or-past flows and CIP forwards for
 /// later dates.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CashflowFxPolicy {
     /// Spot FX at `as_of` when `payment_date <= as_of`; otherwise the CIP
@@ -59,6 +61,7 @@ pub enum CashflowFxPolicy {
 
 /// Why a position did not contribute classified cashflows to a portfolio ladder.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum CashflowExtractionIssueKind {
     /// The instrument exposes `CashflowProvider`, but schedule construction failed.
@@ -67,6 +70,7 @@ pub enum CashflowExtractionIssueKind {
 
 /// Structured issue captured while extracting full cashflow schedules.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct CashflowExtractionIssue {
     /// Position whose cashflow extraction was attempted.
     pub position_id: PositionId,
@@ -82,6 +86,7 @@ pub struct CashflowExtractionIssue {
 
 /// Per-position cashflow summary, including empty-schedule intent metadata.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioCashflowPositionSummary {
     /// Position identifier.
     pub position_id: PositionId,
@@ -97,6 +102,7 @@ pub struct PortfolioCashflowPositionSummary {
 
 /// One scaled portfolio cashflow event derived from an instrument schedule.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioCashflowEvent {
     /// Position contributing the event.
     pub position_id: PositionId,
@@ -105,12 +111,20 @@ pub struct PortfolioCashflowEvent {
     /// Underlying instrument type key.
     pub instrument_type: InstrumentType,
     /// Payment date.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::DateWire")
+    )]
     pub date: Date,
     /// Position-scaled amount.
     pub amount: Money,
     /// Cashflow classification preserved from the instrument schedule.
     pub kind: CFKind,
     /// Optional reset date for floating coupons.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "Option<finstack_quant_core::wire::DateWire>")
+    )]
     pub reset_date: Option<Date>,
     /// Accrual factor used to compute the event when available.
     pub accrual_factor: f64,
@@ -120,6 +134,7 @@ pub struct PortfolioCashflowEvent {
 
 /// Rich portfolio cashflow ladder preserving event classifications.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct PortfolioCashflows {
     /// Scaled cashflow events for all supported positions, sorted by payment date.
     pub events: Vec<PortfolioCashflowEvent>,
@@ -128,6 +143,12 @@ pub struct PortfolioCashflows {
     pub by_position: IndexMap<PositionId, Vec<PortfolioCashflowEvent>>,
 
     /// Aggregated totals by date, currency, and `CFKind`.
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(
+            with = "IndexMap<finstack_quant_core::wire::DateWire, IndexMap<Currency, IndexMap<CFKind, Money>>>"
+        )
+    )]
     pub by_date: IndexMap<Date, IndexMap<Currency, IndexMap<CFKind, Money>>>,
 
     /// Per-position schedule metadata, including placeholder/no-residual intent.
@@ -259,14 +280,16 @@ pub fn net_amounts_by_date(
 ///
 /// Accepts either a full [`PortfolioCashflows`] payload or a bare `by_date`
 /// map. Kind keys are opaque strings (reporting fixtures may use mixed-case
-/// labels such as `"Notional"`). Amounts may be JSON numbers or decimal
-/// strings.
+/// labels such as `"Notional"`). Money values use the canonical decimal-string
+/// amount and ISO currency representation.
 ///
 /// # Errors
 ///
 /// Returns [`Error::InvalidInput`] when `cashflows_json` is not JSON, when
-/// `currency` is not a known ISO code, or when the `by_date` value is not an
-/// object.
+/// `currency` or a bucket key is not a known ISO code, a date or money value
+/// is invalid, a money currency disagrees with its bucket, a total is not
+/// finite, or a date/currency/kind container is not an object. Every bucket is
+/// validated, including currencies other than the requested output currency.
 ///
 /// # Arguments
 ///
@@ -287,37 +310,56 @@ pub fn net_in_currency_by_date_json(
         ));
     };
 
-    let currency_code = currency.to_string();
     let mut out = Vec::new();
     for (date, per_currency) in by_date_obj {
-        let Some(ccy_map) = per_currency.get(&currency_code).and_then(|v| v.as_object()) else {
-            continue;
-        };
-        let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-        let mut saw_finite = false;
-        for kind_money in ccy_map.values() {
-            if let Some(amount) = json_money_amount(kind_money) {
-                if amount.is_finite() {
-                    acc.add(amount);
-                    saw_finite = true;
+        let parsed_date: finstack_quant_core::wire::DateWire =
+            serde_json::from_value(serde_json::Value::String(date.clone()))
+                .map_err(|e| Error::InvalidInput(format!("invalid cashflow date '{date}': {e}")))?;
+        let currencies = per_currency.as_object().ok_or_else(|| {
+            Error::InvalidInput(format!(
+                "cashflow date '{date}' must contain a currency object"
+            ))
+        })?;
+        for (code, per_kind) in currencies {
+            let bucket_currency = Currency::from_str(code).map_err(|e| {
+                Error::InvalidInput(format!("invalid cashflow currency '{code}': {e}"))
+            })?;
+            let kinds = per_kind.as_object().ok_or_else(|| {
+                Error::InvalidInput(format!(
+                    "cashflow bucket '{date}/{code}' must contain a kind object"
+                ))
+            })?;
+            let mut acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
+            for (kind, value) in kinds {
+                let money: Money = serde_json::from_value(value.clone()).map_err(|e| {
+                    Error::InvalidInput(format!(
+                        "invalid cashflow money at '{date}/{code}/{kind}': {e}"
+                    ))
+                })?;
+                if money.currency() != bucket_currency {
+                    return Err(Error::InvalidInput(format!(
+                        "cashflow money at '{date}/{code}/{kind}' has currency {}, expected {bucket_currency}",
+                        money.currency()
+                    )));
                 }
+                acc.add(money.amount());
+            }
+            let total = acc.total();
+            if !total.is_finite() {
+                return Err(Error::InvalidInput(format!(
+                    "cashflow total at '{date}/{code}' is not finite"
+                )));
+            }
+            if bucket_currency == currency && !kinds.is_empty() {
+                out.push((parsed_date.0, total));
             }
         }
-        if saw_finite {
-            out.push((date.clone(), acc.total()));
-        }
     }
-    out.sort_by(|a, b| a.0.cmp(&b.0));
-    Ok(out)
-}
-
-fn json_money_amount(value: &serde_json::Value) -> Option<f64> {
-    let amount = value.get("amount")?;
-    match amount {
-        serde_json::Value::Number(n) => n.as_f64(),
-        serde_json::Value::String(s) => s.parse().ok(),
-        _ => None,
-    }
+    out.sort_by_key(|row| row.0);
+    Ok(out
+        .into_iter()
+        .map(|(date, amount)| (date.to_string(), amount))
+        .collect())
 }
 
 /// Aggregate contractual portfolio cashflows while preserving `CFKind` classification.
@@ -1189,5 +1231,22 @@ mod tests {
                 ("2025-04-15".to_string(), 1_011_250.0),
             ]
         );
+    }
+    #[test]
+    fn json_netting_rejects_invalid_dates_money_and_bucket_currencies() {
+        for json in [
+            r#"{"not-a-date":{"USD":{"fixed":{"amount":"1","currency":"USD"}}}}"#,
+            r#"{"2025-02-30":{"USD":{"fixed":{"amount":"1","currency":"USD"}}}}"#,
+            r#"{"2025-01-01":{"USD":{"fixed":{"amount":"NaN","currency":"USD"}}}}"#,
+            r#"{"2025-01-01":{"USD":{"fixed":{"amount":"1","currency":"EUR"}}}}"#,
+            r#"{"2025-01-01":{"USD":{"fixed":{"amount":"1"}}}}"#,
+            r#"{"2025-01-01":{"USD":[]}}"#,
+            r#"{"2025-01-01":{"USD":{},"EUR":{"fixed":{"amount":"bad","currency":"EUR"}}}}"#,
+        ] {
+            assert!(
+                net_in_currency_by_date_json(json, "USD").is_err(),
+                "accepted {json}"
+            );
+        }
     }
 }

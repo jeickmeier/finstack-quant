@@ -22,7 +22,7 @@ use crate::bindings::statements_analytics::typed::{
 };
 use crate::errors::{display_to_py, serde_json_to_py, statements_to_py};
 use finstack_quant_statements_analytics::analysis::{
-    Explanation, ExplanationStep, ForecastMetrics,
+    DependencyTree, Explanation, ExplanationStep, ForecastMetrics, GoalSeekResult,
 };
 use pyo3::prelude::*;
 
@@ -91,9 +91,12 @@ fn extract_scenario_set(
 /// Raises
 /// ------
 /// ValueError
-///     If the configuration is malformed or a scenario fails to evaluate.
+///     If the configuration is malformed, has duplicate parameters or
+///     non-finite values, exceeds 128 parameters, 10,000 scenarios or
+///     10 million model node-period evaluation cells, references a missing
+///     perturbed parameter or target metric, or a scenario fails.
 /// KeyError
-///     If a perturbed parameter or target metric is missing from the model.
+///     If model evaluation cannot find required data or a formula reference.
 ///
 /// Examples
 /// --------
@@ -134,12 +137,16 @@ fn run_sensitivity(
 /// Returns
 /// -------
 /// list[TornadoEntry]
-///     Typed entries sorted by descending absolute swing.
+///     Typed entries sorted by descending absolute swing, with parameter IDs
+///     preserving the perturbed ``node@period`` key.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If ``period`` does not parse or ``result`` is malformed JSON.
+///     If ``period`` does not parse, ``result`` is malformed JSON, the run
+///     uses a full grid, a scenario does not contain exactly one perturbed
+///     parameter, its unperturbed baseline is absent, the target metric/period
+///     is missing, or a metric value or impact is non-finite.
 ///
 /// Examples
 /// --------
@@ -152,7 +159,7 @@ fn run_sensitivity(
 /// >>> cfg = SensitivityConfig("diagonal", [ParameterSpec.with_percentages("revenue", "2025Q2", 110.0, [-10.0, 10.0])], ["profit"])
 /// >>> entries = generate_tornado_entries(run_sensitivity(b.build(), cfg), "profit", "2025Q2")
 /// >>> [entry.parameter_id for entry in entries]
-/// ['revenue']
+/// ['revenue@2025Q2']
 #[pyfunction]
 #[pyo3(signature = (result, metric_node, period=None))]
 fn generate_tornado_entries(
@@ -170,6 +177,7 @@ fn generate_tornado_entries(
             metric_node,
             period_id,
         )
+        .map_err(statements_to_py)?
         .into_iter()
         .map(PyTornadoEntry::from_inner)
         .collect(),
@@ -460,10 +468,10 @@ impl PyForecastMetrics {
         self.inner.mae
     }
 
-    /// Mean absolute percentage error in percent (``5.0`` = 5%); ``NaN``
-    /// when every actual is zero.
+    /// Mean absolute percentage error in percent (``5.0`` = 5%); ``None``
+    /// when every absolute actual is below ``1e-10`` and excluded from MAPE.
     #[getter]
-    fn mape(&self) -> f64 {
+    fn mape(&self) -> Option<f64> {
         self.inner.mape
     }
 
@@ -473,9 +481,10 @@ impl PyForecastMetrics {
         self.inner.mape_effective_n
     }
 
-    /// Symmetric MAPE in percent.
+    /// Symmetric MAPE in percent, or ``None`` when every denominator
+    /// ``(abs(actual) + abs(forecast)) / 2`` is below ``1e-10``.
     #[getter]
-    fn smape(&self) -> f64 {
+    fn smape(&self) -> Option<f64> {
         self.inner.smape
     }
 
@@ -499,7 +508,8 @@ impl PyForecastMetrics {
     /// Export as a pandas ``Series`` indexed by metric name.
     ///
     /// Index: ``mae``, ``mape``, ``mape_effective_n``, ``smape``, ``rmse``,
-    /// ``n``; counts are cast to float.
+    /// ``n``; counts are cast to float and unavailable percentages become
+    /// pandas ``NaN``.
     fn to_series<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let labels: Vec<String> = ["mae", "mape", "mape_effective_n", "smape", "rmse", "n"]
             .iter()
@@ -507,16 +517,18 @@ impl PyForecastMetrics {
             .collect();
         let values = vec![
             self.inner.mae,
-            self.inner.mape,
+            self.inner.mape.unwrap_or(f64::NAN),
             self.inner.mape_effective_n as f64,
-            self.inner.smape,
+            self.inner.smape.unwrap_or(f64::NAN),
             self.inner.rmse,
             self.inner.n as f64,
         ];
         labeled_values_to_series(py, &labels, values, "forecast_metrics")
     }
 
-    /// Serialize to canonical JSON.
+    /// Serialize to canonical JSON; a non-finite metric (``mape`` with no
+    /// non-zero actual) is written as ``"nan"``, ``"inf"`` or ``"-inf"`` so
+    /// the document round-trips through :meth:`from_json`.
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "ForecastMetrics"))
     }
@@ -550,19 +562,21 @@ impl PyForecastMetrics {
 /// Parameters
 /// ----------
 /// actual : list[float]
-///     Observed values.
+///     Finite observed values in consistent units; negative values are accepted.
 /// forecast : list[float]
-///     Forecast values; same length as ``actual``.
+///     Finite forecast values in the same units and aligned with ``actual``.
 ///
 /// Returns
 /// -------
 /// ForecastMetrics
-///     Typed metrics with ``summary()`` and ``to_series()``.
+///     Typed metrics with ``summary()`` and ``to_series()``. ``mape`` and
+///     ``smape`` are ``None`` when no denominator contributes; JSON emits ``null``.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If the sequences are empty or of different lengths.
+///     If the sequences are empty, of different lengths, contain a non-finite
+///     value, or metric arithmetic overflows.
 ///
 /// Examples
 /// --------
@@ -578,19 +592,21 @@ fn backtest_forecast(actual: Vec<f64>, forecast: Vec<f64>) -> PyResult<PyForecas
     Ok(PyForecastMetrics { inner })
 }
 
-/// Result of a goal-seek solve.
+/// Result of a goal-seek solve (the Rust ``GoalSeekResult``).
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements import ModelBuilder
-/// >>> from finstack_quant.statements_analytics import goal_seek
+/// >>> from finstack_quant.statements_analytics import GoalSeekResult, goal_seek
 /// >>> b = ModelBuilder("m")
 /// >>> _ = b.periods("2025Q1..Q1", None)
 /// >>> _ = b.value("revenue", [("2025Q1", 100.0)])
 /// >>> _ = b.compute("profit", "revenue * 0.5")
-/// >>> result = goal_seek(b.build(), "profit", "2025Q1", 60.0, "revenue", "2025Q1")
+/// >>> result = goal_seek(b.build(), "profit", "2025Q1", 60.0, "revenue", "2025Q1", True)
 /// >>> round(result.solved_value, 6), result.model is None
 /// (120.0, False)
+/// >>> round(GoalSeekResult.from_json(result.to_json()).solved_value, 6)
+/// 120.0
 #[pyclass(
     name = "GoalSeekResult",
     module = "finstack_quant.statements_analytics",
@@ -599,34 +615,70 @@ fn backtest_forecast(actual: Vec<f64>, forecast: Vec<f64>) -> PyResult<PyForecas
 )]
 #[derive(Clone)]
 pub struct PyGoalSeekResult {
-    solved_value: f64,
-    model: Option<finstack_quant_statements::FinancialModelSpec>,
+    pub(crate) inner: GoalSeekResult,
+}
+
+impl PyGoalSeekResult {
+    /// Wrap the Rust goal-seek result.
+    pub(crate) fn from_inner(inner: GoalSeekResult) -> Self {
+        Self { inner }
+    }
 }
 
 #[pymethods]
 impl PyGoalSeekResult {
-    /// Driver value that reaches the target.
+    /// Driver value that reaches the target, in the driver node's units.
     #[getter]
     fn solved_value(&self) -> f64 {
-        self.solved_value
+        self.inner.solved_value
     }
 
     /// Model with the solved driver written in, or ``None`` when
     /// ``update_model=False``.
     #[getter]
     fn model(&self) -> Option<PyFinancialModelSpec> {
-        self.model.clone().map(PyFinancialModelSpec::from_inner)
+        self.inner
+            .model
+            .clone()
+            .map(PyFinancialModelSpec::from_inner)
+    }
+
+    /// Serialize to canonical JSON (``{"solved_value", "model"}``; ``model``
+    /// is ``null`` when it was not requested), identical to the WASM
+    /// ``goalSeek`` result.
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "GoalSeekResult"))
+    }
+
+    /// Deserialize from canonical JSON.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``json`` is not a valid ``GoalSeekResult`` document (unknown
+    ///     fields are rejected).
+    #[staticmethod]
+    fn from_json(json: &str) -> PyResult<Self> {
+        let inner = serde_json::from_str(json)
+            .map_err(|e| serde_json_to_py(e, "invalid GoalSeekResult JSON"))?;
+        Ok(Self { inner })
+    }
+
+    /// Support ``pickle`` through the canonical JSON representation.
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
+        let from_json = py.get_type::<Self>().getattr("from_json")?;
+        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
     fn __float__(&self) -> f64 {
-        self.solved_value
+        self.inner.solved_value
     }
 
     fn __repr__(&self) -> String {
         format!(
             "GoalSeekResult(solved_value={}, model={})",
-            self.solved_value,
-            if self.model.is_some() {
+            self.inner.solved_value,
+            if self.inner.model.is_some() {
                 "FinancialModelSpec(...)"
             } else {
                 "None"
@@ -652,24 +704,26 @@ impl PyGoalSeekResult {
 /// driver_period : str
 ///     Period string for the driver.
 /// update_model : bool
-///     If ``True``, the solved value is written back into the returned model.
-///     Default ``True``.
+///     If ``True``, the result's ``model`` is a copy of ``model`` with the
+///     solved value written in; if ``False`` it is ``None``. Required, as in
+///     Rust and WASM.
 /// bounds : tuple[float, float] | None
-///     Optional search bounds ``(lo, hi)``; bisection is used when set.
+///     Optional search bracket ``(lo, hi)`` in the driver node's units.
 ///
 /// Returns
 /// -------
 /// GoalSeekResult
 ///     ``solved_value`` plus ``model`` (the updated ``FinancialModelSpec`` or
-///     ``None``). ``float(result)`` yields the solved value.
+///     ``None``). ``float(result)`` yields the solved value. The input model
+///     is never modified.
 ///
 /// Raises
 /// ------
 /// ValueError
-///     If a period does not parse, the solver fails to converge, or the
-///     bracket does not contain a root, or the final objective residual exceeds 1e-9 times max(1, abs(target_value)). Failure leaves the model unchanged.
-/// KeyError
-///     If ``target_node`` or ``driver_node`` is missing from the model.
+///     If a period does not parse, ``target_node`` or ``driver_node`` is
+///     missing, the solver fails to converge, the bracket does not contain a
+///     root, or the final objective residual exceeds 1e-9 times
+///     max(1, abs(target_value)).
 ///
 /// Examples
 /// --------
@@ -677,10 +731,10 @@ impl PyGoalSeekResult {
 /// >>> from finstack_quant.statements_analytics import goal_seek
 /// >>> b = ModelBuilder("m"); b.periods("2025Q1..Q1", None); b.value("revenue", [("2025Q1", 100.0)])
 /// >>> b.compute("profit", "revenue * 0.5")
-/// >>> round(goal_seek(b.build(), "profit", "2025Q1", 60.0, "revenue", "2025Q1").solved_value, 6)
+/// >>> round(goal_seek(b.build(), "profit", "2025Q1", 60.0, "revenue", "2025Q1", False).solved_value, 6)
 /// 120.0
 #[pyfunction]
-#[pyo3(signature = (model, target_node, target_period, target_value, driver_node, driver_period, update_model=true, bounds=None))]
+#[pyo3(signature = (model, target_node, target_period, target_value, driver_node, driver_period, update_model, bounds=None))]
 #[allow(clippy::too_many_arguments)]
 fn goal_seek(
     py: Python<'_>,
@@ -693,15 +747,15 @@ fn goal_seek(
     update_model: bool,
     bounds: Option<(f64, f64)>,
 ) -> PyResult<PyGoalSeekResult> {
-    let mut model = extract_model_ref(model)?.into_owned();
+    let model = extract_model_ref(model)?.into_owned();
     let tp: finstack_quant_core::dates::PeriodId = target_period.parse().map_err(display_to_py)?;
     let dp: finstack_quant_core::dates::PeriodId = driver_period.parse().map_err(display_to_py)?;
     let target_node = target_node.to_owned();
     let driver_node = driver_node.to_owned();
 
     py.detach(move || {
-        let solved_value = finstack_quant_statements_analytics::analysis::goal_seek(
-            &mut model,
+        finstack_quant_statements_analytics::analysis::goal_seek(
+            &model,
             &target_node,
             tp,
             target_value,
@@ -710,12 +764,8 @@ fn goal_seek(
             update_model,
             bounds,
         )
-        .map_err(statements_to_py)?;
-
-        Ok(PyGoalSeekResult {
-            solved_value,
-            model: update_model.then_some(model),
-        })
+        .map(PyGoalSeekResult::from_inner)
+        .map_err(statements_to_py)
     })
 }
 
@@ -758,19 +808,49 @@ impl PyDependencyTracer {
         Ok(Self { model, graph })
     }
 
-    /// ASCII-formatted dependency tree for a node.
+    /// Dependency tree for a node (the Rust ``DependencyTracer::dependency_tree``).
+    ///
+    /// Returns
+    /// -------
+    /// DependencyTree
+    ///     Typed tree with ``node_id``, ``formula`` and ``children``; its
+    ///     ``to_json()`` matches the WASM ``DependencyTracer.dependencyTree`` result.
     ///
     /// Raises
     /// ------
     /// KeyError
-    ///     If ``node_id`` is not in the model.
-    fn dependency_tree(&self, node_id: &str) -> PyResult<String> {
-        let tracer = finstack_quant_statements_analytics::analysis::DependencyTracer::new(
+    ///     If ``node_id`` or a reachable dependency is not in the model.
+    fn dependency_tree(&self, node_id: &str) -> PyResult<PyDependencyTree> {
+        finstack_quant_statements_analytics::analysis::DependencyTracer::new(
             &self.model,
             &self.graph,
-        );
-        let tree = tracer.dependency_tree(node_id).map_err(statements_to_py)?;
-        Ok(finstack_quant_statements_analytics::analysis::render_tree_ascii(&tree))
+        )
+        .dependency_tree(node_id)
+        .map(|inner| PyDependencyTree { inner })
+        .map_err(statements_to_py)
+    }
+
+    /// ASCII rendering of a node's dependency tree (the Rust
+    /// ``DependencyTracer::dependency_tree_text``).
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     Root on the first line, then one line per dependency drawn with
+    ///     ``├──`` / ``└──`` connectors and indented by depth; identical to the
+    ///     WASM ``DependencyTracer.dependencyTreeText``.
+    ///
+    /// Raises
+    /// ------
+    /// KeyError
+    ///     If ``node_id`` or a reachable dependency is not in the model.
+    fn dependency_tree_text(&self, node_id: &str) -> PyResult<String> {
+        finstack_quant_statements_analytics::analysis::DependencyTracer::new(
+            &self.model,
+            &self.graph,
+        )
+        .dependency_tree_text(node_id)
+        .map_err(statements_to_py)
     }
 
     /// ASCII tree with node values for a given period.
@@ -849,6 +929,87 @@ impl PyDependencyTracer {
 
     fn __repr__(&self) -> String {
         format!("DependencyTracer(nodes={})", self.model.nodes.len())
+    }
+}
+
+/// Dependency tree of one statement node (the Rust ``DependencyTree``).
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements_analytics import DependencyTree
+/// >>> tree = DependencyTree.from_json(
+/// ...     '{"node_id":"profit","formula":"revenue * 0.5","children":'
+/// ...     '[{"node_id":"revenue","formula":null,"children":[]}]}')
+/// >>> tree.node_id, tree.formula, [child.node_id for child in tree.children]
+/// ('profit', 'revenue * 0.5', ['revenue'])
+#[pyclass(
+    name = "DependencyTree",
+    module = "finstack_quant.statements_analytics",
+    frozen,
+    from_py_object
+)]
+#[derive(Clone)]
+pub struct PyDependencyTree {
+    pub(crate) inner: DependencyTree,
+}
+
+#[pymethods]
+impl PyDependencyTree {
+    /// Node identifier; a dependency already on the current path appears as
+    /// a leaf named ``"<id> (cycle)"``.
+    #[getter]
+    fn node_id(&self) -> &str {
+        &self.inner.node_id
+    }
+
+    /// Formula text when the node is calculated, ``None`` for a value node.
+    #[getter]
+    fn formula(&self) -> Option<&str> {
+        self.inner.formula.as_deref()
+    }
+
+    /// One tree per direct dependency, in formula reference order.
+    #[getter]
+    fn children(&self) -> Vec<PyDependencyTree> {
+        self.inner
+            .children
+            .iter()
+            .cloned()
+            .map(|inner| PyDependencyTree { inner })
+            .collect()
+    }
+
+    /// Serialize to canonical JSON (identical to the WASM ``DependencyTracer.dependencyTree`` output).
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "DependencyTree"))
+    }
+
+    /// Deserialize from canonical JSON.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``json`` is not a valid ``DependencyTree`` document (unknown
+    ///     fields are rejected).
+    #[staticmethod]
+    fn from_json(json: &str) -> PyResult<Self> {
+        let inner = serde_json::from_str(json)
+            .map_err(|e| serde_json_to_py(e, "invalid DependencyTree JSON"))?;
+        Ok(Self { inner })
+    }
+
+    /// Support ``pickle`` through the canonical JSON representation.
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
+        let from_json = py.get_type::<Self>().getattr("from_json")?;
+        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "DependencyTree(node_id={:?}, children={})",
+            self.inner.node_id,
+            self.inner.children.len()
+        )
     }
 }
 
@@ -977,7 +1138,9 @@ impl PyExplanation {
         serde_rows_to_dataframe_with_schema(py, &rows, &EXPLANATION_COLUMNS)
     }
 
-    /// Serialize to canonical JSON (identical to the WASM ``explainFormula`` output).
+    /// Serialize to canonical JSON (identical to the WASM ``explainFormula``
+    /// output); a non-finite ``final_value`` or step ``value`` is written as
+    /// ``"nan"``, ``"inf"`` or ``"-inf"`` so the document round-trips.
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "Explanation"))
     }
@@ -1113,6 +1276,7 @@ fn explain_formula_text(
 /// Register analysis functions and classes.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDependencyTracer>()?;
+    m.add_class::<PyDependencyTree>()?;
     m.add_class::<PyForecastMetrics>()?;
     m.add_class::<PyGoalSeekResult>()?;
     m.add_class::<PyExplanationStep>()?;

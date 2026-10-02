@@ -3,6 +3,7 @@
 use crate::instruments::common_impl::parameters::market::OptionType;
 use crate::instruments::common_impl::pricing::variance_replication::carr_madan_forward_variance;
 use crate::instruments::equity::variance_swap::VarianceSwap;
+use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurfaceAxis};
 use finstack_quant_models::closed_form::vanilla::bs_price_unchecked;
 
 type OhlcVecs = (Vec<f64>, Vec<f64>, Vec<f64>, Vec<f64>);
@@ -43,8 +44,8 @@ pub(crate) fn compute_pv(
                 &high,
                 &low,
                 &close,
-                inst.realized_var_method,
-                annualization_factor(inst),
+                Some(inst.realized_var_method),
+                Some(annualization_factor(inst)),
             )?
         } else {
             let prices = get_historical_prices(inst, curves, as_of)?;
@@ -53,8 +54,8 @@ pub(crate) fn compute_pv(
             }
             realized_variance(
                 &prices,
-                inst.realized_var_method,
-                annualization_factor(inst),
+                Some(inst.realized_var_method),
+                Some(annualization_factor(inst)),
             )?
         };
         let df = crate::instruments::common_impl::pricing::time::relative_df_discount_curve(
@@ -245,7 +246,7 @@ pub(crate) fn get_historical_ohlc(
         .filter(|&d| d <= as_of)
         .collect();
 
-    if dates.len() < 2 {
+    if dates.is_empty() {
         return Ok((vec![], vec![], vec![], vec![]));
     }
 
@@ -276,23 +277,24 @@ fn realized_variance_with_factor(
 ) -> Result<f64> {
     if inst.realized_var_method.requires_ohlc() {
         let (open, high, low, close) = get_historical_ohlc(inst, context, as_of)?;
-        if close.len() < 2 {
-            return Ok(0.0);
-        }
         return finstack_quant_core::math::stats::realized_variance_ohlc(
             &open,
             &high,
             &low,
             &close,
-            inst.realized_var_method,
-            annualization_factor,
+            Some(inst.realized_var_method),
+            Some(annualization_factor),
         );
     }
     let prices = get_historical_prices(inst, context, as_of)?;
     if prices.len() < 2 {
         return Ok(0.0);
     }
-    realized_variance(&prices, inst.realized_var_method, annualization_factor)
+    realized_variance(
+        &prices,
+        Some(inst.realized_var_method),
+        Some(annualization_factor),
+    )
 }
 
 pub(crate) fn partial_realized_variance(
@@ -387,6 +389,8 @@ fn spot_variance_to_date(
         .year_fraction(as_of, target_date, Default::default())?;
 
     let surface = context.get_surface(inst.vol_surface_id.as_str())?;
+    surface.require_quote_type(VolQuoteType::BlackLognormal)?;
+    surface.require_secondary_axis(VolSurfaceAxis::Strike)?;
     let disc = context.get_discount(&inst.discount_curve_id)?;
     let spot = crate::instruments::common_impl::helpers::scalar_price_amount(
         context.get_price(&inst.spot_id)?,
@@ -465,6 +469,45 @@ mod tests {
             .insert_surface(surface.build().expect("surface"))
             .insert_price("SPX", MarketScalar::Unitless(100.0))
             .insert_price("SPX-DIVYIELD", MarketScalar::Unitless(0.0))
+    }
+
+    #[test]
+    fn replication_rejects_incompatible_surface_contracts() {
+        let as_of = date!(2025 - 01 - 02);
+        let target = date!(2026 - 01 - 02);
+        let mut swap = VarianceSwap::example().expect("swap");
+        swap.vol_surface_id = "SPX-VOL".into();
+        swap.start_date = as_of;
+        swap.maturity = target;
+        let market = build_market(as_of);
+        let base = market
+            .get_surface("SPX-VOL")
+            .expect("surface")
+            .as_ref()
+            .clone();
+        let incompatible = [
+            (
+                base.clone()
+                    .with_quote_type(VolQuoteType::Normal)
+                    .expect("normal surface"),
+                "black_lognormal",
+            ),
+            (
+                base.clone()
+                    .with_displacements(&[10.0; 4])
+                    .expect("shifted surface"),
+                "black_lognormal",
+            ),
+            (base.with_secondary_axis(VolSurfaceAxis::Tenor), "strike"),
+        ];
+        for (surface, expected) in incompatible {
+            let invalid_market = market.clone().insert_surface(surface);
+            let error = spot_variance_to_date(&swap, &invalid_market, as_of, target)
+                .expect_err("Black replication requires unshifted Black strike surfaces");
+            let message = error.to_string();
+            assert!(message.contains("SPX-VOL"), "{message}");
+            assert!(message.contains(expected), "{message}");
+        }
     }
 
     #[test]

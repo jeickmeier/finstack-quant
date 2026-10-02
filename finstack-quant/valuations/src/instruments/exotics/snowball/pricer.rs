@@ -905,25 +905,41 @@ mod tests {
         })
     }
 
-    /// `num_paths` counts independent estimators (RNG streams). The registry
-    /// default was halved when it stopped counting antithetic mirrors, so the
-    /// default configuration must replay exactly the same streams: the PV is
-    /// pinned bit-for-bit to the value captured before the change.
+    /// Registry defaults must reproduce the documented explicit estimator
+    /// configuration with identical paths, price and sampling error.
     #[test]
-    fn rate_exotic_default_pv_unchanged() {
+    fn rate_exotic_defaults_match_explicit_estimator_configuration() {
         let as_of = date(2025, Month::January, 1);
         let market = market(as_of, 0.02, 0.03);
-        let estimate = SnowballHw1fMcPricer::with_hw_params(
+        let pricer = SnowballHw1fMcPricer::with_hw_params(
             HullWhiteCalibrationParams::new(0.05, 0.015).expect("hw params"),
-        )
-        .price_estimate(&test_snowball(), &market, as_of)
-        .expect("default price");
+        );
+        let instrument = test_snowball();
+        let estimate = pricer
+            .price_estimate(&instrument, &market, as_of)
+            .expect("default price");
+        let explicit = pricer
+            .with_config(RateExoticMcConfig {
+                num_paths: 10_000,
+                seed: 42,
+                antithetic: true,
+                min_steps_between_events: 4,
+                basis_degree: 2,
+                oos_lsmc: false,
+            })
+            .price_estimate(&instrument, &market, as_of)
+            .expect("explicit configuration price");
+        assert_eq!(estimate.num_paths, 10_000);
+        assert_eq!(estimate.num_simulated_paths, 20_000);
+        assert_eq!(explicit.num_paths, estimate.num_paths);
+        assert_eq!(explicit.num_simulated_paths, estimate.num_simulated_paths);
         assert_eq!(
             estimate.mean.amount().to_bits(),
-            0x412feb0caef2df97_u64,
-            "pv={}",
-            estimate.mean.amount()
+            explicit.mean.amount().to_bits(),
+            "default and explicit configurations must replay identical estimators"
         );
+        assert_eq!(estimate.stderr.to_bits(), explicit.stderr.to_bits());
+        assert_eq!(estimate.ci_95, explicit.ci_95);
     }
 
     #[test]

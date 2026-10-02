@@ -626,15 +626,37 @@ impl InflationLinkedBond {
             .collect()
     }
 
-    /// Build unadjusted real cashflow schedule (no inflation indexation).
-    ///
-    /// Cashflows with `payment_date < as_of` are excluded (already settled).
-    /// The principal payment date is business-day adjusted via the bond's BDC.
-    pub(crate) fn build_real_schedule(&self, as_of: Date) -> Result<DatedFlows> {
-        Ok(Self::real_flows_from(
-            &self.real_cashflow_schedule()?,
-            as_of,
-        ))
+    /// Contractual yield times retaining the real schedule's coupon metadata.
+    fn real_flow_times(
+        &self,
+        schedule: &crate::cashflow::builder::CashFlowSchedule,
+        as_of: Date,
+    ) -> Result<Vec<(Date, f64, Money)>> {
+        use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
+            act365l_flow_times, flow_times,
+        };
+        let flows = Self::real_flows_from(schedule, as_of);
+        if self.day_count != DayCount::Act365L {
+            return flow_times(self.day_count, self.frequency, &flows, as_of);
+        }
+        let coupons = schedule
+            .get_flows()
+            .iter()
+            .filter(|flow| flow.kind.is_interest_like())
+            .map(|flow| {
+                let (start, end) = flow
+                    .accrual
+                    .as_ref()
+                    .and_then(|accrual| accrual.coupon_period)
+                    .ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(
+                            "ACT/365L real yield requires full contractual coupon metadata".into(),
+                        )
+                    })?;
+                Ok((flow.date, start, end))
+            })
+            .collect::<Result<Vec<_>>>()?;
+        act365l_flow_times(self.frequency, &coupons, &flows, as_of)
     }
 
     /// Calculate real yield (yield in real terms, before inflation)
@@ -643,6 +665,14 @@ impl InflationLinkedBond {
     /// against the **real price** (clean price + real accrued interest).
     ///
     /// This is the standard "Real Yield" quoted for TIPS and other linkers.
+    /// ACT/365L timing retains the real schedule's full coupon denominators;
+    /// payment adjustment does not extend the contractual quoted-yield clock.
+    ///
+    /// # Arguments
+    ///
+    /// * `clean_price` - Unindexed real clean price as a percentage of par (100 = par),
+    ///   finite and strictly positive; real accrued interest is added for the yield solve.
+    /// * `as_of` - Settlement date for real accrued interest and remaining contractual yield times.
     ///
     /// # Errors
     ///
@@ -650,10 +680,11 @@ impl InflationLinkedBond {
     /// - The clean price is non-positive or non-finite
     /// - There are no cashflows remaining
     /// - The YTM solver fails to converge
+    /// - ACT/365L settlement is after the contractual end of an unpaid coupon
     pub fn real_yield(&self, clean_price: f64, as_of: Date) -> Result<f64> {
         use crate::instruments::fixed_income::bond::pricing::quote_conversions::YieldCompounding;
         use crate::instruments::fixed_income::bond::pricing::ytm_solver::{
-            solve_ytm, YtmPricingSpec,
+            solve_ytm_timed, YtmPricingSpec,
         };
 
         if !clean_price.is_finite() || clean_price <= 0.0 {
@@ -662,7 +693,7 @@ impl InflationLinkedBond {
 
         // 1. Build real cashflows (unadjusted for inflation)
         let schedule = self.real_cashflow_schedule()?;
-        let flows = Self::real_flows_from(&schedule, as_of);
+        let flows = self.real_flow_times(&schedule, as_of)?;
         if flows.is_empty() {
             return Err(finstack_quant_core::InputError::TooFewPoints.into());
         }
@@ -687,7 +718,7 @@ impl InflationLinkedBond {
         // 4. Solve yield that matches the target real price to PV of real flows
         // The solver handles convergence internally; we propagate any solver errors
         // rather than clamping, so callers can detect and handle extreme cases.
-        solve_ytm(&flows, as_of, target_price, spec)
+        solve_ytm_timed(&flows, target_price, spec)
     }
 
     /// Calculate breakeven inflation rate
@@ -791,7 +822,7 @@ impl InflationLinkedBond {
     ///   `metric_pricing_overrides.bump_config.ytm_bump_bp`, defaulting to 1bp.
     pub fn real_duration(&self, as_of: Date, ytm_bump_bp: f64) -> Result<f64> {
         use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
-            price_from_ytm_compounded_params, YieldCompounding,
+            price_from_ytm_timed, YieldCompounding,
         };
 
         // Determine a base clean price to center the bump around
@@ -807,17 +838,10 @@ impl InflationLinkedBond {
 
         // Use real schedule to calculate sensitivity to real yield (Real Duration)
         // This assumes the "Duration" metric refers to the duration of the real bond component.
-        let flows = self.build_real_schedule(as_of)?;
+        let flows = self.real_flow_times(&self.real_cashflow_schedule()?, as_of)?;
 
         let price_from_yield = |y: f64| -> Result<f64> {
-            let price = price_from_ytm_compounded_params(
-                self.day_count,
-                self.frequency,
-                &flows,
-                as_of,
-                y,
-                YieldCompounding::Street,
-            )?;
+            let price = price_from_ytm_timed(&flows, self.frequency, y, YieldCompounding::Street)?;
             Ok(price / self.notional.amount() * 100.0)
         };
 
@@ -851,7 +875,7 @@ impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond
         curves: &finstack_quant_core::market_data::context::MarketContext,
         as_of: finstack_quant_core::dates::Date,
     ) -> finstack_quant_core::Result<finstack_quant_core::money::Money> {
-        if as_of > self.maturity {
+        if as_of > self.principal_payment_date()? {
             return Ok(finstack_quant_core::money::Money::from((
                 0_i64,
                 self.notional.currency(),
@@ -867,6 +891,14 @@ impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond
 
     fn expiry(&self) -> Option<finstack_quant_core::dates::Date> {
         Some(self.maturity)
+    }
+
+    fn last_payment_date(&self, _curves: &MarketContext, _as_of: Date) -> Result<Option<Date>> {
+        self.principal_payment_date().map(Some)
+    }
+
+    fn includes_valuation_date_cashflows(&self) -> bool {
+        false
     }
 
     fn effective_start_date(&self) -> Option<finstack_quant_core::dates::Date> {
@@ -1097,9 +1129,12 @@ mod tests {
         let as_of = d(2026, Month::April, 10); // mid-life, between coupons
 
         let schedule = bond
-            .build_real_schedule(as_of)
+            .real_cashflow_schedule()
             .expect("ACT/ACT (ISMA) real schedule must not require a day-count override");
-        assert!(!schedule.is_empty(), "schedule should contain future flows");
+        let timed = bond
+            .real_flow_times(&schedule, as_of)
+            .expect("real yield times");
+        assert!(!timed.is_empty(), "schedule should contain future flows");
 
         let accrued = real_accrued(&bond, as_of)
             .expect("ACT/ACT (ISMA) accrued interest must not require a day-count override");
@@ -1109,7 +1144,7 @@ mod tests {
     #[test]
     fn real_duration_uses_dirty_model_price_denominator() {
         use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
-            price_from_ytm_compounded_params, YieldCompounding,
+            price_from_ytm_timed, YieldCompounding,
         };
 
         let issue = d(2024, Month::January, 15);
@@ -1141,16 +1176,12 @@ mod tests {
         };
         let duration = bond.real_duration(as_of, 1.0).expect("real duration");
         let y0 = bond.real_yield(100.0, as_of).expect("real yield");
-        let flows = bond.build_real_schedule(as_of).expect("real schedule");
+        let schedule = bond.real_cashflow_schedule().expect("real schedule");
+        let flows = bond
+            .real_flow_times(&schedule, as_of)
+            .expect("real yield times");
         let price_from_yield = |y: f64| -> Result<f64> {
-            let price = price_from_ytm_compounded_params(
-                bond.day_count,
-                bond.frequency,
-                &flows,
-                as_of,
-                y,
-                YieldCompounding::Street,
-            )?;
+            let price = price_from_ytm_timed(&flows, bond.frequency, y, YieldCompounding::Street)?;
             Ok(price / bond.notional.amount() * 100.0)
         };
         let bp = 1e-4;
@@ -1173,6 +1204,105 @@ mod tests {
             (duration - clean_denominator_duration).abs() > 1e-4,
             "test must distinguish dirty denominator from clean denominator"
         );
+    }
+
+    #[test]
+    fn act365l_real_yield_and_duration_retain_coupon_periods() {
+        use crate::instruments::fixed_income::bond::pricing::quote_conversions::{
+            price_from_ytm_timed, YieldCompounding,
+        };
+
+        let notional = 1_000_000.0;
+        let yield_rate: f64 = 0.031;
+        let fixtures = [
+            (
+                Tenor::annual(),
+                d(2023, Month::March, 1),
+                d(2023, Month::June, 1),
+                d(2025, Month::March, 1),
+                92.0 / 366.0,
+                vec![
+                    (d(2024, Month::March, 1), 274.0 / 366.0, 20_000.0),
+                    (
+                        d(2025, Month::March, 3),
+                        274.0 / 366.0 + 1.0,
+                        notional + 20_000.0,
+                    ),
+                ],
+            ),
+            (
+                Tenor::semi_annual(),
+                d(2023, Month::October, 15),
+                d(2023, Month::December, 15),
+                d(2025, Month::April, 15),
+                61.0 / 366.0,
+                vec![
+                    (d(2024, Month::April, 15), 122.0 / 366.0, 10_000.0),
+                    (d(2024, Month::October, 15), 305.0 / 366.0, 10_000.0),
+                    (
+                        d(2025, Month::April, 15),
+                        305.0 / 366.0 + 182.0 / 365.0,
+                        notional + notional * 0.02 * 182.0 / 365.0,
+                    ),
+                ],
+            ),
+        ];
+        for (frequency, issue, as_of, maturity, accrued_fraction, expected) in fixtures {
+            let mut bond = sample_bond(DeflationProtection::None);
+            bond.day_count = DayCount::Act365L;
+            bond.frequency = frequency;
+            bond.issue_date = issue;
+            bond.maturity = maturity;
+            let m = if frequency == Tenor::annual() {
+                1.0
+            } else {
+                2.0
+            };
+            let base = 1.0 + yield_rate / m;
+            let dirty_price: f64 = expected
+                .iter()
+                .map(|&(_, t, amount)| amount * base.powf(-m * t))
+                .sum();
+            let accrued = notional * 0.02 * accrued_fraction;
+            let clean_price = (dirty_price - accrued) / notional * 100.0;
+            bond.instrument_pricing_overrides =
+                crate::instruments::InstrumentPricingOverrides::default()
+                    .with_quoted_clean_price_pct(clean_price);
+
+            let schedule = bond
+                .real_cashflow_schedule()
+                .expect("real ACT/365L schedule");
+            let timed = bond
+                .real_flow_times(&schedule, as_of)
+                .expect("real yield times");
+            // Principal and final coupon share the adjusted payment date but
+            // remain on the contractual maturity clock; combine for comparison.
+            for &(payment, t, amount) in &expected {
+                let matching: Vec<_> = timed
+                    .iter()
+                    .filter(|&&(date, _, _)| date == payment)
+                    .collect();
+                assert!(!matching.is_empty());
+                assert!(matching
+                    .iter()
+                    .all(|&&(_, actual_t, _)| (actual_t - t).abs() < 1e-12));
+                let actual_amount: f64 = matching.iter().map(|&&(_, _, cash)| cash.amount()).sum();
+                assert!((actual_amount - amount).abs() < 1e-7);
+            }
+            let solved = bond.real_yield(clean_price, as_of).expect("real yield");
+            assert!((solved - yield_rate).abs() < 1e-11);
+            let repriced =
+                price_from_ytm_timed(&timed, frequency, solved, YieldCompounding::Street)
+                    .expect("real yield price");
+            assert!((repriced - dirty_price).abs() < 1e-6);
+            let duration = bond.real_duration(as_of, 1.0).expect("real duration");
+            let expected_duration: f64 = expected
+                .iter()
+                .map(|&(_, t, amount)| amount * t * base.powf(-m * t - 1.0))
+                .sum::<f64>()
+                / dirty_price;
+            assert!((duration - expected_duration).abs() < 1e-7);
+        }
     }
 
     fn d(year: i32, month: Month, day: u8) -> Date {
@@ -1322,8 +1452,11 @@ mod tests {
         assert_eq!(principal_dates, vec![adjusted]);
         assert_ne!(principal_dates[0], bond.maturity);
 
-        let real = bond.build_real_schedule(as_of).expect("real schedule");
-        assert_eq!(real.last().map(|(date, _)| *date), Some(adjusted));
+        let real = bond.real_cashflow_schedule().expect("real schedule");
+        assert_eq!(
+            real.get_flows().last().map(|flow| flow.date),
+            Some(adjusted)
+        );
     }
 
     #[test]

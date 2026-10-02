@@ -35,6 +35,7 @@ from finstack_quant.cashflows import schema as schema
 
 __all__ = [
     "ScheduleBuildOpts",
+    "abs_to_smm",
     "accrual",
     "accrued_interest",
     "aggregation",
@@ -140,7 +141,10 @@ def build_cashflow_schedule(spec: dict[str, Any] | str, market: MarketContext | 
         ``principal_exchange``). Each principal event requires economic ``date``
         and cash ``payment_date``; these dates may differ after payment adjustment.
     market : MarketContext or str, optional
-        Market context (or its JSON) for floating-rate projection.
+        Market context (or its JSON) for floating-rate projection. Complete
+        supplied observations need no forward curve. Explicit fallback covers
+        missing curves or absent fixing series, never supplied historical gaps
+        before a resolved curve's base date or genuine projection errors.
 
     Returns
     -------
@@ -150,9 +154,11 @@ def build_cashflow_schedule(spec: dict[str, Any] | str, market: MarketContext | 
     Raises
     ------
     ValueError
-        If the spec is malformed or the schedule fails validation.
+        If the spec is malformed or the schedule fails validation, including
+        unsupported roll-grid/ICMA anchors, negative lags, supplied historical
+        fixing gaps, or curve/date/day-count/arithmetic failures.
     KeyError
-        If a floating leg references a curve missing from ``market``.
+        If required market data is unavailable and no eligible fallback resolves it.
 
     Examples
     --------
@@ -191,12 +197,17 @@ def dated_flows(schedule: CashFlowSchedule | str) -> list[tuple[datetime.date, M
     -------
     list[tuple[datetime.date, Money]]
         Cash-settling rows in schedule order; PIK capitalizations and
-        default write-downs are omitted.
+        default write-downs are omitted, as are zero-cash principal markers.
+        Native currencies are retained without conversion or netting.
 
     Raises
     ------
     ValueError
-        If ``schedule`` is a malformed JSON string.
+        If ``schedule`` is malformed or its amounts, accrual metadata, row
+        currencies, or dates are invalid. Single-currency principal paths
+        must reconcile with the opening notional. Composite principal paths
+        in multiple currencies receive structural validation without scalar
+        balance reconciliation.
     TypeError
         If ``schedule`` is neither a ``CashFlowSchedule`` nor a string.
 
@@ -308,7 +319,10 @@ def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None)
         fees, and schedule rules.
     market_json : str, optional
         JSON-encoded ``MarketContext`` for floating-rate index lookups. Omit
-        when the schedule uses fixed coupons only.
+        when the schedule uses fixed coupons only. Complete supplied observations
+        need no forward curve. Explicit fallback covers missing curves or absent
+        fixing series, never supplied historical gaps before a resolved curve's
+        base date or genuine projection errors.
 
     Returns
     -------
@@ -319,9 +333,11 @@ def build_cashflow_schedule_json(spec_json: str, market_json: str | None = None)
     ------
     ValueError
         If ``spec_json`` (or ``market_json`` when supplied) fails schema or
-        semantic validation.
+        semantic validation, including unsupported roll-grid/ICMA anchors,
+        negative lags, supplied historical fixing gaps, or
+        curve/date/day-count/arithmetic failures.
     KeyError
-        If required market data or a fixing series is missing.
+        If required market data is unavailable and no eligible fallback resolves it.
 
     Examples
     --------
@@ -406,13 +422,17 @@ def dated_flows_json(schedule_json: str) -> str:
     -------
     str
         JSON array of settlement cash entries. ``PIK`` and
-        ``DefaultedNotional`` state rows are omitted; parse the full schedule
-        JSON when flow classification is required.
+        ``DefaultedNotional`` state rows and zero-cash principal markers are
+        omitted. Native currencies are retained without conversion or netting;
+        parse the full schedule JSON when flow classification is required.
 
     Raises
     ------
     ValueError
-        If ``schedule_json`` is invalid.
+        If the schedule JSON, amounts, accrual metadata, row currencies, or
+        dates are invalid, or a single-currency principal path fails balance
+        reconciliation. Composite principal paths in multiple currencies
+        receive structural validation without scalar balance reconciliation.
 
     Examples
     --------
@@ -459,7 +479,9 @@ def accrued_interest(schedule_json: str, as_of: datetime.date | str, config_json
     Raises
     ------
     ValueError
-        If the schedule JSON or accrual configuration is invalid.
+        If the schedule JSON or accrual configuration is invalid, compounded
+        accrual has a non-finite period rate or a rate at or below -100%, or
+        the resulting accrued interest is non-finite.
     KeyError
         If an ex-coupon calendar is unknown.
 
@@ -481,6 +503,44 @@ def accrued_interest(schedule_json: str, as_of: datetime.date | str, config_json
     True
 
     """
+
+def abs_to_smm(speed: float, month: int) -> float:
+    """
+    Convert an ABS speed to the single-month mortality for a seasoning month.
+
+    Flat re-export of :func:`finstack_quant.cashflows.builder.abs_to_smm`,
+    mirroring the Rust crate-root re-export. The ABS convention prepays a
+    constant share of the *original* balance each month:
+    ``SMM_t = speed / (1 - speed * (t - 1))``, capped at ``1.0`` once the
+    original balance is exhausted; month 0 is treated as month 1.
+
+    Parameters
+    ----------
+    speed : float
+        Monthly prepayment as a decimal fraction of the original balance
+        (``0.015`` = 1.5% ABS), in ``[0, 1]``.
+    month : int
+        Seasoning month counted from origination (non-negative).
+
+    Returns
+    -------
+    float
+        Single-month mortality as a decimal in ``[0, 1]``.
+
+    Raises
+    ------
+    ValueError
+        If ``speed`` is non-finite or outside ``[0, 1]``.
+    OverflowError
+        If ``month`` is negative.
+
+    Examples
+    --------
+    >>> from finstack_quant.cashflows import abs_to_smm
+    >>> round(abs_to_smm(0.015, 11), 6)
+    0.017647
+    """
+    ...
 
 def cpr_to_smm(cpr: float) -> float:
     """

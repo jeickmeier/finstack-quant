@@ -215,7 +215,9 @@ fn test_vanna_computable() {
             continue;
         }
         let start = reference.reference_swap_start(fixing).unwrap();
-        let end = start.add_months(inst.cms_tenor.months().expect("month tenor") as i32);
+        let end = start
+            .add_months(inst.cms_tenor.months().expect("month tenor") as i32)
+            .expect("valid date shift");
         let (forward, _) = reference
             .forward_rate_and_annuity(&market, as_of, start, end)
             .unwrap();
@@ -227,6 +229,7 @@ fn test_vanna_computable() {
                 inst.cms_tenor.to_years(),
                 forward,
                 reference.payments_per_year().unwrap(),
+                (inst.payment_dates[i] - start).whole_days() as f64 / 365.0,
             );
             let adjusted = forward + convexity;
             let d1 = ((adjusted / strike).ln() + 0.5 * sigma * sigma * t) / (sigma * t.sqrt());

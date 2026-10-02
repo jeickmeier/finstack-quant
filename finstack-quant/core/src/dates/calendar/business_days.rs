@@ -66,7 +66,7 @@ pub(crate) fn seek_business_day<C: HolidayCalendar + ?Sized>(
 ) -> Option<Date> {
     let mut searched = 0;
     while !cal.is_business_day(date) {
-        date += Duration::days(step_days as i64);
+        date = date.checked_add(Duration::days(i64::from(step_days)))?;
         searched += 1;
         if searched > max_days {
             return None;
@@ -201,7 +201,15 @@ pub struct CalendarMetadata {
 /// assert_eq!(adj.day(), 3);
 /// # Ok::<(), finstack_quant_core::Error>(())
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+///
+/// # Default
+///
+/// `BusinessDayConvention::default()` is `ModifiedFollowing`, the ISDA 2006
+/// Definitions Section 4.12(c) convention used for swap and bond period dates.
+/// Host bindings use it whenever a caller omits the convention.
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(rename_all = "snake_case")]
 #[non_exhaustive]
@@ -227,6 +235,7 @@ pub enum BusinessDayConvention {
     /// **ISDA**: Section 4.12(c) - "Modified Following Business Day Convention"
     /// **FpML**: "MODFOLLOWING"
     /// **ISO 20022**: "MODF"
+    #[default]
     ModifiedFollowing,
 
     /// Adjust to previous business day (may cross month boundary).

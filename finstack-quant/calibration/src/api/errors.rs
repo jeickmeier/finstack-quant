@@ -26,6 +26,7 @@ fn format_worst_quote(id: &Option<String>, residual: &Option<f64>) -> String {
 /// [`finstack_quant_core::contract::Diagnostic`] so the Python and WASM
 /// bindings can attach the findings as plain records.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct StrictLoadDiagnostic {
     /// Stable machine-readable code (e.g. `parse/invalid-json`,
     /// `calibration/undefined-quote-set`).
@@ -129,6 +130,7 @@ impl EnvelopeError {
 
 /// Errors surfaced when an envelope is invalid or calibration fails.
 #[derive(Debug, Clone, PartialEq, thiserror::Error, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[non_exhaustive]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EnvelopeError {
@@ -221,6 +223,19 @@ pub enum EnvelopeError {
         /// The unresolved quote identifier.
         id: String,
     },
+    /// Two steps (or a step and an explicit quote set) define the same
+    /// quote-set name with different quote ids.
+    #[error("quote set '{quote_set}' is attached by more than one step with different quotes")]
+    QuoteSetConflict {
+        /// The conflicting quote-set name.
+        quote_set: String,
+    },
+    /// One quote id is attached to steps with two different payloads.
+    #[error("quote id '{id}' has conflicting attached payloads")]
+    ConflictingMarketDatum {
+        /// The quote identifier attached with conflicting payloads.
+        id: String,
+    },
     /// Strict bounded contract loading rejected the request or result.
     ///
     /// `message` already lists every retained diagnostic (JSON pointer and
@@ -260,6 +275,8 @@ impl EnvelopeError {
             EnvelopeError::QuoteDataInvalid { .. } => "quote_data_invalid",
             EnvelopeError::DuplicateMarketDatumId { .. } => "duplicate_market_datum_id",
             EnvelopeError::QuoteIdNotInMarketData { .. } => "quote_id_not_in_market_data",
+            EnvelopeError::QuoteSetConflict { .. } => "quote_set_conflict",
+            EnvelopeError::ConflictingMarketDatum { .. } => "conflicting_market_datum",
             EnvelopeError::JsonSerialize { .. } => "json_serialize",
             EnvelopeError::StrictLoad { .. } => "strict_load",
         }
@@ -278,6 +295,8 @@ impl EnvelopeError {
             | EnvelopeError::QuoteDataInvalid { step_id, .. } => Some(step_id),
             EnvelopeError::DuplicateMarketDatumId { .. }
             | EnvelopeError::QuoteIdNotInMarketData { .. }
+            | EnvelopeError::QuoteSetConflict { .. }
+            | EnvelopeError::ConflictingMarketDatum { .. }
             | EnvelopeError::JsonSerialize { .. }
             | EnvelopeError::StrictLoad { .. } => None,
         }

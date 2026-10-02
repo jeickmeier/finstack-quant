@@ -13,8 +13,9 @@
 //! the value of a fixed `[T_0, T_N]` swap.
 //!
 //! The payoff is evaluated entirely from forward rates in the path state,
-//! making it naturally multi-curve-consistent (no short-rate reconstruction
-//! needed). The simulation is conducted under the terminal measure with
+//! using a single curve: each modeled forward must be a bond-ratio forward
+//! of the same discount curve. Independent projection curves and floating
+//! spreads are unsupported. The simulation is conducted under the terminal measure with
 //! `P(t, T_N)` as numeraire.
 //!
 //! # References
@@ -39,7 +40,7 @@ use finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares;
 use finstack_quant_models::monte_carlo::process::lmm::{LmmParams, LmmProcess};
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream};
+use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
 use finstack_quant_models::monte_carlo::TimeGrid;
 
 const EXERCISE_TIME_TOLERANCE: f64 = 1e-10;
@@ -51,7 +52,7 @@ const EXERCISE_TIME_TOLERANCE: f64 = 1e-10;
 /// * `params` — Calibrated LMM parameters.
 /// * `exercise_times` — Strictly increasing, unique year fractions at which
 ///   the holder may exercise. Every time must be finite and lie strictly
-///   between zero and the terminal LMM tenor.
+///   between zero and the terminal LMM tenor and coincide with a tenor start.
 /// * `strike` — Fixed rate K of the underlying swap.
 /// * `payer` — `true` for payer swaption, `false` for receiver.
 /// * `notional` — Swap notional.
@@ -87,21 +88,15 @@ pub fn price_bermudan_lmm(
     currency: Currency,
     config: &RateExoticMcConfig,
 ) -> Result<MoneyEstimate> {
-    let maturity = *params
-        .tenors
-        .last()
-        .ok_or_else(|| finstack_quant_core::Error::Validation("empty tenors".to_string()))?;
     validate_path_config(config)?;
     let (time_grid, exercise_step_indices) =
-        build_exercise_aligned_grid(exercise_times, maturity, config.min_steps_between_events)?;
+        build_exercise_aligned_grid(exercise_times, params, config.min_steps_between_events)?;
 
     let n = params.num_forwards;
     let process = LmmProcess::new(params.clone());
     let disc = LmmPredictorCorrector::new();
 
-    // Build time grid aligned to exercise dates and the final maturity
-    // (forward fixing dates are NOT inserted as grid nodes; exercise dates
-    // are snapped to the nearest node of the sub-divided grid).
+    // The grid includes every exercise, fixing, and volatility-change date.
     let num_steps = time_grid.num_steps();
     let work_size = disc.work_size(&process);
 
@@ -338,28 +333,76 @@ pub fn price_bermudan_lmm(
 /// # Arguments
 ///
 /// * `exercise_times` — Strictly increasing, unique exercise times in year
-///   fractions. Every time must be finite and lie in `(0, maturity)`.
-/// * `maturity` — Finite positive terminal maturity in years.
+///   fractions. Every time must be finite, lie in `(0, maturity)`, and match
+///   a tenor start within `1e-10`. Accepted times are mapped to the exact
+///   tenor node before constructing the grid.
+/// * `params` — Valid LMM parameters; the last tenor is terminal maturity in
+///   years. Every fixing date and volatility knot inside the horizon is
+///   inserted exactly, so a step never crosses a model discontinuity.
 /// * `min_steps_between` — Minimum number of simulation intervals between
 ///   adjacent critical dates. Values below one are treated as one.
 ///
 /// # Returns
 ///
-/// The simulation grid and the exact grid index corresponding to each input
-/// exercise time, in caller-supplied order.
+/// The simulation grid and the index of the canonical tenor node for each
+/// input exercise time, in caller-supplied order.
 ///
 /// # Errors
 ///
-/// Returns an error if `maturity` is not finite and positive, or if the
+/// Returns an error if model parameters are invalid, maturity is not finite
+/// and positive, or if the
 /// exercise schedule is empty, unordered, duplicated within `1e-10`, or has a
-/// time outside `(0, maturity)`.
+/// time outside `(0, maturity)` or without a matching tenor start.
 pub fn build_exercise_aligned_grid(
     exercise_times: &[f64],
-    maturity: f64,
+    params: &LmmParams,
     min_steps_between: usize,
 ) -> Result<(TimeGrid, Vec<usize>)> {
+    let maturity = *params
+        .tenors
+        .last()
+        .ok_or_else(|| finstack_quant_core::Error::Validation("empty LMM tenors".to_string()))?;
     validate_exercise_schedule(exercise_times, maturity)?;
-    build_event_aligned_grid(exercise_times, maturity, min_steps_between)
+    let process = LmmProcess::new(params.clone().validate()?);
+    let canonical_exercises = exercise_times
+        .iter()
+        .map(|&exercise| {
+            params.tenors[..params.num_forwards]
+                .iter()
+                .copied()
+                .filter(|&tenor| tenor > 0.0 && (exercise - tenor).abs() <= EXERCISE_TIME_TOLERANCE)
+                .min_by(|left, right| (exercise - left).abs().total_cmp(&(exercise - right).abs()))
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "LMM exercise times must coincide with tenor starts".to_string(),
+                    )
+                })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let mut events: Vec<_> = canonical_exercises
+        .iter()
+        .chain(&params.tenors)
+        .chain(&params.vol_times)
+        .copied()
+        .filter(|&time| time > 0.0 && time < maturity)
+        .collect();
+    events.sort_by(f64::total_cmp);
+    events.dedup();
+    let (grid, _) = build_event_aligned_grid(&events, maturity, min_steps_between)?;
+    process.validate_time_grid(&grid)?;
+    let exercise_indices = canonical_exercises
+        .iter()
+        .map(|time| {
+            grid.times()
+                .binary_search_by(|node| node.total_cmp(time))
+                .map_err(|_| {
+                    finstack_quant_core::Error::Validation(format!(
+                        "LMM exercise time {time} is missing from the simulation grid"
+                    ))
+                })
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok((grid, exercise_indices))
 }
 
 fn validate_exercise_schedule(exercise_times: &[f64], maturity: f64) -> Result<()> {
@@ -587,7 +630,8 @@ mod tests {
     #[test]
     fn test_exercise_aligned_grid() {
         let exercise_times = vec![1.0, 2.0, 3.0];
-        let (grid, indices) = build_exercise_aligned_grid(&exercise_times, 4.0, 4).expect("ok");
+        let (grid, indices) =
+            build_exercise_aligned_grid(&exercise_times, &test_lmm_params(), 4).expect("ok");
         assert!(grid.num_steps() >= 4);
         assert_eq!(indices.len(), 3);
         // Every exercise time is an exact critical grid point.
@@ -611,9 +655,9 @@ mod tests {
             (vec![2.0, 1.0], 4.0, "strictly increasing"),
         ];
 
-        for (exercise_times, maturity, expected) in cases {
+        for (exercise_times, _maturity, expected) in cases {
             assert_validation_contains(
-                build_exercise_aligned_grid(&exercise_times, maturity, 1),
+                build_exercise_aligned_grid(&exercise_times, &test_lmm_params(), 1),
                 expected,
             );
         }
@@ -622,10 +666,42 @@ mod tests {
     #[test]
     fn exercise_schedule_rejects_invalid_maturity() {
         for maturity in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            let mut params = test_lmm_params();
+            params.tenors[4] = maturity;
             assert_validation_contains(
-                build_exercise_aligned_grid(&[0.5], maturity, 1),
+                build_exercise_aligned_grid(&[0.5], &params, 1),
                 "maturity must be finite and positive",
             );
+        }
+    }
+
+    #[test]
+    fn lmm_grid_includes_unexercised_fixings_and_volatility_knots() {
+        let mut params = test_lmm_params();
+        params.tenors = vec![0.0, 0.7, 1.6, 2.7, 4.0];
+        params.vol_times = vec![0.31, 1.13];
+        params.vol_values = vec![params.vol_values[0].clone(); 3];
+        let (grid, indices) =
+            build_exercise_aligned_grid(&[0.7, 2.7], &params, 1).expect("aligned grid");
+        for time in [0.31, 0.7, 1.13, 1.6, 2.7] {
+            assert!(grid.times().contains(&time), "missing model time {time}");
+        }
+        assert_eq!(grid.time(indices[0]), 0.7);
+        assert_eq!(grid.time(indices[1]), 2.7);
+        assert!(LmmProcess::new(params).validate_time_grid(&grid).is_ok());
+    }
+
+    #[test]
+    fn near_tenor_exercise_times_use_canonical_model_nodes() {
+        for offset in [-1e-12, 1e-12] {
+            let mut params = test_lmm_params();
+            params.tenors[1] = 1.0 + offset;
+            let (grid, indices) = build_exercise_aligned_grid(&[1.0, 2.0], &params, 1)
+                .expect("near-tenor exercise must not introduce a tiny interval");
+            assert_eq!(grid.time(indices[0]), params.tenors[1]);
+            assert_eq!(grid.time(indices[1]), 2.0);
+            assert!(!grid.times().contains(&1.0));
+            assert!(LmmProcess::new(params).validate_time_grid(&grid).is_ok());
         }
     }
 
@@ -680,6 +756,24 @@ mod tests {
                 &config,
             ),
             "at least two independent pricing observations",
+        );
+    }
+
+    #[test]
+    fn lmm_rejects_exercise_between_tenor_starts() {
+        let params = test_lmm_params();
+        assert_validation_contains(
+            price_bermudan_lmm(
+                &params,
+                &[1.5],
+                0.03,
+                true,
+                1_000_000.0,
+                0.9,
+                Currency::USD,
+                &test_config(2, false, false),
+            ),
+            "must coincide with tenor starts",
         );
     }
 

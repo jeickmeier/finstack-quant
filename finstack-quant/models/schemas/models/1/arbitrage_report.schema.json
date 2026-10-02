@@ -1,0 +1,181 @@
+{
+  "$defs": {
+    "ArbitrageSeverity": {
+      "description": "Categorical severity of an arbitrage violation.\n\nSeverity is a *function of magnitude relative to tolerance*, not of\narbitrage type. The same `Butterfly` violation can be `Negligible` (a\nrounding artifact at deep wings) or `Critical` (negative density at ATM).\nUse the `Ord` derive to filter or sort: `Negligible` < `Minor` < `Major`\n< `Critical`.",
+      "oneOf": [
+        {
+          "const": "negligible",
+          "description": "Violation is within numerical noise (< tolerance).\nLikely a finite-difference artifact, not a real arbitrage.",
+          "type": "string"
+        },
+        {
+          "const": "minor",
+          "description": "Small violation that may not be exploitable in practice\ngiven bid-ask spreads, but indicates surface quality issues.",
+          "type": "string"
+        },
+        {
+          "const": "major",
+          "description": "Material violation that would produce negative density or\nnegative local vol in a region with meaningful option liquidity.",
+          "type": "string"
+        },
+        {
+          "const": "critical",
+          "description": "Severe violation: negative prices, negative total variance,\nor local vol density failure at ATM strikes.",
+          "type": "string"
+        }
+      ]
+    },
+    "ArbitrageType": {
+      "description": "Classification of the arbitrage condition that was violated.",
+      "oneOf": [
+        {
+          "const": "butterfly",
+          "description": "Call prices not convex in strike: C(K-d) - 2C(K) + C(K+d) < 0.\nEquivalently, implied density is negative at this strike.",
+          "type": "string"
+        },
+        {
+          "const": "calendar_spread",
+          "description": "Option value decreases with maturity at fixed strike:\nw(k, T2) < w(k, T1) for T2 > T1.",
+          "type": "string"
+        },
+        {
+          "const": "local_vol_density",
+          "description": "Dupire local variance is non-positive: sigma^2_local(K, T) <= 0.\nThis is the definitive no-arbitrage condition for a vol surface.",
+          "type": "string"
+        },
+        {
+          "const": "svi_moment_bound",
+          "description": "SVI-specific: Roger Lee moment formula violated.\nWing slope |dw/dk| > 2 at extreme strikes.",
+          "type": "string"
+        },
+        {
+          "const": "svi_butterfly_condition",
+          "description": "SVI-specific: Gatheral-Jacquier sufficient conditions for\nbutterfly-free SVI not satisfied (density g(k) < 0).",
+          "type": "string"
+        },
+        {
+          "const": "svi_calendar_spread",
+          "description": "SVI-specific: cross-slice total variance ordering violated\n(calendar spread between SVI slices).",
+          "type": "string"
+        }
+      ]
+    },
+    "ArbitrageViolation": {
+      "description": "A single arbitrage violation detected on a volatility surface.",
+      "properties": {
+        "description": {
+          "description": "Human-readable description of the violation.",
+          "type": "string"
+        },
+        "location": {
+          "$ref": "#/$defs/ViolationLocation",
+          "description": "Where on the surface the violation occurs."
+        },
+        "magnitude": {
+          "description": "Magnitude of the violation in total-variance units.\nFor butterfly: the negative second derivative value.\nFor calendar spread: the variance decrease (w1 - w2) where w2 < w1.\nFor local vol density: the negative local variance value.",
+          "format": "double",
+          "type": "number"
+        },
+        "severity": {
+          "$ref": "#/$defs/ArbitrageSeverity",
+          "description": "Categorical severity."
+        },
+        "suggested_fix": {
+          "description": "Suggested adjustment to the implied vol at this point to\nremove the violation (in vol units, additive). `None` if no\nsimple fix is available.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "violation_type": {
+          "$ref": "#/$defs/ArbitrageType",
+          "description": "What type of arbitrage condition was violated."
+        }
+      },
+      "required": [
+        "violation_type",
+        "location",
+        "severity",
+        "magnitude",
+        "description"
+      ],
+      "type": "object"
+    },
+    "ViolationLocation": {
+      "description": "A point on the volatility surface where an arbitrage condition is violated.",
+      "properties": {
+        "adjacent_expiry": {
+          "description": "For calendar spread violations: the adjacent expiry involved.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "expiry": {
+          "description": "Expiry (years) at which the violation occurs.",
+          "format": "double",
+          "type": "number"
+        },
+        "strike": {
+          "description": "Strike or log-moneyness at which the violation occurs.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "strike",
+        "expiry"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/arbitrage_report.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Aggregated arbitrage report for a volatility surface.",
+  "properties": {
+    "counts_by_severity": {
+      "additionalProperties": {
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "description": "Count of violations by severity.",
+      "type": "object"
+    },
+    "counts_by_type": {
+      "additionalProperties": {
+        "format": "uint",
+        "minimum": 0,
+        "type": "integer"
+      },
+      "description": "Count of violations by type.",
+      "type": "object"
+    },
+    "passed": {
+      "description": "Whether the surface passes all checks (no violations above Negligible).",
+      "type": "boolean"
+    },
+    "violations": {
+      "description": "All violations found, sorted by severity (critical first).",
+      "items": {
+        "$ref": "#/$defs/ArbitrageViolation"
+      },
+      "type": "array"
+    },
+    "vol_surface_id": {
+      "description": "Identifier of the volatility surface that was checked.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "vol_surface_id",
+    "violations",
+    "passed",
+    "counts_by_type",
+    "counts_by_severity"
+  ],
+  "title": "ArbitrageReport",
+  "type": "object"
+}

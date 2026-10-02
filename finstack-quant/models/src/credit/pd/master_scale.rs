@@ -27,12 +27,14 @@ use super::error::PdCalibrationError;
 /// assert_eq!(result.grade, "BBB");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(try_from = "MasterScaleWire")]
 pub struct MasterScale {
     grades: Vec<MasterScaleGrade>,
 }
 
 #[derive(Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 struct MasterScaleWire {
     grades: Vec<MasterScaleGrade>,
@@ -48,6 +50,7 @@ impl TryFrom<MasterScaleWire> for MasterScale {
 
 /// A single grade in a master scale.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MasterScaleGrade {
     /// Grade label (e.g., "AAA", "Aaa", "1", etc.).
     pub label: String,
@@ -64,6 +67,7 @@ pub struct MasterScaleGrade {
 
 /// Result of mapping a PD to a master scale grade.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct MasterScaleResult {
     /// The assigned rating grade label.
     pub grade: String,
@@ -119,6 +123,21 @@ impl MasterScale {
         }
 
         Ok(Self { grades })
+    }
+
+    /// Map a batch of PDs to their grades, in input order.
+    ///
+    /// # Arguments
+    ///
+    /// * `pds` - Default probabilities as decimals in the closed unit
+    ///   interval; an empty slice returns an empty vector.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`Self::map_pd`] error of the first PD that is non-finite
+    /// or outside `[0, 1]`.
+    pub fn map_pds(&self, pds: &[f64]) -> Result<Vec<MasterScaleResult>, PdCalibrationError> {
+        pds.iter().map(|pd| self.map_pd(*pd)).collect()
     }
 
     /// Map a PD to the corresponding grade.

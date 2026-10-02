@@ -158,6 +158,7 @@ impl MetricId {
         MetricId::FloatingLastPaymentDate,
         MetricId::FixedFirstAccrualFactor,
         MetricId::FloatingFirstAccrualFactor,
+        MetricId::ExpectedExerciseTime,
         MetricId::SpotRate,
         MetricId::BaseAmount,
         MetricId::QuoteAmount,

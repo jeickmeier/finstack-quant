@@ -6,6 +6,7 @@
 use crate::bindings::extract::extract_market;
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pandas_utils::dict_to_dataframe;
+use crate::bindings::portfolio::factor_model::PyRiskDecomposition;
 use crate::errors::{core_to_py, display_to_py};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -26,10 +27,9 @@ const DEFAULT_PNL_SCENARIO_POINTS: usize =
     frozen,
     skip_from_py_object
 )]
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Clone)]
 pub(crate) struct PySensitivityMatrix {
     base_currency: finstack_quant_core::currency::Currency,
-    #[serde(flatten)]
     pub(crate) inner: finstack_quant_portfolio::sensitivity::SensitivityMatrix,
 }
 
@@ -53,17 +53,35 @@ impl PySensitivityMatrix {
         crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
     }
 
-    /// Parse from JSON (``{base_currency, position_ids, factor_ids, data}``).
+    /// Parse from the canonical wire JSON
+    /// (``{base_currency, position_ids, factor_ids, data}``, ``data`` as one
+    /// row per position), the shape WASM ``computeFactorSensitivities``
+    /// returns and ``decomposeFactorRisk`` accepts.
+    ///
+    /// ``data[position][factor]`` must contain exactly one finite entry per
+    /// declared position/factor pair. Malformed shapes and unknown fields raise
+    /// ``ValueError``.
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        serde_json::from_str(json).map_err(display_to_py)
+        let wire: finstack_quant_portfolio::sensitivity::SensitivityMatrixJson =
+            serde_json::from_str(json).map_err(display_to_py)?;
+        let base_currency = wire.base_currency;
+        let inner = finstack_quant_portfolio::sensitivity::SensitivityMatrix::try_from(wire)
+            .map_err(core_to_py)?;
+        Ok(Self::from_inner(inner, base_currency))
     }
 
-    /// Serialize to compact JSON.
+    /// Serialize to the canonical wire JSON (see :meth:`from_json`).
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(self).map_err(display_to_py)
+        serde_json::to_string(
+            &finstack_quant_portfolio::sensitivity::SensitivityMatrixJson::from_matrix(
+                &self.inner,
+                self.base_currency,
+            ),
+        )
+        .map_err(display_to_py)
     }
 
     /// ISO reporting currency for every sensitivity entry.
@@ -114,28 +132,24 @@ impl PySensitivityMatrix {
     /// float
     #[pyo3(text_signature = "(self, position_idx, factor_idx)")]
     fn delta(&self, position_idx: usize, factor_idx: usize) -> PyResult<f64> {
-        if position_idx >= self.inner.n_positions() || factor_idx >= self.inner.n_factors() {
-            return Err(crate::errors::value_error("index out of bounds"));
-        }
-        Ok(self.inner.delta(position_idx, factor_idx))
+        self.inner
+            .try_delta(position_idx, factor_idx)
+            .map_err(core_to_py)
     }
 
     /// Sensitivity row for a single position across all factors.
     #[pyo3(text_signature = "(self, position_idx)")]
     fn position_deltas(&self, position_idx: usize) -> PyResult<Vec<f64>> {
-        if position_idx >= self.inner.n_positions() {
-            return Err(crate::errors::value_error("position index out of bounds"));
-        }
-        Ok(self.inner.position_deltas(position_idx).to_vec())
+        self.inner
+            .try_position_deltas(position_idx)
+            .map(<[f64]>::to_vec)
+            .map_err(core_to_py)
     }
 
     /// Sensitivity column for a single factor across all positions.
     #[pyo3(text_signature = "(self, factor_idx)")]
     fn factor_deltas(&self, factor_idx: usize) -> PyResult<Vec<f64>> {
-        if factor_idx >= self.inner.n_factors() {
-            return Err(crate::errors::value_error("factor index out of bounds"));
-        }
-        Ok(self.inner.factor_deltas(factor_idx))
+        self.inner.try_factor_deltas(factor_idx).map_err(core_to_py)
     }
 
     /// Export as a pandas ``DataFrame`` with positions as rows and factors as columns.
@@ -319,7 +333,7 @@ fn compute_factor_sensitivities(
     let date = crate::bindings::date_utils::extract_date(as_of)?;
     let base_currency = base_currency
         .parse::<finstack_quant_core::currency::Currency>()
-        .map_err(display_to_py)?;
+        .map_err(core_to_py)?;
     let positions_json = positions_json.to_owned();
     let factors_json = factors_json.to_owned();
     let bump_config_json = bump_config_json.map(str::to_owned);
@@ -390,7 +404,7 @@ fn compute_pnl_profiles(
     let date = crate::bindings::date_utils::extract_date(as_of)?;
     let base_currency = base_currency
         .parse::<finstack_quant_core::currency::Currency>()
-        .map_err(display_to_py)?;
+        .map_err(core_to_py)?;
     let positions_json = positions_json.to_owned();
     let factors_json = factors_json.to_owned();
     let bump_config_json = bump_config_json.map(str::to_owned);
@@ -413,254 +427,6 @@ fn compute_pnl_profiles(
         })
     })
     .map_err(core_to_py)
-}
-
-/// Portfolio-level decomposition of total risk across factors and positions.
-///
-/// Obtain via :func:`decompose_factor_risk`.  The decomposition expresses
-/// forecasted portfolio risk (variance, volatility, VaR, or ES) as a sum of
-/// factor-level contributions, each of which can be further drilled into
-/// per-position contributions.
-#[pyclass(
-    name = "FactorRiskDecomposition",
-    module = "finstack_quant.portfolio",
-    frozen,
-    skip_from_py_object
-)]
-#[derive(Clone)]
-struct PyFactorRiskDecomposition {
-    inner: finstack_quant_models::factor::risk::RiskDecomposition,
-    total_risk: f64,
-    measure: String,
-    residual_risk: f64,
-    factor_ids: Vec<String>,
-    absolute_risks: Vec<f64>,
-    relative_risks: Vec<f64>,
-    marginal_risks: Vec<f64>,
-    pfc_position_ids: Vec<String>,
-    pfc_factor_ids: Vec<String>,
-    pfc_risk_contributions: Vec<f64>,
-    residual_contributions: Vec<finstack_quant_models::factor::risk::PositionResidualContribution>,
-}
-
-/// Bare snake_case serde tag of a [`RiskMeasure`], without JSON quoting or
-/// variant payload (`"variance"`, `"volatility"`, `"var"`,
-/// `"expected_shortfall"`). Matches the tag the WASM binding reports.
-fn risk_measure_tag(measure: &finstack_quant_models::factor::RiskMeasure) -> String {
-    use finstack_quant_models::factor::RiskMeasure as M;
-    match measure {
-        M::Variance => "variance".to_owned(),
-        M::Volatility => "volatility".to_owned(),
-        M::VaR { .. } => "var".to_owned(),
-        M::ExpectedShortfall { .. } => "expected_shortfall".to_owned(),
-        // `RiskMeasure` is `#[non_exhaustive]`; derive the tag of a future
-        // variant from its serde form so the binding stays forward-compatible.
-        other => match serde_json::to_value(other) {
-            Ok(serde_json::Value::String(tag)) => tag,
-            Ok(serde_json::Value::Object(map)) => map
-                .keys()
-                .next()
-                .cloned()
-                .unwrap_or_else(|| format!("{other:?}")),
-            _ => format!("{other:?}"),
-        },
-    }
-}
-
-impl PyFactorRiskDecomposition {
-    fn from_inner(decomp: finstack_quant_models::factor::risk::RiskDecomposition) -> Self {
-        let measure = risk_measure_tag(&decomp.measure);
-        let factor_ids: Vec<String> = decomp
-            .factor_contributions
-            .iter()
-            .map(|c| c.factor_id.to_string())
-            .collect();
-        let absolute_risks: Vec<f64> = decomp
-            .factor_contributions
-            .iter()
-            .map(|c| c.absolute_risk)
-            .collect();
-        let relative_risks: Vec<f64> = decomp
-            .factor_contributions
-            .iter()
-            .map(|c| c.relative_risk)
-            .collect();
-        let marginal_risks: Vec<f64> = decomp
-            .factor_contributions
-            .iter()
-            .map(|c| c.marginal_risk)
-            .collect();
-        let pfc_position_ids: Vec<String> = decomp
-            .position_factor_contributions
-            .iter()
-            .map(|c| c.position_id.to_string())
-            .collect();
-        let pfc_factor_ids: Vec<String> = decomp
-            .position_factor_contributions
-            .iter()
-            .map(|c| c.factor_id.to_string())
-            .collect();
-        let pfc_risk_contributions: Vec<f64> = decomp
-            .position_factor_contributions
-            .iter()
-            .map(|c| c.risk_contribution)
-            .collect();
-        Self {
-            total_risk: decomp.total_risk,
-            measure,
-            residual_risk: decomp.residual_risk,
-            factor_ids,
-            absolute_risks,
-            relative_risks,
-            marginal_risks,
-            pfc_position_ids,
-            pfc_factor_ids,
-            pfc_risk_contributions,
-            residual_contributions: decomp.position_residual_contributions.clone(),
-            inner: decomp,
-        }
-    }
-}
-
-#[pymethods]
-impl PyFactorRiskDecomposition {
-    /// Support `pickle` via the same serde round-trip as ``to_json``.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Parse from canonical ``RiskDecomposition`` JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_models::factor::risk::RiskDecomposition =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self::from_inner(inner))
-    }
-
-    /// Serialize to canonical ``RiskDecomposition`` JSON.
-    #[pyo3(text_signature = "(self)")]
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
-    /// Total portfolio risk under the selected measure.
-    #[getter]
-    fn total_risk(&self) -> f64 {
-        self.total_risk
-    }
-
-    /// Risk-measure tag in canonical snake_case serde form: ``"variance"``,
-    /// ``"volatility"``, ``"var"``, or ``"expected_shortfall"``. Matches the
-    /// tag reported by the WASM ``decomposeFactorRisk`` output.
-    #[getter]
-    fn measure(&self) -> &str {
-        &self.measure
-    }
-
-    /// Residual (idiosyncratic) risk not attributed to any factor.
-    #[getter]
-    fn residual_risk(&self) -> f64 {
-        self.residual_risk
-    }
-
-    /// Factor-level contributions as a list of dicts.
-    ///
-    /// Each dict contains ``factor_id``, ``absolute_risk``, ``relative_risk``,
-    /// and ``marginal_risk``.
-    fn factor_contributions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
-        let items: Vec<Bound<'py, PyDict>> = self
-            .factor_ids
-            .iter()
-            .enumerate()
-            .map(|(i, fid)| {
-                let d = PyDict::new(py);
-                d.set_item("factor_id", fid)?;
-                d.set_item("absolute_risk", self.absolute_risks[i])?;
-                d.set_item("relative_risk", self.relative_risks[i])?;
-                d.set_item("marginal_risk", self.marginal_risks[i])?;
-                Ok(d)
-            })
-            .collect::<PyResult<Vec<_>>>()?;
-        PyList::new(py, items)
-    }
-
-    /// Position × factor contributions as a list of dicts.
-    ///
-    /// Each dict contains ``position_id``, ``factor_id``, and
-    /// ``risk_contribution``.
-    fn position_factor_contributions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyList>> {
-        let items: Vec<Bound<'py, PyDict>> = (0..self.pfc_position_ids.len())
-            .map(|i| {
-                let d = PyDict::new(py);
-                d.set_item("position_id", &self.pfc_position_ids[i])?;
-                d.set_item("factor_id", &self.pfc_factor_ids[i])?;
-                d.set_item("risk_contribution", self.pfc_risk_contributions[i])?;
-                Ok(d)
-            })
-            .collect::<PyResult<Vec<_>>>()?;
-        PyList::new(py, items)
-    }
-
-    /// Per-position residual (idiosyncratic) variance contributions as a
-    /// list of dicts.
-    ///
-    /// Each dict contains ``position_id``, ``residual_variance`` (annualized
-    /// variance units), and a ``source`` object tagged by ``kind``. Empty for
-    /// the parametric decomposer used by :func:`decompose_factor_risk` —
-    /// populated only by credit-aware position decomposers.
-    fn position_residual_contributions<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        crate::bindings::pandas_utils::serde_to_py(py, &self.residual_contributions)
-    }
-
-    /// Primary table: the factor-level risk decomposition.
-    ///
-    /// Alias of :meth:`to_factor_dataframe`. Every tabular result type in the
-    /// library answers ``to_dataframe()``; the position × factor view stays on
-    /// :meth:`to_position_factor_dataframe`.
-    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        self.to_factor_dataframe(py)
-    }
-
-    /// Export factor contributions as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``factor_id``, ``absolute_risk``, ``relative_risk``,
-    /// ``marginal_risk``.
-    fn to_factor_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("factor_id", &self.factor_ids)?;
-        data.set_item("absolute_risk", &self.absolute_risks)?;
-        data.set_item("relative_risk", &self.relative_risks)?;
-        data.set_item("marginal_risk", &self.marginal_risks)?;
-        dict_to_dataframe(py, &data, None)
-    }
-
-    /// Export position × factor contributions as a pandas ``DataFrame``.
-    ///
-    /// Columns: ``position_id``, ``factor_id``, ``risk_contribution``.
-    fn to_position_factor_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let data = PyDict::new(py);
-        data.set_item("position_id", &self.pfc_position_ids)?;
-        data.set_item("factor_id", &self.pfc_factor_ids)?;
-        data.set_item("risk_contribution", &self.pfc_risk_contributions)?;
-        dict_to_dataframe(py, &data, None)
-    }
-
-    fn __repr__(&self) -> String {
-        format!(
-            "FactorRiskDecomposition(measure={:?}, total_risk={:.6}, factors={}, positions={})",
-            self.measure,
-            self.total_risk,
-            self.factor_ids.len(),
-            {
-                let mut unique = self.pfc_position_ids.clone();
-                unique.sort();
-                unique.dedup();
-                unique.len()
-            },
-        )
-    }
 }
 
 // decompose_factor_risk
@@ -686,7 +452,7 @@ impl PyFactorRiskDecomposition {
 ///
 /// Returns
 /// -------
-/// FactorRiskDecomposition
+/// finstack_quant.models.factor.risk.RiskDecomposition
 ///     Portfolio-level risk decomposition with factor and position detail.
 #[pyfunction]
 #[pyo3(signature = (sensitivities, covariance_json, risk_measure=None))]
@@ -695,13 +461,13 @@ fn decompose_factor_risk(
     sensitivities: &PySensitivityMatrix,
     covariance_json: &Bound<'_, PyAny>,
     risk_measure: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyFactorRiskDecomposition> {
+) -> PyResult<PyRiskDecomposition> {
     let covariance_json =
         crate::bindings::extract::extract_records_json(py, covariance_json, "covariance")?;
     let covariance_json: &str = &covariance_json;
     let measure: finstack_quant_models::factor::RiskMeasure = match risk_measure {
         Some(obj) => py_to_serde(py, obj, "risk_measure")?,
-        None => finstack_quant_models::factor::RiskMeasure::Variance,
+        None => finstack_quant_models::factor::RiskMeasure::default(),
     };
 
     let matrix = sensitivities.inner.clone();
@@ -713,7 +479,7 @@ fn decompose_factor_risk(
         let result = decomposer
             .decompose(&matrix, &covariance, &measure)
             .map_err(core_to_py)?;
-        Ok(PyFactorRiskDecomposition::from_inner(result))
+        Ok(PyRiskDecomposition::from_inner(result))
     })
 }
 
@@ -721,7 +487,6 @@ fn decompose_factor_risk(
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySensitivityMatrix>()?;
     m.add_class::<PyFactorPnlProfile>()?;
-    m.add_class::<PyFactorRiskDecomposition>()?;
     m.add_function(pyo3::wrap_pyfunction!(compute_factor_sensitivities, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(compute_pnl_profiles, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(decompose_factor_risk, m)?)?;

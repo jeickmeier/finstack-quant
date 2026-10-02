@@ -9,7 +9,7 @@
 //! removed because the underlying implementation was known-divergent
 //! off-ATM. Use `bs_cos_price` for all Black-Scholes Fourier pricing.
 
-use crate::errors::display_to_py;
+use crate::errors::core_to_py;
 use finstack_quant_models::fourier::cos::{
     bs_cos_price as rust_bs_cos_price, merton_jump_cos_price as rust_merton_jump_cos_price,
     vg_cos_price as rust_vg_cos_price, BlackScholesCosParams, MertonJumpCosParams,
@@ -46,8 +46,9 @@ use pyo3::prelude::*;
 /// Raises
 /// ------
 /// ValueError
-///     If ``n_terms`` is zero, ``vol`` is not strictly positive, the COS truncation range is
-///     degenerate, or the price is non-finite.
+///     If spot, strike, expiry, or volatility is not finite and positive,
+///     rates/carry are non-finite, ``n_terms`` is zero, or the COS calculation
+///     has a degenerate truncation range or non-finite output.
 ///
 /// Sources
 /// -------
@@ -78,7 +79,7 @@ fn bs_cos_price(
             is_call,
             n_terms,
         })
-        .map_err(display_to_py)
+        .map_err(|error| core_to_py(error.into()))
     })
 }
 
@@ -97,9 +98,10 @@ fn bs_cos_price(
 /// sigma : float
 ///     Volatility of the subordinated Brownian motion.
 /// theta : float
-///     Drift of the subordinated Brownian motion (negative values skew left).
+///     Finite annual log-return drift of the subordinated Brownian motion;
+///     negative values skew left.
 /// nu : float
-///     Variance rate of the Gamma subordinator (nu > 0).
+///     Positive finite variance rate of the Gamma time change, in years.
 /// expiry : float
 ///     Time to expiry in years.
 /// is_call : bool
@@ -111,6 +113,13 @@ fn bs_cos_price(
 /// -------
 /// float
 ///     Present-value option price.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If spot, strike, expiry, sigma, or nu is not finite and positive,
+///     rates/carry/theta are non-finite, the VG martingale condition fails,
+///     ``n_terms`` is zero, or the COS calculation is invalid or non-finite.
 ///
 /// Sources
 /// -------
@@ -145,7 +154,7 @@ fn vg_cos_price(
             is_call,
             n_terms,
         })
-        .map_err(display_to_py)
+        .map_err(|error| core_to_py(error.into()))
     })
 }
 
@@ -182,6 +191,14 @@ fn vg_cos_price(
 /// float
 ///     Present-value option price.
 ///
+/// Raises
+/// ------
+/// ValueError
+///     If spot, strike, or expiry is not finite and positive, any rate/carry
+///     or log-jump mean is non-finite, volatility or jump intensity is negative
+///     or non-finite, the jump compensator overflows, ``n_terms`` is zero,
+///     or the COS calculation is invalid or non-finite.
+///
 /// Sources
 /// -------
 /// - Fang-Oosterlee (2008): see docs/REFERENCES.md#fang-oosterlee-2008
@@ -217,7 +234,7 @@ fn merton_jump_cos_price(
             is_call,
             n_terms,
         })
-        .map_err(display_to_py)
+        .map_err(|error| core_to_py(error.into()))
     })
 }
 
