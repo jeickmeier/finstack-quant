@@ -518,6 +518,13 @@ pub struct PyEquityOptionBuilder {
     fields: Vec<(&'static str, String)>,
 }
 
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyEquityOption,
+    PyEquityOptionBuilder,
+    "EquityOptionBuilder",
+    fields
+);
+
 /// Apply one consuming Rust setter and record the field for ``__repr__``.
 macro_rules! eq_set {
     ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{

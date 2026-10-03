@@ -71,7 +71,12 @@ pub fn initialize_composite(
     let date = finstack_quant_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
     let history = parse_observations(history_json.as_deref())?;
     let result = spec
-        .initialize(&market, date, &history)
+        .initialize(
+            &market,
+            date,
+            &history,
+            finstack_quant_calibration::recalibration::pricing_options(),
+        )
         .map_err(to_js_err)?;
     to_js_value(&result)
 }
@@ -112,7 +117,12 @@ pub fn rebalance_composite(
     let date = finstack_quant_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
     let history = parse_observations(history_json.as_deref())?;
     let result = instrument
-        .rebalance(&market, date, &history)
+        .rebalance(
+            &market,
+            date,
+            &history,
+            finstack_quant_calibration::recalibration::pricing_options(),
+        )
         .map_err(to_js_err)?;
     to_js_value(&result)
 }
@@ -152,7 +162,12 @@ pub fn composite_primitive_exposures(
     let date = finstack_quant_core::dates::parse_iso_date(as_of).map_err(to_js_err)?;
     let metrics = parse_metrics(metrics)?;
     let report = instrument
-        .primitive_exposures(&market, date, &metrics)
+        .primitive_exposures(
+            &market,
+            date,
+            &metrics,
+            finstack_quant_calibration::recalibration::pricing_options(),
+        )
         .map_err(to_js_err)?;
     to_js_value(&report)
 }
@@ -228,7 +243,14 @@ pub fn composite_history_from_spec(
     let observations = parse_observations(Some(observations_json))?;
     let warmup = parse_observations(warmup_json.as_deref())?;
     let metrics = parse_metrics(metrics)?;
-    let rows = history_from_spec(&spec, &warmup, &observations, &metrics).map_err(to_js_err)?;
+    let rows = history_from_spec(
+        &spec,
+        &warmup,
+        &observations,
+        &metrics,
+        finstack_quant_calibration::recalibration::pricing_options(),
+    )
+    .map_err(to_js_err)?;
     to_js_value(&rows)
 }
 
@@ -264,7 +286,13 @@ pub fn composite_history(
     let instrument = parse_composite(instrument_json)?;
     let observations = parse_observations(Some(observations_json))?;
     let metrics = parse_metrics(metrics)?;
-    let rows = history(&instrument, &observations, &metrics).map_err(to_js_err)?;
+    let rows = history(
+        &instrument,
+        &observations,
+        &metrics,
+        finstack_quant_calibration::recalibration::pricing_options(),
+    )
+    .map_err(to_js_err)?;
     to_js_value(&rows)
 }
 

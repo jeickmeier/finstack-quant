@@ -165,7 +165,12 @@ mod tests {
             },
             RebalanceRule::Manual,
         );
-        let resolved = spec.initialize(&MarketContext::new(), date!(2025 - 01 - 01), &[])?;
+        let resolved = spec.initialize(
+            &MarketContext::new(),
+            date!(2025 - 01 - 01),
+            &[],
+            PricingOptions::default(),
+        )?;
         assert_eq!(resolved.instrument.state.resolved_legs[0].quantity, 0.75);
         assert_eq!(resolved.instrument.state.resolved_legs[1].quantity, -2.25);
         let gross = resolved
@@ -192,7 +197,12 @@ mod tests {
             WeightingMethod::delta_neutral("A", 1.0),
             RebalanceRule::Manual,
         );
-        let resolved = spec.initialize(&MarketContext::new(), date!(2025 - 01 - 01), &[])?;
+        let resolved = spec.initialize(
+            &MarketContext::new(),
+            date!(2025 - 01 - 01),
+            &[],
+            PricingOptions::default(),
+        )?;
         assert_eq!(resolved.instrument.state.resolved_legs[0].quantity, 1.0);
         assert_eq!(resolved.instrument.state.resolved_legs[1].quantity, -0.5);
         assert!((1.0_f64 * 2.0 + -0.5 * 4.0).abs() < 1.0e-12);
@@ -240,7 +250,12 @@ mod tests {
             .last()
             .ok_or_else(|| Error::Internal("test history is empty".to_string()))?
             .restore()?;
-        let resolved = spec.initialize(&market, date!(2025 - 01 - 04), &observations)?;
+        let resolved = spec.initialize(
+            &market,
+            date!(2025 - 01 - 04),
+            &observations,
+            PricingOptions::default(),
+        )?;
         assert!((resolved.instrument.state.resolved_legs[0].quantity - 1.0).abs() < 1.0e-12);
         assert!((resolved.instrument.state.resolved_legs[1].quantity + 0.5).abs() < 1.0e-12);
         Ok(())
@@ -270,7 +285,12 @@ mod tests {
             },
             RebalanceRule::Manual,
         );
-        let resolved = spec.initialize(&MarketContext::new(), date!(2025 - 01 - 01), &[])?;
+        let resolved = spec.initialize(
+            &MarketContext::new(),
+            date!(2025 - 01 - 01),
+            &[],
+            PricingOptions::default(),
+        )?;
         assert_eq!(resolved.instrument.state.resolved_legs[0].quantity, 2.0);
         assert_eq!(resolved.instrument.state.resolved_legs[1].quantity, -3.0);
         Ok(())
@@ -361,8 +381,12 @@ mod tests {
         .initialize_fixed(date!(2025 - 01 - 01))?
         .instrument;
 
-        let report =
-            outer.primitive_exposures(&MarketContext::new(), date!(2025 - 01 - 02), &[])?;
+        let report = outer.primitive_exposures(
+            &MarketContext::new(),
+            date!(2025 - 01 - 02),
+            &[],
+            PricingOptions::default(),
+        )?;
         assert_eq!(report.paths.len(), 3);
         let a = report
             .aggregates
@@ -417,6 +441,7 @@ mod tests {
                 &MarketContext::new(),
                 date!(2025 - 01 - 02),
                 &[MetricId::DurationMod],
+                PricingOptions::default(),
             )
             .expect_err("modified duration is non-additive");
         assert!(error.to_string().contains("not additive"));
@@ -582,7 +607,12 @@ mod tests {
         );
         assert!(value["spec"].get("metric_pricing_overrides").is_none());
 
-        let rebalanced = composite.rebalance(&MarketContext::new(), date!(2025 - 01 - 03), &[])?;
+        let rebalanced = composite.rebalance(
+            &MarketContext::new(),
+            date!(2025 - 01 - 03),
+            &[],
+            PricingOptions::default(),
+        )?;
         assert_eq!(
             rebalanced.instrument.metric_pricing_overrides,
             composite.metric_pricing_overrides
@@ -679,7 +709,12 @@ mod tests {
             .last()
             .ok_or_else(|| Error::Internal("test history is empty".to_string()))?
             .restore()?;
-        let resolved = spec.initialize(&market, date!(2025 - 01 - 04), &history)?;
+        let resolved = spec.initialize(
+            &market,
+            date!(2025 - 01 - 04),
+            &history,
+            PricingOptions::default(),
+        )?;
         // Tolerance covers only floating-point summation error.
         assert!((resolved.instrument.state.resolved_legs[0].quantity - 26.0).abs() < 1.0e-9);
         assert!(
@@ -728,7 +763,12 @@ mod tests {
             },
             RebalanceRule::Manual,
         );
-        let resolved = spec.initialize(&MarketContext::new(), date!(2025 - 01 - 01), &[])?;
+        let resolved = spec.initialize(
+            &MarketContext::new(),
+            date!(2025 - 01 - 01),
+            &[],
+            PricingOptions::default(),
+        )?;
         let state = &resolved.instrument.state;
         assert_eq!(state.weighting_inputs["leg.A.notional"], -200.0);
         assert_eq!(state.weighting_inputs["leg.B.notional"], 50.0);
@@ -757,6 +797,69 @@ mod tests {
                 date!(2026 - 01 - 01)
             ]
         );
+        Ok(())
+    }
+
+    fn monthly_calendar_rule(
+        end: Option<finstack_quant_core::dates::Date>,
+    ) -> Result<RebalanceRule> {
+        Ok(RebalanceRule::Calendar {
+            start: date!(2024 - 01 - 02),
+            end,
+            frequency: Tenor::parse("1M")?,
+            calendar_id: "weekends_only".to_string(),
+            business_day_convention: finstack_quant_core::dates::BusinessDayConvention::Following,
+        })
+    }
+
+    #[test]
+    fn open_ended_calendar_rebalance_validates_and_runs_through_any_horizon() -> Result<()> {
+        let rule = monthly_calendar_rule(None)?;
+        rule.validate()?;
+        // Horizon off the cadence: the horizon itself is not a rebalance date.
+        let dates = rule.dates_through(date!(2024 - 04 - 15))?;
+        assert_eq!(
+            dates,
+            vec![
+                date!(2024 - 01 - 02),
+                date!(2024 - 02 - 02),
+                date!(2024 - 03 - 04), // 2024-03-02 is a Saturday
+                date!(2024 - 04 - 02),
+            ]
+        );
+        assert_eq!(
+            rule.dates_through(date!(2024 - 01 - 02))?,
+            vec![date!(2024 - 01 - 02)]
+        );
+        assert!(rule.dates_through(date!(2024 - 01 - 01))?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn calendar_rebalance_accepts_end_equal_to_start_and_partial_final_period() -> Result<()> {
+        let single = monthly_calendar_rule(Some(date!(2024 - 01 - 02)))?;
+        single.validate()?;
+        assert_eq!(
+            single.dates_through(date!(2025 - 01 - 01))?,
+            vec![date!(2024 - 01 - 02)]
+        );
+
+        let partial = monthly_calendar_rule(Some(date!(2024 - 12 - 15)))?;
+        partial.validate()?;
+        let dates = partial.dates_through(date!(2025 - 06 - 01))?;
+        assert_eq!(dates.len(), 12);
+        assert_eq!(dates.last(), Some(&date!(2024 - 12 - 02)));
+
+        let backwards = monthly_calendar_rule(Some(date!(2023 - 12 - 01)))?;
+        assert!(backwards.validate().is_err());
+        let unknown = RebalanceRule::Calendar {
+            start: date!(2024 - 01 - 02),
+            end: None,
+            frequency: Tenor::parse("1M")?,
+            calendar_id: "no_such_calendar".to_string(),
+            business_day_convention: finstack_quant_core::dates::BusinessDayConvention::Following,
+        };
+        assert!(unknown.validate().is_err());
         Ok(())
     }
 

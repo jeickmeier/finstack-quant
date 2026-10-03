@@ -154,11 +154,6 @@ const SPECIAL_SETTERS = {
   exercise: (builder, value) =>
     builder.exercise(value.date, value.spot, value.settlement_date, value.exercised),
 };
-const OVERRIDE_KEYS = [
-  'instrument_pricing_overrides',
-  'metric_pricing_overrides',
-  'scenario_pricing_overrides',
-];
 
 /** Build a copy of `example` through its builder, feeding each setter the matching getter. */
 function rebuild(name, cls, example) {
@@ -174,10 +169,6 @@ function rebuild(name, cls, example) {
   const built = builder.build();
   const expected = plain(example.toDict());
   const actual = plain(built.toDict());
-  for (const key of OVERRIDE_KEYS) {
-    delete expected[key];
-    delete actual[key];
-  }
   same(actual, expected, `${name}Builder`);
   assert.throws(
     () => builder.build(),
@@ -195,6 +186,30 @@ test('each builder rebuilds its example from the example getters', () => {
   }
   const deal = instruments.StructuredCredit.fromJson(golden.structured.deal);
   rebuild('StructuredCredit', instruments.StructuredCredit, deal);
+});
+
+test('typed builders set and read the three pricing-override bags', () => {
+  for (const [name, cls] of Object.entries(CLASSES)) {
+    assert.throws(
+      () => cls.builder().instrumentPricingOverrides({ model_cfg: {} }),
+      (error) => error.kind === 'validation',
+      name
+    );
+  }
+  const quote = { market_quotes: { quoted_clean_price_pct: 99 } };
+  const shock = { scenario_price_shock_decimal: -0.02 };
+  const bond = instruments.Bond.example();
+  assert.deepEqual(plain(bond.instrumentPricingOverrides), {});
+  const envelope = JSON.parse(bond.toJson());
+  envelope.instrument.spec.instrument_pricing_overrides = quote;
+  envelope.instrument.spec.scenario_pricing_overrides = shock;
+  const quoted = instruments.Bond.fromJson(JSON.stringify(envelope));
+  assert.deepEqual(plain(quoted.instrumentPricingOverrides), quote);
+  assert.deepEqual(plain(quoted.scenarioPricingOverrides), shock);
+  // The builder carries the bags through its setters.
+  rebuild('Bond', instruments.Bond, quoted);
+  bond.free();
+  quoted.free();
 });
 
 test('builder setters check their argument types and report missing fields', () => {

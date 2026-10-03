@@ -1335,6 +1335,13 @@ pub struct PyBondBuilder {
     fields: Vec<(&'static str, String)>,
 }
 
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyBond,
+    PyBondBuilder,
+    "BondBuilder",
+    fields
+);
+
 /// Take the wrapped Rust builder or fail if `build()` already consumed it.
 fn take_bond(b: &mut PyBondBuilder) -> PyResult<BondBuilderInner> {
     b.inner
@@ -2230,6 +2237,13 @@ pub struct PyTermLoanBuilder {
     inner: Option<TermLoanBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
+
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyTermLoan,
+    PyTermLoanBuilder,
+    "TermLoanBuilder",
+    fields
+);
 
 /// Take the wrapped Rust builder or fail if `build()` already consumed it.
 fn take_term_loan(b: &mut PyTermLoanBuilder) -> PyResult<TermLoanBuilderInner> {

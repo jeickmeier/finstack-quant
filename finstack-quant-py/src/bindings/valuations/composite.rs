@@ -927,7 +927,12 @@ impl PyCompositeSpec {
         let as_of = crate::bindings::date_utils::extract_date(as_of)?;
         let history = observations_from_py(py, history, "composite market history")?;
         self.inner
-            .initialize(&market, as_of, &history)
+            .initialize(
+                &market,
+                as_of,
+                &history,
+                finstack_quant_calibration::recalibration::pricing_options(),
+            )
             .map(PyCompositeRebalanceResult::from_inner)
             .map_err(core_to_py)
     }
@@ -1177,7 +1182,12 @@ impl PyCompositeInstrument {
         let as_of = crate::bindings::date_utils::extract_date(as_of)?;
         let history = observations_from_py(py, history, "composite market history")?;
         self.inner
-            .rebalance(&market, as_of, &history)
+            .rebalance(
+                &market,
+                as_of,
+                &history,
+                finstack_quant_calibration::recalibration::pricing_options(),
+            )
             .map(PyCompositeRebalanceResult::from_inner)
             .map_err(core_to_py)
     }
@@ -1219,7 +1229,12 @@ impl PyCompositeInstrument {
             .collect::<Result<Vec<_>, _>>()
             .map_err(core_to_py)?;
         self.inner
-            .primitive_exposures(&market, as_of, &metrics)
+            .primitive_exposures(
+                &market,
+                as_of,
+                &metrics,
+                finstack_quant_calibration::recalibration::pricing_options(),
+            )
             .map(PyCompositeExposureReport::from_inner)
             .map_err(core_to_py)
     }
@@ -1738,9 +1753,15 @@ fn py_history_from_spec(
         .map(MetricId::try_from)
         .collect::<Result<Vec<_>, _>>()
         .map_err(core_to_py)?;
-    history_from_spec(&spec.inner, &warmup, &observations, &metrics)
-        .map(|inner| PyCompositeHistoryResult { inner })
-        .map_err(core_to_py)
+    history_from_spec(
+        &spec.inner,
+        &warmup,
+        &observations,
+        &metrics,
+        finstack_quant_calibration::recalibration::pricing_options(),
+    )
+    .map(|inner| PyCompositeHistoryResult { inner })
+    .map_err(core_to_py)
 }
 
 /// Calculate chronological rows from an already-resolved initial state.
@@ -1786,9 +1807,14 @@ fn py_history(
         .map(MetricId::try_from)
         .collect::<Result<Vec<_>, _>>()
         .map_err(core_to_py)?;
-    history(&instrument.inner, &observations, &metrics)
-        .map(|inner| PyCompositeHistoryResult { inner })
-        .map_err(core_to_py)
+    history(
+        &instrument.inner,
+        &observations,
+        &metrics,
+        finstack_quant_calibration::recalibration::pricing_options(),
+    )
+    .map(|inner| PyCompositeHistoryResult { inner })
+    .map_err(core_to_py)
 }
 
 pub(crate) const EXPORTS: &[&str] = &[

@@ -659,6 +659,13 @@ pub struct PyCdsTrancheBuilder {
     fields: Vec<(&'static str, String)>,
 }
 
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyCdsTranche,
+    PyCdsTrancheBuilder,
+    "CdsTrancheBuilder",
+    fields
+);
+
 /// Apply one consuming Rust setter and record the field for ``__repr__``.
 macro_rules! tranche_set {
     ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{

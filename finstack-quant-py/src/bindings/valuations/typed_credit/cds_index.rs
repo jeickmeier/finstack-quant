@@ -866,6 +866,13 @@ pub struct PyCdsIndexBuilder {
     fields: Vec<(&'static str, String)>,
 }
 
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyCdsIndex,
+    PyCdsIndexBuilder,
+    "CdsIndexBuilder",
+    fields
+);
+
 /// Apply one consuming Rust setter and record the field for ``__repr__``.
 macro_rules! cds_index_set {
     ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{

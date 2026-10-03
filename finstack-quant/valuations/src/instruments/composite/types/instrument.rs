@@ -210,6 +210,9 @@ impl CompositeInstrument {
     ///   history observation is permitted.
     /// * `history` - Strictly increasing observations available through
     ///   `as_of`. Required for volatility weighting and must end on `as_of`.
+    /// * `options` - Pricing options used when metric-weighted or
+    ///   user-defined weighting prices the legs; quote-recalibrated weighting
+    ///   metrics such as `cs01` need a recalibration provider.
     ///
     /// # Errors
     ///
@@ -219,10 +222,13 @@ impl CompositeInstrument {
         market: &MarketContext,
         as_of: Date,
         history: &[CompositeMarketObservation],
+        options: PricingOptions,
     ) -> Result<CompositeRebalanceResult> {
         self.spec.validate()?;
         validate_history(history, Some(as_of))?;
-        let (quantities, inputs) = self.spec.resolve_quantities(market, as_of, history)?;
+        let (quantities, inputs) = self
+            .spec
+            .resolve_quantities(market, as_of, history, options)?;
         self.spec
             .build_rebalance_result(as_of, quantities, inputs, Some(self))
     }
@@ -312,21 +318,16 @@ impl CompositeInstrument {
     /// * `as_of` - Valuation date and FX conversion date.
     /// * `metrics` - Additive risk metrics to aggregate; an empty slice
     ///   reports value only. Non-additive identifiers are rejected.
+    /// * `options` - Pricing options applied to every primitive, as for
+    ///   the host `price_instrument` entry points. Quote-recalibrated metrics
+    ///   such as `cs01` need a recalibration provider; hosts pass
+    ///   `finstack_quant_calibration::recalibration::pricing_options()`.
     ///
     /// # Errors
     ///
     /// Returns an error for non-additive metrics, invalid embedded instruments,
     /// missing market data, or a metric unsupported by every primitive.
     pub fn primitive_exposures(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        metrics: &[MetricId],
-    ) -> Result<CompositeExposureReport> {
-        self.primitive_exposures_with_options(market, as_of, metrics, PricingOptions::default())
-    }
-
-    pub(crate) fn primitive_exposures_with_options(
         &self,
         market: &MarketContext,
         as_of: Date,
@@ -421,8 +422,7 @@ impl CompositeInstrument {
         metrics: &[MetricId],
         options: PricingOptions,
     ) -> Result<(IndexMap<MetricId, f64>, CompositeValuationDetails)> {
-        let report =
-            self.primitive_exposures_with_options(market, as_of, metrics, options.clone())?;
+        let report = self.primitive_exposures(market, as_of, metrics, options.clone())?;
         let leg_results = self.top_level_leg_results(market, as_of, metrics, options)?;
         let mut measures = IndexMap::<MetricId, f64>::new();
         for path in &report.paths {
@@ -627,7 +627,7 @@ impl Instrument for CompositeInstrument {
         market: &MarketContext,
         as_of: Date,
     ) -> Option<crate::results::ValuationDetails> {
-        self.primitive_exposures(market, as_of, &[])
+        self.primitive_exposures(market, as_of, &[], PricingOptions::default())
             .ok()
             .and_then(|exposures| {
                 let leg_results = self

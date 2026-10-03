@@ -890,6 +890,13 @@ pub struct PyAssetBackedFacilityBuilder {
     inner: Option<FacilityBuilderInner>,
 }
 
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyAssetBackedFacility,
+    PyAssetBackedFacilityBuilder,
+    "AssetBackedFacilityBuilder",
+    no_fields
+);
+
 fn take_facility(b: &mut PyAssetBackedFacilityBuilder) -> PyResult<FacilityBuilderInner> {
     b.inner
         .take()

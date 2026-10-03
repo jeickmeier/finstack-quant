@@ -197,3 +197,113 @@ test('portfolio.primitiveExposures nets composite legs against direct positions'
     book.free();
   }
 });
+
+test('open-ended and partial-period calendar rules validate and rebalance on cadence', () => {
+  const composite = facade.valuations.composite;
+  const calendarRule = (end) => ({
+    kind: 'calendar',
+    start: '2024-01-02',
+    ...(end === undefined ? {} : { end }),
+    frequency: { count: 1, unit: 'months' },
+    calendar_id: 'weekends_only',
+    business_day_convention: 'following',
+  });
+  for (const end of [undefined, null, '2024-01-02', '2024-12-15']) {
+    const ruled = { ...spec, rebalance_rule: calendarRule(end) };
+    assert.equal(
+      composite.initialize(ruled, market, '2024-01-02').instrument.instrument.type,
+      'composite'
+    );
+  }
+  const openEnded = {
+    ...spec,
+    weighting_method: {
+      kind: 'notional_weighted',
+      gross_notional: { amount: '100', currency: 'USD' },
+    },
+    rebalance_rule: calendarRule(undefined),
+  };
+  const observations = ['2024-01-02', '2024-01-20', '2024-02-02', '2024-02-15'].map((date) => ({
+    date,
+    state: market,
+  }));
+  const rows = composite.historyFromSpec(openEnded, observations);
+  assert.deepEqual(
+    rows.filter((row) => row.next_state_effective_date !== null).map((row) => row.date),
+    ['2024-02-02']
+  );
+});
+
+test('composite exposures and history price cs01 like priceInstrument', () => {
+  const { calibration, valuations } = facade;
+  const base = '2024-06-20';
+  const envelope = JSON.parse(
+    readFileSync(
+      join(
+        __dirname,
+        '..',
+        '..',
+        '..',
+        'finstack-quant',
+        'calibration',
+        'examples',
+        'market_bootstrap',
+        '03_single_name_hazard.json'
+      ),
+      'utf8'
+    )
+  );
+  delete envelope.$schema;
+  for (const step of envelope.plan.steps) {
+    step.base_date = base;
+    if (step.kind === 'hazard') {
+      Object.assign(step, { id: 'CORP-HAZARD', curve_id: 'CORP-HAZARD', entity: 'CORP' });
+    }
+  }
+  for (const quote of envelope.market_data) {
+    if (quote.kind === 'cds_quote') quote.entity = 'CORP';
+  }
+  const hazardMarket = calibration.calibrate(envelope).result.final_market;
+  const cds = JSON.parse(valuations.instruments.CreditDefaultSwap.example().toJson()).instrument;
+  const cdsB = structuredClone(cds);
+  cdsB.spec.id = `${cds.spec.id}-B`;
+  const cdsSpec = {
+    ...spec,
+    capital: { amount: '1000000', currency: 'USD' },
+    legs: [
+      { instrument_id: cds.spec.id, instrument: cds, score: 1 },
+      { instrument_id: cdsB.spec.id, instrument: cdsB, score: -0.5 },
+    ],
+  };
+  const composite = valuations.composite;
+  const instrument = composite.initialize(cdsSpec, hazardMarket, base).instrument;
+  const expected = valuations.instruments.priceInstrument(
+    instrument,
+    hazardMarket,
+    base,
+    'default',
+    ['cs01']
+  ).measures.cs01;
+  assert.notEqual(expected, 0);
+  const report = composite.primitiveExposures(instrument, hazardMarket, base, ['cs01']);
+  const total = report.aggregates.reduce((sum, row) => sum + row.net_measures.cs01, 0);
+  assert.ok(Math.abs(total - expected) <= 1e-9 * Math.abs(expected));
+  const observations = [{ date: base, state: hazardMarket }];
+  assert.equal(composite.history(instrument, observations, ['cs01']).length, 1);
+  assert.equal(composite.historyFromSpec(cdsSpec, observations, null, ['cs01']).length, 1);
+  const weighted = {
+    ...cdsSpec,
+    weighting_method: {
+      kind: 'metric_weighted',
+      metric: 'cs01',
+      anchor_leg_id: cds.spec.id,
+      anchor_quantity: 1,
+      neutralize: false,
+    },
+  };
+  const weightedInstrument = composite.initialize(weighted, hazardMarket, base).instrument;
+  assert.equal(
+    composite.rebalance(weightedInstrument, hazardMarket, base).instrument.instrument.type,
+    'composite'
+  );
+});

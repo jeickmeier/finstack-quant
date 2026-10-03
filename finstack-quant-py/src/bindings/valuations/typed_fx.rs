@@ -832,6 +832,13 @@ pub struct PyFxForwardBuilder {
     fields: Vec<(&'static str, String)>,
 }
 
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyFxForward,
+    PyFxForwardBuilder,
+    "FxForwardBuilder",
+    fields
+);
+
 /// Apply one consuming Rust setter and record the field for ``__repr__``.
 macro_rules! fx_forward_set {
     ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{
@@ -1699,6 +1706,13 @@ pub struct PyFxOptionBuilder {
     inner: Option<FxOptionBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
+
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyFxOption,
+    PyFxOptionBuilder,
+    "FxOptionBuilder",
+    fields
+);
 
 /// Apply one consuming Rust setter and record the field for ``__repr__``.
 macro_rules! fx_option_set {
