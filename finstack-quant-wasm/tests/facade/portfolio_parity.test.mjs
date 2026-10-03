@@ -174,6 +174,55 @@ test('factorStress and positionWhatIf match Python', () => {
   );
 });
 
+test('FactorModel handle reuses one model and matches the free functions', () => {
+  const model = portfolio.FactorModel.fromConfig(inputs.factor_model_config);
+  try {
+    const asOf = inputs.as_of_t0;
+    const whatIf = model.positionWhatIf(book, marketT0, asOf, inputs.changes);
+    assertClose(wire(whatIf), expected.position_what_if);
+    const stress = model.factorStress(book, marketT0, asOf, inputs.stresses);
+    assertClose(wire(stress), expected.factor_stress);
+
+    const decomposition = model.analyze(book, marketT0, asOf);
+    assertClose(wire(decomposition), expected.position_what_if.before);
+
+    const pnl = model.factorStressPnl(book, marketT0, asOf, inputs.stresses);
+    assertClose(wire(pnl), {
+      total_pnl: expected.factor_stress.total_pnl,
+      position_pnl: expected.factor_stress.position_pnl,
+    });
+
+    const report = model.assignFactors(book, marketT0);
+    assert.deepEqual(
+      report.assignments.map((row) => row.position_id),
+      ['POS-0', 'POS-1']
+    );
+    assert.deepEqual(report.unmatched, []);
+
+    const matrix = model.computeSensitivities(book, marketT0, asOf);
+    assert.equal(matrix.base_currency, 'USD');
+    assert.deepEqual(matrix.position_ids, ['POS-0', 'POS-1']);
+    assert.equal(matrix.data.length, 2);
+
+    assert.throws(
+      () => model.factorStressPnl(book, marketT0, asOf, [['nope', 1]]),
+      (error) => error.kind === 'validation' && /Unknown factor/.test(error.message)
+    );
+  } finally {
+    model.free();
+  }
+  assert.throws(
+    () =>
+      portfolio.FactorModel.fromConfig({
+        ...inputs.factor_model_config,
+        matching: {
+          mapping_table: [{ dependency_filter: {}, attribute_filter: {}, factor_id: 'missing' }],
+        },
+      }),
+    (error) => error.kind === 'validation'
+  );
+});
+
 test('buildCreditVolReport matches Python', () => {
   const model = models.factor.credit.CreditFactorModel.fromJson(
     JSON.stringify(inputs.credit_model)

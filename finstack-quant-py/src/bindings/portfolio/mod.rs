@@ -19,6 +19,7 @@ pub(crate) mod matrix_input;
 mod optimization_spec;
 mod performance;
 mod pipeline;
+mod primitive;
 mod replay;
 mod scenario_pnl;
 mod schema;
@@ -77,6 +78,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     allocation::register(py, &m)?;
     replay::register(py, &m)?;
     factor_model::register(py, &m)?;
+    primitive::register(py, &m)?;
     sensitivity::register(py, &m)?;
     brinson::register(py, &m)?;
     fi_attribution::register(py, &m)?;
@@ -176,6 +178,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "FactorContributionDelta",
         "WhatIfResult",
         "StressResult",
+        "StressPnl",
+        "FactorModel",
         "PositionAssignment",
         "UnmatchedEntry",
         "FactorAssignmentReport",
@@ -185,6 +189,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "factor_stress",
         "position_what_if",
         "build_credit_vol_report",
+        "PortfolioPrimitiveExposureReport",
+        "primitive_exposures",
         "validate_allocation_json",
         // optimization spec/result classes (Slice 9)
         "WeightingScheme",

@@ -191,6 +191,32 @@ impl FactorModel {
         FactorModelBuilder::new()
     }
 
+    /// Build a factor model directly from a declarative configuration.
+    ///
+    /// Equivalent to `FactorModel::builder().config(config).build()`; this is
+    /// the entry point the Python and WASM `FactorModel` handles call.
+    ///
+    /// # Arguments
+    ///
+    /// * `config` - Factor definitions, covariance matrix (axes in factor
+    ///   order), dependency matching rules, pricing mode, bump sizes and risk
+    ///   measure. Validated before the model is assembled.
+    ///
+    /// # Returns
+    ///
+    /// A configured [`FactorModel`] ready to assign factors, compute
+    /// sensitivities, and decompose risk.
+    ///
+    /// # Errors
+    ///
+    /// Returns the [`FactorModelConfig::validate`] error when matching rules
+    /// reference undeclared factor IDs, the risk measure is invalid, or the
+    /// covariance axes do not align with the configured factors, and a
+    /// sensitivity-engine construction error for invalid bump settings.
+    pub fn from_config(config: FactorModelConfig) -> Result<Self> {
+        FactorModelBuilder::new().config(config).build()
+    }
+
     /// Borrow the factor definitions configured on the model.
     ///
     /// # Returns
@@ -1268,6 +1294,23 @@ pub(super) mod tests {
 
         let Err(error) = FactorModelBuilder::new().config(config).build() else {
             panic!("builder must validate matching factor IDs");
+        };
+        assert!(error.to_string().contains("MissingFactor"), "{error}");
+    }
+
+    #[test]
+    fn test_from_config_matches_builder_and_validates() {
+        let model = FactorModel::from_config(simple_config()).expect("valid config");
+        assert_eq!(model.factors().len(), simple_config().factors.len());
+
+        let mut config = simple_config();
+        config.matching = MatchingConfig::MappingTable(vec![MappingRule {
+            dependency_filter: DependencyFilter::default(),
+            attribute_filter: finstack_quant_models::factor::AttributeFilter::default(),
+            factor_id: FactorId::new("MissingFactor"),
+        }]);
+        let Err(error) = FactorModel::from_config(config) else {
+            panic!("from_config must validate matching factor IDs");
         };
         assert!(error.to_string().contains("MissingFactor"), "{error}");
     }

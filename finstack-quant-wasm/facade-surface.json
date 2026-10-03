@@ -3623,6 +3623,7 @@
   "portfolio": {
     "kind": "namespace",
     "keys": [
+      "FactorModel",
       "InstrumentArtifactCache",
       "Portfolio",
       "PortfolioBuilder",
@@ -3678,6 +3679,7 @@
       "portfolioValuationGetEntityValue",
       "portfolioValuationGetPositionValue",
       "positionWhatIf",
+      "primitiveExposures",
       "rebalanceFromSpec",
       "replayPortfolio",
       "scenarioPnl",
@@ -3705,6 +3707,20 @@
     "statics": ["builder", "fromMaterialization", "fromSpec", "validateMaterialization"],
     "methods": ["free", "numPositions", "toJson", "toSpec"],
     "getters": ["asOf", "baseCurrency", "entityIds", "id", "meta", "name", "positionIds", "tags"]
+  },
+  "portfolio.FactorModel": {
+    "kind": "class",
+    "statics": ["fromConfig"],
+    "methods": [
+      "analyze",
+      "assignFactors",
+      "computeSensitivities",
+      "factorStress",
+      "factorStressPnl",
+      "free",
+      "positionWhatIf"
+    ],
+    "getters": []
   },
   "portfolio.parsePortfolioSpecJson": {
     "kind": "function"
@@ -3842,6 +3858,9 @@
     "kind": "function"
   },
   "portfolio.buildCreditVolReport": {
+    "kind": "function"
+  },
+  "portfolio.primitiveExposures": {
     "kind": "function"
   },
   "portfolio.scenarioPnlBatch": {

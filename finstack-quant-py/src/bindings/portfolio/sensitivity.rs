@@ -34,7 +34,7 @@ pub(crate) struct PySensitivityMatrix {
 }
 
 impl PySensitivityMatrix {
-    fn from_inner(
+    pub(crate) fn from_inner(
         inner: finstack_quant_portfolio::sensitivity::SensitivityMatrix,
         base_currency: finstack_quant_core::currency::Currency,
     ) -> Self {

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Portfolio factor model and exposures (Python-binding audit PR 10)
+
+#### Added
+
+- Python and WASM: `FactorModel` handle on `finstack_quant.portfolio` / `portfolio.FactorModel` (Rust `FactorModel::from_config`), built once and reused for `assign_factors`, `compute_sensitivities`, `analyze`, `position_what_if`, `factor_stress` and the new P&L-only `factor_stress_pnl` (returns `StressPnl`).
+- Python and WASM: portfolio `primitive_exposures(portfolio, market, metrics)` / `portfolio.primitiveExposures` returns the composite look-through `PortfolioPrimitiveExposureReport` with net/gross aggregates per primitive instrument.
+
 ### Error kinds come from Rust (Python-binding audit PR 1)
 
 #### Changed (breaking)

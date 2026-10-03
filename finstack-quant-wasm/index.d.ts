@@ -240,6 +240,7 @@ import type {
   DurationCellTable,
   Entity,
   ExcessReturnResult,
+  FactorAssignmentReport,
   FactorBrinsonResult,
   FactorPnlProfile,
   FiAttributionResult,
@@ -252,6 +253,7 @@ import type {
   PortfolioAttribution,
   PortfolioCashflows,
   PortfolioMetrics,
+  PortfolioPrimitiveExposureReport,
   PositionChange,
   PositionMetrics,
   PositionSpec,
@@ -259,6 +261,7 @@ import type {
   ScenarioPnlBatchItem,
   ScenarioPnlView,
   SensitivityMatrixJson,
+  StressPnl,
   StressResult,
   TradeSpec,
   WeightAllocationResult,
@@ -443,6 +446,7 @@ export type {
   DurationCellTable,
   Entity,
   ExcessReturnResult,
+  FactorAssignmentReport,
   FactorBrinsonResult,
   FactorPnlProfile,
   FiAttributionResult,
@@ -455,6 +459,7 @@ export type {
   PortfolioAttribution,
   PortfolioCashflows,
   PortfolioMetrics,
+  PortfolioPrimitiveExposureReport,
   PositionChange,
   PositionMetrics,
   PositionSpec,
@@ -462,6 +467,7 @@ export type {
   ScenarioPnlBatchItem,
   ScenarioPnlView,
   SensitivityMatrixJson,
+  StressPnl,
   StressResult,
   TradeSpec,
   WeightAllocationResult,
@@ -749,6 +755,7 @@ export type {
   CreditCalibrator,
   CreditFactorModel,
   FactorCovarianceForecast,
+  FactorModel,
   InstrumentArtifactCache,
   LevelsAtDate,
   Performance,
@@ -829,6 +836,12 @@ interface FactorCovarianceForecast extends WasmOwned {}
  * avoids paying that cost twice.
  */
 interface Portfolio extends WasmOwned {}
+/**
+ * Portfolio factor-risk model built once from a `FactorModelConfig` and
+ * reused across assignment, sensitivity, decomposition, what-if and stress
+ * calls.
+ */
+interface FactorModel extends WasmOwned {}
 
 /**
  * ISO-4217 currency code wrapper for JavaScript.
@@ -33303,6 +33316,142 @@ declare class Portfolio {
 }
 
 /**
+ * Portfolio factor-risk model built once from a `FactorModelConfig`.
+ *
+ * Holds the factor definitions, covariance matrix, dependency matcher and
+ * sensitivity engine so repeated analyses reuse one validated model. Build
+ * it with `FactorModel.fromConfig`; call `free()` when done.
+ * @example
+ * ```typescript
+ * import init, { portfolio } from "finstack-quant-wasm";
+ * await init();
+ * const model = portfolio.FactorModel.fromConfig({
+ *   factors: [
+ *     {
+ *       id: "usd_rates",
+ *       factor_type: "rates",
+ *       market_mapping: { curve_parallel: { curve_ids: ["USD-OIS"], units: "rate_bp" } },
+ *     },
+ *   ],
+ *   covariance: { factor_ids: ["usd_rates"], n: 1, data: [0.0001] },
+ *   matching: {
+ *     mapping_table: [{ dependency_filter: {}, attribute_filter: {}, factor_id: "usd_rates" }],
+ *   },
+ *   pricing_mode: "full_repricing",
+ *   risk_measure: "variance",
+ * });
+ * model.free();
+ * ```
+ */
+declare class FactorModel {
+  private constructor();
+  /**
+   * Build a factor model from a declarative configuration.
+   * @param config - `FactorModelConfig` object or JSON: factor definitions, covariance matrix (axes in factor order), matching rules, pricing mode, bump sizes and risk measure.
+   * @returns A validated `FactorModel` handle.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `config` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `FactorModelConfig` schema, a matching rule names an undeclared factor, or the covariance axes do not align with the factors.
+   */
+  static fromConfig(config: FactorModelConfig | string): FactorModel;
+  /**
+   * Match every position's market dependencies to the configured factors.
+   *
+   * Returns the `FactorAssignmentReport`: per-position `assignments` and
+   * the `unmatched` dependencies.
+   * @param portfolio - Built portfolio whose instrument dependencies are mapped.
+   * @param market - `core.MarketContext` handle used to resolve credit-index aggregates.
+   * @returns The `FactorAssignmentReport`.
+   * @throws Error - Throws a `FinstackError` (kind `not_found`) if a referenced credit index is missing from `market`, and kind `validation` if the unmatched policy is strict and a dependency cannot be mapped.
+   */
+  assignFactors(portfolio: Portfolio, market: MarketContext): FactorAssignmentReport;
+  /**
+   * Compute the weighted position-by-factor sensitivity matrix.
+   *
+   * Returns the sensitivity-matrix wire object (`base_currency`,
+   * `position_ids`, `factor_ids`, `data` rows), the same shape
+   * `computeFactorSensitivities` returns and `decomposeFactorRisk` accepts.
+   * @param portfolio - Built portfolio; its base currency is the reporting currency of every sensitivity.
+   * @param market - `core.MarketContext` handle bumped by the sensitivity engine, including FX for cross-currency positions.
+   * @param asOf - ISO-8601 valuation date for sensitivities and spot FX.
+   * @returns The `SensitivityMatrixJson` object.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string, and a `FinstackError` if it is not an ISO date or factor assignment, sensitivity generation or FX conversion fails.
+   */
+  computeSensitivities(
+    portfolio: Portfolio,
+    market: MarketContext,
+    asOf: string
+  ): SensitivityMatrixJson;
+  /**
+   * Decompose portfolio risk into factor and residual contributions.
+   *
+   * Returns the `RiskDecomposition` in the configured risk measure's units.
+   * @param portfolio - Built portfolio to analyze.
+   * @param market - `core.MarketContext` handle used for sensitivity generation.
+   * @param asOf - ISO-8601 valuation date of the analysis.
+   * @returns The `RiskDecomposition`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `asOf` is not a string, and a `FinstackError` if it is not an ISO date or factor assignment, sensitivity or decomposition fails.
+   */
+  analyze(portfolio: Portfolio, market: MarketContext, asOf: string): RiskDecomposition;
+  /**
+   * Run a position remove/resize what-if against the model's baseline.
+   *
+   * Returns the `WhatIfResult`: the `before` and `after` risk
+   * decompositions and the per-factor `delta`.
+   * @param portfolio - Built portfolio the changes are applied to.
+   * @param market - `core.MarketContext` handle holding the curves, quotes and FX data.
+   * @param asOf - ISO-8601 valuation date.
+   * @param changes - Array of `PositionChange` objects: `{ kind: "remove", position_id }` or `{ kind: "resize", position_id, new_quantity }`.
+   * @returns The `WhatIfResult`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a `FinstackError` if the changes are malformed, `asOf` is not an ISO date, a change names an unknown position, or the analysis fails.
+   */
+  positionWhatIf(
+    portfolio: Portfolio,
+    market: MarketContext,
+    asOf: string,
+    changes: PositionChange[] | string
+  ): WhatIfResult;
+  /**
+   * Shock factors, reprice, and decompose risk under the stressed market.
+   *
+   * Returns the `StressResult`: base-currency `total_pnl`, per-position
+   * `position_pnl`, and the `stressed_decomposition`.
+   * @param portfolio - Built portfolio whose positions are revalued.
+   * @param market - `core.MarketContext` handle holding the unstressed market.
+   * @param asOf - ISO-8601 valuation date for both endpoints.
+   * @param stresses - Array of `[factorId, shift]` pairs; each shift is in the factor's configured market-mapping units.
+   * @returns The `StressResult`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a `FinstackError` if the stresses are malformed, `asOf` is not an ISO date, a stress names an unknown factor, or repricing or decomposition fails.
+   */
+  factorStress(
+    portfolio: Portfolio,
+    market: MarketContext,
+    asOf: string,
+    stresses: [string, number][] | string
+  ): StressResult;
+  /**
+   * Shock factors and reprice without decomposing stressed risk.
+   *
+   * Returns the `StressPnl`: base-currency `total_pnl` and per-position
+   * `position_pnl` (loss negative).
+   * @param portfolio - Built portfolio whose positions are revalued.
+   * @param market - `core.MarketContext` handle holding the unstressed market.
+   * @param asOf - ISO-8601 valuation date for both endpoints.
+   * @param stresses - Array of `[factorId, shift]` pairs; each shift is in the factor's configured market-mapping units.
+   * @returns The `StressPnl`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a `FinstackError` if the stresses are malformed, `asOf` is not an ISO date, a stress names an unknown factor, or repricing fails.
+   */
+  factorStressPnl(
+    portfolio: Portfolio,
+    market: MarketContext,
+    asOf: string,
+    stresses: [string, number][] | string
+  ): StressPnl;
+  /**
+   * Release the underlying wasm heap allocation. Do not use this handle after calling `free()`.
+   */
+  free(): void;
+}
+
+/**
  * Namespaced TypeScript entry points for portfolio calculations and types.
  * @example
  * ```typescript
@@ -33326,6 +33475,10 @@ export interface PortfolioNamespace {
    * Typed handle for cached portfolio builds.
    */
   Portfolio: typeof Portfolio;
+  /**
+   * Stateful portfolio factor-risk model handle built from a `FactorModelConfig`.
+   */
+  FactorModel: typeof FactorModel;
   /**
    * Parse and validate a portfolio specification from JSON.
    *
@@ -34025,6 +34178,26 @@ export interface PortfolioNamespace {
     asOf: string,
     changes: PositionChange[] | string
   ): WhatIfResult;
+  /**
+   * Decompose every portfolio position into primitive economic exposures.
+   *
+   * Direct instruments yield one primitive path; composite positions recurse
+   * through their frozen resolved leg quantities. The position quantity scales
+   * every primitive quantity, value and additive risk amount. Returns the
+   * `PortfolioPrimitiveExposureReport`: `base_currency`, position-aware
+   * `paths` and per-instrument net/gross `aggregates`, all in the portfolio
+   * base currency.
+   * @param portfolio - Built portfolio whose direct and composite positions are decomposed.
+   * @param market - `core.MarketContext` handle with the complete valuation and FX market.
+   * @param metrics - Array of additive metric ids (e.g. `"dv01"`); pass `[]` for quantity and value only.
+   * @returns The `PortfolioPrimitiveExposureReport`.
+   * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `metrics` is not an array or JSON string, and a `FinstackError` if a metric id is not canonical or is non-additive, primitive definitions conflict across positions, a composite is invalid, or market data or FX is missing.
+   */
+  primitiveExposures(
+    portfolio: Portfolio,
+    market: MarketContext,
+    metrics: string[] | string
+  ): PortfolioPrimitiveExposureReport;
   /**
    * Build a credit volatility report from a risk decomposition and a credit factor model.
    *

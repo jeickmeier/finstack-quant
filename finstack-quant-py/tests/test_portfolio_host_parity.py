@@ -22,11 +22,15 @@ from typing import Any
 import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
-from finstack_quant.models.factor.credit import CreditFactorModel
+from finstack_quant.models.factor.credit import CreditFactorModel, FactorModelConfig
 from finstack_quant.models.factor.risk import RiskDecomposition
 from finstack_quant.portfolio import (
+    FactorAssignmentReport,
+    FactorModel,
     Portfolio,
     PortfolioError,
+    SensitivityMatrix,
+    StressPnl,
     aggregate_metrics,
     allocate_weights,
     attribute_portfolio_pnl,
@@ -291,3 +295,54 @@ def test_require_metric_and_what_if_errors_come_from_rust() -> None:
             fixture["as_of_t0"],
             [{"kind": "remove", "position_id": "NOPE"}],
         )
+
+
+def test_factor_model_handle_matches_the_shared_host_parity_fixture() -> None:
+    """PORT-007: one FactorModel handle serves every engine method in Rust."""
+    fixture = json.loads(FIXTURE.read_text())
+    inputs, expected = fixture["inputs"], fixture["expected"]
+    portfolio = Portfolio.from_spec(json.dumps(inputs["portfolio_spec"]))
+    market = MarketContext.from_json(json.dumps(inputs["market_t0"]))
+    as_of = inputs["as_of_t0"]
+    stresses = [tuple(pair) for pair in inputs["stresses"]]
+
+    model = FactorModel.from_config(json.dumps(inputs["factor_model_config"]))
+    typed = FactorModel.from_config(FactorModelConfig.from_json(json.dumps(inputs["factor_model_config"])))
+
+    what_if = model.position_what_if(portfolio, market, as_of, inputs["changes"])
+    _assert_close(json.loads(what_if.to_json()), expected["position_what_if"])
+    stress = typed.factor_stress(portfolio, market, as_of, stresses)
+    _assert_close(json.loads(stress.to_json()), expected["factor_stress"])
+
+    decomposition = model.analyze(portfolio, market, as_of)
+    _assert_close(json.loads(decomposition.to_json()), expected["position_what_if"]["before"])
+
+    pnl = model.factor_stress_pnl(portfolio, market, as_of, stresses)
+    assert isinstance(pnl, StressPnl)
+    _assert_close(
+        json.loads(pnl.to_json()),
+        {
+            "total_pnl": expected["factor_stress"]["total_pnl"],
+            "position_pnl": expected["factor_stress"]["position_pnl"],
+        },
+    )
+    assert StressPnl.from_json(pnl.to_json()).position_pnl == pnl.position_pnl
+    assert list(pnl.to_dataframe().columns) == ["position_id", "pnl"]
+
+    report = model.assign_factors(portfolio, market)
+    assert isinstance(report, FactorAssignmentReport)
+    assert [row.position_id for row in report.assignments] == ["POS-0", "POS-1"]
+    assert report.unmatched == []
+
+    matrix = model.compute_sensitivities(portfolio, market, as_of)
+    assert isinstance(matrix, SensitivityMatrix)
+    assert json.loads(matrix.to_json())["position_ids"] == ["POS-0", "POS-1"]
+
+    with pytest.raises(PortfolioError, match="Unknown factor"):
+        model.factor_stress_pnl(portfolio, market, as_of, [("nope", 1.0)])
+    bad = dict(inputs["factor_model_config"])
+    bad["matching"] = {"mapping_table": [{"dependency_filter": {}, "attribute_filter": {}, "factor_id": "missing"}]}
+    with pytest.raises(ValueError, match="missing"):
+        FactorModel.from_config(json.dumps(bad))
+    with pytest.raises(ValueError, match="invalid FactorModelConfig JSON"):
+        FactorModel.from_config("{")

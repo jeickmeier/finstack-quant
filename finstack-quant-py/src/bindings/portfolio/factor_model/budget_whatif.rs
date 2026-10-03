@@ -16,7 +16,7 @@ use super::contributions::PyRiskDecomposition;
 
 /// Deserialize what-if position changes straight into the canonical Rust
 /// `PositionChange` wire shape (`{"kind": "remove" | "resize", ...}`).
-fn parse_position_changes(
+pub(super) fn parse_position_changes(
     py: Python<'_>,
     changes: &Bound<'_, PyAny>,
 ) -> PyResult<Vec<fm::PositionChange>> {
@@ -359,7 +359,7 @@ pub(super) struct PyWhatIfResult {
 }
 
 impl PyWhatIfResult {
-    fn from_inner(inner: WhatIfResult) -> Self {
+    pub(super) fn from_inner(inner: WhatIfResult) -> Self {
         Self { inner }
     }
 }
