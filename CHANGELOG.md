@@ -19,6 +19,15 @@
 
 - Targets return their produced curves or scalar directly, and the runtime installs each product once. Concrete instrument builders, canonical model functions, cache interfaces and decoded recipe bindings replace redundant type erasure, bypasses and repeated computations.
 
+### Features API simplification
+
+#### Changed (breaking)
+
+- Rust feature transforms now take `TimeSeriesOp`, `CrossSectionalOp`, or `PairwiseOp` at their canonical entry points; the redundant string wrappers and `*_with_op` names are removed. Python and WASM convert operation names at the binding boundary.
+- `neutralize_and_zscore` / `neutralizeAndZscore` no longer accepts `params`; OLS always includes an intercept before standardizing residuals.
+- Pandas feature helpers require `op`, `groups`, `exposures`, and `volatility` as keyword arguments where those inputs follow optional key selectors. Operation annotations accept strings or the matching operation enum only; WASM declarations use the corresponding generated selector union.
+- Feature parameters are resolved once per call, rolling statistics share one window driver, and OLS filters complete observations once while preserving numerical results and missing-data behavior.
+
 ### Instrument envelope is a value (Python-binding audit FUP-003)
 
 #### Changed (breaking)

@@ -7,6 +7,9 @@ import {
   scenarios,
   type AttributionFactor,
   type FactorBrinsonResult,
+  type CrossSectionalOp,
+  type PairwiseOp,
+  type TimeSeriesOp,
   type HorizonReport,
   type MaterializationPhases,
   type MaterializationReport,
@@ -119,6 +122,27 @@ features.rankToWeights([1, 2], ['d', 'd']);
 features.riskScaledWeights([1, -1], ['d', 'd'], [0.1, 0.1], {});
 // @ts-expect-error This helper does not accept transform parameters.
 features.rankToWeights([1, 2], ['d', 'd'], {});
+
+const timeSeriesOp: TimeSeriesOp = 'diff';
+const crossSectionalOp: CrossSectionalOp = 'zscore';
+const pairwiseOp: PairwiseOp = 'rolling_corr';
+features.transformTimeseries([1, 2], ['a', 'a'], ['1', '2'], timeSeriesOp);
+features.transformCrossSectional([1, 2], ['d', 'd'], crossSectionalOp);
+features.transformCrossSectionalGrouped([1, 2], ['d', 'd'], ['g', 'g'], crossSectionalOp);
+features.transformTimeseriesPairwise([1, 2], [2, 3], ['a', 'a'], ['1', '2'], pairwiseOp);
+features.neutralizeAndZscore([1, 0, 0], ['d', 'd', 'd'], [[1, 2, 3]]);
+// @ts-expect-error Time-series transforms reject operation-name misspellings.
+features.transformTimeseries([1, 2], ['a', 'a'], ['1', '2'], 'rolling_meen');
+// @ts-expect-error Cross-sectional selectors belong to their own operation family.
+features.transformTimeseries([1, 2], ['a', 'a'], ['1', '2'], 'zscore');
+// @ts-expect-error Cross-sectional transforms reject time-series selectors.
+features.transformCrossSectional([1, 2], ['d', 'd'], 'returns');
+// @ts-expect-error Grouped cross-sectional transforms reject pairwise selectors.
+features.transformCrossSectionalGrouped([1, 2], ['d', 'd'], ['g', 'g'], 'rolling_corr');
+// @ts-expect-error Pairwise transforms reject single-series selectors.
+features.transformTimeseriesPairwise([1, 2], [2, 3], ['a', 'a'], ['1', '2'], 'rolling_mean');
+// @ts-expect-error Neutralization and z-scoring always include an intercept; no parameters exist.
+features.neutralizeAndZscore([1, 0, 0], ['d', 'd', 'd'], [[1, 2, 3]], { fit_intercept: false });
 
 // Native output retains generated nested shapes and stricter emitted-field presence.
 declare const valuation: ValuationResult;

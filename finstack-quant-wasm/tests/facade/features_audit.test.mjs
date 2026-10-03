@@ -52,13 +52,8 @@ test('rank, scale and regression invariants survive the published facade', () =>
     features.neutralizeAndZscore([3, 5, 7], ['d', 'd', 'd'], [[1, 2, 3]]),
     [0, 0, 0]
   );
-  assert.throws(
-    () =>
-      features.neutralizeAndZscore([1, 0, 0], ['d', 'd', 'd'], [[1, 2, 3]], {
-        fit_intercept: false,
-      }),
-    validation
-  );
+  const scored = features.neutralizeAndZscore([1, 0, 0], ['d', 'd', 'd'], [[1, 2, 3]]);
+  scored.forEach((value, i) => close(value, [Math.SQRT1_2, -Math.SQRT2, Math.SQRT1_2][i]));
 });
 
 test('weights enforce positive risk, final caps and neutrality', () => {

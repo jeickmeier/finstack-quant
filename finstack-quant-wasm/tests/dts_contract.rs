@@ -1249,15 +1249,15 @@ fn features_dts_matches_transform_surface() {
     assert!(dts.contains("export type FeatureValue = number | null;"));
     assert!(contains_signature(
         features,
-        "transformTimeseries(values: FeatureValue[], entity: string[], order: string[], op: string, params?: FeatureParams | null): FeatureValue[];"
+        "transformTimeseries(values: FeatureValue[], entity: string[], order: string[], op: TimeSeriesOp, params?: FeatureParams | null): FeatureValue[];"
     ));
     assert!(contains_signature(
         features,
-        "transformCrossSectional(values: FeatureValue[], timeKey: string[], op: string, params?: FeatureParams | null): FeatureValue[];"
+        "transformCrossSectional(values: FeatureValue[], timeKey: string[], op: CrossSectionalOp, params?: FeatureParams | null): FeatureValue[];"
     ));
     assert!(contains_signature(
         features,
-        "transformCrossSectionalGrouped(values: FeatureValue[], timeKey: string[], groups: string[], op: string, params?: FeatureParams | null): FeatureValue[];"
+        "transformCrossSectionalGrouped(values: FeatureValue[], timeKey: string[], groups: string[], op: CrossSectionalOp, params?: FeatureParams | null): FeatureValue[];"
     ));
     assert!(contains_signature(
         features,
@@ -1265,7 +1265,7 @@ fn features_dts_matches_transform_surface() {
     ));
     assert!(contains_signature(
         features,
-        "transformTimeseriesPairwise(values: FeatureValue[], other: FeatureValue[], entity: string[], order: string[], op: string, params?: FeatureParams | null): FeatureValue[];"
+        "transformTimeseriesPairwise(values: FeatureValue[], other: FeatureValue[], entity: string[], order: string[], op: PairwiseOp, params?: FeatureParams | null): FeatureValue[];"
     ));
     assert!(contains_signature(
         features,
@@ -1281,7 +1281,7 @@ fn features_dts_matches_transform_surface() {
     ));
     assert!(contains_signature(
         features,
-        "neutralizeAndZscore(values: FeatureValue[], timeKey: string[], exposures: FeatureValue[][], params?: FeatureParams | null): FeatureValue[];"
+        "neutralizeAndZscore(values: FeatureValue[], timeKey: string[], exposures: FeatureValue[][]): FeatureValue[];"
     ));
     assert!(contains_signature(
         features,

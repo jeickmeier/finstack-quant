@@ -54,7 +54,7 @@ def test_panel_nonfinite_input_and_output_policies_match_direct_calls() -> None:
     frame = pd.DataFrame({"v": values, "t": ["d"] * 5})
     pd.testing.assert_series_equal(
         fd.panel(frame, "v", operations, time_key="t")["rank"],
-        fd.cross_sectional(frame, "v", "t", "rank"),
+        fd.cross_sectional(frame, "v", "t", op="rank"),
         check_names=False,
     )
     spec = {
@@ -86,8 +86,8 @@ def test_scaled_statistics_and_exact_fit_neutralization() -> None:
             1 / 6,
         ])
     assert f.neutralize_and_zscore([3.0, 5.0, 7.0], ["d"] * 3, [[1.0, 2.0, 3.0]]) == [0.0] * 3
-    with pytest.raises(ValueError, match="fit_intercept"):
-        f.neutralize_and_zscore([1.0, 0.0, 0.0], ["d"] * 3, [[1.0, 2.0, 3.0]], {"fit_intercept": False})
+    with pytest.raises(TypeError):
+        f.neutralize_and_zscore([1.0, 0.0, 0.0], ["d"] * 3, [[1.0, 2.0, 3.0]], params={"fit_intercept": False})
 
 
 def test_risk_weights_and_caps_enforce_their_economic_constraints() -> None:

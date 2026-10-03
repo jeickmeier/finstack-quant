@@ -14,7 +14,13 @@ fn ts(
     params: Value,
 ) -> finstack_quant_core::Result<Vec<Option<f64>>> {
     let (entity, order) = keys(values.len());
-    transform_timeseries(values, &entity, &order, op, Some(&params))
+    transform_timeseries(
+        values,
+        &entity,
+        &order,
+        op.parse().expect("valid operation"),
+        Some(&params),
+    )
 }
 fn close(actual: f64, expected: f64) {
     assert!(
@@ -42,8 +48,20 @@ fn dimensionless_features_do_not_depend_on_measurement_units() {
             "minmax_scale",
             "long_short_weights",
         ] {
-            let actual = transform_cross_sectional(&values, &entity, op, None).unwrap();
-            let expected = transform_cross_sectional(&base, &entity, op, None).unwrap();
+            let actual = transform_cross_sectional(
+                &values,
+                &entity,
+                op.parse().expect("valid operation"),
+                None,
+            )
+            .unwrap();
+            let expected = transform_cross_sectional(
+                &base,
+                &entity,
+                op.parse().expect("valid operation"),
+                None,
+            )
+            .unwrap();
             for (a, b) in actual.iter().zip(expected) {
                 close(a.unwrap(), b.unwrap());
             }
@@ -53,7 +71,7 @@ fn dimensionless_features_do_not_depend_on_measurement_units() {
             &values,
             &entity,
             &order,
-            "rolling_corr",
+            PairwiseOp::RollingCorr,
             Some(&json!({"window":4})),
         )
         .unwrap();
@@ -63,7 +81,7 @@ fn dimensionless_features_do_not_depend_on_measurement_units() {
             &values,
             &entity,
             &order,
-            "rolling_beta",
+            PairwiseOp::RollingBeta,
             Some(&json!({"window":4})),
         )
         .unwrap();
@@ -105,11 +123,21 @@ fn invalid_parameters_fail_before_any_window_is_ready() {
             ("cap_weights", json!({"max_abs":0})),
             ("clip", json!({"lower":2,"upper":1})),
         ] {
-            assert!(transform_cross_sectional(&values, &time, op, Some(&params)).is_err());
-            assert!(
-                transform_cross_sectional_grouped(&values, &time, &time, op, Some(&params))
-                    .is_err()
-            );
+            assert!(transform_cross_sectional(
+                &values,
+                &time,
+                op.parse().expect("valid operation"),
+                Some(&params)
+            )
+            .is_err());
+            assert!(transform_cross_sectional_grouped(
+                &values,
+                &time,
+                &time,
+                op.parse().expect("valid operation"),
+                Some(&params)
+            )
+            .is_err());
         }
     }
 }
@@ -177,7 +205,7 @@ fn rolling_windows_and_slope_preserve_row_gaps() {
             &values,
             &entity,
             &order,
-            "rolling_corr",
+            PairwiseOp::RollingCorr,
             Some(&json!({"window":2}))
         )
         .unwrap(),
@@ -189,7 +217,7 @@ fn rolling_windows_and_slope_preserve_row_gaps() {
             &values,
             &entity,
             &order,
-            "rolling_corr",
+            PairwiseOp::RollingCorr,
             Some(&json!({"window":3,"min_periods":2})),
         )
         .unwrap()[2]
@@ -213,7 +241,9 @@ fn signed_zero_never_creates_a_rank_signal() {
         "normal_score_transform",
         "quantile_bucket",
     ] {
-        let result = transform_cross_sectional(&values, &time, op, None).unwrap();
+        let result =
+            transform_cross_sectional(&values, &time, op.parse().expect("valid operation"), None)
+                .unwrap();
         assert_eq!(result[0], result[1]);
     }
     assert_eq!(
@@ -243,14 +273,8 @@ fn ols_residuals_are_invariant_to_exposure_units() {
 fn standardized_residuals_preserve_neutrality_and_do_not_amplify_roundoff() {
     let (time, _) = keys(3);
     let x = vec![vec![Some(1.), Some(2.), Some(3.)]];
-    assert!(neutralize_and_zscore(
-        &[Some(1.), Some(0.), Some(0.)],
-        &time,
-        &x,
-        Some(&json!({"fit_intercept":false}))
-    )
-    .is_err());
-    let residual = neutralize_and_zscore(&[Some(1.), Some(0.), Some(0.)], &time, &x, None).unwrap();
+
+    let residual = neutralize_and_zscore(&[Some(1.), Some(0.), Some(0.)], &time, &x).unwrap();
     close(residual.iter().map(|v| v.unwrap()).sum(), 0.);
     close(
         residual
@@ -261,7 +285,7 @@ fn standardized_residuals_preserve_neutrality_and_do_not_amplify_roundoff() {
         0.,
     );
     assert_eq!(
-        neutralize_and_zscore(&[Some(3.), Some(5.), Some(7.)], &time, &x, None).unwrap(),
+        neutralize_and_zscore(&[Some(3.), Some(5.), Some(7.)], &time, &x).unwrap(),
         vec![Some(0.); 3]
     );
 }
@@ -273,7 +297,7 @@ fn final_weight_caps_preserve_neutrality_and_reject_infeasible_allocations() {
     let result = transform_cross_sectional(
         &[Some(-10.), Some(-1.), Some(1.), Some(10.)],
         &time,
-        "cap_weights",
+        CrossSectionalOp::CapWeights,
         Some(&params),
     )
     .unwrap();
@@ -286,12 +310,18 @@ fn final_weight_caps_preserve_neutrality_and_reject_infeasible_allocations() {
     assert!(transform_cross_sectional(
         &[Some(-1.), Some(1.)],
         &time[..2],
-        "cap_weights",
+        CrossSectionalOp::CapWeights,
         Some(&params)
     )
     .is_err());
     assert_eq!(
-        transform_cross_sectional(&[Some(2.); 4], &time, "cap_weights", Some(&params)).unwrap(),
+        transform_cross_sectional(
+            &[Some(2.); 4],
+            &time,
+            CrossSectionalOp::CapWeights,
+            Some(&params)
+        )
+        .unwrap(),
         vec![Some(0.); 4]
     );
     assert!(
@@ -316,7 +346,7 @@ fn finite_results_survive_json_and_overflow_is_an_error() {
     let (time, _) = keys(2);
     let opposite = [Some(-1e308), Some(1e308)];
     assert_eq!(
-        transform_cross_sectional(&opposite, &time, "zscore", None).unwrap(),
+        transform_cross_sectional(&opposite, &time, CrossSectionalOp::Zscore, None).unwrap(),
         vec![Some(-1.), Some(1.)]
     );
     assert_eq!(
@@ -342,4 +372,22 @@ fn ewma_vol_is_bit_identical_across_build_targets() {
     ];
     let bits = |v: &[Option<f64>]| v.iter().map(|x| x.map(f64::to_bits)).collect::<Vec<_>>();
     assert_eq!(bits(&vol), bits(&expected), "{vol:?}");
+}
+
+#[test]
+fn rolling_regression_requires_the_configured_complete_row_count() {
+    let (entity, order) = keys(5);
+    let values = [Some(1.), Some(4.), None, Some(5.), Some(8.)];
+    let exposures = [vec![Some(1.), Some(2.), Some(3.), Some(4.), Some(5.)]];
+    let params = json!({"window": 5, "min_periods": 4});
+    let residual =
+        rolling_regression_residual(&values, &exposures, &entity, &order, Some(&params)).unwrap();
+    assert_eq!(&residual[..4], &[None, None, None, None]);
+    close(residual[4].unwrap(), 0.5);
+    let singular = [vec![Some(1.); 5]];
+    assert_eq!(
+        rolling_regression_residual(&values, &singular, &entity, &order, Some(&params)).unwrap(),
+        vec![None; 5]
+    );
+    assert!(neutralize(&values, &entity, &singular, None).is_err());
 }

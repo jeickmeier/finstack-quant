@@ -10706,18 +10706,18 @@ export interface FeaturesNamespace {
    * Aggregates may emit at missing rows. EWMA span must be at least 1; mature
    * constant series have zero volatility. String keys need consistent UTC and precision.
    * @returns Transformed values aligned one-for-one with the input `values` rows.
-   * @param values - Numeric observations in the shape and order required by the selected transformation.
-   * @param entity - Entity identifier used to group ordered time-series observations.
-   * @param order - Observation-order key used to sort each entity time series.
-   * @param op - Transformation operation identifier supported by the feature-engineering API.
-   * @param params - Operation-specific parameter object. `rolling_sharpe` accepts optional `risk_free` (default `0.0`, same units as the return series).
+   * @param values - Numeric observations aligned with the key columns; null and non-finite inputs are missing.
+   * @param entity - String entity identifiers grouping observations into independent time series.
+   * @param order - Lexicographic order keys within each entity; temporal keys require a common timezone and fixed precision.
+   * @param op - Snake_case TimeSeriesOp selector accepted by timeSeriesOpValues; parsed by the canonical Rust enum.
+   * @param params - Optional operation parameters; omitted or null uses Rust defaults and unknown keys fail validation. `rolling_sharpe` accepts optional `risk_free` (default `0.0`) in the same units as the input return series, with no annualization.
    * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal row counts, an unsupported `op`, malformed operation parameters, non-finite arithmetic, or a result that cannot be serialized to JavaScript.
    */
   transformTimeseries(
     values: FeatureValue[],
     entity: string[],
     order: string[],
-    op: string,
+    op: TimeSeriesOp,
     params?: FeatureParams | null
   ): FeatureValue[];
   /**
@@ -10725,33 +10725,33 @@ export interface FeaturesNamespace {
    * cap_weights constrains final absolute weights with zero net and unit gross
    * exposure, preserving centered-signal signs; infeasible caps fail.
    * @returns Transformed values aligned one-for-one with the input `values` rows.
-   * @param values - Numeric observations in the shape and order required by the selected transformation.
-   * @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
-   * @param op - Transformation operation identifier supported by the feature-engineering API.
-   * @param params - Operation-specific parameter object defining transformation settings.
+   * @param values - Numeric observations aligned with time_key; null and non-finite inputs are missing.
+   * @param timeKey - String partition keys; equal keys select the same cross-section.
+   * @param op - Snake_case CrossSectionalOp selector accepted by crossSectionalOpValues; parsed by the canonical Rust enum.
+   * @param params - Optional operation parameters; omitted or null uses Rust defaults and unknown keys fail validation.
    * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal `values` and `time_key` lengths, an unsupported `op`, malformed operation parameters, non-finite arithmetic, or a result that cannot be serialized to JavaScript.
    */
   transformCrossSectional(
     values: FeatureValue[],
     timeKey: string[],
-    op: string,
+    op: CrossSectionalOp,
     params?: FeatureParams | null
   ): FeatureValue[];
   /**
    * Transform a cross-section within each time/group sub-partition.
    * @returns Transformed values aligned one-for-one with the input `values` rows.
-   * @param values - Numeric observations in the shape and order required by the selected transformation.
-   * @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
-   * @param groups - Group labels aligned with values for within-group cross-sectional operations.
-   * @param op - Transformation operation identifier supported by the feature-engineering API.
-   * @param params - Operation-specific parameter object defining transformation settings.
+   * @param values - Numeric observations aligned with both key columns; null and non-finite inputs are missing.
+   * @param timeKey - String timestamp partition keys; equal keys select the same cross-section.
+   * @param groups - String subgroup labels aligned with values; transforms run independently for each time_key and group pair.
+   * @param op - Snake_case CrossSectionalOp selector accepted by crossSectionalOpValues; parsed by the canonical Rust enum.
+   * @param params - Optional operation parameters; omitted or null uses Rust defaults and unknown keys fail validation.
    * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal `values`, `time_key`, and `groups` lengths, an unsupported `op`, malformed operation parameters, or a result that cannot be serialized to JavaScript.
    */
   transformCrossSectionalGrouped(
     values: FeatureValue[],
     timeKey: string[],
     groups: string[],
-    op: string,
+    op: CrossSectionalOp,
     params?: FeatureParams | null
   ): FeatureValue[];
   /**
@@ -10772,12 +10772,12 @@ export interface FeaturesNamespace {
   /**
    * Transform two time-series panel columns per entity.
    * @returns Transformed values aligned one-for-one with the input `values` rows.
-   * @param values - Numeric observations in the shape and order required by the selected transformation.
-   * @param other - Second value series aligned with the primary series for a pairwise transformation.
-   * @param entity - Entity identifier used to group ordered time-series observations.
-   * @param order - Lexicographic observation-order key; use ISO-8601 for calendar chronology.
-   * @param op - Transformation operation identifier supported by the feature-engineering API.
-   * @param params - Operation-specific parameter object. `window` counts rows including gaps; `min_periods <= window` counts complete pairs.
+   * @param values - Primary numeric observations aligned with other and both key columns; null and non-finite inputs are missing.
+   * @param other - Second numeric observation column; rolling windows retain only complete finite pairs.
+   * @param entity - String entity identifiers grouping observations into independent time series.
+   * @param order - Lexicographic order keys within each entity; temporal keys require a common timezone and fixed precision.
+   * @param op - Snake_case PairwiseOp selector accepted by pairwiseOpValues; parsed by the canonical Rust enum.
+   * @param params - Optional rolling parameters; window counts entity rows, min_periods counts complete pairs and cannot exceed window.
    * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal row counts, an unsupported `op`, non-positive or non-integer `window` or `min_periods` parameters, or a result that cannot be serialized to JavaScript.
    */
   transformTimeseriesPairwise(
@@ -10785,7 +10785,7 @@ export interface FeaturesNamespace {
     other: FeatureValue[],
     entity: string[],
     order: string[],
-    op: string,
+    op: PairwiseOp,
     params?: FeatureParams | null
   ): FeatureValue[];
   /**
@@ -10830,19 +10830,18 @@ export interface FeaturesNamespace {
   rankToWeights(values: FeatureValue[], timeKey: string[]): FeatureValue[];
   /**
    * Neutralize a signal and z-score residuals.
-   * fit_intercept must be true (the default) to preserve exposure neutrality.
+   * Equal-weighted OLS always includes an intercept so z-scoring preserves
+   * neutrality to the supplied exposures.
    * @returns Transformed values aligned one-for-one with the input `values` rows.
-   * @param values - Numeric observations in the shape and order required by the selected transformation.
-   * @param timeKey - Cross-sectional time key shared by values evaluated in the same slice.
-   * @param exposures - Factor-exposure matrix aligned with the supplied observations.
-   * @param params - Operation-specific parameter object defining transformation settings.
-   * @throws Error - Rejects values that cannot be decoded into the declared arrays or JSON parameters, unequal row counts, exposure columns whose lengths differ from `values`, a false or non-boolean `fit_intercept`, or a result that cannot be serialized to JavaScript.
+   * @param values - Numeric signal observations, with null or non-finite inputs treated as missing, aligned with the partition and exposure columns.
+   * @param timeKey - String partition keys grouping observations into independent cross-sections; exact equal strings select the same partition.
+   * @param exposures - Column-major numeric factor exposures, each column aligned with `values`; rows missing any exposure are excluded from the fit.
+   * @throws Error - Rejects inputs that cannot be decoded into the declared arrays, unequal row counts, exposure columns whose lengths differ from `values`, a singular or underdetermined cross-section, non-finite arithmetic, or a result that cannot be serialized to JavaScript.
    */
   neutralizeAndZscore(
     values: FeatureValue[],
     timeKey: string[],
-    exposures: FeatureValue[][],
-    params?: FeatureParams | null
+    exposures: FeatureValue[][]
   ): FeatureValue[];
   /**
    * Apply a JSON panel transform pipeline.

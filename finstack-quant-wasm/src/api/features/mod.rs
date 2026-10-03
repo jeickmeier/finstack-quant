@@ -8,6 +8,7 @@ use crate::utils::input::{
     from_js_json, js_nullable_f64_matrix, js_nullable_f64_seq, js_string, js_string_seq, json_text,
 };
 use crate::utils::{to_js_err, to_js_value};
+use finstack_quant_features::{CrossSectionalOp, PairwiseOp, TimeSeriesOp};
 use serde_json::Value;
 use wasm_bindgen::prelude::*;
 
@@ -27,16 +28,20 @@ pub mod panel;
 /// `analytics` Sharpe. Optional JSON `risk_free` defaults to `0.0` in the same
 /// units as the return series.
 ///
+/// # Arguments
+///
+/// * `values` - Numeric observations aligned with the key columns; null and non-finite inputs are missing.
+/// * `entity` - String entity identifiers grouping observations into independent time series.
+/// * `order` - Lexicographic order keys within each entity; temporal keys require a common timezone and fixed precision.
+/// * `op` - Snake_case TimeSeriesOp selector accepted by timeSeriesOpValues; parsed by the canonical Rust enum.
+/// * `params` - Optional operation parameters; omitted or null uses Rust defaults and unknown keys fail validation.
+///   `rolling_sharpe` accepts optional `risk_free` (default `0.0`) in the same units as the input return series, with no annualization.
+///
 /// # Errors
 ///
 /// Rejects values that cannot be decoded into the declared arrays or JSON
 /// parameters, unequal row counts, an unsupported `op`, malformed operation
 /// parameters, non-finite arithmetic, or a result that cannot be serialized to JavaScript.
-/// @param values - Numeric observations in the shape and order required by the selected transformation.
-/// @param entity - Entity identifier used to group ordered time-series observations.
-/// @param order - Observation-order key used to sort each entity time series.
-/// @param op - Transformation operation identifier supported by the feature-engineering API.
-/// @param params - Operation-specific parameter object. `rolling_sharpe` accepts optional `risk_free` (default `0.0`, same units as the return series).
 #[wasm_bindgen(js_name = transformTimeseries)]
 pub fn transform_timeseries(
     values: JsValue,
@@ -45,7 +50,7 @@ pub fn transform_timeseries(
     op: JsValue,
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let op: &str = &js_string(&op, "op")?;
+    let op: TimeSeriesOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
     let values = js_nullable_f64_seq(&values, "values")?;
     let entity = js_string_seq(&entity, "entity")?;
     let order = js_string_seq(&order, "order")?;
@@ -67,16 +72,19 @@ pub fn transform_timeseries(
 /// Each demeaned-signal side must support gross 0.5 at the cap; otherwise it
 /// fails. Constant signals produce zero weights. Signed zeros always tie.
 ///
+/// # Arguments
+///
+/// * `values` - Numeric observations aligned with time_key; null and non-finite inputs are missing.
+/// * `time_key` - String partition keys; equal keys select the same cross-section.
+/// * `op` - Snake_case CrossSectionalOp selector accepted by crossSectionalOpValues; parsed by the canonical Rust enum.
+/// * `params` - Optional operation parameters; omitted or null uses Rust defaults and unknown keys fail validation.
+///
 /// # Errors
 ///
 /// Rejects values that cannot be decoded into the declared arrays or JSON
 /// parameters, unequal `values` and `time_key` lengths, an unsupported `op`,
 /// malformed operation parameters, non-finite arithmetic, or a result that cannot be serialized to
 /// JavaScript.
-/// @param values - Numeric observations in the shape and order required by the selected transformation.
-/// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
-/// @param op - Transformation operation identifier supported by the feature-engineering API.
-/// @param params - Operation-specific parameter object defining transformation settings.
 #[wasm_bindgen(js_name = transformCrossSectional)]
 pub fn transform_cross_sectional(
     values: JsValue,
@@ -84,7 +92,7 @@ pub fn transform_cross_sectional(
     op: JsValue,
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let op: &str = &js_string(&op, "op")?;
+    let op: CrossSectionalOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
     let values = js_nullable_f64_seq(&values, "values")?;
     let time_key = js_string_seq(&time_key, "timeKey")?;
     let params = parse_params(params)?;
@@ -96,17 +104,20 @@ pub fn transform_cross_sectional(
 
 /// Transform a cross-section within each time/group sub-partition.
 ///
+/// # Arguments
+///
+/// * `values` - Numeric observations aligned with both key columns; null and non-finite inputs are missing.
+/// * `time_key` - String timestamp partition keys; equal keys select the same cross-section.
+/// * `groups` - String subgroup labels aligned with values; transforms run independently for each time_key and group pair.
+/// * `op` - Snake_case CrossSectionalOp selector accepted by crossSectionalOpValues; parsed by the canonical Rust enum.
+/// * `params` - Optional operation parameters; omitted or null uses Rust defaults and unknown keys fail validation.
+///
 /// # Errors
 ///
 /// Rejects values that cannot be decoded into the declared arrays or JSON
 /// parameters, unequal `values`, `time_key`, and `groups` lengths, an
 /// unsupported `op`, malformed operation parameters, or a result that cannot
 /// be serialized to JavaScript.
-/// @param values - Numeric observations in the shape and order required by the selected transformation.
-/// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
-/// @param groups - Group labels aligned with values for within-group cross-sectional operations.
-/// @param op - Transformation operation identifier supported by the feature-engineering API.
-/// @param params - Operation-specific parameter object defining transformation settings.
 #[wasm_bindgen(js_name = transformCrossSectionalGrouped)]
 pub fn transform_cross_sectional_grouped(
     values: JsValue,
@@ -115,7 +126,7 @@ pub fn transform_cross_sectional_grouped(
     op: JsValue,
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let op: &str = &js_string(&op, "op")?;
+    let op: CrossSectionalOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
     let values = js_nullable_f64_seq(&values, "values")?;
     let time_key = js_string_seq(&time_key, "timeKey")?;
     let groups = js_string_seq(&groups, "groups")?;
@@ -169,18 +180,21 @@ pub fn neutralize(
 /// complete pairs within it. Results can emit at a missing current row.
 /// `order` is lexicographic; temporal strings need a common timezone and precision.
 ///
+/// # Arguments
+///
+/// * `values` - Primary numeric observations aligned with other and both key columns; null and non-finite inputs are missing.
+/// * `other` - Second numeric observation column; rolling windows retain only complete finite pairs.
+/// * `entity` - String entity identifiers grouping observations into independent time series.
+/// * `order` - Lexicographic order keys within each entity; temporal keys require a common timezone and fixed precision.
+/// * `op` - Snake_case PairwiseOp selector accepted by pairwiseOpValues; parsed by the canonical Rust enum.
+/// * `params` - Optional rolling parameters; window counts entity rows, min_periods counts complete pairs and cannot exceed window.
+///
 /// # Errors
 ///
 /// Rejects values that cannot be decoded into the declared arrays or JSON
 /// parameters, unequal row counts, an unsupported `op`, non-positive or
 /// non-integer `window` or `min_periods` parameters, or a result that cannot be
 /// serialized to JavaScript.
-/// @param values - Numeric observations in the shape and order required by the selected transformation.
-/// @param other - Second value series aligned with the primary series for a pairwise transformation.
-/// @param entity - Entity identifier used to group ordered time-series observations.
-/// @param order - Lexicographic observation-order key; use ISO-8601 for calendar chronology.
-/// @param op - Transformation operation identifier supported by the feature-engineering API.
-/// @param params - Operation-specific parameter object. `window` counts rows including gaps; `min_periods <= window` counts complete pairs.
 #[wasm_bindgen(js_name = transformTimeseriesPairwise)]
 pub fn transform_timeseries_pairwise(
     values: JsValue,
@@ -190,7 +204,7 @@ pub fn transform_timeseries_pairwise(
     op: JsValue,
     params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let op: &str = &js_string(&op, "op")?;
+    let op: PairwiseOp = js_string(&op, "op")?.parse().map_err(to_js_err)?;
     let values = js_nullable_f64_seq(&values, "values")?;
     let other = js_nullable_f64_seq(&other, "other")?;
     let entity = js_string_seq(&entity, "entity")?;
@@ -299,34 +313,35 @@ pub fn rank_to_weights(values: JsValue, time_key: JsValue) -> Result<JsValue, Js
 
 /// Neutralize a signal and z-score residuals.
 ///
+/// Equal-weighted OLS always includes an intercept so z-scoring preserves
+/// neutrality to the supplied exposures.
+///
+/// # Arguments
+///
+/// * `values` - Numeric signal observations, with null or non-finite inputs
+///   treated as missing, aligned with the partition and exposure columns.
+/// * `time_key` - String partition keys grouping observations into independent
+///   cross-sections; exact equal strings select the same partition.
+/// * `exposures` - Column-major numeric factor exposures, each column aligned
+///   with `values`; rows missing any exposure are excluded from the fit.
+///
 /// # Errors
 ///
-/// Rejects values that cannot be decoded into the declared arrays or JSON
-/// parameters, unequal row counts, exposure columns whose lengths differ from
-/// `values`, a false or non-boolean `fit_intercept`, or a result that cannot be
-/// serialized to JavaScript.
-/// @param values - Numeric observations in the shape and order required by the selected transformation.
-/// @param time_key - Cross-sectional time key shared by values evaluated in the same slice.
-/// @param exposures - Factor-exposure matrix aligned with the supplied observations.
-/// @param params - Operation-specific parameter object defining transformation settings.
+/// Rejects inputs that cannot be decoded into the declared arrays, unequal row
+/// counts, exposure columns whose lengths differ from `values`, a singular or
+/// underdetermined cross-section, non-finite arithmetic, or a result that cannot
+/// be serialized to JavaScript.
 #[wasm_bindgen(js_name = neutralizeAndZscore)]
 pub fn neutralize_and_zscore(
     values: JsValue,
     time_key: JsValue,
     exposures: JsValue,
-    params: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let values = js_nullable_f64_seq(&values, "values")?;
     let time_key = js_string_seq(&time_key, "timeKey")?;
     let exposures = js_nullable_f64_matrix(&exposures, "exposures")?;
-    let params = parse_params(params)?;
-    let result = finstack_quant_features::neutralize_and_zscore(
-        &values,
-        &time_key,
-        &exposures,
-        params.as_ref(),
-    )
-    .map_err(to_js_err)?;
+    let result = finstack_quant_features::neutralize_and_zscore(&values, &time_key, &exposures)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 

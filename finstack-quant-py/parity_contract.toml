@@ -1554,8 +1554,9 @@ status = "exists"
 # plain objects / snake_case names typed by the schema-generated TypeScript
 # (finstack-quant/features/schemas, gen_features_schemas), with free functions for
 # their members (panelTransformResultGetColumn, <op>Values, <op>ParamKeys). The
-# Rust *_with_op variants stay Rust-only (the string entry points accept the
-# same ops). The WASM side is accounted in the [parity] ledger. Key columns: WASM accepts
+# Rust transform entry points take typed operation enums; Python and WASM
+# convert operation names at the host boundary. The WASM side is accounted
+# in the [parity] ledger. Key columns: WASM accepts
 # strings only; Python also accepts date/datetime objects, formatted by the
 # Rust key policy (datetime_order_key / naive_datetime_order_key: aware -> UTC,
 # fixed nanosecond precision) and rejects every other non-string key with
