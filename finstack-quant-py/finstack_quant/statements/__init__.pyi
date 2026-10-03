@@ -1341,7 +1341,7 @@ class ForecastSpec:
         ...
 
     @staticmethod
-    def seasonal(historical: list[float], season_length: int, mode: str = "additive") -> ForecastSpec:
+    def seasonal(historical: list[float], season_length: int, mode: str) -> ForecastSpec:
         """Forecast an external history using seasonal decomposition.
 
         Parameters
@@ -1351,7 +1351,7 @@ class ForecastSpec:
         season_length:
             Positive number of model periods per seasonal cycle, such as 4 for quarterly observations.
         mode:
-            "additive" for constant absolute swings or "multiplicative" for swings scaling with the level.
+            Required. "additive" for constant absolute swings or "multiplicative" for swings scaling with the level.
 
         Returns
         -------
@@ -1368,7 +1368,7 @@ class ForecastSpec:
         Examples
         --------
         >>> from finstack_quant.statements import ForecastSpec
-        >>> ForecastSpec.seasonal([10.0, 12.0, 11.0, 13.0], 2).method.kind
+        >>> ForecastSpec.seasonal([10.0, 12.0, 11.0, 13.0], 2, "additive").method.kind
         'seasonal'
         """
         ...
@@ -3745,34 +3745,6 @@ class StatementResult:
         """
         ...
 
-    def to_dated_schedule(
-        self, model: FinancialModelSpec | str, node_id: str, convention: str = "end"
-    ) -> list[tuple[date, float]]:
-        """Export a node into a dated cashflow schedule using its model timeline.
-
-        Parameters
-        ----------
-        model:
-            The producing model or its canonical JSON; its period boundaries determine cashflow dates.
-        node_id:
-            Evaluated node identifier to export.
-        convention:
-            "end" uses each period's last inclusive day (exclusive end minus one day); "start" uses the start date.
-
-        Returns
-        -------
-        list[tuple[date, float]]
-            Timeline-ordered date/value pairs in the node's own units; periods without values are skipped.
-
-        Raises
-        ------
-        KeyError
-            If the node is absent from the result.
-        ValueError
-            If convention is invalid or model JSON/semantics are invalid.
-        """
-        ...
-
 class Evaluator:
     """
     Evaluates a ``FinancialModelSpec`` into a ``StatementResult``.
@@ -4479,6 +4451,60 @@ def normalize(results: StatementResult, config: NormalizationConfig) -> list[Nor
     >>> normalize(result, NormalizationConfig("ebitda"))[0].final_value
     25.0
 
+    """
+    ...
+
+def merge_into_results(
+    results: StatementResult,
+    normalization_results: list[NormalizationResult],
+    output_node_id: str,
+) -> StatementResult:
+    """Write normalized values back into statement results as a node.
+
+    Wraps Rust ``NormalizationEngine::merge_into_results``: each period's
+    ``final_value`` becomes node ``output_node_id`` with the shared unit (and
+    currency for monetary values), replacing any existing node of that name
+    across all periods. The attached check report is cleared because it
+    describes the values before the merge; rerun the checks afterwards.
+
+    Parameters
+    ----------
+    results:
+        Evaluated statement results. Left unchanged; the merged copy is
+        returned (Rust updates its argument in place).
+    normalization_results:
+        Per-period results from :func:`normalize`, all with the same unit and
+        currency. An empty list returns an unchanged copy.
+    output_node_id:
+        Node to create or replace, e.g. ``"adjusted_ebitda"``.
+
+    Returns
+    -------
+    StatementResult
+        Copy of ``results`` holding the merged node.
+
+    Raises
+    ------
+    ValueError
+        If the results mix units or currencies, repeat a period, or hold a
+        non-finite value.
+
+    Examples
+    --------
+    >>> from finstack_quant.statements import (
+    ...     Evaluator,
+    ...     ModelBuilder,
+    ...     NormalizationConfig,
+    ...     merge_into_results,
+    ...     normalize,
+    ... )
+    >>> builder = ModelBuilder("m")
+    >>> _ = builder.periods("2025Q1..Q2")
+    >>> _ = builder.value("ebitda", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+    >>> results = Evaluator().evaluate(builder.build())
+    >>> merged = merge_into_results(results, normalize(results, NormalizationConfig("ebitda")), "adj")
+    >>> merged.get("adj", "2025Q2")
+    110.0
     """
     ...
 
@@ -7551,6 +7577,151 @@ class CapitalStructureCashflows:
         ------
         KeyError
             If the period is unknown.
+
+        """
+        ...
+
+    def get_total_interest_cash(self, period: str) -> float:
+        """Cash interest expense across all instruments in one period.
+
+        Parameters
+        ----------
+        period : str
+            Period identifier such as ``"2025Q1"``.
+
+        Returns
+        -------
+        float
+            Cash interest expense in the reporting currency.
+
+        Raises
+        ------
+        ValueError
+            If ``period`` is not a valid period id.
+        RuntimeError
+            If the period has no totals or the instruments span several
+            currencies without a reporting currency.
+
+        """
+        ...
+
+    def get_total_interest_income(self, period: str) -> float:
+        """Cash interest received (net hedge receipts and negative-rate coupon receipts) across all instruments in one period.
+
+        Parameters
+        ----------
+        period : str
+            Period identifier such as ``"2025Q1"``.
+
+        Returns
+        -------
+        float
+            Interest income in the reporting currency.
+
+        Raises
+        ------
+        ValueError
+            If ``period`` is not a valid period id.
+        RuntimeError
+            If the period has no totals or the instruments span several
+            currencies without a reporting currency.
+
+        """
+        ...
+
+    def get_total_interest_pik(self, period: str) -> float:
+        """PIK (non-cash) interest accrued across all instruments in one period.
+
+        Parameters
+        ----------
+        period : str
+            Period identifier such as ``"2025Q1"``.
+
+        Returns
+        -------
+        float
+            PIK interest in the reporting currency.
+
+        Raises
+        ------
+        ValueError
+            If ``period`` is not a valid period id.
+        RuntimeError
+            If the period has no totals or the instruments span several
+            currencies without a reporting currency.
+
+        """
+        ...
+
+    def get_total_accrued_interest(self, period: str) -> float:
+        """Accrued-but-unpaid debt interest at period end across all instruments in one period.
+
+        Parameters
+        ----------
+        period : str
+            Period identifier such as ``"2025Q1"``.
+
+        Returns
+        -------
+        float
+            Accrued interest in the reporting currency.
+
+        Raises
+        ------
+        ValueError
+            If ``period`` is not a valid period id.
+        RuntimeError
+            If the period has no totals or the instruments span several
+            currencies without a reporting currency.
+
+        """
+        ...
+
+    def get_interest_income(self, instrument_id: str, period: str) -> float:
+        """Cash interest received for one instrument and period.
+
+        Includes net hedge receipts and receipts from negative-rate debt
+        coupons; zero when nothing was received.
+
+        Parameters
+        ----------
+        instrument_id : str
+            Capital-structure identifier of the instrument to inspect.
+        period : str
+            Period identifier such as ``"2025Q1"``.
+
+        Returns
+        -------
+        float
+            Interest income in the instrument's native currency.
+
+        Raises
+        ------
+        ValueError
+            If ``period`` is not a valid period id.
+        RuntimeError
+            If the instrument-period breakdown is absent.
+
+        """
+        ...
+
+    @property
+    def totals_by_currency(self) -> dict[str, dict[str, dict[str, Money]]]:
+        """Cross-instrument totals bucketed by native instrument currency.
+
+        Populated for every evaluation with capital-structure flows, including
+        multi-currency structures without a reporting currency, where
+        ``to_totals_dataframe`` and the ``get_total_*`` accessors have nothing
+        to report.
+
+        Returns
+        -------
+        dict[str, dict[str, dict[str, Money]]]
+            ISO currency code to period id to flow type (the ``flow_type``
+            names of :meth:`to_dataframe`) to amount in that currency.
+
+        This accessor does not raise; it is empty when no capital-structure
+        flows were evaluated.
 
         """
         ...

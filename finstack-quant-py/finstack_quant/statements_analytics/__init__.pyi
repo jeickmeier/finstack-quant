@@ -3500,9 +3500,9 @@ def add_rent_roll(
 def add_property_operating_statement(
     model: FinancialModelSpec | str,
     leases: list[LeaseSpec],
-    other_income_nodes: list[str] = ...,
-    opex_nodes: list[str] = ...,
-    capex_nodes: list[str] = ...,
+    other_income_nodes: list[str],
+    opex_nodes: list[str],
+    capex_nodes: list[str],
     management_fee: ManagementFeeSpec | None = None,
     nodes: PropertyTemplateNodes | None = None,
 ) -> FinancialModelSpec:
@@ -3516,11 +3516,11 @@ def add_property_operating_statement(
     leases : list[LeaseSpec]
         Rich lease schedules used to build rental-revenue and rent-roll outputs.
     other_income_nodes : list[str]
-        Existing node IDs aggregated as other income; defaults to an empty list.
+        Existing node IDs aggregated as other income (required; pass ``[]`` for none).
     opex_nodes : list[str]
-        Existing node IDs aggregated as operating expenses; defaults to empty.
+        Existing node IDs aggregated as operating expenses (required; may be ``[]``).
     capex_nodes : list[str]
-        Existing node IDs aggregated as capital expenditures; defaults to empty.
+        Existing node IDs aggregated as capital expenditures (required; may be ``[]``).
     management_fee : ManagementFeeSpec or None
         Optional fee assumptions; ``None`` omits management-fee calculation.
     nodes : PropertyTemplateNodes or None
@@ -3544,7 +3544,7 @@ def add_property_operating_statement(
     >>> _ = builder.periods("2025Q1..Q2")
     >>> model = builder.build()
     >>> lease = LeaseSpec("lease_a", "2025Q1", 100.0)
-    >>> updated = add_property_operating_statement(model, [lease])
+    >>> updated = add_property_operating_statement(model, [lease], [], [], [])
     >>> updated.has_node("ncf")
     True
 
@@ -5487,8 +5487,9 @@ class Exposure:
         For original cumulative curve ``F``, elapsed years ``a`` and the capped
         horizon ``h = min(remaining_maturity, 30.0)``, supply
         ``(F(a + h) - F(a)) / (1 - F(a))``.
-    dpd : int
-        Days past due. Default ``0``.
+    dpd : int | None
+        Days past due. ``None`` uses the Rust ``Exposure`` default of ``0``
+        (performing).
     undrawn : float
         Undrawn commitment in the same currency as ``ead``. Default ``0.0``.
     ccf : float
@@ -5505,8 +5506,9 @@ class Exposure:
         Stage assigned at the previous reporting date, enabling the curing
         rules. Accepts a ``Stage`` or ``"stage1"``, ``"stage2"``, or
         ``"stage3"``. Default ``None``.
-    consecutive_performing_periods : int
-        Performing periods since the last trigger, for curing. Default ``0``.
+    consecutive_performing_periods : int | None
+        Performing periods since the last trigger, for curing. ``None`` uses
+        the Rust ``Exposure`` default of ``0``.
     ead_schedule : list[tuple[float, float]] | None
         Optional EAD amortisation profile as ``(time_years, ead)`` knots.
     segments : list[str] | None
@@ -5534,14 +5536,14 @@ class Exposure:
         remaining_maturity: float,
         current_pd: float,
         origination_pd: float,
-        dpd: int = 0,
+        dpd: int | None = None,
         undrawn: float = 0.0,
         ccf: float = 0.75,
         current_rating: str | None = None,
         origination_rating: str | None = None,
         qualitative_flags: QualitativeFlags | None = None,
         previous_stage: Any | None = None,
-        consecutive_performing_periods: int = 0,
+        consecutive_performing_periods: int | None = None,
         ead_schedule: list[tuple[float, float]] | None = None,
         segments: list[str] | None = None,
     ) -> None: ...
@@ -6867,19 +6869,19 @@ class PeerSet:
         Peer companies.
     period_basis : str
         ``"ltm"``, ``"ntm"`` or a custom label such as ``"FY2025E"``.
-        Default ``"ltm"``.
+        Required: Rust ``PeerSet`` has no default period basis.
 
     Examples
     --------
     >>> from finstack_quant.statements_analytics import CompanyMetrics, PeerSet
     >>> subject = CompanyMetrics("SUBJ", {"leverage": 2.0})
     >>> peers = [CompanyMetrics("P1", {"leverage": 1.0}), CompanyMetrics("P2", {"leverage": 3.0})]
-    >>> PeerSet(subject, peers).peer_count
+    >>> PeerSet(subject, peers, "ltm").peer_count
     2
     """
-    def __init__(self, subject: Any, peers: list[Any], period_basis: str = "ltm") -> None: ...
+    def __init__(self, subject: Any, peers: list[Any], period_basis: str) -> None: ...
     @staticmethod
-    def from_universe(subject: Any, universe: list[Any], filter: PeerFilter, period_basis: str = "ltm") -> PeerSet:
+    def from_universe(subject: Any, universe: list[Any], filter: PeerFilter, period_basis: str) -> PeerSet:
         """
         Build a peer set from a universe by applying a ``PeerFilter``.
 
@@ -6899,7 +6901,7 @@ class PeerSet:
         filter : PeerFilter
             Screening criteria.
         period_basis : str
-            ``"ltm"``, ``"ntm"`` or a custom label. Default ``"ltm"``.
+            ``"ltm"``, ``"ntm"`` or a custom label (required).
         Returns
         -------
         PeerSet
@@ -6908,12 +6910,12 @@ class PeerSet:
         Examples
         --------
         >>> from finstack_quant.statements_analytics import PeerFilter, PeerSet
-        >>> PeerSet.from_universe("{}", [], PeerFilter())
+        >>> PeerSet.from_universe("{}", [], PeerFilter(), "ltm")
         Traceback (most recent call last):
         ValueError: ...
         """
     @staticmethod
-    def from_dataframe(df: Any, subject_id: str, period_basis: str = "ltm", id_column: str | None = None) -> PeerSet:
+    def from_dataframe(df: Any, subject_id: str, period_basis: str, id_column: str | None = None) -> PeerSet:
         """
         Build a peer set from a pandas ``DataFrame`` (rows = companies).
 
@@ -6927,7 +6929,7 @@ class PeerSet:
         subject_id : str
             Id of the subject row; every other row becomes a peer.
         period_basis : str
-            ``"ltm"``, ``"ntm"`` or a custom label. Default ``"ltm"``.
+            ``"ltm"``, ``"ntm"`` or a custom label (required).
         id_column : str | None
             Column holding company ids; ``None`` uses the index.
 
@@ -6948,7 +6950,7 @@ class PeerSet:
         >>> import pandas as pd
         >>> from finstack_quant.statements_analytics import PeerSet
         >>> frame = pd.DataFrame({"id": ["SUBJ", "PEER"], "leverage": [3.0, 2.0]})
-        >>> PeerSet.from_dataframe(frame, "SUBJ", id_column="id").peer_count
+        >>> PeerSet.from_dataframe(frame, "SUBJ", "ltm", id_column="id").peer_count
         1
         """
     @property
@@ -7585,8 +7587,10 @@ class RelativeValueResult:
     ...     CompanyMetrics(f"P{i}", {"leverage": float(i), "oas_bp": spread})
     ...     for i, spread in ((1, 100.0), (2, 210.0), (3, 300.0))
     ... ]
-    >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"leverage": 2.0, "oas_bp": 250.0}), peers)
-    >>> result = score_relative_value(peer_set, [ScoringDimension("Spread vs Leverage", "oas_bp", "leverage")])
+    >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"leverage": 2.0, "oas_bp": 250.0}), peers, "ltm")
+    >>> result = score_relative_value(
+    ...     peer_set, [ScoringDimension("Spread vs Leverage", "oas_bp", "leverage", weight=1.0)]
+    ... )
     >>> result.company_id, result.peer_count
     ('SUBJ', 3)
     """
@@ -8084,12 +8088,13 @@ class ScoringDimension:
         Optional explanatory metric in the same notation. ``None`` (default)
         scores the dependent metric against its peer distribution.
     weight : float
-        Finite non-negative relative weight in the composite score. Default
-        ``1.0``; zero disables the dimension. Positive weights are normalized
-        over usable dimensions.
-    direction : str
-        ``"higher_is_cheap"`` (spread-like, default) or ``"higher_is_rich"``
-        (multiple-like).
+        Keyword-only, required. Finite non-negative relative weight in the
+        composite score; zero disables the dimension. Positive weights are
+        normalized over usable dimensions.
+    direction : str | None
+        ``"higher_is_cheap"`` (spread-like) or ``"higher_is_rich"``
+        (multiple-like). ``None`` uses the Rust ``ScoreDirection`` default,
+        ``"higher_is_cheap"``.
 
     Raises
     ------
@@ -8099,11 +8104,11 @@ class ScoringDimension:
     Examples
     --------
     >>> from finstack_quant.statements_analytics import ScoringDimension
-    >>> ScoringDimension("Spread vs Leverage", "oas_bp", "leverage").direction
+    >>> ScoringDimension("Spread vs Leverage", "oas_bp", "leverage", weight=1.0).direction
     'higher_is_cheap'
     """
     def __init__(
-        self, label: str, y: str, x: str | None = None, weight: float = 1.0, direction: str = "higher_is_cheap"
+        self, label: str, y: str, x: str | None = None, *, weight: float, direction: str | None = None
     ) -> None: ...
     @property
     def label(self) -> str:
@@ -10290,7 +10295,7 @@ def classify_stage(exposure: Exposure, config: StagingConfig | None = None) -> S
 def compute_ecl(
     exposure: Exposure,
     pd_schedule: list[tuple[float, float]],
-    stage: Any | None = None,
+    stage: Stage | str,
     bucket_width_years: float | None = None,
     stage3_time_to_recovery_years: float | None = None,
 ) -> WeightedEclResult:
@@ -10307,10 +10312,10 @@ def compute_ecl(
         Cumulative PD curve as ``[(time_years, cumulative_pd), ...]``, ascending
         in time and non-decreasing in PD. A ``(0.0, 0.0)`` knot is inserted
         when absent.
-    stage : Stage | str | None
+    stage : Stage | str
         Measurement stage (``Stage`` or serde name ``"stage1"``/``"stage2"``/
-        ``"stage3"``). ``None`` classifies the exposure first with the default
-        ``StagingConfig``.
+        ``"stage3"``). Required: classify first with ``classify_stage`` under
+        the desk's ``StagingConfig`` and pass ``result.stage``.
     bucket_width_years : float | None
         Finite integration width of at least 0.0001 years (``0.25`` = quarterly); ``None`` uses
         the canonical policy default.
@@ -10328,22 +10333,21 @@ def compute_ecl(
     ------
     ValueError
         If ``stage`` is unknown, the PD or EAD schedule is invalid, or an
-        exposure input is outside its accepted range. Automatic staging also
-        rejects an unrepresentable enabled relative PD ratio, including zero
-        origination PD with positive current PD, when PD-delta testing runs.
+        exposure input is outside its accepted range.
 
     Examples
     --------
-    >>> from finstack_quant.statements_analytics import Exposure, compute_ecl
+    >>> from finstack_quant.statements_analytics import Exposure, classify_stage, compute_ecl
     >>> exp = Exposure("loan", 1_000_000.0, 0.45, 0.06, 3.0, 0.02, 0.015)
-    >>> compute_ecl(exp, [(1.0, 0.02), (3.0, 0.06)], stage="stage1").ecl > 0
+    >>> stage = classify_stage(exp).stage
+    >>> compute_ecl(exp, [(1.0, 0.02), (3.0, 0.06)], stage).ecl > 0
     True
     """
 
 def compute_ecl_weighted(
     exposure: Exposure,
     scenarios: list[tuple[float, list[tuple[float, float]]]],
-    stage: Any | None = None,
+    stage: Stage | str,
     bucket_width_years: float | None = None,
     stage3_time_to_recovery_years: float | None = None,
 ) -> WeightedEclResult:
@@ -10356,9 +10360,9 @@ def compute_ecl_weighted(
     scenarios : list[tuple[float, list[tuple[float, float]]]]
         ``(weight, pd_schedule)`` pairs; weights must sum to ``1.0`` and each
         schedule follows the ``compute_ecl`` conventions.
-    stage : Stage | str | None
-        Measurement stage; ``None`` classifies the exposure first with the
-        default ``StagingConfig``.
+    stage : Stage | str
+        Measurement stage (required); classify first with ``classify_stage``
+        under the desk's ``StagingConfig`` and pass ``result.stage``.
     bucket_width_years : float | None
         Finite integration width of at least 0.0001 years; ``None`` uses the canonical default.
     stage3_time_to_recovery_years : float | None
@@ -10375,9 +10379,6 @@ def compute_ecl_weighted(
     ValueError
         If ``scenarios`` is empty, weights do not sum to ``1.0``, ``stage`` is
         unknown, a schedule is invalid, or an exposure input is out of range.
-        Automatic staging also rejects an unrepresentable enabled relative PD
-        ratio, including zero origination PD with positive current PD, when
-        PD-delta testing runs.
 
     Examples
     --------
@@ -11504,8 +11505,10 @@ def score_relative_value(peer_set: Any, dimensions: Any) -> RelativeValueResult:
     ...     score_relative_value,
     ... )
     >>> peers = [CompanyMetrics(f"P{i}", {"pe": float(10 * i)}) for i in (1, 2, 3)]
-    >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"pe": 30.0}), peers)
-    >>> score_relative_value(peer_set, [ScoringDimension("pe", "pe", direction="higher_is_rich")]).composite_score < 0
+    >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"pe": 30.0}), peers, "ltm")
+    >>> score_relative_value(
+    ...     peer_set, [ScoringDimension("pe", "pe", weight=1.0, direction="higher_is_rich")]
+    ... ).composite_score < 0
     True
     """
 

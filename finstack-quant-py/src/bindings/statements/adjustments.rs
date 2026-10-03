@@ -620,6 +620,70 @@ fn normalize_json(results: &PyStatementResult, config: &PyNormalizationConfig) -
         .map_err(|e| serde_json_to_py(e, "failed to serialize normalization results"))
 }
 
+/// Write normalized values back into statement results as a node.
+///
+/// Wraps Rust ``NormalizationEngine::merge_into_results``: the normalization
+/// results' ``final_value`` per period become node ``output_node_id`` with the
+/// shared unit (and currency for monetary values), replacing any existing node
+/// of that name across all periods. The attached check report is cleared
+/// because it describes the values before the merge; rerun the checks to
+/// validate the updated results.
+///
+/// Parameters
+/// ----------
+/// results : StatementResult
+///     Evaluated statement results. Left unchanged; the merged copy is
+///     returned (Rust updates its argument in place).
+/// normalization_results : list[NormalizationResult]
+///     Per-period results from :func:`normalize`, all with the same unit and
+///     currency. An empty list returns an unchanged copy.
+/// output_node_id : str
+///     Node to create or replace, e.g. ``"adjusted_ebitda"``.
+///
+/// Returns
+/// -------
+/// StatementResult
+///     Copy of ``results`` holding the merged node.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If the results mix units or currencies, repeat a period, or hold a
+///     non-finite value.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.statements import (
+/// ...     Evaluator, ModelBuilder, NormalizationConfig, merge_into_results, normalize,
+/// ... )
+/// >>> builder = ModelBuilder("m")
+/// >>> _ = builder.periods("2025Q1..Q2")
+/// >>> _ = builder.value("ebitda", [("2025Q1", 100.0), ("2025Q2", 110.0)])
+/// >>> results = Evaluator().evaluate(builder.build())
+/// >>> merged = merge_into_results(results, normalize(results, NormalizationConfig("ebitda")), "adj")
+/// >>> merged.get("adj", "2025Q2")
+/// 110.0
+#[pyfunction]
+#[pyo3(text_signature = "(results, normalization_results, output_node_id)")]
+fn merge_into_results(
+    results: &PyStatementResult,
+    normalization_results: Vec<PyRef<'_, PyNormalizationResult>>,
+    output_node_id: &str,
+) -> PyResult<PyStatementResult> {
+    let normalization_results: Vec<_> = normalization_results
+        .iter()
+        .map(|result| result.inner.clone())
+        .collect();
+    let mut inner = results.inner.clone();
+    finstack_quant_statements::adjustments::engine::NormalizationEngine::merge_into_results(
+        &mut inner,
+        &normalization_results,
+        output_node_id,
+    )
+    .map_err(statements_to_py)?;
+    Ok(PyStatementResult { inner })
+}
+
 /// Register adjustment classes and functions.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyAdjustment>()?;
@@ -628,5 +692,6 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyNormalizationResult>()?;
     m.add_function(pyo3::wrap_pyfunction!(normalize, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(normalize_json, m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(merge_into_results, m)?)?;
     Ok(())
 }

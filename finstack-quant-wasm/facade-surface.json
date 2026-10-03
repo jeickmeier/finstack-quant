@@ -4152,11 +4152,16 @@
       "capitalStructureCashflowsGetFees",
       "capitalStructureCashflowsGetInterest",
       "capitalStructureCashflowsGetInterestCash",
+      "capitalStructureCashflowsGetInterestIncome",
       "capitalStructureCashflowsGetInterestPik",
       "capitalStructureCashflowsGetPrincipal",
+      "capitalStructureCashflowsGetTotalAccruedInterest",
       "capitalStructureCashflowsGetTotalDebtBalance",
       "capitalStructureCashflowsGetTotalFees",
       "capitalStructureCashflowsGetTotalInterest",
+      "capitalStructureCashflowsGetTotalInterestCash",
+      "capitalStructureCashflowsGetTotalInterestIncome",
+      "capitalStructureCashflowsGetTotalInterestPik",
       "capitalStructureCashflowsGetTotalPrincipal",
       "checkConfigValidate",
       "checkReportFindingsBySeverity",
@@ -4178,6 +4183,7 @@
       "forecastSpecOverride",
       "forecastSpecSeasonal",
       "forecastSpecTimeSeries",
+      "mergeIntoResults",
       "modelNodeIds",
       "monteCarloBreachProbability",
       "monteCarloPercentileByPeriod",
@@ -4380,6 +4386,21 @@
   "statements.capitalStructureCashflowsGetTotalFees": {
     "kind": "function"
   },
+  "statements.capitalStructureCashflowsGetTotalInterestCash": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetTotalInterestIncome": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetTotalInterestPik": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetTotalAccruedInterest": {
+    "kind": "function"
+  },
+  "statements.capitalStructureCashflowsGetInterestIncome": {
+    "kind": "function"
+  },
   "statements.forecastSpecForwardFill": {
     "kind": "function"
   },
@@ -4438,6 +4459,9 @@
     "kind": "function"
   },
   "statements.normalizeJson": {
+    "kind": "function"
+  },
+  "statements.mergeIntoResults": {
     "kind": "function"
   },
   "statements.checkSuiteSpecBuiltinCheckNames": {

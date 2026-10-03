@@ -406,3 +406,33 @@ test('normalization validation and duplicate adjustments are rejected in Rust', 
     (e) => e.kind === 'validation'
   );
 });
+
+test('mergeIntoResults writes normalized values back as a node', () => {
+  const result = evaluate(MODEL);
+  const normalized = statements.normalize(result, INPUTS.normalization_config);
+  const merged = statements.mergeIntoResults(result, normalized, 'adjusted_profit');
+  for (const row of normalized) {
+    assert.equal(
+      statements.statementResultGet(merged, 'adjusted_profit', row.period),
+      row.final_value
+    );
+  }
+  assert.equal(statements.statementResultGet(result, 'adjusted_profit', Q1), undefined);
+  assert.throws(
+    () => statements.mergeIntoResults(result, [normalized[0], normalized[0]], 'x'),
+    (e) => e.name === 'FinstackError'
+  );
+});
+
+test('capital-structure interest-income and total accessors are Rust twins', () => {
+  const cs = INPUTS.cs_cashflows;
+  const cash = statements.capitalStructureCashflowsGetTotalInterestCash(cs, Q1);
+  const pik = statements.capitalStructureCashflowsGetTotalInterestPik(cs, Q1);
+  assert.equal(cash + pik, statements.capitalStructureCashflowsGetTotalInterest(cs, Q1));
+  assert.equal(typeof statements.capitalStructureCashflowsGetTotalInterestIncome(cs, Q1), 'number');
+  assert.equal(typeof statements.capitalStructureCashflowsGetTotalAccruedInterest(cs, Q1), 'number');
+  assert.equal(
+    typeof statements.capitalStructureCashflowsGetInterestIncome(cs, 'TL-A', Q1),
+    'number'
+  );
+});

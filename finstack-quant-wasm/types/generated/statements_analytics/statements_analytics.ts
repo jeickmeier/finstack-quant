@@ -433,7 +433,7 @@ export type DownturnMethod =
  *   cycle-average LGD that pins the effective LGD regardless of `base`.
  *   Because the pin would silently discard a scenario `lgd_override`,
  *   combining `ThroughTheCycle` with any scenario override is a validation
- *   error (see [`compute_ecl_weighted`]).
+ *   error (see [`compute_ecl_weighted_from_curves`]).
  * - [`LgdType::Downturn`]: `LGD_eff = EclConfig::downturn_lgd.adjust(base)`,
  *   applied via [`DownturnLgd::adjust`] on top of `base` (so a scenario
  *   `lgd_override` sets the base and the downturn stress is layered on top
@@ -2224,7 +2224,7 @@ export interface StagingConfig {
    * Rating downgrade notches that trigger Stage 2 (IFRS 9 B5.5.17(f):
    * external credit rating downgrade as a SICR indicator).
    *
-   * [`classify_stage`] fires [`StagingTrigger::RatingDowngrade`] when
+   * [`classify_stage_from_curves`] fires [`StagingTrigger::RatingDowngrade`] when
    * `position(current) - position(origination) >= rating_downgrade_notches`
    * on the configured scale (see [`Self::rating_scale_labels`]). Example:
    * 3 means a 3-notch downgrade from origination triggers SICR. A `0`
@@ -2553,9 +2553,9 @@ export interface Exposure {
   ccf?: number;
   /**
    * Number of consecutive performing periods since last Stage 2/3
-   * classification. Used for curing logic.
+   * classification. Used for curing logic. Default `0` (no cure history).
    */
-  consecutive_performing_periods: number;
+  consecutive_performing_periods?: number;
   /**
    * Current rating label (must match the `PdTermStructure` scale).
    * `None` if the exposure is unrated.
@@ -2563,8 +2563,9 @@ export interface Exposure {
   current_rating?: string | null;
   /**
    * Current days past due (DPD). Used for backstop staging triggers.
+   * Default `0` (performing, not past due).
    */
-  days_past_due: number;
+  days_past_due?: number;
   /**
    * Outstanding balance (drawn amount) at the reporting date.
    */

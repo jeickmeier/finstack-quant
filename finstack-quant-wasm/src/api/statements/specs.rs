@@ -10,7 +10,9 @@ use crate::utils::input::{
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::adjustments::engine::NormalizationEngine;
-use finstack_quant_statements::adjustments::types::{Adjustment, NormalizationConfig};
+use finstack_quant_statements::adjustments::types::{
+    Adjustment, NormalizationConfig, NormalizationResult,
+};
 use finstack_quant_statements::checks::{BuiltinCheckSpec, CheckConfig};
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements::types::ForecastSpec;
@@ -411,10 +413,7 @@ pub fn validate_normalization_config_json(json: JsValue) -> Result<String, JsVal
     serde_json::to_string(&config).map_err(to_js_err)
 }
 
-fn normalized(
-    results: &JsValue,
-    config: &JsValue,
-) -> Result<Vec<finstack_quant_statements::adjustments::types::NormalizationResult>, JsValue> {
+fn normalized(results: &JsValue, config: &JsValue) -> Result<Vec<NormalizationResult>, JsValue> {
     let results: StatementResult = from_js_json(results, "results")?;
     let config: NormalizationConfig = from_js_json(config, "config")?;
     NormalizationEngine::normalize(&results, &config).map_err(to_js_err)
@@ -452,6 +451,42 @@ pub fn normalize(results: JsValue, config: JsValue) -> Result<JsValue, JsValue> 
 #[wasm_bindgen(js_name = normalizeJson)]
 pub fn normalize_json(results: JsValue, config: JsValue) -> Result<String, JsValue> {
     serde_json::to_string(&normalized(&results, &config)?).map_err(to_js_err)
+}
+
+/// Write normalized values back into statement results as a node.
+///
+/// Twin of Python `merge_into_results` (Rust
+/// `NormalizationEngine::merge_into_results`). Each period's `final_value`
+/// becomes node `outputNodeId` with the shared unit (and currency for monetary
+/// values), replacing any existing node of that name across all periods. The
+/// attached check report is cleared because it describes the values before the
+/// merge. Rust updates its argument in place; here the merged copy is returned.
+/// @param results - Evaluated `StatementResult` to merge into (object or JSON); left unchanged.
+/// @param normalization_results - `NormalizationResult` array from `normalize`, all with the same unit and currency (object or JSON); an empty array returns an unchanged copy.
+/// @param output_node_id - Node to create or replace, e.g. `"adjusted_ebitda"`.
+/// @returns The merged `StatementResult`.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if an input is malformed, and the kind of the
+/// Rust error if the results mix units or currencies, repeat a period or hold a
+/// non-finite value.
+#[wasm_bindgen(js_name = mergeIntoResults)]
+pub fn merge_into_results(
+    results: JsValue,
+    normalization_results: JsValue,
+    output_node_id: JsValue,
+) -> Result<JsValue, JsValue> {
+    let mut results: StatementResult = from_js_json(&results, "results")?;
+    let normalization_results: Vec<NormalizationResult> =
+        from_js_json(&normalization_results, "normalizationResults")?;
+    NormalizationEngine::merge_into_results(
+        &mut results,
+        &normalization_results,
+        &js_string(&output_node_id, "outputNodeId")?,
+    )
+    .map_err(to_js_err)?;
+    to_js_value(&results)
 }
 
 /// Serde `type` tags of every built-in check a suite spec accepts.

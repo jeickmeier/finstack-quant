@@ -184,7 +184,7 @@ def analytics_cases() -> dict[str, Any]:
     ncf = sa.add_ncf_buildup(noi, "noi", ["cogs"], "ncf")
     lease = sa.LeaseSpec.from_json(json.dumps(INPUTS["lease"]))
     rent_roll = sa.add_rent_roll(MODEL, [lease])
-    property_model = sa.add_property_operating_statement(MODEL, [lease], opex_nodes=["cogs"])
+    property_model = sa.add_property_operating_statement(MODEL, [lease], [], ["cogs"], [])
 
     exposure = sa.Exposure(
         id="E1",

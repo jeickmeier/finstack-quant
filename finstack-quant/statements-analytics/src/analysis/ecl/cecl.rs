@@ -728,7 +728,7 @@ mod tests {
 
         // IFRS 9 Stage 2
         let ifrs9_config = super::super::engine::EclConfig::default();
-        let ifrs9_result = super::super::engine::compute_ecl(
+        let ifrs9_result = super::super::engine::compute_ecl_from_curve(
             &exposure,
             crate::analysis::ecl::types::Stage::Stage2,
             &curve,

@@ -12,6 +12,24 @@
 - Python and WASM: `RatingFactorTable` / `MasterScale` / `DownturnLgd` `from_registry_id` with an unknown id raise `KeyError` / throw kind `not_found` (was `ValueError` / `validation`); the Rust credit registry returns `InputError::NotFound`.
 - Python: typed Rust errors at the remaining statements-analytics, attribution, calibration, margin, portfolio and scenarios binding sites now go through their kind-aware mapper; `display_to_py` accepts only kind-less parse/serde errors (`KindlessError`), so routing a typed error through it no longer compiles.
 
+### Statements analytics (Python-binding audit PR 11)
+
+#### Changed (breaking)
+
+- Rust: the ECL names now match the hosts. `classify_exposure` is `classify_stage`, `compute_ecl_for_exposure` is `compute_ecl_weighted`, and a new single-schedule `compute_ecl` is the twin of Python `compute_ecl` / WASM `computeEcl`. The PD-term-structure + `EclConfig` engine functions are now `classify_stage_from_curves`, `compute_ecl_from_curve` and `compute_ecl_weighted_from_curves`.
+- Python: `compute_ecl` / `compute_ecl_weighted` require `stage` (as WASM already did). They no longer classify the exposure with a hidden default `StagingConfig`, which ignored a custom staging policy; call `classify_stage(exposure, config)` first and pass its `stage`.
+- Python: `ForecastSpec.seasonal` requires `mode`; `PeerSet`, `PeerSet.from_universe` and `PeerSet.from_dataframe` require `period_basis`; `ScoringDimension` requires keyword-only `weight` and `direction=None` reads the Rust `ScoreDirection` default; `add_property_operating_statement` requires `other_income_nodes`, `opex_nodes` and `capex_nodes`. Rust has no default for these values, so the binding no longer invents one.
+- Python: `Exposure(dpd=None, consecutive_performing_periods=None)` defaults to the Rust value; the Rust `Exposure` JSON now accepts omitted `days_past_due` / `consecutive_performing_periods` (default `0`).
+
+#### Added
+
+- Python and WASM: `merge_into_results` / `statements.mergeIntoResults` (Rust `NormalizationEngine::merge_into_results`) write normalized values back into a `StatementResult` as a node and return the merged copy.
+- Python: `CapitalStructureCashflows.totals_by_currency`, `get_interest_income`, `get_total_interest_cash`, `get_total_interest_income`, `get_total_interest_pik` and `get_total_accrued_interest`; WASM gains the matching `capitalStructureCashflowsGet*` functions.
+
+#### Fixed
+
+- Python stubs: removed the stale duplicate `StatementResult.to_dated_schedule` declaration that showed `convention="end"`.
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

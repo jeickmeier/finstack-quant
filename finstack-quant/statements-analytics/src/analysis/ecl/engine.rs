@@ -2,8 +2,8 @@
 //!
 //! Provides the core ECL computation functions:
 //!
-//! - [`compute_ecl`] -- single exposure, single scenario
-//! - [`compute_ecl_weighted`] -- single exposure, probability-weighted across scenarios
+//! - [`compute_ecl_from_curve`] -- single exposure, single scenario
+//! - [`compute_ecl_weighted_from_curves`] -- single exposure, probability-weighted across scenarios
 //! - [`EclEngine`] -- stateful facade wrapping staging + calculation
 //!
 //! # ECL Formula
@@ -41,7 +41,7 @@ use finstack_quant_core::{Error, Result};
 use finstack_quant_models::credit::lgd::DownturnLgd;
 use serde::{Deserialize, Serialize};
 
-use super::staging::{classify_stage, StageResult, StagingConfig};
+use super::staging::{classify_stage_from_curves, StageResult, StagingConfig};
 use super::types::{Exposure, PdTermStructure, Stage};
 
 // Macro scenario
@@ -84,7 +84,7 @@ pub struct MacroScenario {
 ///   cycle-average LGD that pins the effective LGD regardless of `base`.
 ///   Because the pin would silently discard a scenario `lgd_override`,
 ///   combining `ThroughTheCycle` with any scenario override is a validation
-///   error (see [`compute_ecl_weighted`]).
+///   error (see [`compute_ecl_weighted_from_curves`]).
 /// - [`LgdType::Downturn`]: `LGD_eff = EclConfig::downturn_lgd.adjust(base)`,
 ///   applied via [`DownturnLgd::adjust`] on top of `base` (so a scenario
 ///   `lgd_override` sets the base and the downturn stress is layered on top
@@ -124,7 +124,7 @@ pub enum LgdType {
 ///
 /// Controls time bucket granularity, staging parameters, and LGD methodology.
 /// Probability-weighted scenarios are supplied once, alongside their PD sources
-/// to [`compute_ecl_weighted`] or [`EclEngine::new`].
+/// to [`compute_ecl_weighted_from_curves`] or [`EclEngine::new`].
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -172,7 +172,7 @@ impl EclConfig {
     ///
     /// `EclConfig` exposes public fields and can be constructed directly
     /// (bypassing [`EclConfigBuilder`]), so every public entry point that
-    /// consumes a config — [`compute_ecl`] and the functions that
+    /// consumes a config — [`compute_ecl_from_curve`] and the functions that
     /// delegate to it — validates first. A zero `bucket_width_years` would
     /// otherwise produce an unbounded bucket loop.
     ///
@@ -534,7 +534,7 @@ fn effective_lgd(config: &EclConfig, base_lgd: f64) -> Result<f64> {
 ///
 /// ```rust
 /// use finstack_quant_statements_analytics::analysis::{
-///     compute_ecl, EclConfig, Exposure, QualitativeFlags, RawPdCurve, Stage,
+///     compute_ecl_from_curve, EclConfig, Exposure, QualitativeFlags, RawPdCurve, Stage,
 /// };
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -557,7 +557,7 @@ fn effective_lgd(config: &EclConfig, base_lgd: f64) -> Result<f64> {
 /// };
 /// let pd_curve = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 0.02)])?;
 ///
-/// let result = compute_ecl(&exposure, Stage::Stage1, &pd_curve, &EclConfig::default())?;
+/// let result = compute_ecl_from_curve(&exposure, Stage::Stage1, &pd_curve, &EclConfig::default())?;
 /// assert!(result.ecl > 0.0);
 /// # Ok(())
 /// # }
@@ -567,7 +567,7 @@ fn effective_lgd(config: &EclConfig, base_lgd: f64) -> Result<f64> {
 ///
 /// - IFRS 9 B5.5.28-33 -- Measurement of expected credit losses. `docs/REFERENCES.md#ifrs-9-impairment`
 /// - Duffie & Singleton (2003), *Credit Risk: Pricing, Measurement and Management*. `docs/REFERENCES.md#duffie-singleton-1999`
-pub fn compute_ecl(
+pub fn compute_ecl_from_curve(
     exposure: &Exposure,
     stage: Stage,
     pd_source: &dyn PdTermStructure,
@@ -720,7 +720,7 @@ pub fn compute_ecl(
 ///
 /// ```rust
 /// use finstack_quant_statements_analytics::analysis::{
-///     compute_ecl_weighted, EclConfig, Exposure, MacroScenario, PdTermStructure,
+///     compute_ecl_weighted_from_curves, EclConfig, Exposure, MacroScenario, PdTermStructure,
 ///     QualitativeFlags, RawPdCurve, Stage,
 /// };
 ///
@@ -747,7 +747,7 @@ pub fn compute_ecl(
 /// let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
 ///     vec![(&scenario, &pd_curve)];
 ///
-/// let result = compute_ecl_weighted(&exposure, Stage::Stage1, &pd_sources, &EclConfig::default())?;
+/// let result = compute_ecl_weighted_from_curves(&exposure, Stage::Stage1, &pd_sources, &EclConfig::default())?;
 /// assert_eq!(result.scenario_breakdown.len(), 1);
 /// # Ok(())
 /// # }
@@ -756,7 +756,7 @@ pub fn compute_ecl(
 /// # References
 ///
 /// - IFRS 9 B5.5.42 -- Probability-weighted scenarios. `docs/REFERENCES.md#ifrs-9-impairment`
-pub fn compute_ecl_weighted(
+pub fn compute_ecl_weighted_from_curves(
     exposure: &Exposure,
     stage: Stage,
     pd_sources: &[(&MacroScenario, &dyn PdTermStructure)],
@@ -785,7 +785,7 @@ pub fn compute_ecl_weighted(
             lgd: lgd_adj,
             ..exposure.clone()
         };
-        let result = compute_ecl(&adj_exposure, stage, *pd_source, config)?;
+        let result = compute_ecl_from_curve(&adj_exposure, stage, *pd_source, config)?;
         weighted_ecl += scenario.weight * result.ecl;
         scenario_results.push((scenario.id.clone(), scenario.weight, result));
     }
@@ -934,15 +934,19 @@ impl<'a> EclEngine<'a> {
             .ok_or_else(|| {
                 Error::Validation("At least one PD source is required for EclEngine".to_string())
             })?;
-        let stage_result = classify_stage(
+        let stage_result = classify_stage_from_curves(
             exposure,
             base_pd,
             origination_pd_source,
             elapsed_years,
             &self.config.staging,
         )?;
-        let ecl_result =
-            compute_ecl_weighted(exposure, stage_result.stage, &self.pd_sources, &self.config)?;
+        let ecl_result = compute_ecl_weighted_from_curves(
+            exposure,
+            stage_result.stage,
+            &self.pd_sources,
+            &self.config,
+        )?;
         Ok(ExposureEclResult {
             stage_result,
             ecl_result,
@@ -1019,7 +1023,7 @@ mod tests {
             lgd_override: None,
         };
         let curve = make_pd_curve();
-        let result = compute_ecl_weighted(
+        let result = compute_ecl_weighted_from_curves(
             &make_exposure(),
             Stage::Stage1,
             &[(&scenario, &curve)],
@@ -1040,7 +1044,7 @@ mod tests {
         let curve = make_pd_curve();
         let config = EclConfig::default();
 
-        let result = compute_ecl(&exposure, Stage::Stage1, &curve, &config).unwrap();
+        let result = compute_ecl_from_curve(&exposure, Stage::Stage1, &curve, &config).unwrap();
 
         // Stage 1 horizon = min(1.0, 5.0) = 1.0
         assert!((result.horizon - 1.0).abs() < 1e-10);
@@ -1054,7 +1058,7 @@ mod tests {
         let curve = make_pd_curve();
         let config = EclConfig::default();
 
-        let result = compute_ecl(&exposure, Stage::Stage2, &curve, &config).unwrap();
+        let result = compute_ecl_from_curve(&exposure, Stage::Stage2, &curve, &config).unwrap();
 
         // Stage 2 horizon = remaining maturity = 5.0
         assert!((result.horizon - 5.0).abs() < 1e-10);
@@ -1068,7 +1072,7 @@ mod tests {
         let curve = make_pd_curve();
         let config = EclConfig::default();
 
-        let result = compute_ecl(&exposure, Stage::Stage3, &curve, &config).unwrap();
+        let result = compute_ecl_from_curve(&exposure, Stage::Stage3, &curve, &config).unwrap();
 
         // PD ≡ 1: ECL = EAD - (1 - LGD) x EAD x DF(t_recovery), default t_recovery = 1.0
         let expected = 1_000_000.0 - 0.55 * 1_000_000.0 / 1.05_f64;
@@ -1089,7 +1093,7 @@ mod tests {
         let curve = make_pd_curve();
         let config = EclConfig::default();
 
-        let result = compute_ecl(&exposure, Stage::Stage3, &curve, &config).unwrap();
+        let result = compute_ecl_from_curve(&exposure, Stage::Stage3, &curve, &config).unwrap();
         assert!(
             result.ecl > 0.0,
             "Stage 3 with zero remaining maturity must not produce ECL = 0"
@@ -1105,7 +1109,7 @@ mod tests {
             .build()
             .unwrap();
 
-        let result = compute_ecl(&exposure, Stage::Stage3, &curve, &config).unwrap();
+        let result = compute_ecl_from_curve(&exposure, Stage::Stage3, &curve, &config).unwrap();
         let expected = 1_000_000.0 - 0.55 * 1_000_000.0 / 1.05_f64.powi(2);
         assert!((result.ecl - expected).abs() < 1e-6);
     }
@@ -1120,8 +1124,10 @@ mod tests {
         // Level amortization from 1,000,000 down to 0 at maturity.
         amortizing.ead_schedule = Some(vec![(0.0, 1_000_000.0), (5.0, 0.0)]);
 
-        let ecl_constant = compute_ecl(&constant, Stage::Stage2, &curve, &config).unwrap();
-        let ecl_amortizing = compute_ecl(&amortizing, Stage::Stage2, &curve, &config).unwrap();
+        let ecl_constant =
+            compute_ecl_from_curve(&constant, Stage::Stage2, &curve, &config).unwrap();
+        let ecl_amortizing =
+            compute_ecl_from_curve(&amortizing, Stage::Stage2, &curve, &config).unwrap();
 
         assert!(
             ecl_amortizing.ecl < ecl_constant.ecl,
@@ -1142,10 +1148,10 @@ mod tests {
 
         let mut exposure = make_exposure();
         exposure.ead_schedule = Some(vec![(1.0, 100.0), (1.0, 50.0)]);
-        assert!(compute_ecl(&exposure, Stage::Stage1, &curve, &config).is_err());
+        assert!(compute_ecl_from_curve(&exposure, Stage::Stage1, &curve, &config).is_err());
 
         exposure.ead_schedule = Some(vec![(0.0, -1.0)]);
-        assert!(compute_ecl(&exposure, Stage::Stage1, &curve, &config).is_err());
+        assert!(compute_ecl_from_curve(&exposure, Stage::Stage1, &curve, &config).is_err());
     }
 
     #[test]
@@ -1174,7 +1180,7 @@ mod tests {
         // PIT: ECL = cumPD(1y) × LGD × EAD = 0.02 × 0.45 × 100,000 = 900.
         // TTC (ttc_lgd = 0.40): ECL = 0.02 × 0.40 × 100,000 = 800.
         let pit = EclConfig::default();
-        let pit_ecl = compute_ecl(
+        let pit_ecl = compute_ecl_from_curve(
             &lgd_test_exposure(),
             Stage::Stage1,
             &one_year_2pct_curve(),
@@ -1189,7 +1195,7 @@ mod tests {
             .ttc_lgd(0.40)
             .build()
             .unwrap();
-        let ttc_ecl = compute_ecl(
+        let ttc_ecl = compute_ecl_from_curve(
             &lgd_test_exposure(),
             Stage::Stage1,
             &one_year_2pct_curve(),
@@ -1212,7 +1218,7 @@ mod tests {
             .downturn_lgd(adjuster)
             .build()
             .unwrap();
-        let ecl = compute_ecl(
+        let ecl = compute_ecl_from_curve(
             &lgd_test_exposure(),
             Stage::Stage1,
             &one_year_2pct_curve(),
@@ -1243,7 +1249,7 @@ mod tests {
             .downturn_lgd(adjuster)
             .build()
             .unwrap();
-        let ecl = compute_ecl(
+        let ecl = compute_ecl_from_curve(
             &lgd_test_exposure(),
             Stage::Stage1,
             &one_year_2pct_curve(),
@@ -1265,7 +1271,7 @@ mod tests {
             .downturn_lgd(adjuster)
             .build()
             .unwrap();
-        let ecl = compute_ecl(
+        let ecl = compute_ecl_from_curve(
             &lgd_test_exposure(),
             Stage::Stage3,
             &one_year_2pct_curve(),
@@ -1305,9 +1311,13 @@ mod tests {
         };
         let curve = one_year_2pct_curve();
         let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> = vec![(&scenario, &curve)];
-        let result =
-            compute_ecl_weighted(&lgd_test_exposure(), Stage::Stage1, &pd_sources, &config)
-                .unwrap();
+        let result = compute_ecl_weighted_from_curves(
+            &lgd_test_exposure(),
+            Stage::Stage1,
+            &pd_sources,
+            &config,
+        )
+        .unwrap();
         assert!((result.ecl - 760.0).abs() < 1e-9, "got {}", result.ecl);
     }
 
@@ -1392,8 +1402,12 @@ mod tests {
         };
         let curve = one_year_2pct_curve();
         let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> = vec![(&scenario, &curve)];
-        let result =
-            compute_ecl_weighted(&lgd_test_exposure(), Stage::Stage1, &pd_sources, &config);
+        let result = compute_ecl_weighted_from_curves(
+            &lgd_test_exposure(),
+            Stage::Stage1,
+            &pd_sources,
+            &config,
+        );
         assert!(
             result.is_err(),
             "TTC pins LGD; a scenario override must not be silently ignored"
@@ -1414,8 +1428,8 @@ mod tests {
         let curve = make_pd_curve();
         let config = EclConfig::default();
 
-        let s1 = compute_ecl(&exposure, Stage::Stage1, &curve, &config).unwrap();
-        let s2 = compute_ecl(&exposure, Stage::Stage2, &curve, &config).unwrap();
+        let s1 = compute_ecl_from_curve(&exposure, Stage::Stage1, &curve, &config).unwrap();
+        let s2 = compute_ecl_from_curve(&exposure, Stage::Stage2, &curve, &config).unwrap();
 
         // Stage 1 (12-month) ECL must be less than Stage 2 (lifetime)
         assert!(
@@ -1454,7 +1468,7 @@ mod tests {
 
         let config = EclConfigBuilder::new().bucket_width(0.5).build().unwrap();
 
-        let result = compute_ecl(&exposure, Stage::Stage1, &curve, &config).unwrap();
+        let result = compute_ecl_from_curve(&exposure, Stage::Stage1, &curve, &config).unwrap();
 
         // Bucket 1: [0, 0.5]
         // uncond_mpd = cumPD(0.5) - cumPD(0.0) = 0.01 - 0.00 = 0.01
@@ -1480,7 +1494,7 @@ mod tests {
         let config = EclConfig::default();
 
         // Single scenario with weight 1.0 should equal unweighted
-        let single = compute_ecl(&exposure, Stage::Stage1, &curve, &config).unwrap();
+        let single = compute_ecl_from_curve(&exposure, Stage::Stage1, &curve, &config).unwrap();
 
         let scenario = MacroScenario {
             id: "base".into(),
@@ -1490,7 +1504,8 @@ mod tests {
         let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> =
             vec![(&scenario, &curve as &dyn PdTermStructure)];
         let weighted =
-            compute_ecl_weighted(&exposure, Stage::Stage1, &pd_sources, &config).unwrap();
+            compute_ecl_weighted_from_curves(&exposure, Stage::Stage1, &pd_sources, &config)
+                .unwrap();
 
         assert!(
             (single.ecl - weighted.ecl).abs() < 1e-10,
@@ -1521,7 +1536,9 @@ mod tests {
             (&down_scenario, &curve as &dyn PdTermStructure),
         ];
 
-        let result = compute_ecl_weighted(&exposure, Stage::Stage1, &pd_sources, &config).unwrap();
+        let result =
+            compute_ecl_weighted_from_curves(&exposure, Stage::Stage1, &pd_sources, &config)
+                .unwrap();
 
         // Verify manual calculation
         let base_ecl = result.scenario_breakdown[0].2.ecl;
@@ -1564,8 +1581,12 @@ mod tests {
     fn test_compute_ecl_weighted_rejects_empty_pd_sources() {
         let exposure = make_exposure();
         let pd_sources: Vec<(&MacroScenario, &dyn PdTermStructure)> = Vec::new();
-        let result =
-            compute_ecl_weighted(&exposure, Stage::Stage1, &pd_sources, &EclConfig::default());
+        let result = compute_ecl_weighted_from_curves(
+            &exposure,
+            Stage::Stage1,
+            &pd_sources,
+            &EclConfig::default(),
+        );
 
         assert!(result.is_err());
     }
@@ -1593,7 +1614,7 @@ mod tests {
             lgd: 0.45,
             ..make_exposure()
         };
-        let ecl = compute_ecl(
+        let ecl = compute_ecl_from_curve(
             &exposure,
             Stage::Stage1,
             &one_year_2pct_curve(),
@@ -1614,7 +1635,7 @@ mod tests {
             weight: 1.0,
             lgd_override: Some(0.90),
         };
-        let result = compute_ecl_weighted(
+        let result = compute_ecl_weighted_from_curves(
             &exposure,
             Stage::Stage1,
             &[(&scenario, &curve)],

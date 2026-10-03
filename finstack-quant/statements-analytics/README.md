@@ -105,7 +105,7 @@ a submodule.
 | Variance | `VarianceAnalyzer`, `VarianceConfig`, `VarianceReport`, `VarianceRow`, `BridgeChart`, `BridgeStep` |
 | Credit | `compute_credit_context`, `CreditContextMetrics`, `forecast_covenant`, `forecast_breaches`, `StatementsAdapter`, `to_table` |
 | Checks (`analysis::checks`) | `three_statement_checks`, `credit_underwriting_checks`, `lbo_model_checks`, `ThreeStatementMapping`, `CreditMapping`, `FormulaCheckSpec`, `CheckReportRenderer`, plus reconciliation / consistency / credit check types |
-| ECL | `EclEngine`, `EclConfig`, `EclConfigBuilder`, `CeclEngine`, `CeclConfig`, `classify_stage`, `StagingConfig`, `PdTermStructure`, `PortfolioEclResult`, `ProvisionWaterfall`, `compute_waterfall` |
+| ECL | `EclEngine`, `EclConfig`, `EclConfigBuilder`, `CeclEngine`, `CeclConfig`, `classify_stage`, `compute_ecl`, `compute_ecl_weighted`, `classify_stage_from_curves`, `compute_ecl_from_curve`, `compute_ecl_weighted_from_curves`, `StagingConfig`, `PdTermStructure`, `PortfolioEclResult`, `ProvisionWaterfall`, `compute_waterfall` |
 | Comps | `PeerSet`, `PeerFilter`, `PeerStats`, `compute_peer_multiples`, `compute_multiple`, `regression_fair_value`, `score_relative_value`, `percentile_rank`, `z_score` |
 | Goal seek | `goal_seek` |
 | Backtesting | `backtest_forecast`, `ForecastMetrics` |
@@ -156,7 +156,7 @@ chart of accounts: `three_statement_checks(ThreeStatementMapping)`,
 `finstack_quant_statements::checks::CheckSuite`, ready for
 `Evaluator::with_checks`.
 
-**ECL.** IFRS 9 staging (`classify_stage`, `StagingConfig`, `StagingTrigger`)
+**ECL.** IFRS 9 staging (`classify_stage` from scalar PDs, `classify_stage_from_curves` from PD term structures, `StagingConfig`, `StagingTrigger`), measurement (`compute_ecl` / `compute_ecl_weighted` from cumulative-PD schedules, `compute_ecl_from_curve` / `compute_ecl_weighted_from_curves` with an `EclConfig`)
 and CECL (`CeclEngine`, `CeclMethodology`), with single-exposure, weighted, and
 portfolio aggregation paths plus a `ProvisionWaterfall`. Stage 2/3 DPD
 backstops fire at `days_past_due >= 30` / `>= 90` (bank / CECL alignment);
@@ -167,7 +167,7 @@ the display contract is `dpd_stage2 (dpd=30 >= 30)` /
 rating-keyed map of `RawPdCurve` values; a supplied rating missing from its PD source is an error. If either exposure
 rating is `None`, the PD-delta test is explicitly skipped. `EclConfig`, `StagingConfig` and
 `CeclConfig` defaults come from the embedded `ecl_policy.v1.json` registry.
-`classify_stage(exposure, current_pd_source, origination_pd_source, elapsed_years, config)`
+`classify_stage_from_curves(exposure, current_pd_source, origination_pd_source, elapsed_years, config)`
 compares reporting-date risk with the initial-recognition conditional PD over
 the same remaining window, given survival to finite non-negative
 `elapsed_years`, even when the rating label is unchanged. `EclEngine::new(config, pd_sources)` uses

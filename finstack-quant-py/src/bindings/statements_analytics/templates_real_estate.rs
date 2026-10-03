@@ -1040,9 +1040,9 @@ fn add_rent_roll(
 #[pyo3(signature = (
     model,
     leases,
-    other_income_nodes=Vec::new(),
-    opex_nodes=Vec::new(),
-    capex_nodes=Vec::new(),
+    other_income_nodes,
+    opex_nodes,
+    capex_nodes,
     management_fee=None,
     nodes=None,
 ))]
