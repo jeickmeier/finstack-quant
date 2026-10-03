@@ -247,7 +247,6 @@ def benchmark_tearsheet(
         eyebrow="Benchmark-Relative Review",
         title=title or str(fund_name),
         subtitle=subtitle if subtitle is not None else f"vs {bench_name}",
-        meta_lines=["Decimal mode · Bankers rounding"],
         kpis=kpis,
         sections=secs,
         generated=generated,

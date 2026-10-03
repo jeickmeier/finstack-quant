@@ -411,6 +411,29 @@ impl PyPnlAttribution {
         serde_to_py(py, &self.inner.credit_carry_decomposition)
     }
 
+    /// Share of total P&L, in percent, that an amount represents.
+    ///
+    /// Computes ``amount / total_pnl * 100`` (Rust
+    /// ``PnlAttribution::pct_of_total``); the zero test on ``total_pnl`` uses
+    /// the run's rounding context, as ``residual_pct`` does.
+    ///
+    /// Parameters
+    /// ----------
+    /// amount : float
+    ///     P&L amount in ``total_pnl`` currency units, normally one factor
+    ///     field (``carry``, ``rates_curves_pnl``, ``residual``, ...) or
+    ///     ``total_pnl`` itself.
+    ///
+    /// Returns
+    /// -------
+    /// float or None
+    ///     Signed percentage points (``25.0`` = 25% of total P&L), or ``None``
+    ///     when ``total_pnl`` is effectively zero and the share is undefined.
+    #[pyo3(text_signature = "($self, amount)")]
+    fn pct_of_total(&self, amount: f64) -> Option<f64> {
+        self.inner.pct_of_total(amount)
+    }
+
     /// Check whether the residual is within tolerance.
     ///
     /// With no arguments this uses the attribution's own stored,

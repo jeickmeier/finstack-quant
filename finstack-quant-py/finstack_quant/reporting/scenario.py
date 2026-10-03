@@ -4,9 +4,9 @@ Driver tornado, scenario comparison, Monte-Carlo percentile fan, and variance
 vs baseline.
 
 Pure presentation — every input is a pre-built shape (tornado entries, a
-``{scenario: value}`` dict, a Monte-Carlo fan dict, a ``run_variance`` dict).
-No engine wiring or financial calculation; the only transforms are a magnitude
-sort key and display-unit percent scaling.
+``{scenario: value}`` dict, a Monte-Carlo fan dict, a ``run_variance`` result).
+No engine wiring or financial calculation; tornado rows keep the Rust order and
+the only transform is display-unit percent scaling.
 
 Examples:
 --------
@@ -22,7 +22,7 @@ from typing import Any
 
 from . import charts, format as fmt
 from .document import KPI, Section, TearSheet, _resolve_sections
-from .statements_common import _section_variance
+from .statements_common import _section_variance, tornado_entries
 from .theme import INSTITUTIONAL, Theme
 
 __all__ = [
@@ -34,12 +34,10 @@ ALL_SECTIONS = ["tornado", "scenarios", "montecarlo", "variance"]
 
 
 def _section_tornado(tornado: Any, theme: Theme) -> Section | None:
-    if not tornado or not isinstance(tornado, list):
+    if not tornado:
         return None
-    entries = [(e.get("parameter_id"), e.get("downside"), e.get("upside")) for e in tornado if isinstance(e, dict)]
-    if not entries:
-        return None
-    entries.sort(key=lambda t: abs(t[1] or 0.0) + abs(t[2] or 0.0), reverse=True)
+    entries = tornado_entries(tornado)
+    # Rows keep the Rust order (``generate_tornado_entries`` ranks by |swing|).
     return Section(
         "Driver Sensitivity",
         charts.tornado_chart(entries, theme=theme),
@@ -105,14 +103,15 @@ def scenario_tearsheet(
 
     Parameters
     ----------
-    tornado : list[dict], optional
-        ``generate_tornado_entries`` output (``parameter_id``/``downside``/``upside``).
+    tornado : list[TornadoEntry | dict], optional
+        ``generate_tornado_entries`` output (typed entries, dicts or JSON
+        objects with ``parameter_id``/``downside``/``upside``), in Rust order.
     scenarios : dict, optional
         ``{scenario_name: target_metric_value}`` for the comparison bars.
     monte_carlo : dict, optional
         A pre-extracted fan: ``{"periods": [...], "p_low": [...], "p_mid": [...], "p_high": [...]}``.
-    variance : dict, optional
-        A ``run_variance`` result (``{"rows": [...]}``).
+    variance : VarianceReport | dict | str, optional
+        A ``run_variance`` result (typed, dict, or JSON).
     breach_probability : float, optional
         Fraction (e.g. ``0.12``) used for the breach KPI and the MC caption.
     target_metric : str, optional
@@ -130,6 +129,8 @@ def scenario_tearsheet(
 
     Raises:
         ValueError: If ``sections`` contains an unknown section name.
+        TypeError: If ``tornado`` is not a list of tornado entries or
+            ``variance`` is not a variance report, dict, or JSON string.
 
     Returns:
     -------
@@ -169,7 +170,6 @@ def scenario_tearsheet(
         eyebrow="Scenario & Sensitivity",
         title=title or "Scenario & Sensitivity",
         subtitle=subtitle if subtitle is not None else (f"Target metric: {target_metric}" if target_metric else None),
-        meta_lines=["Decimal mode"],
         kpis=kpis,
         sections=secs,
         generated=generated,

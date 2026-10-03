@@ -96,9 +96,22 @@ or `dict` rather than re-parsing a `ValuationResult`.
 ## Conventions a contributor must honor
 
 - **No financial logic.** Sign flips for display direction (the DCF bridge's net-debt
-  step), `x * 100.0` to move a decimal into percentage points, magnitude sort keys,
-  and top-N selection are the whole permitted set. Each module's docstring states
+  step), `x * 100.0` (or `x * 10000.0` for bp) to move a decimal the engine labelled
+  as such into display units, magnitude sort keys for rows the engine returns
+  unordered, and top-N selection are the whole permitted set. An engine-ordered
+  result (the Rust tornado ranking) keeps its order. Each module's docstring states
   which of these it uses; keep that note accurate.
+- **Units come from Rust.** A metric's unit family is read from the result
+  (`ValuationResult.metric_units()`), never from a Python table; only display labels
+  live here. Shares and rolling windows are likewise read from Rust
+  (`PnlAttribution.pct_of_total`, `PeriodKind.periods_per_year`).
+- **Provenance is read, never asserted.** A numeric-mode header line comes from the
+  result's own stamp (`StatementResult` `meta.numeric_mode`, `ValuationResult`
+  meta); a sheet whose input carries no stamp prints none.
+- **Typed results are inputs.** Every result argument is normalised through
+  `statements_common.json_or_dict` (typed → `to_json()`), so a typed Rust result
+  renders exactly like its dict form; an unsupported type raises `TypeError`
+  rather than silently dropping its section.
 - **Units at the boundary.** `format.pct` takes a value *already in percentage
   points* — `13.2` renders `13.2%`. Engine metrics that arrive as decimals are scaled
   by the caller at the call site, not inside `pct`. `charts.line_chart(..., y_pct=True)`

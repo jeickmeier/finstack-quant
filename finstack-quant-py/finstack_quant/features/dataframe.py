@@ -100,9 +100,13 @@ def _index_level_values(df: Any, key: KeySelector) -> Any:
     raise KeyError(f"DataFrame key {key!r} is not a column or index level")
 
 
-def _default_datetime_index_values(df: Any, role: str) -> Any:
+def _is_datetime_index(df: Any) -> bool:
     pd = _require_pandas()
-    if isinstance(df.index, pd.DatetimeIndex):
+    return isinstance(df.index, pd.DatetimeIndex)
+
+
+def _default_datetime_index_values(df: Any, role: str) -> Any:
+    if _is_datetime_index(df):
         return df.index
     raise KeyError(f"{role} is required when df.index is not a DatetimeIndex")
 
@@ -161,10 +165,6 @@ def _require_column_name(value: str | None, role: str) -> str:
     if value is None:
         raise TypeError(f"{role} is required")
     return value
-
-
-def _operations_require(operations: Sequence[Mapping[str, Any]], family: str) -> bool:
-    return any(operation.get("family") == family for operation in operations)
 
 
 def _exposure_columns(df: Any, columns: Sequence[str]) -> list[list[float | None]]:
@@ -316,14 +316,17 @@ def panel(
             column, or the raw ``value`` column for the first op). Names must
             be unique, non-empty, and must not be the reserved name
             ``values``.
-        entity: Column or index level name for the entity key; required when any
-            operation has ``family="timeseries"``. Aware datetimes normalize to UTC; strings remain opaque.
-        order: Column or index level name for the sort key; required when any
-            operation has ``family="timeseries"`` unless ``df.index`` is a
-            ``DatetimeIndex``. Aware datetimes normalize to UTC; strings remain opaque.
-        time_key: Column or index level name for the partition key; required when
-            any operation has ``family="cross_sectional"`` unless ``df.index`` is
-            a ``DatetimeIndex``. Aware datetimes normalize to UTC; strings remain opaque.
+        entity: Column or index level name for the entity key; Rust requires it
+            when any operation has ``family="timeseries"``. Aware datetimes
+            normalize to UTC; strings remain opaque.
+        order: Column or index level name for the sort key; Rust requires it
+            when any operation has ``family="timeseries"``. Defaults to
+            ``df.index`` when that is a ``DatetimeIndex``. Aware datetimes
+            normalize to UTC; strings remain opaque.
+        time_key: Column or index level name for the partition key; Rust
+            requires it when any operation has ``family="cross_sectional"``.
+            Defaults to ``df.index`` when that is a ``DatetimeIndex``. Aware
+            datetimes normalize to UTC; strings remain opaque.
 
     Returns:
         pandas.DataFrame: One column per operation ``name``, in the order given,
@@ -331,11 +334,11 @@ def panel(
 
     Raises:
         ImportError: If pandas is not installed.
-        TypeError: If ``entity`` is omitted for a time-series operation.
         KeyError: If ``value`` or a referenced key is not a column or index
-            level (and no ``DatetimeIndex`` default applies).
+            level.
         ValueError: If a key selector is ambiguous, or the pipeline spec is
-            invalid (duplicate or empty names, or a failing operation).
+            invalid (a key the operation family requires is missing,
+            duplicate or empty names, or a failing operation).
 
     Examples:
     --------
@@ -351,24 +354,15 @@ def panel(
         "values": _numeric_column(df, value),
         "operations": [dict(operation) for operation in operations],
     }
+    # Pass whichever keys the frame supplies; Rust ``transform_panel`` decides
+    # which operation family needs which key and raises ``ValueError``.
     if entity is not None:
         spec["entity"] = _key_column(df, entity, role="entity")
-    elif _operations_require(operations, "timeseries"):
-        raise TypeError("entity is required for timeseries panel operations")
-    if order is not None or _operations_require(operations, "timeseries"):
-        spec["order"] = _key_column(
-            df,
-            order,
-            role="order",
-            default_datetime_index=True,
-        )
-    if time_key is not None or _operations_require(operations, "cross_sectional"):
-        spec["time_key"] = _key_column(
-            df,
-            time_key,
-            role="time_key",
-            default_datetime_index=True,
-        )
+    for role, key in (("order", order), ("time_key", time_key)):
+        if key is not None:
+            spec[role] = _key_column(df, key, role=role)
+        elif _is_datetime_index(df):
+            spec[role] = df.index.tolist()
     result = _transform_panel(spec)
     frame = result.to_dataframe(index=df.index)
     return frame[[operation["name"] for operation in operations]]

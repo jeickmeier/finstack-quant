@@ -30592,6 +30592,14 @@ export interface AttributionNamespace {
    */
   pnlAttributionExplainVerboseText(pnl: PnlAttribution | string): string;
   /**
+   * Share of total P&L, in percent, that an amount represents (twin of Python `PnlAttribution.pct_of_total`).
+   * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+   * @param amount - P&L amount in `total_pnl` currency units, normally one factor field (`carry`, `rates_curves_pnl`, `residual`, ...) or `total_pnl` itself.
+   * @returns Signed percentage points (`25` = 25% of total P&L), or `undefined` when `total_pnl` is effectively zero and the share is undefined.
+   * @throws Error - Throws with kind `validation` if `pnl` is not a `PnlAttribution`, and kind `invalid_type` if `amount` is not a number.
+   */
+  pnlAttributionPctOfTotal(pnl: PnlAttribution | string, amount: number): number | undefined;
+  /**
    * Whether the attribution residual is within tolerance (twin of Python `PnlAttribution.residual_within_tolerance`).
    * @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
    * @param pctTolerance - Optional percentage tolerance (`0.1` = 0.1%); omitted uses the run's `meta.tolerance_pct`.

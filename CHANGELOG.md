@@ -62,6 +62,34 @@
 - `models.volatility.implied_vol_bachelier` / `implied_vol_black` (WASM `models.volatility.impliedVolBachelier` / `impliedVolBlack`) bind the Rust undiscounted implied-vol solvers, so a normal-model price (including negative forwards/strikes) can be inverted from Python and JavaScript (MODB-019).
 - SABR: `SabrSmile.strike_from_delta` / `check_no_arbitrage` / `repair_arbitrage`, the `SabrParameters` factories (`normal`, `lognormal`, `shifted_normal`, `shifted_lognormal`, `equity_standard`, `rates_standard`), `SabrParameters.to_json` / `from_json`, and the `SabrCalibrator` getters `tolerance` / `max_iterations` / `shift` / `atm_pinning`, in Python and WASM (camelCase). Python `SabrParameters` also supports `==`, `pickle` and `copy.deepcopy` (MODB-020).
 
+### Reporting and features: inputs and provenance (Python-binding audit PR 17)
+
+#### Fixed
+
+- `scenario_tearsheet` and `dcf_tearsheet` accept the typed `TornadoEntry` list from `generate_tornado_entries`, and `statement_tearsheet` / `scenario_tearsheet` accept the typed `VarianceReport` from `run_variance`: every entry is normalised through `json_or_dict`. Previously `scenario_tearsheet` and both variance sections dropped typed results silently.
+- Tear sheets no longer print a hard-coded "Decimal mode" / "Decimal mode · Bankers rounding" line. `statement_tearsheet`, `dcf_tearsheet` and `credit_tearsheet` print `Numeric: <mode>` from the statement result's own `meta.numeric_mode` (e.g. `float64`); performance, benchmark, scenario and the portfolio fallback print none.
+
+#### Changed
+
+- **Breaking:** `scenario_tearsheet` / `dcf_tearsheet` raise `TypeError` (or `json.JSONDecodeError`) on a tornado input that is not a list of entries or contains an unsupported entry, instead of skipping it.
+- **Breaking:** `features.dataframe.panel` no longer pre-validates which keys an operation family needs. A missing `entity`, `order` or `time_key` now raises Rust's `ValueError` ("panel transform … is required …") instead of `TypeError` / `KeyError`; `order` and `time_key` still default to a `DatetimeIndex`.
+
+### Reporting: numbers from Rust (Python-binding audit PR 16)
+
+#### Added
+
+- `PnlAttribution.pct_of_total(amount)` (Rust `PnlAttribution::pct_of_total`, WASM `attribution.pnlAttributionPctOfTotal`): a factor's signed share of total P&L in percent, `None`/`undefined` when total P&L is effectively zero. `explain()` and `residual_pct` use the same computation.
+
+#### Fixed
+
+- `instrument_tearsheet` formats every metric from the unit Rust reports (`ValuationResult.metric_units()`) instead of a Python unit table: annuity and risky annuity render as numbers (4.49) rather than whole-currency amounts ("4"), Greeks and risky PV01 render as currency amounts, and custom metrics render as plain numbers. Decimal spreads are still shown in basis points.
+- `attribution_tearsheet` reads each factor's "% of Total" from `PnlAttribution.pct_of_total`; a zero total P&L shows `·` instead of `+0.0%` on every row.
+- `dcf_tearsheet` and `scenario_tearsheet` keep the tornado order Rust returns (ranked by swing) instead of re-sorting by |downside| + |upside|.
+- `portfolio_risk_tearsheet` reads `var_contributions` / `relative_var` from the `PositionRiskDecomposition` that `parametric_var_decomposition` and `historical_var_decomposition` return, so the VaR Contributions section renders again.
+- `charts.nice_ticks` (used by every tear-sheet chart) no longer loops forever on a value range below float resolution, such as a near-constant rolling series; that range is treated as degenerate and expanded to a unit interval.
+- `tables.data_table` renders a missing (`None`) cell as `·` in every tear-sheet table instead of the text `None`.
+- `performance_tearsheet` sizes its rolling Sharpe/volatility window to one year at the panel's frequency (Rust `PeriodKind.periods_per_year`): monthly data gets a 12-observation window instead of 252 observations and two empty charts.
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

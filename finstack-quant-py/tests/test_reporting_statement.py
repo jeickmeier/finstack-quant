@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import datetime as dt
+from typing import Any
 
 import pytest
 
@@ -76,3 +77,32 @@ def test_statement_tearsheet_variance_section() -> None:
 def test_statement_tearsheet_variance_absent_omits_section() -> None:
     html = statement_tearsheet(_results(), sections=["variance"], generated=dt.date(2026, 6, 22)).to_html()
     assert "Variance vs Baseline" not in html
+
+
+def test_statement_tearsheet_renders_typed_variance_report() -> None:
+    """PYPY-006: a typed ``run_variance`` result renders the variance section."""
+    from finstack_quant.statements import Evaluator, ModelBuilder
+    from finstack_quant.statements_analytics import VarianceConfig, run_variance
+
+    def model(revenue: float) -> Any:
+        b = ModelBuilder("m")
+        b.periods("2025Q1..Q1", None)
+        b.value("revenue", [("2025Q1", revenue)])
+        b.compute("profit", "revenue * 0.5")
+        return Evaluator().evaluate(b.build())
+
+    report = run_variance(model(100.0), model(120.0), VarianceConfig("base", "actual", ["profit"], ["2025Q1"]))
+    sheet = statement_tearsheet(model(100.0), variance=report, sections=["variance"])
+    assert [s.title for s in sheet.sections] == ["Variance vs Baseline"]
+    assert "profit" in sheet.sections[0].body
+
+
+def test_statement_tearsheet_stamps_the_results_own_numeric_mode() -> None:
+    """PYPY-008: provenance is read from the result, never asserted."""
+    results = _results()
+    assert str(results.numeric_mode) == 'NumericMode("float64")'
+    sheet = statement_tearsheet(results, sections=[])
+    assert sheet.meta_lines == ["Numeric: float64"]
+    assert "Decimal mode" not in sheet.to_html()
+    # A bare node map carries no stamp: no provenance line is printed.
+    assert statement_tearsheet({"nodes": {}}, sections=[]).meta_lines == []

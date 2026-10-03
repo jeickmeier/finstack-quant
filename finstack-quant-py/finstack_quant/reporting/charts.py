@@ -96,7 +96,8 @@ def nice_ticks(vmin: float, vmax: float, target: int = 4) -> list[float]:
 
     Notes:
     -----
-    This helper does not raise; a degenerate range is expanded to a unit interval.
+    This helper does not raise; a degenerate range (empty, inverted, or narrower
+    than ``1e-9`` of its magnitude) is expanded to a unit interval.
 
     Examples:
     --------
@@ -104,7 +105,9 @@ def nice_ticks(vmin: float, vmax: float, target: int = 4) -> list[float]:
     >>> nice_ticks(-1, 3)
     [-1, 0.0, 1, 2, 3]
     """
-    if vmax <= vmin:
+    # A range below float resolution of its values (a constant series that
+    # rounding made non-constant) is degenerate too: its step would vanish.
+    if vmax - vmin <= 1e-9 * max(1.0, abs(vmin), abs(vmax)):
         vmax = vmin + 1.0
     raw = (vmax - vmin) / target
     mag = 10 ** math.floor(math.log10(raw)) if raw > 0 else 1.0
@@ -688,7 +691,7 @@ def tornado_chart(
 ) -> str:
     """Render a horizontal tornado (diverging bars) for sensitivity entries.
 
-    ``entries`` is ``[(label, downside, upside)]`` (caller sorts by magnitude).
+    ``entries`` is ``[(label, downside, upside)]``, drawn top-down in the given order.
     Each row draws a downside bar (left of the zero baseline, ``theme.neg``) and
     an upside bar (right, ``theme.pos``). Reuses the value-axis, gridline, and
     hover-band (``fq-hb``/``fq-cross``/``fq-mk``) conventions of the other
@@ -697,8 +700,8 @@ def tornado_chart(
     Parameters
     ----------
     entries : list[tuple[str, Any, Any]]
-        ``(label, downside, upside)`` sensitivity rows, normally pre-sorted by
-        magnitude; values use shared display units.
+        ``(label, downside, upside)`` sensitivity rows in display order (the
+        Rust ``generate_tornado_entries`` order); values use shared display units.
     theme : Theme
         Report palette and typography used for SVG elements.
     height : int or None

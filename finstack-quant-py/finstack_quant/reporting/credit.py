@@ -206,7 +206,7 @@ def credit_tearsheet(
         eyebrow="Credit Profile",
         title=title or "Credit Assessment",
         subtitle=subtitle if subtitle is not None else (f"As of {as_of}" if as_of else None),
-        meta_lines=["Decimal mode"],
+        meta_lines=parse_statement(results).meta_lines() if results is not None else [],
         kpis=kpis,
         sections=secs,
         generated=generated,
