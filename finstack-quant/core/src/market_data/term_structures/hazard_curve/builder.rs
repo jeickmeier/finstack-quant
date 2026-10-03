@@ -31,8 +31,6 @@ pub struct HazardCurveBuilder {
     pub(super) day_count: DayCount,
     pub(super) par_points: Vec<(f64, f64)>, // (t, spread_bp)
     pub(super) par_interp: ParInterp,
-    /// Survival-probability interpolation style (default LogLinear).
-    pub(super) survival_interp: InterpStyle,
     /// Maximum allowed hazard rate (default 10.0).
     /// Rates above this trigger an error in `build()`.
     pub(super) max_hazard_rate: f64,
@@ -94,19 +92,6 @@ impl HazardCurveBuilder {
         self
     }
 
-    /// Set the interpolation style for survival probabilities between
-    /// pillars. The default [`InterpStyle::LogLinear`] is the market
-    /// standard and the only supported style: it preserves consistency with
-    /// the stored piecewise-constant hazard rates.
-    ///
-    /// # Arguments
-    ///
-    /// * `style` - Survival interpolation; must be [`InterpStyle::LogLinear`].
-    ///   Other styles are rejected by [`build`](Self::build).
-    pub fn interp(mut self, style: InterpStyle) -> Self {
-        self.survival_interp = style;
-        self
-    }
     /// Attach the exact inputs used to calibrate this curve.
     ///
     /// # Arguments
@@ -198,15 +183,10 @@ impl HazardCurveBuilder {
     /// Returns an error when the base date was not explicitly set, no knots
     /// are supplied, a time, rate, recovery rate, or stored par spread is
     /// invalid, knot times are duplicated, or a hazard rate exceeds the
-    /// configured maximum, or survival interpolation is not log-linear.
+    /// configured maximum.
     /// Input points are sorted by time before the curve is
     /// constructed; callers need not pre-sort them.
     pub fn build(self) -> crate::Result<HazardCurve> {
-        if self.survival_interp != InterpStyle::LogLinear {
-            return Err(crate::Error::Validation(
-                "HazardCurve requires log-linear survival interpolation for piecewise-constant hazards".to_string(),
-            ));
-        }
         // Require explicit base_date to avoid accidentally anchoring to 1970-01-01
         let default_base =
             Date::from_calendar_date(1970, time::Month::January, 1).unwrap_or(time::Date::MIN);
@@ -288,7 +268,7 @@ impl HazardCurveBuilder {
         // LogLinear style implies a piecewise-constant hazard rate.
         // Extrapolate with FlatForward (constant hazard rate at tail).
         let interp = crate::market_data::term_structures::common::build_interp(
-            self.survival_interp,
+            InterpStyle::LogLinear,
             interp_kvec.into_boxed_slice(),
             interp_svec.into_boxed_slice(),
             ExtrapolationPolicy::FlatForward,
@@ -307,7 +287,6 @@ impl HazardCurveBuilder {
             par_tenors: p_ten.into_boxed_slice(),
             par_spreads_bp: p_spd.into_boxed_slice(),
             par_interp: self.par_interp,
-            survival_interp_style: self.survival_interp,
             hazard_calibration: self.hazard_calibration,
             interp,
             fx_policy: self.fx_policy,

@@ -2126,14 +2126,6 @@ export type D_08Aea844Abd10Cb00E40 =
        * Entity name.
        */
       entity: string;
-      /**
-       * Interpolation style for survival probabilities between pillars.
-       *
-       * Only log-linear survival interpolation is supported, preserving the
-       * piecewise-constant hazard representation. Other styles are rejected
-       * before calibration starts.
-       */
-      interpolation?: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
       kind: "hazard";
       /**
        * Calibration method to use.
@@ -4557,10 +4549,6 @@ export type DE988Ea453181Acf6E6F1 =
        * Seniority
        */
       seniority?: DA299B05259471B8097A2 | null;
-      /**
-       * Survival-probability interpolation style between pillars
-       */
-      survival_interp?: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
     }
   | {
       /**

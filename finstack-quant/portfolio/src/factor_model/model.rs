@@ -1864,7 +1864,7 @@ pub(super) mod tests {
                         recovery_rate: 0.4,
                         notional: 1.0,
                         method: Default::default(),
-                        interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
                         par_interp:
                             finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                         doc_clause: Some("cr14".into()),

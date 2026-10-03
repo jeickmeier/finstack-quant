@@ -16,7 +16,7 @@ static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<RatingScaleRegistry> = EmbeddedJs
 );
 
 /// Rating level for credit rating scales.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct RatingLevel {
@@ -34,7 +34,7 @@ pub struct RatingLevel {
 /// Named `ScorecardScale` (rather than just `RatingScale`) to disambiguate
 /// from `finstack_quant_models::credit::migration::RatingScale`, which models
 /// the ordered state set of a credit-migration / transition matrix.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ScorecardScale {
@@ -177,7 +177,7 @@ impl UnknownScalePolicy {
 }
 
 /// Versioned registry of rating scales and scorecard defaults.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct RatingScaleRegistry {
     schema: String,
@@ -461,7 +461,7 @@ fn not_found(name: &str) -> Error {
     ))
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct ScorecardPolicy {
     default_score: f64,
@@ -470,14 +470,14 @@ struct ScorecardPolicy {
     aliases: Vec<RatingScaleAlias>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct RatingScaleAlias {
     alias: String,
     scale_id: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct RatingScaleEntry {
     ids: Vec<String>,

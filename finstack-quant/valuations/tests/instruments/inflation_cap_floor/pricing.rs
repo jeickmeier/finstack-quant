@@ -53,7 +53,6 @@ fn cap_floor_parity_matches_same_forward_swap_across_quote_volatilities() {
                 .insert(flat_discount("USD-OIS", as_of, 0.03).unwrap())
                 .insert(flat_inflation_curve("US-CPI", as_of, 300.0, 0.02).unwrap())
                 .insert_inflation_index(
-                    "US-CPI",
                     InflationIndex::new("US-CPI", vec![(as_of, 300.0)], Currency::USD).unwrap(),
                 )
                 .insert_surface(
@@ -101,7 +100,6 @@ fn zero_and_day_lag_caplets_do_not_consume_unpublished_denominators() {
                 .unwrap(),
         )
         .insert_inflation_index(
-            "US-CPI",
             InflationIndex::new(
                 "US-CPI",
                 vec![
@@ -192,7 +190,7 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
                 .build()
                 .unwrap(),
         )
-        .insert_inflation_index("US-CPI", index.clone())
+        .insert_inflation_index(index.clone())
         .insert_surface(
             flat_vol_surface("USD-INFL-VOL", &[0.01, 1.0], &[0.02], 0.01)
                 .with_quote_type(VolQuoteType::Normal)
@@ -245,7 +243,7 @@ fn monthly_publication_controls_availability_and_explicit_quote_clock() {
         .unwrap()
         .with_publication_dates(index.get_publication_dates())
         .unwrap();
-    let published_market = market.insert_inflation_index("US-CPI", published);
+    let published_market = market.insert_inflation_index(published);
     for valuation_date in [release, release + Duration::days(1)] {
         assert!(zc.value(&published_market, valuation_date).is_ok());
         assert!(yoy.value(&published_market, valuation_date).is_ok());
@@ -280,7 +278,7 @@ fn test_caplet_intrinsic_after_fixing() {
     let ctx = MarketContext::new()
         .insert(disc)
         .insert(infl_curve)
-        .insert_inflation_index("US-CPI-U", index)
+        .insert_inflation_index(index)
         .insert_surface(vol_surface);
 
     let caplet = InflationCapFloor::builder()
@@ -344,7 +342,7 @@ fn test_floor_value_with_negative_forward_normal_model() {
     let ctx = MarketContext::new()
         .insert(disc)
         .insert(infl_curve)
-        .insert_inflation_index("US-CPI-U", index)
+        .insert_inflation_index(index)
         .insert_surface(vol_surface);
 
     let floorlet = InflationCapFloor::builder()

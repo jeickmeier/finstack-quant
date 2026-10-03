@@ -24,7 +24,6 @@ use finstack_quant_core::market_data::term_structures::BaseCorrelationCurve;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::market_data::term_structures::{HazardCurve, ParInterp};
-use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::HashMap;
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use std::sync::Arc;
@@ -112,7 +111,7 @@ fn hazard_preflight_rejects_entity_mismatch() {
             recovery_rate: 0.40,
             notional: 1.0,
             method: Default::default(),
-            interpolation: InterpStyle::Linear,
+
             par_interp: ParInterp::Linear,
             doc_clause: None,
             cds_valuation_convention: None,
@@ -460,7 +459,7 @@ fn inflation_preflight_rejects_lag_mismatch_with_index() {
 
     let source_market = MarketContext::new()
         .insert(discount)
-        .insert_inflation_index("USD-CPI", index);
+        .insert_inflation_index(index);
 
     let quote = MarketQuote::Inflation(InflationQuote::InflationSwap {
         id: QuoteId::new("USD-CPI-ZCIS-20300102"),

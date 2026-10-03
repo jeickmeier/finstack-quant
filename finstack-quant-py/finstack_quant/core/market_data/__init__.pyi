@@ -1163,7 +1163,6 @@ class HazardCurve:
         recovery_rate: float,
         day_count: Optional[Union[DayCount, str]] = None,
         par_spreads: Optional[Sequence[tuple[float, float]]] = None,
-        interp: Optional[str] = None,
         par_interp: Optional[str] = None,
         issuer: Optional[str] = None,
         seniority: Optional[str] = None,
@@ -1189,9 +1188,6 @@ class HazardCurve:
         par_spreads : Sequence[tuple[float, float]], optional
             ``(time_years, par_spread_bp)`` market quotes in **basis points**
             kept for reporting and re-bootstrap risk.
-        interp : str, optional
-            Survival-probability interpolation; only ``"log_linear"`` is supported
-            to preserve the piecewise-constant hazard representation.
         par_interp : str, optional
             Par-spread readout interpolation: ``"linear"`` (default) or ``"log_linear"``.
         issuer : str, optional
@@ -1208,7 +1204,7 @@ class HazardCurve:
         ValueError
             If a knot is non-finite, negative, duplicated or above
             ``max_hazard_rate``, ``recovery_rate`` is outside ``[0, 1]``,
-            survival interpolation is not log-linear, or a label is unknown.
+            or a label is unknown.
         TypeError
             If ``recovery_rate`` is omitted.
 

@@ -1712,11 +1712,6 @@
               ],
               "description": "Seniority"
             },
-            "survival_interp": {
-              "$ref": "#/$defs/d_14c856f170a7fa5ec480",
-              "default": "log_linear",
-              "description": "Survival-probability interpolation style between pillars"
-            },
             "type": {
               "const": "hazard",
               "type": "string"

@@ -19,7 +19,7 @@ impl HazardCurve {
             day_count: DayCount::Act365F,
             par_points: Vec::new(),
             par_interp: ParInterp::Linear,
-            survival_interp: InterpStyle::LogLinear,
+
             max_hazard_rate: 10.0,
             hazard_calibration: None,
             fx_policy: None,

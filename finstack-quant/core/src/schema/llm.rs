@@ -766,16 +766,6 @@ pub(super) fn apply_strict_shape(node: &mut Value) {
                 }
             }
 
-            // `type: [T, "null"]` and `anyOf: [T, null]` mean the same thing;
-            // one spelling is easier for a generator to follow.
-            if let Some(Value::Array(types)) = object.get("type") {
-                if types.len() == 2 && types.iter().any(|entry| entry == "null") {
-                    if let Some(concrete) = types.iter().find(|entry| *entry != "null").cloned() {
-                        object.insert("type".to_string(), concrete);
-                    }
-                }
-            }
-
             if let Some(Value::Array(prefix_items)) = object.remove("prefixItems") {
                 let count = prefix_items.len();
                 // Draft 2020-12 has no array form of `items`, so a tuple becomes

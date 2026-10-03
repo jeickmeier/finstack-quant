@@ -343,11 +343,6 @@
               "description": "Entity name.",
               "type": "string"
             },
-            "interpolation": {
-              "$ref": "#/$defs/d_e82c3e0b6558910d838d",
-              "default": "log_linear",
-              "description": "Interpolation style for survival probabilities between pillars.\n\nOnly log-linear survival interpolation is supported, preserving the\npiecewise-constant hazard representation. Other styles are rejected\nbefore calibration starts."
-            },
             "kind": {
               "const": "hazard",
               "type": "string"
@@ -6620,11 +6615,6 @@
                 }
               ],
               "description": "Seniority"
-            },
-            "survival_interp": {
-              "$ref": "#/$defs/d_e82c3e0b6558910d838d",
-              "default": "log_linear",
-              "description": "Survival-probability interpolation style between pillars"
             }
           },
           "required": [

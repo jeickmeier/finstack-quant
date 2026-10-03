@@ -21,8 +21,7 @@ use super::*;
 /// ```
 pub struct ForwardCurveBuilder {
     pub(super) id: CurveId,
-    pub(super) base: Date,
-    pub(super) base_is_set: bool,
+    pub(super) base: Option<Date>,
     pub(super) reset_lag: i32,
     pub(super) day_count: DayCount,
     pub(super) tenor: f64,
@@ -39,8 +38,7 @@ pub struct ForwardCurveBuilder {
 impl ForwardCurveBuilder {
     /// Set the curve’s valuation **base date**.
     pub fn base_date(mut self, d: Date) -> Self {
-        self.base = d;
-        self.base_is_set = true;
+        self.base = Some(d);
         self
     }
     /// Override the **reset lag** (fixing → spot) in business days.
@@ -158,9 +156,7 @@ impl ForwardCurveBuilder {
     /// the requested interpolation style cannot be built from the knots and
     /// forward values.
     pub fn build(self) -> crate::Result<ForwardCurve> {
-        if !self.base_is_set {
-            return Err(InputError::Invalid.into());
-        }
+        let base = self.base.ok_or(InputError::Invalid)?;
         if !self.tenor.is_finite() || self.tenor <= 0.0 {
             return Err(InputError::Invalid.into());
         }
@@ -221,7 +217,7 @@ impl ForwardCurveBuilder {
         )?;
         let mut curve = ForwardCurve {
             id: self.id,
-            base: self.base,
+            base,
             reset_lag: self.reset_lag,
             day_count: self.day_count,
             tenor: self.tenor,

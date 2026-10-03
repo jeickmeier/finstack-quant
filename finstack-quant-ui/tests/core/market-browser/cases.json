@@ -1,6 +1,6 @@
 {
   "source": "finstack-quant/calibration/examples/market_bootstrap/05_cdx_base_correlation.json",
-  "sha256": "db33201778fa836342d505ea85803508042ed1af9314d9af538f99b168eef330",
+  "sha256": "ac094f2f8b7ce90b1d44127c22d6e5b8aa1ab7ca3d3e0705c535317cfe192cbf",
   "calibrated": {
     "schema_version": 1,
     "curves": [
@@ -28,7 +28,6 @@
           [10.266666666666667, 120]
         ],
         "par_interp": "linear",
-        "survival_interp": "log_linear",
         "hazard_calibration": {
           "hazard_params": {
             "base_date": "2026-05-08",
@@ -36,7 +35,6 @@
             "curve_id": "CDX-NA-IG-46",
             "discount_curve_id": "USD-OIS",
             "entity": "CDX.NA.IG.46",
-            "interpolation": "log_linear",
             "method": "bootstrap",
             "notional": 1,
             "par_interp": "linear",
@@ -518,7 +516,6 @@
           [10.266666666666667, 120]
         ],
         "par_interp": "linear",
-        "survival_interp": "log_linear",
         "hazard_calibration": {
           "hazard_params": {
             "base_date": "2026-05-08",
@@ -526,7 +523,6 @@
             "curve_id": "CDX-NA-IG-46",
             "discount_curve_id": "USD-OIS",
             "entity": "CDX.NA.IG.46",
-            "interpolation": "log_linear",
             "method": "bootstrap",
             "notional": 1,
             "par_interp": "linear",
@@ -892,7 +888,6 @@
         "day_count": "act_365f",
         "par_points": [],
         "par_interp": "linear",
-        "survival_interp": "log_linear",
         "hazard_calibration": null,
         "fx_policy": null
       },

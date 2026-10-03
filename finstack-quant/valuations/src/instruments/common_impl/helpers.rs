@@ -1590,7 +1590,7 @@ mod realized_inflation_index_tests {
                     .build()
                     .expect("curve"),
             )
-            .insert_inflation_index("CPI", index);
+            .insert_inflation_index(index);
         for (lag, exact_date, interpolation_date) in [
             (InflationLag::None, january, date!(2026 - 01 - 16)),
             (
@@ -1641,7 +1641,7 @@ mod realized_inflation_index_tests {
         )
         .expect("daily index")
         .with_interpolation(InflationInterpolation::Linear);
-        let market = MarketContext::new().insert_inflation_index("DAILY", index);
+        let market = MarketContext::new().insert_inflation_index(index);
         for (lag, contract_date) in [
             (InflationLag::None, date!(2026 - 01 - 15)),
             (InflationLag::Days(10), date!(2026 - 01 - 25)),
@@ -1684,7 +1684,7 @@ mod realized_inflation_index_tests {
             .expect("curve");
         let market = MarketContext::new()
             .insert(curve)
-            .insert_inflation_index("US-CPI", index.clone());
+            .insert_inflation_index(index.clone());
         let mixed = resolve_reference_inflation(
             &market,
             "US-CPI",
@@ -1716,7 +1716,7 @@ mod realized_inflation_index_tests {
             .expect("stale history")
             .with_publication_dates(index.get_publication_dates())
             .expect("release dates");
-        let stale_market = market.clone().insert_inflation_index("US-CPI", stale);
+        let stale_market = market.clone().insert_inflation_index(stale);
         assert!(reference_inflation_value(
             &stale_market,
             "US-CPI",
@@ -1729,7 +1729,7 @@ mod realized_inflation_index_tests {
 
         let no_metadata = InflationIndex::new("US-CPI", vec![(december, 305.0)], Currency::USD)
             .expect("history with no publication policy");
-        let no_metadata_market = market.insert_inflation_index("US-CPI", no_metadata);
+        let no_metadata_market = market.insert_inflation_index(no_metadata);
         assert!(reference_inflation_value(
             &no_metadata_market,
             "US-CPI",

@@ -149,7 +149,7 @@ class TestValuationAndResult:
         assert set(values) == {"P1"}
         assert isinstance(values["P1"], PositionValue)
         assert valuation.get_position_value("P1").risk_metrics_complete
-        assert valuation.get_entity_value("ACME").currency == "USD"
+        assert valuation.get_entity_value("ACME").currency.code == "USD"
         assert valuation.fx_collapse_policy == "cashflow_date"
         with pytest.raises(KeyError):
             valuation.get_position_value("nope")

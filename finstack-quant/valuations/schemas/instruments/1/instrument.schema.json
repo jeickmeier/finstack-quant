@@ -9901,17 +9901,8 @@
     },
     "Expr": {
       "additionalProperties": false,
-      "description": "Expression AST with optional unique ID for DAG planning.\n\nDeserialization is strict (`deny_unknown_fields`): unknown fields on\ninbound payloads are rejected rather than silently ignored.",
+      "description": "Expression AST for structural DAG planning.\n\nDeserialization is strict (`deny_unknown_fields`): unknown fields on\ninbound payloads are rejected rather than silently ignored.",
       "properties": {
-        "id": {
-          "description": "Unique identifier for this expression node (for DAG planning).",
-          "format": "uint64",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "node": {
           "$ref": "#/$defs/ExprNode",
           "description": "The actual expression node."

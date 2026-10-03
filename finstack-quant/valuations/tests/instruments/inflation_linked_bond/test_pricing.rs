@@ -322,7 +322,7 @@ fn test_npv_with_deflation_protection() {
 
     let ctx = finstack_quant_core::market_data::context::MarketContext::new()
         .insert(disc)
-        .insert_inflation_index("US-CPI-U", index);
+        .insert_inflation_index(index);
 
     // Act
     let pv = ilb.value(&ctx, as_of).unwrap();

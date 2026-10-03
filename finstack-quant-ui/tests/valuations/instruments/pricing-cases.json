@@ -3,7 +3,7 @@
   "marketProvenance": [
     {
       "path": "finstack-quant-ui/registry/core/components/curve-link-example/market.json",
-      "sha256": "edf8f444ad604e0d45cb20d0c68987d579bc81fbcb639d8715155dfaaba9433e"
+      "sha256": "558276f1cd321686e421052a5a7a5ec72c0be5d5fe5bc6c8c19f4ac9f2bc5be3"
     },
     {
       "path": "finstack-quant/valuations/tests/fixtures/production_equity.json",

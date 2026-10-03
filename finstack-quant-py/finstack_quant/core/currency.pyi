@@ -194,8 +194,8 @@ class Currency:
     ISO 4217 currency identified by its alphabetic code.
 
     Immutable, hashable value type representing a single ISO-4217 currency.
-    Supports comparison with other ``Currency`` instances and with ISO
-    alphabetic code strings.
+    Supports comparison with other ``Currency`` instances. Parse ISO code
+    strings explicitly before comparison.
 
     Parameters
     ----------
@@ -217,7 +217,7 @@ class Currency:
     978
     >>> eur.decimals
     2
-    >>> eur == "EUR"
+    >>> eur == Currency("EUR")
     True
     """
 

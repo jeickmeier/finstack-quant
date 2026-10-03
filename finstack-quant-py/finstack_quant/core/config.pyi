@@ -533,7 +533,7 @@ class FinstackConfig:
 
     def set_extension(self, key: str, value: Any) -> None:
         """
-        Set a versioned registry/config extension from Python data or a JSON string.
+        Set a versioned registry/config extension from native Python JSON data; strings remain strings.
 
         Parameters
         ----------
@@ -541,7 +541,7 @@ class FinstackConfig:
             Namespaced extension key used to locate the versioned configuration
             payload in this process-wide registry.
         value:
-            Python data or a JSON string.
+            Native JSON-compatible Python data; strings are stored literally. Use json.loads explicitly to parse JSON text.
 
         Raises
         ------
@@ -686,7 +686,7 @@ class FinstackConfig:
         """
         ...
     def __eq__(self, other: object) -> bool:
-        """Return whether two configs are structurally equal (JSON wire form).
+        """Return whether two configs are structurally equal under canonical Rust equality; signed zeros compare equal.
 
         Returns
         -------

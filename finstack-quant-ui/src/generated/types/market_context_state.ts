@@ -203,10 +203,6 @@ export type DA33B682660A7Dfa1Ea09 =
        * Seniority
        */
       seniority?: DB205675B4D5Addcd52Ba | null;
-      /**
-       * Survival-probability interpolation style between pillars
-       */
-      survival_interp?: "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
       type: "hazard";
     }
   | {

@@ -102,16 +102,14 @@ fn create_inflation_market() -> MarketContext {
     MarketContext::new()
         .insert(disc_ois)
         .insert(infl_curve)
-        .insert_inflation_index("US-CPI-U", index)
+        .insert_inflation_index(index)
         .insert_surface(vol)
 }
 
 /// ILBs apply their own publication lag, so their market index must be lag-free.
 fn create_inflation_linked_bond_market() -> MarketContext {
-    create_inflation_market().insert_inflation_index(
-        "US-CPI-U",
-        bench_inflation_index().with_lag(InflationLag::None),
-    )
+    create_inflation_market()
+        .insert_inflation_index(bench_inflation_index().with_lag(InflationLag::None))
 }
 
 fn standard_notional() -> Money {

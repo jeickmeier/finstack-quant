@@ -26,7 +26,9 @@ mod builder;
 mod resolution;
 
 pub use builder::HierarchyBuilder;
-pub use resolution::{HierarchyTarget, ResolutionMode, TagFilter, TagPredicate};
+pub use resolution::{
+    HierarchyTarget, ResolutionMode, ResolvedCurveMatch, TagFilter, TagPredicate,
+};
 
 use crate::collections::HashMap;
 use crate::types::CurveId;

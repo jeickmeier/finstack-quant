@@ -496,16 +496,7 @@ impl DiscountCurve {
         if t == 0.0 {
             return 0.0;
         }
-        let df = self.df(t);
-        match compounding {
-            Compounding::Continuous => -df.ln() / t,
-            Compounding::Annual => df.powf(-1.0 / t) - 1.0,
-            Compounding::Periodic(n) => {
-                let n_f = f64::from(n.get());
-                n_f * (df.powf(-1.0 / (n_f * t)) - 1.0)
-            }
-            Compounding::Simple => (1.0 / df - 1.0) / t,
-        }
+        compounding.rate_from_df(self.df(t), t)
     }
 
     /// Helper: compute year fraction from base date to target date using curve's day-count.

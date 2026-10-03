@@ -234,7 +234,7 @@ fn generated_schema_preserves_derived_assertions() {
 
     let raw = serde_json::to_value(schemars::schema_for!(DerivedProbe))
         .expect("derived schema serializes");
-    let schema = generated_schema::<DerivedProbe>(
+    let schema = registry::generated_schema::<DerivedProbe>(
         "https://example.test/schema/",
         "probe.schema.json",
         "Derived probe",
@@ -834,5 +834,23 @@ fn example_from_json_rejects_a_payload_the_contract_does_not_accept() {
     assert!(
         error.to_string().contains("ExternalText"),
         "the error names the contract type: {error}"
+    );
+}
+
+#[test]
+fn strict_projection_preserves_nullable_array_values() {
+    let schema = json!({
+        "type": "object",
+        "properties": {"displacements": {"type": ["array", "null"], "items": {"type": "number"}}}
+    });
+    let projected = project_llm(&schema, &no_resolver, &LlmProfile::default()).expect("projects");
+    assert_eq!(
+        projected["properties"]["displacements"]["type"],
+        json!(["array", "null"])
+    );
+    assert_eq!(projected["required"], json!(["displacements"]));
+    assert_eq!(
+        projected["properties"]["displacements"]["items"]["type"],
+        "number"
     );
 }

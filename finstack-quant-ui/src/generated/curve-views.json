@@ -68,14 +68,13 @@
       "par_points",
       "recovery_rate",
       "seniority",
-      "survival_interp",
       "type"
     ],
     "source": {
       "uri": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json",
       "pointer": "#/$defs/CurveState/oneOf/2",
       "source": "finstack-quant/core/schemas/market_data/1/market_context_state.schema.json",
-      "sha256": "f19d1df452bdca4230979db0f68345f5c7143335af41c89a3f939d5f599f0bc0",
+      "sha256": "d0092d7d91ceae95df8aa6a72596bbd1f3ec85317cc3c6b9e46195dc34fd76a6",
       "description": "Hazard curve state"
     }
   },

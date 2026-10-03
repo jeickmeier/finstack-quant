@@ -30,9 +30,6 @@ pub(super) struct RawHazardCurve {
     /// Par interpolation method
     #[serde(default = "default_par_interp")]
     pub par_interp: ParInterp,
-    /// Survival-probability interpolation style between pillars
-    #[serde(default = "default_survival_interp")]
-    pub survival_interp: InterpStyle,
     /// Exact calibration replay inputs.
     #[serde(default)]
     pub hazard_calibration: Option<crate::market_data::term_structures::HazardCalibrationRecipe>,
@@ -43,10 +40,6 @@ pub(super) struct RawHazardCurve {
 
 fn default_par_interp() -> ParInterp {
     ParInterp::Linear
-}
-
-fn default_survival_interp() -> InterpStyle {
-    InterpStyle::LogLinear
 }
 
 impl From<HazardCurve> for RawHazardCurve {
@@ -75,7 +68,7 @@ impl From<HazardCurve> for RawHazardCurve {
             day_count: curve.day_count,
             par_points,
             par_interp: curve.par_interp,
-            survival_interp: curve.survival_interp_style,
+
             hazard_calibration: curve.hazard_calibration,
             fx_policy: curve.fx_policy,
         }
@@ -93,7 +86,6 @@ impl TryFrom<RawHazardCurve> for HazardCurve {
             .knots(state.knot_points)
             .par_spreads(state.par_points)
             .par_interp(state.par_interp)
-            .interp(state.survival_interp)
             .hazard_calibration_opt(state.hazard_calibration)
             .issuer_opt(state.issuer)
             .seniority_opt(state.seniority)

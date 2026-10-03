@@ -17546,16 +17546,12 @@ export interface CompositeLegSpec {
   score: number;
 }
 /**
- * Expression AST with optional unique ID for DAG planning.
+ * Expression AST for structural DAG planning.
  *
  * Deserialization is strict (`deny_unknown_fields`): unknown fields on
  * inbound payloads are rejected rather than silently ignored.
  */
 export interface Expr {
-  /**
-   * Unique identifier for this expression node (for DAG planning).
-   */
-  id?: number | null;
   /**
    * The actual expression node.
    */

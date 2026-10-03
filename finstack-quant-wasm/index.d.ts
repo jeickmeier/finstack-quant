@@ -3538,7 +3538,7 @@ export interface HazardCurveConstructor {
   /**
    * Construct a hazard curve from named options.
    *
-   * @param options - HazardCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, lambda0, t1, lambda1, …]` array or typed array, `t` in years, `lambda` a non-negative annual default intensity as a decimal); `recoveryRate` (required recovery on default, decimal in `[0, 1]`); and the optional `dayCount` (default `"act_365f"`), `parSpreads` (flat `[t0, bp0, …]` par CDS quotes in basis points, kept for reporting), `interp` (survival interpolation; only `"log_linear"` is accepted), `parInterp` (`"linear"` default or `"log_linear"`), `issuer`, `seniority` (`"senior_secured"`, `"senior"`, `"subordinated"`, `"junior"`), `currency` (ISO-4217 code of the protection leg) and `maxHazardRate` (sanity ceiling on any knot, default `10.0`). Omitted options use the Rust builder defaults. Unknown keys are rejected.
+   * @param options - HazardCurveOptions object (or its JSON text) with: `id` (curve identifier, the `MarketContext` lookup key); `baseDate` (ISO-8601 `"YYYY-MM-DD"`; knot times are year fractions from it under `dayCount`); `knots` (flat `[t0, lambda0, t1, lambda1, …]` array or typed array, `t` in years, `lambda` a non-negative annual default intensity as a decimal); `recoveryRate` (required recovery on default, decimal in `[0, 1]`); and the optional `dayCount` (default `"act_365f"`), `parSpreads` (flat `[t0, bp0, …]` par CDS quotes in basis points, kept for reporting), `parInterp` (`"linear"` default or `"log_linear"`), `issuer`, `seniority` (`"senior_secured"`, `"senior"`, `"subordinated"`, `"junior"`), `currency` (ISO-4217 code of the protection leg) and `maxHazardRate` (sanity ceiling on any knot, default `10.0`). Omitted options use the Rust builder defaults. Unknown keys are rejected.
    * @returns The constructed `HazardCurve`.
    * @throws `TypeError` (kind `invalid_type`) if `options` is not a JSON string or plain object, or holds a non-finite number; `FinstackError` (kind `validation`) for an unknown, missing or mistyped key, an odd-length `knots`/`parSpreads`, a malformed date, an unknown label, a knot the curve builder rejects, or `recoveryRate` outside `[0, 1]`.
    */
@@ -3610,10 +3610,6 @@ export interface HazardCurveOptions {
    * Flat `[t0, bp0, …]` par CDS quotes in basis points, kept for reporting and re-bootstrap risk.
    */
   parSpreads?: NumericArray;
-  /**
-   * Survival interpolation; only `"log_linear"` preserves piecewise-constant hazards.
-   */
-  interp?: string;
   /**
    * Par-spread readout interpolation: `"linear"` (Rust default) or `"log_linear"`.
    */

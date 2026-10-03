@@ -103,7 +103,7 @@ fn b17_month_end_cpi_has_the_same_reference_month_in_index_and_hybrid_sources() 
     .expect("published monthly CPI")
     .with_interpolation(InflationInterpolation::Linear);
     bond.inflation_index_id = "US-CPI".into();
-    let historical = MarketContext::new().insert_inflation_index("US-CPI", index);
+    let historical = MarketContext::new().insert_inflation_index(index);
     let hybrid = historical.clone().insert(
         InflationCurve::builder("US-CPI")
             .base_date(date!(2024 - 11 - 01))
@@ -277,7 +277,6 @@ fn b17_projected_inflation_uses_contract_month_interpolation_weights() {
                 .expect("projection"),
         )
         .insert_inflation_index(
-            "US-CPI",
             InflationIndex::new(
                 "US-CPI",
                 vec![(date!(2024 - 10 - 31), 300.0)],

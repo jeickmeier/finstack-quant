@@ -105,20 +105,22 @@ impl ScheduleSpec {
     ///
     /// Returns InvalidDateRange if start is after end.
     pub fn new(start: Date, end: Date) -> crate::Result<Self> {
-        let builder = ScheduleBuilder::new(start, end)?;
+        if start > end {
+            return Err(crate::error::InputError::InvalidDateRange.into());
+        }
         Ok(Self {
-            start: builder.start,
-            end: builder.end,
-            frequency: builder.frequency,
-            stub: builder.stub,
-            business_day_convention: builder.conv,
-            calendar_id: builder.deferred_calendar_id,
-            end_of_month: builder.eom,
-            imm_mode: builder.imm_mode,
-            cds_imm_mode: builder.cds_imm_mode,
-            error_policy: builder.error_policy,
-            payment_lag_days: builder.payment_lag_days,
-            fixing_lag_business_days: builder.fixing_lag_business_days,
+            start,
+            end,
+            frequency: Tenor::monthly(),
+            stub: StubKind::None,
+            business_day_convention: None,
+            calendar_id: None,
+            end_of_month: false,
+            imm_mode: false,
+            cds_imm_mode: false,
+            error_policy: ScheduleErrorPolicy::Strict,
+            payment_lag_days: 0,
+            fixing_lag_business_days: None,
         })
     }
 
@@ -208,33 +210,13 @@ impl ScheduleSpec {
                 "standard IMM and CDS IMM modes are mutually exclusive".to_string(),
             ));
         }
-        let mut builder = ScheduleBuilder::new(self.start, self.end)?;
-        // The IMM mode setters also reset frequency and stub; apply them first
-        // so the stored `frequency` and `stub` are what generation uses.
-        if self.imm_mode {
-            builder = builder.imm();
-        } else if self.cds_imm_mode {
-            builder = builder.cds_imm();
+        if self.start > self.end {
+            return Err(crate::error::InputError::InvalidDateRange.into());
         }
-        builder = builder
-            .frequency(self.frequency)
-            .stub_rule(self.stub)
-            .end_of_month(self.end_of_month);
-
-        builder = builder.error_policy(self.error_policy);
-
-        if let (Some(conv), Some(id)) = (self.business_day_convention, self.calendar_id.as_deref())
-        {
-            builder = builder.adjust_with_id(conv, id);
+        let mut spec = self.clone();
+        if spec.business_day_convention.is_none() {
+            spec.calendar_id = None;
         }
-
-        if self.payment_lag_days != 0 {
-            builder = builder.payment_lag_days(self.payment_lag_days);
-        }
-        if let Some(lag) = self.fixing_lag_business_days {
-            builder = builder.fixing_lag_business_days(lag);
-        }
-
-        builder.build()
+        ScheduleBuilder { spec, cal: None }.build()
     }
 }

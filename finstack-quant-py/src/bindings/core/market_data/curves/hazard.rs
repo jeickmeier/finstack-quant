@@ -8,8 +8,7 @@ use pyo3::prelude::*;
 
 use super::helpers::{
     columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods,
-    impl_repr_html_via_dataframe, par_interp_name, parse_interp_style, parse_par_interp,
-    parse_seniority, TimePoint,
+    impl_repr_html_via_dataframe, par_interp_name, parse_par_interp, parse_seniority, TimePoint,
 };
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
 use crate::bindings::core::dates::daycount::extract_day_count;
@@ -20,7 +19,6 @@ use crate::errors::core_to_py;
 struct HazardCurveOptions<'a> {
     day_count: Option<&'a Bound<'a, PyAny>>,
     par_spreads: Option<Vec<(f64, f64)>>,
-    interp: Option<&'a str>,
     par_interp: Option<&'a str>,
     issuer: Option<&'a str>,
     seniority: Option<&'a str>,
@@ -83,9 +81,6 @@ impl PyHazardCurve {
         if let Some(points) = options.par_spreads {
             builder = builder.par_spreads(points);
         }
-        if let Some(interp) = options.interp {
-            builder = builder.interp(parse_interp_style(interp)?);
-        }
         if let Some(par_interp) = options.par_interp {
             builder = builder.par_interp(parse_par_interp(par_interp)?);
         }
@@ -125,9 +120,6 @@ impl PyHazardCurve {
     /// par_spreads : list[tuple[float, float]], optional
     ///     ``(time_years, par_spread_bp)`` market quotes in **basis points**
     ///     kept for reporting and re-bootstrap risk.
-    /// interp : str, optional
-    ///     Survival-probability interpolation; only ``"log_linear"`` is supported
-    ///     to preserve piecewise-constant hazards.
     /// par_interp : str, optional
     ///     Par-spread readout interpolation: ``"linear"`` (default) or ``"log_linear"``.
     /// issuer : str, optional
@@ -157,7 +149,7 @@ impl PyHazardCurve {
         clippy::too_many_arguments,
         reason = "keyword-only curve options mirror the Rust builder setters"
     )]
-    #[pyo3(signature = (id, base_date, knots, *, recovery_rate, day_count=None, par_spreads=None, interp=None, par_interp=None, issuer=None, seniority=None, currency=None, max_hazard_rate=None))]
+    #[pyo3(signature = (id, base_date, knots, *, recovery_rate, day_count=None, par_spreads=None, par_interp=None, issuer=None, seniority=None, currency=None, max_hazard_rate=None))]
     fn new(
         id: &str,
         base_date: &Bound<'_, PyAny>,
@@ -165,7 +157,6 @@ impl PyHazardCurve {
         recovery_rate: f64,
         day_count: Option<&Bound<'_, PyAny>>,
         par_spreads: Option<Vec<(f64, f64)>>,
-        interp: Option<&str>,
         par_interp: Option<&str>,
         issuer: Option<&str>,
         seniority: Option<&str>,
@@ -180,7 +171,6 @@ impl PyHazardCurve {
             HazardCurveOptions {
                 day_count,
                 par_spreads,
-                interp,
                 par_interp,
                 issuer,
                 seniority,

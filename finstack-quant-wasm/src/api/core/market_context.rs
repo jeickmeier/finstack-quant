@@ -293,9 +293,8 @@ impl JsMarketContext {
     /// @returns This context, updated in place, so calls can be chained.
     #[wasm_bindgen(js_name = insertInflationIndex)]
     pub fn insert_inflation_index(&mut self, index: &JsInflationIndex) {
-        let id = index.inner.id.clone();
         self.context_mut()
-            .insert_inflation_index_mut(id, Arc::clone(&index.inner));
+            .insert_inflation_index_mut(Arc::clone(&index.inner));
     }
 
     /// Map a CSA code to the discount curve used for collateralised trades

@@ -718,7 +718,7 @@ mod tests {
                         .with_interpolation(interpolation)
                         .with_seasonality(seasonality)
                         .expect("seasonality");
-                    MarketContext::new().insert_inflation_index("CPI", index)
+                    MarketContext::new().insert_inflation_index(index)
                 };
                 let t0 = context(observations[..4].to_vec());
                 let t1 = context(observations.clone());
@@ -736,7 +736,7 @@ mod tests {
             let index = InflationIndex::new("CPI", vec![(sample_date(), value)], Currency::USD)
                 .expect("single print")
                 .with_lag(InflationLag::Months(3));
-            MarketContext::new().insert_inflation_index("CPI", index)
+            MarketContext::new().insert_inflation_index(index)
         };
         let shift = measure_inflation_index_shift("CPI", &context(100.0), &context(101.0))
             .expect("raw print does not need lagged history");
@@ -796,8 +796,8 @@ mod tests {
             Currency::USD,
         )
         .expect("t1 index");
-        let market_t0 = MarketContext::new().insert_inflation_index("US-CPI", index_t0);
-        let market_t1 = MarketContext::new().insert_inflation_index("US-CPI", index_t1);
+        let market_t0 = MarketContext::new().insert_inflation_index(index_t0);
+        let market_t1 = MarketContext::new().insert_inflation_index(index_t1);
 
         let shift = measure_inflation_source_shift("US-CPI", &market_t0, &market_t1)
             .expect("published-print shift");
@@ -834,10 +834,10 @@ mod tests {
         .expect("t1 index");
         let market_t0 = MarketContext::new()
             .insert(curve())
-            .insert_inflation_index("US-CPI", index_t0);
+            .insert_inflation_index(index_t0);
         let market_t1 = MarketContext::new()
             .insert(curve())
-            .insert_inflation_index("US-CPI", index_t1);
+            .insert_inflation_index(index_t1);
 
         let source_shift =
             measure_inflation_source_shift("US-CPI", &market_t0, &market_t1).expect("hybrid shift");

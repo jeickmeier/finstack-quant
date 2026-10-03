@@ -4,7 +4,7 @@ use crate::error::Result;
 use crate::spec::{CurveKind, OperationSpec};
 use crate::warning::Warning;
 use finstack_quant_core::market_data::hierarchy::{
-    HierarchyNode, HierarchyTarget, MarketDataHierarchy, ResolutionMode, TagFilter,
+    HierarchyTarget, MarketDataHierarchy, ResolutionMode, ResolvedCurveMatch,
 };
 use finstack_quant_core::types::{CurveId, PriceId};
 use finstack_quant_core::{HashMap, HashSet};
@@ -32,62 +32,16 @@ enum HierarchyExpansionKey {
     },
 }
 
-#[derive(Debug, Clone)]
-struct HierarchyResolvedMatch {
-    curve_id: CurveId,
-    matched_depth: usize,
-}
-
-fn collect_subtree_matches(
-    node: &HierarchyNode,
-    matched_depth: usize,
-    matches: &mut Vec<HierarchyResolvedMatch>,
-) {
-    for curve_id in node.curve_ids() {
-        matches.push(HierarchyResolvedMatch {
-            curve_id: curve_id.clone(),
-            matched_depth,
-        });
-    }
-    for child in node.children().values() {
-        collect_subtree_matches(child, matched_depth, matches);
-    }
-}
-
-fn collect_filtered_matches(
-    node: &HierarchyNode,
-    filter: &TagFilter,
-    depth: usize,
-    matches: &mut Vec<HierarchyResolvedMatch>,
-) {
-    if filter.matches(node.tags()) {
-        collect_subtree_matches(node, depth, matches);
-    }
-    for child in node.children().values() {
-        collect_filtered_matches(child, filter, depth + 1, matches);
-    }
-}
-
 fn resolve_hierarchy_matches(
     hierarchy: &MarketDataHierarchy,
     target: &HierarchyTarget,
-) -> Vec<HierarchyResolvedMatch> {
-    let Some(node) = hierarchy.get_node(&target.path) else {
-        return Vec::new();
-    };
-
-    let mut matches = Vec::new();
-    let start_depth = target.path.len();
-    match &target.tag_filter {
-        None => collect_subtree_matches(node, start_depth, &mut matches),
-        Some(filter) => collect_filtered_matches(node, filter, start_depth, &mut matches),
-    }
-    dedup_matches_keep_deepest(matches)
+) -> Vec<ResolvedCurveMatch> {
+    dedup_matches_keep_deepest(hierarchy.resolve_matches(target, ResolutionMode::Cumulative))
 }
 
 /// Collapse duplicate curve hits to a single match per `curve_id`, keeping the
 /// deepest `matched_depth` seen for each.
-fn dedup_matches_keep_deepest(matches: Vec<HierarchyResolvedMatch>) -> Vec<HierarchyResolvedMatch> {
+fn dedup_matches_keep_deepest(matches: Vec<ResolvedCurveMatch>) -> Vec<ResolvedCurveMatch> {
     let mut best: HashMap<CurveId, usize> = HashMap::default();
     for m in &matches {
         best.entry(m.curve_id.clone())
@@ -99,7 +53,7 @@ fn dedup_matches_keep_deepest(matches: Vec<HierarchyResolvedMatch>) -> Vec<Hiera
     for m in matches {
         if seen.insert(m.curve_id.clone()) {
             let depth = best[&m.curve_id];
-            out.push(HierarchyResolvedMatch {
+            out.push(ResolvedCurveMatch {
                 curve_id: m.curve_id,
                 matched_depth: depth,
             });
@@ -127,7 +81,7 @@ pub(super) struct ExpansionOutcome<'a> {
 }
 
 fn expand_matches(
-    matches: Vec<HierarchyResolvedMatch>,
+    matches: Vec<ResolvedCurveMatch>,
     mut make: impl FnMut(CurveId) -> (HierarchyExpansionKey, OperationSpec),
 ) -> Vec<HierarchyExpansion> {
     matches
@@ -145,11 +99,11 @@ fn expand_matches(
 
 /// Skip hierarchy-resolved ids that are not in this operation's market collection.
 fn retain_existing_targets(
-    matches: Vec<HierarchyResolvedMatch>,
+    matches: Vec<ResolvedCurveMatch>,
     op_kind: &str,
     warnings: &mut Vec<Warning>,
     exists: impl Fn(&CurveId) -> bool,
-) -> Vec<HierarchyResolvedMatch> {
+) -> Vec<ResolvedCurveMatch> {
     let mut kept = Vec::with_capacity(matches.len());
     for m in matches {
         if exists(&m.curve_id) {

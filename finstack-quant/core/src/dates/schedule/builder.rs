@@ -113,34 +113,9 @@ use super::*;
 /// [`BusinessDayConvention`]: super::BusinessDayConvention
 #[derive(Clone)]
 pub struct ScheduleBuilder<'a> {
-    pub(super) start: Date,
-    pub(super) end: Date,
-    pub(super) frequency: Tenor,
-    pub(super) stub: StubKind,
-    pub(super) conv: Option<BusinessDayConvention>,
-    /// Borrowed calendar (set by [`adjust_with`](Self::adjust_with)).
-    /// Mutually exclusive with [`Self::deferred_calendar_id`].
+    pub(super) spec: ScheduleSpec,
+    /// Borrowed calendar; otherwise the specification's calendar ID is resolved at build time.
     pub(super) cal: Option<&'a dyn HolidayCalendar>,
-    /// Calendar ID to be resolved at [`build`](Self::build) time.
-    ///
-    /// Set by [`adjust_with_id`](Self::adjust_with_id) when the caller has a
-    /// string ID rather than a borrowed `&dyn HolidayCalendar`. Deferred
-    /// resolution is intentional: it lets the build path apply
-    /// [`ScheduleErrorPolicy`] uniformly (strict / warning / graceful) when
-    /// the registry lookup fails, instead of forcing every binding caller
-    /// (Python, WASM) to thread the registry + error-policy themselves.
-    /// Mutually exclusive with [`Self::cal`].
-    pub(super) deferred_calendar_id: Option<String>,
-    pub(super) eom: bool,
-    /// Standard IMM mode (third Wednesday of Mar/Jun/Sep/Dec) for futures.
-    pub(super) imm_mode: bool,
-    /// CDS IMM mode (20th of Mar/Jun/Sep/Dec) for credit default swaps.
-    pub(super) cds_imm_mode: bool,
-    pub(super) error_policy: ScheduleErrorPolicy,
-    /// Business days after each (adjusted) period end for the payment date.
-    pub(super) payment_lag_days: i32,
-    /// Optional T-minus business days from each period's accrual start.
-    pub(super) fixing_lag_business_days: Option<i32>,
 }
 
 impl<'a> ScheduleBuilder<'a> {
@@ -167,30 +142,16 @@ impl<'a> ScheduleBuilder<'a> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn new(start: Date, end: Date) -> crate::Result<Self> {
-        if start > end {
-            return Err(crate::error::InputError::InvalidDateRange.into());
-        }
         Ok(Self {
-            start,
-            end,
-            frequency: Tenor::monthly(),
-            stub: StubKind::None,
-            conv: None,
+            spec: ScheduleSpec::new(start, end)?,
             cal: None,
-            deferred_calendar_id: None,
-            eom: false,
-            imm_mode: false,
-            cds_imm_mode: false,
-            error_policy: ScheduleErrorPolicy::Strict,
-            payment_lag_days: 0,
-            fixing_lag_business_days: None,
         })
     }
 
     /// Set coupon/payment frequency.
     #[must_use]
     pub fn frequency(mut self, frequency: Tenor) -> Self {
-        self.frequency = frequency;
+        self.spec.frequency = frequency;
         self
     }
 
@@ -201,7 +162,7 @@ impl<'a> ScheduleBuilder<'a> {
     /// * `stub` - Stub policy controlling irregular first or final schedule periods.
     #[must_use]
     pub fn stub_rule(mut self, stub: StubKind) -> Self {
-        self.stub = stub;
+        self.spec.stub = stub;
         self
     }
 
@@ -217,9 +178,9 @@ impl<'a> ScheduleBuilder<'a> {
         conv: BusinessDayConvention,
         cal: &'a dyn HolidayCalendar,
     ) -> Self {
-        self.conv = Some(conv);
+        self.spec.business_day_convention = Some(conv);
         self.cal = Some(cal);
-        self.deferred_calendar_id = None;
+        self.spec.calendar_id = None;
         self
     }
 
@@ -238,7 +199,7 @@ impl<'a> ScheduleBuilder<'a> {
     ///   tenor or generation-rule combinations are rejected by `build`.
     #[must_use]
     pub fn end_of_month(mut self, eom: bool) -> Self {
-        self.eom = eom;
+        self.spec.end_of_month = eom;
         self
     }
 
@@ -260,10 +221,7 @@ impl<'a> ScheduleBuilder<'a> {
     /// [`adjust_with`](Self::adjust_with) / [`adjust_with_id`](Self::adjust_with_id).
     #[must_use]
     pub fn cds_imm(mut self) -> Self {
-        self.frequency = Tenor::quarterly();
-        self.stub = StubKind::ShortBack;
-        self.cds_imm_mode = true;
-        self.imm_mode = false;
+        self.spec = self.spec.with_cds_imm();
         self
     }
 
@@ -292,10 +250,7 @@ impl<'a> ScheduleBuilder<'a> {
     /// ```
     #[must_use]
     pub fn imm(mut self) -> Self {
-        self.frequency = Tenor::quarterly();
-        self.stub = StubKind::ShortBack;
-        self.imm_mode = true;
-        self.cds_imm_mode = false;
+        self.spec = self.spec.with_imm();
         self
     }
 
@@ -306,7 +261,7 @@ impl<'a> ScheduleBuilder<'a> {
     /// * `policy` - Policy enum controlling error handling, unmatched keys, or fallbacks
     #[must_use]
     pub fn error_policy(mut self, policy: ScheduleErrorPolicy) -> Self {
-        self.error_policy = policy;
+        self.spec.error_policy = policy;
         self
     }
 
@@ -324,7 +279,7 @@ impl<'a> ScheduleBuilder<'a> {
     ///   end). Negative values are rejected at [`build`](Self::build).
     #[must_use]
     pub fn payment_lag_days(mut self, lag: i32) -> Self {
-        self.payment_lag_days = lag;
+        self.spec.payment_lag_days = lag;
         self
     }
 
@@ -341,7 +296,7 @@ impl<'a> ScheduleBuilder<'a> {
     ///   start. Negative values are rejected at [`build`](Self::build).
     #[must_use]
     pub fn fixing_lag_business_days(mut self, lag: i32) -> Self {
-        self.fixing_lag_business_days = Some(lag);
+        self.spec.fixing_lag_business_days = Some(lag);
         self
     }
 
@@ -380,9 +335,9 @@ impl<'a> ScheduleBuilder<'a> {
     /// ```
     #[must_use]
     pub fn adjust_with_id(mut self, conv: BusinessDayConvention, calendar_id: &str) -> Self {
-        self.conv = Some(conv);
+        self.spec.business_day_convention = Some(conv);
         self.cal = None;
-        self.deferred_calendar_id = Some(calendar_id.to_string());
+        self.spec.calendar_id = Some(calendar_id.to_string());
         self
     }
 
@@ -405,11 +360,11 @@ impl<'a> ScheduleBuilder<'a> {
     /// - Any warning is produced under [`ScheduleErrorPolicy::Strict`]
     /// - EOM is combined with a day/week tenor or an IMM/CDS IMM rule
     pub fn build(self) -> crate::Result<Schedule> {
-        if self.eom
-            && (self.imm_mode
-                || self.cds_imm_mode
+        if self.spec.end_of_month
+            && (self.spec.imm_mode
+                || self.spec.cds_imm_mode
                 || !matches!(
-                    self.frequency.unit(),
+                    self.spec.frequency.unit(),
                     crate::dates::TenorUnit::Months | crate::dates::TenorUnit::Years
                 ))
         {
@@ -417,12 +372,12 @@ impl<'a> ScheduleBuilder<'a> {
                 "end-of-month requires a month/year tenor and cannot be combined with IMM or CDS IMM".to_string(),
             ));
         }
-        if self.imm_mode && self.cds_imm_mode {
+        if self.spec.imm_mode && self.spec.cds_imm_mode {
             return Err(crate::Error::Validation(
                 "standard IMM and CDS IMM modes are mutually exclusive".to_string(),
             ));
         }
-        let error_policy = self.error_policy;
+        let error_policy = self.spec.error_policy;
         let result = self.build_impl();
 
         match result {
@@ -447,38 +402,39 @@ impl<'a> ScheduleBuilder<'a> {
     fn build_impl(self) -> crate::Result<Schedule> {
         use crate::dates::calendar::calendar_by_id_strict;
 
-        if self.start > self.end {
+        if self.spec.start > self.spec.end {
             return Err(crate::error::InputError::InvalidDateRange.into());
         }
 
         let mut warnings: Vec<ScheduleWarning> = Vec::new();
 
         // Resolve pending calendar ID if present, otherwise use directly provided calendar
-        let resolved_cal: Option<&dyn HolidayCalendar> =
-            if let Some(ref calendar_id) = self.deferred_calendar_id {
-                match calendar_by_id_strict(calendar_id) {
-                    Ok(cal) => Some(cal),
-                    Err(_) if self.error_policy == ScheduleErrorPolicy::MissingCalendarWarning => {
-                        tracing::warn!(
-                            calendar_id,
-                            "schedule build skipped missing calendar due to warning policy"
-                        );
-                        warnings.push(ScheduleWarning::MissingCalendarId {
-                            calendar_id: calendar_id.clone(),
-                        });
-                        None
-                    }
-                    // Strict mode: error on missing calendar
-                    Err(err) => return Err(err),
+        let resolved_cal: Option<&dyn HolidayCalendar> = if let Some(ref calendar_id) =
+            self.spec.calendar_id
+        {
+            match calendar_by_id_strict(calendar_id) {
+                Ok(cal) => Some(cal),
+                Err(_) if self.spec.error_policy == ScheduleErrorPolicy::MissingCalendarWarning => {
+                    tracing::warn!(
+                        calendar_id,
+                        "schedule build skipped missing calendar due to warning policy"
+                    );
+                    warnings.push(ScheduleWarning::MissingCalendarId {
+                        calendar_id: calendar_id.clone(),
+                    });
+                    None
                 }
-            } else {
-                self.cal
-            };
+                // Strict mode: error on missing calendar
+                Err(err) => return Err(err),
+            }
+        } else {
+            self.cal
+        };
 
         // Generate dates based on mode
-        let mut dates = if self.imm_mode {
+        let mut dates = if self.spec.imm_mode {
             // Standard IMM: generate dates using next_imm to get proper third Wednesdays
-            let mut imm_dates = generate_imm_dates(self.start, self.end)?;
+            let mut imm_dates = generate_imm_dates(self.spec.start, self.spec.end)?;
             if imm_dates.is_empty() {
                 // No IMM date falls inside [start, end]: a silently empty
                 // schedule means zero cashflows / PV = 0 downstream. Error
@@ -487,14 +443,17 @@ impl<'a> ScheduleBuilder<'a> {
                 return Err(crate::error::Error::Validation(format!(
                     "IMM schedule from {} to {} contains no IMM dates \
                      (first IMM date after start exceeds end)",
-                    self.start, self.end
+                    self.spec.start, self.spec.end
                 )));
             }
-            if imm_dates.first().is_some_and(|&first| self.start < first) {
-                imm_dates.insert(0, self.start);
+            if imm_dates
+                .first()
+                .is_some_and(|&first| self.spec.start < first)
+            {
+                imm_dates.insert(0, self.spec.start);
             }
             imm_dates
-        } else if self.cds_imm_mode {
+        } else if self.spec.cds_imm_mode {
             // CDS IMM: 20th of quarterly months (unadjusted; any business-day
             // adjustment configured on the builder is applied separately below).
             //
@@ -504,27 +463,27 @@ impl<'a> ScheduleBuilder<'a> {
             // one. Snapping the start forward (the previous behavior) dropped
             // that initial accrual period (2026-06-09 core quant review,
             // Moderate/Dates).
-            let adj_start = if crate::dates::imm::is_cds_date(self.start) {
-                self.start
+            let adj_start = if crate::dates::imm::is_cds_date(self.spec.start) {
+                self.spec.start
             } else {
-                prev_cds_date(self.start)?
+                prev_cds_date(self.spec.start)?
             };
 
             let builder = BuilderInternal {
                 start: adj_start,
-                end: self.end,
-                frequency: self.frequency,
-                stub: self.stub,
-                eom: self.eom,
+                end: self.spec.end,
+                frequency: self.spec.frequency,
+                stub: self.spec.stub,
+                eom: self.spec.end_of_month,
             };
             builder.generate()?
         } else {
             let builder = BuilderInternal {
-                start: self.start,
-                end: self.end,
-                frequency: self.frequency,
-                stub: self.stub,
-                eom: self.eom,
+                start: self.spec.start,
+                end: self.spec.end,
+                frequency: self.spec.frequency,
+                stub: self.spec.stub,
+                eom: self.spec.end_of_month,
             };
             builder.generate()?
         };
@@ -543,10 +502,10 @@ impl<'a> ScheduleBuilder<'a> {
         // Accrual dates stay on the unadjusted roll grid (CDS 20ths included).
         let (payment_dates, fixing_dates) = build_payment_and_fixing_dates(
             &dates,
-            self.conv,
+            self.spec.business_day_convention,
             resolved_cal,
-            self.payment_lag_days,
-            self.fixing_lag_business_days,
+            self.spec.payment_lag_days,
+            self.spec.fixing_lag_business_days,
         )?;
 
         Ok(Schedule {

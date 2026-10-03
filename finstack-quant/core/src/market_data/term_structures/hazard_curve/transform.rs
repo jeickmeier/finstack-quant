@@ -37,7 +37,7 @@ impl HazardCurve {
             par_tenors: self.par_tenors.clone(),
             par_spreads_bp: self.par_spreads_bp.clone(),
             par_interp: self.par_interp,
-            survival_interp_style: self.survival_interp_style,
+
             hazard_calibration: None,
             interp: self.interp.clone(),
             fx_policy: self.fx_policy.clone(),
@@ -61,7 +61,6 @@ impl HazardCurve {
             .recovery_rate(self.recovery_rate)
             .day_count(self.day_count)
             .par_interp(self.par_interp)
-            .interp(self.survival_interp_style)
             .issuer_opt(self.issuer.clone())
             .seniority_opt(self.seniority)
             .currency_opt(self.currency)
@@ -155,7 +154,7 @@ impl HazardCurve {
         }
         let (interp_knots, interp_sp) = survival_pillars(&self.knots, &lambdas);
         let interp = crate::market_data::term_structures::common::build_interp(
-            self.survival_interp_style,
+            InterpStyle::LogLinear,
             interp_knots.into_boxed_slice(),
             interp_sp.into_boxed_slice(),
             ExtrapolationPolicy::FlatForward,

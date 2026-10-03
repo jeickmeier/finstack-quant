@@ -470,7 +470,7 @@ impl CompiledExpr {
                         node.dependencies.len() - arg_slices.len()
                     )));
                 }
-                self.eval_function_into(*func, &arg_slices, ctx, cols, out)?;
+                self.eval_function_into(*func, &arg_slices, out)?;
             }
             ExprNode::BinOp { op, .. } => {
                 // Binary operations should have exactly 2 dependencies
@@ -691,34 +691,100 @@ impl CompiledExpr {
         &self,
         fun: Function,
         arg_slices: &[&[f64]],
-        _ctx: &SimpleContext,
-        _cols: &[&[f64]],
         out: &mut [f64],
     ) -> crate::Result<()> {
-        match fun {
-            Function::Lag => self.eval_lag_into(arg_slices, out),
-            Function::Lead => self.eval_lead_into(arg_slices, out),
-            Function::Diff => self.eval_diff_into(arg_slices, out),
-            Function::PctChange => self.eval_pct_change_into(arg_slices, out),
-            Function::RollingMean => self.eval_rolling_mean_into(arg_slices, out),
-            Function::RollingSum => self.eval_rolling_sum_into(arg_slices, out),
-            Function::RollingStd => self.eval_rolling_std_into(arg_slices, out),
-            Function::RollingVar => self.eval_rolling_var_into(arg_slices, out),
-            Function::RollingMedian => self.eval_rolling_median_into(arg_slices, out),
-            Function::Shift => self.eval_shift_into(arg_slices, out),
-            Function::RollingMin => self.eval_rolling_min_into(arg_slices, out),
-            Function::RollingMax => self.eval_rolling_max_into(arg_slices, out),
-            Function::RollingCount => self.eval_rolling_count_into(arg_slices, out),
-            _ => {
-                let result = self.eval_function_core(fun, arg_slices, _ctx, _cols)?;
-                let copy_len = out.len().min(result.len());
-                out[..copy_len].copy_from_slice(&result[..copy_len]);
-                if copy_len < out.len() {
-                    out[copy_len..].fill(f64::NAN);
+        let result = match fun {
+            Function::Lag => return self.eval_lag_into(arg_slices, out),
+            Function::Lead => return self.eval_lead_into(arg_slices, out),
+            Function::Diff => return self.eval_diff_into(arg_slices, out),
+            Function::PctChange => return self.eval_pct_change_into(arg_slices, out),
+            Function::RollingMean => return self.eval_rolling_mean_into(arg_slices, out),
+            Function::RollingSum => return self.eval_rolling_sum_into(arg_slices, out),
+            Function::RollingStd => return self.eval_rolling_std_into(arg_slices, out),
+            Function::RollingVar => return self.eval_rolling_var_into(arg_slices, out),
+            Function::RollingMedian => return self.eval_rolling_median_into(arg_slices, out),
+            Function::Shift => return self.eval_shift_into(arg_slices, out),
+            Function::RollingMin => return self.eval_rolling_min_into(arg_slices, out),
+            Function::RollingMax => return self.eval_rolling_max_into(arg_slices, out),
+            Function::RollingCount => return self.eval_rolling_count_into(arg_slices, out),
+            Function::EwmMean => {
+                if arg_slices.len() < 2 || arg_slices[1].is_empty() {
+                    out.fill(f64::NAN);
+                } else {
+                    self.eval_ewm_mean_into(arg_slices, out);
                 }
-                Ok(())
+                return Ok(());
             }
-        }
+            Function::Std => {
+                if arg_slices.is_empty() {
+                    out.fill(f64::NAN);
+                } else {
+                    self.eval_std_into(arg_slices, out);
+                }
+                return Ok(());
+            }
+            Function::Var => {
+                if arg_slices.is_empty() {
+                    out.fill(f64::NAN);
+                } else {
+                    self.eval_var_into(arg_slices, out);
+                }
+                return Ok(());
+            }
+            Function::Median => {
+                if arg_slices.is_empty() {
+                    out.fill(f64::NAN);
+                } else {
+                    self.eval_median_into(arg_slices, out);
+                }
+                return Ok(());
+            }
+
+            Function::CumSum => self.eval_cum_sum(arg_slices),
+            Function::CumProd => self.eval_cum_prod(arg_slices),
+            Function::CumMin => self.eval_cum_min(arg_slices),
+            Function::CumMax => self.eval_cum_max(arg_slices),
+            Function::Rank => self.eval_rank(arg_slices),
+            Function::Quantile => self.eval_quantile(arg_slices),
+            Function::EwmStd => self.eval_ewm_std(arg_slices),
+            Function::EwmVar => self.eval_ewm_var(arg_slices),
+            Function::Abs => self.eval_abs(arg_slices),
+            Function::Sign => self.eval_sign(arg_slices),
+            Function::Pow => self.eval_pow(arg_slices),
+            Function::Round => self.eval_round(arg_slices)?,
+            Function::Floor => self.eval_floor(arg_slices),
+            Function::Ceil => self.eval_ceil(arg_slices),
+            Function::Ln => self.eval_ln(arg_slices),
+            Function::Exp => self.eval_exp(arg_slices),
+            Function::Log10 => self.eval_log10(arg_slices),
+            Function::Sqrt => self.eval_sqrt(arg_slices),
+            Function::Clamp => self.eval_clamp(arg_slices),
+            Function::IsMissing => self.eval_is_missing(arg_slices),
+            Function::Sum
+            | Function::Mean
+            | Function::Ttm
+            | Function::Ytd
+            | Function::Qtd
+            | Function::FiscalYtd
+            | Function::Annualize
+            | Function::AnnualizeRate
+            | Function::Coalesce
+            | Function::GrowthRate
+            | Function::Min
+            | Function::Max => {
+                debug_assert!(
+                    !fun.is_scalar_evaluable(),
+                    "Function::is_scalar_evaluable disagrees with eval dispatch for {fun:?}"
+                );
+                return Err(crate::Error::Validation(format!(
+                    "Expression function '{fun}' is a statements-layer function; evaluate it via the statements crate instead of core::expr::eval"
+                )));
+            }
+        };
+        let copy_len = out.len().min(result.len());
+        out[..copy_len].copy_from_slice(&result[..copy_len]);
+        out[copy_len..].fill(f64::NAN);
+        Ok(())
     }
 }
 #[cfg(test)]

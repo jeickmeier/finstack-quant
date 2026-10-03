@@ -74,60 +74,47 @@ fn if_then_else_builder() {
     }
 }
 
-#[test]
-fn with_id_builder() {
-    let expr = Expr::column("x").with_id(42);
-    assert_eq!(expr.id, Some(42));
-}
-
 // Structural Equality Tests
 
 #[test]
-fn equality_ignores_id() {
-    let a = Expr::column("x").with_id(1);
-    let b = Expr::column("x").with_id(999);
-    assert_eq!(a, b, "Expr equality must ignore id");
+fn equality_matches_structure() {
+    let a = Expr::column("x");
+    let b = Expr::column("x");
+    assert_eq!(a, b, "Expr equality is structural");
 }
 
 #[test]
-fn equality_same_structure_different_ids() {
+fn equality_same_structure() {
     let e1 = Expr::call(
         Function::RollingMean,
         vec![Expr::column("x"), Expr::literal(3.0)],
-    )
-    .with_id(1);
+    );
     let e2 = Expr::call(
         Function::RollingMean,
         vec![Expr::column("x"), Expr::literal(3.0)],
-    )
-    .with_id(999);
+    );
 
-    assert_eq!(e1, e2, "Expr equality must ignore id");
+    assert_eq!(e1, e2, "Expr equality is structural");
 }
 
 #[test]
-fn hash_ignores_id() {
+fn hash_matches_structure() {
     let e1 = Expr::call(
         Function::RollingMean,
         vec![Expr::column("x"), Expr::literal(3.0)],
-    )
-    .with_id(1);
+    );
     let e2 = Expr::call(
         Function::RollingMean,
         vec![Expr::column("x"), Expr::literal(3.0)],
-    )
-    .with_id(999);
+    );
 
     let mut set = HashSet::new();
     set.insert(e1);
 
     // Should be considered duplicate due to structural identity
-    assert!(set.contains(&e2), "Hash lookup must ignore id");
+    assert!(set.contains(&e2), "Hash lookup is structural");
     let inserted = set.insert(e2);
-    assert!(
-        !inserted,
-        "Hash must ignore id so structural duplicates do not insert twice"
-    );
+    assert!(!inserted, "Structural duplicates do not insert twice");
 }
 
 #[test]

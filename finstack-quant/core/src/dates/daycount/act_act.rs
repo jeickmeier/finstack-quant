@@ -1,12 +1,10 @@
 //! Actual/Actual convention implementations.
 
-use smallvec::SmallVec;
 use time::{Date, Month};
 
 use super::DayCountContext;
 use crate::dates::date_extensions::DateExt;
 use crate::dates::tenor::TenorUnit;
-use crate::dates::Tenor;
 use crate::error::InputError;
 
 const MAX_ACT_ACT_ISMA_PERIODS: usize = 512;
@@ -186,152 +184,40 @@ pub(super) fn year_fraction_act_act_isma_with_ctx(
     if let Some((ref_start, ref_end)) = ctx.coupon_period {
         return act_act_isma_year_fraction_with_reference_period(start, end, ref_start, ref_end);
     }
-    match frequency.unit() {
+    let (months, coupon_fraction) = match frequency.unit() {
+        TenorUnit::Months => (frequency.count() as i32, frequency.count() as f64 / 12.0),
+        TenorUnit::Years => (frequency.count() as i32 * 12, frequency.count() as f64),
         TenorUnit::Weeks | TenorUnit::Days => {
             return Err(InputError::ActActIsmaUnsupportedFrequency {
                 frequency: frequency.to_string(),
             }
             .into());
         }
-        TenorUnit::Months | TenorUnit::Years => {}
-    }
+    };
     if start == end {
         return Ok(0.0);
     }
-    if is_regular_frequency_period(start, end, frequency) {
-        year_fraction_act_act_isma(start, end, frequency)
-    } else {
-        Err(InputError::MissingCouponPeriodForActActIsma.into())
-    }
-}
-
-/// Returns true when `[start, end)` is an integer number of `frequency` coupons.
-///
-/// A span is regular when some positive multiple of the tenor steps from
-/// `start` to `end`, matching the forward quasi-coupon grid. A backward
-/// match alone cannot establish regularity because month clamping is not
-/// invertible; such spans require an explicit `coupon_period`.
-fn is_regular_frequency_period(start: Date, end: Date, frequency: Tenor) -> bool {
-    if start >= end {
-        return false;
-    }
-    let months = match frequency.unit() {
-        TenorUnit::Months => frequency.count() as i32,
-        TenorUnit::Years => frequency.count() as i32 * 12,
-        TenorUnit::Weeks | TenorUnit::Days => return false,
-    };
-    if months <= 0 {
-        return false;
-    }
-    let mut k: i32 = 1;
-    while k <= MAX_ACT_ACT_ISMA_PERIODS as i32 {
-        let Some(step) = k.checked_mul(months) else {
-            break;
-        };
-        let Ok(boundary) = start.add_months(step) else {
-            break;
-        };
-        if boundary == end {
-            return true;
-        }
-        if boundary > end {
-            break;
-        }
-        k += 1;
-    }
-    false
-}
-
-// ACT/ACT (ISMA/ICMA) helper
-/// Calculate year fraction for ACT/ACT (ISMA/ICMA) convention with coupon-period awareness.
-fn year_fraction_act_act_isma(start: Date, end: Date, frequency: Tenor) -> crate::Result<f64> {
-    if start == end {
-        return Ok(0.0);
-    }
-
-    // Coupon length in years based on frequency (e.g., 0.5 for semi-annual, 0.25 for quarterly).
-    // ISMA/ICMA is defined for regular coupon periods; treat Week/Day frequencies as invalid.
-    let coupon_length_years = match frequency.unit() {
-        TenorUnit::Months => frequency.count() as f64 / 12.0,
-        TenorUnit::Years => frequency.count() as f64,
-        TenorUnit::Weeks | TenorUnit::Days => {
-            return Err(InputError::ActActIsmaUnsupportedFrequency {
-                frequency: frequency.to_string(),
+    let mut total = 0.0;
+    // Anchor every boundary on start, preserving month-end clamping. Only
+    // complete periods are admitted without explicit reference dates.
+    if months > 0 {
+        for k in 1..=MAX_ACT_ACT_ISMA_PERIODS as i32 {
+            let Some(step) = k.checked_mul(months) else {
+                break;
+            };
+            let Ok(boundary) = start.add_months(step) else {
+                break;
+            };
+            total += coupon_fraction;
+            if boundary == end {
+                return Ok(total);
             }
-            .into());
-        }
-    };
-
-    // For ISMA, we need to work with quasi-coupon periods.
-    //
-    // The quasi-coupon grid is anchored on `start` itself: each boundary is
-    // `start + k·frequency` computed directly from the unadjusted anchor
-    // (k-multiples, roll-day preserved with per-month clamping), NOT by
-    // chaining `prev + frequency`. Chained stepping from `start - frequency` (the
-    // previous implementation) lost the roll day for month-end starts: a
-    // regular EOM semi-annual period [2025-08-31, 2026-02-28) drifted to a
-    // grid ending Aug 28 and returned 181/184 × 0.5 ≈ 0.49185 instead of
-    // exactly 0.5 .
-    let months_per_period = match frequency.unit() {
-        TenorUnit::Months => frequency.count() as i32,
-        TenorUnit::Years => frequency.count() as i32 * 12,
-        // Unreachable: rejected above when computing `coupon_length_years`.
-        TenorUnit::Weeks | TenorUnit::Days => {
-            return Err(InputError::ActActIsmaUnsupportedFrequency {
-                frequency: frequency.to_string(),
+            if boundary > end {
+                break;
             }
-            .into());
-        }
-    };
-    if months_per_period <= 0 {
-        return Err(InputError::ActActIsmaUnsupportedFrequency {
-            frequency: frequency.to_string(),
-        }
-        .into());
-    }
-
-    let mut total_fraction = 0.0;
-
-    // Optimization: Manually generate dates to avoid heap allocation of ScheduleBuilder
-    // Most ISMA calculations involve very few periods, but long-dated bonds (15+ years)
-    // with semi-annual coupons can have 30+ periods. Using 32 elements covers ~16 years
-    // of semi-annual coupons without heap allocation.
-    let mut periods: SmallVec<[Date; 32]> = SmallVec::new();
-    periods.push(start);
-    let mut k: i32 = 1;
-    loop {
-        let boundary = start.add_months(k * months_per_period)?;
-        periods.push(boundary);
-        if boundary >= end {
-            break;
-        }
-        k += 1;
-    }
-
-    // Find the periods that overlap with our [start, end) interval
-    for window in periods.windows(2) {
-        let period_start = window[0];
-        let period_end = window[1];
-
-        let overlap_start = start.max(period_start);
-        let overlap_end = end.min(period_end);
-
-        if overlap_start < overlap_end {
-            // Numerator: actual days in the overlapping slice
-            let days_in_overlap = (overlap_end - overlap_start).whole_days() as f64;
-
-            // Denominator (ISMA): actual days in the coupon period that contains this slice
-            let coupon_days = (period_end - period_start).whole_days() as f64;
-            if coupon_days <= 0.0 {
-                return Err(InputError::Invalid.into());
-            }
-
-            // Year fraction = (days in slice / days in coupon period) × coupon period in years
-            total_fraction += (days_in_overlap / coupon_days) * coupon_length_years;
         }
     }
-
-    Ok(total_fraction)
+    Err(InputError::MissingCouponPeriodForActActIsma.into())
 }
 
 #[inline]

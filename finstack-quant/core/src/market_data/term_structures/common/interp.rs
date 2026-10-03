@@ -5,12 +5,6 @@ use crate::math::interp::types::Interp;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle, ValidationPolicy};
 use crate::Result;
 
-/// Shared default base date for term-structure builders.
-#[inline]
-pub(crate) fn default_curve_base_date() -> Date {
-    Date::from_calendar_date(1970, time::Month::January, 1).unwrap_or(time::Date::MIN)
-}
-
 /// Build an `Interp` with unified error mapping (crate::Result) for callers
 /// whose builders return `crate::Result<T>` (Forward/Inflation).
 ///

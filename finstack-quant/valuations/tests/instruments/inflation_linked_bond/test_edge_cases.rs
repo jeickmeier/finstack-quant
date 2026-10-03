@@ -220,7 +220,7 @@ fn test_extreme_deflation() {
     )
     .unwrap()
     .with_interpolation(finstack_quant_core::market_data::scalars::InflationInterpolation::Linear);
-    ctx = ctx.insert_inflation_index("US-CPI-U", index);
+    ctx = ctx.insert_inflation_index(index);
 
     let as_of = d(2025, 1, 2);
 
@@ -251,7 +251,7 @@ fn test_extreme_inflation() {
     )
     .unwrap()
     .with_interpolation(finstack_quant_core::market_data::scalars::InflationInterpolation::Linear);
-    ctx = ctx.insert_inflation_index("US-CPI-U", index);
+    ctx = ctx.insert_inflation_index(index);
 
     let as_of = d(2025, 1, 2);
 

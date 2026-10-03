@@ -55277,7 +55277,7 @@ export interface Money93 {
     | "ZWL";
 }
 /**
- * Expression AST with optional unique ID for DAG planning.
+ * Expression AST for structural DAG planning.
  *
  * Deserialization is strict (`deny_unknown_fields`): unknown fields on
  * inbound payloads are rejected rather than silently ignored.
@@ -55286,10 +55286,6 @@ export interface Money93 {
  * via the `definition` "Expr".
  */
 export interface Expr {
-  /**
-   * Unique identifier for this expression node (for DAG planning).
-   */
-  id?: number | null;
   /**
    * The actual expression node.
    */
@@ -55351,10 +55347,6 @@ export interface Expr {
  */
 export interface Expr1 {
   /**
-   * Unique identifier for this expression node (for DAG planning).
-   */
-  id?: number | null;
-  /**
    * The actual expression node.
    */
   node:
@@ -55414,10 +55406,6 @@ export interface Expr1 {
  * Right operand
  */
 export interface Expr2 {
-  /**
-   * Unique identifier for this expression node (for DAG planning).
-   */
-  id?: number | null;
   /**
    * The actual expression node.
    */
@@ -55479,10 +55467,6 @@ export interface Expr2 {
  */
 export interface Expr3 {
   /**
-   * Unique identifier for this expression node (for DAG planning).
-   */
-  id?: number | null;
-  /**
    * The actual expression node.
    */
   node:
@@ -55542,10 +55526,6 @@ export interface Expr3 {
  * Condition expression
  */
 export interface Expr4 {
-  /**
-   * Unique identifier for this expression node (for DAG planning).
-   */
-  id?: number | null;
   /**
    * The actual expression node.
    */
@@ -55607,10 +55587,6 @@ export interface Expr4 {
  */
 export interface Expr5 {
   /**
-   * Unique identifier for this expression node (for DAG planning).
-   */
-  id?: number | null;
-  /**
    * The actual expression node.
    */
   node:
@@ -55670,10 +55646,6 @@ export interface Expr5 {
  * Then branch
  */
 export interface Expr6 {
-  /**
-   * Unique identifier for this expression node (for DAG planning).
-   */
-  id?: number | null;
   /**
    * The actual expression node.
    */

@@ -5,7 +5,7 @@
 //!
 //! # Components
 //!
-//! - [`Expr`]: Top-level expression with optional ID for DAG planning
+//! - [`Expr`]: Top-level expression for structural DAG planning
 //! - [`ExprNode`]: Core expression variants (columns, literals, calls, operators)
 //! - [`Function`]: Built-in function registry (lag, diff, rolling operations)
 //! - [`BinOp`], [`UnaryOp`]: Arithmetic, comparison, and logical operators
@@ -14,7 +14,7 @@
 //!
 //! The AST is designed for:
 //! - **Efficient evaluation**: Minimal allocations during evaluation
-//! - **DAG optimization**: Shared subexpression detection via IDs
+//! - **DAG optimization**: Shared subexpression detection via structural identity
 //! - **Serialization**: Full serde support for persistence
 //! - **Type safety**: Strong typing prevents runtime type errors
 
@@ -22,7 +22,7 @@ use core::hash::{Hash, Hasher};
 
 // DurationSpec removed: time-window API was unused in evaluation
 
-/// Expression AST with optional unique ID for DAG planning.
+/// Expression AST for structural DAG planning.
 ///
 /// Deserialization is strict (`deny_unknown_fields`): unknown fields on
 /// inbound payloads are rejected rather than silently ignored.
@@ -30,8 +30,6 @@ use core::hash::{Hash, Hasher};
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct Expr {
-    /// Unique identifier for this expression node (for DAG planning).
-    pub id: Option<u64>,
     /// The actual expression node.
     pub node: ExprNode,
 }
@@ -137,7 +135,6 @@ impl Expr {
     /// Create a new column reference.
     pub fn column(name: impl Into<String>) -> Self {
         Self {
-            id: None,
             node: ExprNode::Column(name.into()),
         }
     }
@@ -145,7 +142,6 @@ impl Expr {
     /// Create a new capital-structure reference.
     pub fn cs_ref(component: impl Into<String>, instrument_or_total: impl Into<String>) -> Self {
         Self {
-            id: None,
             node: ExprNode::CsRef {
                 component: component.into(),
                 instrument_or_total: instrument_or_total.into(),
@@ -156,7 +152,6 @@ impl Expr {
     /// Create a new literal value.
     pub fn literal(value: f64) -> Self {
         Self {
-            id: None,
             node: ExprNode::Literal(value),
         }
     }
@@ -164,7 +159,6 @@ impl Expr {
     /// Create a new function call.
     pub fn call(func: Function, args: Vec<Expr>) -> Self {
         Self {
-            id: None,
             node: ExprNode::Call(func, args),
         }
     }
@@ -172,7 +166,6 @@ impl Expr {
     /// Create a new binary operation.
     pub fn bin_op(op: BinOp, left: Expr, right: Expr) -> Self {
         Self {
-            id: None,
             node: ExprNode::BinOp {
                 op,
                 left: Box::new(left),
@@ -184,7 +177,6 @@ impl Expr {
     /// Create a new unary operation.
     pub fn unary_op(op: UnaryOp, operand: Expr) -> Self {
         Self {
-            id: None,
             node: ExprNode::UnaryOp {
                 op,
                 operand: Box::new(operand),
@@ -195,7 +187,6 @@ impl Expr {
     /// Create a new if-then-else conditional.
     pub fn if_then_else(condition: Expr, then_expr: Expr, else_expr: Expr) -> Self {
         Self {
-            id: None,
             node: ExprNode::IfThenElse {
                 condition: Box::new(condition),
                 then_expr: Box::new(then_expr),
@@ -203,20 +194,11 @@ impl Expr {
             },
         }
     }
-
-    /// Assign a unique ID to this expression for DAG planning purposes.
-    pub fn with_id(mut self, id: u64) -> Self {
-        self.id = Some(id);
-        self
-    }
 }
 
 /// Hash implementation for Expr to support deduplication in DAG planning.
 ///
-/// Note: Structural identity only. The opaque `id` field is intentionally
-/// excluded from both `Hash` and `Eq` so that DAG deduplication and caches
-/// consider two expressions identical if their `node` matches, regardless of
-/// their runtime-assigned ids.
+/// Identity depends only on expression structure.
 impl Hash for Expr {
     fn hash<H: Hasher>(&self, state: &mut H) {
         match &self.node {

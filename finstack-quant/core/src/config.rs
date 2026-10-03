@@ -113,7 +113,7 @@ impl std::str::FromStr for RoundingMode {
 /// cfg.rounding.output_scale.set_scale(Currency::CHF, 2).expect("valid decimal scale");
 /// assert_eq!(cfg.output_scale(Currency::CHF), 2);
 /// ```
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct FinstackConfig {
     /// Detailed rounding policy (ingest/output scales by currency).
@@ -137,7 +137,7 @@ pub struct FinstackConfig {
 /// `valuations.structured_credit.ytm.v1`). Deserialization rejects keys that
 /// do not match, so obvious typos fail loudly instead of being silently
 /// carried along .
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Default, Serialize, PartialEq)]
 pub struct ConfigExtensions {
     #[serde(flatten)]
     pub(crate) inner: BTreeMap<String, JsonValue>,
@@ -253,7 +253,7 @@ impl ConfigExtensions {
 ///
 /// assert_eq!(cfg.output_scale(Currency::KWD), 3);
 /// ```
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CurrencyScalePolicy {
@@ -332,7 +332,7 @@ where
 }
 
 /// Full rounding policy used at IO boundaries and normalization steps.
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct RoundingPolicy {
     /// Rounding behaviour to apply when mapping fractional values to a scale.

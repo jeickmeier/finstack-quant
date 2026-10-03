@@ -12,8 +12,8 @@ mod knot_ops;
 pub(crate) use adjustment::PiecewiseLinearAdjustment;
 pub(crate) use conventions::infer_forward_curve_defaults;
 pub(crate) use interp::{
-    build_interp, build_interp_allow_any_values, build_interp_input_error, default_curve_base_date,
-    split_points, year_fraction_to,
+    build_interp, build_interp_allow_any_values, build_interp_input_error, split_points,
+    year_fraction_to,
 };
 pub(crate) use knot_ops::{
     bump_knots_parallel, bump_knots_percentage, bump_knots_triangular, infer_spot_from_knots,

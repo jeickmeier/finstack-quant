@@ -17,13 +17,12 @@ fn test_expr_ast_serde_roundtrip() {
     let expr = Expr::call(
         Function::RollingMean,
         vec![Expr::column("x"), Expr::literal(3.0)],
-    )
-    .with_id(42);
+    );
 
     let json = serde_json::to_string(&expr).expect("Failed to serialize Expr");
     let deserialized: Expr = serde_json::from_str(&json).expect("Failed to deserialize Expr");
 
-    assert_eq!(expr.id, deserialized.id);
+    assert_eq!(expr, deserialized);
     match (&expr.node, &deserialized.node) {
         (ExprNode::Call(f1, args1), ExprNode::Call(f2, args2)) => {
             assert_eq!(f1, f2);
@@ -238,7 +237,7 @@ fn test_compiled_expr_serde() {
         serde_json::from_str(&json).expect("Failed to deserialize CompiledExpr");
 
     // Verify AST is preserved
-    assert_eq!(compiled.get_ast().id, deserialized.get_ast().id);
+    assert_eq!(compiled.get_ast(), deserialized.get_ast());
 
     // Verify plan is preserved if it existed
     assert_eq!(compiled.has_plan(), deserialized.has_plan());
@@ -347,4 +346,13 @@ fn test_complex_expression_tree_serde() {
         }
         _ => panic!("Expected Call node at root"),
     }
+}
+
+#[test]
+fn obsolete_caller_id_is_rejected() {
+    let expr = Expr::column("x");
+    let mut state = serde_json::to_value(&expr).unwrap();
+    assert!(state.get("id").is_none());
+    state["id"] = serde_json::json!(42);
+    assert!(serde_json::from_value::<Expr>(state).is_err());
 }

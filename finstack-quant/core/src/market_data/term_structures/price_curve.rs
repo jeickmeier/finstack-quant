@@ -84,8 +84,8 @@
 
 use super::common::{
     build_interp_allow_any_values, bump_knots_parallel, bump_knots_percentage,
-    bump_knots_triangular, default_curve_base_date, infer_spot_from_knots, roll_knots,
-    split_points, validate_non_negative_knots, year_fraction_to,
+    bump_knots_triangular, infer_spot_from_knots, roll_knots, split_points,
+    validate_non_negative_knots, year_fraction_to,
 };
 use crate::dates::DateExt;
 use crate::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
@@ -277,8 +277,7 @@ impl PriceCurve {
         PriceCurveBuilder {
             id: id.into(),
             kind: PriceCurveKind::Price,
-            base: default_curve_base_date(),
-            base_is_set: false,
+            base: None,
             day_count: DayCount::Act365F,
             spot_price: None,
             points: Vec::new(),
@@ -602,8 +601,7 @@ impl PriceCurve {
 pub struct PriceCurveBuilder {
     id: CurveId,
     kind: PriceCurveKind,
-    base: Date,
-    base_is_set: bool,
+    base: Option<Date>,
     day_count: DayCount,
     spot_price: Option<f64>,
     points: Vec<(f64, f64)>,
@@ -624,8 +622,7 @@ impl PriceCurveBuilder {
 
     /// Set the curve's valuation **base date**.
     pub fn base_date(mut self, d: Date) -> Self {
-        self.base = d;
-        self.base_is_set = true;
+        self.base = Some(d);
         self
     }
 
@@ -693,9 +690,7 @@ impl PriceCurveBuilder {
     /// zero-time knot, or the selected
     /// interpolation/extrapolation combination rejects the grid.
     pub fn build(self) -> crate::Result<PriceCurve> {
-        if !self.base_is_set {
-            return Err(InputError::Invalid.into());
-        }
+        let base = self.base.ok_or(InputError::Invalid)?;
         if self.points.len() < 2 {
             return Err(InputError::TooFewPoints.into());
         }
@@ -752,7 +747,7 @@ impl PriceCurveBuilder {
         Ok(PriceCurve {
             id: self.id,
             kind: self.kind,
-            base: self.base,
+            base,
             day_count: self.day_count,
             spot_price,
             knots,

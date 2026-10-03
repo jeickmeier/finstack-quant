@@ -1052,14 +1052,6 @@ pub struct HazardCurveParams {
     /// Calibration method to use.
     #[serde(default)]
     pub method: CalibrationMethod,
-    /// Interpolation style for survival probabilities between pillars.
-    ///
-    /// Only log-linear survival interpolation is supported, preserving the
-    /// piecewise-constant hazard representation. Other styles are rejected
-    /// before calibration starts.
-    #[serde(default = "default_interp_log_linear")]
-    pub interpolation: InterpStyle,
-
     /// Interpolation method for par spreads reported by the calibrated curve.
     ///
     /// Note: this is used for *quoting/interpolation of stored par spreads* and does not affect

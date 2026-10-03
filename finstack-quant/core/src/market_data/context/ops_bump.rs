@@ -535,7 +535,7 @@ mod tests {
             .expect("inflation curve");
         let context = MarketContext::new()
             .insert(curve)
-            .insert_inflation_index("US-CPI", index);
+            .insert_inflation_index(index);
 
         let bumped = context
             .bump([MarketBump::Curve {

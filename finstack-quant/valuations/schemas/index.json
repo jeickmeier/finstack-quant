@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/common/1/instrument_json.schema.json",
-      "bytes": 999469,
+      "bytes": 999210,
       "kind": "component",
       "path": "schemas/common/1/instrument_json.schema.json",
       "summary": "The instrument union embedded by portfolio positions and candidates; the same branches as the instrument envelope's `instrument` field.",
@@ -290,7 +290,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/composite/composite.schema.json",
-      "bytes": 1007382,
+      "bytes": 1007123,
       "kind": "input",
       "path": "schemas/instruments/1/composite/composite.schema.json",
       "summary": "Resolved cross-asset synthetic instrument with immutable leg quantities.",
@@ -488,7 +488,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/exotics/basket.schema.json",
-      "bytes": 1006359,
+      "bytes": 1006100,
       "kind": "input",
       "path": "schemas/instruments/1/exotics/basket.schema.json",
       "summary": "Weighted basket of constituents priced as one position.",
@@ -767,7 +767,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/instrument/1/instrument.schema.json",
-      "bytes": 1097586,
+      "bytes": 1097327,
       "kind": "input",
       "path": "schemas/instruments/1/instrument.schema.json",
       "summary": "The seventy-branch union of every instrument type. Prefer the per-type schema beside it: this document is too large to hand to a model.",
@@ -947,7 +947,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/results/1/composite_rebalance_result.schema.json",
-      "bytes": 1008990,
+      "bytes": 1008731,
       "kind": "output",
       "path": "schemas/results/1/composite_rebalance_result.schema.json",
       "summary": "Result of resolving a new composite holdings state.",

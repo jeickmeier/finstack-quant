@@ -123,7 +123,6 @@ def _hazard_curve(curve_id: str, hazard_rate: float) -> dict[str, Any]:
         "day_count": "act_365f",
         "par_points": [],
         "par_interp": "linear",
-        "survival_interp": "log_linear",
         "fx_policy": None,
     }
 

@@ -963,7 +963,7 @@ fn market_context_state_roundtrip_hits_more_state_serde_lines() {
         .insert(bc)
         .insert_credit_index("CDX", credit_index)
         .expect("canonical credit index")
-        .insert_inflation_index("US-CPI", idx)
+        .insert_inflation_index(idx)
         .insert_series(series)
         .insert_surface(surface)
         .insert_price(

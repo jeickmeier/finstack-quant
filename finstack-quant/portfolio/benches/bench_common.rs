@@ -389,7 +389,7 @@ fn build_market_context(base: Date, rate_shift: f64) -> MarketContext {
         .insert(jpy_alias)
         .insert(hazard)
         .insert(inflation)
-        .insert_inflation_index("USD-CPI", cpi_history)
+        .insert_inflation_index(cpi_history)
         .insert(base_corr)
         .insert_surface(equity_vol)
         .insert_surface(swaption_vol)

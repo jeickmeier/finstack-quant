@@ -55,3 +55,39 @@ def test_config_extension_insertion_validates_key() -> None:
     with pytest.raises(ValueError, match="invalid config extension key"):
         config.set_extension("not namespaced", {"enabled": True})
     assert "not namespaced" not in config.extension_keys()
+
+
+@pytest.mark.parametrize("value", ["true", "null", "123", '{"enabled":true}', "text", True, None, [1, "true"]])
+def test_extension_values_remain_native_json_values(value: object) -> None:
+    config = FinstackConfig()
+    config.set_extension("example.settings.v1", value)
+    assert json.loads(config.get_extension_json("example.settings.v1")) == value
+
+
+def test_currency_equality_is_typed_and_hash_consistent() -> None:
+    from finstack_quant.core.currency import Currency
+
+    usd = Currency("USD")
+    same = Currency("usd")
+    assert usd == same
+    assert hash(usd) == hash(same)
+    assert usd != "USD"
+    assert usd != "usd"
+    assert len({usd, same, "USD", "usd"}) == 3
+
+
+def test_rating_scale_signed_zero_equality_matches_its_levels() -> None:
+    from finstack_quant.core.rating_scales import RatingLevel, ScorecardScale
+
+    positive = RatingLevel("A", 0.0, 0.0)
+    negative = RatingLevel("A", -0.0, -0.0)
+    assert positive == negative
+    assert ScorecardScale("zero", [positive]) == ScorecardScale("zero", [negative])
+
+
+def test_tiny_annual_zero_rate_avoids_subtractive_cancellation() -> None:
+    from finstack_quant.core.market_data import DiscountCurve
+
+    df = 1.0 - 1e-8
+    curve = DiscountCurve("TINY", "2025-01-01", [(0, 1), (1, df)], interp="log_linear")
+    assert abs(curve.zero_annual(1) - (1 - df) / df) < 1e-23

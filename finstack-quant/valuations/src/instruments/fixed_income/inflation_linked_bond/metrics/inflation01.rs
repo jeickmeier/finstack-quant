@@ -57,9 +57,7 @@ pub(super) fn bumped_inflation_market(
 
     let index = market.get_inflation_index(bond.inflation_index_id.as_str())?;
     let bumped = index.apply_projection_bump(as_of, spec)?;
-    Ok(market
-        .clone()
-        .insert_inflation_index(bond.inflation_index_id.clone(), bumped))
+    Ok(market.clone().insert_inflation_index(bumped))
 }
 
 impl MetricCalculator for Inflation01Calculator {
@@ -245,7 +243,7 @@ mod tests {
             .with_lag(InflationLag::None);
         let market = MarketContext::new()
             .insert(discount)
-            .insert_inflation_index("US-CPI", index);
+            .insert_inflation_index(index);
         let bond = sample_bond();
 
         let result = bond

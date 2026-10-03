@@ -18,8 +18,8 @@ pub use generator::{
 };
 pub use llm::{project_llm, LlmProfile, DEFAULT_MAX_INLINE_BYTES, RESOLVES_FROM_KEYWORD};
 pub use registry::{
-    example, example_from_json, find_schema_artifact, generated_schema, SchemaArtifact, SchemaKind,
-    SerdeSchema, COMMON_SCHEMA_BASE, COMMON_SCHEMA_DEFINITIONS, JSON_SCHEMA_DIALECT,
+    example, example_from_json, find_schema_artifact, SchemaArtifact, SchemaKind, SerdeSchema,
+    COMMON_SCHEMA_BASE, COMMON_SCHEMA_DEFINITIONS, JSON_SCHEMA_DIALECT,
 };
 
 /// Register one schema artifact for a contract type under a crate's family.

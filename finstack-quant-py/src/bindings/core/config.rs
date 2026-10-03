@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::bindings::core::currency::extract_currency;
-use crate::bindings::module_utils::py_to_json_value;
+use crate::bindings::module_utils::py_to_serde;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::config::{FinstackConfig, RoundingMode, ToleranceConfig};
 use pyo3::exceptions::PyTypeError;
@@ -382,7 +382,7 @@ impl PyFinstackConfig {
             .collect()
     }
 
-    /// Set a versioned registry/config extension from a Python dict/list or JSON string.
+    /// Set a versioned registry/config extension from native Python JSON data. Strings are stored literally.
     #[pyo3(text_signature = "(self, key, value)")]
     fn set_extension(
         &mut self,
@@ -390,7 +390,7 @@ impl PyFinstackConfig {
         key: &str,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<()> {
-        let value = py_to_json_value(py, value, "config extension")?;
+        let value = py_to_serde::<serde_json::Value>(py, value, "config extension")?;
         self.inner
             .extensions
             .insert(key, value)
@@ -463,13 +463,12 @@ impl PyFinstackConfig {
             .map_err(|err| serde_json_to_py(err, "invalid FinstackConfig JSON"))
     }
 
-    /// Structural equality via the JSON wire form (rounding, scale overrides,
-    /// tolerances and extensions).
+    /// Canonical Rust structural equality (including numeric signed-zero equality).
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
         let Ok(rhs) = other.extract::<PyRef<'_, PyFinstackConfig>>() else {
             return Ok(false);
         };
-        Ok(self.to_json()? == rhs.to_json()?)
+        Ok(self.inner == rhs.inner)
     }
 
     /// Return ``repr(self)`` showing the rounding mode and override counts.

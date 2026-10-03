@@ -694,7 +694,7 @@ class RatingScaleRegistry:
         """
         ...
     def __eq__(self, other: object) -> bool:
-        """Return whether two registries are structurally equal (JSON wire form).
+        """Return whether two registries are structurally equal under canonical Rust equality; signed zeros compare equal.
 
         Returns
         -------

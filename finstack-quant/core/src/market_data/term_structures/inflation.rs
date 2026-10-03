@@ -236,13 +236,10 @@ impl InflationCurve {
     /// ```
     #[must_use]
     pub fn builder(id: impl Into<CurveId>) -> InflationCurveBuilder {
-        let base_date =
-            Date::from_calendar_date(1970, time::Month::January, 1).unwrap_or(time::Date::MIN);
         InflationCurveBuilder {
             id: id.into(),
             base_cpi: 100.0,
-            base_date,
-            base_date_set: false,
+            base_date: None,
             day_count: DayCount::Act365F,
             indexation_lag_months: DEFAULT_INDEXATION_LAG_MONTHS,
             points: Vec::new(),
@@ -583,8 +580,7 @@ impl InflationCurve {
 pub struct InflationCurveBuilder {
     id: CurveId,
     base_cpi: f64,
-    base_date: Date,
-    base_date_set: bool,
+    base_date: Option<Date>,
     day_count: DayCount,
     indexation_lag_months: u32,
     points: Vec<(f64, f64)>, // (t, cpi)
@@ -607,8 +603,7 @@ impl InflationCurveBuilder {
 
     /// Override the default **base date** (valuation date).
     pub fn base_date(mut self, d: Date) -> Self {
-        self.base_date = d;
-        self.base_date_set = true;
+        self.base_date = Some(d);
         self
     }
 
@@ -669,9 +664,7 @@ impl InflationCurveBuilder {
                 "base_cpi must be finite and strictly positive".to_string(),
             ));
         }
-        if !self.base_date_set {
-            return Err(InputError::Invalid.into());
-        }
+        let base_date = self.base_date.ok_or(InputError::Invalid)?;
         if self.points.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
@@ -708,7 +701,7 @@ impl InflationCurveBuilder {
         Ok(InflationCurve {
             id: self.id,
             base_cpi: self.base_cpi,
-            base_date: self.base_date,
+            base_date,
             day_count: self.day_count,
             indexation_lag_months: self.indexation_lag_months,
             knots,

@@ -109,7 +109,7 @@ mod tests {
         MarketContext::new()
             .insert(discount)
             .insert(inflation)
-            .insert_inflation_index("US-CPI", index)
+            .insert_inflation_index(index)
             .insert_surface(vol_surface)
     }
 

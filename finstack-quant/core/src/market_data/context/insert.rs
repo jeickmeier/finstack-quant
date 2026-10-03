@@ -176,7 +176,7 @@ impl MarketContext {
     /// let index = InflationIndex::new("US-CPI", observations, Currency::USD)
     ///     .expect("InflationIndex creation should succeed")
     ///     .with_interpolation(InflationInterpolation::Linear);
-    /// let ctx = MarketContext::new().insert_inflation_index("US-CPI", index);
+    /// let ctx = MarketContext::new().insert_inflation_index(index);
     /// assert!(ctx.get_inflation_index("US-CPI").is_ok());
     ///
     /// // With Arc for sharing
@@ -187,19 +187,14 @@ impl MarketContext {
     /// # let index2 = InflationIndex::new("EU-HICP", observations2, Currency::EUR)
     /// #     .expect("InflationIndex creation should succeed");
     /// let shared = Arc::new(index2);
-    /// let ctx2 = MarketContext::new().insert_inflation_index("EU-HICP", Arc::clone(&shared));
+    /// let ctx2 = MarketContext::new().insert_inflation_index(Arc::clone(&shared));
     /// ```
     ///
     /// # Arguments
     ///
-    /// * `id` - Lookup key stored as [`CurveId`]; must equal `index.id`.
-    /// * `index` - Owned or shared inflation index whose `id` matches `id`.
-    pub fn insert_inflation_index(
-        mut self,
-        id: impl AsRef<str>,
-        index: impl Into<Arc<InflationIndex>>,
-    ) -> Self {
-        self.insert_inflation_index_mut(id, index);
+    /// * `index` - Owned or shared inflation index, stored under its embedded `id`; replaces any index with the same ID.
+    pub fn insert_inflation_index(mut self, index: impl Into<Arc<InflationIndex>>) -> Self {
+        self.insert_inflation_index_mut(index);
         self
     }
 
@@ -433,13 +428,16 @@ impl MarketContext {
     /// Insert an inflation index, mutating in place.
     ///
     /// Mirrors [`Self::insert_inflation_index`] but takes `&mut self`.
+    ///
+    /// # Arguments
+    ///
+    /// * `index` - Owned or shared inflation index, stored under its embedded `id`; replaces any index with the same ID.
     pub fn insert_inflation_index_mut(
         &mut self,
-        id: impl AsRef<str>,
         index: impl Into<Arc<InflationIndex>>,
     ) -> &mut Self {
         let index = index.into();
-        let key = Self::inflation_index_key_for_insert(id, index.as_ref());
+        let key = CurveId::from(index.id.as_str());
         Arc::make_mut(&mut self.inflation_indices).insert(key, index);
         self
     }
@@ -497,20 +495,5 @@ impl MarketContext {
     ) -> &mut Self {
         Arc::make_mut(&mut self.collateral).insert(csa_code.into(), discount_id);
         self
-    }
-
-    #[inline]
-    pub(crate) fn inflation_index_key_for_insert(
-        id: impl AsRef<str>,
-        index: &InflationIndex,
-    ) -> CurveId {
-        let key = CurveId::from(id.as_ref());
-        assert!(
-            key.as_str() == index.id,
-            "MarketContext::insert_inflation_index key '{}' must match InflationIndex.id '{}'",
-            key.as_str(),
-            index.id
-        );
-        key
     }
 }

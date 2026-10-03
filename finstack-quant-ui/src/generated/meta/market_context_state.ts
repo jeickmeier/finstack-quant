@@ -1606,14 +1606,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/seniority/anyOf/1"
   },
   {
-    "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/survival_interp",
-    "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/survival_interp",
-    "default": "log_linear",
-    "description": "Survival-probability interpolation style between pillars",
-    "ref": "#/$defs/InterpStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/InterpStyle"
-  },
-  {
     "path": "#/$defs/d_a33b682660a7dfa1ea09/oneOf/2/properties/type",
     "source": "https://finstack_quant.dev/schemas/market_data/1/market_context_state.schema.json#/$defs/CurveState/oneOf/2/properties/type",
     "const": "hazard"

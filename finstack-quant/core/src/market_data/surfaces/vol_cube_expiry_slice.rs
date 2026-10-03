@@ -1,6 +1,6 @@
 //! Observed volatility by tenor and strike at one fixed option expiry.
 
-use super::{VolQuoteType, VolSurface};
+use super::VolQuoteType;
 use crate::{types::CurveId, Error, Result};
 
 /// A fixed-expiry slice of a volatility cube with truthful tenor and strike axes.
@@ -98,10 +98,10 @@ impl VolCubeExpirySlice {
         }
         // Share canonical axis/grid validation; only the resulting slice's
         // truthful tenor/strike fields are retained or serialized.
-        let grid = VolSurface::from_grid(id, tenors, strikes, vols_row_major)?;
+        super::vol_surface::validate_grid(tenors, strikes, vols_row_major)?;
         super::vol_surface::validate_displacements(quote_type, displacements, tenors.len())?;
         Ok(Self {
-            id: grid.id().clone(),
+            id: CurveId::new(id.as_ref()),
             expiry,
             tenors: tenors.into(),
             strikes: strikes.into(),

@@ -628,12 +628,12 @@ impl MarketSnapshot {
                 }
             }
             if restore_inflation {
-                for (id, index) in &snapshot.inflation_indices {
-                    new_market.insert_inflation_index_mut(id.as_str(), Arc::clone(index));
+                for index in snapshot.inflation_indices.values() {
+                    new_market.insert_inflation_index_mut(Arc::clone(index));
                 }
             } else {
-                for (id, index) in current_market.inflation_indices_iter() {
-                    new_market.insert_inflation_index_mut(id.as_str(), Arc::clone(index));
+                for (_, index) in current_market.inflation_indices_iter() {
+                    new_market.insert_inflation_index_mut(Arc::clone(index));
                 }
             }
             if restore_scalars {
@@ -692,7 +692,6 @@ mod tests {
             .insert_price("EQ", MarketScalar::Unitless(spot))
             .insert_price("EQ-VOL", MarketScalar::Unitless(vol))
             .insert_inflation_index(
-                "CPI",
                 InflationIndex::new("CPI", vec![(date!(2025 - 01 - 01), cpi)], Currency::USD)
                     .unwrap(),
             )

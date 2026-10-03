@@ -145,7 +145,7 @@ fn step_params_v2_roundtrip_for_all_variants() {
         recovery_rate: 0.40,
         notional: 1.0,
         method: CalibrationMethod::Bootstrap,
-        interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
         par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
         doc_clause: None,
         cds_valuation_convention: None,

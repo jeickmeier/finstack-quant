@@ -431,7 +431,6 @@
         "par_points": [],
         "recovery_rate": 0.4,
         "seniority": null,
-        "survival_interp": "log_linear",
         "type": "hazard"
       },
       {

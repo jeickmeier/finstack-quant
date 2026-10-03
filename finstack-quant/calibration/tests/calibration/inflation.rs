@@ -88,7 +88,7 @@ fn calibrated_market(index: Option<InflationIndex>, base_cpi: f64) -> (MarketCon
     })];
     let mut source_market = MarketContext::new().insert(create_discount_curve(base_date));
     if let Some(index) = index {
-        source_market = source_market.insert_inflation_index("USD-CPI", index);
+        source_market = source_market.insert_inflation_index(index);
     }
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
@@ -198,7 +198,7 @@ fn inflation_preflight_rejects_base_cpi_mismatch_with_fixings() {
     })];
     let source_market = MarketContext::new()
         .insert(create_discount_curve(base_date))
-        .insert_inflation_index("USD-CPI", create_us_cpi_fixings_with_seasonality());
+        .insert_inflation_index(create_us_cpi_fixings_with_seasonality());
     let (prior, mut market_data) = cal_utils::split_market_context(&source_market);
     cal_utils::extend_market_data(&mut market_data, &quotes);
     let mut quote_sets: HashMap<String, Vec<QuoteId>> = HashMap::default();

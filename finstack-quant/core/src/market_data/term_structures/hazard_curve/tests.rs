@@ -68,7 +68,6 @@ fn survival_interpolation_preserves_hazard_consistency() {
             .knots([(1.0, 0.02), (2.0, 1.0)])
             .recovery_rate(0.4)
     };
-    assert!(builder().interp(InterpStyle::Linear).build().is_err());
     let curve = builder().build().expect("valid hazard curve");
     for t in [0.5, 1.5, 3.0] {
         let eps = 1e-5;

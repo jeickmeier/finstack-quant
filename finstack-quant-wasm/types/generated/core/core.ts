@@ -347,10 +347,6 @@ export type CurveState =
        * Seniority
        */
       seniority?: Seniority | null;
-      /**
-       * Survival-probability interpolation style between pillars
-       */
-      survival_interp?: InterpStyle;
       type: "hazard";
     }
   | {

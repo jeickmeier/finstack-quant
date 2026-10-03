@@ -233,7 +233,7 @@ fn test_schedule_with_deflation_protection() {
     )
     .unwrap()
     .with_interpolation(finstack_quant_core::market_data::scalars::InflationInterpolation::Linear);
-    ctx = ctx.insert_inflation_index("US-CPI-U", index);
+    ctx = ctx.insert_inflation_index(index);
 
     let as_of = d(2024, 1, 1);
 

@@ -996,14 +996,6 @@ export type CalibrationStep =
        * Entity name.
        */
       entity: string;
-      /**
-       * Interpolation style for survival probabilities between pillars.
-       *
-       * Only log-linear survival interpolation is supported, preserving the
-       * piecewise-constant hazard representation. Other styles are rejected
-       * before calibration starts.
-       */
-      interpolation?: InterpStyle;
       kind: "hazard";
       /**
        * Calibration method to use.
@@ -1991,10 +1983,6 @@ export type PriorMarketObject =
        * Seniority
        */
       seniority?: Seniority | null;
-      /**
-       * Survival-probability interpolation style between pillars
-       */
-      survival_interp?: InterpStyle;
     }
   | {
       /**
@@ -2666,10 +2654,6 @@ export type CurveState =
        * Seniority
        */
       seniority?: Seniority | null;
-      /**
-       * Survival-probability interpolation style between pillars
-       */
-      survival_interp?: InterpStyle;
       type: "hazard";
     }
   | {
@@ -3787,14 +3771,6 @@ export type StepParams =
        * Entity name.
        */
       entity: string;
-      /**
-       * Interpolation style for survival probabilities between pillars.
-       *
-       * Only log-linear survival interpolation is supported, preserving the
-       * piecewise-constant hazard representation. Other styles are rejected
-       * before calibration starts.
-       */
-      interpolation?: InterpStyle;
       kind: "hazard";
       /**
        * Calibration method to use.

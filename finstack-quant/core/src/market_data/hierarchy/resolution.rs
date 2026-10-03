@@ -10,8 +10,11 @@ use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct ResolvedCurveMatch {
+/// A curve matched at a specific hierarchy depth.
+pub struct ResolvedCurveMatch {
+    /// Identifier of the matched curve.
     pub curve_id: CurveId,
+    /// Depth of the node whose subtree matched, counting roots as depth one.
     pub matched_depth: usize,
 }
 
@@ -119,7 +122,13 @@ impl MarketDataHierarchy {
             .collect()
     }
 
-    pub(crate) fn resolve_matches(
+    /// Resolve a target while retaining matching-node depths and traversal order.
+    ///
+    /// # Arguments
+    ///
+    /// * `target` - Hierarchy path and optional tag predicates; a missing path matches nothing.
+    /// * `mode` - Whether to retain all matches or only the deepest match per curve.
+    pub fn resolve_matches(
         &self,
         target: &HierarchyTarget,
         mode: ResolutionMode,

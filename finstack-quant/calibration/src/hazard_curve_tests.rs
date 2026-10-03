@@ -136,7 +136,7 @@ fn hazard_recipe_act365f_inputs_replay_round_trip_and_reject_tampering() {
                 recovery_rate: 0.40,
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
-                interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
                 par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: Some("isda_as".to_string()),
                 cds_valuation_convention: None,
@@ -363,7 +363,7 @@ fn hazard_calibration_rejects_zero_spread() {
                 recovery_rate: 0.40,
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
-                interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
                 par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
@@ -437,7 +437,7 @@ fn hazard_calibration_rejects_negative_spread() {
                 recovery_rate: 0.40,
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
-                interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
                 par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
@@ -509,7 +509,7 @@ fn hazard_calibration_rejects_non_standard_upfront_running_coupon() {
                 recovery_rate: 0.40,
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
-                interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
                 par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
@@ -617,7 +617,7 @@ fn hazard_calibration_handles_extreme_high_spread() {
                 recovery_rate: 0.40,
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
-                interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
                 par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
@@ -742,7 +742,7 @@ fn hazard_calibration_global_solve_sqrt_time_is_not_rougher_than_bootstrap() {
                 recovery_rate: 0.40,
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
-                interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
                 par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
@@ -799,7 +799,7 @@ fn hazard_calibration_global_solve_sqrt_time_is_not_rougher_than_bootstrap() {
                 method: CalibrationMethod::GlobalSolve {
                     use_analytical_jacobian: false,
                 },
-                interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
                 par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,
@@ -899,7 +899,7 @@ fn hazard_calibration_reprices_par_spread() {
                 recovery_rate,
                 notional: 1.0,
                 method: CalibrationMethod::Bootstrap,
-                interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
                 par_interp: finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                 doc_clause: None,
                 cds_valuation_convention: None,

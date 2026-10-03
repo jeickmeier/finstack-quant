@@ -5406,8 +5406,7 @@
           "#/$defs/PoolAsset/properties/amortization_term_months",
           "#/$defs/PoolAsset/properties/io_months",
           "#/$defs/RepLine/properties/amortization_term_months",
-          "#/$defs/RepLine/properties/io_months",
-          "#/$defs/Expr/properties/id"
+          "#/$defs/RepLine/properties/io_months"
         ],
         "nullable-number": [
           "#/$defs/CashFlowAccrual/properties/projected_index_rate",
@@ -6968,7 +6967,6 @@
           "#/$defs/ShiftingInterestStep/properties/months_from_closing",
           "#/$defs/TermOutSpec/properties/months"
         ],
-        "uint64": ["#/$defs/Expr/properties/id"],
         "uint8": [
           "#/$defs/InflationLag/oneOf/0/properties/months",
           "#/$defs/AgencyTba/properties/settlement_month",
@@ -16979,8 +16977,7 @@
           "#/$defs/PoolAsset/properties/amortization_term_months",
           "#/$defs/PoolAsset/properties/io_months",
           "#/$defs/RepLine/properties/amortization_term_months",
-          "#/$defs/RepLine/properties/io_months",
-          "#/$defs/Expr/properties/id"
+          "#/$defs/RepLine/properties/io_months"
         ],
         "nullable-number": [
           "#/$defs/d_b0a5fc543381da6a5722/properties/cds_quote_bp",
@@ -18541,7 +18538,6 @@
           "#/$defs/ShiftingInterestStep/properties/months_from_closing",
           "#/$defs/TermOutSpec/properties/months"
         ],
-        "uint64": ["#/$defs/Expr/properties/id"],
         "uint8": [
           "#/$defs/InflationLag/oneOf/0/properties/months",
           "#/$defs/AgencyTba/properties/settlement_month",

@@ -38,8 +38,6 @@
 //! `quantile` q, `shift` n) read the first element of their argument series
 //! by convention.
 
-use super::ast::Function;
-use super::context::SimpleContext;
 use super::eval::CompiledExpr;
 use crate::math::{
     finite_count, finite_max_or_nan, finite_min_or_nan, quantile_linear_or_nan, NeumaierAccumulator,
@@ -401,17 +399,7 @@ impl CompiledExpr {
         raw.clamp(EWM_ALPHA_FLOOR, 1.0)
     }
 
-    pub(super) fn eval_ewm_mean(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        let len = arg_results.first().map(|a| a.len()).unwrap_or(0);
-        if arg_results.len() >= 2 && !arg_results[1].is_empty() {
-            let mut out = vec![0.0; len];
-            self.eval_ewm_mean_into(arg_results, &mut out);
-            return out;
-        }
-        Vec::with_capacity(len)
-    }
-
-    fn eval_ewm_mean_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
+    pub(super) fn eval_ewm_mean_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
         let len = out.len();
         if len == 0 {
             return;
@@ -457,37 +445,17 @@ impl CompiledExpr {
         }
     }
 
-    pub(super) fn eval_std(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        let len = arg_results.first().map(|a| a.len()).unwrap_or(0);
-        if !arg_results.is_empty() {
-            let mut out = vec![0.0; len];
-            self.eval_std_into(arg_results, &mut out);
-            return out;
-        }
-        Vec::with_capacity(len)
-    }
-
     /// Population standard deviation over all non-NaN observations.
     ///
     /// NaN policy: NaNs are excluded from both the sample and the count `n`
     /// (matching `median`/`quantile` and the statements-layer reducers).
     /// Fewer than two valid observations broadcasts NaN.
-    fn eval_std_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
+    pub(super) fn eval_std_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
         Self::eval_population_var_into(arg_results, out, true);
     }
 
-    pub(super) fn eval_var(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        let len = arg_results.first().map(|a| a.len()).unwrap_or(0);
-        if !arg_results.is_empty() {
-            let mut out = vec![0.0; len];
-            self.eval_var_into(arg_results, &mut out);
-            return out;
-        }
-        Vec::with_capacity(len)
-    }
-
     /// Population variance over all non-NaN observations (see [`Self::eval_std_into`]).
-    fn eval_var_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
+    pub(super) fn eval_var_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
         Self::eval_population_var_into(arg_results, out, false);
     }
 
@@ -528,23 +496,13 @@ impl CompiledExpr {
         out.fill(value);
     }
 
-    pub(super) fn eval_median(&self, arg_results: &[&[f64]]) -> Vec<f64> {
-        let len = arg_results.first().map(|a| a.len()).unwrap_or(0);
-        if !arg_results.is_empty() {
-            let mut out = vec![0.0; len];
-            self.eval_median_into(arg_results, &mut out);
-            return out;
-        }
-        Vec::with_capacity(len)
-    }
-
     /// Median over all non-NaN observations.
     ///
     /// NaN policy: NaNs are excluded from both the sample and the count `n`
     /// (the same skip-NaN policy as `quantile`); an all-NaN or empty input
     /// broadcasts NaN. Previously NaNs sorted as the largest values and
     /// shifted the midpoint (e.g. `median([1,2,3,NaN])` returned `2.5`).
-    fn eval_median_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
+    pub(super) fn eval_median_into(&self, arg_results: &[&[f64]], out: &mut [f64]) {
         let data = &arg_results[0];
         let mut guard = self
             .scratch
@@ -1017,77 +975,5 @@ impl CompiledExpr {
             }
         }
         out
-    }
-
-    pub(super) fn eval_function_core(
-        &self,
-        fun: Function,
-        arg_results: &[&[f64]],
-        _ctx: &SimpleContext,
-        _cols: &[&[f64]],
-    ) -> crate::Result<Vec<f64>> {
-        match fun {
-            Function::CumSum => Ok(self.eval_cum_sum(arg_results)),
-            Function::CumProd => Ok(self.eval_cum_prod(arg_results)),
-            Function::CumMin => Ok(self.eval_cum_min(arg_results)),
-            Function::CumMax => Ok(self.eval_cum_max(arg_results)),
-            Function::EwmMean => Ok(self.eval_ewm_mean(arg_results)),
-            Function::Std => Ok(self.eval_std(arg_results)),
-            Function::Var => Ok(self.eval_var(arg_results)),
-            Function::Median => Ok(self.eval_median(arg_results)),
-            Function::Rank => Ok(self.eval_rank(arg_results)),
-            Function::Quantile => Ok(self.eval_quantile(arg_results)),
-            Function::EwmStd => Ok(self.eval_ewm_std(arg_results)),
-            Function::EwmVar => Ok(self.eval_ewm_var(arg_results)),
-            Function::Abs => Ok(self.eval_abs(arg_results)),
-            Function::Sign => Ok(self.eval_sign(arg_results)),
-            Function::Pow => Ok(self.eval_pow(arg_results)),
-            Function::Round => self.eval_round(arg_results),
-            Function::Floor => Ok(self.eval_floor(arg_results)),
-            Function::Ceil => Ok(self.eval_ceil(arg_results)),
-            Function::Ln => Ok(self.eval_ln(arg_results)),
-            Function::Exp => Ok(self.eval_exp(arg_results)),
-            Function::Log10 => Ok(self.eval_log10(arg_results)),
-            Function::Sqrt => Ok(self.eval_sqrt(arg_results)),
-            Function::Clamp => Ok(self.eval_clamp(arg_results)),
-            Function::IsMissing => Ok(self.eval_is_missing(arg_results)),
-            // The windowed/lag family is evaluated arena-first through the
-            // `eval_*_into` writers in `eval.rs`; it never reaches this path.
-            Function::Lag
-            | Function::Lead
-            | Function::Diff
-            | Function::PctChange
-            | Function::RollingMean
-            | Function::RollingSum
-            | Function::RollingStd
-            | Function::RollingVar
-            | Function::RollingMedian
-            | Function::Shift
-            | Function::RollingMin
-            | Function::RollingMax
-            | Function::RollingCount => Err(crate::Error::Internal(format!(
-                "{fun:?} is evaluated through eval_function_into"
-            ))),
-            Function::Sum
-            | Function::Mean
-            | Function::Ttm
-            | Function::Ytd
-            | Function::Qtd
-            | Function::FiscalYtd
-            | Function::Annualize
-            | Function::AnnualizeRate
-            | Function::Coalesce
-            | Function::GrowthRate
-            | Function::Min
-            | Function::Max => {
-                debug_assert!(
-                    !fun.is_scalar_evaluable(),
-                    "Function::is_scalar_evaluable disagrees with eval dispatch for {fun:?}"
-                );
-                Err(crate::Error::Validation(format!(
-                    "Expression function '{fun}' is a statements-layer function; evaluate it via the statements crate instead of core::expr::eval"
-                )))
-            }
-        }
     }
 }

@@ -690,42 +690,25 @@ impl VolSurface {
         }
         let factor = 1.0 + pct / 100.0;
         let (n_expiries, n_strikes) = self.grid_shape();
-        let mut builder = VolSurface::builder(self.id.clone())
-            .expiries(self.expiries())
-            .strikes(self.strikes())
-            .secondary_axis(self.secondary_axis)
-            .quote_type(if self.displacements.is_some() {
-                VolQuoteType::BlackLognormal
-            } else {
-                self.quote_type
-            })
-            .interpolation_mode(self.interpolation_mode);
-
+        let mut bumped = self.clone();
         for (ei, &expiry) in self.expiries.iter().enumerate().take(n_expiries) {
-            let mut row = Vec::with_capacity(n_strikes);
             for (si, &strike) in self.strikes.iter().enumerate().take(n_strikes) {
-                let val = self.vols[ei * n_strikes + si];
                 let expiry_match = expiries_filter
                     .map(|flt| flt.iter().any(|&e| bucket_filter_matches(e, expiry)))
                     .unwrap_or(true);
                 let strike_match = strikes_filter
                     .map(|flt| flt.iter().any(|&s| bucket_filter_matches(s, strike)))
                     .unwrap_or(true);
-
                 if expiry_match && strike_match {
-                    row.push((val * factor).max(0.0));
-                } else {
-                    row.push(val);
+                    let index = ei * n_strikes + si;
+                    bumped.vols[index] = (self.vols[index] * factor).max(0.0);
+                    if !bumped.vols[index].is_finite() {
+                        return None;
+                    }
                 }
             }
-            builder = builder.row(&row);
         }
-
-        let surface = builder.build().ok()?;
-        match self.get_displacements() {
-            Some(shifts) => surface.with_displacements(shifts).ok(),
-            None => Some(surface),
-        }
+        Some(bumped)
     }
 }
 
@@ -893,26 +876,7 @@ impl VolSurface {
         displacements: Option<&[f64]>,
     ) -> crate::Result<Self> {
         validate_displacements(opts.quote_type, displacements, expiries.len())?;
-        if expiries.is_empty() || strikes.is_empty() {
-            return Err(InputError::TooFewPoints.into());
-        }
-        validate_axis(expiries)?;
-        validate_axis(strikes)?;
-        let n = expiries
-            .len()
-            .checked_mul(strikes.len())
-            .ok_or(InputError::DimensionMismatch)?;
-        if vols_row_major.len() != n {
-            return Err(InputError::DimensionMismatch.into());
-        }
-        for &v in vols_row_major {
-            if !v.is_finite() {
-                return Err(InputError::Invalid.into());
-            }
-            if v < 0.0 {
-                return Err(InputError::NegativeValue.into());
-            }
-        }
+        validate_grid(expiries, strikes, vols_row_major)?;
         Ok(Self {
             id: CurveId::new(id.as_ref()),
             expiries: expiries.to_vec().into_boxed_slice(),
@@ -1069,6 +1033,35 @@ fn validate_axis(axis: &[f64]) -> crate::Result<()> {
     // Allow singleton axes (e.g., a 1xN “surface”) for clamped evaluation.
     if axis.len() > 1 {
         crate::math::interp::utils::validate_knots(axis)?;
+    }
+    Ok(())
+}
+
+/// Validate axes, row-major dimensions and annualized decimal quotes.
+pub(super) fn validate_grid(
+    expiries: &[f64],
+    strikes: &[f64],
+    vols_row_major: &[f64],
+) -> crate::Result<()> {
+    if expiries.is_empty() || strikes.is_empty() {
+        return Err(InputError::TooFewPoints.into());
+    }
+    validate_axis(expiries)?;
+    validate_axis(strikes)?;
+    let n = expiries
+        .len()
+        .checked_mul(strikes.len())
+        .ok_or(InputError::DimensionMismatch)?;
+    if vols_row_major.len() != n {
+        return Err(InputError::DimensionMismatch.into());
+    }
+    for &v in vols_row_major {
+        if !v.is_finite() {
+            return Err(InputError::Invalid.into());
+        }
+        if v < 0.0 {
+            return Err(InputError::NegativeValue.into());
+        }
     }
     Ok(())
 }

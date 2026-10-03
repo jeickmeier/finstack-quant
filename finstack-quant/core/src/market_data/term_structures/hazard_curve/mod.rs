@@ -129,9 +129,6 @@ pub struct HazardCurve {
     par_spreads_bp: Box<[f64]>,
     /// Default interpolation for par spreads
     par_interp: ParInterp,
-    /// Interpolation style for survival probabilities between pillars
-    /// (LogLinear ⇒ piecewise-constant hazard).
-    survival_interp_style: InterpStyle,
     /// Exact typed recipe used to replay calibration after quote shocks.
     hazard_calibration: Option<crate::market_data::term_structures::HazardCalibrationRecipe>,
     /// Interpolator for survival probabilities

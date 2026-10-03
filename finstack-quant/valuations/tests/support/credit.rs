@@ -97,7 +97,7 @@ pub fn calibrated_hazard_curve_from_spec(
         recovery_rate: spec.recovery_rate,
         notional: 1.0,
         method: CalibrationMethod::Bootstrap,
-        interpolation: InterpStyle::LogLinear,
+
         par_interp: ParInterp::Linear,
         doc_clause: None,
         cds_valuation_convention: spec.cds_valuation_convention,

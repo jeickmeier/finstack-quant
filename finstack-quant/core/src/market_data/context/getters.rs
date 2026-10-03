@@ -330,7 +330,7 @@ impl MarketContext {
     /// # let index = InflationIndex::new("US-CPI", observations, Currency::USD)
     /// #     .expect("... creation should succeed")
     /// #     .with_interpolation(InflationInterpolation::Linear);
-    /// # let ctx = MarketContext::new().insert_inflation_index("US-CPI", index);
+    /// # let ctx = MarketContext::new().insert_inflation_index(index);
     /// let idx = ctx.get_inflation_index("US-CPI").expect("Inflation index should exist");
     /// assert_eq!(idx.id, "US-CPI");
     /// ```

@@ -98,7 +98,7 @@ pub const COMMON_SCHEMA_DEFINITIONS: &[ExternalSchemaDefinition] = &[
 ///
 /// Returns [`Error::Internal`] if schemars output cannot be serialized as a
 /// JSON object.
-pub fn generated_schema<T: SerdeSchema>(
+pub(super) fn generated_schema<T: SerdeSchema>(
     schema_base: &str,
     filename: &str,
     title: &str,

@@ -14,7 +14,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{
     DiscountCurve, HazardCurve, ParInterp, Seniority,
 };
-use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::HashMap;
@@ -74,7 +73,7 @@ pub fn calibrated_hazard_curve(
                     recovery_rate,
                     notional: 1.0,
                     method: CalibrationMethod::Bootstrap,
-                    interpolation: InterpStyle::LogLinear,
+
                     par_interp: ParInterp::Linear,
                     doc_clause: Some(convention.doc_clause.as_str().to_string()),
                     cds_valuation_convention: None,

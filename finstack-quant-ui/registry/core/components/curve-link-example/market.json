@@ -73,7 +73,6 @@
       "day_count": "act_365f",
       "par_points": [],
       "par_interp": "linear",
-      "survival_interp": "log_linear",
       "hazard_calibration": null,
       "fx_policy": null
     },

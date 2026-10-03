@@ -231,3 +231,24 @@ test('HazardCurve recovery errors and precedence come from the Rust builder', ()
     validation('Values must be non-negative')
   );
 });
+
+test('HazardCurve survival interpolation is intrinsic and obsolete options are rejected', () => {
+  const options = hazardOptions([1.0, 0.02, 5.0, 0.03], 0.4);
+  const curve = new core.HazardCurve(options);
+  assert.equal(JSON.parse(curve.toJson()).survival_interp, undefined);
+  assert.throws(
+    () => new core.HazardCurve({ ...options, interp: 'log_linear' }),
+    /unknown field.*interp/
+  );
+});
+
+test('tiny annual zero rates avoid subtractive cancellation', () => {
+  const df = 1.0 - 1e-8;
+  const curve = new core.DiscountCurve({
+    id: 'TINY',
+    baseDate: '2025-01-01',
+    knots: [0, 1, 1, df],
+    interp: 'log_linear',
+  });
+  assert.ok(Math.abs(curve.zeroAnnual(1) - (1 - df) / df) < 1e-23);
+});

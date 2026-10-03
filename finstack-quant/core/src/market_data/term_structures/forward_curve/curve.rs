@@ -25,12 +25,9 @@ impl ForwardCurve {
     pub fn builder(id: impl Into<CurveId>, tenor_years: f64) -> ForwardCurveBuilder {
         let id: CurveId = id.into();
         let defaults = infer_forward_curve_defaults(id.as_str());
-        let base =
-            Date::from_calendar_date(1970, time::Month::January, 1).unwrap_or(time::Date::MIN);
         ForwardCurveBuilder {
             id,
-            base,
-            base_is_set: false,
+            base: None,
             reset_lag: defaults.reset_lag_business_days,
             day_count: defaults.day_count,
             tenor: tenor_years,

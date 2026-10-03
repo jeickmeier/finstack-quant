@@ -760,7 +760,7 @@ fn hazard_curve_cds_repricing() {
                     recovery_rate: 0.40,
                     notional: 1.0,
                     method: CalibrationMethod::Bootstrap,
-                    interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
                     par_interp:
                         finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                     doc_clause: None,
@@ -883,7 +883,7 @@ fn hazard_curve_step_report_matches_market_built_cds_repricing() {
                     recovery_rate: 0.40,
                     notional: 1.0,
                     method: CalibrationMethod::Bootstrap,
-                    interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
                     par_interp:
                         finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                     doc_clause: None,
@@ -1041,7 +1041,7 @@ fn hazard_recipe_upfront_inputs_support_par_space_replay() {
                     recovery_rate: 0.40,
                     notional: 1.0,
                     method: CalibrationMethod::Bootstrap,
-                    interpolation: finstack_quant_core::math::interp::InterpStyle::LogLinear,
+
                     par_interp:
                         finstack_quant_core::market_data::term_structures::ParInterp::Linear,
                     doc_clause: None,

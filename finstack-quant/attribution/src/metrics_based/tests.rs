@@ -650,8 +650,8 @@ fn inflation_attribution_supports_index_only_sources() {
         }
         InflationIndex::new("US-CPI", observations, Currency::USD).expect("inflation index")
     };
-    let market_t0 = MarketContext::new().insert_inflation_index("US-CPI", index(false));
-    let market_t1 = MarketContext::new().insert_inflation_index("US-CPI", index(true));
+    let market_t0 = MarketContext::new().insert_inflation_index(index(false));
+    let market_t1 = MarketContext::new().insert_inflation_index(index(true));
 
     let mut measures = IndexMap::new();
     measures.insert(MetricId::Inflation01, 100.0);
@@ -852,7 +852,7 @@ fn exact_credit_recipe_curve(
         recovery_rate: 0.4,
         notional: 1.0,
         method: CalibrationMethod::Bootstrap,
-        interpolation: InterpStyle::LogLinear,
+
         par_interp: ParInterp::Linear,
         doc_clause: Some("isda_na".into()),
         cds_valuation_convention: None,

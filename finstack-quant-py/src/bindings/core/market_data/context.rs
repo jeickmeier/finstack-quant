@@ -270,9 +270,8 @@ impl PyMarketContext {
         mut slf: PyRefMut<'py, Self>,
         index: &PyInflationIndex,
     ) -> PyRefMut<'py, Self> {
-        let id = index.inner.id.clone();
         slf.inner
-            .insert_inflation_index_mut(id, Arc::clone(&index.inner));
+            .insert_inflation_index_mut(Arc::clone(&index.inner));
         slf
     }
 

@@ -566,8 +566,6 @@ struct HazardCurveOptions {
     #[serde(default)]
     par_spreads: Option<Vec<f64>>,
     #[serde(default)]
-    interp: Option<String>,
-    #[serde(default)]
     par_interp: Option<String>,
     #[serde(default)]
     issuer: Option<String>,
@@ -596,9 +594,6 @@ impl JsHazardCurve {
         }
         if let Some(par_spreads) = options.par_spreads.as_deref() {
             builder = builder.par_spreads(flat_pairs(par_spreads, "parSpreads")?);
-        }
-        if let Some(interp) = options.interp.as_deref() {
-            builder = builder.interp(parse_interp_style(interp)?);
         }
         if let Some(par_interp) = options.par_interp.as_deref() {
             builder = builder.par_interp(serde_parse(par_interp).map_err(to_js_err)?);
@@ -633,8 +628,7 @@ impl JsHazardCurve {
     ///   intensity as a decimal); `recoveryRate` (required recovery on default,
     ///   decimal in `[0, 1]`); and the optional `dayCount` (default
     ///   `"act_365f"`), `parSpreads` (flat `[t0, bp0, …]` par CDS quotes in
-    ///   basis points, kept for reporting), `interp` (survival interpolation;
-    ///   only `"log_linear"` is accepted), `parInterp` (`"linear"` default or
+    ///   basis points, kept for reporting), `parInterp` (`"linear"` default or
     ///   `"log_linear"`), `issuer`, `seniority` (`"senior_secured"`,
     ///   `"senior"`, `"subordinated"`, `"junior"`), `currency` (ISO-4217 code of
     ///   the protection leg) and `maxHazardRate` (sanity ceiling on any knot,
@@ -1796,7 +1790,6 @@ mod tests {
             recovery_rate: 0.4,
             day_count: None,
             par_spreads: Some(vec![1.0, 120.0, 5.0, 180.0]),
-            interp: None,
             par_interp: Some("log_linear".into()),
             issuer: Some("ACME".into()),
             seniority: Some("senior".into()),

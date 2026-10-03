@@ -623,8 +623,7 @@ fn restore_market_context(
     }
 
     for idx in state.inflation_indices {
-        let id = MarketContext::inflation_index_key_for_insert(idx.id.clone(), &idx);
-        Arc::make_mut(&mut ctx.inflation_indices).insert(id, Arc::new(idx));
+        ctx.insert_inflation_index_mut(idx);
     }
 
     for schedule in state.dividends {

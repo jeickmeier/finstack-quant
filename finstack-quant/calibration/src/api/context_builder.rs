@@ -120,7 +120,7 @@ pub(crate) fn build_initial_context(
                 ctx.insert_series_mut(s.clone());
             }
             MarketDatum::InflationFixings(i) => {
-                ctx.insert_inflation_index_mut(i.id.clone(), i.clone());
+                ctx.insert_inflation_index_mut(i.clone());
             }
             MarketDatum::CreditIndex(c) => {
                 // Defer until all curves are in place.

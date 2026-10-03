@@ -30,7 +30,7 @@ fn test_lag_override_vs_index_lag() {
     let ctx = MarketContext::new()
         .insert(disc)
         .insert(infl_curve)
-        .insert_inflation_index("US-CPI-U", index);
+        .insert_inflation_index(index);
 
     // Swap with no lag override (uses index 3M lag)
     let swap_idx_lag = InflationSwapBuilder::new()
@@ -89,7 +89,7 @@ fn test_different_lag_durations() {
     let ctx = MarketContext::new()
         .insert(disc)
         .insert(infl_curve)
-        .insert_inflation_index("US-CPI-U", index);
+        .insert_inflation_index(index);
 
     let mut pvs = Vec::new();
     for lag_months in &[0, 1, 2, 3, 6] {
@@ -137,7 +137,7 @@ fn test_lag_in_days_vs_months() {
     let ctx = MarketContext::new()
         .insert(disc)
         .insert(infl_curve)
-        .insert_inflation_index("US-CPI-U", index);
+        .insert_inflation_index(index);
 
     // 3 months ≈ 90 days
     let swap_3m = InflationSwapBuilder::new()

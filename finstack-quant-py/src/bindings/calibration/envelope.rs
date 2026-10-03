@@ -1094,7 +1094,7 @@ impl PyCalibrationStep {
     /// quotes, quote_set, curve_id
     ///     As in ``discount``.
     /// **params
-    ///     Optional wire fields: ``notional``, ``method``, ``interpolation``,
+    ///     Optional wire fields: ``notional``, ``method``,
     ///     ``par_interp``, ``doc_clause``, ``cds_valuation_convention``.
     ///
     /// Raises

@@ -35,10 +35,7 @@
 //! - Fujii, M., Shimada, Y., & Takahashi, A. (2011). "A Note on Construction of
 //!   Multiple Swap Curves with and without Collateral." *FSA Research Review*, 7. `docs/REFERENCES.md#fujii-shimada-takahashi-2010`
 
-use super::common::{
-    build_interp_allow_any_values, default_curve_base_date, roll_knots, split_points,
-    year_fraction_to,
-};
+use super::common::{build_interp_allow_any_values, roll_knots, split_points, year_fraction_to};
 use crate::dates::DateExt;
 use crate::math::interp::{ExtrapolationPolicy, InterpStyle};
 use crate::{
@@ -132,8 +129,7 @@ impl BasisSpreadCurve {
     pub fn builder(id: impl Into<CurveId>) -> BasisSpreadCurveBuilder {
         BasisSpreadCurveBuilder {
             id: id.into(),
-            base: default_curve_base_date(),
-            base_is_set: false,
+            base: None,
             day_count: DayCount::Act365F,
             points: Vec::new(),
             style: InterpStyle::Linear,
@@ -260,8 +256,7 @@ impl BasisSpreadCurve {
             .collect();
         BasisSpreadCurveBuilder {
             id,
-            base: self.base,
-            base_is_set: true,
+            base: Some(self.base),
             day_count: self.day_count,
             points,
             style: self.interp.style(),
@@ -273,8 +268,7 @@ impl BasisSpreadCurve {
 /// Builder for [`BasisSpreadCurve`].
 pub struct BasisSpreadCurveBuilder {
     id: CurveId,
-    base: Date,
-    base_is_set: bool,
+    base: Option<Date>,
     day_count: DayCount,
     points: Vec<(f64, f64)>,
     style: InterpStyle,
@@ -284,8 +278,7 @@ pub struct BasisSpreadCurveBuilder {
 impl BasisSpreadCurveBuilder {
     /// Set the base date.
     pub fn base_date(mut self, date: Date) -> Self {
-        self.base = date;
-        self.base_is_set = true;
+        self.base = Some(date);
         self
     }
 
@@ -326,9 +319,7 @@ impl BasisSpreadCurveBuilder {
     /// supplied knot grid and values cannot construct the selected
     /// interpolation/extrapolation strategy.
     pub fn build(self) -> crate::Result<BasisSpreadCurve> {
-        if !self.base_is_set {
-            return Err(InputError::Invalid.into());
-        }
+        let base = self.base.ok_or(InputError::Invalid)?;
         if self.points.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
@@ -346,7 +337,7 @@ impl BasisSpreadCurveBuilder {
 
         Ok(BasisSpreadCurve {
             id: self.id,
-            base: self.base,
+            base,
             day_count: self.day_count,
             knots,
             spreads,

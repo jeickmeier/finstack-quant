@@ -152,7 +152,7 @@ pub fn standard_market(as_of: Date, inflation_rate: f64, discount_rate: f64) -> 
     MarketContext::new()
         .insert(disc)
         .insert(infl_curve)
-        .insert_inflation_index("US-CPI-U", index)
+        .insert_inflation_index(index)
 }
 
 /// Build a market with realistic curves
@@ -170,7 +170,7 @@ pub fn realistic_market(as_of: Date) -> MarketContext {
     MarketContext::new()
         .insert(disc)
         .insert(infl_curve)
-        .insert_inflation_index("US-CPI-U", index)
+        .insert_inflation_index(index)
 }
 
 /// Standard notional for tests

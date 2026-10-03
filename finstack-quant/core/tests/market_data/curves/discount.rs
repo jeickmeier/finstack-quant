@@ -1715,3 +1715,31 @@ mod continuous_transform_regressions {
         }
     }
 }
+
+#[test]
+fn tiny_annual_zero_rate_avoids_subtractive_cancellation() {
+    use finstack_quant_core::math::Compounding;
+    let df = 1.0 - 1e-8;
+    let curve = DiscountCurve::builder("TINY")
+        .base_date(sample_base_date())
+        .knots([(0.0, 1.0), (1.0, df)])
+        .interp(InterpStyle::LogLinear)
+        .extrapolation(ExtrapolationPolicy::None)
+        .build()
+        .unwrap();
+    let expected = (1.0 - df) / df;
+    assert!((curve.zero_annual(1.0) - expected).abs() < 1e-23);
+    for convention in [
+        Compounding::Annual,
+        Compounding::Continuous,
+        Compounding::Simple,
+        Compounding::Periodic(4.try_into().unwrap()),
+    ] {
+        assert_eq!(curve.zero_rate(0.0, convention), 0.0);
+        assert!(curve.zero_rate(2.0, convention).is_nan());
+        assert_eq!(
+            curve.zero_rate(0.25, convention),
+            convention.rate_from_df(curve.df(0.25), 0.25)
+        );
+    }
+}

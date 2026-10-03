@@ -16750,14 +16750,7 @@ export default [
   {
     "path": "#/$defs/Expr",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr",
-    "description": "Expression AST with optional unique ID for DAG planning.\n\nDeserialization is strict (`deny_unknown_fields`): unknown fields on\ninbound payloads are rejected rather than silently ignored."
-  },
-  {
-    "path": "#/$defs/Expr/properties/id",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Expr/properties/id",
-    "description": "Unique identifier for this expression node (for DAG planning).",
-    "format": "uint64",
-    "minimum": 0
+    "description": "Expression AST for structural DAG planning.\n\nDeserialization is strict (`deny_unknown_fields`): unknown fields on\ninbound payloads are rejected rather than silently ignored."
   },
   {
     "path": "#/$defs/Expr/properties/node",

@@ -204,11 +204,7 @@ impl PyRatingLevel {
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
         other
             .extract::<PyRef<'_, PyRatingLevel>>()
-            .map(|rhs| {
-                self.inner.name == rhs.inner.name
-                    && self.inner.score == rhs.inner.score
-                    && self.inner.min_score == rhs.inner.min_score
-            })
+            .map(|rhs| self.inner == rhs.inner)
             .unwrap_or(false)
     }
 
@@ -355,7 +351,7 @@ impl PyScorecardScale {
         let Ok(rhs) = other.extract::<PyRef<'_, PyScorecardScale>>() else {
             return Ok(false);
         };
-        Ok(self.to_json()? == rhs.to_json()?)
+        Ok(self.inner == rhs.inner)
     }
 
     /// Return ``repr(self)``.
@@ -496,12 +492,12 @@ impl PyRatingScaleRegistry {
         )
     }
 
-    /// Structural equality via the JSON wire form.
+    /// Canonical Rust structural equality.
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> PyResult<bool> {
         let Ok(rhs) = other.extract::<PyRef<'_, PyRatingScaleRegistry>>() else {
             return Ok(false);
         };
-        Ok(self.to_json()? == rhs.to_json()?)
+        Ok(self.inner == rhs.inner)
     }
 
     /// Serialize the registry to a JSON string.

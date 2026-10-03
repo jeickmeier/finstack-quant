@@ -591,14 +591,6 @@ export default [
     "description": "Entity name."
   },
   {
-    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/2/properties/interpolation",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/2/properties/interpolation",
-    "default": "log_linear",
-    "description": "Interpolation style for survival probabilities between pillars.\n\nOnly log-linear survival interpolation is supported, preserving the\npiecewise-constant hazard representation. Other styles are rejected\nbefore calibration starts.",
-    "ref": "#/$defs/InterpStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpStyle"
-  },
-  {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/2/properties/kind",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/2/properties/kind",
     "const": "hazard"
@@ -7095,14 +7087,6 @@ export default [
   {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/2/properties/seniority/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/2/properties/seniority/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/2/properties/survival_interp",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/PriorMarketObject/oneOf/2/properties/survival_interp",
-    "default": "log_linear",
-    "description": "Survival-probability interpolation style between pillars",
-    "ref": "#/$defs/InterpStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/InterpStyle"
   },
   {
     "path": "#/$defs/d_e988ea453181acf6e6f1/oneOf/3",

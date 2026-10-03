@@ -120,7 +120,7 @@ pub fn market_context_with_index() -> (MarketContext, InflationIndex) {
 
     let ctx = MarketContext::new()
         .insert(disc)
-        .insert_inflation_index("US-CPI-U", index.clone());
+        .insert_inflation_index(index.clone());
 
     (ctx, index)
 }
@@ -197,7 +197,7 @@ pub fn uk_market_context() -> (MarketContext, InflationIndex) {
 
     let ctx = MarketContext::new()
         .insert(disc)
-        .insert_inflation_index("UK-RPI", index.clone());
+        .insert_inflation_index(index.clone());
 
     (ctx, index)
 }

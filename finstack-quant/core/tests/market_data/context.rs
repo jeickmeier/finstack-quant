@@ -234,7 +234,7 @@ fn market_context_manages_fx_and_scalars() {
         .insert_fx(sample_fx_matrix())
         .insert(sample_discount_curve("USD-OIS"))
         .insert_series(series)
-        .insert_inflation_index("US-CPI", index)
+        .insert_inflation_index(index)
         .insert_dividends(dividends)
         .insert(Arc::clone(&credit_index.index_credit_curve))
         .insert(Arc::clone(&credit_index.base_correlation_curve))
@@ -688,7 +688,7 @@ fn cross_type_curve_replacement_invalidates_credit_index_dependency() {
 }
 
 #[test]
-fn insert_inflation_index_rejects_mismatched_storage_key() {
+fn insert_inflation_index_uses_embedded_id_and_replaces_existing_index() {
     let index = InflationIndex::new(
         "US-CPI",
         vec![
@@ -705,13 +705,20 @@ fn insert_inflation_index_rejects_mismatched_storage_key() {
     )
     .unwrap();
 
-    let result = std::panic::catch_unwind(|| {
-        let _ = MarketContext::new().insert_inflation_index("ALIAS", index);
-    });
-    assert!(
-        result.is_err(),
-        "mismatched inflation index keys should be rejected when inserted"
-    );
+    let original = Arc::new(index);
+    let mut market = MarketContext::new().insert_inflation_index(Arc::clone(&original));
+    assert!(Arc::ptr_eq(
+        &market.get_inflation_index("US-CPI").unwrap(),
+        &original
+    ));
+
+    let replacement = Arc::new(original.as_ref().clone());
+    market.insert_inflation_index_mut(Arc::clone(&replacement));
+    assert!(Arc::ptr_eq(
+        &market.get_inflation_index("US-CPI").unwrap(),
+        &replacement
+    ));
+    assert_eq!(market.inflation_indices_iter().count(), 1);
 }
 
 #[test]
@@ -917,7 +924,7 @@ fn market_context_snapshot_restore_mutators_drop_and_replace_owned_families() {
         .insert_price("SPOT", MarketScalar::Unitless(100.0))
         .insert_series(series_keep)
         .insert_series(series_drop)
-        .insert_inflation_index("US-CPI", index)
+        .insert_inflation_index(index)
         .insert_dividends(divs);
 
     ctx.retain_curves_mut(|id, _| id.as_str() == "USD-OIS");
@@ -1345,7 +1352,7 @@ fn market_context_insert_and_stats_setters_cover_remaining_paths() {
             .unwrap()
             .with_interpolation(InflationInterpolation::Linear),
     );
-    ctx = ctx.insert_inflation_index("US-CPI", idx);
+    ctx = ctx.insert_inflation_index(idx);
 
     let divs = Arc::new(
         DividendSchedule::builder("AAPL-DIVS")

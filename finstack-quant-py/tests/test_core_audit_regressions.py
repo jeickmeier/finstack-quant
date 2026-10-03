@@ -34,7 +34,7 @@ def test_curve_deserialization_preserves_validation() -> None:
 
 
 def test_hazard_interpolation_rejects_inconsistent_survival() -> None:
-    with pytest.raises(ValueError, match="log-linear"):
+    with pytest.raises(TypeError, match="interp"):
         HazardCurve("HZ", "2025-01-01", [(1.0, 0.02), (2.0, 1.0)], recovery_rate=0.4, interp="linear")
 
 

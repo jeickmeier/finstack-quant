@@ -84,7 +84,7 @@ impl PyCurrency {
         self.inner.numeric() as isize
     }
 
-    /// Rich comparison; supports another [`PyCurrency`] or an ISO code string.
+    /// Rich comparison; compares typed currency values; other types return NotImplemented.
     fn __richcmp__(
         &self,
         other: Bound<'_, PyAny>,
@@ -93,17 +93,6 @@ impl PyCurrency {
     ) -> PyResult<Py<PyAny>> {
         if let Ok(r) = other.extract::<PyRef<'_, PyCurrency>>() {
             let ord = self.inner.cmp(&r.inner);
-            return op.matches(ord).into_py_any(py);
-        }
-        if let Ok(s) = other.extract::<String>() {
-            let Some(rhs) = Currency::from_str(&s).ok() else {
-                return match op {
-                    CompareOp::Eq => false.into_py_any(py),
-                    CompareOp::Ne => true.into_py_any(py),
-                    _ => Ok(py.NotImplemented()),
-                };
-            };
-            let ord = self.inner.cmp(&rhs);
             return op.matches(ord).into_py_any(py);
         }
         Ok(py.NotImplemented())

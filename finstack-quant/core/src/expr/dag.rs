@@ -18,8 +18,6 @@ pub(crate) struct DagNode {
     pub expr: Expr,
     /// Dependencies (other DAG nodes this depends on).
     pub dependencies: Vec<u64>,
-    /// Reference count (how many other nodes depend on this).
-    pub ref_count: usize,
 }
 #[cfg(test)]
 mod tests {
@@ -47,13 +45,11 @@ mod tests {
         let a = Expr::call(
             Function::RollingMean,
             vec![Expr::column("x"), Expr::literal(3.0)],
-        )
-        .with_id(7);
+        );
         let b = Expr::call(
             Function::RollingMean,
             vec![Expr::column("x"), Expr::literal(3.0)],
-        )
-        .with_id(42);
+        );
 
         let plan = builder
             .build_plan(vec![a, b], meta())
@@ -106,7 +102,6 @@ mod tests {
                     id,
                     expr: Expr::literal(id as f64),
                     dependencies,
-                    ref_count: 0,
                 },
             );
             prev = id;
@@ -153,83 +148,6 @@ mod tests {
             .build_plan(vec![expr], meta())
             .expect("AST below the depth limit should build a plan");
         assert_eq!(plan.nodes.len(), MAX_DAG_RECURSION_DEPTH - 1);
-    }
-
-    #[test]
-    fn dag_builder_tracks_shared_subexpressions() {
-        let mut builder = DagBuilder::new();
-        let col_x = Expr::column("x");
-        let lit_3 = Expr::literal(3.0);
-        let rolling_mean = Expr::call(Function::RollingMean, vec![col_x.clone(), lit_3.clone()]);
-        let rolling_sum = Expr::call(Function::RollingSum, vec![col_x, lit_3]);
-
-        let plan = builder
-            .build_plan(vec![rolling_mean, rolling_sum], explicit_meta())
-            .expect("valid expressions should build a DAG plan");
-
-        assert_eq!(plan.nodes.len(), 4);
-        assert_eq!(plan.roots.len(), 2);
-
-        let col_node = plan
-            .nodes
-            .iter()
-            .find(|node| matches!(node.expr.node, ExprNode::Column(_)))
-            .expect("column node should be present");
-        assert!(
-            col_node.ref_count > 1,
-            "shared column should be referenced twice"
-        );
-    }
-
-    #[test]
-    fn dag_builder_tracks_expensive_shared_nodes() {
-        let mut builder = DagBuilder::new();
-        let col_x = Expr::column("x");
-        let rolling_std = Expr::call(Function::RollingStd, vec![col_x, Expr::literal(10.0)]);
-        let expr1 = Expr::call(
-            Function::RollingMean,
-            vec![rolling_std.clone(), Expr::literal(5.0)],
-        );
-        let expr2 = Expr::call(Function::RollingSum, vec![rolling_std, Expr::literal(3.0)]);
-
-        let plan = builder
-            .build_plan(vec![expr1, expr2], explicit_meta())
-            .expect("valid expressions should build a DAG plan");
-
-        let rolling_std_node = plan
-            .nodes
-            .iter()
-            .find(|node| matches!(node.expr.node, ExprNode::Call(Function::RollingStd, _)))
-            .expect("shared rolling std node should be present");
-        assert!(rolling_std_node.ref_count > 1);
-    }
-
-    #[test]
-    fn dag_builder_counts_shared_node_dependencies_once() {
-        let mut builder = DagBuilder::new();
-        let shared = Expr::call(
-            Function::RollingStd,
-            vec![Expr::column("x"), Expr::literal(10.0)],
-        );
-        let derived = Expr::call(
-            Function::RollingMean,
-            vec![shared.clone(), Expr::literal(5.0)],
-        );
-
-        let plan = builder
-            .build_plan(vec![shared, derived], explicit_meta())
-            .expect("valid expressions should build a DAG plan");
-
-        let col_node = plan
-            .nodes
-            .iter()
-            .find(|node| matches!(node.expr.node, ExprNode::Column(_)))
-            .expect("column node should be present");
-
-        assert_eq!(
-            col_node.ref_count, 1,
-            "shared-node dependencies should be counted once per edge"
-        );
     }
 
     #[test]
@@ -321,8 +239,6 @@ impl DagBuilder {
             root_ids.push(id);
         }
 
-        self.calculate_ref_counts(&root_ids);
-
         let ordered_nodes = self.topological_sort(&root_ids)?;
 
         Ok(ExecutionPlan {
@@ -338,9 +254,9 @@ impl DagBuilder {
     ///
     /// Returns [`crate::Error::Validation`] when the expression nests deeper
     /// than [`MAX_DAG_RECURSION_DEPTH`]. The same guard protects
-    /// `topological_sort` and `calculate_ref_counts`; without it here, a
+    /// `topological_sort`; without it here, a
     /// deeply nested programmatic AST would overflow the stack during plan
-    /// construction before either of those guards is reached.
+    /// construction before that guard is reached.
     fn process_expression(&mut self, expr: Expr, depth: usize) -> crate::Result<u64> {
         if depth >= MAX_DAG_RECURSION_DEPTH {
             return Err(crate::Error::Validation(format!(
@@ -387,51 +303,12 @@ impl DagBuilder {
             id,
             expr: expr.clone(),
             dependencies,
-            ref_count: 0,
         };
 
         self.nodes.insert(id, node);
         self.expr_cache.insert(expr, id);
 
         Ok(id)
-    }
-
-    /// Calculate reference counts for all nodes.
-    fn calculate_ref_counts(&mut self, root_ids: &[u64]) {
-        let mut ref_counts: HashMap<u64, usize> = HashMap::default();
-        let mut visited = HashSet::default();
-
-        fn count_refs(
-            node_id: u64,
-            nodes: &HashMap<u64, DagNode>,
-            ref_counts: &mut HashMap<u64, usize>,
-            visited: &mut HashSet<u64>,
-            depth: usize,
-        ) {
-            if depth >= MAX_DAG_RECURSION_DEPTH {
-                return;
-            }
-            let first_visit = visited.insert(node_id);
-
-            if let Some(node) = nodes.get(&node_id) {
-                for &dep_id in &node.dependencies {
-                    if first_visit {
-                        *ref_counts.entry(dep_id).or_insert(0) += 1;
-                        count_refs(dep_id, nodes, ref_counts, visited, depth + 1);
-                    }
-                }
-            }
-        }
-
-        for &root_id in root_ids {
-            count_refs(root_id, &self.nodes, &mut ref_counts, &mut visited, 0);
-        }
-
-        for (id, count) in ref_counts {
-            if let Some(node) = self.nodes.get_mut(&id) {
-                node.ref_count = count;
-            }
-        }
     }
 
     /// Build topological ordering of nodes.

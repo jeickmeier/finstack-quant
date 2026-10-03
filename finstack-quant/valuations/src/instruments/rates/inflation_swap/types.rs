@@ -1186,7 +1186,6 @@ mod tests {
                     .expect("CPI curve"),
             )
             .insert_inflation_index(
-                "US-CPI",
                 InflationIndex::new(
                     "US-CPI",
                     vec![(date!(2024 - 01 - 01), 300.0), (maturity, 310.0)],
@@ -1269,7 +1268,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(sample_discount_curve(discount_base))
             .insert(inflation_curve.clone())
-            .insert_inflation_index("US-CPI", flat_historical_index());
+            .insert_inflation_index(flat_historical_index());
 
         let ratio = swap
             .projected_index_ratio(&market, discount_base)
@@ -1325,7 +1324,6 @@ mod tests {
             .insert(sample_discount_curve(as_of))
             .insert(sample_inflation_curve(d(2024, Month::January, 1)))
             .insert_inflation_index(
-                "US-CPI",
                 InflationIndex::new(
                     "US-CPI",
                     vec![(start, 100.0), (maturity, 110.0)],
@@ -1348,7 +1346,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(sample_discount_curve(as_of))
             .insert(sample_inflation_curve(as_of))
-            .insert_inflation_index("US-CPI", flat_historical_index());
+            .insert_inflation_index(flat_historical_index());
         let swap = InflationSwap::builder()
             .id(InstrumentId::new("INFL-CF"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))
@@ -1414,7 +1412,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(disc.clone())
             .insert(infl)
-            .insert_inflation_index("US-CPI", flat_historical_index());
+            .insert_inflation_index(flat_historical_index());
 
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-REBASE"))
@@ -1474,7 +1472,7 @@ mod tests {
         let market_no_index = MarketContext::new()
             .insert(disc.clone())
             .insert(infl.clone())
-            .insert_inflation_index("US-CPI", flat_historical_index());
+            .insert_inflation_index(flat_historical_index());
 
         // Index with a *future* fixing wildly different from the curve.
         let index = InflationIndex::new(
@@ -1486,7 +1484,7 @@ mod tests {
         let market_with_future_fixing = MarketContext::new()
             .insert(disc)
             .insert(infl)
-            .insert_inflation_index("US-CPI", index);
+            .insert_inflation_index(index);
 
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-LOOKAHEAD"))
@@ -1524,7 +1522,7 @@ mod tests {
         let market = MarketContext::new()
             .insert(sample_discount_curve(as_of))
             .insert(sample_inflation_curve(as_of))
-            .insert_inflation_index("US-CPI", flat_historical_index());
+            .insert_inflation_index(flat_historical_index());
         let swap = YoYInflationSwap::builder()
             .id(InstrumentId::new("YOY-CF"))
             .notional(Money::from((1_000_000_i64, Currency::USD)))

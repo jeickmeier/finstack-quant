@@ -1414,7 +1414,7 @@ mod tests {
             .expect("projected CPI");
         let market = MarketContext::new()
             .insert(curve)
-            .insert_inflation_index("US-CPI", index);
+            .insert_inflation_index(index);
 
         let ratio = bond
             .index_ratio_from_market(d(2025, Month::June, 15), &market)
@@ -1589,7 +1589,7 @@ mod tests {
         .expect("published CPI");
         let market = MarketContext::new()
             .insert(curve)
-            .insert_inflation_index("US-CPI", index);
+            .insert_inflation_index(index);
         let hybrid = bond
             .index_ratio_from_market(date, &market)
             .expect("hybrid ratio");
