@@ -89,3 +89,12 @@ def test_rolling_window_is_one_year_at_the_panel_frequency() -> None:
     # series; a fixed 252 window gave none (two empty charts).
     assert section.body.count("<polyline") == 2
     assert len(perf.rolling_sharpe(0, window=12).to_dataframe()) == 49
+
+
+def test_performance_and_benchmark_tearsheets_assert_no_numeric_mode() -> None:
+    """PYPY-008: ``Performance`` carries no numeric-mode stamp, so none is printed."""
+    from finstack_quant.reporting import benchmark_tearsheet
+
+    perf = _perf()
+    assert performance_tearsheet(perf, sections=[]).meta_lines == []
+    assert "Decimal mode" not in benchmark_tearsheet(perf, sections=[]).to_html()

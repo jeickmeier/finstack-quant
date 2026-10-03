@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Reporting and features: inputs and provenance (Python-binding audit PR 17)
+
+#### Fixed
+
+- `scenario_tearsheet` and `dcf_tearsheet` accept the typed `TornadoEntry` list from `generate_tornado_entries`, and `statement_tearsheet` / `scenario_tearsheet` accept the typed `VarianceReport` from `run_variance`: every entry is normalised through `json_or_dict`. Previously `scenario_tearsheet` and both variance sections dropped typed results silently.
+- Tear sheets no longer print a hard-coded "Decimal mode" / "Decimal mode · Bankers rounding" line. `statement_tearsheet`, `dcf_tearsheet` and `credit_tearsheet` print `Numeric: <mode>` from the statement result's own `meta.numeric_mode` (e.g. `float64`); performance, benchmark, scenario and the portfolio fallback print none.
+
+#### Changed
+
+- **Breaking:** `scenario_tearsheet` / `dcf_tearsheet` raise `TypeError` (or `json.JSONDecodeError`) on a tornado input that is not a list of entries or contains an unsupported entry, instead of skipping it.
+- **Breaking:** `features.dataframe.panel` no longer pre-validates which keys an operation family needs. A missing `entity`, `order` or `time_key` now raises Rust's `ValueError` ("panel transform … is required …") instead of `TypeError` / `KeyError`; `order` and `time_key` still default to a `DatetimeIndex`.
+
 ### Reporting: numbers from Rust (Python-binding audit PR 16)
 
 #### Added

@@ -170,11 +170,14 @@ def panel(
         ``input`` (default: previous column, or the raw ``value`` column
         for the first op).
     entity : str, optional
-        Entity key; required when any operation is ``family="timeseries"``.
+        Entity key; Rust requires it when any operation is
+        ``family="timeseries"``.
     order : str, optional
-        Sort key for time-series operations.
+        Sort key; Rust requires it for time-series operations. Defaults to
+        ``df.index`` when that is a ``DatetimeIndex``.
     time_key : str, optional
-        Partition key for cross-sectional operations.
+        Partition key; Rust requires it for cross-sectional operations.
+        Defaults to ``df.index`` when that is a ``DatetimeIndex``.
 
     Returns
     -------
@@ -183,8 +186,12 @@ def panel(
 
     Raises
     ------
+    KeyError
+        If ``value`` or a named key is not a column or index level.
     ValueError
-        If operation names are duplicated or a required key is missing.
+        If operation names are duplicated, a key the operation family
+        requires is missing (raised by Rust ``transform_panel``), or a key
+        selector is ambiguous.
 
     Examples
     --------

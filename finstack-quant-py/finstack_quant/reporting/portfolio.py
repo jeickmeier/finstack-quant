@@ -271,7 +271,7 @@ def portfolio_tearsheet(
         eyebrow="Portfolio Summary",
         title=title or "Portfolio",
         subtitle=subtitle if subtitle is not None else (f"As of {val.get('as_of')}" if val.get("as_of") else None),
-        meta_lines=[f"Base {base_currency} · FX: {fx}" if base_currency else "Decimal mode"],
+        meta_lines=[f"Base {base_currency} · FX: {fx}"] if base_currency else [],
         kpis=kpis,
         sections=secs,
         generated=generated,

@@ -155,3 +155,20 @@ def test_dataframe_key_resolution_rejects_column_index_ambiguity() -> None:
 
     with pytest.raises(ValueError, match="ambiguous key"):
         fdf.cross_sectional(df, "signal", "date", "rank")
+
+
+@pytest.mark.parametrize(
+    ("family", "kwargs", "missing"),
+    [
+        ("timeseries", {"order": "t"}, "entity"),
+        ("timeseries", {"entity": "asset"}, "order"),
+        ("cross_sectional", {}, "time_key"),
+    ],
+)
+def test_panel_missing_required_key_is_rust_value_error(family: str, kwargs: dict[str, str], missing: str) -> None:
+    """PYPY-011: Rust ``transform_panel`` validates required keys, not Python."""
+    frame = pd.DataFrame({"asset": ["a", "a"], "t": ["1", "2"], "v": [1.0, 2.0]})
+    op = "diff" if family == "timeseries" else "rank"
+    operations = [{"name": "x", "family": family, "op": op}]
+    with pytest.raises(ValueError, match=f"panel transform {missing} is required"):
+        fdf.panel(frame, "v", operations, **kwargs)

@@ -25,6 +25,7 @@ __all__ = [
     "json_or_dict",
     "parse_statement",
     "pl_matrix_table",
+    "tornado_entries",
     "variance_table",
 ]
 
@@ -42,19 +43,45 @@ class StatementView:
     ['2025']
     """
 
-    def __init__(self, nodes: dict[str, dict[str, float]]) -> None:
+    def __init__(self, nodes: dict[str, dict[str, float]], numeric_mode: str | None = None) -> None:
         """Store a statement node-value map.
 
         Parameters
         ----------
         nodes : dict[str, dict[str, float]]
             Mapping from statement node ID to period-label/value mappings.
+        numeric_mode : str or None
+            The result's own numeric-mode stamp (``meta.numeric_mode``, e.g.
+            ``"float64"``), or ``None`` when the source carries none.
 
         Notes:
         -----
         Construction does not raise; arguments are stored as supplied.
         """
         self._nodes = nodes
+        self.numeric_mode = numeric_mode
+
+    def meta_lines(self) -> list[str]:
+        """Provenance header lines read from the result's own stamp.
+
+        Returns:
+        -------
+        list[str]
+            ``["Numeric: <mode>"]`` when the result carried a numeric-mode
+            stamp, otherwise an empty list (no provenance is asserted).
+
+        Notes:
+            This method does not raise.
+
+        Examples:
+        --------
+        >>> from finstack_quant.reporting.statements_common import StatementView
+        >>> StatementView({}, numeric_mode="float64").meta_lines()
+        ['Numeric: float64']
+        >>> StatementView({}).meta_lines()
+        []
+        """
+        return [f"Numeric: {self.numeric_mode}"] if self.numeric_mode else []
 
     def get(self, node_id: str, period: str) -> float | None:
         """Return the value at ``(node_id, period)``, or ``None`` if absent.
@@ -147,6 +174,47 @@ def json_or_dict(obj: Any, *, noun: str = "value") -> dict[str, Any]:
     return data
 
 
+def tornado_entries(tornado: Any, *, noun: str = "tornado") -> list[tuple[Any, Any, Any]]:
+    """Read ``(parameter_id, downside, upside)`` rows from tornado entries.
+
+    Each entry is a typed ``TornadoEntry`` (``generate_tornado_entries``
+    output), a dict, or a JSON-object string, normalised through
+    :func:`json_or_dict`. Rows keep the input order, which for Rust output is
+    the swing ranking.
+
+    Parameters
+    ----------
+    tornado : Any
+        List or tuple of tornado entries, each carrying ``parameter_id``,
+        ``downside`` and ``upside``.
+    noun : str
+        Reader-facing noun used in error messages.
+
+    Returns:
+    -------
+    list[tuple[Any, Any, Any]]
+        ``(parameter_id, downside, upside)`` rows in input order.
+
+    Raises:
+    ------
+    TypeError
+        If ``tornado`` is not a list or tuple, or an entry is not a typed
+        entry, dict, or JSON-object string.
+    json.JSONDecodeError
+        If an entry is a string that is not valid JSON.
+
+    Examples:
+    --------
+    >>> from finstack_quant.reporting.statements_common import tornado_entries
+    >>> tornado_entries([{"parameter_id": "wacc", "downside": -1.0, "upside": 2.0}])
+    [('wacc', -1.0, 2.0)]
+    """
+    if not isinstance(tornado, (list, tuple)):
+        raise TypeError(f"{noun} must be a list of tornado entries; got {type(tornado).__name__}")
+    rows = [json_or_dict(entry, noun=f"{noun} entry") for entry in tornado]
+    return [(row.get("parameter_id"), row.get("downside"), row.get("upside")) for row in rows]
+
+
 def parse_statement(results: Any) -> StatementView:
     """Build a :class:`StatementView` from a ``StatementResult``, JSON, or dict.
 
@@ -167,7 +235,8 @@ def parse_statement(results: Any) -> StatementView:
     Returns:
     -------
     StatementView
-        Read-only view over the payload's ``nodes`` mapping.
+        Read-only view over the payload's ``nodes`` mapping, carrying the
+        payload's ``meta.numeric_mode`` stamp when present.
 
     Examples:
     --------
@@ -182,7 +251,9 @@ def parse_statement(results: Any) -> StatementView:
             f"results must be a StatementResult, JSON string, dict, or StatementView; got {type(results).__name__}"
         )
     data = json_or_dict(results, noun="results")
-    return StatementView(data.get("nodes", {}))
+    meta = data.get("meta")
+    numeric_mode = meta.get("numeric_mode") if isinstance(meta, dict) else None
+    return StatementView(data.get("nodes", {}), numeric_mode=numeric_mode)
 
 
 def pl_matrix_table(
@@ -240,16 +311,21 @@ def variance_table(variance: Any) -> str | None:
     Parameters
     ----------
     variance : Any
-        Variance-report mapping or compatible object containing a ``rows`` list.
+        Typed ``VarianceReport`` (``run_variance`` output), its dict form, or
+        its JSON text, normalised through :func:`json_or_dict`; ``None``
+        renders nothing.
 
     Returns:
     -------
     str | None
         HTML variance table, or ``None`` when no valid rows are supplied.
 
-    Notes:
-    -----
-    This helper does not raise; cell values are escaped and missing numbers use the report placeholder.
+    Raises:
+    ------
+    TypeError
+        If ``variance`` is not a typed report, dict, or JSON-object string.
+    json.JSONDecodeError
+        If ``variance`` is a string that is not valid JSON.
 
     Examples:
     --------
@@ -258,7 +334,9 @@ def variance_table(variance: Any) -> str | None:
     >>> "ebitda" in variance_table({"rows": [row]})
     True
     """
-    rows = variance.get("rows") if isinstance(variance, dict) else None
+    if variance is None:
+        return None
+    rows = json_or_dict(variance, noun="variance").get("rows")
     if not rows:
         return None
 

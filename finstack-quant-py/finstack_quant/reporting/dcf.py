@@ -23,7 +23,7 @@ from typing import Any
 
 from . import charts, format as fmt
 from .document import KPI, Section, TearSheet, _resolve_sections
-from .statements_common import json_or_dict, parse_statement, pl_matrix_table
+from .statements_common import json_or_dict, parse_statement, pl_matrix_table, tornado_entries
 from .theme import INSTITUTIONAL, Theme
 
 __all__ = [
@@ -84,19 +84,9 @@ def _section_ufcf(results: Any, ufcf_node: str, theme: Theme) -> Section | None:
 
 
 def _section_sensitivity(sensitivity: Any, theme: Theme) -> Section | None:
-    if not sensitivity or not isinstance(sensitivity, list):
+    if not sensitivity:
         return None
-    entries: list[tuple[Any, Any, Any]] = []
-    for e in sensitivity:
-        if isinstance(e, dict):
-            entries.append((e.get("parameter_id"), e.get("downside"), e.get("upside")))
-        else:
-            parameter_id = getattr(e, "parameter_id", None)
-            if parameter_id is None:
-                continue
-            entries.append((parameter_id, getattr(e, "downside", None), getattr(e, "upside", None)))
-    if not entries:
-        return None
+    entries = tornado_entries(sensitivity, noun="sensitivity")
     # Rows keep the Rust order (``generate_tornado_entries`` ranks by |swing|).
     return Section(
         "Equity Value Sensitivity",
@@ -139,9 +129,10 @@ def dcf_tearsheet(
         ``equity_value_per_share`` is a plain float.
     results : StatementResult | str | dict, optional
         Statement results for the UFCF and forecast-summary sections.
-    sensitivity : list[dict], optional
-        ``generate_tornado_entries`` output (``parameter_id``/``downside``/``upside``)
-        for the sensitivity tornado.
+    sensitivity : list[TornadoEntry | dict], optional
+        ``generate_tornado_entries`` output (typed entries, dicts or JSON
+        objects with ``parameter_id``/``downside``/``upside``) for the
+        sensitivity tornado, drawn in the given (Rust swing) order.
     ufcf_node : str, default "ufcf"
         Node id holding unlevered free cash flow.
     title : str, optional
@@ -161,7 +152,8 @@ def dcf_tearsheet(
     ValueError
         If ``sections`` contains an unknown section name.
     TypeError
-        If ``valuation`` is neither a dict nor a JSON string.
+        If ``valuation`` is neither a dict nor a JSON string, or
+        ``sensitivity`` is not a list of tornado entries.
 
     Returns:
     -------
@@ -205,7 +197,7 @@ def dcf_tearsheet(
         eyebrow="Corporate Valuation",
         title=title or "DCF Valuation",
         subtitle=subtitle,
-        meta_lines=["Decimal mode"],
+        meta_lines=parse_statement(results).meta_lines() if results is not None else [],
         kpis=kpis,
         sections=secs,
         generated=generated,

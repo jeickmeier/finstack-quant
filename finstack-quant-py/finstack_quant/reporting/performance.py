@@ -275,7 +275,6 @@ def performance_tearsheet(
         eyebrow="Performance Review",
         title=title or str(col),
         subtitle=subtitle if subtitle is not None else auto_subtitle,
-        meta_lines=["Decimal mode · Bankers rounding"],
         kpis=kpis,
         sections=secs,
         generated=generated,

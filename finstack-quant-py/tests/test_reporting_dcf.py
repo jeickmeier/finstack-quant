@@ -101,12 +101,12 @@ def test_dcf_tearsheet_custom_ufcf_node() -> None:
     assert "Unlevered Free Cash Flow" in html
 
 
-def test_dcf_tearsheet_tolerates_bad_sensitivity() -> None:
-    html = dcf_tearsheet(
-        _VAL, sensitivity=["bad", None], sections=["sensitivity", "bridge"], generated=dt.date(2026, 6, 22)
-    ).to_html()
-    assert "Equity Value Sensitivity" not in html
-    assert "Equity Bridge" in html
+def test_dcf_tearsheet_rejects_unsupported_sensitivity() -> None:
+    """PYPY-006: an unsupported entry raises instead of being silently skipped."""
+    with pytest.raises(TypeError):
+        dcf_tearsheet(_VAL, sensitivity=[None], sections=["sensitivity", "bridge"])
+    with pytest.raises(TypeError):
+        dcf_tearsheet(_VAL, sensitivity={"parameter_id": "x"}, sections=["sensitivity"])
 
 
 def test_bridge_reconciles_to_rust_equity_value_with_valuation_discounts() -> None:
@@ -154,3 +154,9 @@ def test_dcf_sensitivity_keeps_rust_swing_order() -> None:
     sheet = dcf_tearsheet(_VAL, sensitivity=entries, sections=["sensitivity"])
     body = sheet.sections[0].body
     assert body.index("margin") < body.index("capex")
+
+
+def test_dcf_tearsheet_provenance_comes_from_the_statement_result() -> None:
+    """PYPY-008: the numeric-mode line is the result's own stamp, or absent."""
+    assert dcf_tearsheet(_VAL, results=_results(), sections=[]).meta_lines == ["Numeric: float64"]
+    assert dcf_tearsheet(_VAL, sections=[]).meta_lines == []
