@@ -279,7 +279,7 @@ def test_composite_entry_points_price_cs01_like_price_instrument() -> None:
         usd,
         Money(1e6, usd),
         legs(),
-        WeightingMethod.metric_weighted(metric="cs01", anchor_leg_id=cds.id, anchor_quantity=1.0),
+        WeightingMethod.metric_weighted(metric="cs01", anchor_leg_id=cds.id, anchor_quantity=1.0, neutralize=False),
         RebalanceRule.manual(),
     )
     weighted_composite = weighted.initialize(market, base).instrument
