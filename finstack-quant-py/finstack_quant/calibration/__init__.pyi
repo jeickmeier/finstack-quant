@@ -2155,8 +2155,8 @@ class PriceDatum:
         Raises
         ------
         ValueError
-            If ``value`` is non-finite, a unitless ``Decimal`` is not exactly
-            representable, or the currency is unknown.
+            If ``value`` is non-finite or the currency is unknown. A unitless
+            ``Decimal`` converts to ``float`` (Rust ``decimal_to_f64``).
 
         """
 

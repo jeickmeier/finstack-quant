@@ -9,7 +9,7 @@
 
 use super::envelope::{currency_code, extract_pillar, from_value};
 use crate::bindings::core::currency::extract_currency;
-use crate::bindings::core::market_data::scalars::extract_exact_f64;
+use crate::bindings::core::market_data::scalars::extract_f64;
 use crate::bindings::core::money::{decimal_to_py, money_from_amount};
 use crate::bindings::date_utils::{date_to_py, extract_date_iso};
 use crate::bindings::extract::extract_basis_points;
@@ -735,8 +735,8 @@ impl PyPriceDatum {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``value`` is non-finite, a unitless ``Decimal`` is not exactly
-    ///     representable, or the currency is unknown.
+    ///     If ``value`` is non-finite or the currency is unknown. A unitless
+    ///     ``Decimal`` converts to ``float`` (Rust ``decimal_to_f64``).
     #[new]
     #[pyo3(signature = (id, value, currency = None))]
     #[pyo3(text_signature = "(id, value, currency=None)")]
@@ -749,7 +749,7 @@ impl PyPriceDatum {
             Some(currency) => {
                 MarketScalar::Price(money_from_amount(value, extract_currency(currency)?)?)
             }
-            None => MarketScalar::Unitless(extract_exact_f64(value, "value")?),
+            None => MarketScalar::unitless(extract_f64(value, "value")?).map_err(core_to_py)?,
         };
         Ok(Self {
             inner: PriceDatum {
