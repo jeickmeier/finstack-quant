@@ -309,7 +309,7 @@ as-of date and model key, dispatch through the standard registry.
 | `parse_typed_instrument_json::<T>` | concrete instrument `T` (via `TryFrom<InstrumentJson>`) |
 | `parse_boxed_instrument_from_json` | `ParsedInstrument` |
 | `instrument_from_spec` | `InstrumentJson` |
-| `instrument_envelope_from_spec` | `String` (canonical envelope JSON) |
+| `instrument_envelope_from_spec` | `InstrumentEnvelope` |
 | `validate_instrument_json`, `validate_typed_instrument_json` | `String` (re-serialized envelope) |
 | `pretty_instrument_json` | `String` |
 | `parse_model_key` | `ModelKey` |
@@ -322,8 +322,8 @@ as-of date and model key, dispatch through the standard registry.
 | `instrument_cashflows` | `String` from a `ParsedInstrument` |
 
 **The `_json` suffix here means JSON *in*, not JSON *out*.** `parse_boxed_instrument_from_json`
-returns a typed `ParsedInstrument` that `price_instrument` prices to a typed `ValuationResult`. Only `validate_*`, `pretty_*`, and
-`instrument_envelope_from_spec` return a JSON string, and each of those is a
+returns a typed `ParsedInstrument` that `price_instrument` prices to a typed `ValuationResult`. Only `validate_*` and `pretty_*`
+return a JSON string, and each of those is a
 validation/formatting surface rather than a computation. This is consistent
 with the result-return contract in
 [`.agents/rules/project-rules.md`](../../../../.agents/rules/project-rules.md)

@@ -737,7 +737,8 @@ pub(crate) fn market_history_json(
 ///     CdsTranche | ConvertibleBond | EquityOption | StructuredCredit |
 ///     CompositeInstrument
 ///     A typed instrument instance or a ``finstack_quant.instrument/1``
-///     JSON envelope.
+///     envelope, as the dict ``instrument_envelope_from_spec`` returns or as
+///     JSON text.
 /// market : MarketContext | str
 ///     A ``MarketContext`` object or a JSON string.
 /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
@@ -1030,7 +1031,8 @@ fn cashflow_envelope(
 ///     CdsTranche | CdsOption | ConvertibleBond | EquityOption |
 ///     StructuredCredit | CompositeInstrument
 ///     A typed instrument instance or a ``finstack_quant.instrument/1``
-///     JSON envelope.
+///     envelope, as the dict ``instrument_envelope_from_spec`` returns or as
+///     JSON text.
 /// market : MarketContext | str
 ///     A ``MarketContext`` object or a JSON string.
 /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str

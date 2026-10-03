@@ -14,7 +14,7 @@ from finstack_quant.core.dates import DayCount, StubKind, Tenor
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Rate
-from finstack_quant.valuations import ValuationResult
+from finstack_quant.valuations import ValuationResult, schema
 from finstack_quant.valuations.instruments import (
     Bond,
     CdsOption,
@@ -30,8 +30,10 @@ from finstack_quant.valuations.instruments import (
     instrument_cashflows,
     instrument_envelope_from_spec,
     metric_metadata,
+    pretty_instrument_json,
     price_instrument,
     validate_instrument_json,
+    validate_typed_instrument_json,
 )
 
 AS_OF = datetime.date(2024, 1, 15)
@@ -603,16 +605,46 @@ def test_instrument_envelope_from_spec_wraps_and_validates_bare_spec() -> None:
         "attributes": {},
     }
     envelope = instrument_envelope_from_spec("fx_spot", spec)
-    payload = json.loads(envelope)
-    assert payload["schema"] == "finstack_quant.instrument/1"
-    assert payload["instrument"]["type"] == "fx_spot"
-    assert validate_instrument_json(envelope) == envelope
+    # FUP-003: the envelope is a value (dict), not JSON text.
+    assert isinstance(envelope, dict)
+    assert envelope["schema"] == "finstack_quant.instrument/1"
+    assert envelope["instrument"]["type"] == "fx_spot"
+    assert json.loads(validate_instrument_json(envelope)) == envelope
     assert instrument_envelope_from_spec("fx_spot", json.dumps(spec)) == envelope
 
     with pytest.raises(ValueError, match="bare spec"):
         instrument_envelope_from_spec("fx_spot", {"type": "fx_spot", "spec": spec})
     with pytest.raises(ValueError, match="unknown_field"):
         instrument_envelope_from_spec("fx_spot", {**spec, "unknown_field": 1})
+
+
+def test_instrument_envelope_dict_is_accepted_by_instrument_entry_points() -> None:
+    """FUP-003: the returned dict prices and validates without ``json.dumps``."""
+    bond = _bond()
+    envelope = instrument_envelope_from_spec("bond", bond.to_dict())
+    assert isinstance(envelope, dict)
+
+    priced = price_instrument(envelope, _market(), AS_OF)
+    assert priced.price == price_instrument(bond, _market(), AS_OF).price
+    assert priced.price == price_instrument(json.dumps(envelope), _market(), AS_OF).price
+
+    canonical = validate_instrument_json(envelope)
+    assert json.loads(canonical) == envelope
+    assert validate_typed_instrument_json("bond", envelope) == canonical
+    assert json.loads(pretty_instrument_json(envelope)) == envelope
+    assert json.loads(schema.validate_instrument_envelope_json(envelope)) == envelope
+    assert json.loads(schema.validate_instrument_type_json("bond", envelope)) == envelope
+    assert instrument_cashflows(envelope, _market(), AS_OF, "discounting").to_json() == (
+        instrument_cashflows(bond, _market(), AS_OF, "discounting").to_json()
+    )
+
+    var = calculate_var_with_pricing([envelope], _market(), _rate_history(), AS_OF)
+    assert var.var == calculate_var_with_pricing([bond], _market(), _rate_history(), AS_OF).var
+
+    with pytest.raises(TypeError, match="dict or JSON string"):
+        price_instrument(1.5, _market(), AS_OF)
+    with pytest.raises(TypeError, match="dict or JSON string"):
+        validate_instrument_json(1.5)
 
 
 # VALB-007 — typed CdsOption

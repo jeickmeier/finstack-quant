@@ -24775,13 +24775,17 @@ export interface ValuationInstrumentsNamespace {
    * Mirrors Rust `pricer::instrument_envelope_from_spec`. This is the
    * construction route for every instrument type without a typed class (FRA,
    * deposit, inflation swaps, exotics, ...): build the type's `spec` object and
-   * pass the returned envelope to `priceInstrument` or `instrumentCashflows`.
+   * pass the returned envelope object straight to `priceInstrument` or
+   * `instrumentCashflows`.
    * @param typeTag - Canonical instrument discriminator, one of `valuations.schema.instrumentTypes()`, e.g. `"forward_rate_agreement"` or `"fx_spot"`.
    * @param spec - The bare `spec` object for that type (plain object or JSON string); tagged `{type, spec}` payloads and envelopes are rejected.
-   * @returns The compact canonical `finstack_quant.instrument/1` envelope JSON.
+   * @returns The canonical `finstack_quant.instrument/1` envelope as a plain object (`{ schema, instrument: { type, spec } }`); use `JSON.stringify` when the wire text is needed.
    * @throws Error - Throws with kind `validation` if `spec` is not a bare object, does not deserialize as a `typeTag` instrument, or fails instrument validation; kind `invalid_type` for a wrong argument type.
    */
-  instrumentEnvelopeFromSpec(typeTag: string, spec: JsonInput): string;
+  instrumentEnvelopeFromSpec(
+    typeTag: string,
+    spec: JsonInput
+  ): generated.valuations.InstrumentEnvelope;
   /**
    * Pretty-print a canonical instrument envelope.
    *

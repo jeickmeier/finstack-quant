@@ -401,7 +401,7 @@ impl PyPortfolioBuilder {
     /// Raises
     /// ------
     /// TypeError
-    ///     If ``instrument`` is neither a typed instrument nor a JSON string.
+    ///     If ``instrument`` is not a typed instrument, an envelope dict or a JSON string.
     /// ValueError
     ///     If the instrument payload is invalid, ``quantity`` is not finite,
     ///     or ``unit`` is unknown.

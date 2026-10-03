@@ -32,7 +32,8 @@ use crate::errors::{display_to_py as to_py, portfolio_to_py};
 // Instrument — typed-or-JSON extraction to a canonical instrument envelope
 
 /// Extract a canonical instrument envelope from a typed instrument object
-/// (fast path) or a pre-serialized envelope string (fallback).
+/// (fast path), an envelope `dict`, or a pre-serialized envelope string
+/// (fallback).
 ///
 /// Typed instances serialize through the same `InstrumentEnvelope` the JSON
 /// loader parses, so downstream pricing observes identical payloads for both
@@ -105,11 +106,33 @@ pub fn extract_instrument_json(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(structured_credit) = obj.cast::<PyStructuredCredit>() {
         return structured_credit.borrow().envelope_json();
     }
-    obj.extract::<String>().map_err(|_| {
+    envelope_json_text(obj).map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(
-            "expected a canonical instrument-envelope JSON string or a typed instrument instance",
+            "expected a canonical instrument envelope (dict or JSON string) or a typed instrument instance",
         )
     })
+}
+
+/// Canonical instrument-envelope JSON text from an envelope `dict` (as
+/// returned by `instrument_envelope_from_spec`) or pre-serialized JSON `str`.
+///
+/// A `str` is passed through unchanged so the Rust parser reports its own
+/// errors; a `dict` is serialized with `json.dumps`.
+///
+/// # Errors
+///
+/// Raises `TypeError` for any other Python type and `ValueError` when a
+/// `dict` is not JSON-serializable.
+pub fn envelope_json_text(obj: &Bound<'_, PyAny>) -> PyResult<String> {
+    if let Ok(text) = obj.extract::<String>() {
+        return Ok(text);
+    }
+    if obj.is_instance_of::<pyo3::types::PyDict>() {
+        return crate::bindings::module_utils::py_to_json_string(obj.py(), obj, "instrument");
+    }
+    Err(pyo3::exceptions::PyTypeError::new_err(
+        "expected a canonical instrument envelope as a dict or JSON string",
+    ))
 }
 
 // Zero-clone access types (available for callers that only need &T)

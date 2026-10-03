@@ -472,9 +472,10 @@ impl PyValuationResult {
 ///
 /// Parameters
 /// ----------
-/// json : str
-///     A ``finstack_quant.instrument/1`` envelope. Bare instrument payloads
-///     are rejected.
+/// json : dict | str
+///     A ``finstack_quant.instrument/1`` envelope, as a dict (the form
+///     ``instrument_envelope_from_spec`` returns) or JSON text. Bare
+///     instrument payloads are rejected.
 /// metric_pricing_overrides : MetricPricingOverrides | dict | str | None, optional
 ///     Metric-time overrides merged into
 ///     ``instrument.spec.metric_pricing_overrides`` before instrument
@@ -494,16 +495,19 @@ impl PyValuationResult {
 /// ValueError
 ///     If ``json`` or ``metric_pricing_overrides`` is malformed, the merged
 ///     payload is not a canonical v1 envelope, or instrument validation fails.
+/// TypeError
+///     If ``json`` is neither a dict nor a string.
 #[pyfunction]
 #[pyo3(signature = (json, metric_pricing_overrides=None))]
 #[pyo3(text_signature = "(json, metric_pricing_overrides=None)")]
 fn validate_instrument_json(
     py: Python<'_>,
-    json: &str,
+    json: &Bound<'_, PyAny>,
     metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<String> {
+    let json = crate::bindings::extract::envelope_json_text(json)?;
     let overrides = pricing::metric_pricing_overrides_json(py, metric_pricing_overrides)?;
-    finstack_quant_valuations::pricer::validate_instrument_json(json, overrides.as_deref())
+    finstack_quant_valuations::pricer::validate_instrument_json(&json, overrides.as_deref())
         .map_err(crate::errors::core_to_py)
 }
 
@@ -518,8 +522,9 @@ fn validate_instrument_json(
 /// ----------
 /// type_tag : str
 ///     Canonical instrument discriminator (e.g. ``"fx_forward"``).
-/// json : str
-///     A ``finstack_quant.instrument/1`` envelope for exactly that type.
+/// json : dict | str
+///     A ``finstack_quant.instrument/1`` envelope for exactly that type, as a
+///     dict or JSON text.
 ///
 /// Returns
 /// -------
@@ -533,10 +538,13 @@ fn validate_instrument_json(
 /// ValueError
 ///     If ``json`` is malformed, carries a different instrument type, or
 ///     fails instrument validation.
+/// TypeError
+///     If ``json`` is neither a dict nor a string.
 #[pyfunction]
 #[pyo3(text_signature = "(type_tag, json)")]
-fn validate_typed_instrument_json(type_tag: &str, json: &str) -> PyResult<String> {
-    finstack_quant_valuations::pricer::validate_typed_instrument_json(type_tag, json)
+fn validate_typed_instrument_json(type_tag: &str, json: &Bound<'_, PyAny>) -> PyResult<String> {
+    let json = crate::bindings::extract::envelope_json_text(json)?;
+    finstack_quant_valuations::pricer::validate_typed_instrument_json(type_tag, &json)
         .map_err(crate::errors::core_to_py)
 }
 
@@ -548,8 +556,8 @@ fn validate_typed_instrument_json(type_tag: &str, json: &str) -> PyResult<String
 /// class (FRA, deposit, FX spot/swap, inflation swaps, exotics, ...): build the
 /// type's ``spec`` object (see
 /// ``finstack_quant.valuations.schema.instrument_type_schema(type_tag)``) and
-/// pass the returned envelope to ``price_instrument`` or
-/// ``instrument_cashflows``.
+/// pass the returned envelope dict straight to ``price_instrument``,
+/// ``instrument_cashflows`` or any other entry point that takes an instrument.
 ///
 /// Parameters
 /// ----------
@@ -563,8 +571,10 @@ fn validate_typed_instrument_json(type_tag: &str, json: &str) -> PyResult<String
 ///
 /// Returns
 /// -------
-/// str
-///     The compact canonical ``finstack_quant.instrument/1`` envelope.
+/// dict
+///     The canonical ``finstack_quant.instrument/1`` envelope, with keys
+///     ``schema`` and ``instrument`` (``{"type", "spec"}``). Use
+///     ``json.dumps`` when the wire text is needed.
 ///
 /// Raises
 /// ------
@@ -575,24 +585,24 @@ fn validate_typed_instrument_json(type_tag: &str, json: &str) -> PyResult<String
 ///
 /// Examples
 /// --------
-/// >>> import json
 /// >>> from finstack_quant.valuations.instruments import instrument_envelope_from_spec
-/// >>> envelope = json.loads(instrument_envelope_from_spec("fx_spot", {
+/// >>> envelope = instrument_envelope_from_spec("fx_spot", {
 /// ...     "id": "EURUSD-SPOT", "base_currency": "EUR", "quote_currency": "USD",
 /// ...     "settlement_date": "2025-01-17", "quoted_spot": 1.2,
-/// ...     "notional": {"amount": "1000000", "currency": "EUR"}, "attributes": {}}))
+/// ...     "notional": {"amount": "1000000", "currency": "EUR"}, "attributes": {}})
 /// >>> (envelope["instrument"]["type"], envelope["instrument"]["spec"]["id"])
 /// ('fx_spot', 'EURUSD-SPOT')
 #[pyfunction]
 #[pyo3(text_signature = "(type_tag, spec)")]
-fn instrument_envelope_from_spec(
-    py: Python<'_>,
+fn instrument_envelope_from_spec<'py>(
+    py: Python<'py>,
     type_tag: &str,
-    spec: &Bound<'_, PyAny>,
-) -> PyResult<String> {
+    spec: &Bound<'py, PyAny>,
+) -> PyResult<Bound<'py, PyAny>> {
     let spec = crate::bindings::module_utils::py_to_json_value(py, spec, "spec")?;
-    finstack_quant_valuations::pricer::instrument_envelope_from_spec(type_tag, spec)
-        .map_err(crate::errors::core_to_py)
+    let envelope = finstack_quant_valuations::pricer::instrument_envelope_from_spec(type_tag, spec)
+        .map_err(crate::errors::core_to_py)?;
+    crate::bindings::pandas_utils::serde_to_py(py, &envelope)
 }
 
 /// Re-render a canonical instrument envelope as pretty-printed JSON.
@@ -604,8 +614,9 @@ fn instrument_envelope_from_spec(
 ///
 /// Parameters
 /// ----------
-/// json : str
-///     A canonical ``finstack_quant.instrument/1`` envelope.
+/// json : dict | str
+///     A canonical ``finstack_quant.instrument/1`` envelope, as a dict or JSON
+///     text.
 ///
 /// Returns
 /// -------
@@ -616,10 +627,13 @@ fn instrument_envelope_from_spec(
 /// ------
 /// ValueError
 ///     If ``json`` is malformed or cannot be rendered.
+/// TypeError
+///     If ``json`` is neither a dict nor a string.
 #[pyfunction]
 #[pyo3(text_signature = "(json)")]
-fn pretty_instrument_json(json: &str) -> PyResult<String> {
-    finstack_quant_valuations::pricer::pretty_instrument_json(json)
+fn pretty_instrument_json(json: &Bound<'_, PyAny>) -> PyResult<String> {
+    let json = crate::bindings::extract::envelope_json_text(json)?;
+    finstack_quant_valuations::pricer::pretty_instrument_json(&json)
         .map_err(crate::errors::core_to_py)
 }
 

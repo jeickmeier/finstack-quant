@@ -141,20 +141,19 @@ pub fn instrument_from_spec(
 ///
 /// # Returns
 ///
-/// Canonical serialized v1 envelope after type-specific deserialization and
-/// validation has succeeded.
+/// The canonical v1 [`InstrumentEnvelope`] after type-specific deserialization
+/// and validation has succeeded. Serialize it with `serde_json` when the wire
+/// text is needed.
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation` when `spec` is not a bare object, the payload is
-/// not a supported instrument, or canonical serialization fails.
+/// Returns `Error::Validation` when `spec` is not a bare object, does not
+/// deserialize as a `type_tag` instrument, or fails instrument validation.
 pub fn instrument_envelope_from_spec(
     type_tag: &str,
     spec: Value,
-) -> finstack_quant_core::Result<String> {
-    let instrument = instrument_from_spec(type_tag, spec)?;
-    serde_json::to_string(&InstrumentEnvelope::new(instrument))
-        .map_err(|error| Error::Validation(format!("invalid instrument JSON: {error}")))
+) -> finstack_quant_core::Result<InstrumentEnvelope> {
+    instrument_from_spec(type_tag, spec).map(InstrumentEnvelope::new)
 }
 
 /// Parse a canonical envelope into one concrete instrument type.
@@ -969,9 +968,10 @@ mod tests {
 
     #[test]
     fn instrument_envelope_from_spec_wraps_bare_fx_spec() {
-        let canonical = instrument_envelope_from_spec("fx_spot", fx_spot_spec_value())
+        let envelope = instrument_envelope_from_spec("fx_spot", fx_spot_spec_value())
             .expect("canonical fx spot");
-        let parsed: Value = serde_json::from_str(&canonical).expect("json");
+        assert_eq!(envelope.instrument.type_tag(), "fx_spot");
+        let parsed = serde_json::to_value(&envelope).expect("json");
         assert_eq!(parsed["schema"], InstrumentEnvelope::CURRENT_SCHEMA);
         assert_eq!(parsed["instrument"]["type"], "fx_spot");
         assert_eq!(parsed["instrument"]["spec"]["id"], "EURUSD-SPOT");
@@ -991,8 +991,11 @@ mod tests {
 
     #[test]
     fn validate_typed_instrument_json_rejects_other_envelope_type() {
-        let fx_spot = instrument_envelope_from_spec("fx_spot", fx_spot_spec_value())
-            .expect("canonical fx spot");
+        let fx_spot = serde_json::to_string(
+            &instrument_envelope_from_spec("fx_spot", fx_spot_spec_value())
+                .expect("canonical fx spot"),
+        )
+        .expect("json");
         let err = validate_typed_instrument_json("fx_forward", &fx_spot)
             .expect_err("wrong envelope type should be rejected");
         assert!(err
@@ -1002,8 +1005,11 @@ mod tests {
 
     #[test]
     fn parse_typed_instrument_json_returns_the_concrete_type() {
-        let fx_spot = instrument_envelope_from_spec("fx_spot", fx_spot_spec_value())
-            .expect("canonical fx spot");
+        let fx_spot = serde_json::to_string(
+            &instrument_envelope_from_spec("fx_spot", fx_spot_spec_value())
+                .expect("canonical fx spot"),
+        )
+        .expect("json");
         let spot: crate::instruments::FxSpot =
             parse_typed_instrument_json(&fx_spot).expect("typed fx spot");
         assert_eq!(spot.id.as_str(), "EURUSD-SPOT");

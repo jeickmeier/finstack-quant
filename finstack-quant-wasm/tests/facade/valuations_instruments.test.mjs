@@ -428,9 +428,14 @@ test('instrumentEnvelopeFromSpec wraps a bare spec and rejects tagged payloads',
     attributes: {},
   };
   const envelope = valuations.instruments.instrumentEnvelopeFromSpec('fx_spot', spec);
-  assert.equal(JSON.parse(envelope).instrument.type, 'fx_spot');
-  assert.equal(valuations.instruments.validateInstrumentJson(envelope), envelope);
-  assert.equal(
+  // FUP-003: the envelope is a plain object, not JSON text.
+  assert.equal(typeof envelope, 'object');
+  assert.equal(Object.getPrototypeOf(envelope), Object.prototype);
+  assert.equal(envelope.schema, 'finstack_quant.instrument/1');
+  assert.equal(envelope.instrument.type, 'fx_spot');
+  assert.deepEqual(JSON.parse(JSON.stringify(envelope)), envelope);
+  assert.deepEqual(JSON.parse(valuations.instruments.validateInstrumentJson(envelope)), envelope);
+  assert.deepEqual(
     valuations.instruments.instrumentEnvelopeFromSpec('fx_spot', JSON.stringify(spec)),
     envelope
   );
