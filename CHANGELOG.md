@@ -26,6 +26,8 @@
 - `attribution_tearsheet` reads each factor's "% of Total" from `PnlAttribution.pct_of_total`; a zero total P&L shows `·` instead of `+0.0%` on every row.
 - `dcf_tearsheet` and `scenario_tearsheet` keep the tornado order Rust returns (ranked by swing) instead of re-sorting by |downside| + |upside|.
 - `portfolio_risk_tearsheet` reads `var_contributions` / `relative_var` from the `PositionRiskDecomposition` that `parametric_var_decomposition` and `historical_var_decomposition` return, so the VaR Contributions section renders again.
+- `charts.nice_ticks` (used by every tear-sheet chart) no longer loops forever on a value range below float resolution, such as a near-constant rolling series; that range is treated as degenerate and expanded to a unit interval.
+- `tables.data_table` renders a missing (`None`) cell as `·` in every tear-sheet table instead of the text `None`.
 - `performance_tearsheet` sizes its rolling Sharpe/volatility window to one year at the panel's frequency (Rust `PeriodKind.periods_per_year`): monthly data gets a 12-observation window instead of 252 observations and two empty charts.
 
 ## [0.9.0] - 2026-10-02

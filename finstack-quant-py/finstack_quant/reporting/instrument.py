@@ -145,7 +145,7 @@ _METRIC_LABELS: dict[str, str] = {
 # Desk display convention: spreads that Rust reports as ``decimal`` are shown
 # in basis points. This only rescales a value whose unit Rust already
 # classified as decimal; any other unit is formatted by its own family.
-_DECIMAL_AS_BP = frozenset({"z_spread", "oas", "i_spread", "asw_par", "asw_market", "g_spread", "discount_margin"})
+_DECIMAL_AS_BP = frozenset({"z_spread", "oas", "i_spread", "asw_par", "asw_market", "discount_margin"})
 
 
 def _humanize(metric_id: str) -> str:
