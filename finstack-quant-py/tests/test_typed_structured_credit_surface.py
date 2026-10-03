@@ -708,3 +708,85 @@ def test_typed_only_clo_reproduces_the_regression_golden() -> None:
     result = price_instrument(deal.to_json(), market, fixture.metadata.valuation_date, model=body["model"])
     tolerance = fixture.tolerances["npv"]
     assert float(result.price) == pytest.approx(fixture.expected["npv"], abs=tolerance.abs, rel=tolerance.rel)
+
+
+def _diversified_pool() -> AssetPool:
+    """Three loans: two obligors in two industries, one of them defaulted."""
+
+    def loan(id_: str, balance: float, rate: float, obligor: str, industry: str, **kwargs: object) -> PoolAsset:
+        return PoolAsset(
+            id_,
+            {"type": "first_lien_loan"},
+            usd(balance),
+            rate,
+            MATURITY,
+            day_count=DayCount.ACT_360,
+            obligor_id=obligor,
+            industry=industry,
+            **kwargs,
+        )
+
+    return AssetPool("P", "clo", USD).with_assets([
+        loan("L1", 40_000_000.0, 0.06, "OB-1", "Utilities"),
+        loan("L2", 40_000_000.0, 0.08, "OB-2", "Media"),
+        loan("L3", 20_000_000.0, 0.10, "OB-2", "Media", defaulted=True),
+    ])
+
+
+def test_asset_pool_exposes_the_rust_collateral_analytics() -> None:
+    """VALB-005: pool balances, WAC/WAS/WAM, diversity and lookups come from Rust."""
+    from finstack_quant.valuations.instruments import PoolStats, calculate_pool_stats
+
+    pool = _diversified_pool()
+    assert pool.total_balance().amount == pytest.approx(100_000_000.0)
+    assert pool.performing_balance().amount == pytest.approx(80_000_000.0)
+    # Defaulted collateral is excluded from the coupon average.
+    assert pool.wac() == pytest.approx(0.07)
+    assert pool.weighted_avg_spread_bp() == 0.0
+    assert pool.weighted_avg_maturity(CLOSE) == pytest.approx(8.0, abs=0.02)
+    assert pool.diversity_score() > 0.0
+    assert [a.id for a in pool.assets_by_obligor("OB-2")] == ["L2", "L3"]
+    assert [a.id for a in pool.assets_by_industry("Utilities")] == ["L1"]
+    assert pool.assets_by_obligor("NOBODY") == []
+
+    stats = calculate_pool_stats(pool, CLOSE)
+    assert isinstance(stats, PoolStats)
+    assert (stats.num_obligors, stats.num_industries) == (2, 2)
+    assert stats.wac == pool.wac()
+    assert stats.diversity_score == pool.diversity_score()
+    assert stats.weighted_avg_maturity == pool.weighted_avg_maturity(CLOSE)
+    assert stats.defaulted_balance_pct == pytest.approx(20.0)
+    assert PoolStats.from_json(stats.to_json()).to_dict() == stats.to_dict()
+    assert stats.to_dataframe().columns[0] == "wac"
+
+
+def test_structured_credit_has_the_typed_instrument_surface() -> None:
+    """VALB-006: a deal prices itself like every sibling typed instrument."""
+    example = StructuredCredit.example()
+    assert example.id == "CLO-EXAMPLE"
+    deal = _clo()
+    market = _market()
+    assert deal.default_model == "discounting"
+    assert deal.expiry is None or isinstance(deal.expiry, datetime.date)
+    assert "USD-OIS" in json.dumps(deal.market_dependencies())
+
+    direct = deal.price(market, CLOSE, metrics=["wal"])
+    generic = price_instrument(deal, market, CLOSE, metrics=["wal"])
+    assert direct.value.amount == pytest.approx(generic.value.amount)
+    assert deal.metric(market, CLOSE, "wal") == pytest.approx(direct.get_metric("wal"))
+
+
+def test_structured_credit_reports_the_effective_policies() -> None:
+    """VALB-006: the policy applied for a ``None`` override is queryable."""
+    clo = StructuredCredit.example()
+    assert clo.loss_allocation is None
+    assert clo.loss_recognition is None
+    assert clo.effective_loss_recognition == "at_default"
+    assert clo.effective_principal_covers_senior_interest is True
+    assert clo.effective_loss_allocation in {"write_down", "par_preserving"}
+    assert _clo().effective_loss_allocation == "par_preserving"
+
+    assert not clo.is_stochastic
+    stochastic = clo.enable_stochastic()
+    assert stochastic.is_stochastic
+    assert not stochastic.disable_stochastic().is_stochastic

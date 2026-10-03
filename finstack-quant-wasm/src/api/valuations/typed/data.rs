@@ -150,6 +150,48 @@ impl JsMertonMcConfig {
         })
     }
 
+    /// Return a copy with a market-calibration specification.
+    ///
+    /// Honoured by the `merton_mc` pricing model (`Bond.price` with model
+    /// `"merton_mc"` and this configuration in the bond's
+    /// `instrument_pricing_overrides.model_config.merton_mc_config`), which
+    /// solves the structural parameter to the target quote before the
+    /// full-path price. `Bond.priceMertonMc` prices the configuration as
+    /// given and does not calibrate.
+    /// @param spec - `MertonMcCalibrationSpec` plain object or JSON string: `target` (a `BondQuoteInput` such as `{ z_spread: 0.03 }`; spreads and yields are decimals), `parameter` (`"debt_barrier"` or `"asset_vol"`), `low_paths`, `max_iterations`, `tolerance_pv` (PV residual in currency units), optional `bracket` and `seed`.
+    /// @returns A new configuration; the receiver is not modified.
+    /// @throws Error - Throws with kind `validation` if `spec` does not match the `MertonMcCalibrationSpec` schema.
+    pub fn calibration(&self, spec: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+        let spec = arg::json(&spec, "spec")?;
+        Ok(Self {
+            inner: self.inner.clone().calibration(spec),
+        })
+    }
+
+    /// Return a copy with term-structure discount factors for cashflow discounting.
+    ///
+    /// Cashflows are then discounted by log-linear interpolation of these
+    /// factors instead of the flat discount rate; the flat rate still drives
+    /// the risk-neutral asset drift.
+    /// @param dfs - `[yearFraction, discountFactor]` pairs sorted by time, with year fractions measured from the valuation date.
+    /// @returns A new configuration; the receiver is not modified.
+    /// @throws Error - Throws with kind `validation` if `dfs` is not an array of number pairs.
+    #[wasm_bindgen(js_name = cashflowDfs)]
+    pub fn cashflow_dfs(&self, dfs: JsValue) -> Result<JsMertonMcConfig, JsValue> {
+        let dfs = arg::json(&dfs, "dfs")?;
+        Ok(Self {
+            inner: self.inner.clone().cashflow_dfs(dfs),
+        })
+    }
+
+    /// Every configuration field as a plain object.
+    /// @returns The `MertonMcConfig` serde form (`merton`, `pik_schedule`, `steps_per_year`, `barrier_crossing`, `recovery_rate`, `calibration`, `cashflow_dfs`, ...).
+    /// @throws Error - Throws if the configuration cannot be serialized.
+    #[wasm_bindgen(js_name = toDict)]
+    pub fn to_dict(&self) -> Result<JsValue, JsValue> {
+        to_js_value(&self.inner)
+    }
+
     /// Deserialize a configuration from its JSON form.
     /// @param json - `MertonMcConfig` JSON string or plain object.
     /// @returns The configuration.
@@ -460,6 +502,113 @@ pub fn asset_pool_with_accounts(pool: JsValue, accounts: JsValue) -> Result<JsVa
         pool.excess_spread_account = value;
     }
     to_js_value(&pool)
+}
+
+/// Current balance of the whole pool (mirrors Rust `AssetPool::total_balance`).
+///
+/// Sums the loan-level assets, the representative lines or the instrument
+/// collateral, whichever represents the pool; defaulted assets are included.
+/// @param pool - `AssetPool` plain object or JSON string.
+/// @returns Pool balance as a `Money` plain object (`{ amount, currency }`) in the pool currency.
+/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, carries both asset rows and representative lines, or mixes currencies.
+#[wasm_bindgen(js_name = assetPoolTotalBalance)]
+pub fn asset_pool_total_balance(pool: JsValue) -> Result<JsValue, JsValue> {
+    let pool: AssetPool = arg::json(&pool, "pool")?;
+    to_js_value(&pool.total_balance().map_err(to_js_err)?)
+}
+
+/// Balance of the performing (non-defaulted) collateral (mirrors Rust `AssetPool::performing_balance`).
+/// @param pool - `AssetPool` plain object or JSON string.
+/// @returns Performing balance as a `Money` plain object in the pool currency; equals the total balance when the pool has no loan-level assets.
+/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema or its representation or currencies are inconsistent.
+#[wasm_bindgen(js_name = assetPoolPerformingBalance)]
+pub fn asset_pool_performing_balance(pool: JsValue) -> Result<JsValue, JsValue> {
+    let pool: AssetPool = arg::json(&pool, "pool")?;
+    to_js_value(&pool.performing_balance().map_err(to_js_err)?)
+}
+
+/// Weighted-average coupon of the performing fixed-rate collateral (mirrors Rust `AssetPool::wac`).
+/// @param pool - `AssetPool` plain object or JSON string.
+/// @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `0` when no performing fixed-rate collateral exists.
+/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
+#[wasm_bindgen(js_name = assetPoolWac)]
+pub fn asset_pool_wac(pool: JsValue) -> Result<f64, JsValue> {
+    let pool: AssetPool = arg::json(&pool, "pool")?;
+    Ok(pool.wac())
+}
+
+/// Weighted-average spread of the performing collateral that carries an explicit spread (mirrors Rust `AssetPool::weighted_avg_spread_bp`).
+/// @param pool - `AssetPool` plain object or JSON string.
+/// @returns Balance-weighted spread in basis points; `0` when no performing asset carries a spread.
+/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
+#[wasm_bindgen(js_name = assetPoolWeightedAvgSpreadBp)]
+pub fn asset_pool_weighted_avg_spread_bp(pool: JsValue) -> Result<f64, JsValue> {
+    let pool: AssetPool = arg::json(&pool, "pool")?;
+    Ok(pool.weighted_avg_spread_bp())
+}
+
+/// Balance-weighted average remaining maturity (mirrors Rust `AssetPool::weighted_avg_maturity`).
+/// @param pool - `AssetPool` plain object or JSON string.
+/// @param as_of - ISO-8601 date the remaining maturities are measured from.
+/// @returns Weighted average maturity in years (ACT/365F from `asOf`); `0` for an empty pool.
+/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
+#[wasm_bindgen(js_name = assetPoolWeightedAvgMaturity)]
+pub fn asset_pool_weighted_avg_maturity(pool: JsValue, as_of: JsValue) -> Result<f64, JsValue> {
+    let pool: AssetPool = arg::json(&pool, "pool")?;
+    pool.weighted_avg_maturity(arg::date(&as_of, "asOf")?)
+        .map_err(to_js_err)
+}
+
+/// Moody's diversity score of the pool (mirrors Rust `AssetPool::diversity_score`).
+/// @param pool - `AssetPool` plain object or JSON string.
+/// @returns Diversity score from the obligor and industry concentrations; `0` when the pool balance cannot be computed.
+/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
+#[wasm_bindgen(js_name = assetPoolDiversityScore)]
+pub fn asset_pool_diversity_score(pool: JsValue) -> Result<f64, JsValue> {
+    let pool: AssetPool = arg::json(&pool, "pool")?;
+    Ok(pool.diversity_score())
+}
+
+/// Loan-level assets of one obligor (mirrors Rust `AssetPool::assets_by_obligor`).
+/// @param pool - `AssetPool` plain object or JSON string.
+/// @param obligor_id - Obligor identifier matched exactly against each asset's `obligor_id`.
+/// @returns `PoolAsset` plain objects in pool order; empty when none match.
+/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, and kind `invalid_type` if `obligorId` is not a string.
+#[wasm_bindgen(js_name = assetPoolAssetsByObligor)]
+pub fn asset_pool_assets_by_obligor(
+    pool: JsValue,
+    obligor_id: JsValue,
+) -> Result<JsValue, JsValue> {
+    let pool: AssetPool = arg::json(&pool, "pool")?;
+    to_js_value(&pool.assets_by_obligor(&js_string(&obligor_id, "obligorId")?))
+}
+
+/// Loan-level assets in one industry (mirrors Rust `AssetPool::assets_by_industry`).
+/// @param pool - `AssetPool` plain object or JSON string.
+/// @param industry - Industry label matched exactly against each asset's `industry`.
+/// @returns `PoolAsset` plain objects in pool order; empty when none match.
+/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, and kind `invalid_type` if `industry` is not a string.
+#[wasm_bindgen(js_name = assetPoolAssetsByIndustry)]
+pub fn asset_pool_assets_by_industry(pool: JsValue, industry: JsValue) -> Result<JsValue, JsValue> {
+    let pool: AssetPool = arg::json(&pool, "pool")?;
+    to_js_value(&pool.assets_by_industry(&js_string(&industry, "industry")?))
+}
+
+/// Collateral-pool statistics at a date (mirrors Rust `calculate_pool_stats`).
+/// @param pool - `AssetPool` plain object or JSON string.
+/// @param as_of - ISO-8601 date the remaining maturities are measured from.
+/// @returns `PoolStats` plain object: weighted-average coupon, spread (bp) and maturity (years), diversity score, obligor and industry counts, defaulted balance in percent points and undrawn commitment.
+/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
+#[wasm_bindgen(js_name = calculatePoolStats)]
+pub fn calculate_pool_stats(pool: JsValue, as_of: JsValue) -> Result<JsValue, JsValue> {
+    let pool: AssetPool = arg::json(&pool, "pool")?;
+    to_js_value(
+        &finstack_quant_valuations::instruments::fixed_income::structured_credit::calculate_pool_stats(
+            &pool,
+            arg::date(&as_of, "asOf")?,
+        )
+        .map_err(to_js_err)?,
+    )
 }
 
 /// A present optional argument (`null` and `undefined` mean absent).

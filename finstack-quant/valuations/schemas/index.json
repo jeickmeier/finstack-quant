@@ -1045,6 +1045,15 @@
       "type_name": "OasResult"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
+      "bytes": 2449,
+      "kind": "output",
+      "path": "schemas/results/1/pool_stats.schema.json",
+      "summary": "Collateral-pool statistics: WAC, spread, maturity, diversity and concentration.",
+      "title": "PoolStats",
+      "type_name": "PoolStats"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
       "bytes": 2531,
       "kind": "output",

@@ -82,6 +82,7 @@ __all__ = [
     "InterestRateSwap",
     "InterestRateSwapBuilder",
     "MarketHistory",
+    "MertonMcCalibrationSpec",
     "MertonMcConfig",
     "MertonMcResult",
     "MetricPricingOverrides",
@@ -90,6 +91,7 @@ __all__ = [
     "PikMode",
     "PikSchedule",
     "PoolAsset",
+    "PoolStats",
     "PremiumLegSpec",
     "ProtectionLegSpec",
     "RepLine",
@@ -108,6 +110,7 @@ __all__ = [
     "VarResult",
     "Waterfall",
     "bond_from_cashflows_json",
+    "calculate_pool_stats",
     "calculate_var_with_pricing",
     "instrument_cashflows",
     "instrument_cashflows_json",
@@ -1814,6 +1817,276 @@ class BarrierCrossing:
         """
         ...
 
+class MertonMcCalibrationSpec:
+    """
+    Market calibration of a Merton Monte Carlo configuration.
+
+    Set on a configuration with :meth:`MertonMcConfig.calibration`. The
+    ``merton_mc`` pricing model (``Bond.price(..., model="merton_mc")`` with
+    the configuration in the bond's
+    ``instrument_pricing_overrides.model_config.merton_mc_config``) first
+    solves ``parameter`` by low-path bisection so the cash base-case price
+    matches ``target``, then re-prices with full paths and reports the solved
+    value as the ``calibrated_debt_barrier`` / ``calibrated_asset_vol``
+    measures. ``Bond.price_merton_mc`` prices the configuration as given and
+    does not calibrate.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import MertonMcCalibrationSpec
+    >>> spec = MertonMcCalibrationSpec({"z_spread": 0.03}, "asset_vol", low_paths=500)
+    >>> spec.parameter, spec.low_paths, spec.max_iterations, spec.target
+    ('asset_vol', 500, 40, {'z_spread': 0.03})
+    """
+
+    def __init__(
+        self,
+        target: dict[str, float] | str,
+        parameter: Literal["debt_barrier", "asset_vol"],
+        low_paths: int | None = None,
+        max_iterations: int | None = None,
+        tolerance_pv: float | None = None,
+        bracket: tuple[float, float] | None = None,
+        seed: int | None = None,
+    ) -> None:
+        """
+        Create a calibration specification; omitted settings take the Rust defaults.
+
+        Parameters
+        ----------
+        target : dict[str, float] | str
+            Market quote to match, as a ``BondQuoteInput`` dict or JSON string
+            with one key: ``clean_price_pct`` (percent of par),
+            ``dirty_price_currency``, ``ytm``, ``ytw``, ``z_spread``,
+            ``discount_margin``, ``oas``, ``asw_market`` ... Spreads and
+            yields are decimals (``0.02`` = 200bp).
+        parameter : {"debt_barrier", "asset_vol"}
+            Structural parameter solved for.
+        low_paths : int, optional
+            Independent MC estimators per calibration iteration; ``None`` uses
+            the Rust default (2,000).
+        max_iterations : int, optional
+            Maximum bisection iterations; ``None`` uses the Rust default (40).
+        tolerance_pv : float, optional
+            Absolute tolerance on the PV residual in currency units at the
+            valuation date; ``None`` uses the Rust default (``1e-4``).
+        bracket : tuple[float, float], optional
+            ``(low, high)`` search bracket for ``parameter``; ``None``
+            auto-brackets from the parameter type.
+        seed : int, optional
+            Seed override for the calibration run; ``None`` uses the pricing
+            seed.
+
+        Raises
+        ------
+        ValueError
+            If ``target`` is not a ``BondQuoteInput`` or ``parameter`` is not
+            ``"debt_barrier"`` or ``"asset_vol"``.
+        """
+        ...
+
+    @property
+    def target(self) -> dict[str, float]:
+        """
+        Market quote to match as its ``BondQuoteInput`` dict.
+
+        Returns
+        -------
+        dict[str, float]
+            One-key dict such as ``{"z_spread": 0.03}``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def parameter(self) -> str:
+        """
+        Structural parameter solved for.
+
+        Returns
+        -------
+        str
+            ``"debt_barrier"`` or ``"asset_vol"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def low_paths(self) -> int:
+        """
+        Independent MC estimators per calibration iteration.
+
+        Returns
+        -------
+        int
+            The estimator count.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def max_iterations(self) -> int:
+        """
+        Maximum bisection iterations.
+
+        Returns
+        -------
+        int
+            The iteration cap.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def tolerance_pv(self) -> float:
+        """
+        Absolute tolerance on the PV residual.
+
+        Returns
+        -------
+        float
+            Tolerance in currency units at the valuation date.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def bracket(self) -> tuple[float, float] | None:
+        """
+        Search bracket for the calibrated parameter.
+
+        Returns
+        -------
+        tuple[float, float] | None
+            ``(low, high)``, or ``None`` to auto-bracket.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def seed(self) -> int | None:
+        """
+        Seed override for the calibration run.
+
+        Returns
+        -------
+        int | None
+            The seed, or ``None`` to use the pricing seed.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @staticmethod
+    def from_json(json: str) -> MertonMcCalibrationSpec:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``MertonMcCalibrationSpec`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        MertonMcCalibrationSpec
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import MertonMcCalibrationSpec
+        >>> try:
+        ...     MertonMcCalibrationSpec.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            JSON-encoded ``MertonMcCalibrationSpec``.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(MertonMcCalibrationSpec.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the value.
+        """
+        ...
+
 class MertonMcConfig:
     """
     Configuration for Merton Monte Carlo PIK bond pricing.
@@ -1988,6 +2261,79 @@ class MertonMcConfig:
         Notes
         -----
         This method does not raise; it returns the same instance for chaining.
+        """
+        ...
+
+    def calibration(self, spec: MertonMcCalibrationSpec) -> MertonMcConfig:
+        """
+        Set the market-calibration specification.
+
+        Honoured by the ``merton_mc`` pricing model (``Bond.price(...,
+        model="merton_mc")`` with this configuration in the bond's
+        ``instrument_pricing_overrides.model_config.merton_mc_config``), which
+        solves the structural parameter to the target quote before the
+        full-path price. ``Bond.price_merton_mc`` prices the configuration as
+        given and does not calibrate.
+
+        Parameters
+        ----------
+        spec : MertonMcCalibrationSpec
+            Calibration target, solved parameter and solver settings.
+
+        Returns
+        -------
+        MertonMcConfig
+            A new configuration; the receiver is unchanged.
+
+        Notes
+        -----
+        This method does not raise; it returns a new configuration.
+        """
+        ...
+
+    def cashflow_dfs(self, dfs: list[tuple[float, float]]) -> MertonMcConfig:
+        """
+        Set term-structure discount factors for cashflow discounting.
+
+        Cashflows are then discounted by log-linear interpolation of these
+        factors instead of the flat ``discount_rate``; the flat rate still
+        drives the risk-neutral asset drift. The ``merton_mc`` pricing model
+        fills them from the discount curve when they are not set.
+
+        Parameters
+        ----------
+        dfs : list[tuple[float, float]]
+            ``(year_fraction, discount_factor)`` pairs sorted by time, with
+            year fractions measured from the valuation date.
+
+        Returns
+        -------
+        MertonMcConfig
+            A new configuration; the receiver is unchanged.
+
+        Raises
+        ------
+        TypeError
+            If ``dfs`` is not a sequence of float pairs.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every configuration field as a plain ``dict``.
+
+        Returns
+        -------
+        dict[str, Any]
+            Canonical serde shape: ``merton``, ``pik_schedule``,
+            ``steps_per_year``, ``barrier_crossing``, ``recovery_rate``,
+            ``calibration``, ``cashflow_dfs`` and the optional hazard,
+            recovery and toggle models.
+
+        Raises
+        ------
+        ValueError
+            If the configuration cannot be serialized.
         """
         ...
 
@@ -19300,6 +19646,156 @@ class AssetPool:
         """
         ...
 
+    def total_balance(self) -> Money:
+        """
+        Current balance of the whole pool (mirrors Rust ``AssetPool::total_balance``).
+
+        Sums the loan-level assets, the representative lines or the
+        instrument collateral, whichever represents the pool; defaulted
+        assets are included.
+
+        Returns
+        -------
+        Money
+            Pool balance in the pool currency.
+
+        Raises
+        ------
+        ValueError
+            If the pool carries both asset rows and representative lines, or
+            balances in more than one currency.
+        """
+        ...
+
+    def performing_balance(self) -> Money:
+        """
+        Balance of the performing (non-defaulted) collateral.
+
+        Returns
+        -------
+        Money
+            Performing balance in the pool currency; equals ``total_balance()``
+            when the pool has no loan-level assets.
+
+        Raises
+        ------
+        ValueError
+            If the pool representation or currencies are inconsistent.
+        """
+        ...
+
+    def wac(self) -> float:
+        """
+        Weighted-average coupon of the performing fixed-rate collateral.
+
+        Returns
+        -------
+        float
+            Balance-weighted coupon as an annual decimal (``0.07`` = 7%);
+            ``0.0`` when no performing fixed-rate collateral exists.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
+    def weighted_avg_spread_bp(self) -> float:
+        """
+        Weighted-average spread of the performing collateral that carries an explicit spread.
+
+        Returns
+        -------
+        float
+            Balance-weighted spread in basis points; ``0.0`` when no
+            performing asset carries a spread.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
+    def weighted_avg_maturity(self, as_of: datetime.date | str) -> float:
+        """
+        Balance-weighted average remaining maturity of the pool.
+
+        Parameters
+        ----------
+        as_of : datetime.date | str
+            Date the remaining maturities are measured from, either a
+            date-like object or an ISO 8601 string.
+
+        Returns
+        -------
+        float
+            Weighted average maturity in years (ACT/365F from ``as_of``);
+            ``0.0`` for an empty pool.
+
+        Raises
+        ------
+        ValueError
+            If ``as_of`` is not a date or the pool balances are inconsistent.
+        """
+        ...
+
+    def diversity_score(self) -> float:
+        """
+        Moody's diversity score of the pool.
+
+        Returns
+        -------
+        float
+            Diversity score from the obligor and industry concentrations;
+            ``0.0`` when the pool balance cannot be computed.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
+    def assets_by_obligor(self, obligor_id: str) -> list[PoolAsset]:
+        """
+        Loan-level assets of one obligor.
+
+        Parameters
+        ----------
+        obligor_id : str
+            Obligor identifier matched exactly against each asset's
+            ``obligor_id``.
+
+        Returns
+        -------
+        list[PoolAsset]
+            Copies of the matching assets in pool order; empty when none match.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
+    def assets_by_industry(self, industry: str) -> list[PoolAsset]:
+        """
+        Loan-level assets in one industry.
+
+        Parameters
+        ----------
+        industry : str
+            Industry label matched exactly against each asset's ``industry``.
+
+        Returns
+        -------
+        list[PoolAsset]
+            Copies of the matching assets in pool order; empty when none match.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
 class Tranche:
     """
     Structured-credit tranche with attachment/detachment points.
@@ -24545,6 +25041,263 @@ class EquityMetrics:
         """
         ...
 
+class PoolStats:
+    """
+    Collateral-pool statistics at one date (the return value of
+    :func:`calculate_pool_stats`): weighted-average coupon, spread and
+    maturity, Moody's diversity score, obligor and industry counts, the
+    defaulted share and the undrawn commitment.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import PoolStats
+    >>> stats = PoolStats.from_json(
+    ...     '{"wac": 0.07, "weighted_avg_spread_bp": 0.0, "weighted_avg_maturity": 10.0,'
+    ...     ' "diversity_score": 1.0, "num_obligors": 0, "num_industries": 0,'
+    ...     ' "defaulted_balance_pct": 0.0, "undrawn_commitment": 0.0}'
+    ... )
+    >>> stats.wac, list(stats.to_dataframe().columns)[:2]
+    (0.07, ['wac', 'weighted_avg_spread_bp'])
+    """
+
+    @staticmethod
+    def from_json(json: str) -> PoolStats:
+        """
+        Deserialize from the JSON produced by ``to_json``.
+
+        Parameters
+        ----------
+        json : str
+            JSON-encoded ``PoolStats`` (the shape ``to_json`` writes).
+
+        Returns
+        -------
+        PoolStats
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import PoolStats
+        >>> try:
+        ...     PoolStats.from_json("{}")
+        ... except ValueError:
+        ...     print("rejected")
+        rejected
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to the JSON shape ``from_json`` accepts.
+
+        Returns
+        -------
+        str
+            JSON-encoded ``PoolStats``.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def to_dict(self) -> dict[str, Any]:
+        """
+        Return every field as a plain ``dict`` (canonical serde shape).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized.
+        """
+        ...
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]:
+        """
+        Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
+
+        Returns
+        -------
+        tuple[Any, tuple[str]]
+            ``(PoolStats.from_json, (json,))``.
+
+        Raises
+        ------
+        ValueError
+            If serialization fails.
+        """
+        ...
+
+    def __repr__(self) -> str:
+        """
+        Return ``repr(self)``.
+
+        Returns
+        -------
+        str
+            A one-line summary of the value.
+        """
+        ...
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        The statistics as a one-row pandas ``DataFrame``.
+
+        Columns: ``wac``, ``weighted_avg_spread_bp``,
+        ``weighted_avg_maturity``, ``diversity_score``, ``num_obligors``,
+        ``num_industries``, ``defaulted_balance_pct``, ``undrawn_commitment``.
+
+        Returns
+        -------
+        pd.DataFrame
+            One row holding every statistic.
+
+        Raises
+        ------
+        ValueError
+            If the statistics cannot be serialized.
+        """
+        ...
+
+    @property
+    def wac(self) -> float:
+        """
+        Weighted-average coupon of the performing fixed-rate collateral.
+
+        Returns
+        -------
+        float
+            Annual decimal (``0.07`` = 7%).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def weighted_avg_spread_bp(self) -> float:
+        """
+        Weighted-average spread of the performing collateral that carries a spread.
+
+        Returns
+        -------
+        float
+            Spread in basis points.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def weighted_avg_maturity(self) -> float:
+        """
+        Balance-weighted average remaining maturity.
+
+        Returns
+        -------
+        float
+            Maturity in years from the statistics date.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def diversity_score(self) -> float:
+        """
+        Moody's diversity score of the pool.
+
+        Returns
+        -------
+        float
+            The diversity score.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def num_obligors(self) -> int:
+        """
+        Number of distinct obligors.
+
+        Returns
+        -------
+        int
+            The obligor count.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def num_industries(self) -> int:
+        """
+        Number of distinct industries.
+
+        Returns
+        -------
+        int
+            The industry count.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def defaulted_balance_pct(self) -> float:
+        """
+        Defaulted balance as a share of the current total pool balance.
+
+        Returns
+        -------
+        float
+            Percent points (``10.0`` = 10%).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def undrawn_commitment(self) -> float:
+        """
+        Undrawn commitment across performing revolving and delayed-draw collateral.
+
+        Returns
+        -------
+        float
+            Amount in pool-currency units.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
 class StructuredCredit:
     """
     Structured-credit deal (ABS/CLO/CMBS/RMBS) with pool, tranches, and waterfall.
@@ -25875,6 +26628,255 @@ class StructuredCredit:
             If a required curve is missing from ``market``.
         RuntimeError
             If the simulation fails.
+        """
+        ...
+
+    @staticmethod
+    def example() -> StructuredCredit:
+        """
+        Canonical example deal (mirrors Rust ``StructuredCredit::example``).
+
+        A USD 100M CLO with one 7% fixed-rate collateral bond and one 6%
+        senior note, closing 2024-01-01, legal final 2034-01-01, discounted
+        on ``USD-OIS`` with the ``nyse`` calendar.
+
+        Returns
+        -------
+        StructuredCredit
+            The example deal.
+
+        Raises
+        ------
+        ValueError
+            If construction fails (does not occur for a released build).
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import StructuredCredit
+        >>> StructuredCredit.example().id
+        'CLO-EXAMPLE'
+        """
+        ...
+
+    def price(
+        self,
+        market: MarketContext | str,
+        as_of: datetime.date | str,
+        model: str = "default",
+        metrics: list[str] | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
+    ) -> ValuationResult:
+        """
+        Price this deal and return a typed ``ValuationResult``.
+
+        Delegates to the same canonical Rust pricer entry point as
+        ``price_instrument(self, market, as_of, model)``.
+
+        Parameters
+        ----------
+        market : MarketContext | str
+            Market context object or JSON string supplying the discount and
+            forward curves.
+        as_of : datetime.date | str
+            Valuation date, either a date-like object or an ISO 8601 string.
+        model : str, default "default"
+            Model key; ``"default"`` is the deal's ``default_model``, the
+            deterministic ``"discounting"`` waterfall.
+        metrics : list[str], optional
+            Metric identifiers to compute (e.g. ``["wal", "clo_warf"]``);
+            omitted means valuation only.
+        metric_pricing_overrides : MetricPricingOverrides | dict | str | None
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing.
+        market_history : MarketHistory | dict | str | None
+            Historical scenarios required by ``hvar`` and
+            ``expected_shortfall``.
+
+        Returns
+        -------
+        ValuationResult
+            Typed valuation envelope carrying value, currency and metrics.
+
+        Raises
+        ------
+        ValueError
+            If an input cannot be interpreted or the deal fails validation.
+        KeyError
+            If a required curve or metric is missing.
+        RuntimeError
+            If pricing or a metric computation fails.
+        """
+        ...
+
+    def metric(
+        self,
+        market: MarketContext | str,
+        as_of: datetime.date | str,
+        metric_id: str,
+        model: str = "default",
+    ) -> float:
+        """
+        Compute one scalar metric (e.g. ``"wal"`` or ``"clo_warf"``).
+
+        Mirrors Rust ``pricer::metric_value``: the deal is priced under
+        ``model`` and the single metric ``metric_id`` is returned.
+
+        Parameters
+        ----------
+        market : MarketContext | str
+            Market context object or JSON string.
+        as_of : datetime.date | str
+            Valuation date, either a date-like object or an ISO 8601 string.
+        metric_id : str
+            Registered metric identifier.
+        model : str, default "default"
+            Model key.
+
+        Returns
+        -------
+        float
+            The metric value in the metric's documented unit.
+
+        Raises
+        ------
+        ValueError
+            If ``metric_id`` is unknown or an input cannot be interpreted.
+        KeyError
+            If a required curve is missing.
+        RuntimeError
+            If the metric computation fails.
+        """
+        ...
+
+    def market_dependencies(self) -> dict[str, Any]:
+        """
+        Market-data dependencies (discount and forward curves, fixing series).
+
+        Returns
+        -------
+        dict[str, Any]
+            Serde form of the Rust ``MarketDependencies``.
+
+        Raises
+        ------
+        ValueError
+            If the deal cannot enumerate its dependencies (for example a pool
+            that cannot be normalised).
+        """
+        ...
+
+    def disable_stochastic(self) -> StructuredCredit:
+        """
+        Return a copy with the stochastic prepayment, default and correlation specs cleared.
+
+        Mirrors Rust ``StructuredCredit::disable_stochastic``, the inverse of
+        ``enable_stochastic``; ``stochastic_recovery_spec`` is kept.
+
+        Returns
+        -------
+        StructuredCredit
+            A new deal priced deterministically; the receiver is unchanged.
+
+        Notes
+        -----
+        This method does not raise.
+        """
+        ...
+
+    @property
+    def default_model(self) -> str:
+        """
+        Default pricing model key from the ``Instrument`` trait.
+
+        Returns
+        -------
+        str
+            ``"discounting"`` (the deterministic waterfall).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def expiry(self) -> datetime.date | None:
+        """
+        Expiry date exposed by the ``Instrument`` trait.
+
+        Returns
+        -------
+        datetime.date | None
+            The expiry date, or ``None`` when the deal has none.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def is_stochastic(self) -> bool:
+        """
+        Whether a stochastic prepayment, default or correlation spec is set.
+
+        Returns
+        -------
+        bool
+            ``True`` when ``price_stochastic`` has specs to simulate.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def effective_loss_allocation(self) -> str:
+        """
+        Loss-allocation policy in force: ``loss_allocation`` when set, else the deal-type convention.
+
+        Returns
+        -------
+        str
+            ``"write_down"`` or ``"par_preserving"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def effective_loss_recognition(self) -> str:
+        """
+        Loss-recognition timing in force: ``loss_recognition`` when set, else the deal-type convention.
+
+        Returns
+        -------
+        str
+            ``"at_liquidation"`` for RMBS and CMBS by default, ``"at_default"`` otherwise.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def effective_principal_covers_senior_interest(self) -> bool:
+        """
+        Whether principal pays senior fees and note interest when interest proceeds fall short.
+
+        Returns
+        -------
+        bool
+            ``principal_covers_senior_interest`` when set, else ``True`` for CLO/CBO and ``False`` otherwise.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
         """
         ...
 
@@ -32948,6 +33950,39 @@ def structured_credit_tranche_oas(
     ...     print("schema" in str(exc))
     True
 
+    """
+    ...
+
+def calculate_pool_stats(pool: AssetPool, as_of: datetime.date | str) -> PoolStats:
+    """
+    Collateral-pool statistics at a date (mirrors Rust ``calculate_pool_stats``).
+
+    Parameters
+    ----------
+    pool : AssetPool
+        Collateral pool to summarise.
+    as_of : datetime.date | str
+        Date the remaining maturities are measured from, either a date-like
+        object or an ISO 8601 string.
+
+    Returns
+    -------
+    PoolStats
+        Weighted-average coupon, spread and maturity, diversity score, obligor
+        and industry counts, defaulted share and undrawn commitment.
+
+    Raises
+    ------
+    ValueError
+        If ``as_of`` is not a date, or the pool balances are inconsistent
+        (mixed currencies, or both asset rows and representative lines).
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import StructuredCredit, calculate_pool_stats
+    >>> stats = calculate_pool_stats(StructuredCredit.example().pool, "2024-01-01")
+    >>> stats.wac, round(stats.weighted_avg_maturity, 1)
+    (0.07, 10.0)
     """
     ...
 

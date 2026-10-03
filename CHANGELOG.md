@@ -25,6 +25,14 @@
 - Python and WASM: `FactorModel` handle on `finstack_quant.portfolio` / `portfolio.FactorModel` (Rust `FactorModel::from_config`), built once and reused for `assign_factors`, `compute_sensitivities`, `analyze`, `position_what_if`, `factor_stress` and the new P&L-only `factor_stress_pnl` (returns `StressPnl`).
 - Python and WASM: portfolio `primitive_exposures(portfolio, market, metrics)` / `portfolio.primitiveExposures` returns the composite look-through `PortfolioPrimitiveExposureReport` with net/gross aggregates per primitive instrument.
 
+### Structured credit and Merton MC coverage (Python-binding audit PR 15)
+
+#### Added
+
+- Python and WASM: `MertonMcCalibrationSpec` (Python class; WASM plain object) and `MertonMcConfig.calibration(spec)` / `cashflow_dfs(dfs)` (`cashflowDfs`) / `to_dict()` (`toDict`), so market-calibrated Merton MC pricing and term-structure discount factors no longer need JSON edits.
+- Python and WASM: `AssetPool` collateral analytics `total_balance`, `performing_balance`, `wac`, `weighted_avg_spread_bp`, `weighted_avg_maturity(as_of)`, `diversity_score`, `assets_by_obligor`, `assets_by_industry` (WASM free functions `assetPool*`), and `calculate_pool_stats(pool, as_of)` returning the new `PoolStats` (schema `results/1/pool_stats`).
+- Python and WASM: `StructuredCredit.example()`, `price`, `metric`, `market_dependencies`, `default_model`, `expiry`, `is_stochastic`, `disable_stochastic()` and the `effective_loss_allocation` / `effective_loss_recognition` / `effective_principal_covers_senior_interest` getters.
+
 ### Error kinds come from Rust (Python-binding audit PR 1)
 
 #### Changed (breaking)

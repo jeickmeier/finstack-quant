@@ -22593,6 +22593,82 @@ export interface StructuredCredit extends WasmOwned {
    */
   readonly id: string;
   /**
+   * Default pricing model key from the Rust `Instrument` trait.
+   * @returns `"discounting"` (the deterministic waterfall).
+   */
+  readonly defaultModel: string;
+  /**
+   * Expiry date from the Rust `Instrument` trait.
+   * @returns The expiry date, or `null` when the instrument has none.
+   */
+  readonly expiry: string | null;
+  /**
+   * Whether a stochastic prepayment, default or correlation spec is set (mirrors Rust `StructuredCredit::is_stochastic`).
+   * @returns `true` when `priceStochastic` has specs to simulate.
+   */
+  readonly isStochastic: boolean;
+  /**
+   * Loss-allocation policy in force for pricing: `lossAllocation` when set, otherwise the deal-type convention.
+   * @returns `"write_down"` or `"par_preserving"`.
+   */
+  readonly effectiveLossAllocation: NonNullable<generated.valuations.StructuredCredit['loss_allocation']>;
+  /**
+   * Loss-recognition timing in force: `lossRecognition` when set, otherwise the deal-type convention.
+   * @returns `"at_liquidation"` for RMBS and CMBS by default, `"at_default"` otherwise.
+   */
+  readonly effectiveLossRecognition: NonNullable<generated.valuations.StructuredCredit['loss_recognition']>;
+  /**
+   * Whether the template waterfall pays senior fees and senior note interest from principal when interest proceeds fall short: `principalCoversSeniorInterest` when set, otherwise `true` for CLO/CBO and `false` for every other deal type.
+   * @returns The flag in force.
+   */
+  readonly effectivePrincipalCoversSeniorInterest: boolean;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+  /**
+   * Return a copy of this deal with every stochastic specification cleared.
+   *
+   * Mirrors Rust `StructuredCredit::disable_stochastic`, the inverse of `enableStochastic`: clears the stochastic prepayment, default and correlation specs (the stochastic recovery spec is kept). The receiver is not modified.
+   * @returns A new deal priced deterministically.
+   */
+  disableStochastic(): StructuredCredit;
+  /**
    * Serialize to the canonical `finstack_quant.instrument/1` envelope.
    *
    * The output is compact JSON, byte-identical to the Python `to_json()` of the same instrument; pass it to `valuations.instruments.priceInstrument` or `fromJson`.
@@ -22953,6 +23029,12 @@ export interface StructuredCreditConstructor {
    * @returns An empty builder.
    */
   builder(): StructuredCreditBuilder;
+  /**
+   * Canonical example deal (mirrors Rust `StructuredCredit::example`): a USD 100,000,000 CLO with one 7% fixed-rate collateral bond and one 6% senior note, closing 2024-01-01, legal final 2034-01-01, discounted on `USD-OIS` with the `nyse` calendar.
+   * @returns The example deal.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): StructuredCredit;
   /**
    * Create an asset-backed security deal (mirrors Rust `StructuredCredit::new_abs`).
    * @param id - Unique instrument identifier.
@@ -23582,6 +23664,30 @@ export interface MertonMcConfig extends WasmOwned {
    * @throws Error - Throws with kind `validation` if `t` does not match the `ToggleExerciseModel` schema.
    */
   toggleModel(t: generated.valuations.ToggleExerciseModel | string): MertonMcConfig;
+  /**
+   * Return a copy with a market-calibration specification.
+   *
+   * Honoured by the `merton_mc` pricing model (`Bond.price` with model `"merton_mc"` and this configuration in the bond's `instrument_pricing_overrides.model_config.merton_mc_config`), which solves the structural parameter to the target quote before the full-path price. `Bond.priceMertonMc` prices the configuration as given and does not calibrate.
+   * @param spec - `MertonMcCalibrationSpec` plain object or JSON string: `target` (a `BondQuoteInput` such as `{ z_spread: 0.03 }`; spreads and yields are decimals), `parameter` (`"debt_barrier"` or `"asset_vol"`), `low_paths`, `max_iterations`, `tolerance_pv` (PV residual in currency units), optional `bracket` and `seed`.
+   * @returns A new configuration; the receiver is not modified.
+   * @throws Error - Throws with kind `validation` if `spec` does not match the `MertonMcCalibrationSpec` schema.
+   */
+  calibration(spec: generated.valuations.MertonMcCalibrationSpec | string): MertonMcConfig;
+  /**
+   * Return a copy with term-structure discount factors for cashflow discounting.
+   *
+   * Cashflows are then discounted by log-linear interpolation of these factors instead of the flat discount rate; the flat rate still drives the risk-neutral asset drift.
+   * @param dfs - `[yearFraction, discountFactor]` pairs sorted by time, with year fractions measured from the valuation date.
+   * @returns A new configuration; the receiver is not modified.
+   * @throws Error - Throws with kind `validation` if `dfs` is not an array of number pairs.
+   */
+  cashflowDfs(dfs: Array<[number, number]> | string): MertonMcConfig;
+  /**
+   * Every configuration field as a plain object.
+   * @returns The `MertonMcConfig` serde form (`merton`, `pik_schedule`, `steps_per_year`, `barrier_crossing`, `recovery_rate`, `calibration`, `cashflow_dfs`, ...).
+   * @throws Error - Throws if the configuration cannot be serialized.
+   */
+  toDict(): generated.valuations.MertonMcConfig;
   /**
    * Serialize the configuration to JSON.
    * @returns Compact `MertonMcConfig` JSON accepted by `fromJson`.
@@ -24482,6 +24588,75 @@ export interface ValuationInstrumentsNamespace {
       >
     >
   ): generated.valuations.AssetPool;
+  /**
+   * Current balance of the whole pool (mirrors Rust `AssetPool::total_balance`).
+   *
+   * Sums the loan-level assets, the representative lines or the instrument collateral, whichever represents the pool; defaulted assets are included.
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @returns Pool balance as a `Money` plain object (`{ amount, currency }`) in the pool currency.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, carries both asset rows and representative lines, or mixes currencies.
+   */
+  assetPoolTotalBalance(pool: generated.valuations.AssetPool | string): MoneyValue;
+  /**
+   * Balance of the performing (non-defaulted) collateral (mirrors Rust `AssetPool::performing_balance`).
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @returns Performing balance as a `Money` plain object in the pool currency; equals the total balance when the pool has no loan-level assets.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema or its representation or currencies are inconsistent.
+   */
+  assetPoolPerformingBalance(pool: generated.valuations.AssetPool | string): MoneyValue;
+  /**
+   * Weighted-average coupon of the performing fixed-rate collateral (mirrors Rust `AssetPool::wac`).
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @returns Balance-weighted coupon as an annual decimal (`0.07` = 7%); `0` when no performing fixed-rate collateral exists.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
+   */
+  assetPoolWac(pool: generated.valuations.AssetPool | string): number;
+  /**
+   * Weighted-average spread of the performing collateral that carries an explicit spread (mirrors Rust `AssetPool::weighted_avg_spread_bp`).
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @returns Balance-weighted spread in basis points; `0` when no performing asset carries a spread.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
+   */
+  assetPoolWeightedAvgSpreadBp(pool: generated.valuations.AssetPool | string): number;
+  /**
+   * Balance-weighted average remaining maturity (mirrors Rust `AssetPool::weighted_avg_maturity`).
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @param asOf - ISO-8601 date the remaining maturities are measured from.
+   * @returns Weighted average maturity in years (ACT/365F from `asOf`); `0` for an empty pool.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
+   */
+  assetPoolWeightedAvgMaturity(pool: generated.valuations.AssetPool | string, asOf: string): number;
+  /**
+   * Moody's diversity score of the pool (mirrors Rust `AssetPool::diversity_score`).
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @returns Diversity score from the obligor and industry concentrations; `0` when the pool balance cannot be computed.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema.
+   */
+  assetPoolDiversityScore(pool: generated.valuations.AssetPool | string): number;
+  /**
+   * Loan-level assets of one obligor (mirrors Rust `AssetPool::assets_by_obligor`).
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @param obligorId - Obligor identifier matched exactly against each asset's `obligor_id`.
+   * @returns `PoolAsset` plain objects in pool order; empty when none match.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, and kind `invalid_type` if `obligorId` is not a string.
+   */
+  assetPoolAssetsByObligor(pool: generated.valuations.AssetPool | string, obligorId: string): generated.valuations.PoolAsset[];
+  /**
+   * Loan-level assets in one industry (mirrors Rust `AssetPool::assets_by_industry`).
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @param industry - Industry label matched exactly against each asset's `industry`.
+   * @returns `PoolAsset` plain objects in pool order; empty when none match.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, and kind `invalid_type` if `industry` is not a string.
+   */
+  assetPoolAssetsByIndustry(pool: generated.valuations.AssetPool | string, industry: string): generated.valuations.PoolAsset[];
+  /**
+   * Collateral-pool statistics at a date (mirrors Rust `calculate_pool_stats`).
+   * @param pool - `AssetPool` plain object or JSON string.
+   * @param asOf - ISO-8601 date the remaining maturities are measured from.
+   * @returns `PoolStats` plain object: weighted-average coupon, spread (bp) and maturity (years), diversity score, obligor and industry counts, defaulted balance in percent points and undrawn commitment.
+   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
+   */
+  calculatePoolStats(pool: generated.valuations.AssetPool | string, asOf: string): generated.valuations.PoolStats;
   /**
    * `PrepaymentPenalty::Lockout`: voluntary prepayment is not allowed.
    * @param through - Optional last date of the lockout as an ISO-8601 string; omit for a lockout to maturity.

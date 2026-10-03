@@ -13,7 +13,8 @@
     "CdsIndex": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"cds_index\",\"spec\":{\"id\":\"CDX-IG-42\",\"index_name\":\"CDX.NA.IG\",\"series\":42,\"version\":1,\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"index_factor\":1.0,\"side\":\"pay\",\"convention\":\"isda_na\",\"premium_leg\":{\"roll_rule\":\"cds_imm\",\"start\":\"2024-03-20\",\"end\":\"2029-12-20\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"stub\":\"short_front\",\"business_day_convention\":\"modified_following\",\"calendar_id\":\"nyse\",\"day_count\":\"act_360\",\"coupon_bp\":\"60\",\"discount_curve_id\":\"USD-OIS\"},\"protection_leg\":{\"credit_curve_id\":\"CDX.NA.IG.HAZARD\",\"recovery_rate\":0.4,\"settlement_delay\":3},\"pricing\":\"single_curve\",\"constituents\":[],\"num_constituents\":125,\"attributes\":{}}}}",
     "CdsTranche": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"cds_tranche\",\"spec\":{\"id\":\"CDXIG-42-0X3\",\"index_name\":\"CDX.NA.IG\",\"series\":42,\"attach_pct\":0.0,\"detach_pct\":3.0,\"notional\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"maturity\":\"2029-12-20\",\"coupon_bp\":100.0,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"business_day_convention\":\"following\",\"calendar_id\":null,\"discount_curve_id\":\"USD-OIS\",\"credit_index_id\":\"CDX.NA.IG.HAZARD\",\"side\":\"pay\",\"start_date\":null,\"realized_loss\":0.0,\"roll_rule\":\"cds_imm\",\"stub\":\"short_front\",\"upfront\":null,\"attributes\":{}}}}",
     "ConvertibleBond": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"convertible_bond\",\"spec\":{\"id\":\"CB-TECH-5Y\",\"notional\":{\"amount\":\"1000000\",\"currency\":\"USD\"},\"issue_date\":\"2024-01-15\",\"maturity\":\"2029-01-15\",\"discount_curve_id\":\"USD-IG\",\"credit_curve_id\":\"USD-CREDIT-BBB\",\"conversion\":{\"ratio\":25.0,\"price\":null,\"policy\":\"voluntary\",\"anti_dilution\":\"none\",\"dividend_adjustment\":\"none\",\"dilution_events\":[]},\"spot_id\":\"TECH\",\"vol_surface_id\":\"TECH-VOL\",\"div_yield_id\":null,\"call_put\":null,\"recovery_rate\":0.0,\"cashflow_spec\":{\"fixed\":{\"coupon_type\":\"cash\",\"rate\":\"0.02\",\"frequency\":{\"count\":6,\"unit\":\"months\"},\"day_count\":\"30_360\",\"business_day_convention\":\"following\",\"calendar_id\":\"weekends_only\",\"stub\":\"none\",\"end_of_month\":false,\"payment_lag_days\":0}},\"attributes\":{}}}}",
-    "EquityOption": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"equity_option\",\"spec\":{\"id\":\"SPX-CALL-4500\",\"underlying_ticker\":\"SPX\",\"strike\":4500.0,\"option_type\":\"call\",\"exercise_style\":\"european\",\"expiry\":\"2024-06-21\",\"quantity\":100.0,\"currency\":\"USD\",\"day_count\":\"act_365f\",\"settlement\":\"cash\",\"discount_curve_id\":\"USD-OIS\",\"spot_id\":\"EQUITY-SPOT\",\"vol_surface_id\":\"EQUITY-VOL\",\"div_yield_id\":\"EQUITY-DIVYIELD\",\"discrete_dividends\":[],\"attributes\":{}}}}"
+    "EquityOption": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"equity_option\",\"spec\":{\"id\":\"SPX-CALL-4500\",\"underlying_ticker\":\"SPX\",\"strike\":4500.0,\"option_type\":\"call\",\"exercise_style\":\"european\",\"expiry\":\"2024-06-21\",\"quantity\":100.0,\"currency\":\"USD\",\"day_count\":\"act_365f\",\"settlement\":\"cash\",\"discount_curve_id\":\"USD-OIS\",\"spot_id\":\"EQUITY-SPOT\",\"vol_surface_id\":\"EQUITY-VOL\",\"div_yield_id\":\"EQUITY-DIVYIELD\",\"discrete_dividends\":[],\"attributes\":{}}}}",
+    "StructuredCredit": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"structured_credit\",\"spec\":{\"id\":\"CLO-EXAMPLE\",\"deal_type\":\"clo\",\"pool\":{\"id\":\"POOL-1\",\"deal_type\":\"clo\",\"currency\":\"USD\",\"assets\":[{\"id\":\"COLLATERAL-1\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"100000000\",\"currency\":\"USD\"},\"rate\":0.07,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2034-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null}],\"cumulative_defaults\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_recoveries\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_prepayments\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_scheduled_amortization\":{\"amount\":\"0\",\"currency\":\"USD\"},\"reinvestment_period\":null,\"collection_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"reserve_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"excess_spread_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"rep_lines\":null},\"tranches\":{\"tranches\":[{\"id\":\"CLONOTES-A\",\"attach_pct\":0.0,\"detach_pct\":100.0,\"seniority\":\"senior\",\"rating\":null,\"original_balance\":{\"amount\":\"100000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"100000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.06}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2034-01-01\",\"attributes\":{}}]},\"closing_date\":\"2024-01-01\",\"first_payment_date\":\"2024-04-01\",\"maturity\":\"2034-01-01\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"calendar_id\":\"nyse\",\"discount_curve_id\":\"USD-OIS\",\"attributes\":{},\"prepayment_spec\":{\"cpr\":0.2,\"curve\":null},\"default_spec\":{\"cdr\":0.02,\"curve\":null},\"recovery_spec\":{\"rate\":0.6,\"recovery_lag\":12},\"market_conditions\":{\"refi_rate\":0.04},\"deal_metadata\":{\"manager_id\":null,\"servicer_id\":null,\"master_servicer_id\":null,\"special_servicer_id\":null,\"trustee_id\":null},\"hedge_swaps\":[]}}}"
   },
   "to_dict": {
     "Bond": {
@@ -628,6 +629,146 @@
       "div_yield_id": "EQUITY-DIVYIELD",
       "discrete_dividends": [],
       "attributes": {}
+    },
+    "StructuredCredit": {
+      "id": "CLO-EXAMPLE",
+      "deal_type": "clo",
+      "pool": {
+        "id": "POOL-1",
+        "deal_type": "clo",
+        "currency": "USD",
+        "assets": [
+          {
+            "id": "COLLATERAL-1",
+            "asset_type": {
+              "type": "high_yield_bond"
+            },
+            "balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "rate": 0.07,
+            "spread_bp": null,
+            "forward_curve_id": null,
+            "maturity": "2034-01-01",
+            "rating": null,
+            "industry": null,
+            "obligor_id": null,
+            "defaulted": false,
+            "recovery_amount": null,
+            "default_date": null,
+            "purchase_price": null,
+            "acquisition_date": null,
+            "origination_date": null,
+            "day_count": "act_360",
+            "smm_override": null,
+            "mdr_override": null,
+            "recovery_rate": null,
+            "contractual_payment": null
+          }
+        ],
+        "cumulative_defaults": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_recoveries": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_prepayments": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "cumulative_scheduled_amortization": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "reinvestment_period": null,
+        "collection_account": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "reserve_account": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "excess_spread_account": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "rep_lines": null
+      },
+      "tranches": {
+        "tranches": [
+          {
+            "id": "CLONOTES-A",
+            "attach_pct": 0.0,
+            "detach_pct": 100.0,
+            "seniority": "senior",
+            "rating": null,
+            "original_balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "current_balance": {
+              "amount": "100000000",
+              "currency": "USD"
+            },
+            "coupon": {
+              "fixed": {
+                "rate": 0.06
+              }
+            },
+            "oc_trigger": null,
+            "ic_trigger": null,
+            "frequency": {
+              "count": 3,
+              "unit": "months"
+            },
+            "day_count": "act_360",
+            "deferred_interest": {
+              "amount": "0",
+              "currency": "USD"
+            },
+            "pik_enabled": false,
+            "maturity": "2034-01-01",
+            "attributes": {}
+          }
+        ]
+      },
+      "closing_date": "2024-01-01",
+      "first_payment_date": "2024-04-01",
+      "maturity": "2034-01-01",
+      "frequency": {
+        "count": 3,
+        "unit": "months"
+      },
+      "calendar_id": "nyse",
+      "discount_curve_id": "USD-OIS",
+      "attributes": {},
+      "prepayment_spec": {
+        "cpr": 0.2,
+        "curve": null
+      },
+      "default_spec": {
+        "cdr": 0.02,
+        "curve": null
+      },
+      "recovery_spec": {
+        "rate": 0.6,
+        "recovery_lag": 12
+      },
+      "market_conditions": {
+        "refi_rate": 0.04
+      },
+      "deal_metadata": {
+        "manager_id": null,
+        "servicer_id": null,
+        "master_servicer_id": null,
+        "special_servicer_id": null,
+        "trustee_id": null
+      },
+      "hedge_swaps": []
     }
   },
   "market_dependencies": {
@@ -839,6 +980,18 @@
       ],
       "fx_pairs": [],
       "series_ids": []
+    },
+    "StructuredCredit": {
+      "curves": {
+        "discount_curves": ["USD-OIS"],
+        "forward_curves": [],
+        "credit_curves": [],
+        "inflation_curves": []
+      },
+      "market_scalar_ids": [],
+      "volatility_dependencies": [],
+      "fx_pairs": [],
+      "series_ids": []
     }
   },
   "default_model": {
@@ -855,7 +1008,8 @@
     "CdsIndex": "hazard_rate",
     "CdsTranche": "hazard_rate",
     "ConvertibleBond": "tree",
-    "EquityOption": "black76"
+    "EquityOption": "black76",
+    "StructuredCredit": "discounting"
   },
   "expiry": {
     "Bond": "2034-01-15",
@@ -870,7 +1024,8 @@
     "CdsIndex": "2029-12-20",
     "CdsTranche": "2029-12-20",
     "ConvertibleBond": null,
-    "EquityOption": "2024-06-21"
+    "EquityOption": "2024-06-21",
+    "StructuredCredit": null
   },
   "rates": {
     "market": "{\"schema_version\": 1, \"curves\": [{\"type\": \"discount\", \"id\": \"USD-OIS\", \"base\": \"2024-01-01\", \"day_count\": \"act_360\", \"knot_points\": [[0.0, 1.0], [5.0, 0.9], [10.0, 0.8]], \"interp_style\": \"monotone_convex\", \"extrapolation\": \"flat_forward\", \"min_forward_rate\": null, \"allow_non_monotonic\": false, \"min_forward_tenor\": 1e-06}, {\"type\": \"forward\", \"id\": \"USD-SOFR-3M\", \"base\": \"2024-01-01\", \"reset_lag\": 2, \"day_count\": \"act_360\", \"tenor\": 0.25, \"knot_points\": [[0.0, 0.04], [10.0, 0.045]], \"interp_style\": \"linear\", \"extrapolation\": \"flat_forward\"}], \"fx\": null, \"surfaces\": [], \"prices\": {}, \"series\": [], \"inflation_indices\": [], \"dividends\": [], \"credit_indices\": [], \"fx_delta_vol_surfaces\": [], \"vol_cubes\": [], \"collateral\": {}, \"hierarchy\": null}",
@@ -3673,7 +3828,43 @@
         "trigger_level": 1.2,
         "action": "pay_down_senior"
       }
-    ]
+    ],
+    "price": 107880891.71638136,
+    "wal": 3.2713320542303355,
+    "effective": {
+      "loss_allocation": "par_preserving",
+      "loss_recognition": "at_default",
+      "principal_covers_senior_interest": true,
+      "is_stochastic": [false, true]
+    },
+    "disable_stochastic": "{\"schema\":\"finstack_quant.instrument/1\",\"instrument\":{\"type\":\"structured_credit\",\"spec\":{\"id\":\"CLO-TYPED\",\"deal_type\":\"clo\",\"pool\":{\"id\":\"P\",\"deal_type\":\"clo\",\"currency\":\"USD\",\"assets\":[{\"id\":\"L0\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L1\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L2\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L3\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L4\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L5\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L6\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L7\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L8\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L9\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null}],\"cumulative_defaults\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_recoveries\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_prepayments\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_scheduled_amortization\":{\"amount\":\"0\",\"currency\":\"USD\"},\"reinvestment_period\":null,\"collection_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"reserve_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"excess_spread_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"rep_lines\":null},\"tranches\":{\"tranches\":[{\"id\":\"A\",\"attach_pct\":40.0,\"detach_pct\":100.0,\"seniority\":\"senior\",\"rating\":null,\"original_balance\":{\"amount\":\"60000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"60000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.05}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2032-01-01\",\"attributes\":{}},{\"id\":\"B\",\"attach_pct\":10.0,\"detach_pct\":40.0,\"seniority\":\"mezzanine\",\"rating\":null,\"original_balance\":{\"amount\":\"30000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"30000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.07}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2032-01-01\",\"attributes\":{}},{\"id\":\"E\",\"attach_pct\":0.0,\"detach_pct\":10.0,\"seniority\":\"equity\",\"rating\":null,\"original_balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"current_balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"coupon\":{\"fixed\":{\"rate\":0.0}},\"oc_trigger\":null,\"ic_trigger\":null,\"frequency\":{\"count\":3,\"unit\":\"months\"},\"day_count\":\"act_360\",\"deferred_interest\":{\"amount\":\"0\",\"currency\":\"USD\"},\"pik_enabled\":false,\"maturity\":\"2032-01-01\",\"attributes\":{}}]},\"closing_date\":\"2024-01-01\",\"first_payment_date\":\"2024-04-01\",\"maturity\":\"2032-01-01\",\"frequency\":{\"count\":3,\"unit\":\"months\"},\"calendar_id\":\"nyse\",\"discount_curve_id\":\"USD-OIS\",\"attributes\":{\"meta\":{\"desk\":\"abs\"}},\"prepayment_spec\":{\"cpr\":0.1,\"curve\":null},\"default_spec\":{\"cdr\":0.02,\"curve\":null},\"recovery_spec\":{\"rate\":0.4,\"recovery_lag\":12},\"market_conditions\":{\"refi_rate\":0.04},\"deal_metadata\":{\"manager_id\":null,\"servicer_id\":null,\"master_servicer_id\":null,\"special_servicer_id\":null,\"trustee_id\":null},\"hedge_swaps\":[],\"coverage_triggers\":[{\"id\":\"OC_A\",\"tranche_id\":\"A\",\"kind\":\"oc\",\"trigger_level\":1.2,\"action\":\"pay_down_senior\"}],\"cleanup_call_decimal\":0.1,\"call_assumption\":{\"date\":\"2028-01-01\",\"price_pct\":100.0,\"scope\":\"deal\"},\"liquidation_price_pct\":99.0,\"loss_allocation\":\"par_preserving\",\"principal_covers_senior_interest\":true,\"coverage_rules\":{\"rating_haircuts\":{},\"defaulted_valuation\":\"recovery\",\"ccc_bucket\":{\"threshold_pct\":7.5,\"carry_at_market_value\":true},\"discount_obligation\":{\"price_threshold_pct\":80.0}}}}}",
+    "pool": "{\"id\":\"P\",\"deal_type\":\"clo\",\"currency\":\"USD\",\"assets\":[{\"id\":\"L0\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L1\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L2\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L3\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L4\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L5\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L6\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L7\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L8\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null},{\"id\":\"L9\",\"asset_type\":{\"type\":\"high_yield_bond\"},\"balance\":{\"amount\":\"10000000\",\"currency\":\"USD\"},\"rate\":0.08,\"spread_bp\":null,\"forward_curve_id\":null,\"maturity\":\"2032-01-01\",\"rating\":null,\"industry\":null,\"obligor_id\":null,\"defaulted\":false,\"recovery_amount\":null,\"default_date\":null,\"purchase_price\":null,\"acquisition_date\":null,\"origination_date\":null,\"day_count\":\"act_360\",\"smm_override\":null,\"mdr_override\":null,\"recovery_rate\":null,\"contractual_payment\":null}],\"cumulative_defaults\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_recoveries\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_prepayments\":{\"amount\":\"0\",\"currency\":\"USD\"},\"cumulative_scheduled_amortization\":{\"amount\":\"0\",\"currency\":\"USD\"},\"reinvestment_period\":null,\"collection_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"reserve_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"excess_spread_account\":{\"amount\":\"0\",\"currency\":\"USD\"},\"rep_lines\":null}",
+    "pool_analytics": {
+      "total_balance": {
+        "amount": 100000000.0,
+        "currency": "USD"
+      },
+      "performing_balance": {
+        "amount": 100000000.0,
+        "currency": "USD"
+      },
+      "wac": 0.08,
+      "weighted_avg_spread_bp": 0.0,
+      "weighted_avg_maturity": 8.005479452054795,
+      "diversity_score": 0.0,
+      "assets_by_obligor": [],
+      "assets_by_industry": [],
+      "pool_stats": {
+        "wac": 0.08,
+        "weighted_avg_spread_bp": 0.0,
+        "weighted_avg_maturity": 8.005479452054795,
+        "diversity_score": 0.0,
+        "num_obligors": 0,
+        "num_industries": 0,
+        "defaulted_balance_pct": -0.0,
+        "undrawn_commitment": -0.0
+      }
+    }
   },
   "merton": {
     "model": {
@@ -3711,7 +3902,43 @@
     "clean_price_pct": 107.19653060111986,
     "expected_loss": 0.11538461538461664,
     "num_paths": 64,
-    "default_rate": 0.1875
+    "default_rate": 0.1875,
+    "calibrated_config": {
+      "merton": {
+        "asset_value": 100.0,
+        "asset_vol": 0.25,
+        "debt_barrier": 60.0,
+        "risk_free_rate": 0.04,
+        "payout_rate": 0.0,
+        "barrier_type": "terminal",
+        "dynamics": "geometric_brownian"
+      },
+      "pik_schedule": {
+        "uniform": "pik"
+      },
+      "endogenous_hazard": null,
+      "dynamic_recovery": null,
+      "toggle_model": null,
+      "steps_per_year": 12,
+      "barrier_crossing": "discrete",
+      "recovery_rate": 0.4,
+      "calibration": {
+        "target": {
+          "z_spread": 0.03
+        },
+        "parameter": "asset_vol",
+        "low_paths": 500,
+        "max_iterations": 40,
+        "tolerance_pv": 0.0001,
+        "bracket": null,
+        "seed": null
+      },
+      "cashflow_dfs": [
+        [0.0, 1.0],
+        [1.0, 0.96],
+        [5.0, 0.8]
+      ]
+    }
   },
   "data": {
     "barrier_crossing": ["discrete", "brownian_bridge"],

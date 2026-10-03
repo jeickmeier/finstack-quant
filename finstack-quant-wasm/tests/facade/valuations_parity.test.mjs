@@ -40,6 +40,7 @@ const CLASSES = {
   CdsTranche: instruments.CdsTranche,
   ConvertibleBond: instruments.ConvertibleBond,
   EquityOption: instruments.EquityOption,
+  StructuredCredit: instruments.StructuredCredit,
 };
 
 // wasm32 and native transcendental functions can differ in the last bits
@@ -414,6 +415,56 @@ test('structured-credit deal analytics match Python', () => {
     () => deal.trancheCashflows('Z', sc.market, sc.as_of),
     (error) => error.kind === 'not_found'
   );
+
+  const result = deal.price(sc.market, sc.as_of, null, ['wal']);
+  close(Number(result.value.amount), sc.price, LOOSE, 'price');
+  close(deal.metric(sc.market, sc.as_of, 'wal'), sc.wal, LOOSE, 'wal');
+  assert.equal(deal.effectiveLossAllocation, sc.effective.loss_allocation);
+  assert.equal(deal.effectiveLossRecognition, sc.effective.loss_recognition);
+  assert.equal(
+    deal.effectivePrincipalCoversSeniorInterest,
+    sc.effective.principal_covers_senior_interest
+  );
+  assert.deepEqual([deal.isStochastic, stochastic.isStochastic], sc.effective.is_stochastic);
+  assert.equal(stochastic.disableStochastic().toJson(), sc.disable_stochastic);
+
+  const pool = JSON.parse(sc.pool);
+  const analytics = sc.pool_analytics;
+  const sameMoney = (actual, expected, label) => {
+    close(Number(actual.amount), expected.amount, TIGHT, label);
+    assert.equal(actual.currency, expected.currency, label);
+  };
+  sameMoney(instruments.assetPoolTotalBalance(pool), analytics.total_balance, 'total balance');
+  sameMoney(
+    instruments.assetPoolPerformingBalance(pool),
+    analytics.performing_balance,
+    'performing balance'
+  );
+  close(instruments.assetPoolWac(pool), analytics.wac, TIGHT, 'wac');
+  close(
+    instruments.assetPoolWeightedAvgSpreadBp(pool),
+    analytics.weighted_avg_spread_bp,
+    TIGHT,
+    'was'
+  );
+  close(
+    instruments.assetPoolWeightedAvgMaturity(pool, sc.as_of),
+    analytics.weighted_avg_maturity,
+    TIGHT,
+    'wam'
+  );
+  close(instruments.assetPoolDiversityScore(pool), analytics.diversity_score, TIGHT, 'diversity');
+  same(
+    plain(instruments.assetPoolAssetsByObligor(pool, 'NOBODY')),
+    analytics.assets_by_obligor,
+    'by obligor'
+  );
+  same(
+    plain(instruments.assetPoolAssetsByIndustry(pool, 'NOBODY')),
+    analytics.assets_by_industry,
+    'by industry'
+  );
+  same(plain(instruments.calculatePoolStats(pool, sc.as_of)), analytics.pool_stats, 'pool stats');
 });
 
 test('Merton Monte Carlo bond pricing matches Python', () => {
@@ -424,6 +475,24 @@ test('Merton Monte Carlo bond pricing matches Python', () => {
     .stepsPerYear(12);
   same(JSON.parse(config.toJson()), merton.config, 'config');
   assert.equal(instruments.MertonMcConfig.fromJson(config.toJson()).toJson(), config.toJson());
+  const calibrated = config
+    .calibration({
+      target: { z_spread: 0.03 },
+      parameter: 'asset_vol',
+      low_paths: 500,
+      max_iterations: 40,
+      tolerance_pv: 1e-4,
+    })
+    .cashflowDfs([
+      [0.0, 1.0],
+      [1.0, 0.96],
+      [5.0, 0.8],
+    ]);
+  same(plain(calibrated.toDict()), merton.calibrated_config, 'calibrated config');
+  assert.throws(
+    () => config.calibration({ target: { z_spread: 0.03 }, parameter: 'leverage' }),
+    (error) => error.kind === 'validation'
+  );
   const result = instruments.Bond.fromJson(merton.bond).priceMertonMc(config, 0.04, '2024-01-15');
   assert.equal(result.num_paths, merton.num_paths);
   close(result.clean_price_pct, merton.clean_price_pct, LOOSE, 'clean price');

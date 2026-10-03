@@ -78,7 +78,36 @@ instrument_builder_entry!(
 
 instrument_to_dict!(JsStructuredCredit, "StructuredCredit");
 
+instrument_market_dependencies!(JsStructuredCredit, "StructuredCredit");
+
+instrument_pricing!(JsStructuredCredit, "StructuredCredit");
+
+factories!(JsStructuredCredit, "StructuredCredit", finstack_quant_valuations::instruments::StructuredCredit, {
+        /// Canonical example deal (mirrors Rust `StructuredCredit::example`): a USD 100,000,000 CLO with one 7% fixed-rate collateral bond and one 6% senior note, closing 2024-01-01, legal final 2034-01-01, discounted on `USD-OIS` with the `nyse` calendar.
+        /// @returns The example deal.
+        /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+        example as example,
+});
+
 getters!(JsStructuredCredit, "StructuredCredit", |i| {
+        /// Default pricing model key from the Rust `Instrument` trait.
+        /// @returns `"discounting"` (the deterministic waterfall).
+        default_model as defaultModel => text(Instrument::default_model(i)),
+        /// Expiry date from the Rust `Instrument` trait.
+        /// @returns The expiry date, or `null` when the instrument has none.
+        expiry as expiry => opt_date(Instrument::expiry(i)),
+        /// Whether a stochastic prepayment, default or correlation spec is set (mirrors Rust `StructuredCredit::is_stochastic`).
+        /// @returns `true` when `priceStochastic` has specs to simulate.
+        is_stochastic as isStochastic => json(i.is_stochastic()),
+        /// Loss-allocation policy in force for pricing: `lossAllocation` when set, otherwise the deal-type convention.
+        /// @returns `"write_down"` or `"par_preserving"`.
+        effective_loss_allocation as effectiveLossAllocation => json(i.effective_loss_allocation()),
+        /// Loss-recognition timing in force: `lossRecognition` when set, otherwise the deal-type convention.
+        /// @returns `"at_liquidation"` for RMBS and CMBS by default, `"at_default"` otherwise.
+        effective_loss_recognition as effectiveLossRecognition => json(i.effective_loss_recognition()),
+        /// Whether the template waterfall pays senior fees and senior note interest from principal when interest proceeds fall short: `principalCoversSeniorInterest` when set, otherwise `true` for CLO/CBO and `false` for every other deal type.
+        /// @returns The flag in force.
+        effective_principal_covers_senior_interest as effectivePrincipalCoversSeniorInterest => json(i.effective_principal_covers_senior_interest()),
         /// Deal classification (serde string).
         /// @returns `"abs"`, `"clo"`, `"cmbs"`, `"rmbs"` ...
         deal_type as dealType => json(i.deal_type),
@@ -565,6 +594,20 @@ impl JsStructuredCredit {
         let mut inner = self.inner.clone();
         inner.enable_stochastic().map_err(to_js_err)?;
         Ok(Self { inner })
+    }
+
+    /// Return a copy of this deal with every stochastic specification cleared.
+    ///
+    /// Mirrors Rust `StructuredCredit::disable_stochastic`, the inverse of
+    /// `enableStochastic`: clears the stochastic prepayment, default and
+    /// correlation specs (the stochastic recovery spec is kept). The receiver
+    /// is not modified.
+    /// @returns A new deal priced deterministically.
+    #[wasm_bindgen(js_name = disableStochastic)]
+    pub fn disable_stochastic(&self) -> JsStructuredCredit {
+        let mut inner = self.inner.clone();
+        inner.disable_stochastic();
+        Self { inner }
     }
 
     /// The waterfall this deal runs (mirrors Rust `StructuredCredit::create_waterfall`).

@@ -62,6 +62,7 @@ InterestRateSwap = _valuations.instruments.InterestRateSwap
 InterestRateSwapBuilder = _valuations.instruments.InterestRateSwapBuilder
 LiquidationSpec = _valuations.instruments.LiquidationSpec
 MarketHistory = _valuations.instruments.MarketHistory
+MertonMcCalibrationSpec = _valuations.instruments.MertonMcCalibrationSpec
 MertonMcConfig = _valuations.instruments.MertonMcConfig
 MertonMcResult = _valuations.instruments.MertonMcResult
 MetricPricingOverrides = _valuations.instruments.MetricPricingOverrides
@@ -70,6 +71,7 @@ PathStatistics = _valuations.instruments.PathStatistics
 PikMode = _valuations.instruments.PikMode
 PikSchedule = _valuations.instruments.PikSchedule
 PoolAsset = _valuations.instruments.PoolAsset
+PoolStats = _valuations.instruments.PoolStats
 PremiumLegSpec = _valuations.instruments.PremiumLegSpec
 PrepaymentPenalty = _valuations.instruments.PrepaymentPenalty
 ProtectionLegSpec = _valuations.instruments.ProtectionLegSpec
@@ -95,6 +97,7 @@ TrancheStructure = _valuations.instruments.TrancheStructure
 VarResult = _valuations.instruments.VarResult
 Waterfall = _valuations.instruments.Waterfall
 bond_from_cashflows_json = _valuations.instruments.bond_from_cashflows_json
+calculate_pool_stats = _valuations.instruments.calculate_pool_stats
 calculate_var_with_pricing = _valuations.instruments.calculate_var_with_pricing
 instrument_cashflows = _valuations.instruments.instrument_cashflows
 instrument_cashflows_json = _valuations.instruments.instrument_cashflows_json
@@ -163,6 +166,7 @@ __all__: list[str] = [
     "InterestRateSwapBuilder",
     "LiquidationSpec",
     "MarketHistory",
+    "MertonMcCalibrationSpec",
     "MertonMcConfig",
     "MertonMcResult",
     "MetricPricingOverrides",
@@ -171,6 +175,7 @@ __all__: list[str] = [
     "PikMode",
     "PikSchedule",
     "PoolAsset",
+    "PoolStats",
     "PremiumLegSpec",
     "PrepaymentPenalty",
     "ProtectionLegSpec",
@@ -196,6 +201,7 @@ __all__: list[str] = [
     "VarResult",
     "Waterfall",
     "bond_from_cashflows_json",
+    "calculate_pool_stats",
     "calculate_var_with_pricing",
     "instrument_cashflows",
     "instrument_cashflows_json",

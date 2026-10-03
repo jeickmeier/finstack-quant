@@ -1037,6 +1037,15 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
     .with_examples(examples::equity_metrics),
+        SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::PoolStats>(
+            "schemas/results/1/pool_stats.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
+            "PoolStats",
+            "Collateral-pool statistics: WAC, spread, maturity, diversity and concentration.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::pool_stats),
         SchemaArtifact::new::<crate::instruments::fixed_income::structured_credit::TrancheCashflows>(
             "schemas/results/1/tranche_cashflows.schema.json",
             "https://finstack_quant.dev/schemas/results/1/tranche_cashflows.schema.json",
