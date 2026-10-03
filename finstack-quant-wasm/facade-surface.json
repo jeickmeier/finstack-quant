@@ -227,6 +227,8 @@
       "dryRun",
       "dryRunJson",
       "hullWhiteParamsSigmaAt",
+      "inflationQuoteInflationSwap",
+      "inflationQuoteYoyInflationSwap",
       "rateBoundsEmergingMarkets",
       "rateBoundsForCurrency",
       "rateQuoteDeposit",
@@ -234,8 +236,15 @@
       "rateQuoteFutures",
       "rateQuoteSwap",
       "schema",
+      "validateButterflyCallConvexity",
+      "validateButterflySpread",
+      "validateCalendarSpread",
+      "validateCalendarSpreadWithForwards",
       "validateCalibration",
       "validateCalibrationJson",
+      "validateSurface",
+      "validateSurfaceWithForwards",
+      "validateVolBounds",
       "volQuoteCapFloorVol",
       "volQuoteOptionVol",
       "volQuoteSwaptionVol"
@@ -301,6 +310,12 @@
   "calibration.volQuoteCapFloorVol": {
     "kind": "function"
   },
+  "calibration.inflationQuoteInflationSwap": {
+    "kind": "function"
+  },
+  "calibration.inflationQuoteYoyInflationSwap": {
+    "kind": "function"
+  },
   "calibration.rateBoundsForCurrency": {
     "kind": "function"
   },
@@ -356,6 +371,27 @@
     "kind": "function"
   },
   "calibration.hullWhiteParamsSigmaAt": {
+    "kind": "function"
+  },
+  "calibration.validateSurface": {
+    "kind": "function"
+  },
+  "calibration.validateSurfaceWithForwards": {
+    "kind": "function"
+  },
+  "calibration.validateCalendarSpread": {
+    "kind": "function"
+  },
+  "calibration.validateCalendarSpreadWithForwards": {
+    "kind": "function"
+  },
+  "calibration.validateButterflySpread": {
+    "kind": "function"
+  },
+  "calibration.validateButterflyCallConvexity": {
+    "kind": "function"
+  },
+  "calibration.validateVolBounds": {
     "kind": "function"
   },
   "calibration.schema": {

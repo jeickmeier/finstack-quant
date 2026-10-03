@@ -10,14 +10,18 @@
 
 use crate::api::schema::CalibrationStep;
 use crate::quotes::cds::CdsQuote;
+use crate::quotes::cds_tranche::CdsTrancheQuote;
 use crate::quotes::ids::Pillar;
+use crate::quotes::inflation::InflationQuote;
 use crate::quotes::rates::RateQuote;
 use crate::quotes::vol::VolQuote;
+use crate::quotes::xccy::XccyQuote;
+use finstack_quant_core::dates::Tenor;
 use finstack_quant_core::{Error, Result};
 use serde_json::{Map, Value};
 
-/// Wire fields that hold a [`Pillar`] on rate and CDS quotes.
-const PILLAR_FIELDS: [&str; 3] = ["pillar", "start", "end"];
+/// Wire fields that hold a [`Pillar`] on rate, CDS and cross-currency quotes.
+const PILLAR_FIELDS: [&str; 4] = ["pillar", "start", "end", "far_pillar"];
 
 /// Step kinds whose produced object is identified by `curve_id`.
 const CURVE_ID_KINDS: [&str; 6] = [
@@ -181,6 +185,89 @@ impl VolQuote {
         let mut outer = Map::new();
         outer.insert(kind.to_string(), Value::Object(fields));
         let quote: Self = from_wire(Value::Object(outer), "VolQuote")?;
+        quote.validate()?;
+        Ok(quote)
+    }
+}
+
+impl InflationQuote {
+    /// Build a validated inflation quote from its variant label and serde wire fields.
+    ///
+    /// # Arguments
+    ///
+    /// * `kind` - Variant label: `"inflation_swap"` (zero-coupon) or
+    ///   `"yoy_inflation_swap"` (year-on-year). It becomes the external tag of
+    ///   the wire object.
+    /// * `fields` - Wire fields of that variant: `id`, `maturity` (ISO-8601
+    ///   date), `rate` (fixed swap rate as a decimal), `index` (inflation index
+    ///   identifier such as `"USA-CPI-U"`), `convention` (inflation-swap
+    ///   convention identifier) and, for year-on-year swaps, `frequency`
+    ///   (payment tenor as a string such as `"1Y"`, or the tenor wire
+    ///   object). Every field is required; unknown fields are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for an unknown `kind`, a missing, unknown or
+    /// mistyped field, an unparsable frequency, or a quote that fails
+    /// [`InflationQuote::validate`].
+    pub fn from_wire_fields(kind: &str, mut fields: Map<String, Value>) -> Result<Self> {
+        if let Some(Value::String(text)) = fields.get("frequency") {
+            let tenor: Tenor = text.parse()?;
+            let wire = serde_json::to_value(tenor)
+                .map_err(|error| Error::Validation(format!("failed to encode tenor: {error}")))?;
+            fields.insert("frequency".to_string(), wire);
+        }
+        let mut outer = Map::new();
+        outer.insert(kind.to_string(), Value::Object(fields));
+        let quote: Self = from_wire(Value::Object(outer), "InflationQuote")?;
+        quote.validate()?;
+        Ok(quote)
+    }
+}
+
+impl XccyQuote {
+    /// Build a validated cross-currency basis-swap quote from its serde wire fields.
+    ///
+    /// # Arguments
+    ///
+    /// * `fields` - Wire fields: `id`, `convention` (cross-currency convention
+    ///   identifier), `far_pillar` (maturity as a tenor string such as `"5Y"`,
+    ///   an ISO-8601 date string or the pillar wire object), `basis_spread_bp`
+    ///   (basis spread in basis points) and optional `spot_fx` (spot FX rate
+    ///   override, quote currency per base currency). Unknown fields are
+    ///   rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for an unparsable pillar, a missing, unknown
+    /// or mistyped field, or a quote that fails [`XccyQuote::validate`].
+    pub fn from_wire_fields(mut fields: Map<String, Value>) -> Result<Self> {
+        normalize_pillars(&mut fields)?;
+        let quote: Self = from_wire(Value::Object(fields), "XccyQuote")?;
+        quote.validate()?;
+        Ok(quote)
+    }
+}
+
+impl CdsTrancheQuote {
+    /// Build a validated CDS index tranche quote from its serde wire fields.
+    ///
+    /// # Arguments
+    ///
+    /// * `fields` - Wire fields: `id`, `index` (credit index name such as
+    ///   `"CDX.NA.IG"`), `series` (index series number), `attachment` and
+    ///   `detachment` (tranche bounds as decimal loss fractions in `[0, 1]`),
+    ///   `maturity` (ISO-8601 date), `upfront_pct` (upfront as a decimal
+    ///   fraction of notional, `|upfront_pct| <= 1`), `coupon_bp` (running
+    ///   coupon in basis points) and `convention` (`{"currency",
+    ///   "doc_clause"}`). Every field is required; unknown fields are rejected.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for a missing, unknown or mistyped field, or
+    /// a quote that fails [`CdsTrancheQuote::validate`].
+    pub fn from_wire_fields(fields: Map<String, Value>) -> Result<Self> {
+        let quote: Self = from_wire(Value::Object(fields), "CdsTrancheQuote")?;
         quote.validate()?;
         Ok(quote)
     }
@@ -394,6 +481,55 @@ mod tests {
             );
         }
         assert!(VolQuote::from_wire_fields("fx_vol", Map::new()).is_err());
+    }
+
+    #[test]
+    fn inflation_xccy_and_tranche_quotes_build_and_validate() {
+        let zc = InflationQuote::from_wire_fields(
+            "inflation_swap",
+            map(
+                json!({"id": "ZC5Y", "maturity": "2031-05-08", "rate": 0.025,
+                       "index": "USA-CPI-U", "convention": "USD"}),
+            ),
+        )
+        .expect("zero-coupon inflation swap");
+        assert_eq!(zc.id().as_str(), "ZC5Y");
+        let yoy = InflationQuote::from_wire_fields(
+            "yoy_inflation_swap",
+            map(
+                json!({"id": "YOY5Y", "maturity": "2031-05-08", "rate": 0.025,
+                       "index": "USA-CPI-U", "frequency": "1Y", "convention": "USD"}),
+            ),
+        )
+        .expect("yoy inflation swap");
+        assert!(serde_json::to_value(&yoy).expect("wire")["yoy_inflation_swap"].is_object());
+        assert!(InflationQuote::from_wire_fields("cpi_swap", Map::new()).is_err());
+
+        let xccy = XccyQuote::from_wire_fields(map(
+            json!({"id": "X5Y", "convention": "EUR-USD", "far_pillar": "5Y", "basis_spread_bp": -12.5}),
+        ))
+        .expect("xccy quote");
+        assert_eq!(
+            serde_json::to_value(&xccy.far_pillar).expect("pillar"),
+            serde_json::to_value("5Y".parse::<Pillar>().expect("tenor")).expect("pillar")
+        );
+        assert!(XccyQuote::from_wire_fields(map(
+            json!({"id": "X", "convention": "EUR-USD", "far_pillar": "5Y", "basis_spread_bp": 1.0, "spot_fx": -1.0}),
+        ))
+        .is_err());
+
+        let tranche = |attachment: f64| {
+            CdsTrancheQuote::from_wire_fields(map(json!({
+                "id": "IG-3-7", "index": "CDX.NA.IG", "series": 42, "attachment": attachment,
+                "detachment": 0.07, "maturity": "2031-06-20", "upfront_pct": 0.01,
+                "coupon_bp": 100.0, "convention": {"currency": "USD", "doc_clause": "isda_na"}
+            })))
+        };
+        assert!(tranche(0.03).is_ok());
+        assert!(
+            tranche(0.08).is_err(),
+            "attachment above detachment must be rejected"
+        );
     }
 
     #[test]

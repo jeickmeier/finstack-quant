@@ -230,10 +230,11 @@ pub enum EnvelopeError {
         /// The conflicting quote-set name.
         quote_set: String,
     },
-    /// One quote id is attached to steps with two different payloads.
-    #[error("quote id '{id}' has conflicting attached payloads")]
+    /// One market-datum id of a kind is attached to steps, or merged into an
+    /// envelope, with two different payloads.
+    #[error("market datum id '{id}' has conflicting payloads")]
     ConflictingMarketDatum {
-        /// The quote identifier attached with conflicting payloads.
+        /// The datum identifier supplied with conflicting payloads.
         id: String,
     },
     /// Strict bounded contract loading rejected the request or result.

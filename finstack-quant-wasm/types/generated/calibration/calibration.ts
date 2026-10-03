@@ -120,7 +120,9 @@ export type MarketDatum =
            * The implied forward is
            * `forward = (100 - price) / 100 − convexity_adjustment`.
            * A positive adjustment lowers the futures-implied rate toward the true
-           * forward. Callers that want no adjustment must pass `0.0` explicitly.
+           * forward. The wire field is required; the host authoring
+           * constructors ([`RateQuote::from_wire_fields`]) fill an omitted value
+           * with [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].
            */
           convexity_adjustment: number;
           /**
@@ -2985,7 +2987,7 @@ export type EnvelopeError =
     }
   | {
       /**
-       * The quote identifier attached with conflicting payloads.
+       * The datum identifier supplied with conflicting payloads.
        */
       id: string;
       kind: "conflicting_market_datum";
@@ -3212,7 +3214,9 @@ export type MarketQuote =
            * The implied forward is
            * `forward = (100 - price) / 100 − convexity_adjustment`.
            * A positive adjustment lowers the futures-implied rate toward the true
-           * forward. Callers that want no adjustment must pass `0.0` explicitly.
+           * forward. The wire field is required; the host authoring
+           * constructors ([`RateQuote::from_wire_fields`]) fill an omitted value
+           * with [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].
            */
           convexity_adjustment: number;
           /**
@@ -3609,7 +3613,9 @@ export type RateQuote =
        * The implied forward is
        * `forward = (100 - price) / 100 − convexity_adjustment`.
        * A positive adjustment lowers the futures-implied rate toward the true
-       * forward. Callers that want no adjustment must pass `0.0` explicitly.
+       * forward. The wire field is required; the host authoring
+       * constructors ([`RateQuote::from_wire_fields`]) fill an omitted value
+       * with [`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`].
        */
       convexity_adjustment: number;
       /**

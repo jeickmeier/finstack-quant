@@ -2,9 +2,11 @@
 
 Rust owns the calibration plan schema, its validation, and every solver. Python
 exposes typed authoring classes over the same serde types, so an envelope can be
-built in code (``RateQuote`` / ``CdsQuote`` / ``VolQuote`` -> ``CalibrationStep``
+built in code (``RateQuote`` / ``CdsQuote`` / ``VolQuote`` / ``InflationQuote`` /
+``XccyQuote`` / ``CdsTrancheQuote`` and the market datums -> ``CalibrationStep``
 -> ``CalibrationPlan`` -> ``CalibrationEnvelope``) or handed to the entry points
-as a ``dict`` or JSON string.
+as a ``dict`` or JSON string. The ``validate_*`` functions run the vol-surface
+no-arbitrage checks on a standalone ``VolSurface``.
 
 Examples:
 --------
@@ -14,13 +16,15 @@ Examples:
 True
 """
 
+import datetime
+from decimal import Decimal
 from typing import Any
 
 import pandas as pd
 
 from finstack_quant.calibration import hull_white as hull_white
 from finstack_quant.calibration import schema as schema
-from finstack_quant.core.market_data import MarketContext
+from finstack_quant.core.market_data import MarketContext, VolSurface
 
 __all__ = [
     "CalibrationConfig",
@@ -33,20 +37,34 @@ __all__ = [
     "CalibrationStep",
     "CalibrationValidationReport",
     "CdsQuote",
+    "CdsTrancheQuote",
+    "CollateralEntry",
+    "DividendScheduleDatum",
+    "FxSpotDatum",
+    "InflationQuote",
+    "PriceDatum",
     "QuoteQuality",
     "RateBounds",
     "RateQuote",
     "SolverConfig",
     "ValidationConfig",
     "VolQuote",
+    "XccyQuote",
     "calibrate",
     "calibrate_bermudan_lmm_base_vol",
     "dry_run",
     "dry_run_json",
     "hull_white",
     "schema",
+    "validate_butterfly_call_convexity",
+    "validate_butterfly_spread",
+    "validate_calendar_spread",
+    "validate_calendar_spread_with_forwards",
     "validate_calibration",
     "validate_calibration_json",
+    "validate_surface",
+    "validate_surface_with_forwards",
+    "validate_vol_bounds",
 ]
 
 class SolverConfig:
@@ -710,7 +728,7 @@ class RateQuote:
         contract: str,
         expiry: str,
         price: float,
-        convexity_adjustment: float = 0.0,
+        convexity_adjustment: float | None = None,
     ) -> RateQuote:
         """Build a short-rate futures quote.
 
@@ -724,9 +742,10 @@ class RateQuote:
             Contract expiry, as an ISO date or tenor code.
         price : float
             Quoted futures price (``94.75`` implies a 5.25% rate).
-        convexity_adjustment : float, default 0.0
+        convexity_adjustment : float | None, default None
             Additive convexity adjustment applied to the implied rate, decimal
-            per annum.
+            per annum. ``None`` uses the Rust authoring default
+            ``RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`` (``0.0``).
 
         Returns
         -------
@@ -1026,6 +1045,58 @@ class CdsQuote:
         """
 
     @property
+    def entity(self) -> str:
+        """
+        Reference entity identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Reference entity identifier.
+        """
+
+    @property
+    def convention(self) -> dict[str, Any]:
+        """
+        CDS convention as ``{"currency": ..., "doc_clause": ...}``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Any]
+            CDS convention as ``{"currency": ..., "doc_clause": ...}``.
+        """
+
+    @property
+    def pillar(self) -> dict[str, Any]:
+        """
+        Maturity pillar as its wire mapping (``{"tenor": ...}`` or ``{"date": ...}``).
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Any]
+            Maturity pillar as its wire mapping (``{"tenor": ...}`` or ``{"date": ...}``).
+        """
+
+    @property
+    def recovery_rate(self) -> float:
+        """
+        Assumed recovery as a decimal fraction of notional.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Assumed recovery as a decimal fraction of notional.
+        """
+
+    @property
     def coupon_bp(self) -> float:
         """
         Running or par spread in basis points per annum.
@@ -1102,7 +1173,7 @@ class VolQuote:
         expiry: str,
         strike: float,
         vol: float,
-        option_type: str = "call",
+        option_type: str | None = None,
     ) -> VolQuote:
         """Build a listed-option implied-volatility quote.
 
@@ -1118,8 +1189,9 @@ class VolQuote:
             Absolute strike in the underlying's price units.
         vol : float
             Black implied volatility, annualized decimal (``0.2`` for 20%).
-        option_type : str, default "call"
-            ``"call"`` or ``"put"``.
+        option_type : str | None, default None
+            ``"call"`` or ``"put"``. ``None`` uses the Rust authoring default
+            ``VolQuote::DEFAULT_OPTION_TYPE`` (``"call"``).
 
         Returns
         -------
@@ -1326,7 +1398,1051 @@ class VolQuote:
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
-type Quote = RateQuote | CdsQuote | VolQuote
+class InflationQuote:
+    """An inflation-swap market quote (zero-coupon or year-on-year) for inflation-curve steps.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import InflationQuote
+    >>> InflationQuote.inflation_swap("zc5y", "2031-05-08", 0.025, "USA-CPI-U", "USD").type
+    'inflation_swap'
+
+    """
+
+    @staticmethod
+    def inflation_swap(id: str, maturity: str, rate: float, index: str, convention: str) -> InflationQuote:
+        """Build a zero-coupon inflation swap quote.
+
+        Parameters
+        ----------
+        id : str
+            Unique quote identifier.
+        maturity : str | datetime.date
+            Swap maturity date (ISO string or ``date``).
+        rate : float
+            Fixed zero-coupon swap rate as a decimal per annum (``0.025`` for 2.5%).
+        index : str
+            Inflation index identifier, for example ``"USA-CPI-U"``.
+        convention : str
+            Inflation-swap convention identifier, for example ``"USD"``.
+
+        Returns
+        -------
+        InflationQuote
+            The typed zero-coupon quote.
+
+        Raises
+        ------
+        ValueError
+            If ``maturity`` cannot be parsed or ``rate`` is not finite.
+
+        Examples:
+        --------
+        >>> from finstack_quant.calibration import InflationQuote
+        >>> InflationQuote.inflation_swap("zc5y", "2031-05-08", 0.025, "USA-CPI-U", "USD").rate
+        0.025
+
+        """
+
+    @staticmethod
+    def yoy_inflation_swap(
+        id: str, maturity: str, rate: float, index: str, frequency: str, convention: str
+    ) -> InflationQuote:
+        """Build a year-on-year inflation swap quote.
+
+        Parameters
+        ----------
+        id : str
+            Unique quote identifier.
+        maturity : str | datetime.date
+            Swap maturity date (ISO string or ``date``).
+        rate : float
+            Fixed year-on-year swap rate as a decimal per annum.
+        index : str
+            Inflation index identifier, for example ``"USA-CPI-U"``.
+        frequency : str
+            Payment frequency tenor, for example ``"1Y"``.
+        convention : str
+            Inflation-swap convention identifier, for example ``"USD"``.
+
+        Returns
+        -------
+        InflationQuote
+            The typed year-on-year quote.
+
+        Raises
+        ------
+        ValueError
+            If ``maturity`` or ``frequency`` cannot be parsed or ``rate`` is
+            not finite.
+
+        Examples:
+        --------
+        >>> from finstack_quant.calibration import InflationQuote
+        >>> InflationQuote.yoy_inflation_swap("yoy5y", "2031-05-08", 0.024, "USA-CPI-U", "1Y", "USD").frequency
+        '1Y'
+
+        """
+
+    @property
+    def id(self) -> str:
+        """
+        Unique quote identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Unique quote identifier.
+        """
+
+    @property
+    def type(self) -> str:
+        """
+        Quote variant: ``"inflation_swap"`` or ``"yoy_inflation_swap"``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Quote variant: ``"inflation_swap"`` or ``"yoy_inflation_swap"``.
+        """
+
+    @property
+    def maturity(self) -> datetime.date:
+        """
+        Swap maturity date.
+
+        This property does not raise.
+
+        Returns
+        -------
+        datetime.date
+            Swap maturity date.
+        """
+
+    @property
+    def rate(self) -> float:
+        """
+        Fixed swap rate as a decimal per annum.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Fixed swap rate as a decimal per annum.
+        """
+
+    @property
+    def index(self) -> str:
+        """
+        Inflation index identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Inflation index identifier.
+        """
+
+    @property
+    def frequency(self) -> str | None:
+        """
+        Payment frequency tenor of a year-on-year quote; None for zero-coupon.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            Payment frequency tenor of a year-on-year quote; None for zero-coupon.
+        """
+
+    @property
+    def convention(self) -> str:
+        """
+        Inflation-swap convention identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Inflation-swap convention identifier.
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON encoding of this value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> InflationQuote:
+        """
+        Rebuild from JSON produced by :meth:`to_json`.
+
+        Parameters
+        ----------
+        json : str
+            JSON produced by :meth:`to_json`.
+
+        Returns
+        -------
+        InflationQuote
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed, carries unknown fields, or fails validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.calibration import InflationQuote
+        >>> InflationQuote.from_json(
+        ...     InflationQuote.inflation_swap("zc5y", "2031-05-08", 0.025, "USA-CPI-U", "USD").to_json()
+        ... ).id
+        'zc5y'
+        """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __repr__(self) -> str: ...
+
+class XccyQuote:
+    """A cross-currency basis-swap market quote for ``xccy_basis`` steps.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import XccyQuote
+    >>> XccyQuote("x5y", "EUR-USD", "5Y", -12.5).basis_spread_bp
+    -12.5
+
+    """
+
+    def __init__(
+        self,
+        id: str,
+        convention: str,
+        far_pillar: str,
+        basis_spread_bp: float,
+        spot_fx: float | None = None,
+    ) -> None:
+        """Build a cross-currency basis-swap quote.
+
+        Parameters
+        ----------
+        id : str
+            Unique quote identifier.
+        convention : str
+            Cross-currency swap convention identifier, for example ``"EUR-USD"``.
+        far_pillar : str | datetime.date | dict
+            Swap maturity pillar: tenor code (``"5Y"``), date, or pillar mapping.
+        basis_spread_bp : float
+            Basis spread in basis points.
+        spot_fx : float | None, default None
+            Spot FX override (quote currency per base currency, positive);
+            the market FX is used when None.
+
+        Raises
+        ------
+        ValueError
+            If ``far_pillar`` cannot be parsed, ``basis_spread_bp`` is not
+            finite, or ``spot_fx`` is not positive.
+
+        """
+
+    @property
+    def id(self) -> str:
+        """
+        Unique quote identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Unique quote identifier.
+        """
+
+    @property
+    def convention(self) -> str:
+        """
+        Cross-currency swap convention identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Cross-currency swap convention identifier.
+        """
+
+    @property
+    def far_pillar(self) -> dict[str, Any]:
+        """
+        Maturity pillar as its wire mapping (``{"tenor": ...}`` or ``{"date": ...}``).
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Any]
+            Maturity pillar as its wire mapping (``{"tenor": ...}`` or ``{"date": ...}``).
+        """
+
+    @property
+    def basis_spread_bp(self) -> float:
+        """
+        Basis spread in basis points.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Basis spread in basis points.
+        """
+
+    @property
+    def spot_fx(self) -> float | None:
+        """
+        Spot FX override, or None when the market FX is used.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float | None
+            Spot FX override, or None when the market FX is used.
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON encoding of this value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> XccyQuote:
+        """
+        Rebuild from JSON produced by :meth:`to_json`.
+
+        Parameters
+        ----------
+        json : str
+            JSON produced by :meth:`to_json`.
+
+        Returns
+        -------
+        XccyQuote
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed, carries unknown fields, or fails validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.calibration import XccyQuote
+        >>> XccyQuote.from_json(XccyQuote("x5y", "EUR-USD", "5Y", -12.5).to_json()).id
+        'x5y'
+        """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __repr__(self) -> str: ...
+
+class CdsTrancheQuote:
+    """A CDS index tranche market quote for ``base_correlation`` steps.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import CdsTrancheQuote
+    >>> CdsTrancheQuote("ig-3-7", "CDX.NA.IG", 42, 0.03, 0.07, "2031-06-20", 0.01, 100.0, "USD", "isda_na").detachment
+    0.07
+
+    """
+
+    def __init__(
+        self,
+        id: str,
+        index: str,
+        series: int,
+        attachment: float,
+        detachment: float,
+        maturity: str,
+        upfront_pct: float,
+        coupon_bp: float,
+        currency: str,
+        doc_clause: str,
+    ) -> None:
+        """Build a CDS index tranche quote.
+
+        Parameters
+        ----------
+        id : str
+            Unique quote identifier.
+        index : str
+            Credit index name, for example ``"CDX.NA.IG"``.
+        series : int
+            Index series number.
+        attachment : float
+            Attachment point as a decimal loss fraction in [0, 1].
+        detachment : float
+            Detachment point as a decimal loss fraction in [0, 1], above
+            ``attachment``.
+        maturity : str | datetime.date
+            Tranche maturity date.
+        upfront_pct : float
+            Upfront payment as a decimal fraction of notional, ``|upfront_pct| <= 1``.
+        coupon_bp : float
+            Running coupon in basis points per annum (positive).
+        currency : str
+            ISO 4217 code of the contract currency.
+        doc_clause : str
+            ISDA documentation clause, for example ``"isda_na"``.
+
+        Raises
+        ------
+        ValueError
+            If a date, convention or numeric input is invalid, or
+            ``attachment >= detachment``.
+
+        """
+
+    @property
+    def id(self) -> str:
+        """
+        Unique quote identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Unique quote identifier.
+        """
+
+    @property
+    def index(self) -> str:
+        """
+        Credit index name.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Credit index name.
+        """
+
+    @property
+    def series(self) -> int:
+        """
+        Index series number.
+
+        This property does not raise.
+
+        Returns
+        -------
+        int
+            Index series number.
+        """
+
+    @property
+    def attachment(self) -> float:
+        """
+        Attachment point as a decimal loss fraction.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Attachment point as a decimal loss fraction.
+        """
+
+    @property
+    def detachment(self) -> float:
+        """
+        Detachment point as a decimal loss fraction.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Detachment point as a decimal loss fraction.
+        """
+
+    @property
+    def maturity(self) -> datetime.date:
+        """
+        Tranche maturity date.
+
+        This property does not raise.
+
+        Returns
+        -------
+        datetime.date
+            Tranche maturity date.
+        """
+
+    @property
+    def upfront_pct(self) -> float:
+        """
+        Upfront payment as a decimal fraction of notional.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Upfront payment as a decimal fraction of notional.
+        """
+
+    @property
+    def coupon_bp(self) -> float:
+        """
+        Running coupon in basis points per annum.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Running coupon in basis points per annum.
+        """
+
+    @property
+    def convention(self) -> dict[str, Any]:
+        """
+        CDS convention as ``{"currency": ..., "doc_clause": ...}``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Any]
+            CDS convention as ``{"currency": ..., "doc_clause": ...}``.
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON encoding of this value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> CdsTrancheQuote:
+        """
+        Rebuild from JSON produced by :meth:`to_json`.
+
+        Parameters
+        ----------
+        json : str
+            JSON produced by :meth:`to_json`.
+
+        Returns
+        -------
+        CdsTrancheQuote
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed, carries unknown fields, or fails validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.calibration import CdsTrancheQuote
+        >>> CdsTrancheQuote.from_json("{")
+        Traceback (most recent call last):
+        ValueError: ...
+        """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __repr__(self) -> str: ...
+
+class FxSpotDatum:
+    """An FX spot market datum (``kind == "fx_spot"``).
+
+    ``from_`` carries the Rust ``from`` field, because ``from`` is a Python
+    keyword.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import FxSpotDatum
+    >>> FxSpotDatum("EURUSD", "EUR", "USD", 1.1).rate
+    1.1
+
+    """
+
+    def __init__(self, id: str, from_: str, to: str, rate: float) -> None:
+        """Build an FX spot datum.
+
+        Parameters
+        ----------
+        id : str
+            Stable datum identifier, for example ``"EURUSD"``.
+        from_ : str | Currency
+            Base currency (``EUR`` in ``EUR/USD``); the Rust ``from`` field.
+        to : str | Currency
+            Quote currency (``USD`` in ``EUR/USD``).
+        rate : float
+            Units of ``to`` per one unit of ``from_``.
+
+        Raises
+        ------
+        ValueError
+            If a currency code is unknown.
+
+        """
+
+    @property
+    def id(self) -> str:
+        """
+        Stable datum identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Stable datum identifier.
+        """
+
+    @property
+    def from_(self) -> str:
+        """
+        Base currency code (the Rust ``from`` field).
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Base currency code (the Rust ``from`` field).
+        """
+
+    @property
+    def to(self) -> str:
+        """
+        Quote currency code.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Quote currency code.
+        """
+
+    @property
+    def rate(self) -> float:
+        """
+        Units of ``to`` per one unit of ``from_``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float
+            Units of ``to`` per one unit of ``from_``.
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON encoding of this value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> FxSpotDatum:
+        """
+        Rebuild from JSON produced by :meth:`to_json`.
+
+        Parameters
+        ----------
+        json : str
+            JSON produced by :meth:`to_json`.
+
+        Returns
+        -------
+        FxSpotDatum
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.calibration import FxSpotDatum
+        >>> FxSpotDatum.from_json(FxSpotDatum("EURUSD", "EUR", "USD", 1.1).to_json()).to
+        'USD'
+        """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __repr__(self) -> str: ...
+
+class PriceDatum:
+    """A single-asset spot price market datum (``kind == "price"``).
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import PriceDatum
+    >>> PriceDatum("AAPL", 187.5).value
+    187.5
+
+    """
+
+    def __init__(self, id: str, value: float | int | Decimal, currency: str | None = None) -> None:
+        """Build a spot price datum.
+
+        Parameters
+        ----------
+        id : str
+            Stable datum identifier, for example the asset ticker.
+        value : float | int | decimal.Decimal
+            Spot value: a unitless scalar without ``currency``, a monetary
+            price with one.
+        currency : str | Currency | None, default None
+            Currency of a monetary price; None stores a unitless scalar.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is non-finite, a unitless ``Decimal`` is not exactly
+            representable, or the currency is unknown.
+
+        """
+
+    @property
+    def id(self) -> str:
+        """
+        Stable datum identifier.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Stable datum identifier.
+        """
+
+    @property
+    def value(self) -> float | Decimal:
+        """
+        Spot value: float when unitless, lossless Decimal for a monetary price.
+
+        This property does not raise.
+
+        Returns
+        -------
+        float | Decimal
+            Spot value: float when unitless, lossless Decimal for a monetary price.
+        """
+
+    @property
+    def currency(self) -> str | None:
+        """
+        Currency code of a monetary price; None when unitless.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str | None
+            Currency code of a monetary price; None when unitless.
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON encoding of this value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> PriceDatum:
+        """
+        Rebuild from JSON produced by :meth:`to_json`.
+
+        Parameters
+        ----------
+        json : str
+            JSON produced by :meth:`to_json`.
+
+        Returns
+        -------
+        PriceDatum
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.calibration import PriceDatum
+        >>> PriceDatum.from_json(PriceDatum("AAPL", 187.5).to_json()).id
+        'AAPL'
+        """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __repr__(self) -> str: ...
+
+class DividendScheduleDatum:
+    """A dividend-schedule market datum (``kind == "dividend_schedule"``).
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import DividendScheduleDatum
+    >>> DividendScheduleDatum({"id": "AAPL-DIVS", "underlying": "AAPL", "events": []}).id
+    'AAPL-DIVS'
+
+    """
+
+    def __init__(self, schedule: dict[str, Any]) -> None:
+        """Build a dividend-schedule datum from the Rust ``DividendSchedule`` wire mapping.
+
+        Parameters
+        ----------
+        schedule : dict
+            Dividend schedule in its serde wire form (``id``, ``underlying``,
+            ``events``, optional ``currency``).
+
+        Raises
+        ------
+        ValueError
+            If ``schedule`` has a missing, unknown or mistyped field.
+
+        """
+
+    @property
+    def id(self) -> str:
+        """
+        Identifier of the dividend schedule (the datum id).
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Identifier of the dividend schedule (the datum id).
+        """
+
+    @property
+    def schedule(self) -> dict[str, Any]:
+        """
+        Dividend schedule as its serde wire mapping.
+
+        This property does not raise.
+
+        Returns
+        -------
+        dict[str, Any]
+            Dividend schedule as its serde wire mapping.
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON encoding of this value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> DividendScheduleDatum:
+        """
+        Rebuild from JSON produced by :meth:`to_json`.
+
+        Parameters
+        ----------
+        json : str
+            JSON produced by :meth:`to_json`.
+
+        Returns
+        -------
+        DividendScheduleDatum
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.calibration import DividendScheduleDatum
+        >>> DividendScheduleDatum.from_json(DividendScheduleDatum({"id": "D", "events": []}).to_json()).id
+        'D'
+        """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __repr__(self) -> str: ...
+
+class CollateralEntry:
+    """A collateral (CSA) currency mapping market datum (``kind == "collateral"``).
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import CollateralEntry
+    >>> CollateralEntry("EUR", "USD").csa_currency
+    'USD'
+
+    """
+
+    def __init__(self, id: str, csa_currency: str) -> None:
+        """Build a collateral mapping entry.
+
+        Parameters
+        ----------
+        id : str | Currency
+            Trade-leg currency the CSA mapping applies to (the datum id).
+        csa_currency : str | Currency
+            Collateral (CSA) currency.
+
+        Raises
+        ------
+        ValueError
+            If a currency code is unknown.
+
+        """
+
+    @property
+    def id(self) -> str:
+        """
+        Trade-leg currency code (the datum id).
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Trade-leg currency code (the datum id).
+        """
+
+    @property
+    def csa_currency(self) -> str:
+        """
+        Collateral (CSA) currency code.
+
+        This property does not raise.
+
+        Returns
+        -------
+        str
+            Collateral (CSA) currency code.
+        """
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON encoding of this value.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+
+    @staticmethod
+    def from_json(json: str) -> CollateralEntry:
+        """
+        Rebuild from JSON produced by :meth:`to_json`.
+
+        Parameters
+        ----------
+        json : str
+            JSON produced by :meth:`to_json`.
+
+        Returns
+        -------
+        CollateralEntry
+            The decoded value.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or carries unknown fields.
+
+        Examples
+        --------
+        >>> from finstack_quant.calibration import CollateralEntry
+        >>> CollateralEntry.from_json(CollateralEntry("EUR", "USD").to_json()).id
+        'EUR'
+        """
+
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
+    def __repr__(self) -> str: ...
+
+type Quote = RateQuote | CdsQuote | VolQuote | InflationQuote | XccyQuote | CdsTrancheQuote
+type MarketDatum = Quote | FxSpotDatum | PriceDatum | DividendScheduleDatum | CollateralEntry
 
 class CalibrationStep:
     """One calibration step: a target kind, its parameters, and its quotes.
@@ -1474,7 +2590,7 @@ class CalibrationStep:
         base_date: str,
         discount_curve_id: str,
         recovery_rate: float,
-        seniority: str = "senior",
+        seniority: str | None = None,
         quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         curve_id: str | None = None,
@@ -1496,8 +2612,10 @@ class CalibrationStep:
             Identifier of the discount curve solved in an earlier step.
         recovery_rate : float
             Assumed recovery as a decimal fraction of notional.
-        seniority : str, default "senior"
-            Debt seniority tier recorded on the curve.
+        seniority : str | None, default None
+            Debt seniority tier recorded on the curve. ``None`` uses the Rust
+            authoring default ``CalibrationStep::DEFAULT_HAZARD_SENIORITY``
+            (``"senior"``).
         quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
             CDS quotes attached inline.
         quote_set : str | None, default None
@@ -1612,7 +2730,7 @@ class CalibrationStep:
         id: str,
         base_date: str,
         underlying_ticker: str,
-        model: str = "sabr",
+        model: str | None = None,
         quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         vol_surface_id: str | None = None,
@@ -1628,8 +2746,10 @@ class CalibrationStep:
             Surface base date as an ISO date string.
         underlying_ticker : str
             Underlying ticker the surface belongs to.
-        model : str, default "sabr"
-            Surface model key, for example ``"sabr"``.
+        model : str | None, default None
+            Surface model key, for example ``"sabr"``. ``None`` uses the Rust
+            authoring default ``CalibrationStep::DEFAULT_VOL_SURFACE_MODEL``
+            (``"sabr"``).
         quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
             Volatility quotes attached inline.
         quote_set : str | None, default None
@@ -2068,7 +3188,7 @@ class CalibrationStep:
     def parametric(
         id: str,
         base_date: str,
-        model: str = "ns",
+        model: str | None = None,
         quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         curve_id: str | None = None,
@@ -2082,9 +3202,10 @@ class CalibrationStep:
             Unique step identifier.
         base_date : str
             Curve base date as an ISO date string.
-        model : str, default "ns"
+        model : str | None, default None
             Parametric family key: ``"ns"`` for Nelson-Siegel or ``"nss"``
-            for Nelson-Siegel-Svensson.
+            for Nelson-Siegel-Svensson. ``None`` uses the Rust authoring
+            default ``CalibrationStep::DEFAULT_PARAMETRIC_MODEL`` (``"ns"``).
         quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
             Rate quotes attached inline.
         quote_set : str | None, default None
@@ -2447,28 +3568,34 @@ class CalibrationEnvelope:
 
     def __init__(
         self,
-        plan: CalibrationPlan | dict[str, Any],
-        market_data: dict[str, Any] | None = None,
-        prior_market: dict[str, Any] | str | None = None,
+        plan: CalibrationPlan,
+        market_data: list[MarketDatum | dict[str, Any]] | None = None,
+        prior_market: list[dict[str, Any]] | None = None,
     ) -> None:
         """Build a calibration envelope.
 
         Parameters
         ----------
-        plan : CalibrationPlan | dict
-            The plan to execute.
-        market_data : dict | None, default None
-            Quote payload keyed by quote-set name; the plan's inline quotes are
-            used when None.
-        prior_market : dict | str | None, default None
-            Existing ``MarketContext`` payload whose curves and surfaces are
-            available to the plan's steps.
+        plan : CalibrationPlan
+            The plan to execute; quotes attached to its steps are included in
+            ``market_data``.
+        market_data : list[MarketDatum | dict] | None, default None
+            Additional flat market data: typed quotes and datums or
+            ``{"kind": ...}`` dicts such as ``fixing_series``. Rust
+            ``CalibrationEnvelope::with_market_data`` merges it onto the
+            attached quotes: an entry identical to one already present (same
+            kind, id and payload) is collected once.
+        prior_market : list[dict] | None, default None
+            Pre-built calibrated objects as ``{"kind": ..., ...}`` dicts.
 
         Raises
         ------
         ValueError
-            If the plan or market payload cannot be read, or a referenced quote
-            set is missing.
+            If a market-data or prior-market entry has an invalid shape.
+        CalibrationEnvelopeError
+            If an entry repeats the kind and id of a market datum already
+            present with a different payload
+            (``kind == "conflicting_market_datum"``).
 
         """
 
@@ -3824,5 +4951,198 @@ def calibrate_bermudan_lmm_base_vol(
     >>> calibrate_bermudan_lmm_base_vol("{}", "{}", "2025-01-01")
     Traceback (most recent call last):
     ValueError: ...
+
+    """
+
+def validate_surface(surface: VolSurface, config: ValidationConfig) -> None:
+    """Run the calendar-spread, butterfly-spread and volatility-bound checks.
+
+    Parameters
+    ----------
+    surface : VolSurface
+        Implied-volatility surface (expiries in years, absolute strikes).
+    config : ValidationConfig
+        Thresholds; ``check_arbitrage=False`` skips the two arbitrage checks
+        and ``lenient_arbitrage=True`` logs arbitrage violations instead of
+        raising (the volatility bounds are always checked).
+
+    Raises
+    ------
+    ValueError
+        If any check fails, naming the offending expiry and strike.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import ValidationConfig, validate_surface
+    >>> from finstack_quant.core.market_data import VolSurface
+    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
+    >>> validate_surface(surface, ValidationConfig())
+
+    """
+
+def validate_surface_with_forwards(surface: VolSurface, config: ValidationConfig, forwards: list[float]) -> None:
+    """Run the forward-aware calendar and call-convexity checks plus the volatility bounds.
+
+    Parameters
+    ----------
+    surface : VolSurface
+        Implied-volatility surface (expiries in years, absolute strikes).
+    config : ValidationConfig
+        Thresholds; ``check_arbitrage=False`` skips the arbitrage checks and
+        ``lenient_arbitrage=True`` logs arbitrage violations instead of raising.
+    forwards : list[float]
+        Forward price for each surface expiry, in expiry order (same units as
+        the strikes); one finite positive entry per expiry.
+
+    Raises
+    ------
+    ValueError
+        If ``forwards`` does not have one finite positive entry per expiry, or
+        any check fails.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import ValidationConfig, validate_surface_with_forwards
+    >>> from finstack_quant.core.market_data import VolSurface
+    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
+    >>> validate_surface_with_forwards(surface, ValidationConfig(), [100.0, 100.0])
+
+    """
+
+def validate_calendar_spread(surface: VolSurface, config: ValidationConfig) -> None:
+    """Check that total variance does not decrease with expiry at each strike.
+
+    Parameters
+    ----------
+    surface : VolSurface
+        Implied-volatility surface (expiries in years, absolute strikes).
+    config : ValidationConfig
+        Thresholds; ``check_arbitrage=False`` skips the check and
+        ``lenient_arbitrage=True`` logs violations instead of raising.
+
+    Raises
+    ------
+    ValueError
+        If total variance decreases between two expiries.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import ValidationConfig, validate_calendar_spread
+    >>> from finstack_quant.core.market_data import VolSurface
+    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
+    >>> validate_calendar_spread(surface, ValidationConfig())
+
+    """
+
+def validate_calendar_spread_with_forwards(
+    surface: VolSurface, config: ValidationConfig, forwards: list[float]
+) -> None:
+    """Check that total variance does not decrease with expiry at fixed forward moneyness.
+
+    Parameters
+    ----------
+    surface : VolSurface
+        Implied-volatility surface (expiries in years, absolute strikes).
+    config : ValidationConfig
+        Thresholds; ``check_arbitrage=False`` skips the check and
+        ``lenient_arbitrage=True`` logs violations instead of raising.
+    forwards : list[float]
+        Forward price for each surface expiry, in expiry order (same units as
+        the strikes); one finite positive entry per expiry.
+
+    Raises
+    ------
+    ValueError
+        If ``forwards`` does not match the expiries, or total variance
+        decreases between two expiries at fixed forward moneyness.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import ValidationConfig, validate_calendar_spread_with_forwards
+    >>> from finstack_quant.core.market_data import VolSurface
+    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
+    >>> validate_calendar_spread_with_forwards(surface, ValidationConfig(), [100.0, 100.0])
+
+    """
+
+def validate_butterfly_spread(surface: VolSurface, config: ValidationConfig) -> None:
+    """Check that total variance is convex in strike at each expiry (butterfly spread).
+
+    Parameters
+    ----------
+    surface : VolSurface
+        Implied-volatility surface (expiries in years, absolute strikes).
+    config : ValidationConfig
+        Thresholds (``butterfly_upper_ratio``, ``butterfly_lower_ratio``);
+        ``check_arbitrage=False`` skips the check and
+        ``lenient_arbitrage=True`` logs violations instead of raising.
+
+    Raises
+    ------
+    ValueError
+        If a butterfly violation exceeds the configured tolerance.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import ValidationConfig, validate_butterfly_spread
+    >>> from finstack_quant.core.market_data import VolSurface
+    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
+    >>> validate_butterfly_spread(surface, ValidationConfig())
+
+    """
+
+def validate_butterfly_call_convexity(surface: VolSurface, config: ValidationConfig, forwards: list[float]) -> None:
+    """Check that undiscounted Black call prices are convex in strike at each expiry.
+
+    Every adjacent vertical call spread must also cost between zero and its
+    strike width; the price tolerance is ``config.tolerance`` times the forward.
+
+    Parameters
+    ----------
+    surface : VolSurface
+        Implied-volatility surface (expiries in years, absolute strikes).
+    config : ValidationConfig
+        Thresholds; ``check_arbitrage=False`` skips the check and
+        ``lenient_arbitrage=True`` logs violations instead of raising.
+    forwards : list[float]
+        Forward price for each surface expiry, in expiry order (same units as
+        the strikes); one finite positive entry per expiry.
+
+    Raises
+    ------
+    ValueError
+        If ``forwards`` does not match the expiries, or call prices are not
+        convex in strike.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import ValidationConfig, validate_butterfly_call_convexity
+    >>> from finstack_quant.core.market_data import VolSurface
+    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
+    >>> validate_butterfly_call_convexity(surface, ValidationConfig(), [100.0, 100.0])
+
+    """
+
+def validate_vol_bounds(surface: VolSurface, config: ValidationConfig) -> None:
+    """Check that every surface volatility is positive and at most ``config.max_volatility``.
+
+    Parameters
+    ----------
+    surface : VolSurface
+        Implied-volatility surface (expiries in years, absolute strikes).
+    config : ValidationConfig
+        Thresholds; ``max_volatility`` is the upper bound (annualized decimal).
+
+    Raises
+    ------
+    ValueError
+        If a volatility is not positive or exceeds ``max_volatility``.
+
+    Examples:
+    --------
+    >>> from finstack_quant.calibration import ValidationConfig, validate_vol_bounds
+    >>> from finstack_quant.core.market_data import VolSurface
+    >>> surface = VolSurface("EQ-VOL", [1.0, 2.0], [90.0, 100.0, 110.0], [[0.205, 0.20, 0.205], [0.215, 0.21, 0.215]])
+    >>> validate_vol_bounds(surface, ValidationConfig())
 
     """

@@ -297,10 +297,35 @@ export type {
   CalibrationReport,
   CalibrationResult,
   CalibrationStep,
+  CdsTrancheQuote,
+  InflationQuote,
   MarketDatum,
   PriorMarketObject,
   StepParams,
+  XccyQuote,
 } from './types/generated/calibration/index.js';
+/**
+ * Payload of a `MarketDatum` tagged `kind: "fx_spot"` (Rust `FxSpotDatum`); twin of Python `calibration.FxSpotDatum`.
+ */
+export type FxSpotDatum = Omit<Extract<generated.calibration.MarketDatum, { kind: 'fx_spot' }>, 'kind'>;
+/**
+ * Payload of a `MarketDatum` tagged `kind: "price"` (Rust `PriceDatum`); twin of Python `calibration.PriceDatum`.
+ */
+export type PriceDatum = Omit<Extract<generated.calibration.MarketDatum, { kind: 'price' }>, 'kind'>;
+/**
+ * Payload of a `MarketDatum` tagged `kind: "dividend_schedule"` (Rust `DividendScheduleDatum`); twin of Python `calibration.DividendScheduleDatum`.
+ */
+export type DividendScheduleDatum = Omit<
+  Extract<generated.calibration.MarketDatum, { kind: 'dividend_schedule' }>,
+  'kind'
+>;
+/**
+ * Payload of a `MarketDatum` tagged `kind: "collateral"` (Rust `CollateralEntry`); twin of Python `calibration.CollateralEntry`.
+ */
+export type CollateralEntry = Omit<
+  Extract<generated.calibration.MarketDatum, { kind: 'collateral' }>,
+  'kind'
+>;
 export type {
   MarketScalar,
   PeriodPlan,
@@ -29804,6 +29829,114 @@ export interface CalibrationNamespace {
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `params` is not a valid `HullWhiteParams` object.
    */
   hullWhiteParamsSigmaAt(params: generated.models.HullWhiteParams | string, time: number): number;
+  /**
+   * Build a zero-coupon inflation swap quote.
+   *
+   * Free-function twin of Python `InflationQuote.inflation_swap` (Rust `InflationQuote::from_wire_fields`).
+   * @param id - Unique quote identifier.
+   * @param maturity - ISO-8601 swap maturity date.
+   * @param rate - Fixed zero-coupon swap rate as a decimal (`0.025` is 2.5%).
+   * @param index - Inflation index identifier (for example `"USA-CPI-U"`).
+   * @param convention - Inflation-swap convention identifier (for example `"USD"`).
+   * @returns A validated `InflationQuote` object tagged `inflation_swap`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if the maturity is not an ISO-8601 date or the rate is not finite.
+   */
+  inflationQuoteInflationSwap(
+    id: string,
+    maturity: string,
+    rate: number,
+    index: string,
+    convention: string
+  ): generated.calibration.InflationQuote;
+  /**
+   * Build a year-on-year inflation swap quote.
+   *
+   * Free-function twin of Python `InflationQuote.yoy_inflation_swap` (Rust `InflationQuote::from_wire_fields`).
+   * @param id - Unique quote identifier.
+   * @param maturity - ISO-8601 swap maturity date.
+   * @param rate - Fixed year-on-year swap rate as a decimal.
+   * @param index - Inflation index identifier (for example `"USA-CPI-U"`).
+   * @param frequency - Payment frequency tenor (for example `"1Y"`).
+   * @param convention - Inflation-swap convention identifier (for example `"USD"`).
+   * @returns A validated `InflationQuote` object tagged `yoy_inflation_swap`.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if the maturity is not an ISO-8601 date, the frequency is not a tenor or the rate is not finite.
+   */
+  inflationQuoteYoyInflationSwap(
+    id: string,
+    maturity: string,
+    rate: number,
+    index: string,
+    frequency: string,
+    convention: string
+  ): generated.calibration.InflationQuote;
+  /**
+   * Run the calendar-spread, butterfly-spread and volatility-bound checks on a surface.
+   *
+   * Free-function twin of Python `calibration.validate_surface` (Rust `validation::validate_surface`).
+   * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
+   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the two arbitrage checks and `lenient_arbitrage: true` logs arbitrage violations instead of throwing (the volatility bounds are always checked).
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed or any check fails.
+   */
+  validateSurface(surface: VolSurface, config: generated.calibration.ValidationConfig): void;
+  /**
+   * Run the forward-aware calendar-spread and call-convexity checks plus the volatility bounds.
+   *
+   * Free-function twin of Python `calibration.validate_surface_with_forwards` (Rust `validation::validate_surface_with_forwards`).
+   * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
+   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the arbitrage checks and `lenient_arbitrage: true` logs arbitrage violations instead of throwing.
+   * @param forwards - Forward price for each surface expiry, in expiry order (same units as the strikes).
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed, `forwards` does not have one finite positive entry per expiry, or any check fails.
+   */
+  validateSurfaceWithForwards(surface: VolSurface, config: generated.calibration.ValidationConfig, forwards: number[] | Float64Array): void;
+  /**
+   * Check that total variance does not decrease with expiry at each strike.
+   *
+   * Free-function twin of Python `calibration.validate_calendar_spread` (Rust `validation::validate_calendar_spread`).
+   * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
+   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the check and `lenient_arbitrage: true` logs violations instead of throwing.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed or total variance decreases between two expiries.
+   */
+  validateCalendarSpread(surface: VolSurface, config: generated.calibration.ValidationConfig): void;
+  /**
+   * Check that total variance does not decrease with expiry at each forward moneyness.
+   *
+   * Free-function twin of Python `calibration.validate_calendar_spread_with_forwards` (Rust `validation::validate_calendar_spread_with_forwards`).
+   * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
+   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the check and `lenient_arbitrage: true` logs violations instead of throwing.
+   * @param forwards - Forward price for each surface expiry, in expiry order.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed, `forwards` does not match the expiries, or total variance decreases at fixed forward moneyness.
+   */
+  validateCalendarSpreadWithForwards(surface: VolSurface, config: generated.calibration.ValidationConfig, forwards: number[] | Float64Array): void;
+  /**
+   * Check that total variance is convex in strike at each expiry (butterfly spread).
+   *
+   * Free-function twin of Python `calibration.validate_butterfly_spread` (Rust `validation::validate_butterfly_spread`).
+   * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
+   * @param config - `ValidationConfig` object (`butterfly_upper_ratio`, `butterfly_lower_ratio`; `lenient_arbitrage: true` logs violations instead of throwing); `check_arbitrage: false` skips the check.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed or a butterfly violation exceeds the tolerance.
+   */
+  validateButterflySpread(surface: VolSurface, config: generated.calibration.ValidationConfig): void;
+  /**
+   * Check that undiscounted Black call prices are convex in strike at each expiry.
+   *
+   * Every adjacent vertical call spread must also cost between zero and its strike width; the price tolerance is `config.tolerance` times the forward.
+   *
+   * Free-function twin of Python `calibration.validate_butterfly_call_convexity` (Rust `validation::validate_butterfly_call_convexity`).
+   * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
+   * @param config - `ValidationConfig` object; `check_arbitrage: false` skips the check and `lenient_arbitrage: true` logs violations instead of throwing.
+   * @param forwards - Forward price for each surface expiry, in expiry order.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed, `forwards` does not match the expiries, or call prices are not convex in strike.
+   */
+  validateButterflyCallConvexity(surface: VolSurface, config: generated.calibration.ValidationConfig, forwards: number[] | Float64Array): void;
+  /**
+   * Check that every surface volatility is positive and at most `config.max_volatility`.
+   *
+   * Free-function twin of Python `calibration.validate_vol_bounds` (Rust `validation::validate_vol_bounds`).
+   * @param surface - Implied-volatility surface (expiries in years, absolute strikes).
+   * @param config - `ValidationConfig` object; `max_volatility` is the upper bound (annualized decimal).
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed or a volatility is not positive or exceeds `max_volatility`.
+   */
+  validateVolBounds(surface: VolSurface, config: generated.calibration.ValidationConfig): void;
 }
 
 /**

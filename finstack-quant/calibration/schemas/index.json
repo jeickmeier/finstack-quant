@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
-      "bytes": 215152,
+      "bytes": 215260,
       "kind": "input",
       "path": "schemas/calibration/1/calibration.schema.json",
       "summary": "Build a market from quotes: a calibration plan, flat market data, and any pre-built curves or surfaces.",
@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/calibration/1/calibration_validation_report.schema.json",
-      "bytes": 15924,
+      "bytes": 15971,
       "kind": "output",
       "path": "schemas/calibration/1/calibration_validation_report.schema.json",
       "summary": "Dry-run findings for a calibration envelope; nothing is solved.",
@@ -101,7 +101,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/market_quote.schema.json",
-      "bytes": 30462,
+      "bytes": 30570,
       "kind": "component",
       "path": "schemas/market/1/market_quote.schema.json",
       "summary": "One market observation, tagged by asset class.",
@@ -110,7 +110,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/market/1/rate_quote.schema.json",
-      "bytes": 8744,
+      "bytes": 8852,
       "kind": "component",
       "path": "schemas/market/1/rate_quote.schema.json",
       "summary": "Deposit, FRA, futures or swap rate quote.",

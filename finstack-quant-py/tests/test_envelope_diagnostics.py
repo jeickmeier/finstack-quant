@@ -9,6 +9,7 @@ import pickle
 import pytest
 
 from finstack_quant.calibration import (
+    CalibrationEnvelope,
     CalibrationEnvelopeError,
     CalibrationPlan,
     CalibrationStep,
@@ -33,7 +34,7 @@ def test_attached_quote_id_rejects_conflicting_payloads(same_set: bool) -> None:
             quotes=[RateQuote.deposit("D", "USD-Deposit", "1Y", 0.08)],
         ),
     ]
-    with pytest.raises(CalibrationEnvelopeError, match="conflicting attached payloads") as info:
+    with pytest.raises(CalibrationEnvelopeError, match="conflicting payloads") as info:
         CalibrationPlan(steps)
     assert info.value.kind == "conflicting_market_datum"
 
@@ -249,3 +250,25 @@ def test_market_freshness_age_is_a_plain_integer() -> None:
     assert dry_run(envelope).errors == []
     canonical = json.loads(validate_calibration_json(envelope))
     assert canonical["plan"]["settings"]["market_freshness"]["max_age_seconds"] == 3600
+
+
+def test_envelope_market_data_merges_onto_attached_quotes() -> None:
+    """CFCC-014: extra market data repeating an attached quote is collected once (Rust merge)."""
+    quotes = [
+        RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.052),
+        RateQuote.swap("USD-SWAP-2Y", "USD-SOFR-OIS", "2Y", 0.049),
+    ]
+    plan = CalibrationPlan([CalibrationStep.discount("USD-OIS", "USD", "2026-05-08", quotes=quotes)])
+    as_dict = {"kind": "rate_quote", **json.loads(quotes[1].to_json())}
+    envelope = CalibrationEnvelope(plan, market_data=[quotes[0], as_dict])
+    assert [datum["id"] for datum in envelope.market_data] == ["USD-DEP-3M", "USD-SWAP-2Y"]
+    assert envelope.dry_run().is_valid
+    assert calibrate(envelope).success
+
+
+def test_envelope_market_data_rejects_a_conflicting_repeat_of_an_attached_quote() -> None:
+    quote = RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.052)
+    plan = CalibrationPlan([CalibrationStep.discount("USD-OIS", "USD", "2026-05-08", quotes=[quote])])
+    with pytest.raises(CalibrationEnvelopeError, match="conflicting payloads") as info:
+        CalibrationEnvelope(plan, market_data=[RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.06)])
+    assert info.value.kind == "conflicting_market_datum"

@@ -29,7 +29,7 @@ use pyo3::types::{PyDict, PyList};
 use serde_json::{Map, Value};
 
 /// ISO-4217 code from a ``Currency`` object (``.code``) or a plain string.
-fn currency_code(obj: &Bound<'_, PyAny>) -> PyResult<String> {
+pub(crate) fn currency_code(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(code) = obj.getattr("code") {
         if let Ok(code) = code.extract::<String>() {
             return Ok(code);
@@ -41,7 +41,7 @@ fn currency_code(obj: &Bound<'_, PyAny>) -> PyResult<String> {
 }
 
 /// Pillar from a tenor / ISO-date string or a ``{"tenor": ...}`` / ``{"date": ...}`` mapping.
-fn extract_pillar(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Value> {
+pub(crate) fn extract_pillar(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Value> {
     let pillar: Pillar = if let Ok(text) = obj.extract::<String>() {
         text.parse().map_err(core_to_py)?
     } else if let Ok(date) = crate::bindings::date_utils::extract_date(obj) {
@@ -53,7 +53,7 @@ fn extract_pillar(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Value> {
 }
 
 /// Deserialize a JSON object into `T` with a labelled error.
-fn from_value<T: serde::de::DeserializeOwned>(value: Value, label: &str) -> PyResult<T> {
+pub(crate) fn from_value<T: serde::de::DeserializeOwned>(value: Value, label: &str) -> PyResult<T> {
     serde_json::from_value(value).map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
 }
 
@@ -196,33 +196,37 @@ impl PyRateQuote {
     ///     Last trading date of the contract (ISO string or ``date``).
     /// price : float
     ///     Futures price (e.g. ``98.50``); implied rate is ``(100 - price) / 100``.
-    /// convexity_adjustment : float, default 0.0
+    /// convexity_adjustment : float, optional
     ///     Convexity adjustment as a decimal rate subtracted from the
-    ///     futures-implied forward (Hull convention).
+    ///     futures-implied forward (Hull convention). ``None`` uses the Rust
+    ///     authoring default ``RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT``
+    ///     (``0.0``, no adjustment).
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If the date cannot be parsed or the price is not finite.
     #[staticmethod]
-    #[pyo3(signature = (id, contract, expiry, price, convexity_adjustment = 0.0))]
-    #[pyo3(text_signature = "(id, contract, expiry, price, convexity_adjustment=0.0)")]
+    #[pyo3(signature = (id, contract, expiry, price, convexity_adjustment = None))]
+    #[pyo3(text_signature = "(id, contract, expiry, price, convexity_adjustment=None)")]
     fn futures(
         id: &str,
         contract: &str,
         expiry: &Bound<'_, PyAny>,
         price: f64,
-        convexity_adjustment: f64,
+        convexity_adjustment: Option<f64>,
     ) -> PyResult<Self> {
         let mut fields = Map::new();
         fields.insert("id".into(), Value::String(id.into()));
         fields.insert("contract".into(), Value::String(contract.into()));
         fields.insert("expiry".into(), Value::String(extract_date_iso(expiry)?));
         fields.insert("price".into(), Value::from(price));
-        fields.insert(
-            "convexity_adjustment".into(),
-            Value::from(convexity_adjustment),
-        );
+        if let Some(convexity_adjustment) = convexity_adjustment {
+            fields.insert(
+                "convexity_adjustment".into(),
+                Value::from(convexity_adjustment),
+            );
+        }
         Self::build(fields, "futures")
     }
 
@@ -521,6 +525,30 @@ impl PyCdsQuote {
         }
     }
 
+    /// Reference entity name.
+    #[getter]
+    fn entity(&self) -> String {
+        self.inner.entity().to_string()
+    }
+
+    /// CDS convention as ``{"currency": ..., "doc_clause": ...}``.
+    #[getter]
+    fn convention<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, self.inner.convention())
+    }
+
+    /// Maturity pillar as its wire mapping (``{"tenor": ...}`` or ``{"date": ...}``).
+    #[getter]
+    fn pillar<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, self.inner.pillar())
+    }
+
+    /// Assumed recovery rate as a decimal.
+    #[getter]
+    fn recovery_rate(&self) -> f64 {
+        self.inner.recovery_rate()
+    }
+
     /// Running coupon, in basis points, of the CDS built from this quote:
     /// the par spread for ``cds_par_spread`` quotes and the contractual
     /// running coupon for ``cds_upfront`` quotes.
@@ -612,23 +640,24 @@ impl PyVolQuote {
     ///     Absolute strike in underlying price units.
     /// vol : float
     ///     Black implied volatility as an annualized decimal.
-    /// option_type : str, default "call"
-    ///     ``"call"`` or ``"put"``.
+    /// option_type : str, optional
+    ///     ``"call"`` or ``"put"``. ``None`` uses the Rust authoring default
+    ///     ``VolQuote::DEFAULT_OPTION_TYPE`` (``"call"``).
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If the date or numeric inputs are invalid.
     #[staticmethod]
-    #[pyo3(signature = (id, underlying, expiry, strike, vol, option_type = "call"))]
-    #[pyo3(text_signature = "(id, underlying, expiry, strike, vol, option_type='call')")]
+    #[pyo3(signature = (id, underlying, expiry, strike, vol, option_type = None))]
+    #[pyo3(text_signature = "(id, underlying, expiry, strike, vol, option_type=None)")]
     fn option_vol(
         id: &str,
         underlying: &str,
         expiry: &Bound<'_, PyAny>,
         strike: f64,
         vol: f64,
-        option_type: &str,
+        option_type: Option<&str>,
     ) -> PyResult<Self> {
         let mut fields = Map::new();
         fields.insert("id".into(), Value::String(id.into()));
@@ -636,7 +665,9 @@ impl PyVolQuote {
         fields.insert("expiry".into(), Value::String(extract_date_iso(expiry)?));
         fields.insert("strike".into(), Value::from(strike));
         fields.insert("vol".into(), Value::from(vol));
-        fields.insert("option_type".into(), Value::String(option_type.into()));
+        if let Some(option_type) = option_type {
+            fields.insert("option_type".into(), Value::String(option_type.into()));
+        }
         Self::build("option_vol", fields)
     }
 
@@ -803,7 +834,7 @@ impl PyVolQuote {
     }
 }
 
-/// Convert one market-data entry (typed quote, dict, or JSON string) into a `MarketDatum`.
+/// Convert one market-data entry (typed quote or datum, or dict) into a `MarketDatum`.
 pub(crate) fn extract_market_datum(
     py: Python<'_>,
     obj: &Bound<'_, PyAny>,
@@ -816,6 +847,27 @@ pub(crate) fn extract_market_datum(
     }
     if let Ok(quote) = obj.cast::<PyVolQuote>() {
         return Ok(MarketDatum::VolQuote(quote.borrow().inner.clone()));
+    }
+    if let Ok(quote) = obj.cast::<super::PyInflationQuote>() {
+        return Ok(MarketDatum::InflationQuote(quote.borrow().inner.clone()));
+    }
+    if let Ok(quote) = obj.cast::<super::PyXccyQuote>() {
+        return Ok(MarketDatum::XccyQuote(quote.borrow().inner.clone()));
+    }
+    if let Ok(quote) = obj.cast::<super::PyCdsTrancheQuote>() {
+        return Ok(MarketDatum::CdsTrancheQuote(quote.borrow().inner.clone()));
+    }
+    if let Ok(datum) = obj.cast::<super::PyFxSpotDatum>() {
+        return Ok(MarketDatum::FxSpot(datum.borrow().inner.clone()));
+    }
+    if let Ok(datum) = obj.cast::<super::PyPriceDatum>() {
+        return Ok(MarketDatum::Price(datum.borrow().inner.clone()));
+    }
+    if let Ok(datum) = obj.cast::<super::PyDividendScheduleDatum>() {
+        return Ok(MarketDatum::DividendSchedule(datum.borrow().inner.clone()));
+    }
+    if let Ok(datum) = obj.cast::<super::PyCollateralEntry>() {
+        return Ok(MarketDatum::Collateral(datum.borrow().inner.clone()));
     }
     let value = py_to_json_value(py, obj, "market datum")?;
     from_value(value, "market datum (expected {\"kind\": ..., ...})")
@@ -1039,8 +1091,10 @@ impl PyCalibrationStep {
     ///     Discount curve used for CDS present values.
     /// recovery_rate : float
     ///     Assumed recovery rate as a decimal.
-    /// seniority : str, default "senior"
-    ///     Debt seniority (``"senior"``, ``"subordinated"``, ...).
+    /// seniority : str, optional
+    ///     Debt seniority (``"senior"``, ``"subordinated"``, ...). ``None`` uses
+    ///     the Rust authoring default
+    ///     ``CalibrationStep::DEFAULT_HAZARD_SENIORITY`` (``"senior"``).
     /// quotes, quote_set, curve_id
     ///     As in ``discount``.
     /// **params
@@ -1052,9 +1106,9 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, entity, currency, base_date, discount_curve_id, recovery_rate, seniority = "senior", quotes = None, quote_set = None, curve_id = None, **params))]
+    #[pyo3(signature = (id, entity, currency, base_date, discount_curve_id, recovery_rate, seniority = None, quotes = None, quote_set = None, curve_id = None, **params))]
     #[pyo3(
-        text_signature = "(id, entity, currency, base_date, discount_curve_id, recovery_rate, seniority='senior', quotes=None, quote_set=None, curve_id=None, **params)"
+        text_signature = "(id, entity, currency, base_date, discount_curve_id, recovery_rate, seniority=None, quotes=None, quote_set=None, curve_id=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn hazard(
@@ -1065,7 +1119,7 @@ impl PyCalibrationStep {
         base_date: &Bound<'_, PyAny>,
         discount_curve_id: &str,
         recovery_rate: f64,
-        seniority: &str,
+        seniority: Option<&str>,
         quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         curve_id: Option<String>,
@@ -1074,7 +1128,7 @@ impl PyCalibrationStep {
         let f = fields(vec![
             ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("entity", Value::String(entity.into())),
-            ("seniority", Value::String(seniority.into())),
+            ("seniority", seniority.map_or(Value::Null, Value::from)),
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("discount_curve_id", Value::String(discount_curve_id.into())),
@@ -1156,8 +1210,9 @@ impl PyCalibrationStep {
     ///     Surface base date.
     /// underlying_ticker : str
     ///     Underlying identifier the quotes reference.
-    /// model : str, default "sabr"
-    ///     Surface model.
+    /// model : str, optional
+    ///     Surface model (``"sabr"``). ``None`` uses the Rust authoring default
+    ///     ``CalibrationStep::DEFAULT_VOL_SURFACE_MODEL`` (``"sabr"``).
     /// quotes, quote_set
     ///     As in ``discount``.
     /// vol_surface_id : str | None, default None
@@ -1172,9 +1227,9 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, base_date, underlying_ticker, model = "sabr", quotes = None, quote_set = None, vol_surface_id = None, **params))]
+    #[pyo3(signature = (id, base_date, underlying_ticker, model = None, quotes = None, quote_set = None, vol_surface_id = None, **params))]
     #[pyo3(
-        text_signature = "(id, base_date, underlying_ticker, model='sabr', quotes=None, quote_set=None, vol_surface_id=None, **params)"
+        text_signature = "(id, base_date, underlying_ticker, model=None, quotes=None, quote_set=None, vol_surface_id=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn vol_surface(
@@ -1182,7 +1237,7 @@ impl PyCalibrationStep {
         id: &str,
         base_date: &Bound<'_, PyAny>,
         underlying_ticker: &str,
-        model: &str,
+        model: Option<&str>,
         quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         vol_surface_id: Option<String>,
@@ -1195,7 +1250,7 @@ impl PyCalibrationStep {
             ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("underlying_ticker", Value::String(underlying_ticker.into())),
-            ("model", Value::String(model.into())),
+            ("model", model.map_or(Value::Null, Value::from)),
         ]);
         Self::build(py, "vol_surface", id, quotes, quote_set, f, params)
     }
@@ -1579,8 +1634,10 @@ impl PyCalibrationStep {
     ///     Step identifier (default quote-set name and curve id).
     /// base_date : datetime.date | str
     ///     Curve base date.
-    /// model : str, default "ns"
+    /// model : str, optional
     ///     Parametric family (``"ns"`` Nelson-Siegel or ``"nss"`` Svensson).
+    ///     ``None`` uses the Rust authoring default
+    ///     ``CalibrationStep::DEFAULT_PARAMETRIC_MODEL`` (``"ns"``).
     /// quotes, quote_set, curve_id
     ///     As in ``discount``.
     /// **params
@@ -1593,16 +1650,16 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, base_date, model = "ns", quotes = None, quote_set = None, curve_id = None, **params))]
+    #[pyo3(signature = (id, base_date, model = None, quotes = None, quote_set = None, curve_id = None, **params))]
     #[pyo3(
-        text_signature = "(id, base_date, model='ns', quotes=None, quote_set=None, curve_id=None, **params)"
+        text_signature = "(id, base_date, model=None, quotes=None, quote_set=None, curve_id=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn parametric(
         py: Python<'_>,
         id: &str,
         base_date: &Bound<'_, PyAny>,
-        model: &str,
+        model: Option<&str>,
         quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         curve_id: Option<String>,
@@ -1611,7 +1668,7 @@ impl PyCalibrationStep {
         let f = fields(vec![
             ("curve_id", curve_id.map_or(Value::Null, Value::String)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
-            ("model", Value::String(model.into())),
+            ("model", model.map_or(Value::Null, Value::from)),
         ]);
         Self::build(py, "parametric", id, quotes, quote_set, f, params)
     }
@@ -1750,14 +1807,20 @@ impl PyCalibrationPlan {
     }
 
     /// Wrap this plan (plus attached quotes) into a request envelope.
+    ///
+    /// Rust `CalibrationEnvelope::with_market_data` merges the extra market
+    /// data onto the attached quotes: identical repeats are collected once and
+    /// a repeated id with a different payload is a `conflicting_market_datum`
+    /// error.
     pub(crate) fn to_envelope(
         &self,
+        py: Python<'_>,
         extra_market_data: Vec<MarketDatum>,
         prior_market: Vec<PriorMarketObject>,
-    ) -> CalibrationEnvelope {
-        let mut market_data = self.market_data.clone();
-        market_data.extend(extra_market_data);
-        CalibrationEnvelope::new(self.inner.clone(), market_data, prior_market)
+    ) -> PyResult<CalibrationEnvelope> {
+        CalibrationEnvelope::new(self.inner.clone(), self.market_data.clone(), prior_market)
+            .with_market_data(extra_market_data)
+            .map_err(|error| super::envelope_error_to_py(py, error))
     }
 }
 
@@ -1971,9 +2034,11 @@ impl PyCalibrationEnvelope {
     /// ----------
     /// plan : CalibrationPlan
     ///     Plan to execute; quotes attached to its steps are included.
-    /// market_data : list[RateQuote | CdsQuote | VolQuote | dict] | None, default None
-    ///     Additional flat market data (typed quotes or ``{"kind": ...}`` dicts
-    ///     such as ``fx_spot``, ``price``, ``fixing_series``).
+    /// market_data : list[RateQuote | CdsQuote | VolQuote | InflationQuote | XccyQuote | CdsTrancheQuote | FxSpotDatum | PriceDatum | DividendScheduleDatum | CollateralEntry | dict] | None, default None
+    ///     Additional flat market data (typed quotes and datums or
+    ///     ``{"kind": ...}`` dicts such as ``fixing_series``). It is merged onto
+    ///     the plan's attached quotes: an entry identical to one already
+    ///     present (same kind, id and payload) is collected once.
     /// prior_market : list[dict] | None, default None
     ///     Pre-built calibrated objects as ``{"kind": ..., ...}`` dicts.
     ///
@@ -1981,6 +2046,9 @@ impl PyCalibrationEnvelope {
     /// ------
     /// ValueError
     ///     If a market-data or prior-market entry has an invalid shape.
+    /// CalibrationEnvelopeError
+    ///     If an entry repeats the kind and id of a market datum already present
+    ///     with a different payload (``kind == "conflicting_market_datum"``).
     #[new]
     #[pyo3(signature = (plan, market_data = None, prior_market = None))]
     #[pyo3(text_signature = "(plan, market_data=None, prior_market=None)")]
@@ -1992,9 +2060,8 @@ impl PyCalibrationEnvelope {
     ) -> PyResult<Self> {
         let market_data = extract_market_data(py, market_data)?;
         let prior_market = extract_prior_market(py, prior_market)?;
-        Ok(Self::from_inner(
-            plan.to_envelope(market_data, prior_market),
-        ))
+        plan.to_envelope(py, market_data, prior_market)
+            .map(Self::from_inner)
     }
 
     /// Schema marker (``"finstack_quant.calibration/1"``).

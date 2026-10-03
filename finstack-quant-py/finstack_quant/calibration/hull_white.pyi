@@ -6,7 +6,7 @@ bootstrap solves one volatility per quote maturity at a fixed mean reversion.
 Examples:
 --------
 >>> from finstack_quant.calibration.hull_white import SwaptionQuote
->>> SwaptionQuote(1.0, 10.0, 0.0085).volatility
+>>> SwaptionQuote(1.0, 10.0, 0.0085, True).volatility
 0.0085
 """
 
@@ -33,7 +33,7 @@ class SwaptionQuote:
     Examples:
     --------
     >>> from finstack_quant.calibration.hull_white import SwaptionQuote
-    >>> SwaptionQuote(1.0, 10.0, 0.0085).tenor
+    >>> SwaptionQuote(1.0, 10.0, 0.0085, True).tenor
     10.0
 
     """
@@ -43,7 +43,7 @@ class SwaptionQuote:
         expiry: float,
         tenor: float,
         volatility: float,
-        is_normal_vol: bool = True,
+        is_normal_vol: bool,
     ) -> None:
         """Build a swaption quote.
 
@@ -56,8 +56,10 @@ class SwaptionQuote:
         volatility : float
             Quoted volatility: decimal per annum for normal (Bachelier) quotes
             (``0.0085`` for 85 bp), annualized decimal for lognormal quotes.
-        is_normal_vol : bool, default True
-            True when ``volatility`` is a normal (Bachelier) volatility.
+        is_normal_vol : bool
+            True when ``volatility`` is a normal (Bachelier) volatility, False
+            for a Black lognormal volatility. Required: it decides the unit of
+            ``volatility``, so there is no default.
 
         Raises
         ------
@@ -170,7 +172,7 @@ class CapFloorQuote:
     Examples:
     --------
     >>> from finstack_quant.calibration.hull_white import CapFloorQuote
-    >>> CapFloorQuote(5.0, 0.04, 0.0090).is_cap
+    >>> CapFloorQuote(5.0, 0.04, 0.0090, True, True).is_cap
     True
 
     """
@@ -180,8 +182,8 @@ class CapFloorQuote:
         maturity: float,
         strike: float,
         volatility: float,
-        is_cap: bool = True,
-        is_normal_vol: bool = True,
+        is_cap: bool,
+        is_normal_vol: bool,
     ) -> None:
         """Build a cap or floor quote.
 
@@ -194,9 +196,10 @@ class CapFloorQuote:
         volatility : float
             Normal/Bachelier flat volatility in decimal rate units per square
             root year; ``0.009`` means 90 bp normal volatility.
-        is_cap : bool, default True
-            True for a cap, False for a floor.
-        is_normal_vol : bool, default True
+        is_cap : bool
+            True for a cap, False for a floor. Required: there is no default
+            side.
+        is_normal_vol : bool
             Must be True. Lognormal cap/floor quotes are unsupported.
 
         Raises
@@ -799,7 +802,7 @@ def calibrate_hull_white_to_swaptions(
     >>> curve = DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.03)
     >>> params, report = calibrate_hull_white_to_swaptions(
     ...     curve,
-    ...     [SwaptionQuote(1.0, 5.0, 0.0085), SwaptionQuote(5.0, 5.0, 0.0080)],
+    ...     [SwaptionQuote(1.0, 5.0, 0.0085, True), SwaptionQuote(5.0, 5.0, 0.0080, True)],
     ...     fit_tolerance=1e-4,
     ... )
     >>> params.sigma > 0.0
@@ -859,7 +862,7 @@ def calibrate_hull_white_to_cap_floors(
     >>> curve = DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.03)
     >>> params, report = calibrate_hull_white_to_cap_floors(
     ...     curve,
-    ...     [CapFloorQuote(5.0, 0.03, 0.009)],
+    ...     [CapFloorQuote(5.0, 0.03, 0.009, True, True)],
     ...     config=CapFloorCalibrationConfig(1e-4, fixed_kappa=0.03),
     ... )
     >>> params.kappa
@@ -922,7 +925,7 @@ def bootstrap_hull_white_sigma_schedule_to_cap_floors(
     >>> curve = DiscountCurve.flat("USD-OIS", datetime.date(2025, 1, 1), 0.03)
     >>> params, report = bootstrap_hull_white_sigma_schedule_to_cap_floors(
     ...     curve,
-    ...     [CapFloorQuote(2.0, 0.03, 0.009), CapFloorQuote(5.0, 0.03, 0.010)],
+    ...     [CapFloorQuote(2.0, 0.03, 0.009, True, True), CapFloorQuote(5.0, 0.03, 0.010, True, True)],
     ...     PiecewiseSigmaCalibrationConfig(0.03, 1e-4, 0.05, 1e-4),
     ... )
     >>> len(params.values)

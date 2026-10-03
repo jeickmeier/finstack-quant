@@ -887,7 +887,39 @@ mod tests {
                 id: "Q1".to_string()
             }
         );
-        assert!(error.to_string().contains("conflicting attached payloads"));
+        assert!(error.to_string().contains("conflicting payloads"));
+    }
+
+    #[test]
+    fn with_market_data_dedups_identical_and_rejects_conflicting_data() {
+        let attached = || {
+            CalibrationEnvelope::from_attached_steps(
+                "p".to_string(),
+                None,
+                Default::default(),
+                Default::default(),
+                vec![(
+                    discount_step("a", "set", "USD-OIS"),
+                    vec![deposit("Q1", 0.05), deposit("Q2", 0.06)],
+                )],
+            )
+            .expect("attached envelope")
+        };
+        let merged = attached()
+            .with_market_data(vec![deposit("Q1", 0.05), deposit("Q3", 0.07)])
+            .expect("an identical repeat merges");
+        let ids: Vec<&str> = merged.market_data.iter().map(MarketDatum::id).collect();
+        assert_eq!(ids, ["Q1", "Q2", "Q3"]);
+
+        let error = attached()
+            .with_market_data(vec![deposit("Q1", 0.055)])
+            .expect_err("same id, different payload must conflict");
+        assert_eq!(
+            error,
+            EnvelopeError::ConflictingMarketDatum {
+                id: "Q1".to_string()
+            }
+        );
     }
 
     #[test]

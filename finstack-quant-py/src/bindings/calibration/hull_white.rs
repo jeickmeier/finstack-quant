@@ -30,7 +30,7 @@ type ScalarConfigReduce<'py> = (
 type PiecewiseConfigReduce<'py> = (Bound<'py, PyAny>, (f64, f64, f64, f64, String));
 
 /// Docstring for the `finstack_quant.calibration.hull_white` namespace.
-const MODULE_DOC: &str = "Direct Hull-White one-factor calibrators (swaptions, caps/floors, piecewise sigma).\n\nThese take a calibrated DiscountCurve and year-fraction quotes; the plan-level\nequivalents are the `hull_white` / `cap_floor_hull_white` calibration steps.\n\nExamples\n--------\n>>> from finstack_quant.calibration.hull_white import SwaptionQuote\n>>> SwaptionQuote(1.0, 5.0, 0.0065).expiry\n1.0\n";
+const MODULE_DOC: &str = "Direct Hull-White one-factor calibrators (swaptions, caps/floors, piecewise sigma).\n\nThese take a calibrated DiscountCurve and year-fraction quotes; the plan-level\nequivalents are the `hull_white` / `cap_floor_hull_white` calibration steps.\n\nExamples\n--------\n>>> from finstack_quant.calibration.hull_white import SwaptionQuote\n>>> SwaptionQuote(1.0, 5.0, 0.0065, True).expiry\n1.0\n";
 
 fn parse_frequency(value: &str) -> PyResult<SwapFrequency> {
     value.parse().map_err(core_to_py)
@@ -71,16 +71,16 @@ impl PySwaptionQuote {
     ///     Underlying swap tenor in years (> 0).
     /// volatility : float
     ///     Normal (absolute, e.g. ``0.0065``) or lognormal (decimal) volatility (> 0).
-    /// is_normal_vol : bool, default True
-    ///     ``True`` for a normal (Bachelier) quote, ``False`` for Black lognormal.
+    /// is_normal_vol : bool
+    ///     ``True`` for a normal (Bachelier) quote, ``False`` for Black
+    ///     lognormal. Required: it decides the unit of ``volatility``.
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If any input is not positive and finite.
     #[new]
-    #[pyo3(signature = (expiry, tenor, volatility, is_normal_vol = true))]
-    #[pyo3(text_signature = "(expiry, tenor, volatility, is_normal_vol=True)")]
+    #[pyo3(text_signature = "(expiry, tenor, volatility, is_normal_vol)")]
     fn new(expiry: f64, tenor: f64, volatility: f64, is_normal_vol: bool) -> PyResult<Self> {
         SwaptionQuote::try_new(expiry, tenor, volatility, is_normal_vol)
             .map(|inner| Self { inner })
@@ -161,7 +161,7 @@ impl PySwaptionQuote {
 /// Examples
 /// --------
 /// >>> from finstack_quant.calibration.hull_white import CapFloorQuote
-/// >>> q = CapFloorQuote(5.0, 0.04, 0.0070)
+/// >>> q = CapFloorQuote(5.0, 0.04, 0.0070, True, True)
 /// >>> (q.maturity, q.strike, q.is_cap)
 /// (5.0, 0.04, True)
 #[pyclass(
@@ -187,10 +187,11 @@ impl PyCapFloorQuote {
     ///     Strike rate as a decimal.
     /// volatility : float
     ///     Normal/Bachelier volatility in decimal rate units (> 0).
-    /// is_cap : bool, default True
+    /// is_cap : bool
     ///     ``True`` for a cap, ``False`` for a floor.
-    /// is_normal_vol : bool, default True
-    ///     Must be ``True``; lognormal cap/floor quotes are unsupported.
+    /// is_normal_vol : bool
+    ///     ``True`` for a normal (Bachelier) quote. Must be ``True``; lognormal
+    ///     cap/floor quotes are unsupported.
     ///
     /// Raises
     /// ------
@@ -198,8 +199,7 @@ impl PyCapFloorQuote {
     ///     If the maturity or volatility is not positive and finite, or the
     ///     strike is not finite, or ``is_normal_vol`` is ``False``.
     #[new]
-    #[pyo3(signature = (maturity, strike, volatility, is_cap = true, is_normal_vol = true))]
-    #[pyo3(text_signature = "(maturity, strike, volatility, is_cap=True, is_normal_vol=True)")]
+    #[pyo3(text_signature = "(maturity, strike, volatility, is_cap, is_normal_vol)")]
     fn new(
         maturity: f64,
         strike: f64,
