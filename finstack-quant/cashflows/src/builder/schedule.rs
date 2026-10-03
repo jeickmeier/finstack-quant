@@ -350,6 +350,73 @@ impl CashFlowSchedule {
         schedule
     }
 
+    /// Construct a canonical schedule from externally supplied flow rows,
+    /// validating every row first.
+    ///
+    /// Each row must pass [`CashFlow::validate`] (finite amounts, a finite
+    /// non-negative `accrual_factor`, a reset date not after the payment date,
+    /// consistent accrual metadata); the rows are then sorted exactly as
+    /// [`Self::from_parts`] does. Cross-flow economic invariants (principal
+    /// reconciliation, metadata dates) are not checked here; call
+    /// [`Self::validate`] for those.
+    ///
+    /// # Arguments
+    ///
+    /// * `flows` - Classified cash, PIK, and notional rows in any order, for
+    ///   example rows read from a table or deserialized from a host.
+    /// * `notional` - Representative notional stamped on the schedule.
+    /// * `day_count` - Day-count convention converting date pairs into year fractions.
+    /// * `meta` - Schedule-level calendars, facility limit, issue/maturity
+    ///   dates, and representation tag stamped on the result.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first row's validation error (`Error::Validation` or
+    /// `Error::Input`) when any row is invalid.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_cashflows::builder::{CashFlowMeta, CashFlowSchedule, Notional};
+    /// use finstack_quant_core::cashflow::{CFKind, CashFlow};
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::dates::{Date, DayCount};
+    /// use finstack_quant_core::money::Money;
+    /// use time::Month;
+    ///
+    /// let date = Date::from_calendar_date(2025, Month::June, 15)?;
+    /// let usd = |x| Money::new(x, Currency::USD);
+    /// let coupon = CashFlow::new(date, None, usd(25.0)?, CFKind::Fixed, 0.25, Some(0.1));
+    /// let schedule = CashFlowSchedule::from_flows(
+    ///     vec![coupon.clone()],
+    ///     Notional::par(1_000.0, Currency::USD)?,
+    ///     DayCount::Act360,
+    ///     CashFlowMeta::default(),
+    /// )?;
+    /// assert_eq!(schedule.get_flows().len(), 1);
+    ///
+    /// let bad = CashFlow { accrual_factor: -1.0, ..coupon };
+    /// assert!(CashFlowSchedule::from_flows(
+    ///     vec![bad],
+    ///     Notional::par(1_000.0, Currency::USD)?,
+    ///     DayCount::Act360,
+    ///     CashFlowMeta::default(),
+    /// )
+    /// .is_err());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_flows(
+        flows: Vec<CashFlow>,
+        notional: Notional,
+        day_count: DayCount,
+        meta: CashFlowMeta,
+    ) -> finstack_quant_core::Result<Self> {
+        for flow in &flows {
+            flow.validate()?;
+        }
+        Ok(Self::from_parts(flows, notional, day_count, meta))
+    }
+
     /// Return the canonical ordered cashflows.
     #[must_use]
     pub fn get_flows(&self) -> &[CashFlow] {
@@ -1471,6 +1538,44 @@ mod tests {
             0.0,
             None,
         )
+    }
+
+    #[test]
+    fn from_flows_validates_every_row_and_from_parts_does_not() {
+        let date = Date::from_calendar_date(2025, Month::June, 15).expect("date");
+        let negative_accrual = CashFlow {
+            accrual_factor: -1.0,
+            ..flow(date, 10.0, CFKind::Fixed)
+        };
+        let late_reset = CashFlow {
+            reset_date: Some(date + time::Duration::days(1)),
+            ..flow(date, 10.0, CFKind::Fixed)
+        };
+        let notional = Notional::par(1_000.0, Currency::USD).expect("notional");
+        for bad in [negative_accrual, late_reset] {
+            assert!(CashFlowSchedule::from_flows(
+                vec![flow(date, 1.0, CFKind::Fixed), bad.clone()],
+                notional.clone(),
+                DayCount::Act360,
+                CashFlowMeta::default(),
+            )
+            .is_err());
+            let raw = CashFlowSchedule::from_parts(
+                vec![bad],
+                notional.clone(),
+                DayCount::Act360,
+                CashFlowMeta::default(),
+            );
+            assert_eq!(raw.get_flows().len(), 1);
+        }
+        let ok = CashFlowSchedule::from_flows(
+            vec![flow(date, 1.0, CFKind::Fixed)],
+            notional,
+            DayCount::Act360,
+            CashFlowMeta::default(),
+        )
+        .expect("valid rows");
+        assert_eq!(ok.get_flows().len(), 1);
     }
 
     #[test]

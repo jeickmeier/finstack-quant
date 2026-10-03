@@ -99,3 +99,27 @@ def test_cap_floor_quote_rejects_lognormal_construction_and_json() -> None:
         CapFloorQuote.from_json(
             json.dumps({"maturity": 5.0, "strike": 0.04, "volatility": 0.2, "is_cap": True, "is_normal_vol": False})
         )
+
+
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [("pct_1.1", 110.0), ("pct_0.07", 7.0), ("pct_0.29", 29.0), ("rate_0.0029", 29.0), ("rate_62.5bp", 62.5)],
+)
+def test_cds_quote_basis_points_come_from_rust_accessor(label: str, expected: float) -> None:
+    """CORE-006: Rate/Percentage spreads use Rust ``as_bp_f64`` (no ``* 10_000`` noise)."""
+    from finstack_quant.calibration import CdsQuote
+    from finstack_quant.core.types import Percentage, Rate
+
+    kind, raw = label.split("_", 1)
+    value = Percentage(float(raw)) if kind == "pct" else Rate(raw if raw.endswith("bp") else float(raw))
+    assert value.as_bp_f64 == expected
+    quote = CdsQuote.par_spread(
+        id="Q",
+        entity="ACME",
+        currency="USD",
+        doc_clause="isda_na",
+        pillar="5Y",
+        spread_bp=value,
+        recovery_rate=0.4,
+    )
+    assert json.loads(quote.to_json())["spread_bp"] == expected

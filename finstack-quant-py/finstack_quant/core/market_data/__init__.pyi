@@ -4773,8 +4773,8 @@ class ScalarTimeSeries:
         id : str
             Series identifier.
         observations : Sequence[tuple[datetime.date or str, float, int or Decimal]]
-            Dated values; ``Decimal`` values must be exactly representable as
-            binary ``float``. Dates must be unique; any order is accepted.
+            Dated values; a ``Decimal`` converts to ``float`` (Rust
+            ``decimal_to_f64``). Dates must be unique; any order is accepted.
         currency : Currency or str, optional
             Currency tag for monetary series; ``None`` for unitless values.
         interpolation : str, optional
@@ -4784,8 +4784,7 @@ class ScalarTimeSeries:
         ------
         ValueError
             If ``observations`` is empty or has duplicate dates, a value is
-            non-finite or a ``Decimal`` cannot be represented exactly as
-            ``float``, or ``interpolation`` is not a recognised label.
+            non-finite, or ``interpolation`` is not a recognised label.
         TypeError
             If a value is not a float, int or ``Decimal``.
 
@@ -5038,8 +5037,8 @@ class InflationIndex:
         id : str
             Index identifier (e.g. ``"US-CPI-U"``).
         observations : Sequence[tuple[datetime.date or str, float, int or Decimal]]
-            Dated index levels; ``Decimal`` values must be exactly representable
-            as binary ``float``.
+            Dated index levels; a ``Decimal`` converts to ``float`` (Rust
+            ``decimal_to_f64``).
         currency : Currency or str
             Currency of the index.
         interpolation : str, optional
@@ -5055,8 +5054,8 @@ class InflationIndex:
         ------
         ValueError
             If ``observations`` is empty or has duplicate dates, a label is
-            unknown, a value is non-finite or a ``Decimal`` cannot be represented
-            exactly as ``float``, or ``seasonality`` does not have exactly 12 entries.
+            unknown, a value is non-finite, or ``seasonality`` does not have
+            exactly 12 entries.
 
         Examples
         --------
@@ -5541,8 +5540,8 @@ class MarketContext:
             Identifier for the scalar.
         value : float, int or Decimal
             Price or unitless value. Monetary ``Decimal`` values keep full
-            precision; unitless ``Decimal`` values must be exactly representable
-            as binary ``float``.
+            precision; a unitless ``Decimal`` converts to ``float`` (Rust
+            ``decimal_to_f64``).
         currency : Currency or str, optional
             When given, the scalar is a monetary price in this currency;
             otherwise it is unitless.
@@ -5555,8 +5554,7 @@ class MarketContext:
         Raises
         ------
         ValueError
-            If ``value`` is non-finite or a unitless ``Decimal`` is not
-            exactly representable.
+            If ``value`` is non-finite.
         TypeError
             If ``value`` is not numeric.
         """

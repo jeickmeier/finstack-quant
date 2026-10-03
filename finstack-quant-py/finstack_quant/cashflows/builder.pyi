@@ -1660,15 +1660,21 @@ class CashFlowSchedule:
         meta: CashFlowMeta | None = None,
     ) -> CashFlowSchedule:
         """
-        Build a schedule from ``CashFlow`` rows or a pandas DataFrame.
+        Build a schedule from ``CashFlow`` rows or a pandas DataFrame,
+        validating every row.
+
+        Both input shapes go through Rust ``CashFlowSchedule::from_flows``,
+        which checks each row (``CashFlow.validate``) before sorting; use
+        ``from_parts`` to assemble rows without validation.
 
         Parameters
         ----------
         flows : list[CashFlow] or pandas.DataFrame
             Typed rows, or a frame with columns ``date``, ``amount`` (float,
             native currency units), ``currency`` (ISO code), ``kind``
-            (``CFKind`` label) and optional ``reset_date``,
-            ``accrual_factor``, ``rate`` (``NaN`` / ``None`` = absent),
+            (``CFKind`` label), ``accrual_factor`` (float year fraction,
+            required; ``0.0`` for non-coupon rows) and optional
+            ``reset_date``, ``rate`` (``NaN`` / ``None`` = absent),
             ``accrual`` and ``principal_date`` (optional economic date), ``principal_delta`` (canonical JSON-compatible dicts
             or None). Exported metadata is preserved when rebuilding.
         notional : Notional
@@ -1686,8 +1692,10 @@ class CashFlowSchedule:
         Raises
         ------
         ValueError
-            If a required frame column is missing, or a currency code, kind
-            label or date cannot be parsed.
+            If a required frame column is missing, a currency code, kind
+            label or date cannot be parsed, or a row fails
+            ``CashFlow.validate`` (e.g. a negative or non-finite
+            ``accrual_factor``, or a reset date after the payment date).
         TypeError
             If ``flows`` is neither a list of ``CashFlow`` nor a DataFrame.
 
@@ -1698,7 +1706,7 @@ class CashFlowSchedule:
         >>> from finstack_quant.cashflows.primitives import CashFlow, CFKind
         >>> from finstack_quant.core.dates import DayCount
         >>> from finstack_quant.core.money import Money
-        >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED)
+        >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED, 0.0)
         >>> CashFlowSchedule.from_flows([flow], Notional.par(1_000.0, "USD"), DayCount.ACT_360).get_flows()[0].kind.name
         'fixed'
         """
@@ -2026,6 +2034,82 @@ class DefaultModelSpec:
         ValueError
             If the underlying curve parameters are invalid, such as a
             negative SDA speed multiplier.
+        """
+        ...
+
+    def mdr_with_survival(self, seasoning_months: int, surviving_balance_fraction: float) -> float:
+        """
+        Monthly default rate on the balance actually surviving to the month.
+
+        Mirrors Rust ``DefaultModelSpec::mdr_with_survival``. Identical to
+        :meth:`mdr` for the constant, SDA and vector curves. Cumulative-loss
+        and timing curves state defaults as a share of the original balance,
+        so their month's default share is divided by
+        ``surviving_balance_fraction``; applying the result to the current
+        balance reproduces the curve's defaults regardless of amortization
+        and prepayments.
+
+        Parameters
+        ----------
+        seasoning_months : int
+            Number of months since origination or pool start.
+        surviving_balance_fraction : float
+            Current pool balance divided by the balance the curve is expressed
+            against, as a finite non-negative decimal (may exceed 1.0 after
+            par build).
+
+        Returns
+        -------
+        float
+            Monthly default rate as a decimal in ``[0, 1]``; zero once the
+            surviving balance is exhausted.
+
+        Raises
+        ------
+        ValueError
+            If ``surviving_balance_fraction`` is negative or non-finite, or the
+            curve parameters are invalid.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import DefaultModelSpec
+        >>> spec = DefaultModelSpec.timing(0.10, [50.0, 50.0])
+        >>> round(spec.mdr_with_survival(6, 1.0), 6), round(spec.mdr_with_survival(6, 0.5), 6)
+        (0.004167, 0.008333)
+        """
+        ...
+
+    def cumulative_default_fraction(self, seasoning_months: int) -> float | None:
+        """
+        Cumulative defaults through a seasoning month as a fraction of the
+        original balance.
+
+        Mirrors Rust ``DefaultModelSpec::cumulative_default_fraction``.
+
+        Parameters
+        ----------
+        seasoning_months : int
+            Number of months since origination; month 0 is before any default.
+
+        Returns
+        -------
+        float or None
+            The fraction for cumulative-loss and timing curves (may exceed 1.0
+            for a cumulative-loss curve with replenishment or par build);
+            ``None`` for rate-based curves.
+
+        Raises
+        ------
+        ValueError
+            If the curve parameters are invalid.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import DefaultModelSpec
+        >>> round(DefaultModelSpec.timing(0.10, [50.0, 50.0]).cumulative_default_fraction(12), 12)
+        0.05
+        >>> DefaultModelSpec.cdr_2pct().cumulative_default_fraction(12) is None
+        True
         """
         ...
 
@@ -3797,8 +3881,10 @@ class FloatingLegCompounding:
     Examples
     --------
     >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
-    >>> FloatingLegCompounding.compounded_in_arrears() is not None
+    >>> FloatingLegCompounding.sofr() == FloatingLegCompounding.compounded_in_arrears(0)
     True
+    >>> FloatingLegCompounding.SIMPLE.is_overnight()
+    False
     """
 
     SIMPLE: FloatingLegCompounding
@@ -3807,14 +3893,14 @@ class FloatingLegCompounding:
     """Arithmetic average of daily fixings weighted by accrual days."""
 
     @staticmethod
-    def compounded_in_arrears(lookback_days: int = 0) -> FloatingLegCompounding:
+    def compounded_in_arrears(lookback_days: int) -> FloatingLegCompounding:
         """
-        Compounded in arrears with an optional observation lookback.
+        Compounded in arrears with an observation lookback.
 
         Parameters
         ----------
-        lookback_days : int, default 0
-            Business days by which observation dates move back while the day-count weights stay on the accrual dates; ``0`` is plain in-arrears (cleared OIS).
+        lookback_days : int
+            Business days by which observation dates move back while the day-count weights stay on the accrual dates; ``0`` is plain in-arrears (cleared OIS, also named by the ``sofr()`` / ``sonia()`` / ... presets).
 
         Returns
         -------
@@ -3887,6 +3973,264 @@ class FloatingLegCompounding:
         >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
         >>> FloatingLegCompounding.compounded_with_rate_cutoff(2) is not None
         True
+        """
+        ...
+
+    @staticmethod
+    def sofr() -> FloatingLegCompounding:
+        """
+        USD SOFR OIS convention: plain compounded in arrears.
+
+        Mirrors Rust ``FloatingLegCompounding::sofr``. The preset sets only the compounding method;
+        the leg's day count is configured separately.
+
+        Returns
+        -------
+        FloatingLegCompounding
+            The market-standard convention, equal to ``compounded_in_arrears(0)``.
+
+        Notes
+        -----
+        This constructor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.sofr() == FloatingLegCompounding.compounded_in_arrears(0)
+        True
+        """
+        ...
+
+    @staticmethod
+    def fedfunds() -> FloatingLegCompounding:
+        """
+        USD Fed Funds / EFFR OIS convention: plain compounded in arrears.
+
+        Mirrors Rust ``FloatingLegCompounding::fedfunds``. The preset sets only the compounding method;
+        the leg's day count is configured separately.
+
+        Returns
+        -------
+        FloatingLegCompounding
+            The market-standard convention, equal to ``compounded_in_arrears(0)``.
+
+        Notes
+        -----
+        This constructor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.fedfunds() == FloatingLegCompounding.compounded_in_arrears(0)
+        True
+        """
+        ...
+
+    @staticmethod
+    def sonia() -> FloatingLegCompounding:
+        """
+        GBP SONIA OIS convention: plain compounded in arrears.
+
+        Mirrors Rust ``FloatingLegCompounding::sonia``. The preset sets only the compounding method;
+        the leg's day count is configured separately.
+
+        Returns
+        -------
+        FloatingLegCompounding
+            The market-standard convention, equal to ``compounded_in_arrears(0)``.
+
+        Notes
+        -----
+        This constructor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.sonia() == FloatingLegCompounding.compounded_in_arrears(0)
+        True
+        """
+        ...
+
+    @staticmethod
+    def estr() -> FloatingLegCompounding:
+        """
+        EUR €STR OIS convention: plain compounded in arrears.
+
+        Mirrors Rust ``FloatingLegCompounding::estr``. The preset sets only the compounding method;
+        the leg's day count is configured separately.
+
+        Returns
+        -------
+        FloatingLegCompounding
+            The market-standard convention, equal to ``compounded_in_arrears(0)``.
+
+        Notes
+        -----
+        This constructor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.estr() == FloatingLegCompounding.compounded_in_arrears(0)
+        True
+        """
+        ...
+
+    @staticmethod
+    def tona() -> FloatingLegCompounding:
+        """
+        JPY TONA OIS convention: plain compounded in arrears.
+
+        Mirrors Rust ``FloatingLegCompounding::tona``. The preset sets only the compounding method;
+        the leg's day count is configured separately.
+
+        Returns
+        -------
+        FloatingLegCompounding
+            The market-standard convention, equal to ``compounded_in_arrears(0)``.
+
+        Notes
+        -----
+        This constructor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.tona() == FloatingLegCompounding.compounded_in_arrears(0)
+        True
+        """
+        ...
+
+    @staticmethod
+    def saron() -> FloatingLegCompounding:
+        """
+        CHF SARON OIS convention: plain compounded in arrears.
+
+        Mirrors Rust ``FloatingLegCompounding::saron``. The preset sets only the compounding method;
+        the leg's day count is configured separately.
+
+        Returns
+        -------
+        FloatingLegCompounding
+            The market-standard convention, equal to ``compounded_in_arrears(0)``.
+
+        Notes
+        -----
+        This constructor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.saron() == FloatingLegCompounding.compounded_in_arrears(0)
+        True
+        """
+        ...
+
+    @staticmethod
+    def sofr_observation_shift() -> FloatingLegCompounding:
+        """
+        USD SOFR FRN convention: ISDA 2021 observation shift of 2 business days.
+
+        Mirrors Rust ``FloatingLegCompounding::sofr_observation_shift``. The preset sets only the compounding method;
+        the leg's day count is configured separately.
+
+        Returns
+        -------
+        FloatingLegCompounding
+            The market-standard convention, equal to ``compounded_with_observation_shift(2)``.
+
+        Notes
+        -----
+        This constructor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.sofr_observation_shift() == FloatingLegCompounding.compounded_with_observation_shift(
+        ...     2
+        ... )
+        True
+        """
+        ...
+
+    @staticmethod
+    def sonia_observation_shift() -> FloatingLegCompounding:
+        """
+        GBP SONIA FRN convention: ISDA 2021 observation shift of 5 business days.
+
+        Mirrors Rust ``FloatingLegCompounding::sonia_observation_shift``. The preset sets only the compounding method;
+        the leg's day count is configured separately.
+
+        Returns
+        -------
+        FloatingLegCompounding
+            The market-standard convention, equal to ``compounded_with_observation_shift(5)``.
+
+        Notes
+        -----
+        This constructor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.sonia_observation_shift() == FloatingLegCompounding.compounded_with_observation_shift(
+        ...     5
+        ... )
+        True
+        """
+        ...
+
+    @staticmethod
+    def rate_cutoff(cutoff_days: int) -> FloatingLegCompounding:
+        """
+        Compounded RFR with an end-of-period rate cut-off.
+
+        Mirrors Rust ``FloatingLegCompounding::rate_cutoff``.
+
+        Parameters
+        ----------
+        cutoff_days : int
+            Business days before period end over which the overnight rate is frozen.
+
+        Returns
+        -------
+        FloatingLegCompounding
+            The convention, equal to ``compounded_with_rate_cutoff(cutoff_days)``.
+
+        Raises
+        ------
+        OverflowError
+            If *cutoff_days* is outside the unsigned 32-bit integer range.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.rate_cutoff(2) == FloatingLegCompounding.compounded_with_rate_cutoff(2)
+        True
+        """
+        ...
+
+    def is_overnight(self) -> bool:
+        """
+        Whether the period rate is built from daily overnight fixings.
+
+        Mirrors Rust ``FloatingLegCompounding::is_overnight``: true for every
+        convention except ``SIMPLE``.
+
+        Returns
+        -------
+        bool
+            ``False`` for ``SIMPLE``, ``True`` otherwise.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
+        >>> FloatingLegCompounding.sofr().is_overnight(), FloatingLegCompounding.SIMPLE.is_overnight()
+        (True, False)
         """
         ...
 

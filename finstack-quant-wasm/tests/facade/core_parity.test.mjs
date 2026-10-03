@@ -468,6 +468,25 @@ const kind = (expected, pattern) => (error) => {
   return true;
 };
 
+test('unitless insertPrice rejects non-finite values in Rust (MarketScalar::unitless)', () => {
+  for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+    const context = new core.MarketContext();
+    assert.throws(
+      () => context.insertPrice('P', bad),
+      kind('validation', /MarketScalar unitless value must be finite/)
+    );
+    assert.throws(() => context.getPrice('P'), kind('not_found'));
+  }
+});
+
+test('Rate and Percentage report fractional basis points without binary noise', () => {
+  assert.equal(new core.Rate(0.0029).asBpF64, 29);
+  assert.equal(new core.Rate(0.00625).asBpF64, 62.5);
+  assert.equal(new core.Rate(0.00625).asBp, 63);
+  assert.equal(new core.Percentage(1.1).asBpF64, 110);
+  assert.equal(new core.Percentage(0.07).asBpF64, 7);
+});
+
 test('F350: FX pair keys are parsed by Rust in both hosts', () => {
   assert.throws(
     () => core.FxMatrix.fromDict({ 'é€x': 1.0 }),

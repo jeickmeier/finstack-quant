@@ -308,7 +308,7 @@ class CashFlow:
     >>> import datetime
     >>> from finstack_quant.cashflows.primitives import CashFlow, CFKind
     >>> from finstack_quant.core.money import Money
-    >>> cf = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED)
+    >>> cf = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED, 0.0)
     >>> cf.kind == CFKind.FIXED
     True
     """
@@ -318,8 +318,8 @@ class CashFlow:
         date: datetime.date,
         amount: Money,
         kind: CFKind | str,
+        accrual_factor: float,
         reset_date: datetime.date | None = None,
-        accrual_factor: float = 0.0,
         rate: float | None = None,
     ) -> None:
         """
@@ -335,11 +335,13 @@ class CashFlow:
         kind : CFKind | str
             Cashflow classification, either a ``CFKind`` instance or its
             snake_case label string (e.g. ``"fixed"``).
+        accrual_factor : float
+            Accrual year fraction used for the coupon amount; required, as in
+            Rust ``CashFlow::new`` and the JSON wire form (``0.0`` for
+            non-coupon rows). Checked by ``validate`` and
+            ``CashFlowSchedule.from_flows``.
         reset_date : datetime.date, optional
             Index reset date for floating coupons; must not be after *date*.
-        accrual_factor : float
-            Accrual year fraction used for the coupon amount, default
-            ``0.0``.
         rate : float, optional
             Effective annual rate used to compute this cashflow, when known.
 
@@ -583,7 +585,7 @@ class CashFlow:
         >>> import datetime
         >>> from finstack_quant.cashflows.primitives import CashFlow
         >>> from finstack_quant.core.money import Money
-        >>> isinstance(CashFlow(datetime.date(2025, 6, 15), Money(1.0, "USD"), "fixed").to_json(), str)
+        >>> isinstance(CashFlow(datetime.date(2025, 6, 15), Money(1.0, "USD"), "fixed", 0.0).to_json(), str)
         True
         """
         ...
@@ -613,7 +615,7 @@ class CashFlow:
         >>> import datetime
         >>> from finstack_quant.cashflows.primitives import CashFlow
         >>> from finstack_quant.core.money import Money
-        >>> value = CashFlow(datetime.date(2025, 6, 15), Money(1.0, "USD"), "fixed")
+        >>> value = CashFlow(datetime.date(2025, 6, 15), Money(1.0, "USD"), "fixed", 0.0)
         >>> CashFlow.from_json(value.to_json()).to_json() == value.to_json()
         True
         """

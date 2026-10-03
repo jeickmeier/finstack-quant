@@ -22,7 +22,7 @@ use super::curves::{
     PyFxDeltaVolSurface, PyHazardCurve, PyInflationCurve, PyPriceCurve, PyVolCube, PyVolSurface,
 };
 use super::fx::PyFxMatrix;
-use super::scalars::{extract_exact_f64, PyInflationIndex, PyScalarTimeSeries};
+use super::scalars::{extract_f64, PyInflationIndex, PyScalarTimeSeries};
 
 /// Unified market data container for curves, surfaces, scalars and FX.
 ///
@@ -178,8 +178,8 @@ impl PyMarketContext {
     ///     Identifier for the scalar.
     /// value : float | int | decimal.Decimal
     ///     Price or unitless value. Monetary ``Decimal`` values keep full
-    ///     precision; unitless ``Decimal`` values must be exactly representable
-    ///     as binary ``float``.
+    ///     precision; a unitless ``Decimal`` converts to ``float`` (Rust
+    ///     ``decimal_to_f64``).
     /// currency : Currency | str, optional
     ///     When given, the scalar is a monetary price in this currency;
     ///     otherwise it is unitless.
@@ -192,7 +192,7 @@ impl PyMarketContext {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``value`` is non-finite or a unitless ``Decimal`` is not exactly representable.
+    ///     If ``value`` is non-finite (Rust ``MarketScalar::unitless`` / ``Money::new``).
     #[pyo3(signature = (id, value, currency=None), text_signature = "(self, id, value, currency=None)")]
     fn insert_price<'py>(
         mut slf: PyRefMut<'py, Self>,
@@ -204,7 +204,7 @@ impl PyMarketContext {
             let currency = extract_currency(raw_currency)?;
             MarketScalar::Price(money_from_amount(value, currency)?)
         } else {
-            MarketScalar::Unitless(extract_exact_f64(value, "price value")?)
+            MarketScalar::unitless(extract_f64(value, "price value")?).map_err(core_to_py)?
         };
         slf.inner.insert_price_mut(id, scalar);
         Ok(slf)

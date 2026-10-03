@@ -41,7 +41,7 @@ def test_aggregation_round_trip_preserves_currency_labels() -> None:
 @pytest.mark.parametrize("as_json", [False, True])
 def test_dated_flows_rejects_same_invalid_economics_as_json(as_json: bool) -> None:
     schedule = CashFlowSchedule.from_flows(
-        [CashFlow(dt.date(2025, 6, 15), Money(150, "USD"), "amortization")],
+        [CashFlow(dt.date(2025, 6, 15), Money(150, "USD"), "amortization", 0.0)],
         Notional.par(100, "USD"),
         DayCount.ACT_360,
     )
@@ -56,9 +56,9 @@ def test_dated_flows_preserves_cash_and_omits_state_rows() -> None:
     date = dt.date(2025, 6, 15)
     schedule = CashFlowSchedule.from_flows(
         [
-            CashFlow(date, Money(10, "USD"), "fixed"),
-            CashFlow(date, Money(5, "USD"), "pik"),
-            CashFlow(date, Money(20, "USD"), "defaulted_notional"),
+            CashFlow(date, Money(10, "USD"), "fixed", 0.0),
+            CashFlow(date, Money(5, "USD"), "pik", 0.0),
+            CashFlow(date, Money(20, "USD"), "defaulted_notional", 0.0),
         ],
         Notional.par(100, "USD"),
         DayCount.ACT_360,

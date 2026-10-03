@@ -730,3 +730,69 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     );
   });
 });
+
+test('CFCC-008: fromFlows validates every row in Rust; fromParts does not', () => {
+  const row = (overrides) => ({
+    date: '2025-07-15',
+    reset_date: null,
+    amount: usd('10'),
+    kind: 'fixed',
+    accrual_factor: 0.25,
+    rate: null,
+    ...overrides,
+  });
+  const notional = cashflows.notionalPar(1000, 'USD');
+  const meta = cashflows.CashFlowSchedule.fromFlows([], notional, 'act_360').getMeta();
+  for (const [bad, pattern] of [
+    [row({ accrual_factor: -1 }), /accrual_factor must be non-negative/],
+    [row({ reset_date: '2025-08-01' }), /reset_date must not be after payment date/],
+  ]) {
+    assert.throws(
+      () => cashflows.CashFlowSchedule.fromFlows([bad], notional, 'act_360'),
+      kind('validation', pattern)
+    );
+    const raw = cashflows.CashFlowSchedule.fromParts([bad], notional, 'act_360', meta);
+    assert.equal(raw.getFlows().length, 1);
+  }
+  assert.equal(
+    cashflows.CashFlowSchedule.fromFlows([row({})], notional, 'act_360').getFlows().length,
+    1
+  );
+});
+
+test('CFCC-010: compounding presets and default-model survival helpers come from Rust', () => {
+  const inArrears = { compounded_in_arrears: { lookback_days: 0 } };
+  for (const preset of ['Sofr', 'Fedfunds', 'Sonia', 'Estr', 'Tona', 'Saron']) {
+    assert.deepEqual(cashflows[`floatingLegCompounding${preset}`](), inArrears);
+  }
+  assert.deepEqual(cashflows.floatingLegCompoundingSofrObservationShift(), {
+    compounded_with_observation_shift: { shift_days: 2 },
+  });
+  assert.deepEqual(cashflows.floatingLegCompoundingSoniaObservationShift(), {
+    compounded_with_observation_shift: { shift_days: 5 },
+  });
+  assert.deepEqual(
+    cashflows.floatingLegCompoundingRateCutoff(2),
+    cashflows.floatingLegCompoundingCompoundedWithRateCutoff(2)
+  );
+  assert.equal(cashflows.floatingLegCompoundingIsOvernight('simple'), false);
+  assert.equal(cashflows.floatingLegCompoundingIsOvernight('simple_average'), true);
+  assert.equal(cashflows.floatingLegCompoundingIsOvernight(inArrears), true);
+
+  const timing = cashflows.defaultModelSpecTiming(0.1, [50, 50]);
+  assert.ok(
+    Math.abs(cashflows.defaultModelSpecCumulativeDefaultFraction(timing, 12) - 0.05) < 1e-12
+  );
+  assert.equal(
+    cashflows.defaultModelSpecCumulativeDefaultFraction(cashflows.defaultModelSpecCdr2pct(), 12),
+    undefined
+  );
+  assert.ok(
+    cashflows.defaultModelSpecMdrWithSurvival(timing, 6, 0.5) >
+      cashflows.defaultModelSpecMdr(timing, 6)
+  );
+  assert.throws(
+    () => cashflows.defaultModelSpecMdrWithSurvival(timing, 6, -1),
+    kind('validation', /surviving_balance_fraction/)
+  );
+});

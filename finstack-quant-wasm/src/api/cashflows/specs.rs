@@ -226,6 +226,94 @@ pub fn floating_leg_compounding_compounded_with_rate_cutoff(
     })
 }
 
+/// USD SOFR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::sofr`).
+///
+/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
+#[wasm_bindgen(js_name = floatingLegCompoundingSofr)]
+pub fn floating_leg_compounding_sofr() -> Result<JsValue, JsValue> {
+    to_js_value(&FloatingLegCompounding::sofr())
+}
+
+/// USD Fed Funds / EFFR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::fedfunds`).
+///
+/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
+#[wasm_bindgen(js_name = floatingLegCompoundingFedfunds)]
+pub fn floating_leg_compounding_fedfunds() -> Result<JsValue, JsValue> {
+    to_js_value(&FloatingLegCompounding::fedfunds())
+}
+
+/// GBP SONIA OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::sonia`).
+///
+/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
+#[wasm_bindgen(js_name = floatingLegCompoundingSonia)]
+pub fn floating_leg_compounding_sonia() -> Result<JsValue, JsValue> {
+    to_js_value(&FloatingLegCompounding::sonia())
+}
+
+/// EUR €STR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::estr`).
+///
+/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
+#[wasm_bindgen(js_name = floatingLegCompoundingEstr)]
+pub fn floating_leg_compounding_estr() -> Result<JsValue, JsValue> {
+    to_js_value(&FloatingLegCompounding::estr())
+}
+
+/// JPY TONA OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::tona`).
+///
+/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
+#[wasm_bindgen(js_name = floatingLegCompoundingTona)]
+pub fn floating_leg_compounding_tona() -> Result<JsValue, JsValue> {
+    to_js_value(&FloatingLegCompounding::tona())
+}
+
+/// CHF SARON OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::saron`).
+///
+/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
+#[wasm_bindgen(js_name = floatingLegCompoundingSaron)]
+pub fn floating_leg_compounding_saron() -> Result<JsValue, JsValue> {
+    to_js_value(&FloatingLegCompounding::saron())
+}
+
+/// USD SOFR FRN compounding convention: ISDA 2021 observation shift of 2 business days (Rust `FloatingLegCompounding::sofr_observation_shift`).
+///
+/// @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days: 2 } }`.
+#[wasm_bindgen(js_name = floatingLegCompoundingSofrObservationShift)]
+pub fn floating_leg_compounding_sofr_observation_shift() -> Result<JsValue, JsValue> {
+    to_js_value(&FloatingLegCompounding::sofr_observation_shift())
+}
+
+/// GBP SONIA FRN compounding convention: ISDA 2021 observation shift of 5 business days (Rust `FloatingLegCompounding::sonia_observation_shift`).
+///
+/// @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days: 5 } }`.
+#[wasm_bindgen(js_name = floatingLegCompoundingSoniaObservationShift)]
+pub fn floating_leg_compounding_sonia_observation_shift() -> Result<JsValue, JsValue> {
+    to_js_value(&FloatingLegCompounding::sonia_observation_shift())
+}
+
+/// Compounded RFR with an end-of-period rate cut-off (Rust `FloatingLegCompounding::rate_cutoff`).
+///
+/// @param cutoff_days - Business days before period end over which the overnight rate is frozen (non-negative integer).
+/// @returns `FloatingLegCompounding` wire value `{ compounded_with_rate_cutoff: { cutoff_days } }`.
+/// @throws If `cutoffDays` is not a non-negative integer (kind `invalid_type`).
+#[wasm_bindgen(js_name = floatingLegCompoundingRateCutoff)]
+pub fn floating_leg_compounding_rate_cutoff(cutoff_days: JsValue) -> Result<JsValue, JsValue> {
+    to_js_value(&FloatingLegCompounding::rate_cutoff(js_uint(
+        &cutoff_days,
+        "cutoffDays",
+    )?))
+}
+
+/// Whether a compounding convention builds the period rate from daily overnight
+/// fixings (Rust `FloatingLegCompounding::is_overnight`).
+///
+/// @param value - `FloatingLegCompounding` wire value (for example `"simple"` or `{ compounded_in_arrears: { lookback_days: 0 } }`).
+/// @returns `false` for `"simple"`, `true` for every other convention.
+/// @throws If `value` is not a `FloatingLegCompounding` wire value (kind `validation`).
+#[wasm_bindgen(js_name = floatingLegCompoundingIsOvernight)]
+pub fn floating_leg_compounding_is_overnight(value: JsValue) -> Result<bool, JsValue> {
+    Ok(js_wire::<FloatingLegCompounding>(&value, "value")?.is_overnight())
+}
+
 /// Check a floating-rate specification's reset lag, caps and floors.
 ///
 /// @param spec - `FloatingRateSpec` wire object.
@@ -416,6 +504,49 @@ pub fn default_model_spec_validate(spec: JsValue) -> Result<(), JsValue> {
 pub fn default_model_spec_mdr(spec: JsValue, seasoning_months: JsValue) -> Result<f64, JsValue> {
     js_wire::<DefaultModelSpec>(&spec, "spec")?
         .mdr(js_uint(&seasoning_months, "seasoningMonths")?)
+        .map_err(to_js_err)
+}
+
+/// Survival-adjusted monthly default rate (Rust `DefaultModelSpec::mdr_with_survival`).
+///
+/// Identical to `defaultModelSpecMdr` for constant, SDA and vector curves. For
+/// cumulative-loss and timing curves the month's default share of the original
+/// balance is divided by `survivingBalanceFraction`, so applying the rate to the
+/// current balance reproduces the curve's defaults.
+///
+/// @param spec - `DefaultModelSpec` wire object.
+/// @param seasoning_months - Months since origination or pool start (non-negative integer).
+/// @param surviving_balance_fraction - Current pool balance divided by the balance the curve is expressed against, as a finite non-negative decimal (may exceed 1.0 after par build).
+/// @returns Monthly default rate as a decimal in `[0, 1]`; zero once the surviving balance is exhausted.
+/// @throws If `spec` is not a `DefaultModelSpec`, its curve parameters are invalid, or `survivingBalanceFraction` is negative or non-finite (kind `validation`); if `seasoningMonths` is not a non-negative integer or `survivingBalanceFraction` is not a number (kind `invalid_type`).
+#[wasm_bindgen(js_name = defaultModelSpecMdrWithSurvival)]
+pub fn default_model_spec_mdr_with_survival(
+    spec: JsValue,
+    seasoning_months: JsValue,
+    surviving_balance_fraction: JsValue,
+) -> Result<f64, JsValue> {
+    js_wire::<DefaultModelSpec>(&spec, "spec")?
+        .mdr_with_survival(
+            js_uint(&seasoning_months, "seasoningMonths")?,
+            js_f64(&surviving_balance_fraction, "survivingBalanceFraction")?,
+        )
+        .map_err(to_js_err)
+}
+
+/// Cumulative defaults through a seasoning month as a fraction of the original
+/// balance (Rust `DefaultModelSpec::cumulative_default_fraction`).
+///
+/// @param spec - `DefaultModelSpec` wire object.
+/// @param seasoning_months - Months since origination (non-negative integer); month 0 is before any default.
+/// @returns The fraction for cumulative-loss and timing curves (may exceed 1.0 with replenishment or par build); `undefined` for rate-based curves.
+/// @throws If `spec` is not a `DefaultModelSpec` or its curve parameters are invalid (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+#[wasm_bindgen(js_name = defaultModelSpecCumulativeDefaultFraction)]
+pub fn default_model_spec_cumulative_default_fraction(
+    spec: JsValue,
+    seasoning_months: JsValue,
+) -> Result<Option<f64>, JsValue> {
+    js_wire::<DefaultModelSpec>(&spec, "spec")?
+        .cumulative_default_fraction(js_uint(&seasoning_months, "seasoningMonths")?)
         .map_err(to_js_err)
 }
 

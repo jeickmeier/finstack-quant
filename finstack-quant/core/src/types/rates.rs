@@ -30,6 +30,20 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::{Error, InputError, NonFiniteKind};
 use crate::Result;
+
+/// Multiply `value` by a power of ten in decimal arithmetic.
+///
+/// `value` is read through its shortest round-trip decimal form
+/// (`Decimal::from_f64`), scaled exactly, and converted back to the nearest
+/// `f64`, so the result carries no binary-multiplication noise. Values outside
+/// the `Decimal` range fall back to the plain `f64` product.
+fn shift_decimal_point(value: f64, factor: u32) -> f64 {
+    use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
+    rust_decimal::Decimal::from_f64(value)
+        .and_then(|decimal| decimal.checked_mul(rust_decimal::Decimal::from(factor)))
+        .and_then(|scaled| scaled.to_f64())
+        .unwrap_or(value * f64::from(factor))
+}
 /// A financial rate stored as an `f64` decimal.
 ///
 /// For example, `0.05` represents 5% or 500 bp.
@@ -120,6 +134,28 @@ impl Rate {
     #[must_use]
     pub fn as_bp(self) -> i32 {
         (self.0 * 10_000.0).round() as i32
+    }
+
+    /// Get the rate as fractional basis points, without rounding.
+    ///
+    /// The decimal point of the rate's shortest round-trip decimal form is
+    /// moved four places, so a rate typed as `0.0029` reports `29.0` bp rather
+    /// than the binary-noise product `0.0029 * 10_000.0 = 28.999999999999996`,
+    /// and a sub-bp rate such as `0.00625` keeps its `62.5` bp. Use
+    /// [`Self::as_bp`] for the rounded integer quote.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::types::Rate;
+    ///
+    /// assert_eq!(Rate::from_decimal(0.0029)?.as_bp_f64(), 29.0);
+    /// assert_eq!(Rate::from_decimal(0.00625)?.as_bp_f64(), 62.5);
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    #[must_use]
+    pub fn as_bp_f64(self) -> f64 {
+        shift_decimal_point(self.0, 10_000)
     }
 
     /// The zero rate, represented as decimal value 0.0.
@@ -606,6 +642,27 @@ impl Percentage {
         (self.0 * 100.0).round() as i32
     }
 
+    /// Convert to fractional basis points, without rounding.
+    ///
+    /// The decimal point of the percentage's shortest round-trip decimal form
+    /// is moved two places, so `1.1%` reports `110.0` bp rather than the
+    /// binary-noise product `1.1 * 100.0 = 110.00000000000001`. Use
+    /// [`Self::as_bp`] for the rounded integer quote.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::types::Percentage;
+    ///
+    /// assert_eq!(Percentage::new(1.1)?.as_bp_f64(), 110.0);
+    /// assert_eq!(Percentage::new(0.625)?.as_bp_f64(), 62.5);
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    #[must_use]
+    pub fn as_bp_f64(self) -> f64 {
+        shift_decimal_point(self.0, 100)
+    }
+
     /// The zero percentage value.
     pub const ZERO: Self = Self(0.0);
 
@@ -755,6 +812,21 @@ impl From<Percentage> for Bps {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fractional_bp_accessors_scale_without_binary_noise() {
+        let rate = |x: f64| Rate::from_decimal(x).expect("finite rate");
+        let pct = |x: f64| Percentage::new(x).expect("finite percentage");
+        assert_eq!(rate(0.0029).as_bp_f64(), 29.0);
+        assert_eq!(rate(0.00625).as_bp_f64(), 62.5);
+        assert_eq!(rate(-0.0001).as_bp_f64(), -1.0);
+        assert_eq!(pct(1.1).as_bp_f64(), 110.0);
+        assert_eq!(pct(0.07).as_bp_f64(), 7.0);
+        assert_eq!(pct(0.29).as_bp_f64(), 29.0);
+        assert_eq!(pct(0.0).as_bp_f64(), 0.0);
+        // Rounded integer accessors are unchanged.
+        assert_eq!(rate(0.00625).as_bp(), 63);
+    }
 
     #[test]
     fn rate_from_str_accepts_decimal_percent_and_bp() {

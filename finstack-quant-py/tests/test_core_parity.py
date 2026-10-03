@@ -893,13 +893,20 @@ class TestMarketContextParity:
         assert value == Decimal("185.2500000000000000001")
         assert currency == "USD"
 
-    def test_unitless_price_accepts_only_exactly_representable_decimal(self) -> None:
+    def test_unitless_price_converts_decimal_to_nearest_float(self) -> None:
         mc = MarketContext()
         mc.insert_price("EXACT", Decimal("0.5"))
+        mc.insert_price("NEAREST", Decimal("0.1"))
         assert mc.get_price("EXACT") == (0.5, None)
+        assert mc.get_price("NEAREST") == (0.1, None)
 
-        with pytest.raises(ValueError, match="exactly representable"):
-            mc.insert_price("INEXACT", Decimal("0.1"))
+    @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
+    def test_unitless_price_finiteness_comes_from_rust(self, value: float) -> None:
+        mc = MarketContext()
+        with pytest.raises(ValueError, match="MarketScalar unitless value must be finite"):
+            mc.insert_price("BAD", value)
+        with pytest.raises(KeyError):
+            mc.get_price("BAD")
 
     def test_insert_and_get_scalar_time_series(self) -> None:
         observations = [(date(2024, 1, 1), 100.0), (date(2024, 1, 3), 104.0)]
@@ -922,50 +929,24 @@ class TestMarketContextParity:
 
     @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf])
     def test_scalar_time_series_rejects_non_finite_observations(self, value: float) -> None:
-        with pytest.raises(ValueError, match="finite"):
+        with pytest.raises(ValueError, match="time-series observation values must be finite"):
             ScalarTimeSeries("INVALID", [(date(2024, 1, 1), value)])
-
-    def test_scalar_time_series_decimal_values_require_exact_f64(self) -> None:
-        series = ScalarTimeSeries(
-            "EXACT",
-            [(date(2024, 1, 1), Decimal("100.25"))],
-            currency=Currency("USD"),
-        )
-        assert series.observations == [(date(2024, 1, 1), 100.25)]
-        assert series.currency == Currency("USD")
-
-        with pytest.raises(ValueError, match="exactly representable"):
-            ScalarTimeSeries(
-                "INEXACT",
-                [(date(2024, 1, 1), Decimal("0.1"))],
-            )
-
-    @pytest.mark.parametrize("text", ["1e-20", "1e-28", "2e-28", "9007199254740993"])
-    def test_scalar_decimal_rejects_inexact_binary_values(self, text: str) -> None:
-        value = Decimal(text)
-        observations = [(date(2024, 1, 1), value)]
-
-        with pytest.raises(ValueError, match="exactly representable"):
-            ScalarTimeSeries("INEXACT", observations)
-        with pytest.raises(ValueError, match="exactly representable"):
-            InflationIndex("INEXACT", observations, "USD")
-        context = MarketContext()
-        with pytest.raises(ValueError, match="exactly representable"):
-            context.insert_price("INEXACT", value)
-        with pytest.raises(KeyError):
-            context.get_price("INEXACT")
+        with pytest.raises(ValueError, match="time-series observation values must be finite"):
+            InflationIndex("INVALID", [(date(2024, 1, 1), value)], "USD")
 
     @pytest.mark.parametrize(
-        ("text", "expected"),
-        [
-            ("0.0000000037252902984619140625", 2.0**-28),
-            ("9007199254740994", 9007199254740994.0),
-            ("1237940039285380274899124224", 2.0**90),
-        ],
+        "text",
+        ["0.1", "100.25", "300.1", "1e-20", "9007199254740993", "0.0000000037252902984619140625"],
     )
-    def test_scalar_decimal_accepts_exact_binary_values(self, text: str, expected: float) -> None:
-        series = ScalarTimeSeries("EXACT", [(date(2024, 1, 1), Decimal(text))])
-        assert series.observations == [(date(2024, 1, 1), expected)]
+    def test_scalar_decimal_converts_like_float(self, text: str) -> None:
+        value = Decimal(text)
+        observations = [(date(2024, 1, 1), value)]
+        expected = [(date(2024, 1, 1), float(value))]
+
+        assert ScalarTimeSeries("S", observations).observations == expected
+        assert InflationIndex("I", observations, "USD").observations == expected
+        context = MarketContext().insert_price("P", value)
+        assert context.get_price("P") == (float(value), None)
 
     def test_scalar_time_series_json_roundtrip(self) -> None:
         series = ScalarTimeSeries(

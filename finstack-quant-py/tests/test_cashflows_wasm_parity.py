@@ -334,7 +334,7 @@ def _primitives() -> Any:
     return {
         # WASM returns the serde wire string (``pre_payment``); read Python's from a serialized flow.
         "parse": [
-            wire(CashFlow(dt.date(2025, 7, 15), usd(0), CFKind.parse(name)))["kind"]
+            wire(CashFlow(dt.date(2025, 7, 15), usd(0), CFKind.parse(name), 0.0))["kind"]
             for name in ("fixed", "prepayment", "collateral_substitution_out")
         ],
         "interest_like": [

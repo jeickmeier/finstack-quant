@@ -300,11 +300,11 @@ impl PyCashFlow {
 impl PyCashFlow {
     /// Construct a dated cashflow.
     ///
-    /// The Python positional order is ``(date, amount, kind, reset_date,
-    /// accrual_factor, rate)`` so the three required inputs come first; the
-    /// Rust constructor ``CashFlow::new`` orders them ``(date, reset_date,
-    /// amount, kind, accrual_factor, rate)``. Prefer keyword arguments for
-    /// the optional fields.
+    /// The Python positional order is ``(date, amount, kind, accrual_factor,
+    /// reset_date, rate)`` so the four required inputs come first; the Rust
+    /// constructor ``CashFlow::new`` orders them ``(date, reset_date, amount,
+    /// kind, accrual_factor, rate)``. Prefer keyword arguments for the
+    /// optional fields.
     ///
     /// Parameters
     /// ----------
@@ -314,24 +314,25 @@ impl PyCashFlow {
     ///     Monetary amount including its currency.
     /// kind : CFKind or str
     ///     Cashflow classification.
+    /// accrual_factor : float
+    ///     Accrual year fraction used for the coupon amount (required, as in
+    ///     Rust and the JSON wire form; ``0.0`` for non-coupon rows).
     /// reset_date : datetime.date or str, optional
     ///     Index reset date for floating coupons.
-    /// accrual_factor : float, default 0.0
-    ///     Accrual year fraction used for the coupon amount.
     /// rate : float, optional
     ///     Effective annual rate (decimal, ``0.05`` = 5%) used to compute
     ///     this cashflow.
     #[new]
     #[pyo3(
-        signature = (date, amount, kind, reset_date=None, accrual_factor=0.0, rate=None),
-        text_signature = "(date, amount, kind, reset_date=None, accrual_factor=0.0, rate=None)"
+        signature = (date, amount, kind, accrual_factor, reset_date=None, rate=None),
+        text_signature = "(date, amount, kind, accrual_factor, reset_date=None, rate=None)"
     )]
     fn new(
         date: &Bound<'_, PyAny>,
         amount: PyMoney,
         kind: &Bound<'_, PyAny>,
-        reset_date: Option<&Bound<'_, PyAny>>,
         accrual_factor: f64,
+        reset_date: Option<&Bound<'_, PyAny>>,
         rate: Option<f64>,
     ) -> PyResult<Self> {
         let reset = reset_date.map(py_to_date).transpose()?;

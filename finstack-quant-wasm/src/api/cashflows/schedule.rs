@@ -100,17 +100,21 @@ impl JsCashFlowSchedule {
         )))
     }
 
-    /// Assemble a schedule from existing flows, with default metadata unless given.
+    /// Assemble a schedule from externally supplied flows, validating every row
+    /// (Rust `CashFlowSchedule::from_flows`).
     ///
-    /// Same as `fromParts` with `meta` optional. (Python's `from_flows` also
-    /// reads a pandas DataFrame; WASM takes the flow list.)
+    /// Each flow must pass `CashFlow::validate` (finite amount and rate, a
+    /// finite non-negative `accrual_factor`, a reset date not after the payment
+    /// date) before the rows are sorted; use `fromParts` to assemble rows
+    /// without validation. (Python's `from_flows` also reads a pandas
+    /// DataFrame; WASM takes the flow list.)
     ///
     /// @param flows - `CashFlow` wire objects.
     /// @param notional - `Notional` wire object: initial balance and amortization rule.
     /// @param day_count - `DayCount` wire string used for accrual and year fractions.
     /// @param meta - Optional `CashFlowMeta` wire object; omitted means the default metadata (contractual representation, no issue date).
     /// @returns The assembled `CashFlowSchedule`.
-    /// @throws If an argument does not match its wire type (kind `validation`).
+    /// @throws If an argument does not match its wire type or a flow fails validation (kind `validation`).
     #[wasm_bindgen(js_name = fromFlows)]
     pub fn from_flows(
         flows: JsValue,
@@ -118,12 +122,14 @@ impl JsCashFlowSchedule {
         day_count: JsValue,
         meta: Option<JsValue>,
     ) -> Result<JsCashFlowSchedule, JsValue> {
-        Ok(Self::from_inner(CashFlowSchedule::from_parts(
+        CashFlowSchedule::from_flows(
             js_wire::<Vec<CashFlow>>(&flows, "flows")?,
             js_wire::<Notional>(&notional, "notional")?,
             js_wire::<DayCount>(&day_count, "dayCount")?,
             js_opt_wire::<CashFlowMeta>(meta.as_ref(), "meta")?.unwrap_or_default(),
-        )))
+        )
+        .map(Self::from_inner)
+        .map_err(to_js_err)
     }
 
     /// Parse a schedule from its canonical JSON.

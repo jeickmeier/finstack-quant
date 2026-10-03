@@ -240,6 +240,35 @@ class Rate:
         ...
 
     @property
+    def as_bp_f64(self) -> float:
+        """
+        Rate in fractional basis points, without rounding.
+
+        The decimal point of the rate's shortest decimal form is moved four
+        places in Rust (``Rate::as_bp_f64``), so ``0.0029`` reports ``29.0``
+        rather than the binary product ``28.999999999999996`` and a sub-bp
+        rate keeps its fraction (``as_bp`` rounds to an integer).
+
+        Returns
+        -------
+        float
+            Basis points (``1.0`` = 0.01%).
+
+        Notes
+        -----
+        This accessor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.types import Rate
+        >>> Rate(0.0029).as_bp_f64
+        29.0
+        >>> Rate("62.5bp").as_bp_f64, Rate("62.5bp").as_bp
+        (62.5, 63)
+        """
+        ...
+
+    @property
     def as_basis_points(self) -> Bps:
         """
         Rate as a ``Bps`` value, rounded to the nearest whole basis point.
@@ -769,6 +798,32 @@ class Percentage:
         Notes
         -----
         This accessor does not raise.
+        """
+        ...
+
+    @property
+    def as_bp_f64(self) -> float:
+        """
+        Value in fractional basis points, without rounding.
+
+        The decimal point of the percentage's shortest decimal form is moved
+        two places in Rust (``Percentage::as_bp_f64``), so ``1.1`` reports
+        ``110.0`` rather than the binary product ``110.00000000000001``.
+
+        Returns
+        -------
+        float
+            Basis points (``1.0`` = 0.01%).
+
+        Notes
+        -----
+        This accessor does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.types import Percentage
+        >>> Percentage(1.1).as_bp_f64
+        110.0
         """
         ...
 

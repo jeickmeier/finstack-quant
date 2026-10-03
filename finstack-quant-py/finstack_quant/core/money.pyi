@@ -89,9 +89,9 @@ class Money:
         ----------
         amount : float | int | decimal.Decimal | str
             Finite monetary amount. ``Decimal`` and ``str`` inputs never pass
-            through ``float`` (no IEEE 754 round-trip), but digits beyond
-            Decimal's 96-bit mantissa or 28-digit scale are rounded exactly as
-            in ``from_json``; use ``from_decimal_str`` to reject such inputs.
+            through ``float`` (no IEEE 754 round-trip) and must be exactly
+            representable as a Rust ``Decimal`` (96-bit mantissa, at most 28
+            fractional digits); more precise input raises ``ValueError``.
             Whitespace around a ``str`` amount is ignored (Rust
             ``decimal::parse_decimal``). ``float``/``int`` follow standard
             IEEE 754 semantics.
@@ -120,9 +120,9 @@ class Money:
 
         This is the recommended entry point when the caller already holds a
         high-precision value. Unlike the regular ``Money(amount, ccy)``
-        constructor's float path, this never rounds through ``f64``; digits
-        beyond Decimal's 28-digit scale are rounded as in ``from_json`` (use
-        ``from_decimal_str`` to reject them).
+        constructor's float path, this never rounds through ``f64``; a value
+        not exactly representable as a Rust ``Decimal`` (more than 28
+        fractional digits) raises ``ValueError``.
 
         Parameters
         ----------

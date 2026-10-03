@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Cashflows and number parsing (Python-binding audit PR 4)
+
+#### Added
+
+- Rust `CashFlowSchedule::from_flows` validates every row (`CashFlow::validate`) before sorting; Python `CashFlowSchedule.from_flows` (list and DataFrame input) and WASM `CashFlowSchedule.fromFlows` call it.
+- Python `FloatingLegCompounding.sofr` / `fedfunds` / `sonia` / `estr` / `tona` / `saron` / `sofr_observation_shift` / `sonia_observation_shift` / `rate_cutoff` / `is_overnight` and `DefaultModelSpec.mdr_with_survival` / `cumulative_default_fraction`, with WASM twins `cashflows.floatingLegCompounding*` and `cashflows.defaultModelSpecMdrWithSurvival` / `defaultModelSpecCumulativeDefaultFraction`.
+- Rust `Rate::as_bp_f64` / `Percentage::as_bp_f64` (fractional basis points without binary noise), bound as Python `as_bp_f64` and WASM `asBpF64`; Python CDS quote `spread_bp` / `coupon_bp` given as `Rate`/`Percentage` now use it (`Percentage(1.1)` gives `110.0`, was `110.00000000000001`).
+- Rust `MarketScalar::unitless` rejects non-finite values; Python `MarketContext.insert_price` and WASM `insertPrice` without a currency use it, so WASM no longer stores a NaN unitless price.
+
+#### Changed (breaking)
+
+- Python: `CashFlow(...)` requires `accrual_factor` (no `0.0` default) and takes it as the fourth positional argument: `(date, amount, kind, accrual_factor, reset_date=None, rate=None)`. `CashFlowSchedule.from_flows` with a DataFrame requires an `accrual_factor` column, and list input is now validated like DataFrame input.
+- Python: `FloatingLegCompounding.compounded_in_arrears` requires `lookback_days` (no binding default); use `FloatingLegCompounding.sofr()` and the other presets for the plain in-arrears convention.
+- Python: str arguments of `finstack_quant.cashflows.builder` Decimal parameters parse with Rust `decimal::parse_decimal`, rejecting text that is not exactly representable as a `Decimal` (was silently rounded).
+- Python: `ScalarTimeSeries`, `InflationIndex` and unitless `MarketContext.insert_price` convert a `decimal.Decimal` to `float` with Rust `decimal::decimal_to_f64` (`Decimal("0.1")` is accepted; was rejected unless binary-exact); non-finite values are rejected by Rust with its message. Rust `decimal::decimal_to_f64_exact` is removed.
+
 ### Error kinds come from Rust (Python-binding audit PR 1)
 
 #### Changed (breaking)

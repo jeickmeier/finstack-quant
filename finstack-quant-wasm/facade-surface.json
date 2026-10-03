@@ -406,8 +406,10 @@
       "datedFlowsJson",
       "defaultModelSpecCdr2pct",
       "defaultModelSpecConstantCdr",
+      "defaultModelSpecCumulativeDefaultFraction",
       "defaultModelSpecCumulativeLoss",
       "defaultModelSpecMdr",
+      "defaultModelSpecMdrWithSurvival",
       "defaultModelSpecSda",
       "defaultModelSpecTiming",
       "defaultModelSpecValidate",
@@ -420,6 +422,16 @@
       "floatingLegCompoundingCompoundedInArrears",
       "floatingLegCompoundingCompoundedWithObservationShift",
       "floatingLegCompoundingCompoundedWithRateCutoff",
+      "floatingLegCompoundingEstr",
+      "floatingLegCompoundingFedfunds",
+      "floatingLegCompoundingIsOvernight",
+      "floatingLegCompoundingRateCutoff",
+      "floatingLegCompoundingSaron",
+      "floatingLegCompoundingSofr",
+      "floatingLegCompoundingSofrObservationShift",
+      "floatingLegCompoundingSonia",
+      "floatingLegCompoundingSoniaObservationShift",
+      "floatingLegCompoundingTona",
       "floatingRateFallbackFixedRate",
       "floatingRateSpecEuribor3m",
       "floatingRateSpecSofr",
@@ -604,10 +616,16 @@
   "cashflows.defaultModelSpecConstantCdr": {
     "kind": "function"
   },
+  "cashflows.defaultModelSpecCumulativeDefaultFraction": {
+    "kind": "function"
+  },
   "cashflows.defaultModelSpecCumulativeLoss": {
     "kind": "function"
   },
   "cashflows.defaultModelSpecMdr": {
+    "kind": "function"
+  },
+  "cashflows.defaultModelSpecMdrWithSurvival": {
     "kind": "function"
   },
   "cashflows.defaultModelSpecSda": {
@@ -644,6 +662,36 @@
     "kind": "function"
   },
   "cashflows.floatingLegCompoundingCompoundedWithRateCutoff": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingEstr": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingFedfunds": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingIsOvernight": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingRateCutoff": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingSaron": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingSofr": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingSofrObservationShift": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingSonia": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingSoniaObservationShift": {
+    "kind": "function"
+  },
+  "cashflows.floatingLegCompoundingTona": {
     "kind": "function"
   },
   "cashflows.floatingRateFallbackFixedRate": {
@@ -1110,7 +1158,7 @@
     "kind": "class",
     "statics": ["fromBp", "fromJson", "fromPercent", "parse", "zero"],
     "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
-    "getters": ["asBasisPoints", "asBp", "asDecimal", "asPercent", "asPercentage"]
+    "getters": ["asBasisPoints", "asBp", "asBpF64", "asDecimal", "asPercent", "asPercentage"]
   },
   "core.Bps": {
     "kind": "class",
@@ -1122,7 +1170,7 @@
     "kind": "class",
     "statics": ["fromJson", "zero"],
     "methods": ["abs", "free", "isNegative", "isPositive", "isZero", "toJson"],
-    "getters": ["asBasisPoints", "asBp", "asDecimal", "asPercent", "asRate"]
+    "getters": ["asBasisPoints", "asBp", "asBpF64", "asDecimal", "asPercent", "asRate"]
   },
   "core.CreditRating": {
     "kind": "class",

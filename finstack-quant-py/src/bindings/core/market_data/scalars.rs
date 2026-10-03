@@ -15,24 +15,21 @@ use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
 use crate::errors::core_to_py;
 
-/// Extract a finite `f64`, rejecting `Decimal` values without an exact binary representation.
-pub(super) fn extract_exact_f64(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64> {
+/// Extract an `f64` observation from a `float`, `int` or `decimal.Decimal`.
+///
+/// A `Decimal` converts to `f64` through
+/// `finstack_quant_core::decimal::decimal_to_f64`; finiteness is checked by the
+/// Rust constructor that receives the value.
+pub(super) fn extract_f64(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64> {
     if is_python_decimal(value)? {
-        let decimal = decimal_from_py(value)?;
-        return finstack_quant_core::decimal::decimal_to_f64_exact(decimal).map_err(core_to_py);
+        return finstack_quant_core::decimal::decimal_to_f64(decimal_from_py(value)?)
+            .map_err(core_to_py);
     }
-
-    let converted = value.extract::<f64>().map_err(|_| {
+    value.extract::<f64>().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
             "{field} must be float, int, or decimal.Decimal"
         ))
-    })?;
-    if !converted.is_finite() {
-        return Err(crate::errors::value_error(format!(
-            "{field} must be finite"
-        )));
-    }
-    Ok(converted)
+    })
 }
 
 /// Date-indexed scalar market observations with Rust-owned interpolation.
@@ -64,7 +61,7 @@ impl PyScalarTimeSeries {
     /// id : str
     ///     Series identifier.
     /// observations : list[tuple[datetime.date | str, float | int | decimal.Decimal]]
-    ///     Dated values; ``Decimal`` values must be exactly representable as binary ``float``.
+    ///     Dated values; a ``Decimal`` converts to ``float`` (Rust ``decimal_to_f64``).
     ///     Dates must be unique; any order is accepted.
     /// currency : Currency | str, optional
     ///     Currency tag for monetary series; ``None`` for unitless values.
@@ -75,8 +72,7 @@ impl PyScalarTimeSeries {
     /// ------
     /// ValueError
     ///     If ``observations`` is empty or has duplicate dates, a value is
-    ///     non-finite or a ``Decimal`` cannot be represented exactly as ``float``,
-    ///     or ``interpolation`` is not a recognised label.
+    ///     non-finite, or ``interpolation`` is not a recognised label.
     ///
     /// Example
     /// -------
@@ -98,7 +94,7 @@ impl PyScalarTimeSeries {
             .map(|(index, (date, value))| {
                 Ok((
                     py_to_date(date)?,
-                    extract_exact_f64(value, &format!("observations[{index}] value"))?,
+                    extract_f64(value, &format!("observations[{index}] value"))?,
                 ))
             })
             .collect::<PyResult<Vec<_>>>()?;
@@ -310,7 +306,7 @@ impl PyInflationIndex {
     /// id : str
     ///     Index identifier (e.g. ``"US-CPI-U"``).
     /// observations : list[tuple[datetime.date | str, float | int | decimal.Decimal]]
-    ///     Dated index levels; ``Decimal`` values must be exactly representable as binary ``float``.
+    ///     Dated index levels; a ``Decimal`` converts to ``float`` (Rust ``decimal_to_f64``).
     /// currency : Currency | str
     ///     Currency of the index.
     /// interpolation : str, optional
@@ -325,8 +321,8 @@ impl PyInflationIndex {
     /// ------
     /// ValueError
     ///     If ``observations`` is empty or has duplicate dates, a label is
-    ///     unknown, a value is non-finite or a ``Decimal`` cannot be represented
-    ///     exactly as ``float``, or ``seasonality`` does not have exactly 12 entries.
+    ///     unknown, a value is non-finite, or ``seasonality`` does not have
+    ///     exactly 12 entries.
     ///
     /// Example
     /// -------
@@ -376,7 +372,7 @@ impl PyInflationIndex {
             .map(|(index, (date, value))| {
                 Ok((
                     py_to_date(date)?,
-                    extract_exact_f64(value, &format!("observations[{index}] value"))?,
+                    extract_f64(value, &format!("observations[{index}] value"))?,
                 ))
             })
             .collect::<PyResult<Vec<_>>>()?;

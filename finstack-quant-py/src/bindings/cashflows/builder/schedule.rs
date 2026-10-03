@@ -266,7 +266,9 @@ fn optional_json_field<T: serde::de::DeserializeOwned>(
 }
 
 /// Extract cashflow rows from ``list[CashFlow]`` or a DataFrame with columns
-/// ``date, amount, currency, kind`` and optional ``reset_date, accrual_factor, rate``.
+/// ``date, amount, currency, kind, accrual_factor`` and optional ``reset_date, rate``.
+///
+/// Rows are only converted here; `CashFlowSchedule::from_flows` validates them.
 pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
     if let Ok(flows) = obj.extract::<Vec<PyRef<'_, PyCashFlow>>>() {
         return Ok(flows.iter().map(|f| f.inner.clone()).collect());
@@ -275,7 +277,7 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
         let missing = |name: &str| {
             crate::errors::value_error(format!(
                 "cashflow DataFrame is missing required column '{name}' \
-                 (required: date, amount, currency, kind; optional: reset_date, accrual_factor, rate)"
+                 (required: date, amount, currency, kind, accrual_factor; optional: reset_date, rate)"
             ))
         };
         let dates = frame_column(obj, "date")?.ok_or_else(|| missing("date"))?;
@@ -283,7 +285,8 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
         let currencies = frame_column(obj, "currency")?.ok_or_else(|| missing("currency"))?;
         let kinds = frame_column(obj, "kind")?.ok_or_else(|| missing("kind"))?;
         let resets = frame_column(obj, "reset_date")?;
-        let factors = frame_column(obj, "accrual_factor")?;
+        let factors =
+            frame_column(obj, "accrual_factor")?.ok_or_else(|| missing("accrual_factor"))?;
         let rates = frame_column(obj, "rate")?;
         let accruals = frame_column(obj, "accrual")?;
         let deltas = frame_column(obj, "principal_delta")?;
@@ -296,10 +299,7 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
                 Some(r) if !is_missing(r)? => Some(extract_date(r)?),
                 _ => None,
             };
-            let accrual_factor = match factors.as_ref().map(|f| &f[i]) {
-                Some(f) if !is_missing(f)? => f.extract()?,
-                _ => 0.0,
-            };
+            let accrual_factor: f64 = factors[i].extract()?;
             let rate = match rates.as_ref().map(|r| &r[i]) {
                 Some(r) if !is_missing(r)? => Some(r.extract()?),
                 _ => None,
@@ -318,7 +318,6 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
                 Some(date) if !is_missing(date)? => Some(extract_date(date)?),
                 _ => None,
             };
-            flow.validate().map_err(core_to_py)?;
             flows.push(flow);
         }
         return Ok(flows);
@@ -378,15 +377,21 @@ impl PyCashFlowSchedule {
         ))
     }
 
-    /// Build a schedule from ``CashFlow`` rows or a pandas DataFrame.
+    /// Build a schedule from ``CashFlow`` rows or a pandas DataFrame,
+    /// validating every row.
+    ///
+    /// Both input shapes go through Rust ``CashFlowSchedule::from_flows``,
+    /// which checks each row (``CashFlow.validate``) before sorting; use
+    /// ``from_parts`` to assemble rows without validation.
     ///
     /// Parameters
     /// ----------
     /// flows : list[CashFlow] or pandas.DataFrame
     ///     Either typed rows, or a frame with columns ``date``, ``amount``
     ///     (float, native currency units), ``currency`` (ISO code), ``kind``
-    ///     (``CFKind`` label such as ``"fixed"``), and optional
-    ///     ``reset_date``, ``accrual_factor``, ``rate``. Dates accept
+    ///     (``CFKind`` label such as ``"fixed"``), ``accrual_factor`` (float
+    ///     year fraction; ``0.0`` for non-coupon rows), and optional
+    ///     ``reset_date``, ``rate``. Dates accept
     ///     ``datetime.date``, ``pandas.Timestamp`` or ISO strings; ``NaN`` /
     ///     ``None`` in the optional columns means absent.
     /// notional : Notional
@@ -405,7 +410,9 @@ impl PyCashFlowSchedule {
     /// ------
     /// ValueError
     ///     If a required frame column is missing, a currency code or kind
-    ///     label is unknown, or a date cannot be parsed.
+    ///     label is unknown, a date cannot be parsed, or a row fails
+    ///     ``CashFlow.validate`` (e.g. a negative or non-finite
+    ///     ``accrual_factor``, or a reset date after the payment date).
     /// TypeError
     ///     If ``flows`` is neither a list of ``CashFlow`` nor a DataFrame.
     ///
@@ -416,7 +423,7 @@ impl PyCashFlowSchedule {
     /// >>> from finstack_quant.cashflows.primitives import CashFlow, CFKind
     /// >>> from finstack_quant.core.dates import DayCount
     /// >>> from finstack_quant.core.money import Money
-    /// >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED)
+    /// >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED, 0.0)
     /// >>> CashFlowSchedule.from_flows([flow], Notional.par(1_000.0, "USD"), DayCount.ACT_360).get_flows()[0].kind.name
     /// 'fixed'
     #[staticmethod]
@@ -430,13 +437,14 @@ impl PyCashFlowSchedule {
         day_count: PyRef<'_, PyDayCount>,
         meta: Option<PyRef<'_, PyCashFlowMeta>>,
     ) -> PyResult<Self> {
-        let flows = extract_flows(flows)?;
-        Ok(Self::from_inner(CashFlowSchedule::from_parts(
-            flows,
+        CashFlowSchedule::from_flows(
+            extract_flows(flows)?,
             notional.inner.clone(),
             day_count.inner,
             meta.map_or_else(CashFlowMeta::default, |m| m.inner.clone()),
-        )))
+        )
+        .map(Self::from_inner)
+        .map_err(core_to_py)
     }
 
     /// Return a copy with the metadata representation label replaced.
