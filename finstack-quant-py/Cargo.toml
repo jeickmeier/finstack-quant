@@ -41,7 +41,7 @@ finstack-quant-arrow = { path = "../finstack-quant/arrow-interchange", version =
 arrow = { workspace = true, features = ["ffi", "ipc"] }
 nalgebra = { version = "0.34", default-features = false, features = ["std"] }
 numpy = "0.29"
-pyo3 = { version = "0.29", features = ["multiple-pymethods"] }
+pyo3 = { version = "0.29", features = ["multiple-pymethods", "indexmap", "time"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 indexmap = { workspace = true }

@@ -1,5 +1,39 @@
 {
   "$defs": {
+    "NonFiniteF64Wire": {
+      "anyOf": [
+        {
+          "description": "A finite value, written as a JSON number.",
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "$ref": "#/$defs/NonFiniteSentinel",
+          "description": "A non-finite value, written as its sentinel string."
+        }
+      ],
+      "description": "An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,\notherwise one of the strings `\"inf\"`, `\"-inf\"` or `\"nan\"`.\n\nContract types store plain `f64` fields with\n`#[serde(with = \"finstack_quant_core::wire::non_finite_f64\")]` and name this\ntype in `#[schemars(with = ...)]`, so the generated schema describes the\nsentinel strings the serializer actually writes."
+    },
+    "NonFiniteSentinel": {
+      "description": "Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.",
+      "oneOf": [
+        {
+          "const": "inf",
+          "description": "`+∞`, written as `\"inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "-inf",
+          "description": "`-∞`, written as `\"-inf\"`.",
+          "type": "string"
+        },
+        {
+          "const": "nan",
+          "description": "`NaN`, written as `\"nan\"`.",
+          "type": "string"
+        }
+      ]
+    },
     "OptimizationStatus": {
       "description": "Status of an optimization run.",
       "oneOf": [
@@ -276,9 +310,8 @@
       "type": "object"
     },
     "objective_value": {
-      "description": "Objective value at the solution.",
-      "format": "double",
-      "type": "number"
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Objective value at the solution.\n\n`NaN` when the solve is not feasible; non-finite values travel as the\nstring sentinels `\"nan\"`, `\"inf\"` and `\"-inf\"` so the result round-trips."
     },
     "optimal_weights": {
       "additionalProperties": {
@@ -308,9 +341,8 @@
       "type": "array"
     },
     "turnover": {
-      "description": "Gross turnover.",
-      "format": "double",
-      "type": "number"
+      "$ref": "#/$defs/NonFiniteF64Wire",
+      "description": "Gross turnover.\n\n`NaN` when the solve is not feasible; encoded like `objective_value`."
     },
     "weight_deltas": {
       "additionalProperties": {

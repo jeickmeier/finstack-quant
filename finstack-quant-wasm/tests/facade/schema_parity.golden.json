@@ -1825,7 +1825,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
             "type_name": "PortfolioOptimizationResultWire",
             "kind": "output",
-            "bytes": 9217
+            "bytes": 10752
           },
           {
             "path": "schemas/portfolio/1/portfolio_optimization_spec.schema.json",
@@ -4322,7 +4322,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
             "type_name": "PortfolioOptimizationResultWire",
             "kind": "output",
-            "bytes": 9217
+            "bytes": 10752
           },
           {
             "domain": "portfolio",

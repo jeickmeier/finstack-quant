@@ -66,6 +66,37 @@ pub enum PositionUnit {
     Percentage,
 }
 
+impl std::str::FromStr for PositionUnit {
+    type Err = crate::error::Error;
+
+    /// Parse a unit-only position unit from its serde name.
+    ///
+    /// Accepts the snake_case serde names of the unit variants: `units`,
+    /// `face_value` and `percentage`. `Notional` carries an optional currency
+    /// and has no bare-string form; supply it in its serde mapping form
+    /// (`{"notional": "USD"}` or `{"notional": null}`) instead.
+    ///
+    /// # Arguments
+    ///
+    /// * `s` - Unit name; matching is exact (no trimming, no case folding).
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error naming the unrecognised text, including
+    /// a bare `notional`.
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "units" => Ok(Self::Units),
+            "face_value" => Ok(Self::FaceValue),
+            "percentage" => Ok(Self::Percentage),
+            other => Err(crate::error::Error::invalid_input(format!(
+                "unknown position unit {other:?}; expected one of units, face_value, \
+                 percentage, or the mapping {{\"notional\": <currency or null>}}"
+            ))),
+        }
+    }
+}
+
 /// A position in an instrument.
 ///
 /// Represents a holding of a specific quantity of an instrument,
@@ -573,6 +604,24 @@ mod tests {
     use super::*;
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use time::macros::date;
+
+    #[test]
+    fn position_unit_from_str_agrees_with_serde() {
+        use std::str::FromStr;
+        for name in ["units", "face_value", "percentage"] {
+            let parsed = PositionUnit::from_str(name).expect("unit variant");
+            let via_serde: PositionUnit =
+                serde_json::from_value(serde_json::Value::String(name.to_string()))
+                    .expect("serde unit variant");
+            assert_eq!(parsed, via_serde);
+        }
+        // `Notional` has no bare-string form in serde, so `from_str` rejects
+        // it too and both input paths accept the same vocabulary.
+        assert!(PositionUnit::from_str("notional").is_err());
+        assert!(serde_json::from_value::<PositionUnit>(serde_json::json!("notional")).is_err());
+        let err = PositionUnit::from_str("bogus").expect_err("unknown unit");
+        assert!(err.to_string().contains("\"bogus\""), "{err}");
+    }
 
     #[test]
     fn test_position_creation() {

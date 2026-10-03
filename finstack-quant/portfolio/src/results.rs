@@ -2,10 +2,11 @@
 
 use crate::metrics::PortfolioMetrics;
 use crate::valuation::PortfolioValuation;
-use finstack_quant_core::config::ResultsMeta;
+use finstack_quant_core::config::{results_meta_with_timestamp, FinstackConfig, ResultsMeta};
 use finstack_quant_core::money::Money;
 use finstack_quant_core::wire::SchemaVersion;
 use serde::{Deserialize, Serialize};
+use time::OffsetDateTime;
 
 /// Complete results from portfolio evaluation.
 ///
@@ -27,13 +28,25 @@ pub struct PortfolioResult {
 }
 
 impl PortfolioResult {
-    /// Create a new portfolio results instance.
+    /// Assemble a result envelope and stamp its metadata from the valuation.
+    ///
+    /// The `meta` stamp is derived here rather than supplied by the caller:
+    /// the numeric mode, rounding context and library version come from
+    /// `config`, and `fx_policy_applied` records the valuation's
+    /// [`fx_collapse_policy`](PortfolioValuation::fx_collapse_policy), so the
+    /// envelope always names the FX strategy that produced its base-currency
+    /// totals.
     ///
     /// # Arguments
     ///
-    /// * `valuation` - Portfolio valuation component.
-    /// * `metrics` - Portfolio metrics component.
-    /// * `meta` - Metadata describing calculation context.
+    /// * `valuation` - Portfolio valuation component; its FX collapse policy is
+    ///   stamped into `meta.fx_policy_applied` (e.g. `"cashflow_date"`).
+    /// * `metrics` - Aggregated metrics computed from the same valuation.
+    /// * `config` - Library configuration whose rounding context is recorded
+    ///   in `meta.rounding`.
+    /// * `timestamp` - Optional UTC audit timestamp for `meta.timestamp`. Pass
+    ///   `None` for deterministic output: identical inputs then serialize
+    ///   identically.
     ///
     /// # Returns
     ///
@@ -41,8 +54,11 @@ impl PortfolioResult {
     pub fn new(
         valuation: PortfolioValuation,
         metrics: PortfolioMetrics,
-        meta: ResultsMeta,
+        config: &FinstackConfig,
+        timestamp: Option<OffsetDateTime>,
     ) -> Self {
+        let mut meta = results_meta_with_timestamp(config, timestamp);
+        meta.fx_policy_applied = Some(valuation.fx_collapse_policy.to_string());
         Self {
             schema_version: SchemaVersion::CURRENT,
             valuation,
@@ -102,7 +118,6 @@ mod tests {
     use crate::test_utils::build_test_market;
     use crate::types::Entity;
     use crate::valuation::value_portfolio;
-    use finstack_quant_core::config::{results_meta_now, FinstackConfig};
     use finstack_quant_core::currency::Currency;
     use finstack_quant_valuations::instruments::rates::deposit::Deposit;
     use std::sync::Arc;
@@ -150,9 +165,23 @@ mod tests {
             .expect("test should succeed");
         let metrics = aggregate_metrics(&valuation, Currency::USD, &market, as_of)
             .expect("test should succeed");
-        let meta = results_meta_now(&config);
+        let results = PortfolioResult::new(valuation.clone(), metrics.clone(), &config, None);
 
-        let results = PortfolioResult::new(valuation, metrics, meta);
+        // The meta stamp names the valuation's FX policy and, without a
+        // timestamp, two envelopes from identical inputs serialize identically.
+        assert_eq!(
+            results.meta.fx_policy_applied.as_deref(),
+            Some(valuation.fx_collapse_policy.to_string().as_str())
+        );
+        assert_eq!(results.meta.timestamp, None);
+        let again = PortfolioResult::new(valuation.clone(), metrics.clone(), &config, None);
+        assert_eq!(
+            serde_json::to_string(&results).expect("serialize"),
+            serde_json::to_string(&again).expect("serialize")
+        );
+        let stamp = time::macros::datetime!(2024-01-01 12:00 UTC);
+        let stamped = PortfolioResult::new(valuation, metrics, &config, Some(stamp));
+        assert_eq!(stamped.meta.timestamp, Some(stamp));
 
         // Note: With flat curve, deposit PV is small but portfolio results should be present
         assert!(results.total_value().amount().abs() >= 0.0);

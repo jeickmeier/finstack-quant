@@ -534,9 +534,10 @@ pub fn extract_cashflows_ref<'py>(
 /// Turn a JSON-shaped Python input into its compact JSON string.
 ///
 /// Accepts a pre-serialized JSON `str` (passed through unchanged), any
-/// `json.dumps`-able object (`dict`, `list`, tuples of scalars), or a
-/// `pandas.DataFrame`, which is converted through `to_dict("records")` so
-/// each row becomes one JSON object.
+/// `json.dumps`-able object (`dict`, `list`, tuples of scalars), typed
+/// result/spec wrappers standalone or nested in lists and dicts (encoded
+/// through their `to_dict` / `to_json`), or a `pandas.DataFrame`, which is
+/// converted through `to_dict("records")` so each row becomes one JSON object.
 ///
 /// # Errors
 ///

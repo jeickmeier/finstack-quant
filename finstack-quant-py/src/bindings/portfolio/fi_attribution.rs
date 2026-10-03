@@ -134,6 +134,28 @@ impl PyFiAttributionResult {
         serde_rows_to_dataframe_with_schema(py, &self.inner.sectors, FI_SECTOR_COLUMNS)
     }
 
+    /// Reconcile the five Campisi effect totals against the active return.
+    ///
+    /// Binds the Rust method ``FiAttributionResult::reconciliation_check``.
+    ///
+    /// Parameters
+    /// ----------
+    /// tolerance : float
+    ///     Absolute tolerance in return units (``1e-10`` is appropriate for
+    ///     return-space values).
+    ///
+    /// Returns
+    /// -------
+    /// FiReconciliationReport
+    ///     Typed report with ``total_residual``, ``is_reconciled`` and
+    ///     ``tolerance``.
+    #[pyo3(text_signature = "(self, tolerance)")]
+    fn reconciliation_check(&self, tolerance: f64) -> PyFiReconciliationReport {
+        PyFiReconciliationReport {
+            inner: self.inner.reconciliation_check(tolerance),
+        }
+    }
+
     /// Serialize to a compact JSON string.
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
@@ -646,10 +668,11 @@ fn campisi_carino_link_from_snapshots_json(
 ///
 /// Parameters
 /// ----------
-/// result_json : str | dict | list | pandas.DataFrame
-///     JSON ``FiAttributionResult``, as returned by
-///     :func:`campisi_attribution_json` (or
-///     ``FiAttributionResult.to_json()``).
+/// result_json : FiAttributionResult | str | dict | list | pandas.DataFrame
+///     Typed ``FiAttributionResult`` (as returned by
+///     :func:`campisi_attribution`) or its JSON form, as returned by
+///     :func:`campisi_attribution_json` (or ``FiAttributionResult.to_json()``).
+///     ``FiAttributionResult.reconciliation_check`` is the method form.
 /// tolerance : float
 ///     Absolute tolerance in return units (``1e-10`` is appropriate for
 ///     return-space values).

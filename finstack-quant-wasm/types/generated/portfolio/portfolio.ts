@@ -1219,6 +1219,20 @@ export type NettingSetId =
 export type SimmRiskClass =
   "interest_rate" | "credit_qualifying" | "credit_non_qualifying" | "equity" | "commodity" | "fx";
 /**
+ * An `f64` in the [`non_finite_f64`] wire form: a JSON number when finite,
+ * otherwise one of the strings `"inf"`, `"-inf"` or `"nan"`.
+ *
+ * Contract types store plain `f64` fields with
+ * `#[serde(with = "finstack_quant_core::wire::non_finite_f64")]` and name this
+ * type in `#[schemars(with = ...)]`, so the generated schema describes the
+ * sentinel strings the serializer actually writes.
+ */
+export type NonFiniteF64Wire = number | NonFiniteSentinel;
+/**
+ * Sentinel string the [`non_finite_f64`] adapter writes for a non-finite `f64`.
+ */
+export type NonFiniteSentinel = "inf" | "-inf" | "nan";
+/**
  * Optimization direction and target.
  */
 export type Objective =
@@ -4732,8 +4746,11 @@ export interface PortfolioOptimizationResultWire {
   };
   /**
    * Objective value at the solution.
+   *
+   * `NaN` when the solve is not feasible; non-finite values travel as the
+   * string sentinels `"nan"`, `"inf"` and `"-inf"` so the result round-trips.
    */
-  objective_value: number;
+  objective_value: NonFiniteF64Wire;
   /**
    * Optimal weights keyed by position.
    */
@@ -4758,8 +4775,10 @@ export interface PortfolioOptimizationResultWire {
   trades: TradeSpec[];
   /**
    * Gross turnover.
+   *
+   * `NaN` when the solve is not feasible; encoded like `objective_value`.
    */
-  turnover: number;
+  turnover: NonFiniteF64Wire;
   /**
    * Weight changes keyed by position.
    */

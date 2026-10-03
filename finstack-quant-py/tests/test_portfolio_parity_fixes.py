@@ -302,3 +302,161 @@ class TestReconciliationReport:
         assert report.is_reconciled
         assert report.tolerance == 0.01
         assert pickle.loads(pickle.dumps(report)).to_json() == report.to_json()  # noqa: S301
+
+
+class TestOptimizationAndResultsAudit:
+    """Regressions for the Python-binding audit PR 9 (PORT-003/006/010/011/027)."""
+
+    def test_optimization_result_dicts_keep_wire_order(self) -> None:
+        # PORT-003: the six dict getters used to collect into a HashMap, so key
+        # order was random per process and disagreed with to_json().
+        from finstack_quant.portfolio import PortfolioOptimizationResult
+
+        keys = [f"K-{i}" for i in (7, 2, 5, 0, 3, 6, 1, 4)]
+        values = {k: float(i) for i, k in enumerate(keys)}
+        fields = [
+            "current_weights",
+            "optimal_weights",
+            "weight_deltas",
+            "implied_quantities",
+            "metric_values",
+            "constraint_slacks",
+        ]
+        wire = {
+            "schema_version": 1,
+            "status": "optimal",
+            "status_label": "optimal",
+            "is_feasible": True,
+            "objective_value": 0.0,
+            "turnover": 0.0,
+            "trades": [],
+            "binding_constraints": [],
+            **dict.fromkeys(fields, values),
+        }
+        result = PortfolioOptimizationResult.from_json(json.dumps(wire))
+        back = json.loads(result.to_json())
+        for field in fields:
+            assert list(getattr(result, field)) == keys, field
+            assert list(back[field]) == keys, field
+
+    def test_infeasible_optimization_result_round_trips_and_pickles(self) -> None:
+        # PORT-011: NaN objective_value/turnover were written as null and then
+        # rejected by from_json, so pickle failed for every infeasible result.
+        import math
+
+        from finstack_quant.portfolio import (
+            PortfolioOptimizationResult,
+            PortfolioOptimizationSpec,
+            optimize_portfolio,
+        )
+
+        spec = (
+            PortfolioOptimizationSpec
+            .new(_portfolio(), Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.pv_base())))
+            .with_constraint(Constraint.budget(1.0))
+            .with_constraint(Constraint.weight_bounds(PositionFilter.all(), 0.0, 0.1))
+        )
+        result = optimize_portfolio(spec, _market())
+        assert not result.is_feasible
+        assert math.isnan(result.objective_value)
+        assert math.isnan(result.turnover)
+        wire = json.loads(result.to_json())
+        assert (wire["objective_value"], wire["turnover"]) == ("nan", "nan")
+        rebuilt = PortfolioOptimizationResult.from_json(result.to_json())
+        assert rebuilt.to_json() == result.to_json()
+        assert math.isnan(rebuilt.objective_value)
+        unpickled = pickle.loads(pickle.dumps(result))  # noqa: S301
+        assert unpickled.to_json() == result.to_json()
+        assert unpickled.status.kind == "infeasible"
+
+    def test_position_unit_strings_parse_in_rust_on_every_path(self) -> None:
+        # PORT-010: the builder and CandidatePosition accepted a bare "notional"
+        # that Portfolio.from_spec rejects; both now call PositionUnit::from_str.
+        for unit in ("units", "face_value", "percentage"):
+            builder = Portfolio.builder("book", "USD", AS_OF).position("P1", _bond(), 1.0, unit=unit)
+            assert builder.build().positions_to_dataframe().iloc[0]["unit"] == unit
+            assert CandidatePosition("C1", "ACME", _bond("B2"), unit=unit).to_json()
+        message = r'unknown position unit "notional"; expected one of units, face_value, percentage'
+        with pytest.raises(PortfolioError, match=message):
+            Portfolio.builder("book", "USD", AS_OF).position("P1", _bond(), 1.0, unit="notional")
+        with pytest.raises(PortfolioError, match=message):
+            CandidatePosition("C1", "ACME", _bond("B2"), unit="notional")
+        spec = _portfolio().to_spec()
+        spec["positions"][0]["unit"] = "notional"
+        with pytest.raises(ValueError, match=r"invalid type: unit variant"):
+            Portfolio.from_spec(json.dumps(spec))
+        for unit in ({"notional": "USD"}, {"notional": None}):
+            pf = Portfolio.builder("book", "USD", AS_OF).position("P1", _bond(), 1.0, unit=unit).build()
+            assert json.loads(pf.positions_to_dataframe().iloc[0]["unit"]) == unit
+            assert CandidatePosition("C1", "ACME", _bond("B2"), unit=unit).to_json()
+
+    def test_portfolio_result_meta_is_derived_from_the_valuation(self) -> None:
+        # PORT-027: meta used a wall-clock timestamp and fx_policy_applied=None.
+        from finstack_quant.core.config import FinstackConfig
+
+        valuation = value_portfolio(_portfolio(), _market())
+        metrics = aggregate_metrics(valuation, "USD", _market(), AS_OF)
+        first = PortfolioResult(valuation, metrics)
+        assert first.meta["fx_policy_applied"] == valuation.fx_collapse_policy == "cashflow_date"
+        assert "timestamp" not in first.meta
+        assert first.to_json() == PortfolioResult(valuation, metrics).to_json()
+
+        stamp = dt.datetime(2025, 1, 15, 17, 30, tzinfo=dt.UTC)
+        stamped = PortfolioResult(valuation, metrics, config=FinstackConfig(rounding_mode="floor"), timestamp=stamp)
+        assert stamped.meta["rounding"]["mode"] == "floor"
+        assert stamped.meta["timestamp"].endswith("2025-01-15T17:30:00.000000000Z")
+        assert PortfolioResult.from_json(stamped.to_json()).to_json() == stamped.to_json()
+        with pytest.raises(TypeError):
+            PortfolioResult(valuation, metrics, timestamp=dt.datetime(2025, 1, 15))
+
+    def test_attribution_chaining_accepts_typed_results(self) -> None:
+        # PORT-006: typed results had to be round-tripped through to_json()
+        # before the next Rust step; FiAttributionResult had no method form.
+        from finstack_quant import portfolio as pf
+
+        def snap(sector: str, weight: float, total_return: float) -> dict[str, float | str]:
+            return {
+                "sector": sector,
+                "weight": weight,
+                "total_return": total_return,
+                "yield_annual": 0.05,
+                "modified_duration": 5.0,
+                "spread_duration": 4.0,
+                "spread": 0.01,
+                "delta_treasury_yield": 0.001,
+                "delta_spread": -0.0005,
+            }
+
+        fi = pf.campisi_attribution(
+            json.dumps([snap("CORP", 0.5, 0.02), snap("GOVT", 0.5, 0.01)]),
+            json.dumps([snap("CORP", 0.4, 0.015), snap("GOVT", 0.6, 0.012)]),
+            json.dumps({"period_years": 0.25}),
+        )
+        report = fi.reconciliation_check(1e-9)
+        assert report.is_reconciled
+        assert report.to_json() == pf.campisi_reconciliation_check(fi, 1e-9).to_json()
+        assert report.to_json() == pf.campisi_reconciliation_check(fi.to_json(), 1e-9).to_json()
+        linked = pf.campisi_carino_link([fi, fi])
+        assert linked.to_json() == pf.campisi_carino_link([json.loads(fi.to_json())] * 2).to_json()
+
+        ref = [{"duration": d, "total_return": r} for d, r in ((0.5, 0.01), (1.5, 0.02), (2.5, 0.03))]
+        table = pf.cell_returns_from_reference(json.dumps(ref), "UST", json.dumps({"width": 1.0}))
+        positions = json.dumps([{"id": "X", "duration": 1.0, "total_return": 0.025, "weight": 1.0}])
+        assert pf.excess_returns(positions, table).to_json() == pf.excess_returns(positions, table.to_json()).to_json()
+
+        grid = pf.grid_attribution(
+            json.dumps([
+                {"cell": "0-3", "sector": "GOVT", "weight": 0.5, "total_return": 0.02},
+                {"cell": "3-7", "sector": "CORP", "weight": 0.5, "total_return": 0.03},
+            ]),
+            json.dumps([
+                {"cell": "0-3", "sector": "GOVT", "weight": 0.6, "total_return": 0.01},
+                {"cell": "3-7", "sector": "CORP", "weight": 0.4, "total_return": 0.02},
+            ]),
+        )
+        assert (
+            pf.grid_carino_link([grid, grid]).to_json()
+            == pf.grid_carino_link([json.loads(grid.to_json())] * 2).to_json()
+        )
+        with pytest.raises(ValueError, match="is not JSON serializable"):
+            pf.grid_carino_link([object()])
