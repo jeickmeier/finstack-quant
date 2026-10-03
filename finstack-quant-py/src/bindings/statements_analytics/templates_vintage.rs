@@ -6,7 +6,7 @@
 //! applies `add_vintage_buildup`, and returns a typed model specification.
 
 use crate::bindings::statements::types::PyFinancialModelSpec;
-use crate::errors::display_to_py;
+use crate::errors::statements_to_py;
 use finstack_quant_statements_analytics::templates::vintage as rust_vintage;
 use pyo3::prelude::*;
 
@@ -46,7 +46,7 @@ fn add_vintage_buildup(
         new_volume_node,
         &decay_curve,
     )
-    .map_err(display_to_py)?;
+    .map_err(statements_to_py)?;
     finish_builder(builder)
 }
 

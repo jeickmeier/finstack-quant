@@ -247,7 +247,7 @@ impl PyVmCalculator {
         currency: &str,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyVmResult> {
-        let ccy: Currency = currency.parse().map_err(display_to_py)?;
+        let ccy: Currency = currency.parse().map_err(crate::errors::core_to_py)?;
         let exp = money_from_amount(exposure, ccy)?;
         let posted = money_from_amount(posted_collateral, ccy)?;
         let as_of = extract_date(as_of)?;

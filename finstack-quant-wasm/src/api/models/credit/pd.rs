@@ -152,7 +152,7 @@ impl JsMasterScale {
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if no scale is registered under `scaleId`.
+    /// Throws a `not_found` error if no scale is registered under `scaleId`.
     #[wasm_bindgen(js_name = fromRegistryId)]
     pub fn from_registry_id(scale_id: JsValue) -> Result<JsMasterScale, JsValue> {
         MasterScale::from_registry_id(&js_string(&scale_id, "scaleId")?)

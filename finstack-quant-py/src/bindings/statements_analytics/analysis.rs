@@ -20,7 +20,7 @@ use crate::bindings::statements_analytics::typed::{
     PyBridgeChart, PyScenarioDiff, PyScenarioResults, PyScenarioSet, PySensitivityConfig,
     PySensitivityResult, PyTornadoEntry, PyVarianceConfig, PyVarianceReport,
 };
-use crate::errors::{display_to_py, serde_json_to_py, statements_to_py};
+use crate::errors::{core_to_py, serde_json_to_py, statements_to_py};
 use finstack_quant_statements_analytics::analysis::{
     DependencyTree, Explanation, ExplanationStep, ForecastMetrics, GoalSeekResult,
 };
@@ -168,9 +168,8 @@ fn generate_tornado_entries(
     period: Option<&str>,
 ) -> PyResult<Vec<PyTornadoEntry>> {
     let result = extract_sensitivity_result(result)?;
-    let period_id: Option<finstack_quant_core::dates::PeriodId> = period
-        .map(|p| p.parse().map_err(display_to_py))
-        .transpose()?;
+    let period_id: Option<finstack_quant_core::dates::PeriodId> =
+        period.map(|p| p.parse().map_err(core_to_py)).transpose()?;
     Ok(
         finstack_quant_statements_analytics::analysis::generate_tornado_entries(
             &result,
@@ -342,7 +341,7 @@ fn scenario_diff(
     let results = results.inner.clone();
     let periods = periods
         .iter()
-        .map(|period| period.parse().map_err(display_to_py))
+        .map(|period| period.parse().map_err(core_to_py))
         .collect::<PyResult<Vec<_>>>()?;
     let baseline = baseline.to_string();
     let comparison = comparison.to_string();
@@ -417,7 +416,7 @@ fn variance_bridge(
 ) -> PyResult<PyBridgeChart> {
     let base = extract_results_ref(base)?.into_owned();
     let comparison = extract_results_ref(comparison)?.into_owned();
-    let period = period.parse().map_err(display_to_py)?;
+    let period = period.parse().map_err(core_to_py)?;
     let target_metric = target_metric.to_string();
     let baseline_label = baseline_label.to_string();
     let comparison_label = comparison_label.to_string();
@@ -662,7 +661,7 @@ impl PyGoalSeekResult {
     fn from_json(json: &str) -> PyResult<Self> {
         GoalSeekResult::from_json(json)
             .map(|inner| Self { inner })
-            .map_err(crate::errors::statements_to_py)
+            .map_err(statements_to_py)
     }
 
     /// Support ``pickle`` through the canonical JSON representation.
@@ -749,8 +748,8 @@ fn goal_seek(
     bounds: Option<(f64, f64)>,
 ) -> PyResult<PyGoalSeekResult> {
     let model = extract_model_ref(model)?.into_owned();
-    let tp: finstack_quant_core::dates::PeriodId = target_period.parse().map_err(display_to_py)?;
-    let dp: finstack_quant_core::dates::PeriodId = driver_period.parse().map_err(display_to_py)?;
+    let tp: finstack_quant_core::dates::PeriodId = target_period.parse().map_err(core_to_py)?;
+    let dp: finstack_quant_core::dates::PeriodId = driver_period.parse().map_err(core_to_py)?;
     let target_node = target_node.to_owned();
     let driver_node = driver_node.to_owned();
 
@@ -869,7 +868,7 @@ impl PyDependencyTracer {
         period: &str,
     ) -> PyResult<String> {
         let results = extract_results_ref(results)?;
-        let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(display_to_py)?;
+        let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(core_to_py)?;
         let tracer = finstack_quant_statements_analytics::analysis::DependencyTracer::new(
             &self.model,
             &self.graph,
@@ -1093,8 +1092,7 @@ impl PyExplanation {
     /// Node type serde name (e.g. ``"calculated"``, ``"input"``).
     #[getter]
     fn node_type(&self) -> PyResult<String> {
-        finstack_quant_core::wire::serde_label(&self.inner.node_type)
-            .map_err(crate::errors::core_to_py)
+        finstack_quant_core::wire::serde_label(&self.inner.node_type).map_err(core_to_py)
     }
 
     /// Formula text, or ``None`` for non-formula nodes.
@@ -1220,7 +1218,7 @@ fn explain_formula(
 ) -> PyResult<PyExplanation> {
     let model = extract_model_ref(model)?;
     let results = extract_results_ref(results)?;
-    let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(display_to_py)?;
+    let pid: finstack_quant_core::dates::PeriodId = period.parse().map_err(core_to_py)?;
 
     let explainer =
         finstack_quant_statements_analytics::analysis::FormulaExplainer::new(&model, &results);

@@ -320,7 +320,7 @@ pub(crate) fn attribute_pnl_many<'py>(
         .iter()
         .map(finstack_quant_attribution::pnl_attribution_wide_row)
         .collect::<Result<Vec<_>, _>>()
-        .map_err(display_to_py)?;
+        .map_err(crate::errors::core_to_py)?;
     serde_rows_to_dataframe_with_schema(py, &rows, &WIDE_COLUMNS)
 }
 

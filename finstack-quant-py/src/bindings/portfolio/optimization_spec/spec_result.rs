@@ -83,9 +83,7 @@ impl PyCandidatePosition {
         let envelope_json = crate::bindings::extract::extract_instrument_json(instrument)?;
         let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
             serde_json::from_str(&envelope_json).map_err(crate::errors::display_to_py)?;
-        let boxed = envelope
-            .into_boxed()
-            .map_err(crate::errors::display_to_py)?;
+        let boxed = envelope.into_boxed().map_err(crate::errors::core_to_py)?;
         let unit: finstack_quant_portfolio::position::PositionUnit =
             match unit {
                 None => finstack_quant_portfolio::position::PositionUnit::Units,
@@ -508,20 +506,17 @@ const TRADE_COLUMNS: [ColumnSchema<'static>; 9] = [
 )]
 pub(super) struct PyPortfolioOptimizationResult {
     pub(crate) inner: PortfolioOptimizationResultWire,
-    /// Rebalanced portfolio built eagerly from the live problem (which does
-    /// not survive the wire round-trip), or the reason it is unavailable.
-    rebalanced: Result<std::sync::Arc<finstack_quant_portfolio::Portfolio>, String>,
+    /// The live result (with the original problem, which does not survive the
+    /// wire round-trip), kept so the rebalanced portfolio is built on demand.
+    /// `None` for a result rebuilt from JSON or unpickled.
+    live: Option<std::sync::Arc<PortfolioOptimizationResult>>,
 }
 
 impl PyPortfolioOptimizationResult {
     pub(crate) fn from_inner(inner: PortfolioOptimizationResult) -> Self {
-        let rebalanced = inner
-            .to_rebalanced_portfolio()
-            .map(std::sync::Arc::new)
-            .map_err(|e| e.to_string());
         Self {
             inner: PortfolioOptimizationResultWire::from(&inner),
-            rebalanced,
+            live: Some(std::sync::Arc::new(inner)),
         }
     }
 }
@@ -550,14 +545,7 @@ impl PyPortfolioOptimizationResult {
     fn from_json(json_str: &str) -> PyResult<Self> {
         let inner = serde_json::from_str(json_str)
             .map_err(|e| crate::errors::serde_json_to_py(e, "invalid optimization result JSON"))?;
-        Ok(Self {
-            inner,
-            rebalanced: Err(
-                "rebalanced portfolio is only available on a result returned by \
-                 optimize_portfolio, not on one rebuilt from JSON"
-                    .to_owned(),
-            ),
-        })
+        Ok(Self { inner, live: None })
     }
 
     /// Rebuild the portfolio with the implied post-trade quantities.
@@ -568,17 +556,28 @@ impl PyPortfolioOptimizationResult {
     ///
     /// Raises
     /// ------
+    /// PortfolioError
+    ///     If the solution is infeasible.
     /// RuntimeError
-    ///     If the solution is infeasible, or this result was rebuilt from
-    ///     JSON / unpickled (the live problem is not part of the wire form).
+    ///     If this result was rebuilt from JSON / unpickled (the live problem
+    ///     is not part of the wire form).
     #[pyo3(text_signature = "(self)")]
-    fn to_rebalanced_portfolio(&self) -> PyResult<crate::bindings::portfolio::types::PyPortfolio> {
-        match &self.rebalanced {
-            Ok(portfolio) => Ok(crate::bindings::portfolio::types::PyPortfolio {
-                inner: std::sync::Arc::clone(portfolio),
-            }),
-            Err(message) => Err(pyo3::exceptions::PyRuntimeError::new_err(message.clone())),
-        }
+    fn to_rebalanced_portfolio(
+        &self,
+        py: Python<'_>,
+    ) -> PyResult<crate::bindings::portfolio::types::PyPortfolio> {
+        let live = self.live.as_ref().ok_or_else(|| {
+            pyo3::exceptions::PyRuntimeError::new_err(
+                "rebalanced portfolio is only available on a result returned by \
+                 optimize_portfolio, not on one rebuilt from JSON",
+            )
+        })?;
+        let portfolio = py
+            .detach(|| live.to_rebalanced_portfolio())
+            .map_err(crate::errors::portfolio_to_py)?;
+        Ok(crate::bindings::portfolio::types::PyPortfolio {
+            inner: std::sync::Arc::new(portfolio),
+        })
     }
 
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).

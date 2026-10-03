@@ -445,7 +445,9 @@ impl PyPnlAttribution {
     /// silent currency mismatch would otherwise be visible only in the raw
     /// ``to_dict()`` payload. Raises ``ValueError`` on mismatch.
     fn validate_currencies(&self) -> PyResult<()> {
-        self.inner.validate_currencies().map_err(display_to_py)
+        self.inner
+            .validate_currencies()
+            .map_err(crate::errors::core_to_py)
     }
 
     /// Human-readable tree explanation (non-zero factors only).
@@ -483,7 +485,7 @@ impl PyPnlAttribution {
         // frame is only meaningful when the factors agree with `total_pnl`.
         // Without this, a EUR `fx_pnl` beside a USD total is presented as
         // comparable and `df[factors].sum(axis=1)` silently adds unlike units.
-        let wide = pnl_attribution_wide_row(&self.inner).map_err(display_to_py)?;
+        let wide = pnl_attribution_wide_row(&self.inner).map_err(crate::errors::core_to_py)?;
         let names: Vec<&str> = WIDE_COLUMNS.iter().map(|(name, _)| *name).collect();
         serde_object_to_single_row_dataframe_with_schema(py, &wide, &names)
     }

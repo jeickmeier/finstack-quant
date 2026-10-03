@@ -53,7 +53,8 @@ impl RatingFactorTable {
     ///
     /// # Errors
     ///
-    /// Returns an error if the embedded registry is invalid or `id` is absent.
+    /// Returns a not-found error (`InputError::NotFound`) if `id` is absent,
+    /// and a validation error if the embedded registry is invalid.
     pub fn from_registry_id(id: &str) -> Result<Self> {
         Ok(Self::from_registry_parts(
             embedded_registry()?.rating_factor_table(id)?,

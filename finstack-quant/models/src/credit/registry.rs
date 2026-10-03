@@ -4,7 +4,7 @@ use crate::credit::lgd::seniority::{BetaRecovery, SeniorityCalibration, Seniorit
 use crate::credit::pd::MasterScaleGrade;
 use finstack_quant_core::embedded_registry::EmbeddedJsonRegistry;
 use finstack_quant_core::types::CreditRating;
-use finstack_quant_core::{Error, HashMap, Result};
+use finstack_quant_core::{Error, HashMap, InputError, Result};
 use serde::{Deserialize, Serialize};
 
 static EMBEDDED_REGISTRY: EmbeddedJsonRegistry<CreditAssumptionRegistry> =
@@ -180,11 +180,19 @@ impl CreditAssumptionRegistry {
                 .map(|record| record.ids.as_slice()),
         )?;
 
-        self.rating_factor_table(&self.default_rating_factor_table_id)?;
-        self.seniority_calibration(&self.default_seniority_calibration_id)?;
-        self.pd_master_scale_grades(&self.default_pd_master_scale_id)?;
-        self.downturn_lgd_preset(&self.default_downturn_lgd_id)?;
-        self.workout_lgd_defaults(&self.default_workout_lgd_id)?;
+        // A default id that names no record is a malformed registry, not a
+        // caller lookup miss, so it stays a validation error.
+        let missing_default = |err: Error| Error::Validation(format!("invalid default: {err}"));
+        self.rating_factor_table(&self.default_rating_factor_table_id)
+            .map_err(missing_default)?;
+        self.seniority_calibration(&self.default_seniority_calibration_id)
+            .map_err(missing_default)?;
+        self.pd_master_scale_grades(&self.default_pd_master_scale_id)
+            .map_err(missing_default)?;
+        self.downturn_lgd_preset(&self.default_downturn_lgd_id)
+            .map_err(missing_default)?;
+        self.workout_lgd_defaults(&self.default_workout_lgd_id)
+            .map_err(missing_default)?;
         for record in &self.rating_factor_tables {
             if record.default_factor < 0.0 || !record.default_factor.is_finite() {
                 return Err(Error::Validation(format!(
@@ -293,10 +301,14 @@ fn first_id(ids: &[String]) -> &str {
     ids.first().map_or("<missing>", String::as_str)
 }
 
+/// Lookup miss for `id` in the `kind` section of the registry. Its kind is
+/// [`ErrorKind::NotFound`](finstack_quant_core::error::ErrorKind::NotFound), so
+/// hosts raise their missing-key error (`KeyError` / `not_found`).
 fn not_found(kind: &str, id: &str) -> Error {
-    Error::Validation(format!(
-        "credit assumptions registry does not contain {kind} '{id}'"
-    ))
+    InputError::NotFound {
+        id: format!("credit assumptions registry {kind} '{id}'"),
+    }
+    .into()
 }
 
 #[derive(Clone, Debug)]
@@ -429,6 +441,19 @@ mod tests {
             .find(|(class, _)| *class == SeniorityClass::SeniorSecured)
             .expect("senior secured class should exist");
         assert!((senior_secured.1.mean() - 0.53).abs() < 1e-12);
+    }
+
+    #[test]
+    fn unknown_registry_id_is_a_not_found_error() {
+        let registry = embedded_registry().expect("embedded registry should load");
+        let err = registry
+            .rating_factor_table("nope")
+            .expect_err("unknown id should fail");
+        assert_eq!(err.kind(), finstack_quant_core::error::ErrorKind::NotFound);
+        assert!(
+            err.to_string().contains("rating factor table 'nope'"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Error kinds come from Rust (Python-binding audit PR 1)
+
+#### Changed (breaking)
+
+- Python: `ScenarioResults.to_comparison_table` / `to_dataframe` raise `KeyError` (was `ValueError`) for a metric missing from the baseline scenario.
+- Python: `Constraint.weight_bounds` / `max_turnover` / `budget` / `exposure_limit` / `exposure_minimum` and `replay_portfolio` / `replay_portfolio_json` timeline validation raise `PortfolioError` (a `ValueError`) instead of a plain `ValueError`.
+- Python: `PortfolioOptimizationResult.to_rebalanced_portfolio` raises `PortfolioError` (was `RuntimeError`) for an infeasible solution, and builds the rebalanced portfolio on demand instead of for every `optimize_portfolio` result.
+- Python and WASM: `RatingFactorTable` / `MasterScale` / `DownturnLgd` `from_registry_id` with an unknown id raise `KeyError` / throw kind `not_found` (was `ValueError` / `validation`); the Rust credit registry returns `InputError::NotFound`.
+- Python: typed Rust errors at the remaining statements-analytics, attribution, calibration, margin, portfolio and scenarios binding sites now go through their kind-aware mapper; `display_to_py` accepts only kind-less parse/serde errors (`KindlessError`), so routing a typed error through it no longer compiles.
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

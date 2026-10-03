@@ -873,7 +873,8 @@ fn im_profile_from_simm(
     decay: &PyImDecayProfile,
     time_grid: Vec<f64>,
 ) -> PyResult<PyImProfile> {
-    let ccy: finstack_quant_core::currency::Currency = currency.parse().map_err(display_to_py)?;
+    let ccy: finstack_quant_core::currency::Currency =
+        currency.parse().map_err(crate::errors::core_to_py)?;
     let inner = mva::im_profile_from_simm(
         &calculator.inner,
         &sensitivities.inner,

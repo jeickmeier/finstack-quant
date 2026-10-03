@@ -193,7 +193,7 @@ test('LGD, EAD and PD handles expose their accessors and reject bad input', () =
   assert.equal(downturn.method, 'regulatory_floor');
   assert.deepEqual(downturn.params, { regulatory_floor: { add_on: 0.08, floor: 0.1 } });
   assert.equal(credit.DownturnLgd.stressed(0.15, 0.3, 0.999).method, 'stressed_approximation');
-  assert.throws(() => credit.DownturnLgd.fromRegistryId('nope'), kind('validation'));
+  assert.throws(() => credit.DownturnLgd.fromRegistryId('nope'), kind('not_found'));
   assert.throws(
     () => credit.DownturnLgd.fromJson({ method: { regulatory_floor: { add_on: -1, floor: 0.1 } } }),
     kind('validation')
@@ -209,7 +209,7 @@ test('LGD, EAD and PD handles expose their accessors and reject bad input', () =
   assert.throws(() => scaleHandle.mapPd(5), kind('validation'));
   assert.throws(() => scaleHandle.mapPds([0.01, -1]), kind('validation'));
   assert.throws(() => new credit.MasterScale([]), kind('validation'));
-  assert.throws(() => credit.MasterScale.fromRegistryId('nope'), kind('validation'));
+  assert.throws(() => credit.MasterScale.fromRegistryId('nope'), kind('not_found'));
   // Altman scores carry no implied PD, so they cannot be mapped to a grade.
   assert.throws(
     () => scaleHandle.mapScore(credit.altmanZScore(0.1, 0.2, 0.15, 1.5, 1.1)),

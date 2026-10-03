@@ -249,6 +249,15 @@ def test_scenario_result_set_to_dataframe_renders_the_comparison() -> None:
     assert row["downside_vs_base_frac"] == pytest.approx(-0.1)
 
 
+def test_scenario_result_set_unknown_metric_raises_key_error() -> None:
+    """A metric missing from the baseline is Rust ``MissingData`` (kind NotFound)."""
+    results = _scenario_result_set()
+    with pytest.raises(KeyError, match="nope"):
+        results.to_comparison_table(["nope"])
+    with pytest.raises(KeyError, match="nope"):
+        results.to_dataframe(["nope"])
+
+
 def test_scenario_result_set_to_dataframe_matches_comparison_table() -> None:
     """The two exports stay in lockstep on schema and row count.
 

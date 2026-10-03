@@ -275,8 +275,9 @@ impl MasterScale {
     ///
     /// # Errors
     ///
-    /// Returns an error if the embedded registry cannot load, `id` is unknown,
-    /// or the selected grades fail the non-empty, finite, in-range, strictly
+    /// Returns a not-found error (`InputError::NotFound`) if `id` is unknown,
+    /// and a validation error if the embedded registry cannot load or the
+    /// selected grades fail the non-empty, finite, in-range, strictly
     /// increasing-boundary invariants of [`MasterScale::new`].
     pub fn from_registry_id(id: &str) -> finstack_quant_core::Result<Self> {
         let grades = crate::credit::registry::embedded_registry()?.pd_master_scale_grades(id)?;

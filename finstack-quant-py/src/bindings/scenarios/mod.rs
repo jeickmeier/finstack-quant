@@ -167,7 +167,7 @@ fn list_builtin_template_metadata() -> PyResult<Vec<PyTemplateMetadata>> {
 fn build_from_template(template_id: &str) -> PyResult<PyScenarioSpec> {
     let spec = builtin_registry()?
         .build(template_id)
-        .map_err(|error| crate::errors::value_error(error.to_string()))?;
+        .map_err(crate::errors::scenarios_to_py)?;
     Ok(PyScenarioSpec::from_inner(spec))
 }
 
@@ -195,7 +195,7 @@ fn list_template_components(template_id: &str) -> PyResult<Vec<String>> {
     builtin_registry()?
         .component_ids(template_id)
         .map(|ids| ids.into_iter().map(str::to_string).collect())
-        .map_err(|error| crate::errors::value_error(error.to_string()))
+        .map_err(crate::errors::scenarios_to_py)
 }
 
 /// Build a scenario specification from one component of a built-in template.
@@ -220,7 +220,7 @@ fn list_template_components(template_id: &str) -> PyResult<Vec<String>> {
 fn build_template_component(template_id: &str, component_id: &str) -> PyResult<PyScenarioSpec> {
     let spec = builtin_registry()?
         .build_component(template_id, component_id)
-        .map_err(|error| crate::errors::value_error(error.to_string()))?;
+        .map_err(crate::errors::scenarios_to_py)?;
     Ok(PyScenarioSpec::from_inner(spec))
 }
 

@@ -241,7 +241,7 @@ impl PyScorecardConfig {
     /// Validate the configuration without executing.
     fn validate(&self) -> PyResult<()> {
         rust_scorecards::CreditScorecardExtension::validate_config(&self.inner)
-            .map_err(display_to_py)
+            .map_err(crate::errors::statements_to_py)
     }
 
     /// Serialize this config to JSON.
@@ -493,7 +493,7 @@ impl PyCreditScorecardExtension {
         let inner = self
             .inner
             .execute(&model, &results)
-            .map_err(display_to_py)?;
+            .map_err(crate::errors::statements_to_py)?;
         Ok(PyScorecardReport { inner })
     }
 }
@@ -501,7 +501,8 @@ impl PyCreditScorecardExtension {
 /// Validate a [`ScorecardConfig`] payload (typed object) without executing.
 #[pyfunction]
 fn validate_scorecard_config(config: &PyScorecardConfig) -> PyResult<()> {
-    rust_scorecards::CreditScorecardExtension::validate_config(&config.inner).map_err(display_to_py)
+    rust_scorecards::CreditScorecardExtension::validate_config(&config.inner)
+        .map_err(crate::errors::statements_to_py)
 }
 
 /// Register scorecard types and functions on the parent module.

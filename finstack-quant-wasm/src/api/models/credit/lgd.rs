@@ -537,7 +537,7 @@ impl JsDownturnLgd {
     ///
     /// # Errors
     ///
-    /// Throws a `validation` error if no calibration is registered under `id`.
+    /// Throws a `not_found` error if no calibration is registered under `id`.
     #[wasm_bindgen(js_name = fromRegistryId)]
     pub fn from_registry_id(id: JsValue) -> Result<JsDownturnLgd, JsValue> {
         DownturnLgd::from_registry_id(&js_string(&id, "id")?)

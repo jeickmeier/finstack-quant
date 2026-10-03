@@ -7,7 +7,7 @@ use finstack_quant_portfolio::optimization::{
 use finstack_quant_portfolio::types::{AttributeTest, AttributeValue, ComparisonOp, PositionId};
 use finstack_quant_valuations::metrics::MetricId;
 
-use crate::errors::display_to_py;
+use crate::errors::portfolio_to_py;
 
 use super::super::json_bridge::{deserialize_json, serialize_json};
 use super::enums::PyInequality;
@@ -35,7 +35,7 @@ fn parse_attribute_value(text: Option<String>, number: Option<f64>) -> PyResult<
 }
 
 fn parse_comparison_op(op: &str) -> PyResult<ComparisonOp> {
-    op.parse().map_err(crate::errors::portfolio_to_py)
+    op.parse().map_err(portfolio_to_py)
 }
 
 /// Accept an ``Inequality`` object or one of its string spellings
@@ -49,7 +49,7 @@ fn extract_inequality(op: &Bound<'_, PyAny>) -> PyResult<Inequality> {
             "expected an Inequality or one of 'le', '<=', 'ge', '>=', 'eq', '=='",
         )
     })?;
-    text.parse().map_err(crate::errors::portfolio_to_py)
+    text.parse().map_err(portfolio_to_py)
 }
 
 /// Per-position metric source (clone-only declarative wrapper).
@@ -512,8 +512,8 @@ impl PyConstraint {
         }))
     }
 
-    /// Weight bounds for positions matching the filter. Returns an error
-    /// when ``min > max``.
+    /// Weight bounds for positions matching the filter. Raises
+    /// ``PortfolioError`` when ``min > max``.
     #[classmethod]
     #[pyo3(text_signature = "(cls, filter, min, max, label=None)")]
     #[pyo3(signature = (filter, min, max, label=None))]
@@ -524,7 +524,7 @@ impl PyConstraint {
         max: f64,
         label: Option<String>,
     ) -> PyResult<Self> {
-        let mut c = Constraint::weight_bounds(filter.inner, min, max).map_err(display_to_py)?;
+        let mut c = Constraint::weight_bounds(filter.inner, min, max).map_err(portfolio_to_py)?;
         if let Some(lbl) = label {
             c = c.with_label(lbl);
         }
@@ -540,7 +540,7 @@ impl PyConstraint {
         max_turnover: f64,
         label: Option<String>,
     ) -> PyResult<Self> {
-        let mut c = Constraint::max_turnover(max_turnover).map_err(display_to_py)?;
+        let mut c = Constraint::max_turnover(max_turnover).map_err(portfolio_to_py)?;
         if let Some(lbl) = label {
             c = c.with_label(lbl);
         }
@@ -551,7 +551,7 @@ impl PyConstraint {
     #[classmethod]
     #[pyo3(text_signature = "(cls, rhs)")]
     fn budget(_cls: &Bound<'_, PyType>, rhs: f64) -> PyResult<Self> {
-        let c = Constraint::budget(rhs).map_err(display_to_py)?;
+        let c = Constraint::budget(rhs).map_err(portfolio_to_py)?;
         Ok(Self::from_inner(c))
     }
 
@@ -566,7 +566,7 @@ impl PyConstraint {
         max_share: f64,
         label: Option<String>,
     ) -> PyResult<Self> {
-        let mut c = Constraint::exposure_limit(key, value, max_share).map_err(display_to_py)?;
+        let mut c = Constraint::exposure_limit(key, value, max_share).map_err(portfolio_to_py)?;
         if let Some(lbl) = label {
             c = c.with_label(lbl);
         }
@@ -584,7 +584,7 @@ impl PyConstraint {
         min_share: f64,
         label: Option<String>,
     ) -> PyResult<Self> {
-        let mut c = Constraint::exposure_minimum(key, value, min_share).map_err(display_to_py)?;
+        let mut c = Constraint::exposure_minimum(key, value, min_share).map_err(portfolio_to_py)?;
         if let Some(lbl) = label {
             c = c.with_label(lbl);
         }

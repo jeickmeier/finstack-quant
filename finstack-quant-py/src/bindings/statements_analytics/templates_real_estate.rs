@@ -20,7 +20,7 @@ use pyo3::prelude::*;
 use super::templates_common::{extract_builder, finish_builder};
 
 fn parse_period(s: &str) -> PyResult<PeriodId> {
-    s.parse().map_err(display_to_py)
+    s.parse().map_err(crate::errors::core_to_py)
 }
 
 /// Rent step that resets the base rent starting at ``start`` (inclusive).
@@ -227,7 +227,9 @@ impl PyRenewalSpec {
 
     /// Validate renewal fields.
     fn validate(&self) -> PyResult<()> {
-        self.inner.validate().map_err(display_to_py)
+        self.inner
+            .validate()
+            .map_err(crate::errors::statements_to_py)
     }
 
     /// Export the renewal spec as a single-row pandas ``DataFrame``.
@@ -461,7 +463,9 @@ impl PyLeaseSpec {
 
     /// Validate lease fields.
     fn validate(&self) -> PyResult<()> {
-        self.inner.validate().map_err(display_to_py)
+        self.inner
+            .validate()
+            .map_err(crate::errors::statements_to_py)
     }
 
     /// Export the lease spec as a single-row pandas ``DataFrame``.
@@ -991,7 +995,7 @@ fn add_noi_buildup(
         &expense_refs,
         noi_node,
     )
-    .map_err(display_to_py)?;
+    .map_err(crate::errors::statements_to_py)?;
     finish_builder(builder)
 }
 
@@ -1008,7 +1012,7 @@ fn add_ncf_buildup(
     let capex_refs: Vec<&str> = capex_nodes.iter().map(String::as_str).collect();
     let builder =
         rust_re::add_ncf_buildup(extract_builder(model)?, noi_node, &capex_refs, ncf_node)
-            .map_err(display_to_py)?;
+            .map_err(crate::errors::statements_to_py)?;
     finish_builder(builder)
 }
 
@@ -1025,7 +1029,7 @@ fn add_rent_roll(
     let lease_specs: Vec<rust_re::LeaseSpec> = leases.into_iter().map(|l| l.inner).collect();
     let nodes_inner = nodes.map(|n| n.inner).unwrap_or_default();
     let builder = rust_re::add_rent_roll(extract_builder(model)?, &lease_specs, &nodes_inner)
-        .map_err(display_to_py)?;
+        .map_err(crate::errors::statements_to_py)?;
     finish_builder(builder)
 }
 
@@ -1066,7 +1070,7 @@ fn add_property_operating_statement(
         fee,
         &nodes_inner,
     )
-    .map_err(display_to_py)?;
+    .map_err(crate::errors::statements_to_py)?;
     finish_builder(builder)
 }
 

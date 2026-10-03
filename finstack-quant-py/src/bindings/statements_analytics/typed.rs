@@ -43,7 +43,7 @@ const BRIDGE_STEP_COLUMNS: [ColumnSchema<'static>; 2] =
     [("driver", "str"), ("contribution", "float64")];
 
 fn parse_period(period: &str) -> PyResult<PeriodId> {
-    period.parse().map_err(display_to_py)
+    period.parse().map_err(crate::errors::core_to_py)
 }
 
 /// Parse the serde name of a [`SensitivityMode`] (`"diagonal"`, `"full_grid"`, `"tornado"`).
@@ -592,7 +592,9 @@ impl PyScenarioSet {
     ///     If the scenario is unknown or its parent chain contains a cycle.
     #[pyo3(text_signature = "(scenario)")]
     fn trace(&self, scenario: &str) -> PyResult<Vec<String>> {
-        self.inner.trace(scenario).map_err(display_to_py)
+        self.inner
+            .trace(scenario)
+            .map_err(crate::errors::statements_to_py)
     }
 
     /// Identify this value in notebooks and logs.
@@ -1133,6 +1135,8 @@ impl PyScenarioResults {
     /// ------
     /// ValueError
     ///     If the result set or `metrics` is empty.
+    /// KeyError
+    ///     If a metric in ``metrics`` is not a node of the baseline scenario.
     #[pyo3(text_signature = "(metrics)")]
     fn to_comparison_table(
         &self,
@@ -1165,6 +1169,8 @@ impl PyScenarioResults {
     /// ------
     /// ValueError
     ///     If the result set or ``metrics`` is empty.
+    /// KeyError
+    ///     If a metric in ``metrics`` is not a node of the baseline scenario.
     #[pyo3(text_signature = "(metrics)")]
     fn to_dataframe<'py>(
         &self,
@@ -1184,7 +1190,9 @@ impl PyScenarioResults {
         metrics: &[String],
     ) -> PyResult<finstack_quant_core::table::TableEnvelope> {
         let refs: Vec<&str> = metrics.iter().map(String::as_str).collect();
-        self.inner.to_comparison_table(&refs).map_err(display_to_py)
+        self.inner
+            .to_comparison_table(&refs)
+            .map_err(crate::errors::statements_to_py)
     }
 }
 
