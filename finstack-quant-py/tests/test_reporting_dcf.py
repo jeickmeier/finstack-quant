@@ -14,6 +14,7 @@ _VAL: dict[str, Any] = {
     "equity_value": {"amount": "850.00", "currency": "USD"},
     "enterprise_value": {"amount": "1000.00", "currency": "USD"},
     "net_debt": {"amount": "150.00", "currency": "USD"},
+    "valuation_discount": {"amount": "0.00", "currency": "USD"},
     "terminal_value_pv": {"amount": "600.00", "currency": "USD"},
     "equity_value_per_share": 8.5,
     "diluted_shares": 100.0,
@@ -106,3 +107,39 @@ def test_dcf_tearsheet_tolerates_bad_sensitivity() -> None:
     ).to_html()
     assert "Equity Value Sensitivity" not in html
     assert "Equity Bridge" in html
+
+
+def test_bridge_reconciles_to_rust_equity_value_with_valuation_discounts() -> None:
+    """The bridge total is Rust's equity value, with the DLOM shown as its own step."""
+    import re
+
+    from finstack_quant.core.money import Money
+    from finstack_quant.statements_analytics import (
+        EquityBridge,
+        TerminalValueSpec,
+        ValuationDiscounts,
+        evaluate_dcf,
+    )
+
+    builder = statements.ModelBuilder("dcf")
+    builder.periods("2025..2026")
+    builder.value_money("ufcf", [("2025", Money(100.0, "USD")), ("2026", Money(110.0, "USD"))])
+    builder.with_meta("currency", '"USD"')
+    result = evaluate_dcf(
+        builder.build(),
+        0.10,
+        TerminalValueSpec.gordon_growth(0.02),
+        options={
+            "equity_bridge": EquityBridge(total_debt=500.0, cash=100.0, minority_interest=50.0),
+            "valuation_discounts": ValuationDiscounts(dlom=0.25),
+        },
+    )
+    equity = result.equity_value.amount
+    bridge = result.enterprise_value.amount - result.net_debt.amount - result.valuation_discount.amount
+    assert bridge == pytest.approx(equity, abs=0.01)
+    assert result.valuation_discount.amount > 0.0
+
+    html = dcf_tearsheet(result, sections=["bridge"]).to_html()
+    bars = dict(re.findall(r'data-label="([^"]+)" data-val="([^"]+)"', html))
+    assert "− Valuation Discounts" in bars
+    assert float(bars["Equity Value"].replace(",", "")) == pytest.approx(equity, abs=1.0)

@@ -1832,7 +1832,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
             "type_name": "PortfolioOptimizationSpec",
             "kind": "input",
-            "bytes": 57149
+            "bytes": 57461
           },
           {
             "path": "schemas/portfolio/1/portfolio_primitive_exposure_report.schema.json",
@@ -4330,7 +4330,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
             "type_name": "PortfolioOptimizationSpec",
             "kind": "input",
-            "bytes": 57149
+            "bytes": 57461
           },
           {
             "domain": "portfolio",

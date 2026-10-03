@@ -548,7 +548,9 @@ export interface CovenantForecastConfig {
    * `sqrt(T)` where T is the year-fraction from this date to the test date.
    * When `None`, the engine uses the end date of the period immediately
    * preceding the first forecast period, so the first simulated point still
-   * has a non-zero forecast horizon.
+   * has a non-zero forecast horizon. A dated-row series
+   * (`series::forecast_covenant` / `series::forecast_breaches`) carries no
+   * period starts, so it requires this field for stochastic forecasts.
    */
   reference_date?: DateWire | null;
   /**

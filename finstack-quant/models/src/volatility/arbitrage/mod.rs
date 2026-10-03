@@ -88,6 +88,17 @@ pub struct ArbitrageCheckConfig {
     pub min_severity: ArbitrageSeverity,
 }
 
+/// Default violation tolerance of every arbitrage check.
+///
+/// Used by [`ArbitrageCheckConfig::default`], the per-check `Default`s
+/// ([`ButterflyCheck`], [`CalendarSpreadCheck`], [`LocalVolDensityCheck`]),
+/// [`check_local_vol_density_grid`], and by the host bindings of the raw-grid
+/// checks ([`check_butterfly_grid`], [`check_calendar_spread_grid`],
+/// [`check_surface_grid`]) when the caller does not choose one. Expressed in
+/// the units of each check's violation magnitude (call-price convexity or total
+/// variance); a caller screening noisy market quotes passes a looser value.
+pub const DEFAULT_ARBITRAGE_TOLERANCE: f64 = 1e-10;
+
 impl Default for ArbitrageCheckConfig {
     fn default() -> Self {
         Self {
@@ -95,7 +106,7 @@ impl Default for ArbitrageCheckConfig {
             check_calendar_spread: true,
             check_local_vol_density: true,
             forward_prices: None,
-            tolerance: 1e-10,
+            tolerance: DEFAULT_ARBITRAGE_TOLERANCE,
             min_severity: ArbitrageSeverity::Negligible,
         }
     }
@@ -255,15 +266,6 @@ pub fn check_surface(
     })
 }
 
-/// Violation tolerance the host bindings apply to the raw-grid checks
-/// ([`check_butterfly_grid`], [`check_calendar_spread_grid`],
-/// [`check_surface_grid`]) when the caller does not choose one.
-///
-/// Expressed in the units of each check's own violation magnitude (call-price
-/// convexity or total variance), so quote-level noise on a market grid is not
-/// reported as an arbitrage.
-pub const DEFAULT_GRID_TOLERANCE: f64 = 1e-6;
-
 /// Run a butterfly arbitrage check on volatility rows.
 ///
 /// # Arguments
@@ -360,7 +362,7 @@ pub fn check_local_vol_density_grid(
     Ok(local_vol_density_violations(
         &surface,
         &forward_prices,
-        1e-10,
+        DEFAULT_ARBITRAGE_TOLERANCE,
     ))
 }
 

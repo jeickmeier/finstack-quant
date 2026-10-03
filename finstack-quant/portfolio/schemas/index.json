@@ -227,7 +227,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
-      "bytes": 57149,
+      "bytes": 57461,
       "kind": "input",
       "path": "schemas/portfolio/1/portfolio_optimization_spec.schema.json",
       "summary": "JSON-serializable specification for a portfolio optimization problem.",

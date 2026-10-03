@@ -463,13 +463,15 @@ def waterfall_chart(
     *,
     theme: Theme,
     total_label: str = "Total",
+    total: Any = None,
     height: int = 210,
 ) -> str:
     """Render a contribution waterfall (bridge).
 
     Each ``deltas[i]`` is a signed contribution; bar ``i`` floats from the running
     cumulative ``cum_i`` to ``cum_i + deltas[i]``, and a final anchored bar spans
-    ``[0, Σ deltas]`` labelled ``total_label``. Positive steps use ``theme.pos``,
+    ``[0, total]`` labelled ``total_label``, where ``total`` is the caller's
+    reported figure when given and ``Σ deltas`` otherwise. Positive steps use ``theme.pos``,
     negative ``theme.neg``, and the total bar ``theme.ink``. Reuses the axis,
     gridline, value-label, and hover-band (``fq-hb``/``fq-cross``/``fq-mk``)
     conventions of :func:`bar_chart`. Deterministic.
@@ -484,6 +486,9 @@ def waterfall_chart(
         Report palette and typography used for SVG elements.
     total_label : str
         Label shown on the final cumulative-total bar.
+    total : Any
+        Reported total to anchor the final bar on (for example a figure taken
+        from a Rust result); ``None`` uses the sum of ``deltas``.
     height : int
         SVG viewbox height in pixels; defaults to ``210``.
 
@@ -511,7 +516,7 @@ def waterfall_chart(
     cum = [0.0]
     for d in ds:
         cum.append(cum[-1] + d)
-    total = cum[-1]
+    total = cum[-1] if total is None or fmt._missing(total) else float(total)
 
     levels = [*cum, 0.0, total]
     lo, hi = min(0.0, *levels), max(0.0, *levels)

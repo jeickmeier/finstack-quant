@@ -6,9 +6,9 @@
 //! strings and date-like objects only. Datetimes and pandas timestamps are
 //! formatted by the Rust key policy (``datetime_order_key``: aware values
 //! normalize to UTC; naive values keep wall time; fixed nanosecond precision);
-//! dates use ``isoformat()``. Ints, floats, bools and other objects raise
-//! ``TypeError`` (as in WASM, where keys are strings); convert integer period
-//! keys to zero-padded strings. Mixed aware/naive datetime keys fail; opaque
+//! dates use ``isoformat()``. Ints, floats, bools, durations (``pd.Timedelta``)
+//! and other objects raise ``TypeError`` (as in WASM, where keys are strings);
+//! convert integer period keys to zero-padded strings. Mixed aware/naive datetime keys fail; opaque
 //! strings retain caller ordering.
 
 use crate::bindings::module_utils::py_to_json_value;
@@ -23,11 +23,14 @@ use serde_json::Value;
 /// Convert one key-column sequence into strings.
 ///
 /// Strings pass through. Datetimes and pandas timestamps go to the Rust key
-/// formatter; other date-like objects use ``isoformat``. Every other element
-/// type raises ``TypeError``. Aware and naive datetimes must not be mixed.
+/// formatter; ``datetime.date`` values use ``isoformat``. Every other element
+/// type (ints, floats, durations such as ``pd.Timedelta``, times) raises
+/// ``TypeError``. Aware and naive datetimes must not be mixed.
 fn extract_keys(obj: &Bound<'_, PyAny>, role: &str) -> PyResult<Vec<String>> {
     let mut keys = Vec::new();
-    let datetime_type = obj.py().import("datetime")?.getattr("datetime")?;
+    let datetime_module = obj.py().import("datetime")?;
+    let datetime_type = datetime_module.getattr("datetime")?;
+    let date_type = datetime_module.getattr("date")?;
     let mut aware_kind = None;
     for item in obj.try_iter().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
@@ -58,11 +61,14 @@ fn extract_keys(obj: &Bound<'_, PyAny>, role: &str) -> PyResult<Vec<String>> {
             } else {
                 finstack_quant_features::naive_datetime_order_key(wall)
             });
-        } else if item.hasattr("isoformat")? {
+        } else if item.is_instance(&date_type)? {
+            // A plain date: ISO `YYYY-MM-DD` sorts chronologically. Other
+            // objects with an `isoformat` (durations such as `pd.Timedelta`,
+            // times) do not sort correctly as text, so they are rejected below.
             keys.push(item.call_method0("isoformat")?.extract()?);
         } else {
             return Err(pyo3::exceptions::PyTypeError::new_err(format!(
-                "{role} entries must be str or date-like, got {}",
+                "{role} entries must be str, datetime or date, got {}",
                 item.get_type()
                     .name()
                     .map_or_else(|_| "?".to_string(), |n| n.to_string())

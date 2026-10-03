@@ -3,8 +3,10 @@
 EV→equity bridge, UFCF projection, sensitivity tornado, and a forecast summary.
 
 Pure presentation — reads the ``evaluate_dcf`` result dict, statement nodes, and
-a caller-supplied tornado-entries list. The only value transform is negating net
-debt for the bridge's downward step (a display-direction sign).
+a caller-supplied tornado-entries list. The bridge steps (enterprise value, net
+debt, valuation discount) and its equity-value total are the Rust result's own
+figures; the only value transform is negating the downward steps (a
+display-direction sign).
 
 Examples:
 --------
@@ -53,12 +55,20 @@ def _money_parts(value: Any) -> tuple[float | None, str | None]:
 def _section_bridge(val: dict[str, Any], theme: Theme) -> Section | None:
     ev, _ = _money_parts(val.get("enterprise_value"))
     nd, _ = _money_parts(val.get("net_debt"))
+    eq, _ = _money_parts(val.get("equity_value"))
     if ev is None or nd is None:
         return None
+    discount, _ = _money_parts(val.get("valuation_discount"))
+    labels, deltas = ["Enterprise Value", "− Net Debt"], [ev, -nd]  # noqa: RUF001
+    subtitle = "Enterprise value less net debt equals equity value."
+    if discount:
+        labels.append("− Valuation Discounts")  # noqa: RUF001
+        deltas.append(-discount)
+        subtitle = "Enterprise value less net debt and valuation discounts (DLOM, DLOC) equals equity value."
     return Section(
         "EV → Equity Bridge",
-        charts.waterfall_chart(["Enterprise Value", "− Net Debt"], [ev, -nd], theme=theme, total_label="Equity Value"),  # noqa: RUF001
-        subtitle="Enterprise value less net debt equals equity value.",
+        charts.waterfall_chart(labels, deltas, theme=theme, total_label="Equity Value", total=eq),
+        subtitle=subtitle,
     )
 
 

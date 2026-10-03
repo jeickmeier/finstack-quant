@@ -1591,6 +1591,15 @@ export interface CorporateValuationResult {
    * Terminal value (present value)
    */
   terminal_value_pv: Money;
+  /**
+   * Total valuation discount (DLOM, DLOC, other) deducted after the
+   * EV-to-equity bridge; zero when `DcfOptions::valuation_discounts` is unset.
+   *
+   * `enterprise_value - net_debt - valuation_discount` equals
+   * `equity_value`, so a bridge built from these three steps reconciles to
+   * the reported equity value.
+   */
+  valuation_discount: Money;
   [k: string]: unknown;
 }
 /**

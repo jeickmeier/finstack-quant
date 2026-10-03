@@ -273,7 +273,7 @@ mod tests {
         );
         let violations = LocalVolDensityCheck {
             forwards: forwards.to_vec(),
-            tolerance: 1e-10,
+            tolerance: crate::volatility::arbitrage::DEFAULT_ARBITRAGE_TOLERANCE,
         }
         .check(&surface);
         assert!(

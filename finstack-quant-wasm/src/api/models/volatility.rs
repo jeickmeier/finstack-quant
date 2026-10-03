@@ -806,7 +806,7 @@ pub fn svi_durrleman_g(params: JsValue, k: JsValue) -> Result<f64, JsValue> {
 }
 
 fn grid_tolerance(tolerance: Option<&JsValue>) -> Result<f64, JsValue> {
-    Ok(js_opt_f64(tolerance, "tolerance")?.unwrap_or(model_arbitrage::DEFAULT_GRID_TOLERANCE))
+    Ok(js_opt_f64(tolerance, "tolerance")?.unwrap_or(model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))
 }
 
 /// Butterfly-arbitrage check on a strike by expiry volatility grid.
@@ -814,7 +814,7 @@ fn grid_tolerance(tolerance: Option<&JsValue>) -> Result<f64, JsValue> {
 /// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
 /// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
 /// @param forward_prices - One forward price to broadcast, or one per expiry.
-/// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_GRID_TOLERANCE` (1e-6).
+/// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
 /// @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
 ///
 /// # Errors
@@ -845,7 +845,7 @@ pub fn check_butterfly_grid(
 /// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
 /// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
 /// @param forward_prices - One forward price to broadcast, or one per expiry.
-/// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_GRID_TOLERANCE` (1e-6).
+/// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
 /// @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
 ///
 /// # Errors
@@ -904,7 +904,7 @@ pub fn check_local_vol_density_grid(
 /// @param expiries - Strictly increasing expiries in years, one per row of `vols`.
 /// @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
 /// @param forward_prices - One forward price to broadcast, or one per expiry.
-/// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_GRID_TOLERANCE` (1e-6).
+/// @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
 /// @returns The `ArbitrageReport` object (`vol_surface_id`, `violations`, `passed`, `counts_by_type`, `counts_by_severity`).
 ///
 /// # Errors

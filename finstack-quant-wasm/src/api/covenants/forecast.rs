@@ -23,6 +23,9 @@ fn forecast_config(config: Option<&JsValue>) -> Result<CovenantForecastConfig, J
 /// Deterministic by default: breach probability is `0` for a pass and `1` for
 /// a breach. With `config.stochastic` a lognormal overlay on the metric gives
 /// probabilities, analytic when `num_paths` is `0` and Monte Carlo otherwise.
+/// A stochastic config needs `reference_date`: rows carry only test dates, so
+/// the horizon start (for example the day before the first reporting period
+/// begins) must be stated.
 ///
 /// @param spec - `CovenantSpec` wire object of a numeric covenant.
 /// @param metrics - `DatedMetrics` rows (`{ date, metrics }`): projected metric values per ISO-8601 test date, in any order with unique dates. (Python takes a date-indexed DataFrame.)
@@ -47,8 +50,9 @@ pub fn forecast_covenant(
 ///
 /// Effective windows, waivers and threshold schedules are honored;
 /// non-numeric covenants are skipped. Deterministic breaches are always
-/// listed; in stochastic mode dates whose breach probability reaches
-/// `config.breach_probability_threshold` are listed too.
+/// listed; in stochastic mode (which needs `config.reference_date`) dates
+/// whose breach probability reaches `config.breach_probability_threshold` are
+/// listed too.
 ///
 /// @param engine - `CovenantEngine` handle.
 /// @param metrics - `DatedMetrics` rows (`{ date, metrics }`): projected metric values per ISO-8601 test date, in any order with unique dates. (Python takes a date-indexed DataFrame.)

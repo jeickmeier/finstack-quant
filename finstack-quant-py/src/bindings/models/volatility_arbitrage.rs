@@ -214,7 +214,7 @@ impl PyArbitrageReport {
 ///     Forward prices. Pass either one value to broadcast across expiries,
 ///     or one value per expiry.
 /// tolerance : float, optional
-///     Tolerance in total-variance units. Default ``1e-6``.
+///     Tolerance in total-variance units. Default ``1e-10`` (Rust ``DEFAULT_ARBITRAGE_TOLERANCE``, the same default as every Rust arbitrage check); pass a looser value to screen noisy market quotes.
 ///
 /// Returns
 /// -------
@@ -227,7 +227,7 @@ impl PyArbitrageReport {
 /// ValueError
 ///     If grid dimensions are inconsistent or inputs are non-finite.
 #[pyfunction]
-#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_GRID_TOLERANCE))]
+#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
 fn check_butterfly_grid<'py>(
     py: Python<'py>,
     strikes: Vec<f64>,
@@ -261,7 +261,7 @@ fn check_butterfly_grid<'py>(
 ///     Forward prices. Pass either one value to broadcast across expiries,
 ///     or one value per expiry.
 /// tolerance : float, optional
-///     Tolerance in total-variance units. Default ``1e-6``.
+///     Tolerance in total-variance units. Default ``1e-10`` (Rust ``DEFAULT_ARBITRAGE_TOLERANCE``, the same default as every Rust arbitrage check); pass a looser value to screen noisy market quotes.
 ///
 /// Returns
 /// -------
@@ -273,7 +273,7 @@ fn check_butterfly_grid<'py>(
 /// ValueError
 ///     If grid dimensions are inconsistent or inputs are non-finite.
 #[pyfunction]
-#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_GRID_TOLERANCE))]
+#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
 fn check_calendar_spread_grid<'py>(
     py: Python<'py>,
     strikes: Vec<f64>,
@@ -351,7 +351,7 @@ fn check_local_vol_density_grid<'py>(
 ///     Forward prices for every check. Pass either one value to broadcast or
 ///     one value per expiry.
 /// tolerance : float, optional
-///     Shared tolerance for all checks. Default ``1e-6``.
+///     Shared tolerance for all checks. Default ``1e-10`` (Rust ``DEFAULT_ARBITRAGE_TOLERANCE``, the same default as every Rust arbitrage check); pass a looser value to screen noisy market quotes.
 ///
 /// Returns
 /// -------
@@ -364,7 +364,7 @@ fn check_local_vol_density_grid<'py>(
 /// ValueError
 ///     If the forward-price shape or grid inputs are invalid.
 #[pyfunction]
-#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_GRID_TOLERANCE))]
+#[pyo3(signature = (strikes, expiries, vols, forward_prices, tolerance = model_arbitrage::DEFAULT_ARBITRAGE_TOLERANCE))]
 fn check_surface_grid(
     strikes: Vec<f64>,
     expiries: Vec<f64>,

@@ -274,8 +274,8 @@ pub fn vol_quote_option_vol(
 /// @param maturity - ISO-8601 maturity date of the underlying swap.
 /// @param strike - Fixed strike rate as a decimal.
 /// @param vol - Volatility: absolute rate volatility for normal quotes (for example `0.0072`), annualized decimal for lognormal quotes.
-/// @param quote_type - `"normal"` or `"black_lognormal"`; defaults to `"normal"`.
-/// @param convention - Swaption market convention identifier; defaults to `"USD"`.
+/// @param quote_type - `"normal"` (`vol` is an absolute rate volatility) or `"black_lognormal"` (`vol` is a relative volatility); required, because it decides the unit of `vol`.
+/// @param convention - Swaption market convention identifier; omitted uses the Rust default `VolQuote::DEFAULT_SWAPTION_CONVENTION` (`"USD"`).
 /// @returns A validated `VolQuote` object tagged `swaption_vol`.
 ///
 /// # Errors
@@ -289,7 +289,7 @@ pub fn vol_quote_swaption_vol(
     maturity: JsValue,
     strike: JsValue,
     vol: JsValue,
-    quote_type: Option<JsValue>,
+    quote_type: JsValue,
     convention: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::new()
@@ -298,7 +298,7 @@ pub fn vol_quote_swaption_vol(
         .date("maturity", &maturity, "maturity")?
         .number("strike", &strike, "strike")?
         .number("vol", &vol, "vol")?
-        .opt_string("quote_type", quote_type.as_ref(), "quoteType")?
+        .string("quote_type", &quote_type, "quoteType")?
         .opt_string("convention", convention.as_ref(), "convention")?;
     vol_quote("swaption_vol", fields)
 }
@@ -310,7 +310,7 @@ pub fn vol_quote_swaption_vol(
 /// @param expiry - ISO-8601 cap/floor maturity date.
 /// @param strike - Strike rate as a decimal.
 /// @param vol - Volatility: absolute rate volatility for normal quotes, annualized decimal for lognormal quotes.
-/// @param quote_type - `"normal"` or `"black_lognormal"`; defaults to `"normal"`.
+/// @param quote_type - `"normal"` (`vol` is an absolute rate volatility) or `"black_lognormal"` (`vol` is a relative volatility); required, because it decides the unit of `vol`.
 /// @param is_cap - `true` for a cap, `false` for a floor; defaults to `true`.
 /// @returns A validated `VolQuote` object tagged `cap_floor_vol`.
 ///
@@ -324,7 +324,7 @@ pub fn vol_quote_cap_floor_vol(
     expiry: JsValue,
     strike: JsValue,
     vol: JsValue,
-    quote_type: Option<JsValue>,
+    quote_type: JsValue,
     is_cap: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let fields = Fields::new()
@@ -332,7 +332,7 @@ pub fn vol_quote_cap_floor_vol(
         .date("expiry", &expiry, "expiry")?
         .number("strike", &strike, "strike")?
         .number("vol", &vol, "vol")?
-        .opt_string("quote_type", quote_type.as_ref(), "quoteType")?
+        .string("quote_type", &quote_type, "quoteType")?
         .opt_bool("is_cap", is_cap.as_ref(), "isCap")?;
     vol_quote("cap_floor_vol", fields)
 }

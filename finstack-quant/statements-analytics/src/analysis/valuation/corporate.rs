@@ -33,6 +33,13 @@ pub struct CorporateValuationResult {
     pub enterprise_value: Money,
     /// Net debt (or effective bridge amount) used in calculation
     pub net_debt: Money,
+    /// Total valuation discount (DLOM, DLOC, other) deducted after the
+    /// EV-to-equity bridge; zero when `DcfOptions::valuation_discounts` is unset.
+    ///
+    /// `enterprise_value - net_debt - valuation_discount` equals
+    /// `equity_value`, so a bridge built from these three steps reconciles to
+    /// the reported equity value.
+    pub valuation_discount: Money,
     /// Terminal value (present value)
     pub terminal_value_pv: Money,
     /// Equity value per diluted share (if shares_outstanding was provided)
@@ -975,11 +982,18 @@ pub(crate) fn evaluate_dcf_from_results_impl(
     let equity_val = equity_value.amount();
     let equity_value_per_share = dcf.equity_value_per_share(equity_val);
     let diluted_shares = dcf.diluted_shares(equity_val);
+    let net_debt = dcf.effective_net_debt();
+    let valuation_discount = if context.options.valuation_discounts.is_some() {
+        enterprise_value - net_debt - equity_val
+    } else {
+        0.0
+    };
 
     Ok(CorporateValuationResult {
         equity_value,
         enterprise_value: Money::new(enterprise_value, currency)?,
-        net_debt: Money::new(dcf.effective_net_debt(), currency)?,
+        net_debt: Money::new(net_debt, currency)?,
+        valuation_discount: Money::new(valuation_discount, currency)?,
         terminal_value_pv: Money::new(pv_terminal, currency)?,
         equity_value_per_share,
         diluted_shares,
@@ -1053,6 +1067,10 @@ fn equity_bridge_from_model(
 
 /// Replace an exit-multiple `terminal_metric` with the last forecast
 /// period's statement node when `metric_node` is set.
+///
+/// Without a metric node the spec's own `terminal_metric` is used, and it must
+/// be positive and finite: a zero placeholder would silently price a zero
+/// terminal value.
 fn resolve_exit_multiple_metric(
     model: &FinancialModelSpec,
     results: &StatementResult,
@@ -1060,6 +1078,19 @@ fn resolve_exit_multiple_metric(
     metric_node: Option<&str>,
 ) -> Result<TerminalValueSpec> {
     let Some(node) = metric_node else {
+        if let TerminalValueSpec::ExitMultiple {
+            terminal_metric, ..
+        } = terminal_value
+        {
+            if !(terminal_metric.is_finite() && terminal_metric > 0.0) {
+                return Err(finstack_quant_statements::error::Error::InvalidInput(
+                    format!(
+                        "exit-multiple terminal_metric must be positive and finite unless \
+                     exit_multiple_metric_node supplies it (got {terminal_metric})"
+                    ),
+                ));
+            }
+        }
         return Ok(terminal_value);
     };
     let TerminalValueSpec::ExitMultiple { multiple, .. } = terminal_value else {
@@ -1263,6 +1294,50 @@ mod tests {
             result.is_err(),
             "missing debt and cash inputs must fail without an override"
         );
+    }
+
+    #[test]
+    fn valuation_discount_reconciles_the_equity_bridge() {
+        let model = sensitivity_model();
+        let gordon = || TerminalValueSpec::GordonGrowth {
+            stable_growth_rate: 0.02,
+        };
+        let plain = evaluate_dcf_with_market(
+            &model,
+            0.10,
+            gordon(),
+            "ufcf",
+            Some(200.0),
+            &DcfOptions::default(),
+            None,
+            None,
+        )
+        .expect("plain DCF");
+        assert_eq!(plain.valuation_discount.amount(), 0.0);
+
+        let discounted = evaluate_dcf_with_market(
+            &model,
+            0.10,
+            gordon(),
+            "ufcf",
+            Some(200.0),
+            &DcfOptions {
+                valuation_discounts: Some(ValuationDiscounts {
+                    dlom: Some(0.25),
+                    ..ValuationDiscounts::default()
+                }),
+                ..DcfOptions::default()
+            },
+            None,
+            None,
+        )
+        .expect("discounted DCF");
+        let bridge = discounted.enterprise_value.amount()
+            - discounted.net_debt.amount()
+            - discounted.valuation_discount.amount();
+        assert!((bridge - discounted.equity_value.amount()).abs() < 0.01);
+        let pre_discount = discounted.enterprise_value.amount() - discounted.net_debt.amount();
+        assert!((discounted.valuation_discount.amount() - 0.25 * pre_discount).abs() < 0.01);
     }
 
     fn sensitivity_model() -> FinancialModelSpec {
@@ -1585,6 +1660,16 @@ mod tests {
             )
             .is_err());
             assert!(resolve_exit_multiple_metric(&model, &results, terminal, None).is_ok());
+            for bad in [0.0, -5.0, f64::NAN] {
+                let unset = TerminalValueSpec::ExitMultiple {
+                    terminal_metric: bad,
+                    multiple: 8.,
+                };
+                assert!(
+                    resolve_exit_multiple_metric(&model, &results, unset, None).is_err(),
+                    "terminal_metric {bad} without a metric node must be rejected"
+                );
+            }
         }
     }
 

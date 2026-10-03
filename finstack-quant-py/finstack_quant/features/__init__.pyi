@@ -12,7 +12,8 @@ Key columns (``entity``, ``order``, ``time_key``, ``groups``) accept strings
 and date-like objects. Datetimes are formatted by the Rust key policy
 (``datetime_order_key``: aware values normalize to UTC, naive values keep
 wall time, fixed nanosecond precision); dates use ``isoformat()``. Ints,
-floats, bools and other objects raise ``TypeError``, matching the WASM
+floats, bools, durations (``pd.Timedelta``), times and other objects raise
+``TypeError``, matching the WASM
 string-only key columns; convert integer period keys to zero-padded strings.
 
 Examples

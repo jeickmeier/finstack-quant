@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/covenants/1/covenant_forecast_config.schema.json",
-      "bytes": 3820,
+      "bytes": 3979,
       "kind": "input",
       "path": "schemas/covenants/1/covenant_forecast_config.schema.json",
       "summary": "Covenant forecast configuration.",

@@ -4055,7 +4055,8 @@ class CorporateValuationResult:
     >>> from finstack_quant.statements_analytics import CorporateValuationResult
     >>> r = CorporateValuationResult.from_json(
     ...     '{"equity_value":{"amount":"90","currency":"USD"},"enterprise_value":{"amount":"100","currency":"USD"},'
-    ...     '"net_debt":{"amount":"10","currency":"USD"},"terminal_value_pv":{"amount":"60","currency":"USD"},'
+    ...     '"net_debt":{"amount":"10","currency":"USD"},"valuation_discount":{"amount":"0","currency":"USD"},'
+    ...     '"terminal_value_pv":{"amount":"60","currency":"USD"},'
     ...     '"equity_value_per_share":null,"diluted_shares":null}'
     ... )
     >>> r.equity_value.amount
@@ -4098,6 +4099,21 @@ class CorporateValuationResult:
             Net debt (or effective bridge amount) subtracted from EV.
         """
     @property
+    def valuation_discount(self) -> Money:
+        """
+        Total valuation discount (DLOM, DLOC, other) deducted after the
+        EV-to-equity bridge; zero without ``valuation_discounts``.
+        ``enterprise_value - net_debt - valuation_discount`` equals
+        ``equity_value``.
+
+        This property does not raise.
+
+        Returns
+        -------
+        Money
+            Discount amount in the model currency.
+        """
+    @property
     def terminal_value_pv(self) -> Money:
         """
         Present value of the terminal value.
@@ -4138,13 +4154,14 @@ class CorporateValuationResult:
         Export as a single-row pandas ``DataFrame``.
 
         Columns: ``currency``, ``equity_value``, ``enterprise_value``,
-        ``net_debt``, ``terminal_value_pv`` (float amounts in ``currency``),
-        ``equity_value_per_share``, ``diluted_shares`` (``None`` when absent).
+        ``net_debt``, ``valuation_discount``, ``terminal_value_pv`` (float
+        amounts in ``currency``), ``equity_value_per_share``,
+        ``diluted_shares`` (``None`` when absent).
 
         Returns
         -------
         pd.DataFrame
-            Export as a single-row pandas ``DataFrame``. Columns: ``currency``, ``equity_value``, ``enterprise_value``, ``net_debt``, ``terminal_value_pv`` (float amounts in ``currency``), ``equity_value_per_share``, ``diluted_shares`` (``None`` when absent).
+            Export as a single-row pandas ``DataFrame``. Columns: ``currency``, ``equity_value``, ``enterprise_value``, ``net_debt``, ``valuation_discount``, ``terminal_value_pv`` (float amounts in ``currency``), ``equity_value_per_share``, ``diluted_shares`` (``None`` when absent).
 
         Raises
         ------
@@ -8908,7 +8925,7 @@ class TerminalValueSpec:
     >>> from finstack_quant.statements_analytics import TerminalValueSpec
     >>> TerminalValueSpec.gordon_growth(0.02).kind
     'gordon_growth'
-    >>> TerminalValueSpec.exit_multiple(9.0).params["multiple"]
+    >>> TerminalValueSpec.exit_multiple(9.0, 120.0).params["multiple"]
     9.0
     """
     @staticmethod
@@ -8934,7 +8951,7 @@ class TerminalValueSpec:
         'gordon_growth'
         """
     @staticmethod
-    def exit_multiple(multiple: float, terminal_metric: float = 0.0) -> TerminalValueSpec:
+    def exit_multiple(multiple: float, terminal_metric: float) -> TerminalValueSpec:
         """
         Exit multiple: ``TV = terminal_metric * multiple``.
 
@@ -8946,8 +8963,10 @@ class TerminalValueSpec:
             Exit multiple in turns (``9.0`` = 9.0x).
         terminal_metric : float
             Terminal-year metric (EBITDA, revenue, ...) in model currency.
-            Default ``0.0``; pass ``exit_multiple_metric_node`` to
-            ``evaluate_dcf`` to read it from the statement model instead.
+            Required, as in the Rust wire form. Pass ``0.0`` when
+            ``DcfOptions.exit_multiple_metric_node`` supplies the metric from
+            the statement model; without that node ``evaluate_dcf`` raises
+            ``ValueError`` unless the metric is positive and finite.
         Returns
         -------
         TerminalValueSpec
@@ -8956,7 +8975,7 @@ class TerminalValueSpec:
         Examples
         --------
         >>> from finstack_quant.statements_analytics import TerminalValueSpec
-        >>> TerminalValueSpec.exit_multiple(8.0).kind
+        >>> TerminalValueSpec.exit_multiple(8.0, 120.0).kind
         'exit_multiple'
         """
     @staticmethod

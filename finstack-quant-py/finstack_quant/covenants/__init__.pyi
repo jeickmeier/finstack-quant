@@ -2381,8 +2381,10 @@ class CovenantForecastConfig:
 
     Deterministic by default (breach probability ``0`` or ``1`` per date).
     With ``stochastic=True`` a lognormal overlay with ``volatility`` scales
-    shocks by ``sqrt(T)`` from ``reference_date`` (default: the day before
-    the first forecast date): ``num_paths=0`` is the closed-form analytic
+    shocks by ``sqrt(T)`` from ``reference_date``, which a stochastic
+    :func:`forecast_covenant` / :func:`forecast_breaches` requires (a
+    date-indexed frame does not say where its first reporting period starts):
+    ``num_paths=0`` is the closed-form analytic
     mode, ``num_paths>0`` is Monte Carlo (deterministic for a given
     ``random_seed``).
 
@@ -2424,8 +2426,10 @@ class CovenantForecastConfig:
             Simulate Monte Carlo paths in ``(Z, -Z)`` pairs; requires
             ``num_paths > 0``.
         reference_date : datetime.date | str | None
-            Anchor for ``sqrt(T)`` horizon scaling; ``None`` uses the day
-            before the first forecast date.
+            Anchor for ``sqrt(T)`` horizon scaling, typically the day before
+            the first reporting period starts. Required for a stochastic
+            :func:`forecast_covenant` / :func:`forecast_breaches`, which
+            raise ``ValueError`` without it.
         breach_probability_threshold : float
             Minimum breach probability (decimal) for :func:`forecast_breaches`
             to report a date; must lie in ``[0, 1]``.
@@ -3204,8 +3208,8 @@ def forecast_covenant(
     ValueError
         If the frame is empty, the covenant is non-numeric or has a
         non-finite threshold, or the config is invalid (stochastic without
-        ``volatility``, antithetic without paths, threshold outside
-        ``[0, 1]``).
+        ``volatility`` or ``reference_date``, antithetic without paths,
+        threshold outside ``[0, 1]``).
 
     Examples
     --------
@@ -3259,7 +3263,8 @@ def forecast_breaches(
         If any active numeric test lacks a required metric at a requested date.
     ValueError
         If the frame is empty, has duplicate metric columns or non-finite required
-        observations, or the engine, date ordering, or configuration is invalid.
+        observations, or the engine, date ordering, or configuration is invalid
+        (including a stochastic config without ``reference_date``).
 
     Examples
     --------

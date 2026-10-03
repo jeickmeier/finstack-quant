@@ -650,18 +650,19 @@ impl PyGoalSeekResult {
         serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "GoalSeekResult"))
     }
 
-    /// Deserialize from canonical JSON.
+    /// Deserialize from canonical JSON; the embedded model is validated like
+    /// ``FinancialModelSpec.from_json``.
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If ``json`` is not a valid ``GoalSeekResult`` document (unknown
-    ///     fields are rejected).
+    ///     fields are rejected) or its model fails validation.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid GoalSeekResult JSON"))?;
-        Ok(Self { inner })
+        GoalSeekResult::from_json(json)
+            .map(|inner| Self { inner })
+            .map_err(crate::errors::statements_to_py)
     }
 
     /// Support ``pickle`` through the canonical JSON representation.

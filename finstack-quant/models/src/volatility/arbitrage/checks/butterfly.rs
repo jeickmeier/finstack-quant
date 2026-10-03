@@ -47,7 +47,7 @@ impl Default for ButterflyCheck {
     fn default() -> Self {
         Self {
             forwards: Vec::new(),
-            tolerance: 1e-10,
+            tolerance: crate::volatility::arbitrage::DEFAULT_ARBITRAGE_TOLERANCE,
         }
     }
 }

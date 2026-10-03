@@ -110,12 +110,7 @@ impl<'de> Deserialize<'de> for LiquidityProfile {
         D: serde::Deserializer<'de>,
     {
         let wire = LiquidityProfileWire::deserialize(deserializer)?;
-        if wire.observation_days == 0 {
-            return Err(serde::de::Error::custom(
-                "minor 12: observation_days must be positive",
-            ));
-        }
-        let mut profile = Self::new(
+        let profile = Self::new(
             wire.instrument_id,
             wire.mid,
             wire.bid,
@@ -124,14 +119,18 @@ impl<'de> Deserialize<'de> for LiquidityProfile {
             wire.avg_trade_size,
             wire.spread_volatility,
         )
+        .map_err(serde::de::Error::custom)?
+        .with_spread_volatility_kind(wire.spread_volatility_kind)
+        .with_observation_days(wire.observation_days)
         .map_err(serde::de::Error::custom)?;
-        profile.spread_volatility_kind = wire.spread_volatility_kind;
-        profile.observation_days = wire.observation_days;
         Ok(profile)
     }
 }
 
 impl LiquidityProfile {
+    /// Observation window, in trading days, of a profile built without one.
+    pub const DEFAULT_OBSERVATION_DAYS: u32 = 20;
+
     /// Create a new liquidity profile with validation.
     ///
     /// # Errors
@@ -190,8 +189,27 @@ impl LiquidityProfile {
             avg_trade_size,
             spread_volatility,
             spread_volatility_kind: SpreadVolatilityKind::default(),
-            observation_days: 20,
+            observation_days: Self::DEFAULT_OBSERVATION_DAYS,
         })
+    }
+
+    /// Override the observation window behind the volume and spread statistics.
+    ///
+    /// # Arguments
+    ///
+    /// * `observation_days` - Number of trading days the ADV and spread
+    ///   estimates were measured over; must be at least 1. Defaults to
+    ///   [`Self::DEFAULT_OBSERVATION_DAYS`] when not set.
+    ///
+    /// # Errors
+    ///
+    /// Returns `finstack_quant_core::Error::Validation` if `observation_days` is 0.
+    pub fn with_observation_days(mut self, observation_days: u32) -> Result<Self> {
+        if observation_days == 0 {
+            return Err(invalid_input("observation_days must be positive"));
+        }
+        self.observation_days = observation_days;
+        Ok(self)
     }
 
     /// Override the [`SpreadVolatilityKind`] for this profile.

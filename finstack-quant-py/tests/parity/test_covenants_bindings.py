@@ -314,7 +314,19 @@ def test_forecast_covenant_and_breaches_from_dataframe() -> None:
     stochastic = covenants.forecast_covenant(spec, frame, config)
     assert all(0.0 < p < 1.0 for p in stochastic.breach_probability[:2])
     with pytest.raises(ValueError, match="volatility"):
-        covenants.forecast_covenant(spec, frame, covenants.CovenantForecastConfig(stochastic=True))
+        covenants.forecast_covenant(
+            spec, frame, covenants.CovenantForecastConfig(stochastic=True, reference_date="2025-12-31")
+        )
+    # Frame rows carry only test dates, so a stochastic forecast must say where
+    # its horizon starts; a default anchor would be one period too short.
+    with pytest.raises(ValueError, match="reference_date"):
+        covenants.forecast_covenant(spec, frame, covenants.CovenantForecastConfig(stochastic=True, volatility=0.25))
+    with pytest.raises(ValueError, match="reference_date"):
+        covenants.forecast_breaches(
+            covenants.CovenantEngine.from_specs([spec]),
+            frame,
+            covenants.CovenantForecastConfig(stochastic=True, volatility=0.25),
+        )
     with pytest.raises(KeyError, match="debt_to_ebitda"):
         covenants.forecast_covenant(spec, frame.rename(columns={"debt_to_ebitda": "other"}))
 
@@ -435,7 +447,9 @@ def test_forecast_scope_and_mc_boundaries() -> None:
         config.with_scope("invalid")
     with pytest.raises(ValueError, match="independent samples"):
         covenants.forecast_breaches(
-            engine, frame, covenants.CovenantForecastConfig(stochastic=True, volatility=0.2, num_paths=1)
+            engine,
+            frame,
+            covenants.CovenantForecastConfig(stochastic=True, volatility=0.2, num_paths=1, reference_date="2025-12-31"),
         )
 
 

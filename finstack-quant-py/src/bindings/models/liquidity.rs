@@ -28,13 +28,6 @@ fn parse_spread_volatility_kind(kind: &str) -> PyResult<SpreadVolatilityKind> {
     })
 }
 
-fn spread_volatility_kind_str(kind: SpreadVolatilityKind) -> &'static str {
-    match kind {
-        SpreadVolatilityKind::Relative => "relative",
-        SpreadVolatilityKind::Absolute => "absolute",
-    }
-}
-
 /// Market microstructure snapshot for one instrument.
 ///
 /// Prices are in the instrument's native currency, ``avg_daily_volume`` and
@@ -60,16 +53,20 @@ fn spread_volatility_kind_str(kind: SpreadVolatilityKind) -> &'static str {
 ///     Non-negative average trade size in shares/contracts.
 /// spread_volatility : float
 ///     Non-negative spread standard deviation; ``0.0`` when unavailable.
-/// spread_volatility_kind : str, default ``"relative"``
-///     ``"relative"`` or ``"absolute"``.
-/// observation_days : int, default ``20``
-///     Trading-day window behind the volume and spread statistics.
+/// spread_volatility_kind : str, optional
+///     ``"relative"`` or ``"absolute"``. ``None`` uses the Rust default
+///     ``SpreadVolatilityKind::default()`` (``"relative"``).
+/// observation_days : int, optional
+///     Trading-day window behind the volume and spread statistics; at least 1.
+///     ``None`` uses the Rust default
+///     ``LiquidityProfile::DEFAULT_OBSERVATION_DAYS`` (20).
 ///
 /// Raises
 /// ------
 /// ValueError
 ///     If a price is non-positive, the market is crossed, a statistic is
-///     negative/non-finite, or ``spread_volatility_kind`` is not recognised.
+///     negative/non-finite, ``spread_volatility_kind`` is not recognised, or
+///     ``observation_days`` is 0.
 #[pyclass(
     name = "LiquidityProfile",
     module = "finstack_quant.models.liquidity",
@@ -99,11 +96,11 @@ impl PyLiquidityProfile {
         avg_daily_volume,
         avg_trade_size,
         spread_volatility,
-        spread_volatility_kind = "relative",
-        observation_days = 20,
+        spread_volatility_kind = None,
+        observation_days = None,
     ))]
     #[pyo3(
-        text_signature = "(instrument_id, mid, bid, ask, avg_daily_volume, avg_trade_size, spread_volatility, spread_volatility_kind=\"relative\", observation_days=20)"
+        text_signature = "(instrument_id, mid, bid, ask, avg_daily_volume, avg_trade_size, spread_volatility, spread_volatility_kind=None, observation_days=None)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -114,10 +111,9 @@ impl PyLiquidityProfile {
         avg_daily_volume: f64,
         avg_trade_size: f64,
         spread_volatility: f64,
-        spread_volatility_kind: &str,
-        observation_days: u32,
+        spread_volatility_kind: Option<&str>,
+        observation_days: Option<u32>,
     ) -> PyResult<Self> {
-        let kind = parse_spread_volatility_kind(spread_volatility_kind)?;
         let mut inner = LiquidityProfile::new(
             instrument_id,
             mid,
@@ -127,9 +123,13 @@ impl PyLiquidityProfile {
             avg_trade_size,
             spread_volatility,
         )
-        .map_err(core_to_py)?
-        .with_spread_volatility_kind(kind);
-        inner.observation_days = observation_days;
+        .map_err(core_to_py)?;
+        if let Some(kind) = spread_volatility_kind {
+            inner = inner.with_spread_volatility_kind(parse_spread_volatility_kind(kind)?);
+        }
+        if let Some(days) = observation_days {
+            inner = inner.with_observation_days(days).map_err(core_to_py)?;
+        }
         Ok(Self { inner })
     }
 
@@ -177,8 +177,9 @@ impl PyLiquidityProfile {
 
     /// ``"relative"`` or ``"absolute"``.
     #[getter]
-    fn spread_volatility_kind(&self) -> &'static str {
-        spread_volatility_kind_str(self.inner.spread_volatility_kind)
+    fn spread_volatility_kind(&self) -> PyResult<String> {
+        finstack_quant_core::wire::serde_label(&self.inner.spread_volatility_kind)
+            .map_err(core_to_py)
     }
 
     /// Trading-day observation window behind the statistics.

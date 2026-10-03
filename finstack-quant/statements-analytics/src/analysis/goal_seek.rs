@@ -70,6 +70,38 @@ pub struct GoalSeekResult {
     pub model: Option<FinancialModelSpec>,
 }
 
+impl GoalSeekResult {
+    /// Load a goal-seek result from its canonical JSON, validating the model.
+    ///
+    /// The embedded model goes through [`FinancialModelSpec::from_value`], so a
+    /// persisted or hand-edited result cannot carry a model that
+    /// [`FinancialModelSpec::from_json`] would reject.
+    ///
+    /// # Arguments
+    ///
+    /// * `json` - The serde form `{"solved_value": <number>, "model": <model or null>}`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Serde`] for malformed JSON, a missing field or an
+    /// unknown field, and the model's validation error when the embedded model
+    /// is invalid.
+    pub fn from_json(json: &str) -> Result<Self> {
+        #[derive(serde::Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            solved_value: f64,
+            model: Option<serde_json::Value>,
+        }
+        let wire: Wire = serde_json::from_str(json)
+            .map_err(|e| Error::Serde(format!("invalid GoalSeekResult JSON: {e}")))?;
+        Ok(Self {
+            solved_value: wire.solved_value,
+            model: wire.model.map(FinancialModelSpec::from_value).transpose()?,
+        })
+    }
+}
+
 /// Perform goal seek on a financial model.
 ///
 /// Solves for the driver node value that achieves a target metric value in a specific period.
@@ -425,7 +457,23 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::solve_with_bounds;
+    use super::{solve_with_bounds, GoalSeekResult};
+
+    #[test]
+    fn goal_seek_result_from_json_validates_the_embedded_model() {
+        let empty = r#"{"solved_value": 1.0, "model": {"id": "m", "periods": [], "nodes": {}, "schema_version": 1}}"#;
+        let err = GoalSeekResult::from_json(empty).expect_err("a model needs at least one period");
+        assert!(err.to_string().contains("at least one period"), "{err}");
+
+        let without_model = GoalSeekResult::from_json(r#"{"solved_value": 2.5, "model": null}"#)
+            .expect("a result without a model");
+        assert_eq!(without_model.solved_value, 2.5);
+        assert!(without_model.model.is_none());
+
+        assert!(
+            GoalSeekResult::from_json(r#"{"solved_value": 1.0, "model": null, "x": 1}"#).is_err()
+        );
+    }
 
     #[test]
     fn solve_with_bounds_accepts_endpoint_within_tolerance() {

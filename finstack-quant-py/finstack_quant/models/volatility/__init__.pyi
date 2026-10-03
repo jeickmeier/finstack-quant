@@ -1487,7 +1487,7 @@ def check_butterfly_grid(
     expiries: list[float],
     vols: list[list[float]],
     forward_prices: list[float],
-    tolerance: float = 1e-6,
+    tolerance: float = 1e-10,
 ) -> list[_ArbitrageViolation]:
     """
     Check butterfly arbitrage via Durrleman's ``g(k)`` density condition.
@@ -1504,7 +1504,7 @@ def check_butterfly_grid(
     forward_prices : list[float]
         Forward prices per expiry, or a single value broadcast across expiries.
     tolerance : float, optional
-        Tolerance in total-variance units. Default ``1e-6``.
+        Tolerance in total-variance units. Default ``1e-10`` (Rust ``DEFAULT_ARBITRAGE_TOLERANCE``, the same default as every Rust arbitrage check); pass a looser value to screen noisy market quotes.
 
     Returns
     -------
@@ -1538,7 +1538,7 @@ def check_calendar_spread_grid(
     expiries: list[float],
     vols: list[list[float]],
     forward_prices: list[float],
-    tolerance: float = 1e-6,
+    tolerance: float = 1e-10,
 ) -> list[_ArbitrageViolation]:
     """
     Check calendar-spread arbitrage (total-variance monotonicity in log-moneyness).
@@ -1554,7 +1554,7 @@ def check_calendar_spread_grid(
     forward_prices : list[float]
         Forward prices per expiry or one broadcast value.
     tolerance : float, optional
-        Tolerance in total-variance units. Default ``1e-6``.
+        Tolerance in total-variance units. Default ``1e-10`` (Rust ``DEFAULT_ARBITRAGE_TOLERANCE``, the same default as every Rust arbitrage check); pass a looser value to screen noisy market quotes.
 
     Returns
     -------
@@ -1627,7 +1627,7 @@ def check_surface_grid(
     expiries: list[float],
     vols: list[list[float]],
     forward_prices: list[float],
-    tolerance: float = 1e-6,
+    tolerance: float = 1e-10,
 ) -> ArbitrageReport:
     """
     Run butterfly, calendar-spread, and local-vol density checks together.
@@ -1643,7 +1643,7 @@ def check_surface_grid(
     forward_prices : list[float]
         One forward price to broadcast or one price per expiry.
     tolerance : float, optional
-        Tolerance in total-variance units. Default ``1e-6``.
+        Tolerance in total-variance units. Default ``1e-10`` (Rust ``DEFAULT_ARBITRAGE_TOLERANCE``, the same default as every Rust arbitrage check); pass a looser value to screen noisy market quotes.
 
     Returns
     -------

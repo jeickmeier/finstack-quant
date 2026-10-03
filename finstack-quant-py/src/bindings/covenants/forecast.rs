@@ -20,9 +20,8 @@ use pyo3::prelude::*;
 
 /// Read a date-indexed metrics frame as a Rust `DatedMetricSeries`.
 ///
-/// Each frame row is one forecast period on its index date. With
-/// `reference_date` unset in the config the forecaster anchors stochastic
-/// horizons on the day before the first row.
+/// Each frame row is one forecast period on its index date. Rows carry no
+/// period start, so Rust requires `reference_date` for stochastic forecasts.
 fn metric_series(frame: &Bound<'_, PyAny>) -> PyResult<DatedMetricSeries> {
     DatedMetricSeries::new(extract_metric_frame(frame)?).map_err(core_to_py)
 }
@@ -39,8 +38,11 @@ fn bound_kind_name(kind: BoundKind) -> &'static str {
 ///
 /// ``volatility`` is the annualized lognormal volatility of the metric and is
 /// required when ``stochastic`` is true; ``reference_date`` anchors the
-/// ``sqrt(T)`` horizon scaling (default: the day before the first forecast
-/// date); ``breach_probability_threshold`` (decimal, default ``0.05``) is the
+/// ``sqrt(T)`` horizon scaling and is required for a stochastic
+/// ``forecast_covenant`` / ``forecast_breaches`` (a date-indexed frame says
+/// nothing about where its first reporting period starts, so pass that start,
+/// e.g. the day before the first quarter begins);
+/// ``breach_probability_threshold`` (decimal, default ``0.05``) is the
 /// minimum probability for ``forecast_breaches`` to report a date.
 #[pyclass(
     name = "CovenantForecastConfig",

@@ -1316,7 +1316,7 @@
       "oneOf": [
         {
           "additionalProperties": false,
-          "description": "Directly from `ValuationResult::measures` using a standard `MetricId`.\n\nExamples:\n- `Metric(MetricId::DurationMod)` for modified duration\n- `Metric(MetricId::Ytm)` for yield to maturity\n- `Metric(MetricId::Dv01)` for DV01",
+          "description": "Directly from `ValuationResult::measures` using a standard `MetricId`.\n\nExamples:\n- `Metric(MetricId::DurationMod)` for modified duration\n- `Metric(MetricId::Ytm)` for yield to maturity\n- `Metric(MetricId::Dv01)` for DV01\n\nDeserialization accepts only standard metric names\n([`MetricId::parse_strict`]): an unknown name would otherwise become a\ncustom metric that no position reports, and the optimizer would solve\nagainst all-zero coefficients. Custom and composite (bucketed) keys go\nthrough [`PerPositionMetric::CustomKey`].",
           "properties": {
             "metric": {
               "$ref": "#/$defs/MetricId"

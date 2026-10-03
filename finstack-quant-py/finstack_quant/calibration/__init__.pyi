@@ -1147,8 +1147,8 @@ class VolQuote:
         maturity: str,
         strike: float,
         vol: float,
-        quote_type: str = "normal",
-        convention: str = "USD",
+        quote_type: str,
+        convention: str | None = None,
     ) -> VolQuote:
         """Build a swaption volatility quote.
 
@@ -1165,10 +1165,14 @@ class VolQuote:
         vol : float
             Quoted volatility: annualized decimal for lognormal quotes, decimal
             per annum for normal quotes (``0.0085`` for 85 bp).
-        quote_type : str, default "normal"
-            ``"normal"`` (Bachelier) or ``"lognormal"`` (Black).
-        convention : str, default "USD"
+        quote_type : str
+            ``"normal"`` (Bachelier; ``vol`` is an absolute rate volatility) or
+            ``"black_lognormal"`` (Black; ``vol`` is a relative volatility).
+            Required: it decides the unit of ``vol``, so there is no default.
+        convention : str, optional
             Swaption convention key resolved against the convention registry.
+            ``None`` uses the Rust authoring default
+            ``VolQuote::DEFAULT_SWAPTION_CONVENTION`` (``"USD"``).
 
         Returns
         -------
@@ -1184,7 +1188,7 @@ class VolQuote:
         Examples:
         --------
         >>> from finstack_quant.calibration import VolQuote
-        >>> VolQuote.swaption_vol("s1", "2026-01-15", "2036-01-15", 0.04, 0.0085).type
+        >>> VolQuote.swaption_vol("s1", "2026-01-15", "2036-01-15", 0.04, 0.0085, "normal").type
         'swaption_vol'
 
         """
@@ -1195,8 +1199,8 @@ class VolQuote:
         expiry: str,
         strike: float,
         vol: float,
-        quote_type: str = "normal",
-        is_cap: bool = True,
+        quote_type: str,
+        is_cap: bool | None = None,
     ) -> VolQuote:
         """Build a cap or floor volatility quote.
 
@@ -1210,10 +1214,13 @@ class VolQuote:
             Absolute strike rate, decimal per annum.
         vol : float
             Quoted flat volatility, in the units implied by ``quote_type``.
-        quote_type : str, default "normal"
-            ``"normal"`` (Bachelier) or ``"lognormal"`` (Black).
-        is_cap : bool, default True
-            True for a cap, False for a floor.
+        quote_type : str
+            ``"normal"`` (Bachelier; ``vol`` is an absolute rate volatility) or
+            ``"black_lognormal"`` (Black; ``vol`` is a relative volatility).
+            Required: it decides the unit of ``vol``, so there is no default.
+        is_cap : bool, optional
+            True for a cap, False for a floor. ``None`` uses the Rust authoring
+            default ``VolQuote::DEFAULT_IS_CAP`` (a cap).
 
         Returns
         -------
@@ -1229,7 +1236,7 @@ class VolQuote:
         Examples:
         --------
         >>> from finstack_quant.calibration import VolQuote
-        >>> VolQuote.cap_floor_vol("c1", "2031-01-15", 0.04, 0.0090).type
+        >>> VolQuote.cap_floor_vol("c1", "2031-01-15", 0.04, 0.0090, "normal").type
         'cap_floor_vol'
 
         """
@@ -1705,7 +1712,7 @@ class CalibrationStep:
         ...     "2024-06-28",
         ...     "usd_ois",
         ...     "USD",
-        ...     quotes=[VolQuote.swaption_vol("s1", "2026-01-15", "2036-01-15", 0.04, 0.0085)],
+        ...     quotes=[VolQuote.swaption_vol("s1", "2026-01-15", "2036-01-15", 0.04, 0.0085, "normal")],
         ... ).kind
         'swaption_vol'
 

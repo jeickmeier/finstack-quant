@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import datetime
 import json
 
+import pandas as pd
 import pytest
 
 from finstack_quant.features import (
@@ -211,8 +213,6 @@ def test_unknown_params_and_ops_are_rejected_with_listings() -> None:
 
 
 def test_op_enums_and_key_coercion() -> None:
-    import datetime
-
     from finstack_quant.features import CrossSectionalOp, PairwiseOp, TimeSeriesOp
 
     assert TimeSeriesOp("returns") == TimeSeriesOp["RETURNS"]
@@ -233,17 +233,24 @@ def test_op_enums_and_key_coercion() -> None:
     assert out[1] == pytest.approx(0.02)
 
 
-@pytest.mark.parametrize("bad_key", [9, 1.5, True, object()])
+@pytest.mark.parametrize(
+    "bad_key",
+    [9, 1.5, True, object(), datetime.timedelta(days=2), pd.Timedelta(days=2), datetime.time(9, 30)],
+)
 def test_non_string_non_date_keys_are_rejected(bad_key: object) -> None:
-    """Keys are strings (as in WASM); the binding does not invent a str() coercion."""
+    """Keys are strings (as in WASM); the binding does not invent a str() coercion.
+
+    Durations and times have an ``isoformat`` too, but their text does not sort
+    chronologically (``P10D`` sorts before ``P2D``), so they are rejected.
+    """
     from finstack_quant.features import PanelTransformSpec, transform_panel
 
-    with pytest.raises(TypeError, match="order entries must be str or date-like"):
+    with pytest.raises(TypeError, match="order entries must be str, datetime or date"):
         transform_timeseries([1.0, 2.0], ["A", "A"], ["x", bad_key], "diff")
     ops = [{"name": "d", "family": "timeseries", "op": "diff"}]
-    with pytest.raises(TypeError, match="order entries must be str or date-like"):
+    with pytest.raises(TypeError, match="order entries must be str, datetime or date"):
         transform_panel({"values": [1.0, 2.0], "operations": ops, "entity": ["A", "A"], "order": ["x", bad_key]})
-    with pytest.raises(TypeError, match="order entries must be str or date-like"):
+    with pytest.raises(TypeError, match="order entries must be str, datetime or date"):
         PanelTransformSpec([1.0, 2.0], ops, entity=["A", "A"], order=["x", bad_key])
 
 

@@ -138,9 +138,12 @@ impl ModelTimeSeries for DatedMetricSeries {
 ///
 /// # Errors
 ///
-/// Returns the errors of [`forecast_covenant_generic`]: a validation error for
-/// invalid configuration or terms, dates before the reference date or
-/// non-finite observations, and `NotFound` for a missing required metric.
+/// Returns a validation error for a stochastic `config` without
+/// `reference_date` (a dated row does not say where its reporting period
+/// starts), and otherwise the errors of [`forecast_covenant_generic`]: a
+/// validation error for invalid configuration or terms, dates before the
+/// reference date or non-finite observations, and `NotFound` for a missing
+/// required metric.
 ///
 /// # Examples
 ///
@@ -182,7 +185,27 @@ pub fn forecast_covenant(
     series: &DatedMetricSeries,
     config: CovenantForecastConfig,
 ) -> Result<CovenantForecast> {
+    require_stochastic_reference_date(&config)?;
     forecast_covenant_generic(covenant, series, series.periods(), config)
+}
+
+/// Reject a stochastic forecast over dated rows that has no reference date.
+///
+/// A dated row carries only its test date, not the start of the reporting
+/// period it covers, so the default horizon anchor of the generic forecaster
+/// (the day before the first period's start) would be the day before the first
+/// test date: one full reporting period too short. The caller must state where
+/// the forecast horizon starts.
+fn require_stochastic_reference_date(config: &CovenantForecastConfig) -> Result<()> {
+    if config.stochastic && config.reference_date.is_none() {
+        return Err(Error::Validation(
+            "a stochastic forecast over dated rows requires config.reference_date: \
+             a row carries only its test date, so the start of the forecast horizon \
+             (for example the start of the first reporting period) cannot be inferred"
+                .to_string(),
+        ));
+    }
+    Ok(())
 }
 
 /// Forecast every breach of an engine's covenants over a dated metric series.
@@ -200,13 +223,15 @@ pub fn forecast_covenant(
 ///
 /// # Errors
 ///
-/// Returns the errors of [`forecast_breaches_generic`]; no partial breach list
-/// is returned.
+/// Returns a validation error for a stochastic `config` without
+/// `reference_date`, and otherwise the errors of
+/// [`forecast_breaches_generic`]; no partial breach list is returned.
 pub fn forecast_breaches(
     engine: &CovenantEngine,
     series: &DatedMetricSeries,
     config: CovenantForecastConfig,
 ) -> Result<Vec<FutureBreach>> {
+    require_stochastic_reference_date(&config)?;
     forecast_breaches_generic(engine, series, series.periods(), config)
 }
 
@@ -309,6 +334,36 @@ mod tests {
         assert_eq!(
             duplicate.to_string(),
             "Validation error: metric series contains duplicate date 2026-03-31"
+        );
+    }
+
+    #[test]
+    fn stochastic_series_forecast_requires_a_reference_date() {
+        let series = DatedMetricSeries::new(vec![row(Month::March, 31, 4.3)]).unwrap();
+        let mut engine = CovenantEngine::new();
+        engine.add_spec(leverage_spec());
+        let config = CovenantForecastConfig {
+            stochastic: true,
+            volatility: Some(0.30),
+            ..CovenantForecastConfig::default()
+        };
+        // Without a reference date the horizon would start the day before the
+        // first test date, one reporting period too late.
+        let err = forecast_covenant(&leverage_spec(), &series, config.clone()).unwrap_err();
+        assert!(err.to_string().contains("reference_date"), "{err}");
+        assert!(forecast_breaches(&engine, &series, config.clone()).is_err());
+
+        let anchored = CovenantForecastConfig {
+            reference_date: Some(date(Month::January, 1).previous_day().unwrap()),
+            ..config
+        };
+        let forecast = forecast_covenant(&leverage_spec(), &series, anchored).unwrap();
+        // A quarter of 30% volatility leaves a material chance of crossing 4.5x
+        // from 4.3x; a one-day horizon would report almost none.
+        assert!(
+            forecast.breach_probability[0] > 0.2,
+            "{:?}",
+            forecast.breach_probability
         );
     }
 

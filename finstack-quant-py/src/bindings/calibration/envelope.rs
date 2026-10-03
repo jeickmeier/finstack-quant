@@ -655,20 +655,22 @@ impl PyVolQuote {
     /// vol : float
     ///     Volatility: annualized decimal (lognormal) or absolute rate
     ///     volatility (normal, e.g. ``0.0072``).
-    /// quote_type : str, default "normal"
-    ///     ``"normal"`` or ``"black_lognormal"``.
-    /// convention : str, default "USD"
-    ///     Swaption market convention identifier.
+    /// quote_type : str
+    ///     ``"normal"`` (``vol`` is an absolute rate volatility) or
+    ///     ``"black_lognormal"`` (``vol`` is a relative volatility). Required:
+    ///     it decides the unit of ``vol``, so there is no default.
+    /// convention : str, optional
+    ///     Swaption market convention identifier. ``None`` uses the Rust
+    ///     authoring default ``VolQuote::DEFAULT_SWAPTION_CONVENTION``
+    ///     (``"USD"``).
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If a date or numeric input is invalid.
+    ///     If a date or numeric input is invalid or ``quote_type`` is unknown.
     #[staticmethod]
-    #[pyo3(signature = (id, expiry, maturity, strike, vol, quote_type = "normal", convention = "USD"))]
-    #[pyo3(
-        text_signature = "(id, expiry, maturity, strike, vol, quote_type='normal', convention='USD')"
-    )]
+    #[pyo3(signature = (id, expiry, maturity, strike, vol, quote_type, convention = None))]
+    #[pyo3(text_signature = "(id, expiry, maturity, strike, vol, quote_type, convention=None)")]
     #[allow(clippy::too_many_arguments)]
     fn swaption_vol(
         id: &str,
@@ -677,7 +679,7 @@ impl PyVolQuote {
         strike: f64,
         vol: f64,
         quote_type: &str,
-        convention: &str,
+        convention: Option<&str>,
     ) -> PyResult<Self> {
         let mut fields = Map::new();
         fields.insert("id".into(), Value::String(id.into()));
@@ -689,7 +691,9 @@ impl PyVolQuote {
         fields.insert("strike".into(), Value::from(strike));
         fields.insert("vol".into(), Value::from(vol));
         fields.insert("quote_type".into(), Value::String(quote_type.into()));
-        fields.insert("convention".into(), Value::String(convention.into()));
+        if let Some(convention) = convention {
+            fields.insert("convention".into(), Value::String(convention.into()));
+        }
         Self::build("swaption_vol", fields)
     }
 
@@ -705,25 +709,28 @@ impl PyVolQuote {
     ///     Strike rate as a decimal.
     /// vol : float
     ///     Volatility (normal absolute or lognormal decimal per ``quote_type``).
-    /// quote_type : str, default "normal"
-    ///     ``"normal"`` or ``"black_lognormal"``.
-    /// is_cap : bool, default True
-    ///     ``True`` for a cap, ``False`` for a floor.
+    /// quote_type : str
+    ///     ``"normal"`` (``vol`` is an absolute rate volatility) or
+    ///     ``"black_lognormal"`` (``vol`` is a relative volatility). Required:
+    ///     it decides the unit of ``vol``, so there is no default.
+    /// is_cap : bool, optional
+    ///     ``True`` for a cap, ``False`` for a floor. ``None`` uses the Rust
+    ///     authoring default ``VolQuote::DEFAULT_IS_CAP`` (a cap).
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If the date or numeric inputs are invalid.
+    ///     If the date or numeric inputs are invalid or ``quote_type`` is unknown.
     #[staticmethod]
-    #[pyo3(signature = (id, expiry, strike, vol, quote_type = "normal", is_cap = true))]
-    #[pyo3(text_signature = "(id, expiry, strike, vol, quote_type='normal', is_cap=True)")]
+    #[pyo3(signature = (id, expiry, strike, vol, quote_type, is_cap = None))]
+    #[pyo3(text_signature = "(id, expiry, strike, vol, quote_type, is_cap=None)")]
     fn cap_floor_vol(
         id: &str,
         expiry: &Bound<'_, PyAny>,
         strike: f64,
         vol: f64,
         quote_type: &str,
-        is_cap: bool,
+        is_cap: Option<bool>,
     ) -> PyResult<Self> {
         let mut fields = Map::new();
         fields.insert("id".into(), Value::String(id.into()));
@@ -731,7 +738,9 @@ impl PyVolQuote {
         fields.insert("strike".into(), Value::from(strike));
         fields.insert("vol".into(), Value::from(vol));
         fields.insert("quote_type".into(), Value::String(quote_type.into()));
-        fields.insert("is_cap".into(), Value::Bool(is_cap));
+        if let Some(is_cap) = is_cap {
+            fields.insert("is_cap".into(), Value::Bool(is_cap));
+        }
         Self::build("cap_floor_vol", fields)
     }
 

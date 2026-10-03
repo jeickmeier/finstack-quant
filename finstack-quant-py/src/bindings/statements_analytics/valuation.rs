@@ -60,7 +60,7 @@ const CREDIT_COLUMNS: [ColumnSchema<'static>; 6] = [
 /// >>> from finstack_quant.statements_analytics import TerminalValueSpec
 /// >>> TerminalValueSpec.gordon_growth(0.02).kind
 /// 'gordon_growth'
-/// >>> TerminalValueSpec.exit_multiple(9.0).params["multiple"]
+/// >>> TerminalValueSpec.exit_multiple(9.0, 120.0).params["multiple"]
 /// 9.0
 #[pyclass(
     name = "TerminalValueSpec",
@@ -97,10 +97,12 @@ impl PyTerminalValueSpec {
     ///     Exit multiple in turns (``9.0`` = 9.0x).
     /// terminal_metric : float
     ///     Terminal-year metric (EBITDA, revenue, ...) in model currency.
-    ///     Default ``0.0``; pass ``exit_multiple_metric_node`` to
-    ///     ``evaluate_dcf`` to read it from the statement model instead.
+    ///     Required, as in the Rust wire form. Pass ``0.0`` when
+    ///     ``DcfOptions.exit_multiple_metric_node`` supplies the metric from
+    ///     the statement model; without that node ``evaluate_dcf`` raises
+    ///     ``ValueError`` unless the metric is positive and finite.
     #[staticmethod]
-    #[pyo3(signature = (multiple, terminal_metric=0.0))]
+    #[pyo3(text_signature = "(multiple, terminal_metric)")]
     fn exit_multiple(multiple: f64, terminal_metric: f64) -> Self {
         Self {
             inner: TerminalValueSpec::ExitMultiple {
@@ -471,6 +473,15 @@ impl PyCorporateValuationResult {
         PyMoney::from_inner(self.inner.net_debt)
     }
 
+    /// Total valuation discount (DLOM, DLOC, other) deducted after the
+    /// EV-to-equity bridge; zero without ``valuation_discounts``.
+    /// ``enterprise_value - net_debt - valuation_discount`` equals
+    /// ``equity_value``.
+    #[getter]
+    fn valuation_discount(&self) -> PyMoney {
+        PyMoney::from_inner(self.inner.valuation_discount)
+    }
+
     /// Present value of the terminal value.
     #[getter]
     fn terminal_value_pv(&self) -> PyMoney {
@@ -492,7 +503,8 @@ impl PyCorporateValuationResult {
     /// Export as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``currency``, ``equity_value``, ``enterprise_value``,
-    /// ``net_debt``, ``terminal_value_pv`` (float amounts in ``currency``),
+    /// ``net_debt``, ``valuation_discount``, ``terminal_value_pv`` (float
+    /// amounts in ``currency``),
     /// ``equity_value_per_share``, ``diluted_shares`` (``None`` when absent).
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let row = serde_json::json!({
@@ -500,6 +512,7 @@ impl PyCorporateValuationResult {
             "equity_value": self.inner.equity_value.amount(),
             "enterprise_value": self.inner.enterprise_value.amount(),
             "net_debt": self.inner.net_debt.amount(),
+            "valuation_discount": self.inner.valuation_discount.amount(),
             "terminal_value_pv": self.inner.terminal_value_pv.amount(),
             "equity_value_per_share": self.inner.equity_value_per_share,
             "diluted_shares": self.inner.diluted_shares,
@@ -512,6 +525,7 @@ impl PyCorporateValuationResult {
                 "equity_value",
                 "enterprise_value",
                 "net_debt",
+                "valuation_discount",
                 "terminal_value_pv",
                 "equity_value_per_share",
                 "diluted_shares",

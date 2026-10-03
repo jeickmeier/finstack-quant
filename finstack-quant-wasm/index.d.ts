@@ -15852,6 +15852,9 @@ export interface CovenantsNamespace {
    * Deterministic by default: breach probability is `0` for a pass and `1` for
    * a breach. With `config.stochastic` a lognormal overlay on the metric gives
    * probabilities, analytic when `num_paths` is `0` and Monte Carlo otherwise.
+   * A stochastic config needs `reference_date`: rows carry only test dates, so
+   * the horizon start (for example the day before the first reporting period
+   * begins) must be stated.
    *
    * @param spec - `CovenantSpec` wire object of a numeric covenant.
    * @param metrics - `DatedMetrics` rows (`{ date, metrics }`): projected metric values per ISO-8601 test date, in any order with unique dates. (Python takes a date-indexed DataFrame.)
@@ -15866,8 +15869,9 @@ export interface CovenantsNamespace {
    *
    * Effective windows, waivers and threshold schedules are honored;
    * non-numeric covenants are skipped. Deterministic breaches are always
-   * listed; in stochastic mode dates whose breach probability reaches
-   * `config.breach_probability_threshold` are listed too.
+   * listed; in stochastic mode (which needs `config.reference_date`) dates
+   * whose breach probability reaches `config.breach_probability_threshold` are
+   * listed too.
    *
    * @param engine - `CovenantEngine` handle.
    * @param metrics - `DatedMetrics` rows (`{ date, metrics }`): projected metric values per ISO-8601 test date, in any order with unique dates. (Python takes a date-indexed DataFrame.)
@@ -27999,7 +28003,7 @@ export interface VolatilityNamespace {
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
    * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
    * @param forwardPrices - One forward price to broadcast, or one per expiry.
-   * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_GRID_TOLERANCE` (1e-6).
+   * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
    * @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
    * @throws Error - Throws a `validation` error if the grid or forwards are invalid or the tolerance is negative or non-finite.
    */
@@ -28016,7 +28020,7 @@ export interface VolatilityNamespace {
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
    * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
    * @param forwardPrices - One forward price to broadcast, or one per expiry.
-   * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_GRID_TOLERANCE` (1e-6).
+   * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
    * @returns The `ArbitrageViolation` objects found (empty when the grid is clean).
    * @throws Error - Throws a `validation` error if the grid or forwards are invalid or the tolerance is negative or non-finite.
    */
@@ -28048,7 +28052,7 @@ export interface VolatilityNamespace {
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.
    * @param vols - Implied volatilities as nested rows: one `number[]` per expiry, one decimal volatility per strike.
    * @param forwardPrices - One forward price to broadcast, or one per expiry.
-   * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_GRID_TOLERANCE` (1e-6).
+   * @param tolerance - Optional non-negative violation tolerance; omitted uses the Rust `DEFAULT_ARBITRAGE_TOLERANCE` (1e-10).
    * @returns The `ArbitrageReport` object (`vol_surface_id`, `violations`, `passed`, `counts_by_type`, `counts_by_severity`).
    * @throws Error - Throws a `validation` error if the grid or forwards are invalid or the tolerance is negative or non-finite.
    */
@@ -29331,8 +29335,8 @@ export interface CalibrationNamespace {
    * @param maturity - ISO-8601 maturity date of the underlying swap.
    * @param strike - Fixed strike rate as a decimal.
    * @param vol - Volatility: absolute rate volatility for normal quotes (for example `0.0072`), annualized decimal for lognormal quotes.
-   * @param quoteType - `"normal"` or `"black_lognormal"`; defaults to `"normal"`.
-   * @param convention - Swaption market convention identifier; defaults to `"USD"`.
+   * @param quoteType - `"normal"` (`vol` is an absolute rate volatility) or `"black_lognormal"` (`vol` is a relative volatility); required, because it decides the unit of `vol`.
+   * @param convention - Swaption market convention identifier; omitted uses the Rust default `VolQuote::DEFAULT_SWAPTION_CONVENTION` (`"USD"`).
    * @returns A validated `VolQuote` object tagged `swaption_vol`.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if a date is not ISO-8601, the quote type is unknown or a numeric input is invalid.
    */
@@ -29342,7 +29346,7 @@ export interface CalibrationNamespace {
     maturity: string,
     strike: number,
     vol: number,
-    quoteType?: string | null,
+    quoteType: string,
     convention?: string | null
   ): generated.calibration.VolQuote;
   /**
@@ -29353,7 +29357,7 @@ export interface CalibrationNamespace {
    * @param expiry - ISO-8601 cap/floor maturity date.
    * @param strike - Strike rate as a decimal.
    * @param vol - Volatility: absolute rate volatility for normal quotes, annualized decimal for lognormal quotes.
-   * @param quoteType - `"normal"` or `"black_lognormal"`; defaults to `"normal"`.
+   * @param quoteType - `"normal"` (`vol` is an absolute rate volatility) or `"black_lognormal"` (`vol` is a relative volatility); required, because it decides the unit of `vol`.
    * @param isCap - `true` for a cap, `false` for a floor; defaults to `true`.
    * @returns A validated `VolQuote` object tagged `cap_floor_vol`.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if the expiry is not an ISO-8601 date, the quote type is unknown or a numeric input is invalid.
@@ -29363,7 +29367,7 @@ export interface CalibrationNamespace {
     expiry: string,
     strike: number,
     vol: number,
-    quoteType?: string | null,
+    quoteType: string,
     isCap?: boolean | null
   ): generated.calibration.VolQuote;
   /**

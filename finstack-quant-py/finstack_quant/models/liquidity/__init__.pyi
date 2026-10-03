@@ -60,16 +60,20 @@ class LiquidityProfile:
         Non-negative average trade size in shares/contracts.
     spread_volatility : float
         Non-negative spread standard deviation; ``0.0`` when unavailable.
-    spread_volatility_kind : str, default "relative"
-        ``"relative"`` or ``"absolute"``.
-    observation_days : int, default 20
-        Trading-day window behind the volume and spread statistics.
+    spread_volatility_kind : str, optional
+        ``"relative"`` or ``"absolute"``. ``None`` uses the Rust default
+        ``SpreadVolatilityKind::default()`` (``"relative"``).
+    observation_days : int, optional
+        Trading-day window behind the volume and spread statistics; at least 1.
+        ``None`` uses the Rust default
+        ``LiquidityProfile::DEFAULT_OBSERVATION_DAYS`` (20).
 
     Raises
     ------
     ValueError
         If a price is non-positive, the market is crossed, a statistic is
-        negative or non-finite, or ``spread_volatility_kind`` is unknown.
+        negative or non-finite, ``spread_volatility_kind`` is unknown, or
+        ``observation_days`` is 0.
 
     Examples
     --------
@@ -88,8 +92,8 @@ class LiquidityProfile:
         avg_daily_volume: float,
         avg_trade_size: float,
         spread_volatility: float,
-        spread_volatility_kind: str = "relative",
-        observation_days: int = 20,
+        spread_volatility_kind: str | None = None,
+        observation_days: int | None = None,
     ) -> None: ...
     @property
     def instrument_id(self) -> str:

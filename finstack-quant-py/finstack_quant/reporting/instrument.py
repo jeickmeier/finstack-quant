@@ -17,12 +17,13 @@ TypeError: instrument_tearsheet requires a precomputed ValuationResult
 from __future__ import annotations
 
 import datetime as dt
+import html
 import json
 import math
-import re
 from typing import Any
 
 from finstack_quant.cashflows.aggregation import calendar_year_ladder
+from finstack_quant.core.dates import Tenor
 from finstack_quant.models import vanilla_expiry_payoff
 
 from . import charts, format as fmt, tables
@@ -33,8 +34,6 @@ __all__ = [
     "ALL_SECTIONS",
     "instrument_tearsheet",
 ]
-
-_TENOR_ORDER = ["3m", "6m", "1y", "2y", "3y", "5y", "7y", "10y", "15y", "20y", "30y"]
 
 
 def _parse_result(result: Any) -> dict[str, Any]:
@@ -51,23 +50,39 @@ def _parse_result(result: Any) -> dict[str, Any]:
     }
 
 
-def _bucketed_series(result: Any, prefix: str) -> list[tuple[str, float]]:
-    """Per-tenor sum of a bucketed metric, ordered by the standard tenor grid.
+def _bucketed_series(result: Any, prefix: str) -> tuple[list[str], list[float], str]:
+    """Buckets of a composite metric exactly as Rust reports them.
 
-    Parses ``{prefix}::{curve}::{tenor}`` composite keys from ``result.metric_keys()``.
+    Reads ``result.metric_series(prefix)``: Rust decodes the composite keys, so
+    nothing is re-parsed, summed or filtered here. When every bucket ends in a
+    tenor (key-rate DV01/CS01), bars are ordered by the Rust ``Tenor`` year
+    fraction, as the portfolio tear sheet does; otherwise (an expiry-by-strike
+    vega grid) the Rust order is kept. When every bucket shares its first
+    coordinate (one curve or surface), that coordinate becomes the caption and
+    bars are labelled by the remaining coordinates.
     """
-    pat = re.compile(rf"^{re.escape(prefix)}::.+?::(\w+)$")
-    by_tenor: dict[str, float] = {}
-    for key in result.metric_keys():
-        m = pat.match(key)
-        if not m:
-            continue
-        tenor = m.group(1)
-        val = result.get_metric(key)
-        if val is None:
-            continue
-        by_tenor[tenor] = by_tenor.get(tenor, 0.0) + float(val)
-    return [(t, by_tenor[t]) for t in _TENOR_ORDER if t in by_tenor]
+    series = [(list(components), float(value)) for components, value in result.metric_series(prefix) if components]
+    if not series:
+        return [], [], ""
+    years = [_tenor_years(components[-1]) for components, _ in series]
+    if all(y is not None for y in years):
+        series = [item for _, item in sorted(zip(years, series, strict=True), key=lambda pair: pair[0])]
+    firsts = {components[0] for components, _ in series}
+    if len(firsts) == 1 and all(len(components) > 1 for components, _ in series):
+        caption = next(iter(firsts))
+        labels = [" · ".join(components[1:]) for components, _ in series]
+    else:
+        caption = ""
+        labels = [" · ".join(components) for components, _ in series]
+    return labels, [value for _, value in series], caption
+
+
+def _tenor_years(label: str) -> float | None:
+    """Year fraction of a tenor label via the Rust ``Tenor`` parser, or ``None``."""
+    try:
+        return Tenor.parse(label).to_years()
+    except ValueError:
+        return None
 
 
 def _money_str(m: Any) -> str:
@@ -396,14 +411,14 @@ def _keyrate_section(result: Any, itype: str, theme: Theme) -> Section | None:
         prefix = "bucketed_vega"
     else:
         prefix = "bucketed_dv01"
-    series = _bucketed_series(result, prefix)
-    if not series:
+    labels, vals, caption = _bucketed_series(result, prefix)
+    if not labels:
         return None
-    labels = [t for t, _ in series]
-    vals = [v for _, v in series]
     title_map = {"bucketed_cs01": "Bucketed CS01", "bucketed_vega": "Bucketed Vega"}
     title = title_map.get(prefix, "Key-Rate (Bucketed) DV01")
-    return Section(title, charts.bar_chart(labels, vals, theme=theme, y_pct=False, height=175))
+    chart = charts.bar_chart(labels, vals, theme=theme, y_pct=False, height=175)
+    sub = f'<p class="sub">{html.escape(caption)}</p>' if caption else ""
+    return Section(title, sub + chart)
 
 
 def _cashflow_sections(cashflows: Any, theme: Theme) -> list[Section]:

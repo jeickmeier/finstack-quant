@@ -34,12 +34,17 @@
         "terminal_value_pv": {
           "$ref": "#/$defs/Money",
           "description": "Terminal value (present value)"
+        },
+        "valuation_discount": {
+          "$ref": "#/$defs/Money",
+          "description": "Total valuation discount (DLOM, DLOC, other) deducted after the\nEV-to-equity bridge; zero when `DcfOptions::valuation_discounts` is unset.\n\n`enterprise_value - net_debt - valuation_discount` equals\n`equity_value`, so a bridge built from these three steps reconciles to\nthe reported equity value."
         }
       },
       "required": [
         "equity_value",
         "enterprise_value",
         "net_debt",
+        "valuation_discount",
         "terminal_value_pv"
       ],
       "type": "object"

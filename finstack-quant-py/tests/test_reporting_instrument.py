@@ -11,6 +11,8 @@ import pytest
 
 from finstack_quant.reporting import instrument as ins
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 
 class _FakeResult:
     """Stand-in for ValuationResult exposing the methods instrument.py uses."""
@@ -35,6 +37,16 @@ class _FakeResult:
 
     def get_metric(self, key: str) -> float | None:
         return self._p["measures"].get(key)
+
+    def metric_series(self, base: str) -> list[tuple[list[str], float]]:
+        # Test double of ValuationResult.metric_series: composite entries in
+        # insertion order with their coordinates (the fixture keys are plain).
+        prefix = f"{base}::"
+        return [
+            (key[len(prefix) :].split("::"), value)
+            for key, value in self._p["measures"].items()
+            if key.startswith(prefix)
+        ]
 
     def all_covenants_passed(self) -> bool:
         return not self._p.get("covenants")
@@ -72,11 +84,41 @@ def test_parse_result_meta() -> None:
     assert m["numeric_mode"] == "Decimal"
 
 
-def test_bucketed_series_orders_by_tenor() -> None:
-    series = ins._bucketed_series(_fake_bond_result(), "bucketed_dv01")
-    # ordered by the standard tenor grid: 2y, 5y, 10y (3m/6m/1y absent)
-    assert [t for t, _ in series] == ["2y", "5y", "10y"]
-    assert dict(series)["10y"] == 2620.0
+def test_bucketed_series_renders_rust_buckets_as_reported() -> None:
+    labels, values, caption = ins._bucketed_series(_fake_bond_result(), "bucketed_dv01")
+    # Tenor buckets are ordered by the Rust Tenor year fraction; the shared curve
+    # becomes the caption.
+    assert labels == ["2y", "5y", "10y"]
+    assert values == [230.0, 1350.0, 2620.0]
+    assert caption == "USD-OIS"
+    # A non-standard tenor is kept, not dropped by a fixed grid.
+    result = _fake_bond_result()
+    result._p["measures"]["bucketed_dv01::USD-OIS::4y"] = 900.0
+    labels, _, _ = ins._bucketed_series(result, "bucketed_dv01")
+    assert labels == ["2y", "4y", "5y", "10y"]
+
+
+def test_keyrate_section_shows_every_rust_vega_bucket() -> None:
+    from finstack_quant.valuations.instruments import price_instrument
+
+    fixture = json.loads((REPO_ROOT / "finstack-quant/valuations/tests/fixtures/production_equity.json").read_text())
+    spec = fixture["instrument"]["instrument"]["spec"]
+    spec["exercise_style"] = "european"
+    spec["strike"] = 120.0
+    result = price_instrument(
+        json.dumps(fixture["instrument"]),
+        json.dumps(fixture["market"]),
+        fixture["as_of"],
+        "black76",
+        ["vega", "bucketed_vega"],
+    )
+    rust = result.metric_series("bucketed_vega")
+    labels, values, _caption = ins._bucketed_series(result, "bucketed_vega")
+    # Every (expiry, strike) bucket Rust computed is shown, none is summed away.
+    assert len(labels) == len(rust) == 9
+    assert sum(values) == pytest.approx(sum(v for _, v in rust))
+    sheet = ins.instrument_tearsheet(result, definition=fixture["instrument"]["instrument"], sections=["keyrate"])
+    assert [s.title for s in sheet.sections] == ["Bucketed Vega"]
 
 
 def test_metric_cell_formats_by_unit() -> None:
@@ -383,10 +425,10 @@ def test_valid_definition_parses_once_and_preserves_exact_rendering() -> None:
 
     assert sum(call.args[0] == definition_json for call in parse_json.call_args_list) == 1
     assert json_html == dict_html
-    assert len(dict_html.encode()) == 11258
+    assert len(dict_html.encode()) == 11284
     assert (
         hashlib.sha256(dict_html.encode()).hexdigest()
-        == "b7c99f3afd7e73641c15b60aaeb929d17f56723b58e70e654743be727c5bbca9"
+        == "11a3aba264dce45e91749bc0deae1d60586fdb5f0e7467db55bf0adf0380f187"
     )
 
 

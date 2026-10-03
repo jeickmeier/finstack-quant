@@ -70,7 +70,17 @@ pub enum PerPositionMetric {
     /// - `Metric(MetricId::DurationMod)` for modified duration
     /// - `Metric(MetricId::Ytm)` for yield to maturity
     /// - `Metric(MetricId::Dv01)` for DV01
-    Metric(MetricId),
+    ///
+    /// Deserialization accepts only standard metric names
+    /// ([`MetricId::parse_strict`]): an unknown name would otherwise become a
+    /// custom metric that no position reports, and the optimizer would solve
+    /// against all-zero coefficients. Custom and composite (bucketed) keys go
+    /// through [`PerPositionMetric::CustomKey`].
+    Metric(
+        #[serde(deserialize_with = "deserialize_standard_metric")]
+        #[cfg_attr(feature = "json-schema", schemars(with = "MetricId"))]
+        MetricId,
+    ),
 
     /// From `ValuationResult::measures` using a string key (for custom or
     /// bucketed metrics stored by name).
@@ -97,6 +107,15 @@ pub enum PerPositionMetric {
 
     /// Constant scalar for all positions.
     Constant(f64),
+}
+
+/// Deserialize a standard [`MetricId`], rejecting unknown and custom names.
+fn deserialize_standard_metric<'de, D>(deserializer: D) -> std::result::Result<MetricId, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let name = String::deserialize(deserializer)?;
+    MetricId::parse_strict(&name).map_err(serde::de::Error::custom)
 }
 
 impl PerPositionMetric {
@@ -247,3 +266,29 @@ pub const WEIGHT_TOL: f64 = 1e-9;
 /// Smallest absolute constraint slack at which a constraint is reported
 /// as binding in the result envelope.
 pub const SLACK_TOL: f64 = 1e-6;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn per_position_metric_deserializes_standard_names_only() {
+        let dv01: PerPositionMetric =
+            serde_json::from_str(r#"{"metric":"dv01"}"#).expect("standard metric");
+        assert!(matches!(dv01, PerPositionMetric::Metric(id) if id == MetricId::Dv01));
+
+        // An unknown name must not become a custom metric that solves to a
+        // zero objective; composite keys belong in `custom_key`.
+        for bad in ["bogus", "dv01x", "bucketed_dv01::USD-OIS::10y"] {
+            let json = format!(r#"{{"metric":"{bad}"}}"#);
+            assert!(
+                serde_json::from_str::<PerPositionMetric>(&json).is_err(),
+                "{bad} must be rejected"
+            );
+        }
+        let custom: PerPositionMetric =
+            serde_json::from_str(r#"{"custom_key":"bucketed_dv01::USD-OIS::10y"}"#)
+                .expect("composite key via custom_key");
+        assert!(matches!(custom, PerPositionMetric::CustomKey(_)));
+    }
+}

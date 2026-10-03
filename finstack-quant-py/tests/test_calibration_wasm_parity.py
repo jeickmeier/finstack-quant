@@ -56,7 +56,7 @@ QUOTES = {
     "par_spread": lambda: CdsQuote.par_spread("ACME-5Y", "ACME", "USD", "isda_na", "5Y", 80.0, 0.4),
     "upfront": lambda: CdsQuote.upfront("ACME-5Y-U", "ACME", "USD", "isda_na", "5Y", 100.0, 0.01, 0.4),
     "option_vol": lambda: VolQuote.option_vol("O", "AAPL", "2027-05-08", 155.0, 0.28),
-    "swaption_vol": lambda: VolQuote.swaption_vol("SV", "2027-05-08", "2032-05-08", 0.04, 0.0072),
+    "swaption_vol": lambda: VolQuote.swaption_vol("SV", "2027-05-08", "2032-05-08", 0.04, 0.0072, "normal"),
     "cap_floor_vol": lambda: VolQuote.cap_floor_vol("CF", "2027-05-08", 0.04, 0.0072, "normal", False),
 }
 

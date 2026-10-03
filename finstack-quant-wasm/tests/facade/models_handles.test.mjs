@@ -506,10 +506,11 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
     [0.28, 0.24, 0.2, 0.21, 0.23],
     [0.27, 0.235, 0.21, 0.215, 0.23],
   ];
-  // An omitted tolerance is the Rust DEFAULT_GRID_TOLERANCE (1e-6).
+  // An omitted tolerance is the Rust DEFAULT_ARBITRAGE_TOLERANCE (1e-10), the
+  // same default as every Rust arbitrage check.
   assert.deepEqual(
     volatility.checkSurfaceGrid(strikes, [0.5, 1], vols, [100, 100]),
-    volatility.checkSurfaceGrid(strikes, [0.5, 1], vols, [100, 100], 1e-6)
+    volatility.checkSurfaceGrid(strikes, [0.5, 1], vols, [100, 100], 1e-10)
   );
   assert.throws(
     () => volatility.checkButterflyGrid(strikes, [0.5, 1], vols, [100, 100], -1),

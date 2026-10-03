@@ -285,8 +285,17 @@ test('covenant errors are structured and Rust-owned', () => {
     kind('not_found', /debt_to_ebitda/)
   );
   assert.throws(
-    () => covenants.forecastCovenant(leverageSpec(), series, { stochastic: true }),
+    () =>
+      covenants.forecastCovenant(leverageSpec(), series, {
+        stochastic: true,
+        reference_date: '2025-12-31',
+      }),
     kind('validation', /volatility/)
+  );
+  // Dated rows carry no period start, so a stochastic forecast must anchor its horizon.
+  assert.throws(
+    () => covenants.forecastCovenant(leverageSpec(), series, { stochastic: true, volatility: 0.2 }),
+    kind('validation', /reference_date/)
   );
   withEngine([leverageSpec()], (engine) => {
     assert.throws(() => engine.evaluate({}, '2026-03-31'), kind('not_found', /debt_to_ebitda/));

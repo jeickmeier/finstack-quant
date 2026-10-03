@@ -247,6 +247,37 @@ impl FinancialModelSpec {
         Ok(model)
     }
 
+    /// Load and validate a financial model already parsed into a JSON value.
+    ///
+    /// Same contract as [`Self::from_json`] for a model embedded in a larger
+    /// document (a scenario application or goal-seek result): serde plus
+    /// [`Self::validate_semantics`], so an embedded model is never handed out
+    /// unvalidated.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - The model's serde form (`{"id", "periods", "nodes", ...}`).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Serde`] when `value` does not match the model schema,
+    /// and the [`Self::validate_semantics`] error otherwise.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_statements::types::FinancialModelSpec;
+    ///
+    /// let value = serde_json::json!({"id": "m", "periods": [], "nodes": {}, "schema_version": 1});
+    /// assert!(FinancialModelSpec::from_value(value).is_err());
+    /// ```
+    pub fn from_value(value: serde_json::Value) -> Result<Self> {
+        let mut model: Self = serde_json::from_value(value)
+            .map_err(|e| Error::Serde(format!("invalid FinancialModelSpec JSON: {e}")))?;
+        model.validate_semantics()?;
+        Ok(model)
+    }
+
     /// Load and validate a persisted financial model.
     ///
     /// This strict entry point requires `schema_version: 1` and runs

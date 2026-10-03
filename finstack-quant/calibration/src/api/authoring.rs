@@ -132,8 +132,6 @@ impl CdsQuote {
 impl VolQuote {
     /// Option type label of an option-vol quote authored without one.
     pub const DEFAULT_OPTION_TYPE: &'static str = "call";
-    /// Volatility convention label of a swaption or cap/floor quote authored without one.
-    pub const DEFAULT_QUOTE_TYPE: &'static str = "normal";
     /// Swaption convention identifier of a swaption quote authored without one.
     pub const DEFAULT_SWAPTION_CONVENTION: &'static str = "USD";
     /// Cap (`true`) or floor (`false`) side of a cap/floor quote authored without one.
@@ -148,10 +146,12 @@ impl VolQuote {
     /// * `fields` - Wire fields of that variant (`id`, `expiry` as an ISO-8601
     ///   date, `strike`, `vol` as a decimal, ...). Omitted or `null` entries
     ///   take the authoring defaults: `option_type` is
-    ///   [`Self::DEFAULT_OPTION_TYPE`], `quote_type` is
-    ///   [`Self::DEFAULT_QUOTE_TYPE`], a swaption `convention` is
+    ///   [`Self::DEFAULT_OPTION_TYPE`], a swaption `convention` is
     ///   [`Self::DEFAULT_SWAPTION_CONVENTION`] and `is_cap` is
-    ///   [`Self::DEFAULT_IS_CAP`]. Unknown fields are rejected.
+    ///   [`Self::DEFAULT_IS_CAP`]. A swaption or cap/floor `quote_type`
+    ///   (`"normal"` or `"black_lognormal"`) has no default: it decides
+    ///   whether `vol` is an absolute or a relative volatility, so it must
+    ///   be stated. Unknown fields are rejected.
     ///
     /// # Errors
     ///
@@ -169,21 +169,11 @@ impl VolQuote {
             "swaption_vol" => {
                 default_field(
                     &mut fields,
-                    "quote_type",
-                    Value::from(Self::DEFAULT_QUOTE_TYPE),
-                );
-                default_field(
-                    &mut fields,
                     "convention",
                     Value::from(Self::DEFAULT_SWAPTION_CONVENTION),
                 );
             }
             "cap_floor_vol" => {
-                default_field(
-                    &mut fields,
-                    "quote_type",
-                    Value::from(Self::DEFAULT_QUOTE_TYPE),
-                );
                 default_field(&mut fields, "is_cap", Value::from(Self::DEFAULT_IS_CAP));
             }
             _ => {}
@@ -374,7 +364,7 @@ mod tests {
 
         let swaption = VolQuote::from_wire_fields(
             "swaption_vol",
-            map(json!({"id": "S", "expiry": "2027-05-08", "maturity": "2032-05-08", "strike": 0.04, "vol": 0.007})),
+            map(json!({"id": "S", "expiry": "2027-05-08", "maturity": "2032-05-08", "strike": 0.04, "vol": 0.007, "quote_type": "normal"})),
         )
         .expect("swaption vol");
         let wire = serde_json::to_value(&swaption).expect("wire");
@@ -383,12 +373,26 @@ mod tests {
 
         let floor = VolQuote::from_wire_fields(
             "cap_floor_vol",
-            map(json!({"id": "C", "expiry": "2027-05-08", "strike": 0.04, "vol": 0.007, "is_cap": false})),
+            map(json!({"id": "C", "expiry": "2027-05-08", "strike": 0.04, "vol": 0.20, "is_cap": false, "quote_type": "black_lognormal"})),
         )
         .expect("floor vol");
         let wire = serde_json::to_value(&floor).expect("wire");
         assert_eq!(wire["cap_floor_vol"]["is_cap"], false);
-        assert_eq!(wire["cap_floor_vol"]["quote_type"], "normal");
+        assert_eq!(wire["cap_floor_vol"]["quote_type"], "black_lognormal");
+
+        // The quote type decides the unit of `vol`, so it is never defaulted.
+        for kind in ["swaption_vol", "cap_floor_vol"] {
+            let mut without = map(
+                json!({"id": "Q", "expiry": "2027-05-08", "maturity": "2032-05-08", "strike": 0.04, "vol": 0.2}),
+            );
+            if kind == "cap_floor_vol" {
+                without.remove("maturity");
+            }
+            assert!(
+                VolQuote::from_wire_fields(kind, without).is_err(),
+                "{kind} without quote_type must be rejected"
+            );
+        }
         assert!(VolQuote::from_wire_fields("fx_vol", Map::new()).is_err());
     }
 
