@@ -55,19 +55,21 @@ impl PyRecoveryClaim {
     ///     Absolute-priority rank; lower ranks are paid first.
     /// principal : float
     ///     Principal outstanding (>= 0).
-    /// accrued : float, default 0.0
-    ///     Accrued but unpaid interest included in the claim.
-    /// penalties : float, default 0.0
-    ///     Penalties and fees included in the claim.
+    /// accrued : float
+    ///     Accrued but unpaid interest included in the claim (``0.0`` when
+    ///     none accrued).
+    /// penalties : float
+    ///     Penalties and fees included in the claim (``0.0`` when none).
+    /// collateral_haircut : float
+    ///     Haircut applied to ``collateral_value`` as a decimal in [0, 1]
+    ///     (``0.0`` for an unsecured claim or full collateral credit).
     /// collateral_value : float | None, default None
     ///     Gross value of collateral pledged to this claim, or ``None`` for an
-    ///     unsecured claim.
-    /// collateral_haircut : float, default 0.0
-    ///     Haircut applied to ``collateral_value`` as a decimal in [0, 1].
+    ///     unsecured claim (the Rust wire form also omits it).
     #[new]
-    #[pyo3(signature = (id, seniority, priority, principal, accrued=0.0, penalties=0.0, collateral_value=None, collateral_haircut=0.0))]
+    #[pyo3(signature = (id, seniority, priority, principal, accrued, penalties, collateral_haircut, collateral_value=None))]
     #[pyo3(
-        text_signature = "(id, seniority, priority, principal, accrued=0.0, penalties=0.0, collateral_value=None, collateral_haircut=0.0)"
+        text_signature = "(id, seniority, priority, principal, accrued, penalties, collateral_haircut, collateral_value=None)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn new(
@@ -77,8 +79,8 @@ impl PyRecoveryClaim {
         principal: f64,
         accrued: f64,
         penalties: f64,
-        collateral_value: Option<f64>,
         collateral_haircut: f64,
+        collateral_value: Option<f64>,
     ) -> Self {
         Self {
             inner: RecoveryClaim {

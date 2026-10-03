@@ -242,20 +242,6 @@ pub enum HierarchyDimension {
     Custom(String),
 }
 
-impl HierarchyDimension {
-    /// Display label of this dimension: `"Rating"`, `"Region"`, `"Sector"`,
-    /// or the custom dimension's own key.
-    #[must_use]
-    pub fn label(&self) -> &str {
-        match self {
-            Self::Rating => "Rating",
-            Self::Region => "Region",
-            Self::Sector => "Sector",
-            Self::Custom(name) => name,
-        }
-    }
-}
-
 /// Ordered list of hierarchy dimensions, broadest → narrowest.
 ///
 /// The ordering is significant: factor IDs and beta vectors are indexed
@@ -908,13 +894,18 @@ pub struct CreditFactorModel {
 }
 
 impl CreditFactorModel {
-    /// Display labels of the hierarchy levels, broadest first.
+    /// Names of the hierarchy levels, broadest first.
+    ///
+    /// Each name is the level's [`dimension_key`] (`"rating"`, `"region"`,
+    /// `"sector"` or a custom dimension's own key), so it matches the serde
+    /// form of [`HierarchyDimension`], the issuer-tag keys and the level
+    /// dimensions in every serialized artifact.
     #[must_use]
     pub fn level_names(&self) -> Vec<String> {
         self.hierarchy
             .levels
             .iter()
-            .map(|level| level.label().to_owned())
+            .map(|level| dimension_key(level).to_owned())
             .collect()
     }
 

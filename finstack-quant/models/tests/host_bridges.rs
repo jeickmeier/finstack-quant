@@ -10,7 +10,7 @@ use finstack_quant_models::credit::migration::{
 };
 use finstack_quant_models::credit::pd::{MasterScale, MasterScaleGrade, PdCalibrationError};
 use finstack_quant_models::credit::scoring::CreditScoringError;
-use finstack_quant_models::factor::credit::hierarchy::HierarchyDimension;
+use finstack_quant_models::factor::credit::hierarchy::{dimension_key, HierarchyDimension};
 use finstack_quant_models::factor::credit::VolHorizon;
 use finstack_quant_models::factor::risk::{DecompositionConfig, ParametricPositionDecomposer};
 use finstack_quant_models::factor::FactorCovarianceMatrix;
@@ -155,12 +155,20 @@ fn vol_horizon_descriptor_round_trips_through_parse() {
 }
 
 #[test]
-fn hierarchy_dimension_labels_are_the_display_names() {
-    assert_eq!(HierarchyDimension::Rating.label(), "Rating");
-    assert_eq!(HierarchyDimension::Region.label(), "Region");
-    assert_eq!(HierarchyDimension::Sector.label(), "Sector");
+fn hierarchy_level_names_are_the_serde_dimension_keys() {
+    for (dim, key) in [
+        (HierarchyDimension::Rating, "rating"),
+        (HierarchyDimension::Region, "region"),
+        (HierarchyDimension::Sector, "sector"),
+    ] {
+        assert_eq!(dimension_key(&dim), key);
+        assert_eq!(
+            serde_json::to_value(&dim).expect("serialize"),
+            serde_json::json!(key)
+        );
+    }
     assert_eq!(
-        HierarchyDimension::Custom("Currency".into()).label(),
+        dimension_key(&HierarchyDimension::Custom("Currency".into())),
         "Currency"
     );
 }

@@ -7,6 +7,4 @@ export const dtsm = {
   nelsonSiegelYields: wasm.nelsonSiegelYields,
   dieboldLiFitFactors: wasm.dieboldLiFitFactors,
   dieboldLiForecast: wasm.dieboldLiForecast,
-  yieldPcaFit: wasm.yieldPcaFit,
-  yieldPcaScenario: wasm.yieldPcaScenario,
 };

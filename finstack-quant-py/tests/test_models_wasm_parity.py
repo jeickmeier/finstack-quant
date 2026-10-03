@@ -70,9 +70,9 @@ GRADES = [("A", 0.01, 0.005), ("B", 0.10, 0.04), ("C", 1.0, 0.30)]
 TRANSITIONS = [[0.90, 0.08, 0.02], [0.10, 0.80, 0.10], [0.0, 0.0, 1.0]]
 GENERATOR = [[-0.10, 0.08, 0.02], [0.10, -0.20, 0.10], [0.0, 0.0, 0.0]]
 CLAIMS = [
-    ("secured", "senior_secured", 1, 100.0, 5.0, 0.0, 60.0, 0.25),
-    ("unsecured", "senior_unsecured", 2, 80.0, 0.0, 0.0, None, 0.0),
-    ("junior", "subordinated", 3, 50.0, 0.0, 1.0, None, 0.0),
+    ("secured", "senior_secured", 1, 100.0, 5.0, 0.0, 0.25, 60.0),
+    ("unsecured", "senior_unsecured", 2, 80.0, 0.0, 0.0, 0.0, None),
+    ("junior", "subordinated", 3, 50.0, 0.0, 1.0, 0.0, None),
 ]
 EXPOSURES = [
     ("A", 100.0, 0.02, 0.6, [0.4]),
@@ -583,8 +583,8 @@ def _rates_cases() -> dict[str, Callable[[], Any]]:
             pca().components_for_threshold(0.9),
             list(pca().scenario([1.0])),
             list(pca().apply_scenario([0.03, 0.032, 0.036, 0.04], [1.0, -0.5])),
-            list(dtsm.yield_pca_fit(_changes(), 2).eigenvalues),
-            list(dtsm.yield_pca_scenario(_changes(), 0, 1.0, 2)),
+            list(dtsm.YieldPca.fit_yield_changes(_changes()).truncated(2).eigenvalues),
+            list(dtsm.YieldPca.fit_yield_changes(_changes()).scenario([1.0, 0.0])),
             list(dtsm.YieldPca.fit_yield_changes(_changes()).cumulative_variance),
         ],
     }

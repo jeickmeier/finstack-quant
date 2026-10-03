@@ -335,8 +335,9 @@ impl PySabrSmile {
     /// -------
     /// pandas.DataFrame
     ///     Columns ``strike``, ``vol`` (decimal Black vol, or absolute normal
-    ///     vol when ``beta == 0``) and ``log_moneyness`` (``ln(K / F)``;
-    ///     ``NaN`` when the ratio is not positive).
+    ///     vol when ``beta == 0``) and ``log_moneyness``
+    ///     (``ln((K + s) / (F + s))`` with the SABR shift ``s``, ``0`` when
+    ///     unshifted; ``NaN`` when a shifted rate is not positive).
     ///
     /// Raises
     /// ------
@@ -345,17 +346,9 @@ impl PySabrSmile {
     ///     domain.
     fn to_dataframe<'py>(&self, py: Python<'py>, strikes: Vec<f64>) -> PyResult<Bound<'py, PyAny>> {
         let vols = self.inner.generate_smile(&strikes).map_err(core_to_py)?;
-        let forward = self.inner.forward();
         let log_moneyness: Vec<f64> = strikes
             .iter()
-            .map(|k| {
-                let ratio = k / forward;
-                if ratio > 0.0 {
-                    ratio.ln()
-                } else {
-                    f64::NAN
-                }
-            })
+            .map(|&k| self.inner.log_moneyness(k))
             .collect();
         let data = PyDict::new(py);
         data.set_item("strike", strikes)?;

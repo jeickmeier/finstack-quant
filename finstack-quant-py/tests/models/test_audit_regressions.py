@@ -68,3 +68,14 @@ def test_density_check_requires_one_forward_per_expiry() -> None:
         )
         == []
     )
+
+
+def test_sabr_smile_dataframe_log_moneyness_is_shift_aware() -> None:
+    """MODB-006: ``log_moneyness`` is ``ln((K+s)/(F+s))``, computed in Rust."""
+    shifted = SabrParameters(alpha=0.01, beta=0.5, nu=0.3, rho=-0.2, shift=0.02)
+    frame = SabrSmile(shifted, -0.001, 1.0).to_dataframe(strikes=[-0.005, 0.0, 0.005])
+    expected = [math.log((k + 0.02) / (-0.001 + 0.02)) for k in (-0.005, 0.0, 0.005)]
+    assert list(frame["log_moneyness"]) == pytest.approx(expected, abs=1e-14)
+    positive = SabrSmile(shifted, 0.01, 1.0).to_dataframe(strikes=[0.005, 0.01, 0.02])
+    expected = [math.log((k + 0.02) / 0.03) for k in (0.005, 0.01, 0.02)]
+    assert list(positive["log_moneyness"]) == pytest.approx(expected, abs=1e-14)

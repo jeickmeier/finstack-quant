@@ -791,8 +791,8 @@ impl JsCreditFactorModel {
         self.inner.config.factors.len()
     }
 
-    /// Display labels of the hierarchy levels, broadest first.
-    /// @returns Labels such as `"Rating"`, `"Region"`, `"Sector"` or a custom dimension key.
+    /// Names of the hierarchy levels, broadest first.
+    /// @returns Dimension keys such as `"rating"`, `"region"`, `"sector"` or a custom dimension key — the same keys as the issuer tags and the serialized model.
     #[wasm_bindgen(js_name = levelNames)]
     pub fn level_names(&self) -> Vec<String> {
         self.inner.level_names()

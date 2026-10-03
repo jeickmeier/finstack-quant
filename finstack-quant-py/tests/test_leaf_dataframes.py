@@ -206,9 +206,9 @@ _ALLOCATION_COLUMNS = [
 def _claims() -> list[recovery_waterfall.RecoveryClaim]:
     """Three claims of different size, supplied out of priority order."""
     return [
-        recovery_waterfall.RecoveryClaim("SUB", "subordinated", 3, 100.0),
-        recovery_waterfall.RecoveryClaim("SEN", "senior_secured", 1, 100.0),
-        recovery_waterfall.RecoveryClaim("MEZZ", "senior_unsecured", 2, 50.0),
+        recovery_waterfall.RecoveryClaim("SUB", "subordinated", 3, 100.0, 0.0, 0.0, 0.0),
+        recovery_waterfall.RecoveryClaim("SEN", "senior_secured", 1, 100.0, 0.0, 0.0, 0.0),
+        recovery_waterfall.RecoveryClaim("MEZZ", "senior_unsecured", 2, 50.0, 0.0, 0.0, 0.0),
     ]
 
 
@@ -532,7 +532,7 @@ def test_period_decomposition_level_dataframe_is_long_and_sorted() -> None:
     assert expected_rows == 8
 
     assert list(df["level_index"]) == sorted(df["level_index"]) == [0, 0, 1, 1, 1, 1, 1, 1]
-    assert list(df["dimension"]) == ["Rating"] * 2 + ["Region"] * 6
+    assert list(df["dimension"]) == ["rating"] * 2 + ["region"] * 6
     assert list(df["bucket"]) == [
         "HY",
         "IG",

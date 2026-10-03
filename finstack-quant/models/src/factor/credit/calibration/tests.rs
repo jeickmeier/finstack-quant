@@ -360,6 +360,61 @@ fn history_panel_serde_roundtrip() {
     assert_eq!(panel, back);
 }
 
+/// MODB-005: the panel -> inputs derivation lives in Rust. The anchor is the
+/// last panel date (the only one calibration accepts), the anchor
+/// cross-section is the last row, and an empty panel is rejected.
+#[test]
+fn inputs_from_panel_anchor_at_last_date() {
+    use super::inputs::{CreditCalibrationInputs, GenericFactorSeries, IssuerTagPanel};
+    use crate::factor::credit::hierarchy::GenericFactorSpec;
+
+    let dates = vec![
+        Date::from_calendar_date(2024, time::Month::January, 31).unwrap(),
+        Date::from_calendar_date(2024, time::Month::February, 29).unwrap(),
+    ];
+    let mut spreads = BTreeMap::new();
+    spreads.insert(IssuerId::new("A"), vec![Some(0.0100), Some(0.0101)]);
+    spreads.insert(IssuerId::new("B"), vec![Some(0.0200), None]);
+    let generic = GenericFactorSeries {
+        spec: GenericFactorSpec {
+            name: "CDX IG 5Y".into(),
+            series_id: "cdx.ig.5y".into(),
+        },
+        values: vec![0.006, 0.007],
+    };
+    let tags = IssuerTagPanel {
+        tags: BTreeMap::new(),
+    };
+    let inputs = CreditCalibrationInputs::from_panel(
+        HistoryPanel {
+            dates: dates.clone(),
+            spreads,
+        },
+        tags.clone(),
+        generic.clone(),
+        BTreeMap::new(),
+    )
+    .unwrap();
+    assert_eq!(inputs.as_of, dates[1]);
+    assert_eq!(
+        inputs.as_of_spreads,
+        BTreeMap::from([(IssuerId::new("A"), 0.0101)])
+    );
+    assert_eq!(inputs.generic_factor.spec.series_id, "cdx.ig.5y");
+    assert!(inputs.idiosyncratic_overrides.is_empty());
+
+    let empty = CreditCalibrationInputs::from_panel(
+        HistoryPanel {
+            dates: Vec::new(),
+            spreads: BTreeMap::new(),
+        },
+        tags,
+        generic,
+        BTreeMap::new(),
+    );
+    assert!(empty.is_err());
+}
+
 // End-to-end calibration fixtures for fold-up, look-ahead, and degenerate-OLS
 // regression tests.
 

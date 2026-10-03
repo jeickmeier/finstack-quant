@@ -12,6 +12,19 @@
 - Python and WASM: `RatingFactorTable` / `MasterScale` / `DownturnLgd` `from_registry_id` with an unknown id raise `KeyError` / throw kind `not_found` (was `ValueError` / `validation`); the Rust credit registry returns `InputError::NotFound`.
 - Python: typed Rust errors at the remaining statements-analytics, attribution, calibration, margin, portfolio and scenarios binding sites now go through their kind-aware mapper; `display_to_py` accepts only kind-less parse/serde errors (`KindlessError`), so routing a typed error through it no longer compiles.
 
+### Credit models and DTSM (Python-binding audit PR 7)
+
+#### Changed (breaking)
+
+- Python: `RecoveryClaim(id, seniority, priority, principal, accrued, penalties, collateral_haircut, collateral_value=None)` requires `accrued`, `penalties` and `collateral_haircut` (were invented `0.0` defaults the Rust wire form rejects); `collateral_haircut` now precedes the optional `collateral_value`.
+- Python and WASM: removed the host-only `yield_pca_fit` / `yield_pca_scenario` (`yieldPcaFit` / `yieldPcaScenario`) and their fixed `n_components=3` default; use `YieldPca.fit_yield_changes(changes).truncated(n)` and `YieldPca.fit_yield_changes(changes).scenario(shocks)`. Rust: removed `YieldPca::scenario_from_yield_changes` and `DEFAULT_PCA_COMPONENTS`.
+- Rust, Python and WASM: `CreditFactorModel::level_names()`, the `dimension` column of `LevelsAtDate.to_dataframe` / `PeriodDecomposition.to_level_dataframe`, and `LevelVolContribution.level_name` use the dimension key (`rating`, `region`, `sector`), matching issuer tags and JSON. Rust `HierarchyDimension::label()` is removed; use `dimension_key`.
+- Python: `CreditCalibrator.from_dataframe(spreads, tags, generic, generic_spec, spread_durations=None, config=None)` requires a `GenericFactorSpec` dict/JSON (no invented `"generic"` ids) and drops `as_of`; Rust `CreditCalibrationInputs::from_panel` now anchors the inputs at the last panel date.
+
+#### Fixed
+
+- Python: `SabrSmile.to_dataframe` `log_moneyness` is shift-aware, `ln((K+s)/(F+s))`, from the new Rust `SabrSmile::log_moneyness` (was `ln(K/F)` computed in the binding).
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

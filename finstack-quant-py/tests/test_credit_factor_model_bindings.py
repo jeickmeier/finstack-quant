@@ -173,7 +173,7 @@ def test_credit_factor_model_from_json_minimal() -> None:
     assert model.n_levels == 2
     assert model.n_issuers == 0
     assert model.n_factors == 0
-    assert model.level_names() == ["Rating", "Region"]
+    assert model.level_names() == ["rating", "region"]
     assert model.issuer_ids() == []
     assert model.factor_ids() == []
 
@@ -216,8 +216,11 @@ def test_calibrator_produces_valid_artifact() -> None:
 def test_calibrated_model_level_names() -> None:
     model = _calibrate()
     names = model.level_names()
-    assert "Rating" in names
-    assert "Region" in names
+    assert "rating" in names
+    assert "region" in names
+    # MODB-004: level names are the keys the model's own tag maps and JSON use.
+    issuer_tags = json.loads(model.to_json())["issuer_betas"][0]["tags"]
+    assert all(name in issuer_tags for name in names)
 
 
 def test_calibrated_model_serializes_to_json() -> None:
@@ -505,3 +508,28 @@ def test_idiosyncratic_override_is_decimal_spread_per_sqrt_year() -> None:
     row = model.to_dataframe().set_index("issuer_id").loc["ISSUER-A"]
     assert row["adder_vol_annualized"] == pytest.approx(10.0)
     assert row["adder_vol_source"] == "caller_supplied"
+
+
+def test_from_dataframe_matches_json_path_and_invents_no_generic_ids() -> None:
+    """MODB-005: Rust derives the anchor; the caller names the generic series."""
+    import pandas as pd
+
+    cfg = _calibration_config()
+    inp = _fixture_inputs()
+    via_json = CreditCalibrator(config=json.dumps(cfg)).calibrate(inputs=json.dumps(inp))
+    spreads = pd.DataFrame(inp["history_panel"]["spreads"], index=pd.to_datetime(inp["history_panel"]["dates"]).date)
+    generic = pd.Series(inp["generic_factor"]["values"], index=spreads.index)
+    via_frames = CreditCalibrator.from_dataframe(
+        spreads, inp["issuer_tags"]["tags"], generic, inp["generic_factor"]["spec"], config=cfg
+    )
+    assert json.loads(via_frames.to_json()) == json.loads(via_json.to_json())
+    with pytest.raises(TypeError):
+        CreditCalibrator.from_dataframe(spreads, inp["issuer_tags"]["tags"], generic, config=cfg)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        CreditCalibrator.from_dataframe(  # type: ignore[call-arg]
+            spreads, inp["issuer_tags"]["tags"], generic, inp["generic_factor"]["spec"], as_of=spreads.index[-1]
+        )
+    with pytest.raises(ValueError, match=r"history_panel\.dates is empty"):
+        CreditCalibrator.from_dataframe(
+            spreads.iloc[0:0], inp["issuer_tags"]["tags"], [], inp["generic_factor"]["spec"], config=cfg
+        )

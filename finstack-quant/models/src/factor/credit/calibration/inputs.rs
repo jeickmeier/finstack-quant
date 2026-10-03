@@ -99,3 +99,105 @@ pub struct CreditCalibrationInputs {
     #[serde(default)]
     pub spread_durations: BTreeMap<IssuerId, f64>,
 }
+
+impl CreditCalibrationInputs {
+    /// Build calibration inputs anchored at the end of a history panel.
+    ///
+    /// The calibrator only accepts an anchor equal to the last panel date
+    /// (an earlier `as_of` would leak post-anchor history into the fit), so
+    /// this constructor sets `as_of` to the last entry of
+    /// `history_panel.dates` and `as_of_spreads` to each issuer's spread on
+    /// that date. Issuers whose last observation is `None` are left out of
+    /// `as_of_spreads`; calibration then rejects the gap.
+    /// `idiosyncratic_overrides` starts empty.
+    ///
+    /// # Arguments
+    ///
+    /// * `history_panel` - Sorted, regular issuer-spread history in decimal
+    ///   units (`0.01` = 100 bp); its last date becomes the calibration
+    ///   anchor and its last row the anchor cross-section.
+    /// * `issuer_tags` - Point-in-time hierarchy tags per issuer, keyed by
+    ///   the canonical dimension keys (`"rating"`, `"region"`, ...).
+    /// * `generic_factor` - Generic (PC) factor reference and values aligned
+    ///   with `history_panel.dates`, in decimal units. The caller names the
+    ///   series explicitly; nothing is defaulted.
+    /// * `spread_durations` - Option-adjusted spread duration in years per
+    ///   issuer; may be empty unless DTS bucket weighting is configured.
+    ///
+    /// # Returns
+    ///
+    /// Inputs ready for [`super::CreditCalibrator::calibrate`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when
+    /// `history_panel.dates` is empty. All other checks run at calibration.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use std::collections::BTreeMap;
+    /// use finstack_quant_core::dates::Date;
+    /// use finstack_quant_core::types::IssuerId;
+    /// use finstack_quant_models::factor::credit::calibration::{
+    ///     CreditCalibrationInputs, GenericFactorSeries, HistoryPanel, IssuerTagPanel,
+    /// };
+    /// use finstack_quant_models::factor::credit::hierarchy::GenericFactorSpec;
+    /// use time::Month;
+    ///
+    /// let dates = vec![
+    ///     Date::from_calendar_date(2024, Month::January, 31)?,
+    ///     Date::from_calendar_date(2024, Month::February, 29)?,
+    /// ];
+    /// let panel = HistoryPanel {
+    ///     dates: dates.clone(),
+    ///     spreads: BTreeMap::from([(IssuerId::new("A"), vec![Some(0.010), Some(0.012)])]),
+    /// };
+    /// let generic = GenericFactorSeries {
+    ///     spec: GenericFactorSpec { name: "CDX IG 5Y".into(), series_id: "cdx.ig.5y".into() },
+    ///     values: vec![0.006, 0.007],
+    /// };
+    /// let inputs = CreditCalibrationInputs::from_panel(
+    ///     panel,
+    ///     IssuerTagPanel { tags: BTreeMap::new() },
+    ///     generic,
+    ///     BTreeMap::new(),
+    /// )?;
+    /// assert_eq!(inputs.as_of, dates[1]);
+    /// assert_eq!(inputs.as_of_spreads[&IssuerId::new("A")], 0.012);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn from_panel(
+        history_panel: HistoryPanel,
+        issuer_tags: IssuerTagPanel,
+        generic_factor: GenericFactorSeries,
+        spread_durations: BTreeMap<IssuerId, f64>,
+    ) -> finstack_quant_core::Result<Self> {
+        let Some(&as_of) = history_panel.dates.last() else {
+            return Err(finstack_quant_core::Error::Validation(
+                "CreditCalibrationInputs::from_panel: history_panel.dates is empty".into(),
+            ));
+        };
+        let last = history_panel.dates.len() - 1;
+        let as_of_spreads = history_panel
+            .spreads
+            .iter()
+            .filter_map(|(issuer, values)| {
+                values
+                    .get(last)
+                    .copied()
+                    .flatten()
+                    .map(|v| (issuer.clone(), v))
+            })
+            .collect();
+        Ok(Self {
+            history_panel,
+            issuer_tags,
+            generic_factor,
+            as_of,
+            as_of_spreads,
+            idiosyncratic_overrides: BTreeMap::new(),
+            spread_durations,
+        })
+    }
+}

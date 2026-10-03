@@ -1079,82 +1079,6 @@ fn diebold_li_forecast(
         .map_err(core_to_py)
 }
 
-/// Fit PCA to a matrix of yield changes and return the leading components.
-///
-/// Thin twin of ``YieldPca.fit_yield_changes(yield_changes).truncated(n_components)``.
-///
-/// Parameters
-/// ----------
-/// yield_changes : list[list[float]]
-///     ``yield_changes[t][tenor]`` in decimal units (e.g. ``numpy.diff(yields, axis=0)``).
-/// n_components : int, default ``3``
-///     Number of leading components to keep (``1..=min(T-1, N)``).
-///
-/// Returns
-/// -------
-/// YieldPcaView
-///     Loadings, scores, eigenvalues and variance shares with ``to_dataframe()``.
-///     ``tenors`` are placeholders ``1..N`` because yield changes do not
-///     identify the maturities.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the panel is empty/ragged/non-finite, has fewer than two rows or
-///     tenors, or ``n_components`` is out of range.
-#[pyfunction]
-#[pyo3(signature = (yield_changes, n_components = dtsm::DEFAULT_PCA_COMPONENTS))]
-#[pyo3(text_signature = "(yield_changes, n_components=3)")]
-fn yield_pca_fit(
-    py: Python<'_>,
-    yield_changes: Vec<Vec<f64>>,
-    n_components: usize,
-) -> PyResult<PyYieldPcaView> {
-    py.detach(|| YieldPca::fit_yield_changes(yield_changes)?.truncated(n_components))
-        .map(PyYieldPcaView::from_inner)
-        .map_err(core_to_py)
-}
-
-/// Generate a single-component N-sigma PCA scenario shift to the yield curve.
-///
-/// Returns ``delta_yield = sigma_shock * sqrt(eigenvalue_k) * loading_k``,
-/// i.e. the yield-change vector that corresponds to a ``sigma_shock``-sigma
-/// move along principal component ``component_index``.
-///
-/// Parameters
-/// ----------
-/// yield_changes : list[list[float]]
-///     ``yield_changes[t][tenor]`` matrix of decimal yield changes.
-/// component_index : int
-///     0-based principal component to shock (``< n_components``).
-/// sigma_shock : float
-///     Shock size in standard deviations (``2.0`` for +2 sigma).
-/// n_components : int, default ``3``
-///     Number of PCs to fit; used for bounds checking on ``component_index``.
-///
-/// Returns
-/// -------
-/// list[float]
-///     Yield-change vector of length ``N`` in decimal units.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the panel is malformed or ``component_index`` / ``n_components``
-///     are out of range.
-#[pyfunction]
-#[pyo3(signature = (yield_changes, component_index, sigma_shock, n_components = dtsm::DEFAULT_PCA_COMPONENTS))]
-#[pyo3(text_signature = "(yield_changes, component_index, sigma_shock, n_components=3)")]
-fn yield_pca_scenario(
-    yield_changes: Vec<Vec<f64>>,
-    component_index: usize,
-    sigma_shock: f64,
-    n_components: usize,
-) -> PyResult<Vec<f64>> {
-    YieldPca::scenario_from_yield_changes(yield_changes, component_index, sigma_shock, n_components)
-        .map_err(core_to_py)
-}
-
 /// Evaluate the static Nelson-Siegel (1987) yield curve for a given decay
 /// parameter, factor triple, and tenor grid.
 ///
@@ -1211,8 +1135,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(diebold_li_fit_factors, &m)?)?;
     m.add_function(wrap_pyfunction!(diebold_li_forecast, &m)?)?;
     m.add_function(wrap_pyfunction!(nelson_siegel_yields, &m)?)?;
-    m.add_function(wrap_pyfunction!(yield_pca_fit, &m)?)?;
-    m.add_function(wrap_pyfunction!(yield_pca_scenario, &m)?)?;
 
     let all = PyList::new(
         py,
@@ -1226,8 +1148,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "diebold_li_fit_factors",
             "diebold_li_forecast",
             "nelson_siegel_yields",
-            "yield_pca_fit",
-            "yield_pca_scenario",
         ],
     )?;
     m.setattr("__all__", all)?;

@@ -1678,7 +1678,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/credit_vol_report.schema.json",
             "type_name": "CreditVolReport",
             "kind": "output",
-            "bytes": 6261
+            "bytes": 6417
           },
           {
             "path": "schemas/portfolio/1/dated_cashflow.schema.json",
@@ -4154,7 +4154,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/credit_vol_report.schema.json",
             "type_name": "CreditVolReport",
             "kind": "output",
-            "bytes": 6261
+            "bytes": 6417
           },
           {
             "domain": "portfolio",

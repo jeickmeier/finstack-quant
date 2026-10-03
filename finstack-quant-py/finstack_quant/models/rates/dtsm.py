@@ -20,8 +20,6 @@ YieldPcaView = _dtsm.YieldPcaView
 diebold_li_fit_factors = _dtsm.diebold_li_fit_factors
 diebold_li_forecast = _dtsm.diebold_li_forecast
 nelson_siegel_yields = _dtsm.nelson_siegel_yields
-yield_pca_fit = _dtsm.yield_pca_fit
-yield_pca_scenario = _dtsm.yield_pca_scenario
 
 __all__: list[str] = [
     "DieboldLi",
@@ -33,6 +31,4 @@ __all__: list[str] = [
     "diebold_li_fit_factors",
     "diebold_li_forecast",
     "nelson_siegel_yields",
-    "yield_pca_fit",
-    "yield_pca_scenario",
 ]

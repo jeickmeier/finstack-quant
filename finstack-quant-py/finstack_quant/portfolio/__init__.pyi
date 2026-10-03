@@ -9245,7 +9245,9 @@ class LevelVolContribution:
         Returns
         -------
         str
-            Name of the hierarchy level that received this volatility contribution.
+            The level's dimension key (``"rating"``, ``"region"``,
+            ``"sector"`` or a custom dimension's own key), matching
+            ``CreditFactorModel.level_names()`` and the issuer-tag keys.
 
         Notes
         -----
