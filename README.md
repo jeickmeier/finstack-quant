@@ -336,7 +336,8 @@ mise run python-examples
 exact stable Rust with `clippy`, `rustfmt`, and the `wasm32-unknown-unknown`
 target, plus nightly (needed only for the rustdoc JSON that `cargo-public-api`
 consumes), Node, `wasm-pack`, `cargo-nextest`, `cargo-llvm-cov`, `cargo-deny`,
-`cargo-public-api`, `flamegraph`, `maturin`, and `osv-scanner`. Rust 1.97.1 is
+`cargo-public-api`, `maturin`, and `osv-scanner`. `cargo-flamegraph` is not
+installed by default; it has no release binary. Rust 1.97.1 is
 also the minimum supported version declared by every library crate.
 
 ```bash
@@ -381,7 +382,7 @@ rest are narrower (`goldens-*`, `wheel-*`, `pre-commit-*`, `materialization-*`,
 | `mise run rust-lint` | `cargo fmt --check` plus clippy with `-D warnings` across the workspace |
 | `mise run rust-doc` | Build workspace docs, enforce input docs, and run doctests |
 | `mise run rust-bench` | Run Criterion benchmarks with reduced measurement timing |
-| `mise run rust-flamegraph` | Generate a CPU flamegraph (`cargo flamegraph --profile bench`; pass extra args after `--`) |
+| `mise run rust-flamegraph` | Generate a CPU flamegraph (`cargo flamegraph --profile bench`; install once with `mise install cargo:flamegraph`; pass extra args after `--`) |
 | `mise run gen-write` | Regenerate checked-in schemas, fixtures, and TypeScript bindings |
 | `mise run rust-gen-schemas` | Regenerate typed JSON schemas from Rust types |
 | `mise run rust-check-schemas` | Verify JSON schemas match Rust types |

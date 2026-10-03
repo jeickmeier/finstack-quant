@@ -58,10 +58,12 @@ jobs:
           - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.12", timeout: 90, lto: thin, codegen_units: 16 }
           - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.13", timeout: 90, lto: thin, codegen_units: 16 }
           - { os: macos-arm64, runner: macos-14,       target: aarch64, python: "3.14", timeout: 90, lto: thin, codegen_units: 16 }
-          # ── Windows x86_64 (MSVC is slower — larger timeout) ──
-          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.12", timeout: 90, lto: fat,  codegen_units: 1 }
-          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.13", timeout: 90, lto: fat,  codegen_units: 1 }
-          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.14", timeout: 90, lto: fat,  codegen_units: 1 }
+          # ── Windows x86_64 (MSVC fat LTO — larger timeout) ──
+          # Release #155 cancelled py3.12 at the 90-minute cap while rustc was
+          # still compiling finstack-quant-py. py3.14 finished at 89 minutes.
+          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.12", timeout: 120, lto: fat,  codegen_units: 1 }
+          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.13", timeout: 120, lto: fat,  codegen_units: 1 }
+          - { os: windows-x64, runner: windows-latest, target: x64,     python: "3.14", timeout: 120, lto: fat,  codegen_units: 1 }
 
     steps:
       - uses: actions/checkout@v5
@@ -77,6 +79,12 @@ jobs:
         uses: jdx/mise-action@v4
         with:
           cache: true
+          # Wheels only need the pinned stable compiler. A full `mise install`
+          # also compiles cargo-nextest, cargo-deny, cargo-public-api,
+          # cargo-llvm-cov, flamegraph, and maturin from source, and downloads
+          # nightly. On the Release #155 Windows cache miss that took 26
+          # minutes, then maturin-action installed its own maturin anyway.
+          install_args: rust@1.97.1
         env:
           # rustup download cache is not concurrency-safe under parallel cargo:*.
           MISE_JOBS: "1"
@@ -164,6 +172,9 @@ jobs:
         uses: jdx/mise-action@v4
         with:
           cache: true
+          # wasm-pack and Node package the release. The cargo CLIs and nightly
+          # rustc are not used here.
+          install_args: rust@1.97.1 node aqua:rustwasm/wasm-pack
         env:
           # rustup download cache is not concurrency-safe under parallel cargo:*.
           MISE_JOBS: "1"

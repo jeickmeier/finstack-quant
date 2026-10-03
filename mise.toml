@@ -12,6 +12,12 @@
 #                                        invalidate the plain clippy cache)
 #   - `*-lint`                         — check-only (CI-safe, no mutation)
 
+[settings]
+# Download GitHub release binaries for `cargo:` tools. Otherwise a cache miss
+# compiles them with `cargo install`. cargo-public-api publishes no release
+# binary, so that one tool still builds from source.
+cargo.binstall_native = true
+
 [tools]
 # Pin the active toolchain to an exact rustup name. A bare channel can make
 # parallel `cargo:*` installs race to fetch and rename the same download.
@@ -32,7 +38,6 @@ node = "24"
 "cargo:cargo-deny" = "0.20.2"
 "github:obi1kenobi/cargo-semver-checks" = "0.50.0"
 "cargo:cargo-public-api" = "0.52.0"
-"cargo:flamegraph" = "latest"    # local profiling only, never gates CI
 "cargo:maturin" = "1.14.1"
 "aqua:google/osv-scanner" = "2.3.5"
 
@@ -929,7 +934,7 @@ run = [
 ]
 
 [tasks.rust-flamegraph]
-description = "Generate a CPU flamegraph using the bench profile (keeps symbols; pass cargo-flamegraph args after --). Example: mise run rust-flamegraph -- -p finstack-quant-portfolio --bench materialization --open"
+description = "Generate a CPU flamegraph using the bench profile (keeps symbols; pass cargo-flamegraph args after --). Install the tool once with `mise install cargo:flamegraph` — it has no release binary, so it is not part of `mise install`. Example: mise run rust-flamegraph -- -p finstack-quant-portfolio --bench materialization --open"
 env = { CARGO_INCREMENTAL = "0" }
 run = "cargo flamegraph --profile bench"
 
