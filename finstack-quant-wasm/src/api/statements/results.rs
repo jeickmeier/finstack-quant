@@ -547,6 +547,132 @@ pub fn capital_structure_cashflows_get_total_debt_balance(
         .map_err(to_js_err)
 }
 
+/// Total cash interest expense across all instruments in one period.
+///
+/// Free-function twin of Python `CapitalStructureCashflows.get_total_interest_cash` (Rust
+/// `CapitalStructureCashflows::get_total_interest_cash`).
+/// @param cashflows_json - The `cs_cashflows` object of a statement result (object or JSON).
+/// @param period - Period identifier, e.g. `"2025Q1"`.
+/// @returns Cash interest expense in the reporting currency.
+///
+/// # Errors
+///
+/// Throws with kind `computation` if the period has no totals or the
+/// instruments span several currencies without a reporting currency, and kind
+/// `validation` if an input is malformed.
+#[wasm_bindgen(js_name = capitalStructureCashflowsGetTotalInterestCash)]
+pub fn capital_structure_cashflows_get_total_interest_cash(
+    cashflows_json: JsValue,
+    period: JsValue,
+) -> Result<f64, JsValue> {
+    let cashflows: CapitalStructureCashflows = from_js_json(&cashflows_json, "cashflowsJson")?;
+    cashflows
+        .get_total_interest_cash(&period_id(&period)?)
+        .map_err(to_js_err)
+}
+
+/// Total cash interest received (net hedge receipts and negative-rate coupon receipts) across all instruments in one period.
+///
+/// Free-function twin of Python `CapitalStructureCashflows.get_total_interest_income` (Rust
+/// `CapitalStructureCashflows::get_total_interest_income`).
+/// @param cashflows_json - The `cs_cashflows` object of a statement result (object or JSON).
+/// @param period - Period identifier, e.g. `"2025Q1"`.
+/// @returns Interest income in the reporting currency.
+///
+/// # Errors
+///
+/// Throws with kind `computation` if the period has no totals or the
+/// instruments span several currencies without a reporting currency, and kind
+/// `validation` if an input is malformed.
+#[wasm_bindgen(js_name = capitalStructureCashflowsGetTotalInterestIncome)]
+pub fn capital_structure_cashflows_get_total_interest_income(
+    cashflows_json: JsValue,
+    period: JsValue,
+) -> Result<f64, JsValue> {
+    let cashflows: CapitalStructureCashflows = from_js_json(&cashflows_json, "cashflowsJson")?;
+    cashflows
+        .get_total_interest_income(&period_id(&period)?)
+        .map_err(to_js_err)
+}
+
+/// Total PIK (non-cash) interest accrued across all instruments in one period.
+///
+/// Free-function twin of Python `CapitalStructureCashflows.get_total_interest_pik` (Rust
+/// `CapitalStructureCashflows::get_total_interest_pik`).
+/// @param cashflows_json - The `cs_cashflows` object of a statement result (object or JSON).
+/// @param period - Period identifier, e.g. `"2025Q1"`.
+/// @returns PIK interest in the reporting currency.
+///
+/// # Errors
+///
+/// Throws with kind `computation` if the period has no totals or the
+/// instruments span several currencies without a reporting currency, and kind
+/// `validation` if an input is malformed.
+#[wasm_bindgen(js_name = capitalStructureCashflowsGetTotalInterestPik)]
+pub fn capital_structure_cashflows_get_total_interest_pik(
+    cashflows_json: JsValue,
+    period: JsValue,
+) -> Result<f64, JsValue> {
+    let cashflows: CapitalStructureCashflows = from_js_json(&cashflows_json, "cashflowsJson")?;
+    cashflows
+        .get_total_interest_pik(&period_id(&period)?)
+        .map_err(to_js_err)
+}
+
+/// Total accrued-but-unpaid debt interest at period end across all instruments in one period.
+///
+/// Free-function twin of Python `CapitalStructureCashflows.get_total_accrued_interest` (Rust
+/// `CapitalStructureCashflows::get_total_accrued_interest`).
+/// @param cashflows_json - The `cs_cashflows` object of a statement result (object or JSON).
+/// @param period - Period identifier, e.g. `"2025Q1"`.
+/// @returns Accrued interest in the reporting currency.
+///
+/// # Errors
+///
+/// Throws with kind `computation` if the period has no totals or the
+/// instruments span several currencies without a reporting currency, and kind
+/// `validation` if an input is malformed.
+#[wasm_bindgen(js_name = capitalStructureCashflowsGetTotalAccruedInterest)]
+pub fn capital_structure_cashflows_get_total_accrued_interest(
+    cashflows_json: JsValue,
+    period: JsValue,
+) -> Result<f64, JsValue> {
+    let cashflows: CapitalStructureCashflows = from_js_json(&cashflows_json, "cashflowsJson")?;
+    cashflows
+        .get_total_accrued_interest(&period_id(&period)?)
+        .map_err(to_js_err)
+}
+
+/// Cash interest received by one instrument in one period.
+///
+/// Free-function twin of Python `CapitalStructureCashflows.get_interest_income`
+/// (Rust `CapitalStructureCashflows::get_interest_income`). Includes net hedge
+/// receipts and receipts from negative-rate debt coupons; zero when nothing
+/// was received.
+/// @param cashflows_json - The `cs_cashflows` object of a statement result (object or JSON).
+/// @param instrument_id - Capital-structure instrument identifier.
+/// @param period - Period identifier, e.g. `"2025Q1"`.
+/// @returns Interest income in the instrument's currency.
+///
+/// # Errors
+///
+/// Throws with kind `computation` if the instrument or period has no
+/// cashflows, and kind `validation` if an input is malformed.
+#[wasm_bindgen(js_name = capitalStructureCashflowsGetInterestIncome)]
+pub fn capital_structure_cashflows_get_interest_income(
+    cashflows_json: JsValue,
+    instrument_id: JsValue,
+    period: JsValue,
+) -> Result<f64, JsValue> {
+    let cashflows: CapitalStructureCashflows = from_js_json(&cashflows_json, "cashflowsJson")?;
+    cashflows
+        .get_interest_income(
+            &js_string(&instrument_id, "instrumentId")?,
+            &period_id(&period)?,
+        )
+        .map_err(to_js_err)
+}
+
 /// Total fees across all instruments in one period.
 ///
 /// Free-function twin of Python `CapitalStructureCashflows.get_total_fees` (Rust

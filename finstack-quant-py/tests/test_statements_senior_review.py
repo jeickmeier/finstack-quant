@@ -131,6 +131,39 @@ def test_swap_with_two_receiving_legs_reports_interest_income(
     assert results.cs_cashflows.get_accrued_interest("IRS", "2025") == 0.0
     assert float(flow["principal_payment"]["amount"]) == 0.0
     assert results.get("income", "2025") == pytest.approx(income)
+    # STMT-007: interest-income and per-currency totals are reachable typed.
+    cs = results.cs_cashflows
+    assert cs.get_interest_income("IRS", "2025") == pytest.approx(income)
+    usd_totals = cs.totals_by_currency["USD"]["2025"]
+    assert usd_totals["interest_income_cash"].amount == pytest.approx(income)
+    assert usd_totals["interest_expense_cash"].amount == 0.0
+    if cs.reporting_currency is not None:
+        assert cs.get_total_interest_income("2025") == pytest.approx(income)
+        assert cs.get_total_interest_cash("2025") == 0.0
+        assert cs.get_total_interest_pik("2025") == 0.0
+        assert cs.get_total_accrued_interest("2025") == 0.0
+
+
+def test_merge_into_results_writes_normalized_node() -> None:
+    """STMT-007: normalized values go back into a StatementResult via Rust."""
+    builder = s.ModelBuilder("normalize-merge")
+    builder.periods("2025Q1..Q2", None)
+    builder.value_money(
+        "ebitda", [("2025Q1", Money(100.0, Currency("USD"))), ("2025Q2", Money(110.0, Currency("USD")))]
+    )
+    results = s.Evaluator().evaluate(builder.build())
+    config = s.NormalizationConfig("ebitda").add_adjustment(
+        s.Adjustment.fixed("addback", "Addback", {"2025Q1": 5.0, "2025Q2": 5.0})
+    )
+    normalized = s.normalize(results, config)
+
+    merged = s.merge_into_results(results, normalized, "adjusted_ebitda")
+    assert merged.get("adjusted_ebitda", "2025Q1") == pytest.approx(normalized[0].final_value)
+    assert merged.get("adjusted_ebitda", "2025Q2") == pytest.approx(normalized[1].final_value)
+    assert "adjusted_ebitda" not in results.node_ids()
+    assert s.merge_into_results(results, [], "adjusted_ebitda").node_ids() == results.node_ids()
+    with pytest.raises(ValueError, match="Duplicate normalization period"):
+        s.merge_into_results(results, [normalized[0], normalized[0]], "adjusted_ebitda")
 
 
 def test_model_rejects_rate_hedge_as_pik_target() -> None:

@@ -31989,6 +31989,80 @@ export interface StatementsNamespace {
     period: string
   ): number;
   /**
+   * Total cash interest expense across all instruments in one period.
+   *
+   * Free-function twin of Python `CapitalStructureCashflows.get_total_interest_cash` (Rust
+   * `CapitalStructureCashflows::get_total_interest_cash`).
+   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
+   * @param period - Period identifier, e.g. `"2025Q1"`.
+   * @returns Cash interest expense in the reporting currency.
+   * @throws Error - Throws with kind `computation` if the period has no totals or the instruments span several currencies without a reporting currency, and kind `validation` if an input is malformed.
+   */
+  capitalStructureCashflowsGetTotalInterestCash(
+    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
+    period: string
+  ): number;
+  /**
+   * Total cash interest received (net hedge receipts and negative-rate coupon receipts) across all instruments in one period.
+   *
+   * Free-function twin of Python `CapitalStructureCashflows.get_total_interest_income` (Rust
+   * `CapitalStructureCashflows::get_total_interest_income`).
+   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
+   * @param period - Period identifier, e.g. `"2025Q1"`.
+   * @returns Interest income in the reporting currency.
+   * @throws Error - Throws with kind `computation` if the period has no totals or the instruments span several currencies without a reporting currency, and kind `validation` if an input is malformed.
+   */
+  capitalStructureCashflowsGetTotalInterestIncome(
+    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
+    period: string
+  ): number;
+  /**
+   * Total PIK (non-cash) interest accrued across all instruments in one period.
+   *
+   * Free-function twin of Python `CapitalStructureCashflows.get_total_interest_pik` (Rust
+   * `CapitalStructureCashflows::get_total_interest_pik`).
+   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
+   * @param period - Period identifier, e.g. `"2025Q1"`.
+   * @returns PIK interest in the reporting currency.
+   * @throws Error - Throws with kind `computation` if the period has no totals or the instruments span several currencies without a reporting currency, and kind `validation` if an input is malformed.
+   */
+  capitalStructureCashflowsGetTotalInterestPik(
+    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
+    period: string
+  ): number;
+  /**
+   * Total accrued-but-unpaid debt interest at period end across all instruments in one period.
+   *
+   * Free-function twin of Python `CapitalStructureCashflows.get_total_accrued_interest` (Rust
+   * `CapitalStructureCashflows::get_total_accrued_interest`).
+   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
+   * @param period - Period identifier, e.g. `"2025Q1"`.
+   * @returns Accrued interest in the reporting currency.
+   * @throws Error - Throws with kind `computation` if the period has no totals or the instruments span several currencies without a reporting currency, and kind `validation` if an input is malformed.
+   */
+  capitalStructureCashflowsGetTotalAccruedInterest(
+    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
+    period: string
+  ): number;
+  /**
+   * Cash interest received by one instrument in one period.
+   *
+   * Free-function twin of Python `CapitalStructureCashflows.get_interest_income`
+   * (Rust `CapitalStructureCashflows::get_interest_income`). Includes net hedge
+   * receipts and receipts from negative-rate debt coupons; zero when nothing
+   * was received.
+   * @param cashflowsJson - The `cs_cashflows` object of a statement result (object or JSON).
+   * @param instrumentId - Capital-structure instrument identifier.
+   * @param period - Period identifier, e.g. `"2025Q1"`.
+   * @returns Interest income in the instrument's currency.
+   * @throws Error - Throws with kind `computation` if the instrument or period has no cashflows, and kind `validation` if an input is malformed.
+   */
+  capitalStructureCashflowsGetInterestIncome(
+    cashflowsJson: generated.statements.CapitalStructureCashflows | string,
+    instrumentId: string,
+    period: string
+  ): number;
+  /**
    * Forecast that carries the last value forward unchanged.
    *
    * Free-function twin of Python `ForecastSpec.forward_fill` (Rust
@@ -32262,6 +32336,26 @@ export interface StatementsNamespace {
     results: StatementResult | string,
     config: generated.statements.NormalizationConfig | string
   ): string;
+  /**
+   * Write normalized values back into statement results as a node.
+   *
+   * Twin of Python `merge_into_results` (Rust
+   * `NormalizationEngine::merge_into_results`). Each period's `final_value`
+   * becomes node `outputNodeId` with the shared unit (and currency for monetary
+   * values), replacing any existing node of that name across all periods. The
+   * attached check report is cleared because it describes the values before the
+   * merge. Rust updates its argument in place; here the merged copy is returned.
+   * @param results - Evaluated `StatementResult` to merge into (object or JSON); left unchanged.
+   * @param normalizationResults - `NormalizationResult` array from `normalize`, all with the same unit and currency (object or JSON); an empty array returns an unchanged copy.
+   * @param outputNodeId - Node to create or replace, e.g. `"adjusted_ebitda"`.
+   * @returns The merged `StatementResult`.
+   * @throws Error - Throws with kind `validation` if an input is malformed, and the kind of the Rust error if the results mix units or currencies, repeat a period or hold a non-finite value.
+   */
+  mergeIntoResults(
+    results: StatementResult | string,
+    normalizationResults: generated.statements.NormalizationResult[] | string,
+    outputNodeId: string
+  ): StatementResult;
   /**
    * Serde `type` tags of every built-in check a suite spec accepts.
    *
@@ -32988,7 +33082,7 @@ export interface StatementsAnalyticsNamespace {
   /**
    * Classify an exposure into an IFRS 9 stage from directly supplied lifetime PDs.
    *
-   * Twin of Python `classify_stage` (Rust `classify_exposure`). Runs the full
+   * Twin of Python and Rust `classify_stage`. Runs the full
    * staging waterfall: days-past-due backstops, the SICR test on the two PDs,
    * the rating-downgrade notch test, qualitative flags and curing. The Python
    * `Exposure` carries the two PDs itself; here they are arguments.
@@ -33008,11 +33102,10 @@ export interface StatementsAnalyticsNamespace {
   /**
    * Expected credit loss of one exposure under a single cumulative-PD schedule.
    *
-   * Twin of Python `compute_ecl` (Rust `compute_ecl_for_exposure` with one
-   * scenario of weight `1.0`). The priced exposure at default is
-   * `ead + undrawn * ccf`; the schedule is anchored at `(0, 0)` when that knot
-   * is absent. Unlike Python, `stage` is required (classify with
-   * `classifyStage` first).
+   * Twin of Python and Rust `compute_ecl` (one scenario of weight `1.0`). The
+   * priced exposure at default is `ead + undrawn * ccf`; the schedule is
+   * anchored at `(0, 0)` when that knot is absent. Classify with
+   * `classifyStage` first and pass its `stage`.
    * @param exposure - `Exposure` supplying EAD, undrawn amount and CCF, LGD, EIR, remaining maturity and any EAD schedule (object or JSON).
    * @param pdSchedule - Cumulative PD knots as `[timeYears, cumulativePd]` pairs, ascending in time and non-decreasing in PD (decimals).
    * @param stage - `"stage1"` (12-month horizon), `"stage2"` (lifetime) or `"stage3"` (credit-impaired).
@@ -33031,8 +33124,8 @@ export interface StatementsAnalyticsNamespace {
   /**
    * Probability-weighted expected credit loss across macro scenarios.
    *
-   * Twin of Python `compute_ecl_weighted` (Rust `compute_ecl_for_exposure`).
-   * Unlike Python, `stage` is required (classify with `classifyStage` first).
+   * Twin of Python and Rust `compute_ecl_weighted`. Classify with
+   * `classifyStage` first and pass its `stage`.
    * @param exposure - `Exposure` supplying EAD, undrawn amount and CCF, LGD, EIR, remaining maturity and any EAD schedule (object or JSON).
    * @param scenarios - `[weight, schedule]` pairs whose weights sum to `1.0`; each schedule holds `[timeYears, cumulativePd]` knots ascending in time and non-decreasing in PD.
    * @param stage - `"stage1"` (12-month horizon), `"stage2"` (lifetime) or `"stage3"` (credit-impaired).

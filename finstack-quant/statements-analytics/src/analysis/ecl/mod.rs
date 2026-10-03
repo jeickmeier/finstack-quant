@@ -74,14 +74,15 @@ pub use types::{
     DEFAULT_REVOLVER_CCF,
 };
 
-pub use staging::{classify_stage, StageResult, StagingConfig, StagingTrigger};
+pub use staging::{classify_stage_from_curves, StageResult, StagingConfig, StagingTrigger};
 
 pub use engine::{
-    compute_ecl, compute_ecl_weighted, EclBucket, EclConfig, EclConfigBuilder, EclEngine,
-    EclResult, ExposureEclResult, LgdType, MacroScenario, WeightedEclResult,
+    compute_ecl_from_curve, compute_ecl_weighted_from_curves, EclBucket, EclConfig,
+    EclConfigBuilder, EclEngine, EclResult, ExposureEclResult, LgdType, MacroScenario,
+    WeightedEclResult,
 };
 
-pub use request::{classify_exposure, compute_ecl_for_exposure, EclRequest, EclStageRequest};
+pub use request::{classify_stage, compute_ecl, compute_ecl_weighted, EclRequest, EclStageRequest};
 
 pub use cecl::{CeclConfig, CeclEngine, CeclMethodology, CeclResult, ReversionMethod};
 

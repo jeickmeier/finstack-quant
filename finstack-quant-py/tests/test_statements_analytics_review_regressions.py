@@ -62,7 +62,7 @@ def test_backtest_rejects_arithmetic_overflow() -> None:
 
 def test_dataframe_constructor_returns_peer_set() -> None:
     frame = pd.DataFrame({"company": ["SUBJ", "PEER"], "leverage": [3.0, 2.0]})
-    result = PeerSet.from_dataframe(frame, "SUBJ", id_column="company")
+    result = PeerSet.from_dataframe(frame, "SUBJ", "ltm", id_column="company")
     assert isinstance(result, PeerSet)
     assert result.subject.id == "SUBJ"
     assert [peer.id for peer in result.peers] == ["PEER"]
@@ -187,3 +187,25 @@ def test_tornado_rejects_joint_scenarios_mislabeled_as_diagonal_json() -> None:
     document["config"]["mode"] = "diagonal"
     with pytest.raises(ValueError, match="exactly one"):
         generate_tornado_entries(json.dumps(document), "profit", "2025Q1")
+
+
+def test_binding_requires_values_without_a_rust_default() -> None:
+    """STMT-006: period basis, seasonal mode and RE node lists are required."""
+    from finstack_quant.statements import ForecastSpec
+    from finstack_quant.statements_analytics import LeaseSpec, PeerFilter, add_property_operating_statement
+
+    with pytest.raises(TypeError):
+        PeerSet("{}", [])  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        PeerSet.from_universe("{}", [], PeerFilter())  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        ForecastSpec.seasonal([1.0] * 8, 4)  # type: ignore[call-arg]
+    assert '"mode":"multiplicative"' in ForecastSpec.seasonal([1.0] * 8, 4, "multiplicative").to_json()
+
+    builder = ModelBuilder("re")
+    builder.periods("2025Q1..Q2", None)
+    model = builder.build()
+    lease = LeaseSpec("lease_a", "2025Q1", 100.0)
+    with pytest.raises(TypeError):
+        add_property_operating_statement(model, [lease])  # type: ignore[call-arg]
+    assert add_property_operating_statement(model, [lease], [], [], []).has_node("ncf")

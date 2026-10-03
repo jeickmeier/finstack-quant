@@ -770,7 +770,7 @@ fn push_breakdown_rows(
     period: &PeriodId,
     breakdown: &CashflowBreakdown,
 ) {
-    let mut push = |flow_type: &str, money: finstack_quant_core::money::Money| {
+    for (flow_type, money) in breakdown_flows(breakdown) {
         rows.push(serde_json::json!({
             "instrument": instrument,
             "period": period.to_string(),
@@ -778,16 +778,25 @@ fn push_breakdown_rows(
             "amount": money.amount(),
             "currency": money.currency().to_string(),
         }));
-    };
-    push("interest_expense_cash", breakdown.interest_expense_cash);
-    if let Some(income) = breakdown.interest_income_cash {
-        push("interest_income_cash", income);
     }
-    push("interest_expense_pik", breakdown.interest_expense_pik);
-    push("principal_payment", breakdown.principal_payment);
-    push("fees", breakdown.fees);
-    push("debt_balance", breakdown.debt_balance);
-    push("accrued_interest", breakdown.accrued_interest);
+}
+
+/// Flow-type labels and amounts of one breakdown, in export order.
+fn breakdown_flows(
+    breakdown: &CashflowBreakdown,
+) -> Vec<(&'static str, finstack_quant_core::money::Money)> {
+    let mut flows = vec![("interest_expense_cash", breakdown.interest_expense_cash)];
+    if let Some(income) = breakdown.interest_income_cash {
+        flows.push(("interest_income_cash", income));
+    }
+    flows.extend([
+        ("interest_expense_pik", breakdown.interest_expense_pik),
+        ("principal_payment", breakdown.principal_payment),
+        ("fees", breakdown.fees),
+        ("debt_balance", breakdown.debt_balance),
+        ("accrued_interest", breakdown.accrued_interest),
+    ]);
+    flows
 }
 
 #[pymethods]
@@ -998,6 +1007,177 @@ impl PyCapitalStructureCashflows {
     fn get_total_fees(&self, period: &str) -> PyResult<f64> {
         let pid = super::parse_period_id(period)?;
         self.inner.get_total_fees(&pid).map_err(statements_to_py)
+    }
+
+    /// Total cash interest expense across instruments for a period.
+    ///
+    /// Parameters
+    /// ----------
+    /// period : str
+    ///     Reporting-period label such as ``"2025Q1"``.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Cash interest expense in the reporting currency.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``period`` is not a valid period id.
+    /// RuntimeError
+    ///     If the period has no totals or the instruments span several
+    ///     currencies without a reporting currency.
+    #[pyo3(text_signature = "($self, period)")]
+    fn get_total_interest_cash(&self, period: &str) -> PyResult<f64> {
+        let pid = super::parse_period_id(period)?;
+        self.inner
+            .get_total_interest_cash(&pid)
+            .map_err(statements_to_py)
+    }
+
+    /// Total cash interest received across instruments for a period.
+    ///
+    /// Includes net hedge receipts and receipts from negative-rate debt
+    /// coupons; zero when nothing was received.
+    ///
+    /// Parameters
+    /// ----------
+    /// period : str
+    ///     Reporting-period label such as ``"2025Q1"``.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Interest income in the reporting currency.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``period`` is not a valid period id.
+    /// RuntimeError
+    ///     If the period has no totals or the instruments span several
+    ///     currencies without a reporting currency.
+    #[pyo3(text_signature = "($self, period)")]
+    fn get_total_interest_income(&self, period: &str) -> PyResult<f64> {
+        let pid = super::parse_period_id(period)?;
+        self.inner
+            .get_total_interest_income(&pid)
+            .map_err(statements_to_py)
+    }
+
+    /// Total PIK (non-cash) interest accrued across instruments for a period.
+    ///
+    /// Parameters
+    /// ----------
+    /// period : str
+    ///     Reporting-period label such as ``"2025Q1"``.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     PIK interest in the reporting currency.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``period`` is not a valid period id.
+    /// RuntimeError
+    ///     If the period has no totals or the instruments span several
+    ///     currencies without a reporting currency.
+    #[pyo3(text_signature = "($self, period)")]
+    fn get_total_interest_pik(&self, period: &str) -> PyResult<f64> {
+        let pid = super::parse_period_id(period)?;
+        self.inner
+            .get_total_interest_pik(&pid)
+            .map_err(statements_to_py)
+    }
+
+    /// Total accrued-but-unpaid debt interest across instruments at period end.
+    ///
+    /// Parameters
+    /// ----------
+    /// period : str
+    ///     Reporting-period label such as ``"2025Q1"``.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Accrued interest in the reporting currency.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``period`` is not a valid period id.
+    /// RuntimeError
+    ///     If the period has no totals or the instruments span several
+    ///     currencies without a reporting currency.
+    #[pyo3(text_signature = "($self, period)")]
+    fn get_total_accrued_interest(&self, period: &str) -> PyResult<f64> {
+        let pid = super::parse_period_id(period)?;
+        self.inner
+            .get_total_accrued_interest(&pid)
+            .map_err(statements_to_py)
+    }
+
+    /// Cash interest received for one instrument and period.
+    ///
+    /// Includes net hedge receipts and receipts from negative-rate debt
+    /// coupons; zero when nothing was received.
+    ///
+    /// Parameters
+    /// ----------
+    /// instrument_id : str
+    ///     Capital-structure identifier of the instrument to inspect.
+    /// period : str
+    ///     Reporting-period label such as ``"2025Q1"``.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Interest income in the instrument's native currency.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``period`` is not a valid period id.
+    /// RuntimeError
+    ///     If the instrument-period breakdown is absent.
+    #[pyo3(text_signature = "($self, instrument_id, period)")]
+    fn get_interest_income(&self, instrument_id: &str, period: &str) -> PyResult<f64> {
+        let pid = super::parse_period_id(period)?;
+        self.inner
+            .get_interest_income(instrument_id, &pid)
+            .map_err(statements_to_py)
+    }
+
+    /// Cross-instrument totals bucketed by native instrument currency.
+    ///
+    /// Populated for every evaluation with capital-structure flows, including
+    /// multi-currency structures without a reporting currency (where
+    /// ``to_totals_dataframe`` and the ``get_total_*`` accessors have nothing
+    /// to report).
+    ///
+    /// Returns
+    /// -------
+    /// dict[str, dict[str, dict[str, Money]]]
+    ///     ISO currency code to period id to flow type (the ``flow_type``
+    ///     names of :meth:`to_dataframe`) to amount in that currency.
+    #[getter]
+    fn totals_by_currency<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let out = PyDict::new(py);
+        for (currency, by_period) in &self.inner.totals_by_currency {
+            let periods = PyDict::new(py);
+            for (period, breakdown) in by_period {
+                let flows = PyDict::new(py);
+                for (flow_type, money) in breakdown_flows(breakdown) {
+                    flows.set_item(flow_type, PyMoney { inner: money })?;
+                }
+                periods.set_item(period.to_string(), flows)?;
+            }
+            out.set_item(currency.to_string(), periods)?;
+        }
+        Ok(out)
     }
 
     /// Post-waterfall residual cash distributed to equity per period.

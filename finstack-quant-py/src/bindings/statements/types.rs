@@ -395,16 +395,17 @@ impl PyForecastSpec {
     /// season_length : int
     ///     Length of one seasonal cycle counted in **model periods** (4 for
     ///     quarterly, 12 for monthly data); must be positive.
-    /// mode : str, default "additive"
-    ///     ``"additive"`` (constant seasonal swings; safe for series that
-    ///     cross zero) or ``"multiplicative"`` (swings scale with the level).
+    /// mode : str
+    ///     Required. ``"additive"`` (constant seasonal swings; safe for series
+    ///     that cross zero) or ``"multiplicative"`` (swings scale with the
+    ///     level).
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If ``mode`` is not ``"additive"`` or ``"multiplicative"``.
     #[staticmethod]
-    #[pyo3(signature = (historical, season_length, mode="additive"), text_signature = "(historical, season_length, mode='additive')")]
+    #[pyo3(signature = (historical, season_length, mode), text_signature = "(historical, season_length, mode)")]
     fn seasonal(historical: Vec<f64>, season_length: usize, mode: &str) -> PyResult<Self> {
         let mode: finstack_quant_statements::types::SeasonalMode =
             finstack_quant_core::wire::serde_parse(mode).map_err(|e| {

@@ -87,7 +87,8 @@
       "type": "number"
     },
     "consecutive_performing_periods": {
-      "description": "Number of consecutive performing periods since last Stage 2/3\nclassification. Used for curing logic.",
+      "default": 0,
+      "description": "Number of consecutive performing periods since last Stage 2/3\nclassification. Used for curing logic. Default `0` (no cure history).",
       "format": "uint32",
       "minimum": 0,
       "type": "integer"
@@ -100,7 +101,8 @@
       ]
     },
     "days_past_due": {
-      "description": "Current days past due (DPD). Used for backstop staging triggers.",
+      "default": 0,
+      "description": "Current days past due (DPD). Used for backstop staging triggers.\nDefault `0` (performing, not past due).",
       "format": "uint32",
       "minimum": 0,
       "type": "integer"
@@ -194,9 +196,7 @@
     "eir",
     "remaining_maturity_years",
     "lgd",
-    "days_past_due",
-    "qualitative_flags",
-    "consecutive_performing_periods"
+    "qualitative_flags"
   ],
   "title": "Exposure",
   "type": "object"

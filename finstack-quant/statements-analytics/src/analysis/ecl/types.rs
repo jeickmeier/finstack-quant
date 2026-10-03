@@ -211,6 +211,8 @@ pub struct Exposure {
     pub lgd: f64,
 
     /// Current days past due (DPD). Used for backstop staging triggers.
+    /// Default `0` (performing, not past due).
+    #[serde(default)]
     pub days_past_due: u32,
 
     /// Current rating label (must match the `PdTermStructure` scale).
@@ -225,7 +227,8 @@ pub struct Exposure {
     pub qualitative_flags: QualitativeFlags,
 
     /// Number of consecutive performing periods since last Stage 2/3
-    /// classification. Used for curing logic.
+    /// classification. Used for curing logic. Default `0` (no cure history).
+    #[serde(default)]
     pub consecutive_performing_periods: u32,
 
     /// Previous reporting period's stage (for migration tracking).
@@ -613,6 +616,26 @@ impl PdTermStructure for RatingPdMap {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn exposure_counters_default_to_performing_when_omitted() {
+        let exposure: Exposure = serde_json::from_value(serde_json::json!({
+            "id": "loan",
+            "segments": [],
+            "ead": 100.0,
+            "eir": 0.05,
+            "remaining_maturity_years": 1.0,
+            "lgd": 0.4,
+            "current_rating": null,
+            "origination_rating": null,
+            "qualitative_flags": serde_json::to_value(QualitativeFlags::default()).unwrap(),
+            "previous_stage": null,
+            "ead_schedule": null
+        }))
+        .unwrap();
+        assert_eq!(exposure.days_past_due, 0);
+        assert_eq!(exposure.consecutive_performing_periods, 0);
+    }
 
     #[test]
     fn test_stage_display() {

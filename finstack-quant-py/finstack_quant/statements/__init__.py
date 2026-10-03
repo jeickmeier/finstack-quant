@@ -41,6 +41,7 @@ PikToggleSpec = _statements.PikToggleSpec
 Registry = _statements.Registry
 StatementResult = _statements.StatementResult
 WaterfallSpec = _statements.WaterfallSpec
+merge_into_results = _statements.merge_into_results
 normalize = _statements.normalize
 normalize_json = _statements.normalize_json
 parse_and_compile = _statements.parse_and_compile
@@ -80,6 +81,7 @@ __all__: list[str] = [
     "Registry",
     "StatementResult",
     "WaterfallSpec",
+    "merge_into_results",
     "normalize",
     "normalize_json",
     "parse_and_compile",

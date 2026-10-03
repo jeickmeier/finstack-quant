@@ -411,14 +411,14 @@ impl PyPeerFilter {
 ///     Peer companies.
 /// period_basis : str
 ///     ``"ltm"``, ``"ntm"`` or a custom label such as ``"FY2025E"``.
-///     Default ``"ltm"``.
+///     Required: Rust ``PeerSet`` has no default period basis.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements_analytics import CompanyMetrics, PeerSet
 /// >>> subject = CompanyMetrics("SUBJ", {"leverage": 2.0})
 /// >>> peers = [CompanyMetrics("P1", {"leverage": 1.0}), CompanyMetrics("P2", {"leverage": 3.0})]
-/// >>> PeerSet(subject, peers).peer_count
+/// >>> PeerSet(subject, peers, "ltm").peer_count
 /// 2
 #[pyclass(
     name = "PeerSet",
@@ -433,7 +433,7 @@ pub struct PyPeerSet {
 #[pymethods]
 impl PyPeerSet {
     #[new]
-    #[pyo3(signature = (subject, peers, period_basis="ltm"))]
+    #[pyo3(signature = (subject, peers, period_basis))]
     fn new(
         py: Python<'_>,
         subject: &Bound<'_, PyAny>,
@@ -463,9 +463,9 @@ impl PyPeerSet {
     /// filter : PeerFilter
     ///     Screening criteria.
     /// period_basis : str
-    ///     ``"ltm"``, ``"ntm"`` or a custom label. Default ``"ltm"``.
+    ///     ``"ltm"``, ``"ntm"`` or a custom label (required).
     #[staticmethod]
-    #[pyo3(signature = (subject, universe, filter, period_basis="ltm"))]
+    #[pyo3(signature = (subject, universe, filter, period_basis))]
     fn from_universe(
         py: Python<'_>,
         subject: &Bound<'_, PyAny>,
@@ -500,7 +500,7 @@ impl PyPeerSet {
     /// subject_id : str
     ///     Id of the subject row; every other row becomes a peer.
     /// period_basis : str
-    ///     ``"ltm"``, ``"ntm"`` or a custom label. Default ``"ltm"``.
+    ///     ``"ltm"``, ``"ntm"`` or a custom label (required).
     /// id_column : str | None
     ///     Column holding company ids; ``None`` uses the index.
     ///
@@ -511,7 +511,7 @@ impl PyPeerSet {
     /// ValueError
     ///     If a cell is neither numeric, string, nor missing.
     #[staticmethod]
-    #[pyo3(signature = (df, subject_id, period_basis="ltm", id_column=None))]
+    #[pyo3(signature = (df, subject_id, period_basis, id_column=None))]
     fn from_dataframe(
         py: Python<'_>,
         df: &Bound<'_, PyAny>,
@@ -651,17 +651,18 @@ impl PyPeerSet {
 ///     Optional explanatory metric in the same notation. ``None`` (default)
 ///     scores the dependent metric against its peer distribution.
 /// weight : float
-///     Finite non-negative relative weight in the composite score. Default
-///     ``1.0``; zero disables the dimension. Positive weights are normalized
-///     over usable dimensions.
-/// direction : str
-///     ``"higher_is_cheap"`` (spread-like, default) or ``"higher_is_rich"``
-///     (multiple-like).
+///     Keyword-only, required. Finite non-negative relative weight in the
+///     composite score; zero disables the dimension. Positive weights are
+///     normalized over usable dimensions.
+/// direction : str | None
+///     ``"higher_is_cheap"`` (spread-like) or ``"higher_is_rich"``
+///     (multiple-like). ``None`` uses the Rust ``ScoreDirection`` default,
+///     ``"higher_is_cheap"``.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.statements_analytics import ScoringDimension
-/// >>> ScoringDimension("Spread vs Leverage", "oas_bp", "leverage").direction
+/// >>> ScoringDimension("Spread vs Leverage", "oas_bp", "leverage", weight=1.0).direction
 /// 'higher_is_cheap'
 #[pyclass(
     name = "ScoringDimension",
@@ -676,9 +677,18 @@ pub struct PyScoringDimension {
 #[pymethods]
 impl PyScoringDimension {
     #[new]
-    #[pyo3(signature = (label, y, x=None, weight=1.0, direction="higher_is_cheap"))]
-    fn new(label: &str, y: &str, x: Option<&str>, weight: f64, direction: &str) -> PyResult<Self> {
-        let direction: ScoreDirection = direction.parse().map_err(display_to_py)?;
+    #[pyo3(signature = (label, y, x=None, *, weight, direction=None))]
+    fn new(
+        label: &str,
+        y: &str,
+        x: Option<&str>,
+        weight: f64,
+        direction: Option<&str>,
+    ) -> PyResult<Self> {
+        let direction: ScoreDirection = match direction {
+            Some(direction) => direction.parse().map_err(display_to_py)?,
+            None => ScoreDirection::default(),
+        };
         Ok(Self {
             inner: ScoringDimension {
                 label: label.to_string(),
@@ -1027,8 +1037,8 @@ impl PyDimensionScore {
 /// ...     CompanyMetrics, PeerSet, ScoringDimension, score_relative_value,
 /// ... )
 /// >>> peers = [CompanyMetrics(f"P{i}", {"leverage": float(i), "oas_bp": 100.0 * i}) for i in (1, 2, 3)]
-/// >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"leverage": 2.0, "oas_bp": 250.0}), peers)
-/// >>> result = score_relative_value(peer_set, [ScoringDimension("Spread vs Leverage", "oas_bp", "leverage")])
+/// >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"leverage": 2.0, "oas_bp": 250.0}), peers, "ltm")
+/// >>> result = score_relative_value(peer_set, [ScoringDimension("Spread vs Leverage", "oas_bp", "leverage", weight=1.0)])
 /// >>> result.company_id, result.peer_count
 /// ('SUBJ', 3)
 #[pyclass(
@@ -1356,8 +1366,8 @@ fn extract_dimensions(
 /// ...     CompanyMetrics, PeerSet, ScoringDimension, score_relative_value,
 /// ... )
 /// >>> peers = [CompanyMetrics(f"P{i}", {"pe": float(10 * i)}) for i in (1, 2, 3)]
-/// >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"pe": 30.0}), peers)
-/// >>> score_relative_value(peer_set, [ScoringDimension("pe", "pe", direction="higher_is_rich")]).composite_score < 0
+/// >>> peer_set = PeerSet(CompanyMetrics("SUBJ", {"pe": 30.0}), peers, "ltm")
+/// >>> score_relative_value(peer_set, [ScoringDimension("pe", "pe", weight=1.0, direction="higher_is_rich")]).composite_score < 0
 /// True
 #[pyfunction]
 #[pyo3(text_signature = "(peer_set, dimensions)")]

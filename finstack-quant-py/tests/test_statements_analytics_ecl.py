@@ -94,7 +94,7 @@ def test_compute_ecl_weighted_validates_scenario_weights() -> None:
     ]
 
     with pytest.raises(ValueError, match=r"[Ss]cenario weights must sum to 1\.0"):
-        compute_ecl_weighted(_exposure(), scenarios)
+        compute_ecl_weighted(_exposure(), scenarios, "stage1")
 
 
 def test_compute_ecl_weighted_preserves_public_error_mapping() -> None:
@@ -102,10 +102,10 @@ def test_compute_ecl_weighted_preserves_public_error_mapping() -> None:
     from finstack_quant.statements_analytics import compute_ecl_weighted
 
     with pytest.raises(ValueError, match="At least one scenario is required for weighted ECL"):
-        compute_ecl_weighted(_exposure(), [])
+        compute_ecl_weighted(_exposure(), [], "stage1")
 
     with pytest.raises(ValueError, match="At least two data points are required"):
-        compute_ecl_weighted(_exposure(), [(1.0, [])])
+        compute_ecl_weighted(_exposure(), [(1.0, [])], "stage1")
 
 
 def test_compute_ecl_weighted_returns_probability_weighted_ecl() -> None:
@@ -116,9 +116,9 @@ def test_compute_ecl_weighted_returns_probability_weighted_ecl() -> None:
     downside_curve = [(0.0, 0.0), (1.0, 0.05)]
     exposure = _exposure()
 
-    base = compute_ecl(exposure, base_curve).ecl
-    downside = compute_ecl(exposure, downside_curve).ecl
-    weighted = compute_ecl_weighted(exposure, [(0.70, base_curve), (0.30, downside_curve)])
+    base = compute_ecl(exposure, base_curve, "stage1").ecl
+    downside = compute_ecl(exposure, downside_curve, "stage1").ecl
+    weighted = compute_ecl_weighted(exposure, [(0.70, base_curve), (0.30, downside_curve)], "stage1")
 
     assert weighted.ecl == pytest.approx(0.70 * base + 0.30 * downside, rel=1e-12)
     assert len(weighted.scenario_breakdown) == 2
@@ -150,8 +150,8 @@ def test_compute_ecl_prices_undrawn_commitment() -> None:
     from finstack_quant.statements_analytics import compute_ecl
 
     curve = [(0.0, 0.0), (1.0, 0.02)]
-    drawn = compute_ecl(_exposure(), curve).ecl
-    revolver = compute_ecl(_exposure(undrawn=1_000_000.0, ccf=0.5), curve).ecl
+    drawn = compute_ecl(_exposure(), curve, "stage1").ecl
+    revolver = compute_ecl(_exposure(undrawn=1_000_000.0, ccf=0.5), curve, "stage1").ecl
     assert revolver == pytest.approx(1.5 * drawn, rel=1e-9)
 
 
@@ -163,9 +163,11 @@ def test_compute_ecl_weighted_anchors_unanchored_schedules() -> None:
     unanchored = [(1.0, 0.02)]
     exposure = _exposure()
 
-    assert compute_ecl(exposure, unanchored).ecl == pytest.approx(compute_ecl(exposure, anchored).ecl)
-    assert compute_ecl_weighted(exposure, [(1.0, unanchored)]).ecl == pytest.approx(
-        compute_ecl_weighted(exposure, [(1.0, anchored)]).ecl
+    assert compute_ecl(exposure, unanchored, "stage1").ecl == pytest.approx(
+        compute_ecl(exposure, anchored, "stage1").ecl
+    )
+    assert compute_ecl_weighted(exposure, [(1.0, unanchored)], "stage1").ecl == pytest.approx(
+        compute_ecl_weighted(exposure, [(1.0, anchored)], "stage1").ecl
     )
 
 
@@ -217,3 +219,43 @@ def test_stage_three_full_loss_and_invalid_bucket_inputs() -> None:
             compute_ecl(exposure, [(1.0, 0.1)], stage=Stage.Stage2, bucket_width_years=invalid)
         with pytest.raises(ValueError, match=r"(?i)knot"):
             compute_ecl(exposure, [(0.0, 0.0), (invalid, 0.1)], stage=Stage.Stage2)
+
+
+def test_compute_ecl_requires_stage_and_honours_custom_staging_policy() -> None:
+    """STMT-002: no hidden default-policy staging inside ``compute_ecl``.
+
+    The stage comes from ``classify_stage`` under the desk's policy; omitting it
+    is a ``TypeError`` rather than a silent ``StagingConfig()`` classification.
+    """
+    from finstack_quant.statements_analytics import (
+        Stage,
+        StagingConfig,
+        classify_stage,
+        compute_ecl,
+        compute_ecl_weighted,
+    )
+
+    exposure = _exposure(remaining_maturity=3.0, current_pd=0.03, origination_pd=0.015)
+    schedule = [(1.0, 0.02), (3.0, 0.06)]
+    lenient = StagingConfig(pd_delta_absolute=0.05, pd_delta_relative=None)
+
+    with pytest.raises(TypeError):
+        compute_ecl(exposure, schedule)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        compute_ecl_weighted(exposure, [(1.0, schedule)])  # type: ignore[call-arg]
+
+    assert classify_stage(exposure).stage is Stage.Stage2
+    stage = classify_stage(exposure, lenient).stage
+    assert stage is Stage.Stage1
+    lenient_ecl = compute_ecl(exposure, schedule, stage)
+    assert lenient_ecl.stage is Stage.Stage1
+    assert lenient_ecl.ecl == pytest.approx(8742.732176751271, rel=1e-12)
+    assert compute_ecl_weighted(exposure, [(1.0, schedule)], stage).ecl == pytest.approx(lenient_ecl.ecl)
+
+
+def test_exposure_counters_default_from_rust() -> None:
+    """STMT-006: DPD and cure counters default to the Rust ``Exposure`` default."""
+    exposure = _exposure()
+    assert (exposure.dpd, exposure.consecutive_performing_periods) == (0, 0)
+    explicit_none = _exposure(dpd=None, consecutive_performing_periods=None)
+    assert (explicit_none.dpd, explicit_none.consecutive_performing_periods) == (0, 0)

@@ -187,7 +187,7 @@ pub struct StagingConfig {
     /// Rating downgrade notches that trigger Stage 2 (IFRS 9 B5.5.17(f):
     /// external credit rating downgrade as a SICR indicator).
     ///
-    /// [`classify_stage`] fires [`StagingTrigger::RatingDowngrade`] when
+    /// [`classify_stage_from_curves`] fires [`StagingTrigger::RatingDowngrade`] when
     /// `position(current) - position(origination) >= rating_downgrade_notches`
     /// on the configured scale (see [`Self::rating_scale_labels`]). Example:
     /// 3 means a 3-notch downgrade from origination triggers SICR. A `0`
@@ -330,7 +330,7 @@ fn rating_downgrade_notches(orig: &str, curr: &str, config: &StagingConfig) -> O
 /// errors. Stage 3 backstops do not require PD lookups. If either exposure
 /// rating is `None`, the PD-delta test is explicitly skipped; rating, DPD,
 /// qualitative, and curing triggers still apply.
-pub fn classify_stage(
+pub fn classify_stage_from_curves(
     exposure: &Exposure,
     current_pd_source: &dyn PdTermStructure,
     origination_pd_source: &dyn PdTermStructure,
@@ -659,7 +659,7 @@ mod tests {
         exposure.origination_rating = Some("A".to_string());
         exposure.current_rating = Some("B".to_string());
 
-        let result = classify_stage(
+        let result = classify_stage_from_curves(
             &exposure,
             &make_multi_rating_curves(),
             &make_multi_rating_curves(),
@@ -685,7 +685,7 @@ mod tests {
         exposure.origination_rating = Some("BBB".to_string());
         exposure.current_rating = Some("B".to_string());
 
-        let result = classify_stage(
+        let result = classify_stage_from_curves(
             &exposure,
             &make_multi_rating_curves(),
             &make_multi_rating_curves(),
@@ -699,7 +699,7 @@ mod tests {
         let mut upgraded = base_exposure();
         upgraded.origination_rating = Some("BB".to_string());
         upgraded.current_rating = Some("A".to_string());
-        let result = classify_stage(
+        let result = classify_stage_from_curves(
             &upgraded,
             &make_multi_rating_curves(),
             &make_multi_rating_curves(),
@@ -738,7 +738,7 @@ mod tests {
                 ),
             ],
         };
-        let result = classify_stage(&exposure, &pd, &pd, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &pd, &pd, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result.triggers.iter().any(|t| matches!(
             t,
@@ -758,20 +758,20 @@ mod tests {
         exposure.current_rating = Some("BBB".to_string());
         let pd = make_multi_rating_curves();
         let mut config = downgrade_only_config(0); // threshold 0 must never fire
-        let result = classify_stage(&exposure, &pd, &pd, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &pd, &pd, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage1);
 
         config = downgrade_only_config(3);
         config.rating_scale_labels = Some(vec!["AAA".to_string(), "D".to_string()]);
         // Ratings absent from the configured scale: skipped.
-        let result = classify_stage(&exposure, &pd, &pd, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &pd, &pd, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage1);
     }
 
     #[test]
     fn staging_trigger_display_is_the_stable_reason_contract() {
         // The exact strings are consumed by host bindings (Python
-        // `classify_stage` trigger reasons); a change here is a wire break.
+        // `classify_stage_from_curves` trigger reasons); a change here is a wire break.
         let cases: Vec<(StagingTrigger, &str)> = vec![
             (
                 StagingTrigger::DpdStage3 {
@@ -848,7 +848,7 @@ mod tests {
         let config = StagingConfig::default();
         let exposure = base_exposure();
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage1);
         assert!(!result.cured);
     }
@@ -860,7 +860,7 @@ mod tests {
         let mut exposure = base_exposure();
         exposure.days_past_due = 90;
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage3);
         assert!(matches!(
             result.triggers[0],
@@ -878,7 +878,7 @@ mod tests {
         let mut exposure = base_exposure();
         exposure.days_past_due = 30;
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result.triggers.iter().any(|t| matches!(
             t,
@@ -898,7 +898,7 @@ mod tests {
         exposure.origination_rating = Some("A".to_string());
         exposure.current_rating = Some("BB".to_string());
 
-        let result = classify_stage(&exposure, &curves, &curves, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curves, &curves, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result
             .triggers
@@ -913,7 +913,7 @@ mod tests {
         let mut exposure = base_exposure();
         exposure.qualitative_flags.watchlist = true;
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result
             .triggers
@@ -931,7 +931,7 @@ mod tests {
         let mut exposure = base_exposure();
         exposure.qualitative_flags.watchlist = true;
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         // With qualitative triggers disabled, watchlist alone doesn't trigger Stage 2
         assert_eq!(result.stage, Stage::Stage1);
     }
@@ -944,7 +944,7 @@ mod tests {
         exposure.previous_stage = Some(Stage::Stage2);
         exposure.consecutive_performing_periods = 3;
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage1);
         assert!(result.cured);
     }
@@ -957,7 +957,7 @@ mod tests {
         exposure.previous_stage = Some(Stage::Stage2);
         exposure.consecutive_performing_periods = 2; // Need 3
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(!result.cured);
     }
@@ -973,7 +973,7 @@ mod tests {
         // enough for Stage 3 → Stage 2 but not yet Stage 2 → Stage 1.
         exposure.consecutive_performing_periods = 12;
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result.cured);
     }
@@ -987,7 +987,7 @@ mod tests {
         // 12 + 3 = fully cured from Stage 3 all the way to Stage 1.
         exposure.consecutive_performing_periods = 15;
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage1);
         assert!(result.cured);
     }
@@ -1008,7 +1008,7 @@ mod tests {
         exposure.consecutive_performing_periods = 3; // < 12 = cure_periods_stage3_to_2
         exposure.qualitative_flags.watchlist = true; // fires a Stage-2 trigger
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(
             result.stage,
             Stage::Stage3,
@@ -1028,7 +1028,7 @@ mod tests {
         exposure.consecutive_performing_periods = 12; // == cure_periods_stage3_to_2
         exposure.qualitative_flags.watchlist = true;
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
     }
 
@@ -1041,7 +1041,7 @@ mod tests {
         let mut exposure = base_exposure();
         exposure.qualitative_flags.bankruptcy = true;
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage3);
         assert!(result
             .triggers
@@ -1060,12 +1060,14 @@ mod tests {
         exposure_distressed
             .qualitative_flags
             .distressed_modification = true;
-        let r = classify_stage(&exposure_distressed, &curve, &curve, 0.0, &config).unwrap();
+        let r =
+            classify_stage_from_curves(&exposure_distressed, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(r.stage, Stage::Stage3);
 
         let mut exposure_forbearance = base_exposure();
         exposure_forbearance.qualitative_flags.forbearance = true;
-        let r = classify_stage(&exposure_forbearance, &curve, &curve, 0.0, &config).unwrap();
+        let r = classify_stage_from_curves(&exposure_forbearance, &curve, &curve, 0.0, &config)
+            .unwrap();
         assert_eq!(r.stage, Stage::Stage2);
     }
 
@@ -1081,7 +1083,7 @@ mod tests {
         let mut exposure = base_exposure();
         exposure.qualitative_flags.bankruptcy = true;
 
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         // Without DPD and with Stage-3 qualitatives disabled, the
         // obligor falls back through the Stage-2 waterfall. Bankruptcy
         // is not one of the SICR flags, so we end up at Stage 1.
@@ -1094,10 +1096,10 @@ mod tests {
         let config = StagingConfig::default();
         let mut exposure = base_exposure();
         exposure.origination_rating = Some("A".to_string());
-        assert!(classify_stage(&exposure, &curve, &curve, 0.0, &config).is_err());
+        assert!(classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).is_err());
         exposure.origination_rating = Some("BBB".to_string());
         exposure.current_rating = Some("A".to_string());
-        assert!(classify_stage(&exposure, &curve, &curve, 0.0, &config).is_err());
+        assert!(classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).is_err());
     }
 
     #[test]
@@ -1106,10 +1108,10 @@ mod tests {
         let config = StagingConfig::default();
         let mut exposure = base_exposure();
         exposure.origination_rating = None;
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage1);
         exposure.days_past_due = 30;
-        let result = classify_stage(&exposure, &curve, &curve, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &curve, &curve, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
     }
 
@@ -1119,10 +1121,10 @@ mod tests {
         let exposure = base_exposure();
         let config = StagingConfig::default();
         for age in [-0.1, f64::NAN, f64::INFINITY] {
-            assert!(classify_stage(&exposure, &curve, &curve, age, &config).is_err());
+            assert!(classify_stage_from_curves(&exposure, &curve, &curve, age, &config).is_err());
         }
         let exhausted = RawPdCurve::new("BBB", vec![(0.0, 0.0), (1.0, 1.0)]).unwrap();
-        assert!(classify_stage(&exposure, &curve, &exhausted, 1.0, &config).is_err());
+        assert!(classify_stage_from_curves(&exposure, &curve, &exhausted, 1.0, &config).is_err());
     }
 
     #[test]
@@ -1197,7 +1199,7 @@ mod tests {
         exposure.origination_rating = Some("A".to_string());
         exposure.current_rating = Some("BB".to_string());
 
-        let result = classify_stage(&exposure, &map, &map, 0.0, &config).unwrap();
+        let result = classify_stage_from_curves(&exposure, &map, &map, 0.0, &config).unwrap();
         assert_eq!(result.stage, Stage::Stage2);
         assert!(result
             .triggers

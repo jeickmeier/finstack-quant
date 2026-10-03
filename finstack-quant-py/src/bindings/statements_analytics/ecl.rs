@@ -611,8 +611,9 @@ impl PyStageResult {
 ///     For original cumulative curve ``F``, elapsed years ``a`` and the capped
 ///     horizon ``h = min(remaining_maturity, 30.0)``, supply
 ///     ``(F(a + h) - F(a)) / (1 - F(a))``.
-/// dpd : int
-///     Days past due. Default ``0``.
+/// dpd : int | None
+///     Days past due. ``None`` uses the Rust ``Exposure`` default of ``0``
+///     (performing).
 /// undrawn : float
 ///     Undrawn commitment in the same currency as ``ead``. Default ``0.0``.
 /// ccf : float
@@ -629,8 +630,9 @@ impl PyStageResult {
 ///     Stage assigned at the previous reporting date, enabling the curing
 ///     rules. Accepts a ``Stage`` or ``"stage1"``, ``"stage2"``, or
 ///     ``"stage3"``. Default ``None``.
-/// consecutive_performing_periods : int
-///     Performing periods since the last trigger, for curing. Default ``0``.
+/// consecutive_performing_periods : int | None
+///     Performing periods since the last trigger, for curing. ``None`` uses
+///     the Rust ``Exposure`` default of ``0``.
 /// ead_schedule : list[tuple[float, float]] | None
 ///     Optional EAD amortisation profile as ``(time_years, ead)`` knots.
 /// segments : list[str] | None
@@ -677,14 +679,14 @@ impl PyExposure {
         remaining_maturity,
         current_pd,
         origination_pd,
-        dpd=0,
+        dpd=None,
         undrawn=0.0,
         ccf=rust_ecl::DEFAULT_REVOLVER_CCF,
         current_rating=None,
         origination_rating=None,
         qualitative_flags=None,
         previous_stage=None,
-        consecutive_performing_periods=0,
+        consecutive_performing_periods=None,
         ead_schedule=None,
         segments=None,
     ))]
@@ -697,14 +699,14 @@ impl PyExposure {
         remaining_maturity: f64,
         current_pd: f64,
         origination_pd: f64,
-        dpd: u32,
+        dpd: Option<u32>,
         undrawn: f64,
         ccf: f64,
         current_rating: Option<String>,
         origination_rating: Option<String>,
         qualitative_flags: Option<PyQualitativeFlags>,
         previous_stage: Option<&Bound<'_, PyAny>>,
-        consecutive_performing_periods: u32,
+        consecutive_performing_periods: Option<u32>,
         ead_schedule: Option<Vec<(f64, f64)>>,
         segments: Option<Vec<String>>,
     ) -> PyResult<Self> {
@@ -719,13 +721,13 @@ impl PyExposure {
                 eir,
                 remaining_maturity_years: remaining_maturity,
                 lgd,
-                days_past_due: dpd,
+                days_past_due: dpd.unwrap_or_default(),
                 current_rating,
                 origination_rating,
                 qualitative_flags: qualitative_flags
                     .map(|flags| flags.inner)
                     .unwrap_or_default(),
-                consecutive_performing_periods,
+                consecutive_performing_periods: consecutive_performing_periods.unwrap_or_default(),
                 previous_stage,
                 ead_schedule,
             },
@@ -1319,7 +1321,7 @@ fn classify_stage(
     exposure: &PyExposure,
     config: Option<&PyStagingConfig>,
 ) -> PyResult<PyStageResult> {
-    let inner = rust_ecl::classify_exposure(
+    let inner = rust_ecl::classify_stage(
         &exposure.inner,
         exposure.current_pd,
         exposure.origination_pd,
@@ -1327,16 +1329,6 @@ fn classify_stage(
     )
     .map_err(core_to_py)?;
     Ok(PyStageResult { inner })
-}
-
-fn resolve_stage(
-    exposure: &PyExposure,
-    stage: Option<&Bound<'_, PyAny>>,
-) -> PyResult<rust_ecl::Stage> {
-    match stage {
-        Some(stage) => extract_stage(stage),
-        None => Ok(classify_stage(exposure, None)?.inner.stage),
-    }
 }
 
 /// Compute single-scenario ECL for one exposure.
@@ -1352,10 +1344,10 @@ fn resolve_stage(
 ///     Cumulative PD curve as ``[(time_years, cumulative_pd), ...]``, ascending
 ///     in time and non-decreasing in PD. A ``(0.0, 0.0)`` knot is inserted
 ///     when absent.
-/// stage : Stage | str | None
+/// stage : Stage | str
 ///     Measurement stage (``Stage`` or serde name ``"stage1"``/``"stage2"``/
-///     ``"stage3"``). ``None`` classifies the exposure first with the default
-///     ``StagingConfig``.
+///     ``"stage3"``). Required: classify first with ``classify_stage`` under
+///     the desk's ``StagingConfig`` and pass ``result.stage``.
 /// bucket_width_years : float | None
 ///     Finite integration width of at least 0.0001 years (``0.25`` = quarterly); ``None`` uses
 ///     the canonical policy default.
@@ -1373,9 +1365,7 @@ fn resolve_stage(
 /// ------
 /// ValueError
 ///     If ``stage`` is unknown, the PD or EAD schedule is invalid, or an
-///     exposure input is outside its accepted range. Automatic staging also
-///     rejects an unrepresentable enabled relative PD ratio, including zero
-///     origination PD with positive current PD, when PD-delta testing runs.
+///     exposure input is outside its accepted range.
 ///
 /// Examples
 /// --------
@@ -1384,23 +1374,23 @@ fn resolve_stage(
 /// >>> compute_ecl(exp, [(1.0, 0.02), (3.0, 0.06)], stage="stage1").ecl > 0
 /// True
 #[pyfunction]
-#[pyo3(signature = (exposure, pd_schedule, stage=None, bucket_width_years=None, stage3_time_to_recovery_years=None))]
+#[pyo3(signature = (exposure, pd_schedule, stage, bucket_width_years=None, stage3_time_to_recovery_years=None))]
 fn compute_ecl(
     py: Python<'_>,
     exposure: &PyExposure,
     pd_schedule: Vec<(f64, f64)>,
-    stage: Option<&Bound<'_, PyAny>>,
+    stage: &Bound<'_, PyAny>,
     bucket_width_years: Option<f64>,
     stage3_time_to_recovery_years: Option<f64>,
 ) -> PyResult<PyWeightedEclResult> {
-    let stage = resolve_stage(exposure, stage)?;
+    let stage = extract_stage(stage)?;
     let exposure = exposure.inner.clone();
     let inner = py
         .detach(move || {
-            rust_ecl::compute_ecl_for_exposure(
+            rust_ecl::compute_ecl(
                 &exposure,
                 stage,
-                &[(1.0, pd_schedule)],
+                pd_schedule,
                 bucket_width_years,
                 stage3_time_to_recovery_years,
             )
@@ -1418,9 +1408,9 @@ fn compute_ecl(
 /// scenarios : list[tuple[float, list[tuple[float, float]]]]
 ///     ``(weight, pd_schedule)`` pairs; weights must sum to ``1.0`` and each
 ///     schedule follows the ``compute_ecl`` conventions.
-/// stage : Stage | str | None
-///     Measurement stage; ``None`` classifies the exposure first with the
-///     default ``StagingConfig``.
+/// stage : Stage | str
+///     Measurement stage (required); classify first with ``classify_stage``
+///     under the desk's ``StagingConfig`` and pass ``result.stage``.
 /// bucket_width_years : float | None
 ///     Finite integration width of at least 0.0001 years; ``None`` uses the canonical default.
 /// stage3_time_to_recovery_years : float | None
@@ -1437,9 +1427,6 @@ fn compute_ecl(
 /// ValueError
 ///     If ``scenarios`` is empty, weights do not sum to ``1.0``, ``stage`` is
 ///     unknown, a schedule is invalid, or an exposure input is out of range.
-///     Automatic staging also rejects an unrepresentable enabled relative PD
-///     ratio, including zero origination PD with positive current PD, when
-///     PD-delta testing runs.
 ///
 /// Examples
 /// --------
@@ -1449,20 +1436,20 @@ fn compute_ecl(
 /// >>> len(compute_ecl_weighted(exp, scenarios, stage="stage1").scenario_breakdown)
 /// 2
 #[pyfunction]
-#[pyo3(signature = (exposure, scenarios, stage=None, bucket_width_years=None, stage3_time_to_recovery_years=None))]
+#[pyo3(signature = (exposure, scenarios, stage, bucket_width_years=None, stage3_time_to_recovery_years=None))]
 fn compute_ecl_weighted(
     py: Python<'_>,
     exposure: &PyExposure,
     scenarios: Vec<(f64, Vec<(f64, f64)>)>,
-    stage: Option<&Bound<'_, PyAny>>,
+    stage: &Bound<'_, PyAny>,
     bucket_width_years: Option<f64>,
     stage3_time_to_recovery_years: Option<f64>,
 ) -> PyResult<PyWeightedEclResult> {
-    let stage = resolve_stage(exposure, stage)?;
+    let stage = extract_stage(stage)?;
     let exposure = exposure.inner.clone();
     let inner = py
         .detach(move || {
-            rust_ecl::compute_ecl_for_exposure(
+            rust_ecl::compute_ecl_weighted(
                 &exposure,
                 stage,
                 &scenarios,

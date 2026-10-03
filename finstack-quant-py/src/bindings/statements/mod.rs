@@ -178,6 +178,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "Registry",
             "StatementResult",
             "WaterfallSpec",
+            "merge_into_results",
             "normalize",
             "normalize_json",
             "parse_and_compile",

@@ -7,7 +7,7 @@ from finstack_quant.statements_analytics import ScoringDimension
 
 @pytest.mark.parametrize("predictor", [None, "leverage"])
 def test_scoring_dimension_optional_predictor_roundtrip(predictor: str | None) -> None:
-    dimension = ScoringDimension("spread", "oas_bp", predictor)
+    dimension = ScoringDimension("spread", "oas_bp", predictor, weight=1.0)
     assert dimension.x == predictor
     wire = json.loads(dimension.to_json())
     assert wire["x_extractor"] == (None if predictor is None else {"named": predictor})
@@ -20,4 +20,13 @@ def test_scoring_dimension_rejects_obsolete_predictor_vector() -> None:
     with pytest.raises(ValueError, match="x_extractors"):
         ScoringDimension.from_json(json.dumps(wire))
     with pytest.raises(TypeError):
-        ScoringDimension("spread", "oas_bp", ["leverage"])
+        ScoringDimension("spread", "oas_bp", ["leverage"], weight=1.0)
+
+
+def test_scoring_dimension_requires_weight_and_reads_rust_direction_default() -> None:
+    """STMT-006: weight has no Rust default, so the binding does not invent one."""
+    with pytest.raises(TypeError):
+        ScoringDimension("spread", "oas_bp")  # type: ignore[call-arg]
+    dimension = ScoringDimension("spread", "oas_bp", weight=0.5)
+    assert dimension.weight == 0.5
+    assert dimension.direction == "higher_is_cheap"
