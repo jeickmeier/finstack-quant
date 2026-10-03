@@ -129,9 +129,31 @@ function frtbSensitivities() {
   sens.addDrcPosition('ACME', 1_000_000, 4, 'corporate', 'senior_unsecured', 'corporate', 2.0);
   sens.addDrcPosition('ACME', -250_000, 4, 'corporate', 'subordinated', 'corporate', 0.5, -1_000);
   sens.addRraoPosition('EXOTIC_1', 1_000_000, true);
-  sens.addRraoPosition('GAP_1', 2_000_000);
+  sens.addRraoPosition('GAP_1', 2_000_000, false);
   return sens;
 }
+
+/** Config carrying the margin-registry overlay shared with the Python golden generator. */
+function marginOverlayConfig() {
+  const config = new core.FinstackConfig();
+  config.setExtension('margin.registry.v1', { defaults: { defaults: { vm: { mta: 250_000 } } } });
+  return config;
+}
+
+test('calculators build from a FinstackConfig registry overlay', () => {
+  const empty = new core.FinstackConfig();
+  assert.equal(
+    margin.SimmCalculator.fromFinstackConfig('v2_6', empty).mporDays,
+    new margin.SimmCalculator('v2_6').mporDays
+  );
+  assert.equal(
+    margin.ScheduleImCalculator.fromFinstackConfig(empty).mporDays,
+    margin.ScheduleImCalculator.bcbsStandard().mporDays
+  );
+  const broken = new core.FinstackConfig();
+  broken.setExtension('margin.registry.v1', { simm: { not_a_section: 1 } });
+  throwsKind(() => margin.SimmCalculator.fromFinstackConfig('v2_6', broken), 'validation');
+});
 
 test('constants() is the Rust MarginConstants value Python publishes as CONSTANTS', () => {
   close(margin.constants(), golden.constants, 'constants');
@@ -208,6 +230,14 @@ test('CsaSpec twins build, amend, apply and validate plain specifications', () =
     csa.with_im_default_segregated,
     'im default segregated'
   );
+  const cleared = margin.csaSpecWithIm(usd, 'clearing_house', 5, 0, 0);
+  close(cleared, csa.with_im_cleared_default_segregated, 'im cleared default segregated');
+  assert.equal(cleared.im_params.segregated, false);
+  close(
+    margin.csaSpecRegulatoryFromConfig(marginOverlayConfig(), 'USD', 'CSA-CFG', 'USD-OIS'),
+    csa.regulatory_from_config,
+    'regulatory_from_config'
+  );
 
   const applied = margin.csaSpecApplyImTerms(usd, 60_000_000, 5_000_000);
   close(
@@ -237,6 +267,15 @@ test('EligibleCollateralSchedule twins match Python', () => {
   close(bcbs, schedule.bcbs, 'bcbs');
   close(cashOnly, schedule.cash_only, 'cash_only');
   close(margin.eligibleCollateralScheduleUsTreasuries(), schedule.us_treasuries, 'us_treasuries');
+  close(
+    margin.eligibleCollateralScheduleFromFinstackConfig(marginOverlayConfig(), 'bcbs_standard'),
+    schedule.from_finstack_config,
+    'from_finstack_config'
+  );
+  throwsKind(
+    () => margin.eligibleCollateralScheduleFromFinstackConfig(new core.FinstackConfig(), 'nowhere'),
+    'validation'
+  );
   assert.deepEqual(
     [
       margin.eligibleCollateralScheduleIsEligible(bcbs, 'equity'),
@@ -671,4 +710,10 @@ test('SA-CCR configuration twins, SaCcrEngine and saccrEad match Python', () => 
   );
   throwsKind(() => margin.saccrEad(trades, unmargined, 0.5), 'validation', /alpha/);
   throwsKind(() => new margin.SaCcrEngine(0.5), 'validation');
+});
+
+test('addRraoPosition requires the exotic flag', () => {
+  const sens = new margin.FrtbSensitivities('USD');
+  throwsKind(() => sens.addRraoPosition('X', 1_000_000), 'invalid_type');
+  sens.addRraoPosition('X', 1_000_000, false);
 });

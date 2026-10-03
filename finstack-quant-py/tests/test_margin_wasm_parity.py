@@ -20,6 +20,7 @@ from typing import Any
 
 import pytest
 
+from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.market_data import DiscountCurve, HazardCurve
 from finstack_quant.margin import (
     CONSTANTS,
@@ -77,6 +78,16 @@ LIMITED_SCHEDULE = {
     ],
     "rehypothecation_allowed": False,
 }
+
+
+# Margin-registry overlay shared with the WASM facade test (``margin.registry.v1``).
+MARGIN_OVERLAY = {"defaults": {"defaults": {"vm": {"mta": 250_000.0}}}}
+
+
+def margin_overlay_config() -> FinstackConfig:
+    config = FinstackConfig()
+    config.set_extension("margin.registry.v1", MARGIN_OVERLAY)
+    return config
 
 
 def _wire(obj: Any) -> Any:
@@ -147,14 +158,18 @@ def frtb_sensitivities() -> FrtbSensitivities:
     sens.add_drc_position("ACME", 1_000_000.0, 4, "corporate", "senior_unsecured", "corporate", 2.0)
     sens.add_drc_position("ACME", -250_000.0, 4, "corporate", "subordinated", "corporate", 0.5, -1_000.0)
     sens.add_rrao_position("EXOTIC_1", 1_000_000.0, True)
-    sens.add_rrao_position("GAP_1", 2_000_000.0)
+    sens.add_rrao_position("GAP_1", 2_000_000.0, False)
     return sens
 
 
 def saccr_trades() -> list[SaCcrTrade]:
     return [
-        SaCcrTrade("t1", "interest_rate", 1_000_000.0, "2025-01-15", "2030-01-15", "USD", "USD", 1.0, 1.0, 12_000.0),
-        SaCcrTrade("t2", "interest_rate", 500_000.0, "2025-01-15", "2027-01-15", "USD", "USD", -1.0, -1.0, -3_000.0),
+        SaCcrTrade(
+            "t1", "interest_rate", 1_000_000.0, "2025-01-15", "2030-01-15", "USD", "USD", 1.0, 1.0, 12_000.0, False
+        ),
+        SaCcrTrade(
+            "t2", "interest_rate", 500_000.0, "2025-01-15", "2027-01-15", "USD", "USD", -1.0, -1.0, -3_000.0, False
+        ),
     ]
 
 
@@ -220,6 +235,10 @@ def compute() -> dict[str, Any]:
         "with_vm_threshold_defaults": _wire(usd.with_vm_threshold(1_000_000.0, 250_000.0)),
         "with_im": _wire(usd.with_im("schedule", 10, 50_000_000.0, 500_000.0, False)),
         "with_im_default_segregated": _wire(usd.with_im("simm", 10, 0.0, 0.0)),
+        "with_im_cleared_default_segregated": _wire(usd.with_im("clearing_house", 5, 0.0, 0.0)),
+        "regulatory_from_config": _wire(
+            CsaSpec.regulatory_from_config(margin_overlay_config(), "USD", "CSA-CFG", "USD-OIS")
+        ),
         "apply_im_terms": _im_collateral(usd.apply_im_terms(60_000_000.0, 5_000_000.0)),
     }
 
@@ -230,6 +249,9 @@ def compute() -> dict[str, Any]:
         "bcbs": _wire(bcbs),
         "cash_only": _wire(cash_only),
         "us_treasuries": _wire(treasuries),
+        "from_finstack_config": _wire(
+            EligibleCollateralSchedule.from_finstack_config(margin_overlay_config(), "bcbs_standard")
+        ),
         "is_eligible": [bcbs.is_eligible("equity"), cash_only.is_eligible("equity")],
         "haircut_for": [bcbs.haircut_for("government_bonds"), cash_only.haircut_for("equity")],
         "haircut_for_maturity": [

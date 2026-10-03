@@ -439,6 +439,13 @@ impl EligibleCollateralSchedule {
     /// registry. The returned schedule is cloned from the registry, so later
     /// changes to `cfg` do not mutate it.
     ///
+    /// # Arguments
+    ///
+    /// * `cfg` - Config whose `margin.registry.v1` extension (if any) overlays
+    ///   the embedded margin registry.
+    /// * `schedule_id` - Registry id of the collateral schedule, for example
+    ///   `"bcbs_standard"`, `"cash_only"` or `"us_treasuries"`.
+    ///
     /// # Errors
     ///
     /// Returns an error if registry configuration cannot be parsed or validated,

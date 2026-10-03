@@ -33,6 +33,14 @@ from finstack_quant.margin import (
 )
 
 SENSITIVITY_COLUMNS = ["risk_class", "bucket", "tenor", "issuer", "kind", "amount"]
+FRTB_SENSITIVITY_COLUMNS = [
+    *SENSITIVITY_COLUMNS,
+    "sector",
+    "seniority",
+    "asset_type",
+    "maturity_years",
+    "pnl_adjustment",
+]
 
 
 def _sort_keys(df: pd.DataFrame) -> list[tuple[object, ...]]:
@@ -297,7 +305,7 @@ def test_frtb_sensitivities_to_dataframe_keeps_schema_when_empty() -> None:
     df = FrtbSensitivities("USD").to_dataframe()
     assert isinstance(df, pd.DataFrame)
     assert len(df) == 0
-    assert list(df.columns) == SENSITIVITY_COLUMNS
+    assert list(df.columns) == FRTB_SENSITIVITY_COLUMNS
 
 
 def test_frtb_sensitivities_to_dataframe_is_long_and_sorted() -> None:
@@ -313,7 +321,7 @@ def test_frtb_sensitivities_to_dataframe_is_long_and_sorted() -> None:
     df = sens.to_dataframe()
 
     assert isinstance(df, pd.DataFrame)
-    assert list(df.columns) == SENSITIVITY_COLUMNS
+    assert list(df.columns) == FRTB_SENSITIVITY_COLUMNS
     # 2 GIRR deltas + 1 CSR + 1 equity + 1 FX + 2 curvature halves + 1 RRAO.
     assert len(df) == 8
 

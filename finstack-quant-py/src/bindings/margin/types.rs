@@ -1,5 +1,6 @@
 //! Python wrappers for margin domain types and enums.
 
+use crate::bindings::core::config::PyFinstackConfig;
 use crate::bindings::module_utils::parse_currency;
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::errors::{core_to_py, display_to_py};
@@ -657,6 +658,49 @@ impl PyCsaSpec {
         Ok(Self { inner })
     }
 
+    /// Standard regulatory CSA built from a config's margin-registry overlay.
+    ///
+    /// Parameters
+    /// ----------
+    /// config : FinstackConfig
+    ///     Config whose ``"margin.registry.v1"`` extension (if any) overlays
+    ///     the embedded margin registry; without one the result equals
+    ///     ``CsaSpec.regulatory(currency, id, collateral_curve)``.
+    /// currency : str
+    ///     ISO-4217 base currency for thresholds, MTA and collateral values.
+    /// id : str
+    ///     CSA identifier used in margin lookups; must be non-empty.
+    /// collateral_curve : str
+    ///     Discount-curve id for collateral valuation (e.g. ``"USD-OIS"``).
+    ///
+    /// Returns
+    /// -------
+    /// CsaSpec
+    ///     The validated regulatory CSA using the merged registry terms.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``currency`` is unknown, ``id`` is empty, or the overlay is
+    ///     malformed or fails registry validation.
+    #[staticmethod]
+    #[pyo3(signature = (config, currency, id, collateral_curve))]
+    fn regulatory_from_config(
+        config: PyRef<'_, PyFinstackConfig>,
+        currency: &str,
+        id: &str,
+        collateral_curve: &str,
+    ) -> PyResult<Self> {
+        let inner = fm::CsaSpec::regulatory_from_config(
+            &config.inner,
+            parse_currency(currency)?,
+            id,
+            collateral_curve,
+        )
+        .map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
     /// Return a copy with bilateral (legacy, non-zero) VM threshold terms.
     ///
     /// Parameters
@@ -711,22 +755,25 @@ impl PyCsaSpec {
     ///     IM threshold in ``base_currency``.
     /// mta : float
     ///     IM minimum transfer amount in ``base_currency``.
-    /// segregated : bool, default True
-    ///     Whether IM must be held with a third-party custodian.
+    /// segregated : bool | None, default None
+    ///     Whether IM must be held with a third-party custodian. ``None``
+    ///     keeps the margin-registry default for ``methodology`` (``True``
+    ///     for SIMM and schedule IM, ``False`` for clearing-house and
+    ///     haircut IM).
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If ``mpor_days`` is zero, an amount is non-finite, or the
     ///     methodology label is unknown.
-    #[pyo3(signature = (methodology, mpor_days, threshold, mta, segregated = true))]
+    #[pyo3(signature = (methodology, mpor_days, threshold, mta, segregated = None))]
     fn with_im(
         &self,
         methodology: &Bound<'_, PyAny>,
         mpor_days: u32,
         threshold: f64,
         mta: f64,
-        segregated: bool,
+        segregated: Option<bool>,
     ) -> PyResult<Self> {
         let methodology = extract_im_methodology(methodology)?;
         let threshold = self.base_money(threshold, "im threshold")?;
@@ -1031,6 +1078,38 @@ impl PyEligibleCollateralSchedule {
     #[staticmethod]
     fn us_treasuries() -> PyResult<Self> {
         let inner = fm::EligibleCollateralSchedule::us_treasuries().map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
+    /// Load a named schedule from a config's margin-registry overlay.
+    ///
+    /// Parameters
+    /// ----------
+    /// config : FinstackConfig
+    ///     Config whose ``"margin.registry.v1"`` extension (if any) overlays
+    ///     the embedded margin registry; configured schedules take precedence.
+    /// schedule_id : str
+    ///     Registry id of the schedule, e.g. ``"bcbs_standard"``,
+    ///     ``"cash_only"``, ``"us_treasuries"`` or an id the overlay adds.
+    ///
+    /// Returns
+    /// -------
+    /// EligibleCollateralSchedule
+    ///     A copy of the merged registry's schedule.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the overlay is malformed or ``schedule_id`` names no schedule.
+    #[staticmethod]
+    #[pyo3(signature = (config, schedule_id))]
+    fn from_finstack_config(
+        config: PyRef<'_, PyFinstackConfig>,
+        schedule_id: &str,
+    ) -> PyResult<Self> {
+        let inner =
+            fm::EligibleCollateralSchedule::from_finstack_config(&config.inner, schedule_id)
+                .map_err(core_to_py)?;
         Ok(Self { inner })
     }
 

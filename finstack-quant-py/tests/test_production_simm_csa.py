@@ -5,7 +5,7 @@ import math
 
 import pytest
 
-from finstack_quant.margin import FrtbSbaEngine, FrtbSensitivities, SimmCalculator, SimmSensitivities
+from finstack_quant.margin import CsaSpec, FrtbSbaEngine, FrtbSensitivities, SimmCalculator, SimmSensitivities
 
 
 @pytest.mark.parametrize(("currency", "weight"), [("USD", 60.0), ("JPY", 23.0), ("BRL", 97.0)])
@@ -59,8 +59,6 @@ def test_curvature_scales_expiries_before_netting() -> None:
 
 
 def test_csa_im_collateral_terms_preserve_gross_and_apply_signed_mta() -> None:
-    from finstack_quant.margin import CsaSpec
-
     csa = CsaSpec.usd_regulatory().with_im("simm", 40, 10_000.0, 1_500.0, True)
     result = csa.apply_im_terms(24_000.0, 13_000.0)
     assert result.gross_initial_margin == 24_000.0
@@ -80,3 +78,16 @@ def test_csa_im_collateral_terms_preserve_gross_and_apply_signed_mta() -> None:
             csa.apply_im_terms(invalid, 0.0)
         with pytest.raises(ValueError, match=r"finite|nonnegative|non-negative"):
             csa.apply_im_terms(24_000.0, invalid)
+
+
+@pytest.mark.parametrize(
+    ("methodology", "mpor_days", "expected"),
+    [("simm", 10, True), ("schedule", 10, True), ("clearing_house", 5, False), ("haircut", 2, False)],
+)
+def test_with_im_omitted_segregated_uses_registry_default(methodology: str, mpor_days: int, expected: bool) -> None:
+    """MSAF-003: an omitted ``segregated`` keeps the Rust registry default for the methodology."""
+    csa = CsaSpec.usd_regulatory().with_im(methodology, mpor_days, 0.0, 0.0)
+    assert csa.im_segregated is expected
+    assert CsaSpec.usd_regulatory().with_im(methodology, mpor_days, 0.0, 0.0, not expected).im_segregated is (
+        not expected
+    )

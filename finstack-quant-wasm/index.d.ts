@@ -12734,6 +12734,14 @@ export interface SimmCalculatorConstructor {
    * @throws Error - Throws if the version is unknown, `mpor_days` is not a non-negative integer, or the registry parameters cannot be loaded.
    */
   new (version?: string | null, mporDays?: number | null): SimmCalculator;
+  /**
+   * Create a SIMM calculator from a config's margin-registry overlay.
+   * @param version - Canonical SIMM version label such as `"v2_6"`.
+   * @param config - `FinstackConfig` handle whose `"margin.registry.v1"` extension (if any) overlays the embedded margin registry; without one the result equals `new SimmCalculator(version)`.
+   * @returns A `SimmCalculator` handle using the merged registry's SIMM parameters and margin period of risk.
+   * @throws Error - Throws if the version is unknown, or the overlay is malformed or yields incomplete SIMM parameters.
+   */
+  fromFinstackConfig(version: string, config: FinstackConfig): SimmCalculator;
 }
 
 /**
@@ -12947,6 +12955,13 @@ export interface ScheduleImCalculatorConstructor {
    * @throws Error - Throws if `schedule_id` is unknown or the registry data is invalid.
    */
   fromRegistryId(scheduleId: string): ScheduleImCalculator;
+  /**
+   * Create the BCBS-IOSCO schedule calculator from a config's margin-registry overlay.
+   * @param config - `FinstackConfig` handle whose `"margin.registry.v1"` extension (if any) overlays the embedded registry's `schedule_im` section; without one the result equals `bcbsStandard()`.
+   * @returns A `ScheduleImCalculator` handle built from the merged `bcbs_iosco` entry.
+   * @throws Error - Throws if the overlay is malformed or the merged registry has no `bcbs_iosco` schedule.
+   */
+  fromFinstackConfig(config: FinstackConfig): ScheduleImCalculator;
 }
 
 /**
@@ -13353,10 +13368,10 @@ export interface FrtbSensitivities extends WasmOwned {
    * Add a Residual Risk Add-On position.
    * @param instrumentId - Instrument identifier.
    * @param notional - Gross notional in the base currency.
-   * @param isExotic - `true` for an exotic underlying (1.0% weight); `false` (the default) for other residual risk such as gap, correlation or behavioural risk (0.1% weight).
+   * @param isExotic - Required: `true` for an exotic underlying (1.0% weight); `false` for other residual risk such as gap, correlation or behavioural risk (0.1% weight).
    * @throws Error - Throws a `TypeError` for an argument of the wrong type.
    */
-  addRraoPosition(instrumentId: string, notional: number, isExotic?: boolean | null): void;
+  addRraoPosition(instrumentId: string, notional: number, isExotic: boolean): void;
 }
 
 /**
@@ -13842,6 +13857,24 @@ export interface MarginNamespace {
    */
   csaSpecRegulatory(currency: string, id: string, collateralCurve: string): CsaSpec;
   /**
+   * Regulatory CSA specification built from a config's margin-registry overlay.
+   *
+   * Same terms as `csaSpecRegulatory`, except that a `"margin.registry.v1"`
+   * extension in `config` takes precedence over the embedded margin registry.
+   * @param config - `FinstackConfig` handle whose `"margin.registry.v1"` extension (if any) overlays the embedded margin registry.
+   * @param currency - ISO-4217 base currency of the agreement; every CSA amount is in it.
+   * @param id - Identifier stamped on the specification; must be non-empty.
+   * @param collateralCurve - Curve id used to discount and accrue interest on collateral, for example `"USD-OIS"`.
+   * @returns The `CsaSpec` as a plain object.
+   * @throws Error - Throws for an unknown currency or empty id, or if the overlay is malformed or fails registry validation.
+   */
+  csaSpecRegulatoryFromConfig(
+    config: FinstackConfig,
+    currency: string,
+    id: string,
+    collateralCurve: string
+  ): CsaSpec;
+  /**
    * Copy of a CSA with new variation margin threshold terms.
    * @param csa - `CsaSpec` (object or JSON) to copy.
    * @param threshold - VM threshold in major units of the CSA base currency; exposure below it is uncollateralized.
@@ -13865,7 +13898,7 @@ export interface MarginNamespace {
    * @param mporDays - Margin period of risk in business days.
    * @param threshold - IM threshold in major units of the CSA base currency.
    * @param mta - IM minimum transfer amount in major units of the CSA base currency.
-   * @param segregated - Whether posted IM is segregated and unavailable to meet VM; defaults to `true`.
+   * @param segregated - Whether posted IM is segregated and unavailable to meet VM; omitted keeps the margin-registry default for `methodology` (`true` for SIMM and schedule IM, `false` for clearing-house and haircut IM).
    * @returns The updated `CsaSpec` as a plain object.
    * @throws Error - Throws if `csa` is malformed or invalid, the methodology label is unknown, `mpor_days` is not a non-negative integer, or an amount is rejected by the CSA validation.
    */
@@ -13917,6 +13950,17 @@ export interface MarginNamespace {
    * @throws Error - Throws if the embedded margin registry cannot be loaded.
    */
   eligibleCollateralScheduleUsTreasuries(): EligibleCollateralSchedule;
+  /**
+   * Named eligible-collateral schedule from a config's margin-registry overlay.
+   * @param config - `FinstackConfig` handle whose `"margin.registry.v1"` extension (if any) overlays the embedded margin registry; configured schedules take precedence.
+   * @param scheduleId - Registry id of the schedule, e.g. `"bcbs_standard"`, `"cash_only"`, `"us_treasuries"` or an id the overlay adds.
+   * @returns A copy of the merged registry's `EligibleCollateralSchedule` as a plain object.
+   * @throws Error - Throws if the overlay is malformed or `schedule_id` names no schedule.
+   */
+  eligibleCollateralScheduleFromFinstackConfig(
+    config: FinstackConfig,
+    scheduleId: string
+  ): EligibleCollateralSchedule;
   /**
    * Whether a schedule accepts an asset class, by entry or through its default haircut.
    * @param schedule - `EligibleCollateralSchedule` (object or JSON).

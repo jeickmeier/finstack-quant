@@ -290,7 +290,9 @@ impl CsaSpec {
     /// * `mpor_days` - Margin period of risk in business days; must be positive.
     /// * `threshold` - IM threshold in the CSA base currency.
     /// * `mta` - IM minimum transfer amount in the CSA base currency.
-    /// * `segregated` - Whether IM must be held with a third-party custodian.
+    /// * `segregated` - Whether IM must be held with a third-party custodian;
+    ///   `None` keeps the registry default for `methodology` (`true` for SIMM
+    ///   and schedule IM, `false` for clearing-house and haircut IM).
     ///
     /// # Errors
     ///
@@ -302,7 +304,7 @@ impl CsaSpec {
         mpor_days: u32,
         threshold: Money,
         mta: Money,
-        segregated: bool,
+        segregated: Option<bool>,
     ) -> Result<Self> {
         if mpor_days == 0 {
             return Err(finstack_quant_core::Error::Validation(format!(
@@ -324,12 +326,34 @@ impl CsaSpec {
         im.mpor_days = mpor_days;
         im.threshold = threshold;
         im.mta = mta;
-        im.segregated = segregated;
+        if let Some(segregated) = segregated {
+            im.segregated = segregated;
+        }
         self.im_params = Some(im);
         Ok(self)
     }
 
-    /// Create a CSA using overrides resolved from a config.
+    /// Create a regulatory CSA using margin-registry overrides resolved from a
+    /// config.
+    ///
+    /// Same terms as [`Self::regulatory_for_currency`], except that a
+    /// `margin.registry.v1` extension in `cfg` takes precedence over the
+    /// embedded margin registry.
+    ///
+    /// # Arguments
+    ///
+    /// * `cfg` - Config whose `margin.registry.v1` extension (if any) overlays
+    ///   the embedded margin registry.
+    /// * `currency` - CSA base currency; every CSA amount is in it.
+    /// * `id` - Identifier stamped on the specification; must be non-empty.
+    /// * `collateral_curve` - Curve id used to discount and accrue interest on
+    ///   collateral, for example `"USD-OIS"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the registry overlay cannot be parsed or
+    /// validated, the merged registry has no regulatory terms for
+    /// `currency`, or the resulting specification fails validation.
     pub fn regulatory_from_config(
         cfg: &FinstackConfig,
         currency: Currency,
@@ -496,7 +520,7 @@ mod tests {
                 5,
                 Money::from((1_000_000_i64, Currency::USD)),
                 Money::from((0_i64, Currency::USD)),
-                true,
+                Some(true),
             )
             .expect("same-currency IM terms");
         assert_eq!(csa.vm_threshold().amount(), 300_000.0);
@@ -524,5 +548,32 @@ mod tests {
             .expect("registry should load");
         assert_eq!(csa.calendar_id, "weekends_only");
         csa.validate().expect("fallback calendar should resolve");
+    }
+
+    #[test]
+    fn with_im_without_segregated_keeps_the_registry_default() {
+        let zero = Money::from((0_i64, Currency::USD));
+        for (methodology, expected) in [
+            (ImMethodology::Simm, true),
+            (ImMethodology::Schedule, true),
+            (ImMethodology::ClearingHouse, false),
+            (ImMethodology::Haircut, false),
+        ] {
+            let registry = ImParameters::for_methodology(methodology, Currency::USD)
+                .expect("registry")
+                .segregated;
+            assert_eq!(registry, expected, "{methodology:?} registry default");
+            let csa = CsaSpec::usd_regulatory()
+                .expect("registry should load")
+                .with_im(methodology, 5, zero, zero, None)
+                .expect("IM terms");
+            let im = csa.im_params.expect("im");
+            assert_eq!(im.segregated, registry, "{methodology:?}");
+        }
+        let explicit = CsaSpec::usd_regulatory()
+            .expect("registry should load")
+            .with_im(ImMethodology::ClearingHouse, 5, zero, zero, Some(true))
+            .expect("IM terms");
+        assert!(explicit.im_params.expect("im").segregated);
     }
 }

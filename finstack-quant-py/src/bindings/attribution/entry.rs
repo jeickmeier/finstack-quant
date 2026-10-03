@@ -498,14 +498,19 @@ pub(crate) fn attribute_pnl_envelope_json(py: Python<'_>, spec_json: &str) -> Py
 ///     ``group:<dimension>`` label columns; missing optional cells may be
 ///     ``NaN``.
 /// as_of : datetime.date | str, optional
-///     Attribution date label. Required with a ``DataFrame`` spec; fills a
-///     missing ``as_of`` in the dict form.
+///     Attribution date label, set as the spec's ``as_of`` field for every
+///     form. Required with a ``DataFrame`` spec (which has no other place
+///     for it).
 /// weighting : str, optional
-///     ``"gross"`` (default) or ``"net_market_value"`` for market-value
-///     positions; ``DataFrame`` form only.
+///     ``"gross"`` or ``"net_market_value"`` for market-value positions, set
+///     as the spec's ``weighting`` field for every form; when neither the
+///     keyword nor the spec gives it, the wire default ``"gross"`` applies.
 /// factors : list[dict], optional
-///     Factor rows ``{"factor", "exposure", "factor_return"}``; ``DataFrame``
-///     form only.
+///     Factor rows ``{"factor", "exposure", "factor_return"}``, set as the
+///     spec's ``factors`` field for every form.
+///
+/// A keyword that duplicates a field the dict or JSON spec already carries
+/// raises ``ValueError``; pass each field once.
 ///
 /// Returns
 /// -------
@@ -518,7 +523,9 @@ pub(crate) fn attribute_pnl_envelope_json(py: Python<'_>, spec_json: &str) -> Py
 /// Raises
 /// ------
 /// ValueError
-///     If the spec is malformed, ``as_of`` is missing for a DataFrame,
+///     If the spec is malformed, ``as_of`` is missing for a DataFrame, a
+///     keyword duplicates a spec field, ``weighting`` or ``factors`` is
+///     invalid,
 ///     numeric inputs or derived weights, contributions, or aggregates are non-finite,
 ///     positions are empty, weighting modes are mixed, or benchmark inputs
 ///     are incomplete, or a Brinson group has zero net weight but nonzero

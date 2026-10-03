@@ -2216,6 +2216,7 @@
       "csaSpecApplyImTerms",
       "csaSpecEurRegulatory",
       "csaSpecRegulatory",
+      "csaSpecRegulatoryFromConfig",
       "csaSpecUsdRegulatory",
       "csaSpecValidate",
       "csaSpecWithIm",
@@ -2224,6 +2225,7 @@
       "eligibleCollateralScheduleBcbsStandard",
       "eligibleCollateralScheduleCashOnly",
       "eligibleCollateralScheduleCheckConcentrationLimits",
+      "eligibleCollateralScheduleFromFinstackConfig",
       "eligibleCollateralScheduleHaircutFor",
       "eligibleCollateralScheduleHaircutForMaturity",
       "eligibleCollateralScheduleIsEligible",
@@ -2345,7 +2347,7 @@
   },
   "margin.ScheduleImCalculator": {
     "kind": "class",
-    "statics": ["bcbsStandard", "fromRegistryId"],
+    "statics": ["bcbsStandard", "fromFinstackConfig", "fromRegistryId"],
     "methods": [
       "calculateForNotional",
       "calculateNettingSetWithNgr",
@@ -2358,7 +2360,7 @@
   },
   "margin.SimmCalculator": {
     "kind": "class",
-    "statics": [],
+    "statics": ["fromFinstackConfig"],
     "methods": ["calculateFromSensitivities", "free"],
     "getters": ["mporDays", "version"]
   },
@@ -2424,6 +2426,9 @@
   "margin.csaSpecRegulatory": {
     "kind": "function"
   },
+  "margin.csaSpecRegulatoryFromConfig": {
+    "kind": "function"
+  },
   "margin.csaSpecUsdRegulatory": {
     "kind": "function"
   },
@@ -2443,6 +2448,9 @@
     "kind": "function"
   },
   "margin.eligibleCollateralScheduleCheckConcentrationLimits": {
+    "kind": "function"
+  },
+  "margin.eligibleCollateralScheduleFromFinstackConfig": {
     "kind": "function"
   },
   "margin.eligibleCollateralScheduleHaircutFor": {

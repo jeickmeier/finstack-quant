@@ -32,6 +32,7 @@ export const margin = {
   csaSpecApplyImTerms: wasm.csaSpecApplyImTerms,
   csaSpecEurRegulatory: wasm.csaSpecEurRegulatory,
   csaSpecRegulatory: wasm.csaSpecRegulatory,
+  csaSpecRegulatoryFromConfig: wasm.csaSpecRegulatoryFromConfig,
   csaSpecUsdRegulatory: wasm.csaSpecUsdRegulatory,
   csaSpecValidate: wasm.csaSpecValidate,
   csaSpecWithIm: wasm.csaSpecWithIm,
@@ -40,6 +41,7 @@ export const margin = {
   eligibleCollateralScheduleCashOnly: wasm.eligibleCollateralScheduleCashOnly,
   eligibleCollateralScheduleCheckConcentrationLimits:
     wasm.eligibleCollateralScheduleCheckConcentrationLimits,
+  eligibleCollateralScheduleFromFinstackConfig: wasm.eligibleCollateralScheduleFromFinstackConfig,
   eligibleCollateralScheduleHaircutFor: wasm.eligibleCollateralScheduleHaircutFor,
   eligibleCollateralScheduleHaircutForMaturity: wasm.eligibleCollateralScheduleHaircutForMaturity,
   eligibleCollateralScheduleIsEligible: wasm.eligibleCollateralScheduleIsEligible,

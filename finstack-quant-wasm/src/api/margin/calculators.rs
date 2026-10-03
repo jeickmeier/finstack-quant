@@ -7,6 +7,7 @@
 
 use super::types::parse_csa;
 use super::{js_currency, js_date, js_money};
+use crate::api::core::config::JsFinstackConfig;
 use crate::utils::input::{from_js_json, js_bool, js_f64, js_opt_string, js_string};
 use crate::utils::{date_to_iso, parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::money::Money;
@@ -252,6 +253,24 @@ impl JsScheduleImCalculator {
         let schedule_id = js_string(&schedule_id, "scheduleId")?;
         Ok(Self {
             inner: fm::ScheduleImCalculator::from_registry_id(&schedule_id).map_err(to_js_err)?,
+        })
+    }
+
+    /// Create the BCBS-IOSCO schedule calculator from a config's margin-registry overlay.
+    /// @param config - `FinstackConfig` handle whose `"margin.registry.v1"` extension (if any) overlays the embedded registry's `schedule_im` section; without one the result equals `bcbsStandard()`.
+    /// @returns A `ScheduleImCalculator` handle built from the merged `bcbs_iosco` entry.
+    ///
+    /// # Errors
+    ///
+    /// Throws if the overlay is malformed or the merged registry has no
+    /// `bcbs_iosco` schedule.
+    #[wasm_bindgen(js_name = fromFinstackConfig)]
+    pub fn from_finstack_config(
+        config: &JsFinstackConfig,
+    ) -> Result<JsScheduleImCalculator, JsValue> {
+        Ok(Self {
+            inner: fm::ScheduleImCalculator::from_finstack_config(&config.inner)
+                .map_err(to_js_err)?,
         })
     }
 

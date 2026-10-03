@@ -4,9 +4,10 @@
 //! require a Python representation of the Rust `Marginable` trait.
 
 use super::calculators::{money_from_amount, PyImResult};
-use super::frame::{opt_str, records, req_f64, req_str, split_pair};
+use super::frame::sensitivity_rows;
 use super::im_curvature::PySimmCurvatureSensitivity;
 use super::types::{extract_asset_class, PyCollateralAssetClass, PyEligibleCollateralSchedule};
+use crate::bindings::core::config::PyFinstackConfig;
 use crate::bindings::date_utils::extract_date;
 use crate::bindings::module_utils::parse_currency;
 use crate::errors::core_to_py;
@@ -22,12 +23,6 @@ fn parse_simm_version(version: &str) -> PyResult<fm::SimmVersion> {
 fn parse_credit_sector(sector: &str) -> PyResult<fm::SimmCreditSector> {
     sector
         .parse::<fm::SimmCreditSector>()
-        .map_err(crate::errors::value_error)
-}
-
-fn parse_risk_class(risk_class: &str) -> PyResult<fm::SimmRiskClass> {
-    risk_class
-        .parse::<fm::SimmRiskClass>()
         .map_err(crate::errors::value_error)
 }
 
@@ -59,10 +54,10 @@ pub struct PySimmSensitivities {
 
 #[pymethods]
 impl PySimmSensitivities {
-    /// Create an empty SIMM sensitivity container in ``base_currency``.
-    /// Raises ``ValueError`` for an unknown currency code.
+    /// Create an empty SIMM sensitivity container in ``base_currency``
+    /// (required). Raises ``ValueError`` for an unknown currency code.
     #[new]
-    #[pyo3(signature = (base_currency = "USD"))]
+    #[pyo3(signature = (base_currency))]
     fn new(base_currency: &str) -> PyResult<Self> {
         Ok(Self {
             inner: fm::SimmSensitivities::new(parse_currency(base_currency)?),
@@ -99,103 +94,32 @@ impl PySimmSensitivities {
     /// ----------
     /// frame : pandas.DataFrame
     ///     Columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
-    ///     ``tenor``, ``amount`` with the same encoding as ``to_dataframe``:
-    ///     ``issuer`` is the currency for ``interest_rate``/``fx`` delta, the
-    ///     ``"CCY1/CCY2"`` pair for FX vega, the issuer for credit and the
-    ///     underlier for equity; ``bucket`` is the credit sector or the
-    ///     commodity bucket; ``tenor`` is the SIMM tenor where the risk class
-    ///     has one. ``kind`` is ``delta``, ``vega`` or ``curvature``.
-    /// base_currency : str, default "USD"
-    ///     Currency in which every ``amount`` is expressed.
+    ///     ``tenor``, ``amount`` (and ``expiry_tenor`` on curvature rows)
+    ///     with the same encoding as ``to_dataframe``: ``issuer`` is the
+    ///     currency for ``interest_rate``/``fx`` delta, the ``"CCY1/CCY2"``
+    ///     pair for FX vega, the issuer for credit, the underlier for equity
+    ///     and the factor for curvature; ``bucket`` is the credit sector, the
+    ///     commodity bucket or the curvature bucket; ``tenor`` is the SIMM
+    ///     tenor where the risk class has one. ``kind`` is ``delta``,
+    ///     ``vega`` or ``curvature``.
+    /// base_currency : str
+    ///     Currency in which every ``amount`` is expressed (the frame does
+    ///     not carry it).
     ///
-    /// Rows with the same key accumulate. Raises ``ValueError`` for an
-    /// unknown risk class, kind, sector, currency or a missing column, and
-    /// ``TypeError`` when ``frame`` has no ``to_dict`` method.
+    /// Rows with the same key accumulate. Decoding is the Rust
+    /// ``SimmSensitivities::from_rows``, the inverse of ``to_dataframe``.
+    /// Raises ``ValueError`` for an unknown risk class, kind, sector,
+    /// currency, a missing column or value, or an invalid curvature row, and
+    /// ``AttributeError`` when ``frame`` has no ``to_dict`` method.
     #[staticmethod]
-    #[pyo3(signature = (frame, base_currency = "USD"))]
+    #[pyo3(signature = (frame, base_currency))]
     fn from_dataframe(frame: &Bound<'_, PyAny>, base_currency: &str) -> PyResult<Self> {
-        let mut sens = fm::SimmSensitivities::new(parse_currency(base_currency)?);
-        for row in records(frame)? {
-            let risk_class = req_str(&row, "risk_class")?;
-            let kind = req_str(&row, "kind")?;
-            let amount = req_f64(&row, "amount")?;
-            let issuer = opt_str(&row, "issuer")?;
-            let bucket = opt_str(&row, "bucket")?;
-            let tenor = opt_str(&row, "tenor")?;
-            let need = |value: &Option<String>, name: &str| -> PyResult<String> {
-                value.clone().ok_or_else(|| {
-                    crate::errors::value_error(format!(
-                        "from_dataframe: {risk_class} {kind} row needs a '{name}' value"
-                    ))
-                })
-            };
-            if kind == "curvature" {
-                let input = fm::SimmCurvatureSensitivity {
-                    risk_class: parse_risk_class(&risk_class)?,
-                    bucket: need(&bucket, "bucket")?,
-                    factor: need(&issuer, "issuer")?,
-                    risk_tenor: tenor,
-                    expiry_tenor: need(&opt_str(&row, "expiry_tenor")?, "expiry_tenor")?,
-                    volatility_weighted_vega: amount,
-                };
-                input.validate().map_err(core_to_py)?;
-                sens.add_curvature(input);
-                continue;
-            }
-            match (risk_class.as_str(), kind.as_str()) {
-                ("interest_rate", "delta") => sens.add_ir_delta(
-                    parse_currency(&need(&issuer, "issuer")?)?,
-                    need(&tenor, "tenor")?,
-                    amount,
-                ),
-                ("interest_rate", "vega") => sens.add_ir_vega(
-                    parse_currency(&need(&issuer, "issuer")?)?,
-                    need(&tenor, "tenor")?,
-                    amount,
-                ),
-                ("credit_qualifying", "delta") => sens.add_credit_qualifying_delta(
-                    parse_credit_sector(&need(&bucket, "bucket")?)?,
-                    need(&issuer, "issuer")?,
-                    need(&tenor, "tenor")?,
-                    amount,
-                ),
-                ("credit_qualifying", "vega") => sens.add_credit_qualifying_vega(
-                    parse_credit_sector(&need(&bucket, "bucket")?)?,
-                    need(&issuer, "issuer")?,
-                    need(&tenor, "tenor")?,
-                    amount,
-                ),
-                ("credit_non_qualifying", "delta") => sens.add_credit_non_qualifying_delta(
-                    need(&issuer, "issuer")?,
-                    need(&tenor, "tenor")?,
-                    amount,
-                ),
-                ("credit_non_qualifying", "vega") => sens.add_credit_non_qualifying_vega(
-                    need(&issuer, "issuer")?,
-                    need(&tenor, "tenor")?,
-                    amount,
-                ),
-                ("equity", "delta") => sens.add_equity_delta(need(&issuer, "issuer")?, amount),
-                ("equity", "vega") => sens.add_equity_vega(need(&issuer, "issuer")?, amount),
-                ("fx", "delta") => {
-                    sens.add_fx_delta(parse_currency(&need(&issuer, "issuer")?)?, amount)
-                }
-                ("fx", "vega") => {
-                    let (c1, c2) = split_pair(&need(&issuer, "issuer")?, "fx vega issuer")?;
-                    sens.add_fx_vega(parse_currency(&c1)?, parse_currency(&c2)?, amount);
-                }
-                ("commodity", "delta") => {
-                    sens.add_commodity_delta(need(&bucket, "bucket")?, amount)
-                }
-                ("commodity", "vega") => sens.add_commodity_vega(need(&bucket, "bucket")?, amount),
-                _ => {
-                    return Err(crate::errors::value_error(format!(
-                    "from_dataframe: unsupported SIMM row risk_class={risk_class:?} kind={kind:?}"
-                )))
-                }
-            }
-        }
-        Ok(Self { inner: sens })
+        let inner = fm::SimmSensitivities::from_rows(
+            parse_currency(base_currency)?,
+            &sensitivity_rows(frame)?,
+        )
+        .map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Add an interest-rate delta: ``amount`` is a signed DV01-style
@@ -481,6 +405,37 @@ impl PySimmCalculator {
         Ok(Self { inner })
     }
 
+    /// Create a SIMM calculator from a config's margin-registry overlay.
+    ///
+    /// Parameters
+    /// ----------
+    /// version : str
+    ///     SIMM rule-set label such as ``"v2_6"``.
+    /// config : FinstackConfig
+    ///     Config whose ``"margin.registry.v1"`` extension (if any) overlays
+    ///     the embedded margin registry; without one the result equals
+    ///     ``SimmCalculator(version)``.
+    ///
+    /// Returns
+    /// -------
+    /// SimmCalculator
+    ///     Calculator using the merged registry's SIMM parameters and its
+    ///     registry margin period of risk.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the version is unknown, or the overlay is malformed or yields
+    ///     incomplete SIMM parameters.
+    #[staticmethod]
+    #[pyo3(signature = (version, config))]
+    fn from_finstack_config(version: &str, config: PyRef<'_, PyFinstackConfig>) -> PyResult<Self> {
+        let inner =
+            fm::SimmCalculator::from_finstack_config(parse_simm_version(version)?, &config.inner)
+                .map_err(core_to_py)?;
+        Ok(Self { inner })
+    }
+
     /// Supported SIMM version label (`"v2_6"`).
     #[getter]
     fn version(&self) -> &'static str {
@@ -575,6 +530,35 @@ impl PyScheduleImCalculator {
     fn from_registry_id(schedule_id: &str) -> PyResult<Self> {
         Ok(Self {
             inner: fm::ScheduleImCalculator::from_registry_id(schedule_id).map_err(core_to_py)?,
+        })
+    }
+
+    /// Create the BCBS-IOSCO schedule calculator from a config's
+    /// margin-registry overlay.
+    ///
+    /// Parameters
+    /// ----------
+    /// config : FinstackConfig
+    ///     Config whose ``"margin.registry.v1"`` extension (if any) overlays
+    ///     the embedded registry's ``schedule_im`` section; without one the
+    ///     result equals ``bcbs_standard()``.
+    ///
+    /// Returns
+    /// -------
+    /// ScheduleImCalculator
+    ///     Calculator built from the merged ``bcbs_iosco`` schedule entry.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the overlay is malformed or the merged registry has no
+    ///     ``bcbs_iosco`` schedule.
+    #[staticmethod]
+    #[pyo3(signature = (config))]
+    fn from_finstack_config(config: PyRef<'_, PyFinstackConfig>) -> PyResult<Self> {
+        Ok(Self {
+            inner: fm::ScheduleImCalculator::from_finstack_config(&config.inner)
+                .map_err(core_to_py)?,
         })
     }
 

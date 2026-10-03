@@ -9,6 +9,7 @@
 //! has no function; its twin is the TypeScript string literal.
 
 use super::{base_money, js_currency};
+use crate::api::core::config::JsFinstackConfig;
 use crate::utils::input::{from_js_json, js_f64, js_opt_bool, js_opt_f64, js_string, js_uint};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin as fm;
@@ -225,6 +226,35 @@ pub fn csa_spec_regulatory(
     to_js_value(&csa)
 }
 
+/// Regulatory CSA specification built from a config's margin-registry overlay.
+///
+/// Same terms as `csaSpecRegulatory`, except that a `"margin.registry.v1"`
+/// extension in `config` takes precedence over the embedded margin registry.
+/// @param config - `FinstackConfig` handle whose `"margin.registry.v1"` extension (if any) overlays the embedded margin registry.
+/// @param currency - ISO-4217 base currency of the agreement; every CSA amount is in it.
+/// @param id - Identifier stamped on the specification; must be non-empty.
+/// @param collateral_curve - Curve id used to discount and accrue interest on collateral, for example `"USD-OIS"`.
+/// @returns The `CsaSpec` as a plain object.
+///
+/// # Errors
+///
+/// Throws for an unknown currency or empty id, or if the overlay is
+/// malformed or fails registry validation.
+#[wasm_bindgen(js_name = csaSpecRegulatoryFromConfig)]
+pub fn csa_spec_regulatory_from_config(
+    config: &JsFinstackConfig,
+    currency: JsValue,
+    id: JsValue,
+    collateral_curve: JsValue,
+) -> Result<JsValue, JsValue> {
+    let currency = js_currency(&currency, "currency")?;
+    let id = js_string(&id, "id")?;
+    let collateral_curve = js_string(&collateral_curve, "collateralCurve")?;
+    let csa = fm::CsaSpec::regulatory_from_config(&config.inner, currency, &id, &collateral_curve)
+        .map_err(to_js_err)?;
+    to_js_value(&csa)
+}
+
 /// Copy of a CSA with new variation margin threshold terms.
 /// @param csa - `CsaSpec` (object or JSON) to copy.
 /// @param threshold - VM threshold in major units of the CSA base currency; exposure below it is uncollateralized.
@@ -266,7 +296,7 @@ pub fn csa_spec_with_vm_threshold(
 /// @param mpor_days - Margin period of risk in business days.
 /// @param threshold - IM threshold in major units of the CSA base currency.
 /// @param mta - IM minimum transfer amount in major units of the CSA base currency.
-/// @param segregated - Whether posted IM is segregated and unavailable to meet VM; defaults to `true`.
+/// @param segregated - Whether posted IM is segregated and unavailable to meet VM; omitted keeps the margin-registry default for `methodology` (`true` for SIMM and schedule IM, `false` for clearing-house and haircut IM).
 /// @returns The updated `CsaSpec` as a plain object.
 ///
 /// # Errors
@@ -288,7 +318,7 @@ pub fn csa_spec_with_im(
     let mpor_days: u32 = js_uint(&mpor_days, "mporDays")?;
     let threshold = base_money(&csa, js_f64(&threshold, "threshold")?)?;
     let mta = base_money(&csa, js_f64(&mta, "mta")?)?;
-    let segregated = js_opt_bool(segregated.as_ref(), "segregated")?.unwrap_or(true);
+    let segregated = js_opt_bool(segregated.as_ref(), "segregated")?;
     let csa = csa
         .with_im(methodology, mpor_days, threshold, mta, segregated)
         .map_err(to_js_err)?;
@@ -374,6 +404,26 @@ pub fn eligible_collateral_schedule_bcbs_standard() -> Result<JsValue, JsValue> 
 #[wasm_bindgen(js_name = eligibleCollateralScheduleUsTreasuries)]
 pub fn eligible_collateral_schedule_us_treasuries() -> Result<JsValue, JsValue> {
     to_js_value(&fm::EligibleCollateralSchedule::us_treasuries().map_err(to_js_err)?)
+}
+
+/// Named eligible-collateral schedule from a config's margin-registry overlay.
+/// @param config - `FinstackConfig` handle whose `"margin.registry.v1"` extension (if any) overlays the embedded margin registry; configured schedules take precedence.
+/// @param schedule_id - Registry id of the schedule, e.g. `"bcbs_standard"`, `"cash_only"`, `"us_treasuries"` or an id the overlay adds.
+/// @returns A copy of the merged registry's `EligibleCollateralSchedule` as a plain object.
+///
+/// # Errors
+///
+/// Throws if the overlay is malformed or `schedule_id` names no schedule.
+#[wasm_bindgen(js_name = eligibleCollateralScheduleFromFinstackConfig)]
+pub fn eligible_collateral_schedule_from_finstack_config(
+    config: &JsFinstackConfig,
+    schedule_id: JsValue,
+) -> Result<JsValue, JsValue> {
+    let schedule_id = js_string(&schedule_id, "scheduleId")?;
+    let schedule =
+        fm::EligibleCollateralSchedule::from_finstack_config(&config.inner, &schedule_id)
+            .map_err(to_js_err)?;
+    to_js_value(&schedule)
 }
 
 /// Whether a schedule accepts an asset class, by entry or through its default haircut.

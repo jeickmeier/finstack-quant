@@ -6,6 +6,7 @@
 //! TypeScript.
 
 use super::{js_currency, js_date};
+use crate::api::core::config::JsFinstackConfig;
 use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_opt_uint, js_string};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_margin as fm;
@@ -508,6 +509,28 @@ impl JsSimmCalculator {
         if let Some(days) = mpor_days {
             inner = inner.with_mpor(days);
         }
+        Ok(Self { inner })
+    }
+
+    /// Create a SIMM calculator from a config's margin-registry overlay.
+    /// @param version - Canonical SIMM version label such as `"v2_6"`.
+    /// @param config - `FinstackConfig` handle whose `"margin.registry.v1"` extension (if any) overlays the embedded margin registry; without one the result equals `new SimmCalculator(version)`.
+    /// @returns A `SimmCalculator` handle using the merged registry's SIMM parameters and margin period of risk.
+    ///
+    /// # Errors
+    ///
+    /// Throws if the version is unknown, or the overlay is malformed or yields
+    /// incomplete SIMM parameters.
+    #[wasm_bindgen(js_name = fromFinstackConfig)]
+    pub fn from_finstack_config(
+        version: JsValue,
+        config: &JsFinstackConfig,
+    ) -> Result<JsSimmCalculator, JsValue> {
+        let version = js_string(&version, "version")?
+            .parse::<fm::SimmVersion>()
+            .map_err(to_js_err)?;
+        let inner =
+            fm::SimmCalculator::from_finstack_config(version, &config.inner).map_err(to_js_err)?;
         Ok(Self { inner })
     }
 

@@ -43,6 +43,20 @@
 
 - The calibration `rust_only` contract list no longer names the crate-private `recalibrate_hazard_with_recovery` and now records every public calibration item without a Python twin (`calibrate_from_json`, `CurveValidator`, `MarketQuote`, `SwapFrequency`, ...).
 
+### Margin and attribution inputs (Python-binding audit PR 6)
+
+#### Changed
+
+- **Breaking:** `FrtbSensitivities.to_dataframe` (Rust `FrtbSensitivities::to_table`) gains the DRC columns `sector`, `seniority`, `asset_type`, `maturity_years` and `pnl_adjustment`, and `FrtbSensitivities.from_dataframe` now reads `drc` rows back instead of rejecting them (MSAF-002).
+- `FrtbSensitivities.from_dataframe` and `SimmSensitivities.from_dataframe` decode the long frame with the new Rust `FrtbSensitivities::from_rows` / `SimmSensitivities::from_rows` (inverses of the new `to_rows`, built on the public `margin::table::SensitivityRow`) instead of a binding-side dispatch table (MSAF-002).
+- **Breaking:** `CsaSpec.with_im` / WASM `margin.csaSpecWithIm` take `segregated=None` by default and then keep the margin-registry default for the methodology (`False` for `clearing_house` and `haircut`) instead of always `True`; Rust `CsaSpec::with_im` takes `segregated: Option<bool>` (MSAF-003).
+- **Breaking:** `base_currency` is required by `FrtbSensitivities(...)`, `SimmSensitivities(...)` and both `from_dataframe` constructors; `is_exotic` is required by `FrtbSensitivities.add_rrao_position` and WASM `addRraoPosition`; `is_option` is required by `SaCcrTrade(...)` and as a `SaCcrTrade.from_dataframe` column (MSAF-004).
+- **Breaking:** `attribute_return_contribution` sets the `as_of`, `weighting` and `factors` keywords on dict and JSON specs as well as DataFrame specs, and raises `ValueError` when a keyword duplicates a field the spec already carries, instead of silently ignoring the keyword (MSAF-006).
+
+#### Added
+
+- `SimmCalculator.from_finstack_config`, `ScheduleImCalculator.from_finstack_config`, `EligibleCollateralSchedule.from_finstack_config` and `CsaSpec.regulatory_from_config` apply a `margin.registry.v1` `FinstackConfig` overlay; WASM twins `SimmCalculator.fromFinstackConfig`, `ScheduleImCalculator.fromFinstackConfig`, `margin.eligibleCollateralScheduleFromFinstackConfig` and `margin.csaSpecRegulatoryFromConfig` (MSAF-007).
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

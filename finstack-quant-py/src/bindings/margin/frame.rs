@@ -3,8 +3,10 @@
 //! The ``from_dataframe`` constructors accept the long-format frames the
 //! matching ``to_dataframe`` exits emit. Rows are pulled through
 //! ``DataFrame.to_dict("records")`` so the binding only touches plain Python
-//! dicts; all interpretation of the rows happens in the Rust ``add_*`` adders.
+//! dicts; all interpretation of the rows happens in Rust (the ``add_*`` adders
+//! and the sensitivity ``from_rows`` constructors).
 
+use finstack_quant_margin::table::SensitivityRow;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -69,16 +71,6 @@ pub(super) fn req_f64(row: &Bound<'_, PyDict>, key: &str) -> PyResult<f64> {
     }
 }
 
-/// Read a required bucket cell as a 1-based ``u8`` index.
-pub(super) fn req_bucket(row: &Bound<'_, PyDict>, key: &str) -> PyResult<u8> {
-    let text = req_str(row, key)?;
-    text.trim().parse::<u8>().map_err(|_| {
-        crate::errors::value_error(format!(
-            "from_dataframe: column '{key}' must be a bucket index, got {text:?}"
-        ))
-    })
-}
-
 /// Read a required boolean cell.
 pub(super) fn req_bool(row: &Bound<'_, PyDict>, key: &str) -> PyResult<bool> {
     match row.get_item(key)? {
@@ -101,14 +93,41 @@ pub(super) fn req_date(row: &Bound<'_, PyDict>, key: &str) -> PyResult<time::Dat
     }
 }
 
-/// Split an ``"A/B"`` pair label into its two halves.
-pub(super) fn split_pair(label: &str, what: &str) -> PyResult<(String, String)> {
-    match label.split_once('/') {
-        Some((a, b)) if !a.is_empty() && !b.is_empty() => Ok((a.to_string(), b.to_string())),
-        _ => Err(crate::errors::value_error(format!(
-            "from_dataframe: {what} must be a 'CCY1/CCY2' pair, got {label:?}"
-        ))),
+/// Read an optional float cell; ``None``/``NaN`` become ``None``.
+fn opt_f64(row: &Bound<'_, PyDict>, key: &str) -> PyResult<Option<f64>> {
+    match row.get_item(key)? {
+        Some(value) if !is_missing(&value) => value.extract::<f64>().map(Some).map_err(|_| {
+            crate::errors::value_error(format!("from_dataframe: column '{key}' must be numeric"))
+        }),
+        _ => Ok(None),
     }
+}
+
+/// Convert a long-format sensitivity frame into Rust [`SensitivityRow`]s.
+///
+/// Only cell conversion happens here; the meaning of each
+/// ``(risk_class, kind)`` row is decoded by the Rust ``from_rows``
+/// constructors. Absent optional columns read as nulls.
+pub(super) fn sensitivity_rows(frame: &Bound<'_, PyAny>) -> PyResult<Vec<SensitivityRow>> {
+    records(frame)?
+        .iter()
+        .map(|row| {
+            Ok(SensitivityRow {
+                risk_class: req_str(row, "risk_class")?,
+                bucket: opt_str(row, "bucket")?,
+                tenor: opt_str(row, "tenor")?,
+                expiry_tenor: opt_str(row, "expiry_tenor")?,
+                issuer: opt_str(row, "issuer")?,
+                kind: req_str(row, "kind")?,
+                sector: opt_str(row, "sector")?,
+                seniority: opt_str(row, "seniority")?,
+                asset_type: opt_str(row, "asset_type")?,
+                maturity_years: opt_f64(row, "maturity_years")?,
+                pnl_adjustment: opt_f64(row, "pnl_adjustment")?,
+                amount: req_f64(row, "amount")?,
+            })
+        })
+        .collect()
 }
 
 /// Convert ``list[tuple[float, float]] | pandas.Series`` into ``(x, y)`` pairs.
