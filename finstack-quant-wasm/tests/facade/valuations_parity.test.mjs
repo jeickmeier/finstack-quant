@@ -556,6 +556,14 @@ test('instrument data-type constructors match Python', () => {
   );
 });
 
+test('weightingMethodMetricWeighted requires neutralize (no binding default)', () => {
+  assert.throws(
+    // neutralize is required, as in Rust `WeightingMethod::MetricWeighted`.
+    () => composite.weightingMethodMetricWeighted('dv01', 'LEG-A', 1.0),
+    (error) => error instanceof TypeError && error.kind === 'invalid_type'
+  );
+});
+
 test('composite weighting and rebalance constructors match Python', () => {
   const usd = { amount: '1000000', currency: 'USD' };
   same(

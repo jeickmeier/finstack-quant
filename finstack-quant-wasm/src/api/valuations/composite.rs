@@ -305,7 +305,7 @@ pub fn weighting_method_notional_weighted(gross_notional: JsValue) -> Result<JsV
 /// @param metric - Canonical additive metric identifier, e.g. `"dv01"` or `"delta"`.
 /// @param anchor_leg_id - Leg whose quantity is fixed at `anchorQuantity`.
 /// @param anchor_quantity - Quantity of the anchor leg.
-/// @param neutralize - Optional; `true` sizes the other legs so the net metric is zero, `false` (the default) scales them by score.
+/// @param neutralize - Required; `true` sizes the other legs so the net metric is zero (the `weightingMethodDv01Neutral` / `weightingMethodDeltaNeutral` presets), `false` scales them by score.
 /// @returns The `WeightingMethod` plain object.
 /// @throws Error - Throws with kind `validation` if `metric` is not a canonical metric identifier, and kind `invalid_type` for a wrong argument type.
 #[wasm_bindgen(js_name = weightingMethodMetricWeighted)]
@@ -313,14 +313,13 @@ pub fn weighting_method_metric_weighted(
     metric: JsValue,
     anchor_leg_id: JsValue,
     anchor_quantity: JsValue,
-    neutralize: Option<JsValue>,
+    neutralize: JsValue,
 ) -> Result<JsValue, JsValue> {
     to_js_value(&WeightingMethod::MetricWeighted {
         metric: js_string(&metric, "metric")?.parse().map_err(to_js_err)?,
         anchor_leg_id: arg::id(&anchor_leg_id, "anchorLegId")?,
         anchor_quantity: arg::num(&anchor_quantity, "anchorQuantity")?,
-        neutralize: crate::utils::input::js_opt_bool(neutralize.as_ref(), "neutralize")?
-            .unwrap_or(false),
+        neutralize: crate::utils::input::js_bool(&neutralize, "neutralize")?,
     })
 }
 

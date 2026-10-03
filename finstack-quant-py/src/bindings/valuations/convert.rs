@@ -8,7 +8,8 @@
 //! - spreads: `float | int | Bps` (basis points)
 //! - money: `Money | float | int` (a bare number needs a currency from the caller)
 //! - enums: serde string names, resolved through `enum_from_str`
-//! - attributes: `Attributes | dict[str, str] | None`
+//! - attributes: `Attributes | dict | None`, a `dict` being the serde form of
+//!   `Attributes` (`{"tags": [...], "meta": {...}}`, as `to_dict()` returns it)
 //!
 //! Outbound conversions (`enum_to_py_string`, `money_to_py`) are the exact
 //! inverses so getters render what the constructor accepted.
@@ -113,14 +114,22 @@ pub(crate) fn enum_to_py_string<T: serde::Serialize>(value: &T) -> PyResult<Stri
     }
 }
 
-/// Coerce `Attributes | dict[str, str] | None` to a Rust attribute bag.
+/// Coerce `Attributes | dict | None` to a Rust attribute bag.
 ///
-/// A `dict` populates `meta` (string keys and values); an optional `"tags"`
-/// entry holding a list of strings populates `tags`.
+/// A `dict` is deserialized as the serde form of
+/// [`finstack_quant_core::types::Attributes`]: optional `"tags"` (list of
+/// strings) and `"meta"` (string-to-string mapping), exactly what `to_dict()`
+/// returns. Any other key or a non-string value is rejected, never coerced.
 ///
 /// # Arguments
 ///
-/// * `obj` - `finstack_quant.core.types.Attributes`, a `dict`, or `None`.
+/// * `obj` - `finstack_quant.core.types.Attributes`, the serde `dict` form, or
+///   `None` (an empty bag).
+///
+/// # Errors
+///
+/// `TypeError` for any other Python type; `ValueError` when the `dict` does not
+/// match the `Attributes` serde shape (unknown key, non-string tag or value).
 pub(crate) fn attributes_from_py(
     obj: &Bound<'_, PyAny>,
 ) -> PyResult<finstack_quant_core::types::Attributes> {
@@ -130,26 +139,13 @@ pub(crate) fn attributes_from_py(
     if let Ok(attrs) = obj.cast::<PyAttributes>() {
         return Ok(attrs.borrow().inner.clone());
     }
-    let Ok(dict) = obj.cast::<PyDict>() else {
+    if obj.cast::<PyDict>().is_err() {
         return Err(pyo3::exceptions::PyTypeError::new_err(format!(
-            "attributes: expected finstack_quant.core.types.Attributes or dict[str, str], got {}",
+            "attributes: expected finstack_quant.core.types.Attributes or a dict with \"tags\" / \"meta\", got {}",
             obj.get_type().name()?
         )));
-    };
-    let mut attrs = finstack_quant_core::types::Attributes::new();
-    for (key, value) in dict.iter() {
-        let key: String = key.extract()?;
-        if key == "tags" {
-            let tags: Vec<String> = value.extract()?;
-            for tag in tags {
-                attrs.tags.insert(tag);
-            }
-            continue;
-        }
-        let value: String = value.str()?.extract()?;
-        attrs.set_meta(&key, &value);
     }
-    Ok(attrs)
+    crate::bindings::module_utils::py_to_serde(obj.py(), obj, "attributes")
 }
 
 /// Wrap a Rust attribute bag for Python.

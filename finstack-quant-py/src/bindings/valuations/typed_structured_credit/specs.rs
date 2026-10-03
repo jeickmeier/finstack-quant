@@ -465,17 +465,17 @@ impl PySpecialServicingSpec {
     ///
     /// Parameters
     /// ----------
-    /// appraisal_reduction_pct : float, optional
+    /// appraisal_reduction_pct : float
     ///     Appraisal reduction in percent of the loan balance (``40.0`` =
-    ///     40%); ``0.0`` by default (specially serviced, full advancing).
+    ///     40%); required as in Rust (``0.0`` = specially serviced with full
+    ///     advancing).
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If the percent is outside ``[0, 100]``.
     #[new]
-    #[pyo3(signature = (appraisal_reduction_pct=0.0))]
-    #[pyo3(text_signature = "(appraisal_reduction_pct=0.0)")]
+    #[pyo3(text_signature = "(appraisal_reduction_pct)")]
     fn new(appraisal_reduction_pct: f64) -> PyResult<Self> {
         let inner = SpecialServicingSpec {
             appraisal_reduction_pct,

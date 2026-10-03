@@ -1511,15 +1511,16 @@ class BondBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``BondSettlementConvention``.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str]) -> BondBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> BondBuilder:
         """
         Set instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str]
-            Attribute bag; a ``dict`` populates ``meta`` and an optional
-            ``"tags"`` entry holding a list of strings populates ``tags``.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -1529,7 +1530,9 @@ class BondBuilder:
         Raises
         ------
         TypeError
-            If ``value`` is neither ``Attributes`` nor a ``dict``.
+            If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def __repr__(self) -> str:
@@ -3718,15 +3721,16 @@ class TermLoanBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str]) -> TermLoanBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> TermLoanBuilder:
         """
         Set instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str]
-            Attribute bag; a ``dict`` populates ``meta`` and an optional
-            ``"tags"`` entry holding a list of strings populates ``tags``.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -3736,7 +3740,9 @@ class TermLoanBuilder:
         Raises
         ------
         TypeError
-            If ``value`` is neither ``Attributes`` nor a ``dict``.
+            If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def __repr__(self) -> str:
@@ -4921,7 +4927,7 @@ class ProtectionLegSpec:
     0.4
     """
 
-    def __init__(self, credit_curve_id: str, recovery_rate: float, settlement_delay: int = 3) -> None:
+    def __init__(self, credit_curve_id: str, recovery_rate: float, settlement_delay: int) -> None:
         """
         Create a protection leg.
 
@@ -4930,14 +4936,18 @@ class ProtectionLegSpec:
         credit_curve_id : str
             Hazard/credit curve identifier for default probabilities.
         recovery_rate : float
-            Recovery rate in ``[0.0, 1.0]`` (e.g. 0.4 = 40%).
-        settlement_delay : int, default 3
-            Settlement delay in business days.
+            Recovery rate in ``[0.0, 1.0)`` (e.g. 0.4 = 40%).
+        settlement_delay : int
+            Settlement delay in business days between the credit event and the
+            protection payment. Required: the lag is a contract term (ISDA North
+            America uses 3, ISDA Europe uses 1); read it from
+            ``ConventionRegistry().resolve_cds(...).settlement_days`` when the
+            contract follows a standard convention.
 
         Raises
         ------
         ValueError
-            If ``recovery_rate`` is outside ``[0.0, 1.0]``.
+            If ``recovery_rate`` is outside ``[0.0, 1.0)``.
 
         Examples
         --------
@@ -5045,7 +5055,7 @@ class ProtectionLegSpec:
         Returns
         -------
         float
-            Value in ``[0.0, 1.0]``.
+            Value in ``[0.0, 1.0)``.
 
         Notes
         -----
@@ -5695,15 +5705,16 @@ class InterestRateSwapBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``OtcMarginSpec``.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str]) -> InterestRateSwapBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> InterestRateSwapBuilder:
         """
         Set instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str]
-            Attribute bag; a ``dict`` populates ``meta`` and an optional
-            ``"tags"`` entry holding a list of strings populates ``tags``.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -5713,7 +5724,9 @@ class InterestRateSwapBuilder:
         Raises
         ------
         TypeError
-            If ``value`` is neither ``Attributes`` nor a ``dict``.
+            If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def __repr__(self) -> str:
@@ -6578,15 +6591,16 @@ class SwaptionBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``SabrParameters``.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str]) -> SwaptionBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> SwaptionBuilder:
         """
         Set instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str]
-            Attribute bag; a ``dict`` populates ``meta`` and an optional
-            ``"tags"`` entry holding a list of strings populates ``tags``.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -6596,7 +6610,9 @@ class SwaptionBuilder:
         Raises
         ------
         TypeError
-            If ``value`` is neither ``Attributes`` nor a ``dict``.
+            If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def __repr__(self) -> str:
@@ -7698,15 +7714,16 @@ class CapFloorBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``OvernightCouponConvention``.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str]) -> CapFloorBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> CapFloorBuilder:
         """
         Set instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str]
-            Attribute bag; a ``dict`` populates ``meta`` and an optional
-            ``"tags"`` entry holding a list of strings populates ``tags``.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -7716,7 +7733,9 @@ class CapFloorBuilder:
         Raises
         ------
         TypeError
-            If ``value`` is neither ``Attributes`` nor a ``dict``.
+            If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def __repr__(self) -> str:
@@ -8560,14 +8579,16 @@ class CreditDefaultSwapBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as an ``OtcMarginSpec``.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str] | None) -> CreditDefaultSwapBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> CreditDefaultSwapBuilder:
         """
         Set instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str] | None
-            Attribute bag; a ``dict`` populates ``meta`` and an optional ``"tags"`` entry holding a list of strings populates ``tags``.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -8580,6 +8601,8 @@ class CreditDefaultSwapBuilder:
             If the builder was already consumed by ``build()``.
         TypeError
             If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def __repr__(self) -> str:
@@ -9657,14 +9680,16 @@ class CdsIndexBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as an ``OtcMarginSpec``.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str] | None) -> CdsIndexBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> CdsIndexBuilder:
         """
         Set instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str] | None
-            Attribute bag; a ``dict`` populates ``meta`` and an optional ``"tags"`` entry holding a list of strings populates ``tags``.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -9677,6 +9702,8 @@ class CdsIndexBuilder:
             If the builder was already consumed by ``build()``.
         TypeError
             If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def __repr__(self) -> str:
@@ -10865,14 +10892,16 @@ class CdsTrancheBuilder:
             If ``value`` is not a ``(date, Money)`` pair.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str] | None) -> CdsTrancheBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> CdsTrancheBuilder:
         """
         Set instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str] | None
-            Attribute bag; a ``dict`` populates ``meta`` and an optional ``"tags"`` entry holding a list of strings populates ``tags``.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -10885,6 +10914,8 @@ class CdsTrancheBuilder:
             If the builder was already consumed by ``build()``.
         TypeError
             If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def __repr__(self) -> str:
@@ -11621,7 +11652,9 @@ class ConvertibleBondBuilder:
     ...     .issue_date("2024-01-15")
     ...     .maturity("2029-01-15")
     ...     .discount_curve_id("USD-OIS")
-    ...     .conversion(ConversionSpec(ratio=20.0, anti_dilution="full_ratchet"))
+    ...     .conversion(
+    ...         ConversionSpec(ratio=20.0, policy="voluntary", anti_dilution="full_ratchet", dividend_adjustment="none")
+    ...     )
     ...     .spot_id("ACME")
     ...     .vol_surface_id("ACME-VOL")
     ...     .cashflow_spec(ConvertibleBond.example().cashflow_spec)
@@ -11939,14 +11972,16 @@ class ConvertibleBondBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``CashflowSpec``.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str] | None) -> ConvertibleBondBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> ConvertibleBondBuilder:
         """
         Set instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str] | None
-            Attribute bag; a ``dict`` populates ``meta`` and an optional ``"tags"`` entry holding a list of strings populates ``tags``.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -11959,6 +11994,8 @@ class ConvertibleBondBuilder:
             If the builder was already consumed by ``build()``.
         TypeError
             If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def __repr__(self) -> str:
@@ -12896,14 +12933,16 @@ class FxForwardBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str] | None) -> FxForwardBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> FxForwardBuilder:
         """
         Set instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str] | None
-            Attribute bag; a ``dict`` populates ``meta`` and an optional ``"tags"`` entry holding a list of strings populates ``tags``.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -12916,6 +12955,8 @@ class FxForwardBuilder:
             If the builder was already consumed by ``build()``.
         TypeError
             If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def __repr__(self) -> str:
@@ -14081,14 +14122,16 @@ class FxOptionBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str] | None) -> FxOptionBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> FxOptionBuilder:
         """
         Set instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str] | None
-            Attribute bag; a ``dict`` populates ``meta`` and an optional ``"tags"`` entry holding a list of strings populates ``tags``.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -14101,6 +14144,8 @@ class FxOptionBuilder:
             If the builder was already consumed by ``build()``.
         TypeError
             If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def __repr__(self) -> str:
@@ -15365,14 +15410,16 @@ class EquityOptionBuilder:
             If the builder was already consumed by ``build()`` or a date cannot be interpreted.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str] | None) -> EquityOptionBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> EquityOptionBuilder:
         """
         Set instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str] | None
-            Attribute bag; a ``dict`` populates ``meta`` and an optional ``"tags"`` entry holding a list of strings populates ``tags``.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -15385,6 +15432,8 @@ class EquityOptionBuilder:
             If the builder was already consumed by ``build()``.
         TypeError
             If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def __repr__(self) -> str:
@@ -17521,15 +17570,16 @@ class TrancheBuilder:
         """
         ...
 
-    def attributes(self, value: Attributes | dict[str, str]) -> TrancheBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> TrancheBuilder:
         """
         Set free-form attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str]
-            Attribute bag; a dict populates ``meta`` (an optional ``"tags"`` list
-            populates ``tags``).
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
         Returns
         -------
         TrancheBuilder
@@ -17537,9 +17587,13 @@ class TrancheBuilder:
 
         Raises
         ------
+        TypeError
+            If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
         ValueError
             If ``value`` is invalid or this builder was already consumed by a
             prior call to :meth:`TrancheBuilder.build`.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
 
@@ -17858,6 +17912,7 @@ class PoolAsset:
     --------
     >>> import datetime
     >>> from finstack_quant.core.currency import Currency
+    >>> from finstack_quant.core.dates import DayCount
     >>> from finstack_quant.core.money import Money
     >>> from finstack_quant.valuations.instruments import PoolAsset
     >>> loan = PoolAsset(
@@ -17866,6 +17921,7 @@ class PoolAsset:
     ...     Money(10_000_000.0, Currency("USD")),
     ...     0.08,
     ...     datetime.date(2031, 1, 15),
+    ...     day_count=DayCount.ACT_360,
     ...     rating="B",
     ...     balloon={"extension_prob": 0.3, "extension_months": 24},
     ... )
@@ -17881,7 +17937,7 @@ class PoolAsset:
         rate: float,
         maturity: datetime.date,
         *,
-        day_count: DayCount | None = None,
+        day_count: DayCount,
         spread_bp: float | None = None,
         forward_curve_id: str | None = None,
         index_floor_bp: float | None = None,
@@ -17928,8 +17984,8 @@ class PoolAsset:
             engine adds ``spread_bp`` to the ``forward_curve_id`` projection.
         maturity : datetime.date
             Contractual maturity (balloon date for commercial mortgages).
-        day_count : DayCount, optional
-            Accrual convention; Act/360 when omitted.
+        day_count : DayCount
+            Accrual convention of the row (keyword-only, required as in Rust).
         spread_bp : float, optional
             Floating spread over ``forward_curve_id`` in basis points.
         forward_curve_id : str, optional
@@ -19564,15 +19620,16 @@ class SpecialServicingSpec:
     40.0
     """
 
-    def __init__(self, appraisal_reduction_pct: float = 0.0) -> None:
+    def __init__(self, appraisal_reduction_pct: float) -> None:
         """
         Construct the special-servicing state.
 
         Parameters
         ----------
-        appraisal_reduction_pct : float, optional
+        appraisal_reduction_pct : float
             Appraisal reduction in percent of the loan balance (``40.0`` =
-            40%); ``0.0`` by default (specially serviced, full advancing).
+            40%); required as in Rust (``0.0`` = specially serviced with full
+            advancing).
 
         Raises
         ------
@@ -24060,15 +24117,16 @@ class StructuredCreditBuilder:
         """
         ...
 
-    def attributes(self, value: Attributes | dict[str, str]) -> StructuredCreditBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> StructuredCreditBuilder:
         """
         Set free-form attributes (tags and metadata) on the deal.
 
         Parameters
         ----------
-        value : Attributes | dict[str, str]
-            Attribute bag; a dict populates ``meta`` (an optional ``"tags"`` list
-            populates ``tags``).
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
         Returns
         -------
         StructuredCreditBuilder
@@ -24076,9 +24134,13 @@ class StructuredCreditBuilder:
 
         Raises
         ------
+        TypeError
+            If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
         ValueError
             If ``value`` does not match the expected shape or this builder
             was already consumed by :meth:`StructuredCreditBuilder.build`.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
 
@@ -26369,14 +26431,16 @@ class AssetBackedFacilityBuilder:
             consumed.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str] | None) -> AssetBackedFacilityBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> AssetBackedFacilityBuilder:
         """
         Set scenario-selection attributes.
 
         Parameters
         ----------
-        value : Attributes | dict[str, str] | None
-            Attribute map; ``None`` clears it.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -26388,7 +26452,9 @@ class AssetBackedFacilityBuilder:
         ValueError
             If the builder was already consumed.
         TypeError
-            If ``value`` is neither ``Attributes`` nor a ``dict``.
+            If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def build(self) -> AssetBackedFacility:
@@ -26600,9 +26666,11 @@ class FacilityProjection:
         One row per payment date as a pandas ``DataFrame``.
 
         Columns: ``date`` (ISO 8601 string), ``interest``, ``principal``,
-        ``commitment_fee``, ``draw`` (lender advances), ``lender_total`` (the
-        first three summed less draws) and ``residual`` (cash to the residual
-        class), all in currency units.
+        ``commitment_fee``, ``draw`` (lender advances), ``lender_total`` and
+        ``residual`` (cash to the residual class), all in currency units. The
+        component columns pivot the flow lists by date; ``lender_total`` is the
+        Rust ``lender_cashflows`` amount on that date (the flows behind the
+        ``lender_cashflows`` property and the facility IRR).
 
         Returns
         -------
@@ -26612,7 +26680,8 @@ class FacilityProjection:
         Raises
         ------
         ValueError
-            If the rows cannot be serialized.
+            If two lender flows on one date carry different currencies, or the
+            rows cannot be serialized.
         """
         ...
 
@@ -27944,14 +28013,16 @@ class RevolvingCreditBuilder:
             If the builder was already consumed.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str] | None) -> RevolvingCreditBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> RevolvingCreditBuilder:
         """
         Set scenario-selection attributes.
 
         Parameters
         ----------
-        value : Attributes | dict[str, str] | None
-            Attribute map; ``None`` clears it.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -27963,7 +28034,9 @@ class RevolvingCreditBuilder:
         ValueError
             If the builder was already consumed.
         TypeError
-            If ``value`` is neither ``Attributes`` nor a ``dict``.
+            If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def build(self) -> RevolvingCredit:
@@ -30803,7 +30876,7 @@ class ConversionSpec:
     Examples
     --------
     >>> from finstack_quant.valuations.instruments import ConversionSpec
-    >>> spec = ConversionSpec(ratio=25.0)
+    >>> spec = ConversionSpec(ratio=25.0, policy="voluntary", anti_dilution="none", dividend_adjustment="none")
     >>> (spec.ratio, spec.policy, spec.anti_dilution)
     (25.0, 'voluntary', 'none')
     """
@@ -30812,9 +30885,10 @@ class ConversionSpec:
         self,
         ratio: float | None = None,
         price: float | None = None,
-        policy: str | dict[str, object] | None = None,
-        anti_dilution: Literal["none", "full_ratchet", "weighted_average"] = "none",
-        dividend_adjustment: Literal["none", "adjust_price", "adjust_ratio"] = "none",
+        *,
+        policy: str | dict[str, object],
+        anti_dilution: Literal["none", "full_ratchet", "weighted_average"],
+        dividend_adjustment: Literal["none", "adjust_price", "adjust_ratio"],
         dilution_events: list[dict[str, object]] | None = None,
     ) -> None:
         """
@@ -30826,17 +30900,17 @@ class ConversionSpec:
             Conversion ratio (shares per bond); derived from ``price`` when ``None``.
         price : float | None
             Conversion price per share; derived from ``ratio`` when ``None``.
-        policy : str | dict[str, object] | None
-            Conversion policy: ``"voluntary"`` (the default when ``None``), or a
-            tagged dict such as ``{"mandatory_on": "2027-03-15"}``,
+        policy : str | dict[str, object]
+            Conversion policy (keyword-only, required as in Rust): ``"voluntary"``,
+            or a tagged dict such as ``{"mandatory_on": "2027-03-15"}``,
             ``{"window": {"start": "2025-01-15", "end": "2028-01-15"}}``,
             ``{"upon_event": "qualified_ipo"}`` or ``{"mandatory_variable":
             {"conversion_date": ..., "upper_conversion_price": ...,
             "lower_conversion_price": ...}}`` (dates as ISO strings).
-        anti_dilution : {"none", "full_ratchet", "weighted_average"}, default "none"
-            Anti-dilution protection.
-        dividend_adjustment : {"none", "adjust_price", "adjust_ratio"}, default "none"
-            Dividend protection.
+        anti_dilution : {"none", "full_ratchet", "weighted_average"}
+            Anti-dilution protection (keyword-only, required as in Rust).
+        dividend_adjustment : {"none", "adjust_price", "adjust_ratio"}
+            Dividend protection (keyword-only, required as in Rust).
         dilution_events : list[dict[str, object]] | None
             Dilution events (``date``, ``new_issue_price``, ``new_shares_issued``,
             ``shares_outstanding_before``) in chronological order; pricing raises
@@ -30851,7 +30925,10 @@ class ConversionSpec:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import ConversionSpec
-        >>> ConversionSpec(price=50.0, dividend_adjustment="adjust_ratio").dividend_adjustment
+        >>> spec = ConversionSpec(
+        ...     price=50.0, policy="voluntary", anti_dilution="none", dividend_adjustment="adjust_ratio"
+        ... )
+        >>> spec.dividend_adjustment
         'adjust_ratio'
         """
         ...
@@ -30879,7 +30956,11 @@ class ConversionSpec:
         Examples
         --------
         >>> from finstack_quant.valuations.instruments import ConversionSpec
-        >>> ConversionSpec.from_json(ConversionSpec(ratio=20.0).to_json()).ratio
+        >>> ConversionSpec.from_json(
+        ...     ConversionSpec(
+        ...         ratio=20.0, policy="voluntary", anti_dilution="none", dividend_adjustment="none"
+        ...     ).to_json()
+        ... ).ratio
         20.0
         """
         ...

@@ -175,6 +175,19 @@
 
 - Python stubs: removed the stale duplicate `StatementResult.to_dated_schedule` declaration that showed `convention="end"`.
 
+### Valuations: invented defaults and attributes (Python-binding audit PR 12)
+
+#### Changed (breaking)
+
+- Python: `ProtectionLegSpec(credit_curve_id, recovery_rate, settlement_delay)` requires `settlement_delay` (was a binding default of 3, wrong for ISDA Europe T+1); the recovery range is documented as `[0.0, 1.0)`, matching Rust.
+- Python and WASM: `WeightingMethod.metric_weighted` / `weightingMethodMetricWeighted` require `neutralize` (was a binding default of `false`), as the Rust `MetricWeighted` variant does.
+- Python: every typed builder's `.attributes(...)` takes an `Attributes` or its serde dict `{"tags": [...], "meta": {...}}` (the `to_dict()` form); flat `{"desk": "x"}` dicts and non-string values now raise `ValueError` instead of being stored under `meta` or `str()`-coerced.
+- Python: `ConversionSpec` requires keyword-only `policy`, `anti_dilution` and `dividend_adjustment`; `PoolAsset` requires keyword-only `day_count` (was Act/360); `SpecialServicingSpec` requires `appraisal_reduction_pct` (was 0.0) — all required in Rust.
+
+#### Fixed
+
+- Python: `FacilityProjection.to_dataframe` takes `lender_total` from Rust `lender_cashflows()` (and raises `ValueError` on mixed currencies) instead of re-summing the components in the binding.
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

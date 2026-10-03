@@ -2123,9 +2123,10 @@ impl PyStructuredCreditBuilder {
     ///
     /// Parameters
     /// ----------
-    /// value : Attributes | dict[str, str]
-    ///     Attribute bag; a dict populates ``meta`` (an optional ``"tags"``
-    ///     list populates ``tags``).
+    /// value : Attributes | dict | None
+    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
+    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+    ///     ``None`` clears it.
     ///
     /// Returns
     /// -------
@@ -2134,9 +2135,12 @@ impl PyStructuredCreditBuilder {
     ///
     /// Raises
     /// ------
+    /// TypeError
+    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
     /// ValueError
-    ///     If ``value`` does not match the expected shape or this builder
-    ///     was already consumed by :meth:`StructuredCreditBuilder.build`.
+    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or
+    ///     value, or this builder was already consumed by
+    ///     :meth:`StructuredCreditBuilder.build`.
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

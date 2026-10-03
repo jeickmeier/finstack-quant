@@ -346,6 +346,9 @@ impl PyWeightingMethod {
     ///     Finite non-zero signed quantity assigned to the anchor leg.
     /// neutralize : bool
     ///     Whether positive and negative score groups normalize separately.
+    ///     Required, as in the Rust ``WeightingMethod::MetricWeighted`` variant:
+    ///     ``True`` sizes the book metric-neutral (the ``dv01_neutral`` /
+    ///     ``delta_neutral`` presets), ``False`` scales every leg by its score.
     ///
     /// Returns
     /// -------
@@ -358,7 +361,7 @@ impl PyWeightingMethod {
     ///     If the metric key uses noncanonical composite encoding. Anchors and
     ///     quantities are validated by ``CompositeSpec``.
     #[staticmethod]
-    #[pyo3(signature = (metric, anchor_leg_id, anchor_quantity, neutralize=false))]
+    #[pyo3(text_signature = "(metric, anchor_leg_id, anchor_quantity, neutralize)")]
     fn metric_weighted(
         metric: &str,
         anchor_leg_id: &str,

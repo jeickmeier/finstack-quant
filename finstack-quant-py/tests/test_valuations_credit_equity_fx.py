@@ -169,7 +169,7 @@ class TestCreditDefaultSwap:
             .protection_leg(protection)
             .upfront((upfront_date, Money(-250_000.0, USD)))
             .doc_clause("xr14")
-            .attributes({"desk": "credit", "tags": ["ig"]})
+            .attributes({"tags": ["ig"], "meta": {"desk": "credit"}})
             .build()
         )
         date, amount = cds.upfront
@@ -367,8 +367,18 @@ class TestConvertibleBond:
         assert isinstance(mandatory.call_put, CallPutSchedule)
         assert mandatory.soft_call_trigger["threshold_pct"] == 130.0
 
+    def test_conversion_spec_requires_the_terms_rust_requires(self) -> None:
+        """Rust ``ConversionSpec`` has no default policy / anti-dilution / dividend term (VALB-003)."""
+        terms = {"policy": "voluntary", "anti_dilution": "none", "dividend_adjustment": "none"}
+        for missing in terms:
+            partial = {key: value for key, value in terms.items() if key != missing}
+            with pytest.raises(TypeError, match=missing):
+                ConversionSpec(ratio=20.0, **partial)  # type: ignore[call-arg]
+        spec = ConversionSpec(ratio=20.0, **terms)  # type: ignore[arg-type]
+        assert ConversionSpec.from_json(spec.to_json()).to_json() == spec.to_json()
+
     def test_conversion_accepts_typed_dict_and_json(self) -> None:
-        spec = ConversionSpec(ratio=20.0, anti_dilution="full_ratchet")
+        spec = ConversionSpec(ratio=20.0, policy="voluntary", anti_dilution="full_ratchet", dividend_adjustment="none")
         as_dict = json.loads(spec.to_json())
 
         def build(conversion: object) -> ConvertibleBond:
@@ -408,7 +418,9 @@ class TestConvertibleBond:
             .discount_curve_id("USD-OIS")
             .spot_id("ACME-EQ")
             .vol_surface_id("ACME-EQ-VOL")
-            .conversion(ConversionSpec(price=50.0))
+            .conversion(
+                ConversionSpec(price=50.0, policy="voluntary", anti_dilution="none", dividend_adjustment="none")
+            )
             .cashflow_spec(ConvertibleBond.example().cashflow_spec)
             .call_put(sched)
             .soft_call_trigger({"threshold_pct": 130.0, "observation_days": 30, "required_days_above": 20})
@@ -597,9 +609,42 @@ class TestFxOption:
             .domestic_discount_curve_id("USD-OIS")
             .foreign_discount_curve_id("EUR-OIS")
             .vol_surface_id("EURUSD-VOL")
-            .attributes({"book": "fx"})
+            .attributes({"meta": {"book": "fx"}})
             .build()
         )
         assert opt.day_count == DayCount.ACT_360
         assert opt.attributes.get_meta("book") == "fx"
         assert 'option_type="put"' in repr(opt)
+
+    def test_attributes_take_the_rust_serde_dict(self) -> None:
+        """``.attributes`` deserializes the ``to_dict()`` form; flat dicts are rejected (VALA-005)."""
+
+        def build(attributes: object) -> FxOption:
+            return (
+                FxOption
+                .builder()
+                .id("FXO-A")
+                .base_currency("EUR")
+                .quote_currency(USD)
+                .strike(1.1)
+                .option_type("call")
+                .delta_convention("spot", "USD", "desk")
+                .expiry("2025-06-15")
+                .notional(Money(1_000_000.0, EUR))
+                .domestic_discount_curve_id("USD-OIS")
+                .foreign_discount_curve_id("EUR-OIS")
+                .vol_surface_id("EURUSD-VOL")
+                .attributes(attributes)
+                .build()
+            )
+
+        serde_form = FxForward.example().to_dict()["attributes"]
+        assert serde_form == {"tags": ["fx"], "meta": {"pair": "EURUSD"}}
+        assert build(serde_form).to_dict()["attributes"] == serde_form
+        assert build({"meta": {"tags": "x"}}).attributes.get_meta("tags") == "x"
+        with pytest.raises(ValueError, match="unknown field `desk`"):
+            build({"desk": "fx"})
+        with pytest.raises(ValueError, match="attributes"):
+            build({"meta": {"k": 1}})
+        with pytest.raises(TypeError, match="attributes"):
+            build(["fx"])
