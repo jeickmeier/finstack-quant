@@ -12,6 +12,18 @@
 - Python and WASM: `RatingFactorTable` / `MasterScale` / `DownturnLgd` `from_registry_id` with an unknown id raise `KeyError` / throw kind `not_found` (was `ValueError` / `validation`); the Rust credit registry returns `InputError::NotFound`.
 - Python: typed Rust errors at the remaining statements-analytics, attribution, calibration, margin, portfolio and scenarios binding sites now go through their kind-aware mapper; `display_to_py` accepts only kind-less parse/serde errors (`KindlessError`), so routing a typed error through it no longer compiles.
 
+### Valuations: instrument coverage (Python-binding audit PR 14)
+
+#### Added
+
+- Python and WASM: `calculate_var_with_pricing` / `valuations.instruments.calculateVarWithPricing` bind the multi-instrument full-revaluation historical VaR / expected shortfall (Rust `metrics::risk::calculate_var_with_pricing`) and return a typed `VarResult` (getters, `to_json`/`from_json`, `to_dataframe`, pickle in Python; the schema-backed `VarResult` object in WASM). `VarResult` now derives serde and has a published `var_result.schema.json`; Rust adds `PricingDispatch::from_model` for the host `model` argument.
+- Python and WASM: `instrument_envelope_from_spec` / `valuations.instruments.instrumentEnvelopeFromSpec` wrap and validate a bare instrument spec into the canonical envelope. The 54 registered instrument types without a typed Python class, and the JSON-first fixed-income types, are recorded in `parity_contract.toml` as JSON-envelope only by decision.
+- Python and WASM: typed `CdsOption` / `CdsOptionBuilder` (example, one getter per field, one builder setter per Rust `FinancialBuilder` setter, `price`/`metric`); Rust re-exports `CdsOptionBuilder` from `cds_option`.
+
+#### Changed (breaking)
+
+- Python: `finstack_quant.valuations.instrument_cashflows` (a pure-Python wrapper returning `(dict, DataFrame)`) is removed. Use the compiled `finstack_quant.valuations.instruments.instrument_cashflows(instrument, market, as_of, model)`, which returns a typed `InstrumentCashflowEnvelope`; call `.to_dataframe()` for the per-flow frame. `model` is now positional.
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

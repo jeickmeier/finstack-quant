@@ -338,3 +338,141 @@ test('validateInstrumentJson merges metric-pricing overrides before validation',
       error.message.includes('invalid metric_pricing_overrides JSON')
   );
 });
+
+// Python-binding audit PR 14: VaR, spec envelopes and the typed CdsOption.
+
+function flatBond(id, amount) {
+  return valuations.instruments.Bond.fixed(
+    id,
+    new core.Money(amount, new core.Currency('USD')),
+    new core.Rate(0.05),
+    '2024-01-15',
+    '2029-01-15',
+    'none',
+    'USD-OIS'
+  ).toJson();
+}
+
+const RATE_HISTORY = {
+  base_date: '2024-01-15',
+  window_days: 3,
+  scenarios: [0.001, -0.0005, 0.002].map((shift, index) => ({
+    date: `2024-01-1${2 - index}`,
+    shifts: [{ factor: { type: 'discount_rate', curve_id: 'USD-OIS', tenor_years: 5.0 }, shift }],
+  })),
+};
+
+test('calculateVarWithPricing matches the hvar metric and aggregates positions', () => {
+  const long = flatBond('LONG', 1_000_000);
+  const result = valuations.instruments.calculateVarWithPricing(
+    [long],
+    FLAT_MARKET,
+    RATE_HISTORY,
+    '2024-01-15'
+  );
+  const metric = valuations.instruments.priceInstrument(
+    long,
+    FLAT_MARKET,
+    '2024-01-15',
+    'default',
+    ['hvar'],
+    null,
+    RATE_HISTORY
+  );
+  assert.equal(result.num_scenarios, 3);
+  assert.equal(result.confidence_level, 0.95);
+  assert.ok(result.var < 0);
+  assert.ok(Math.abs(result.var - metric.measures.hvar) < 1e-9);
+
+  const doubled = valuations.instruments.calculateVarWithPricing(
+    [long, JSON.parse(flatBond('LONG-2', 1_000_000))],
+    FLAT_MARKET,
+    JSON.stringify(RATE_HISTORY),
+    '2024-01-15',
+    { confidence_level: 0.99 },
+    'discounting'
+  );
+  const single99 = valuations.instruments.calculateVarWithPricing(
+    [long],
+    FLAT_MARKET,
+    RATE_HISTORY,
+    '2024-01-15',
+    { confidence_level: 0.99 },
+    'discounting'
+  );
+  assert.equal(doubled.confidence_level, 0.99);
+  assert.ok(Math.abs(doubled.var - 2 * single99.var) < 1e-6);
+  assert.throws(
+    () =>
+      valuations.instruments.calculateVarWithPricing(
+        [long],
+        FLAT_MARKET,
+        RATE_HISTORY,
+        '2024-01-15',
+        {
+          confidence_level: 1.5,
+        }
+      ),
+    (error) => error.name === 'FinstackError' && error.kind === 'validation'
+  );
+});
+
+test('instrumentEnvelopeFromSpec wraps a bare spec and rejects tagged payloads', () => {
+  const spec = {
+    id: 'EURUSD-SPOT',
+    base_currency: 'EUR',
+    quote_currency: 'USD',
+    settlement_date: '2025-01-17',
+    quoted_spot: 1.2,
+    notional: { amount: '1000000', currency: 'EUR' },
+    attributes: {},
+  };
+  const envelope = valuations.instruments.instrumentEnvelopeFromSpec('fx_spot', spec);
+  assert.equal(JSON.parse(envelope).instrument.type, 'fx_spot');
+  assert.equal(valuations.instruments.validateInstrumentJson(envelope), envelope);
+  assert.equal(
+    valuations.instruments.instrumentEnvelopeFromSpec('fx_spot', JSON.stringify(spec)),
+    envelope
+  );
+  assert.throws(
+    () => valuations.instruments.instrumentEnvelopeFromSpec('fx_spot', { type: 'fx_spot', spec }),
+    (error) => error.name === 'FinstackError' && error.kind === 'validation'
+  );
+});
+
+test('CdsOption is a typed class matching the Python wrapper', () => {
+  const { CdsOption } = valuations.instruments;
+  const option = CdsOption.example();
+  assert.equal(option.toJson(), valuations.creditDerivatives.cdsOptionExampleJson());
+  assert.deepEqual(option.strike, { spread: '0.01' });
+  assert.equal(option.optionType, 'call');
+  assert.equal(option.expiry, '2025-06-20');
+  assert.equal(option.couponBp, null);
+  assert.equal(CdsOption.fromJson(option.toJson()).toJson(), option.toJson());
+
+  const built = CdsOption.builder()
+    .id('CDXO-1')
+    .strike({ clean_price_pct: '107.0' })
+    .optionType('put')
+    .exerciseStyle('european')
+    .expiry('2025-06-20')
+    .underlyingMaturity('2030-06-20')
+    .notional(new core.Money(25_000_000, new core.Currency('USD')))
+    .settlement('physical')
+    .recoveryRate(0.3)
+    .discountCurveId('USD-OIS')
+    .creditCurveId('CDX-HY-HAZARD')
+    .volSurfaceId('CDX-HY-VOL')
+    .underlyingIsIndex(true)
+    .indexFactor(0.98)
+    .strikeIndexFactor(1.0)
+    .couponBp(500)
+    .protectionStartConvention('forward')
+    .build();
+  assert.equal(built.couponBp, 500);
+  assert.equal(built.protectionStartConvention, 'forward');
+  assert.throws(
+    () => CdsOption.builder().id('X').build(),
+    (error) => error.kind === 'validation' && /missing required field/.test(error.message)
+  );
+});

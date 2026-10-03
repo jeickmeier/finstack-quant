@@ -133,11 +133,15 @@ test('volQuoteOptionVol defaults the option type in Rust', () => {
 
 test('volQuoteSwaptionVol defaults the convention in Rust and requires the quote type', () => {
   assert.deepEqual(
-    plain(calibration.volQuoteSwaptionVol('SV', '2027-05-08', '2032-05-08', 0.04, 0.0072, 'normal')),
+    plain(
+      calibration.volQuoteSwaptionVol('SV', '2027-05-08', '2032-05-08', 0.04, 0.0072, 'normal')
+    ),
     GOLDEN.quotes.swaption_vol
   );
   // The quote type decides the unit of `vol`, so omitting it is an error.
-  assert.throws(() => calibration.volQuoteSwaptionVol('SV', '2027-05-08', '2032-05-08', 0.04, 0.0072));
+  assert.throws(() =>
+    calibration.volQuoteSwaptionVol('SV', '2027-05-08', '2032-05-08', 0.04, 0.0072)
+  );
 });
 
 test('volQuoteCapFloorVol builds the Python VolQuote.cap_floor_vol object', () => {
@@ -146,7 +150,8 @@ test('volQuoteCapFloorVol builds the Python VolQuote.cap_floor_vol object', () =
     GOLDEN.quotes.cap_floor_vol
   );
   assert.equal(
-    calibration.volQuoteCapFloorVol('CF', '2027-05-08', 0.04, 0.0072, 'normal').cap_floor_vol.is_cap,
+    calibration.volQuoteCapFloorVol('CF', '2027-05-08', 0.04, 0.0072, 'normal').cap_floor_vol
+      .is_cap,
     true
   );
   assert.throws(() => calibration.volQuoteCapFloorVol('CF', '2027-05-08', 0.04, 0.0072));

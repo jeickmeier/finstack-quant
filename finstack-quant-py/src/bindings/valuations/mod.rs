@@ -19,6 +19,7 @@ pub(crate) mod typed_fx;
 mod typed_legs;
 pub(crate) mod typed_rates;
 pub(crate) mod typed_revolving_credit;
+mod var;
 #[macro_use]
 pub(crate) mod typed_structured_credit;
 // Declared after `typed_structured_credit` so its `sc_wire_methods!` macro is in scope.
@@ -539,6 +540,61 @@ fn validate_typed_instrument_json(type_tag: &str, json: &str) -> PyResult<String
         .map_err(crate::errors::core_to_py)
 }
 
+/// Wrap a bare instrument spec in the canonical envelope after validating it.
+///
+/// Pure delegation to the Rust
+/// ``finstack_quant_valuations::pricer::instrument_envelope_from_spec``. This
+/// is the construction route for every instrument type without a typed Python
+/// class (FRA, deposit, FX spot/swap, inflation swaps, exotics, ...): build the
+/// type's ``spec`` object (see
+/// ``finstack_quant.valuations.schema.instrument_type_schema(type_tag)``) and
+/// pass the returned envelope to ``price_instrument`` or
+/// ``instrument_cashflows``.
+///
+/// Parameters
+/// ----------
+/// type_tag : str
+///     Canonical instrument discriminator, one of
+///     ``finstack_quant.valuations.schema.instrument_types()`` (e.g.
+///     ``"forward_rate_agreement"``, ``"fx_spot"``).
+/// spec : dict | str
+///     The bare ``spec`` object for that type, as a dict or JSON text. Tagged
+///     ``{"type", "spec"}`` payloads and envelopes are rejected.
+///
+/// Returns
+/// -------
+/// str
+///     The compact canonical ``finstack_quant.instrument/1`` envelope.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If ``spec`` is not a bare object, does not deserialize as a
+///     ``type_tag`` instrument (unknown tag, missing or unknown field), or
+///     fails instrument validation.
+///
+/// Examples
+/// --------
+/// >>> import json
+/// >>> from finstack_quant.valuations.instruments import instrument_envelope_from_spec
+/// >>> envelope = json.loads(instrument_envelope_from_spec("fx_spot", {
+/// ...     "id": "EURUSD-SPOT", "base_currency": "EUR", "quote_currency": "USD",
+/// ...     "settlement_date": "2025-01-17", "quoted_spot": 1.2,
+/// ...     "notional": {"amount": "1000000", "currency": "EUR"}, "attributes": {}}))
+/// >>> (envelope["instrument"]["type"], envelope["instrument"]["spec"]["id"])
+/// ('fx_spot', 'EURUSD-SPOT')
+#[pyfunction]
+#[pyo3(text_signature = "(type_tag, spec)")]
+fn instrument_envelope_from_spec(
+    py: Python<'_>,
+    type_tag: &str,
+    spec: &Bound<'_, PyAny>,
+) -> PyResult<String> {
+    let spec = crate::bindings::module_utils::py_to_json_value(py, spec, "spec")?;
+    finstack_quant_valuations::pricer::instrument_envelope_from_spec(type_tag, spec)
+        .map_err(crate::errors::core_to_py)
+}
+
 /// Re-render a canonical instrument envelope as pretty-printed JSON.
 ///
 /// Pure delegation to the Rust
@@ -601,7 +657,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "- market data (DiscountCurve, ForwardCurve, HazardCurve, MarketContext, FxMatrix):\n",
             "  ``finstack_quant.core.market_data``; curve bootstrapping: ``finstack_quant.calibration``\n",
             "- instruments, builders and ``price_instrument``: ``finstack_quant.valuations.instruments``\n",
-            "- results: ``ValuationResult`` here, plus ``instrument_cashflows`` for per-flow tables\n",
+            "- results: ``ValuationResult`` here; per-flow tables via ``instruments.instrument_cashflows``\n",
             "- composites, credit-derivative examples, listed-market catalog, JSON schemas:\n",
             "  ``.composite``, ``.credit_derivatives``, ``.market``, ``.schema``\n\n",
             "The module-level ``*_coupon_profile`` / ``cms_spread_option_intrinsic`` / \n",
@@ -652,6 +708,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
 
     m.add_function(wrap_pyfunction!(validate_instrument_json, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_typed_instrument_json, &m)?)?;
+    m.add_function(wrap_pyfunction!(instrument_envelope_from_spec, &m)?)?;
     m.add_function(wrap_pyfunction!(pretty_instrument_json, &m)?)?;
     m.add_function(wrap_pyfunction!(bond_from_cashflows_json, &m)?)?;
     instruments::register(py, &m)?;
@@ -665,6 +722,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     typed_revolving_credit::register(py, &m)?;
     typed_asset_backed_facility::register(py, &m)?;
     pricing::register(py, &m)?;
+    var::register(&m)?;
     structured_credit::register(&m)?;
     let mut exports = vec![
         "AssetPool",
@@ -702,7 +760,9 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "TrancheBuilder",
         "TrancheStructure",
         "bond_from_cashflows_json",
+        "instrument_cashflows",
         "instrument_cashflows_json",
+        "instrument_envelope_from_spec",
         "list_models",
         "list_models_grouped",
         "list_standard_metrics",
@@ -725,6 +785,7 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend_from_slice(typed_revolving_credit::EXPORTS);
     exports.extend_from_slice(typed_asset_backed_facility::EXPORTS);
     exports.extend_from_slice(pricing::EXPORTS);
+    exports.extend_from_slice(var::EXPORTS);
     exports.sort_unstable();
     exports.dedup();
     let all = PyList::new(py, exports)?;

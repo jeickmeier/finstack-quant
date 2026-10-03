@@ -19989,6 +19989,58 @@ export interface ValidationReport {
   truncated: boolean;
 }
 /**
+ * Historical-simulation portfolio VaR, expected shortfall and P&L distribution.
+ */
+export interface VarResult {
+  /**
+   * Confidence level used
+   */
+  confidence_level: number;
+  /**
+   * Expected Shortfall (CVaR) at specified confidence level.
+   *
+   * Same loss convention as [`Self::var`]. The conditional tail
+   * expectation: the average signed P&L over the worst `(1 - α)` fraction
+   * of the distribution, computed as the mean of the interpolated quantile
+   * function over `[0, 1 - α]`. By construction
+   * `expected_shortfall <= var` (ES lies at or beyond VaR in the loss tail).
+   */
+  expected_shortfall: number;
+  /**
+   * Number of scenarios used in calculation
+   */
+  num_scenarios: number;
+  /**
+   * Full P&L distribution from historical simulation (sorted, worst first)
+   */
+  pnl_distribution: number[];
+  /**
+   * True when the Taylor approximation skipped one or more FX-spot shocks
+   * (no FX-delta Taylor term exists). The FX component of those scenarios
+   * is excluded, so VaR/ES understate FX risk; prefer full revaluation for
+   * FX-exposed portfolios. Always false for full revaluation.
+   */
+  skipped_fx: boolean;
+  /**
+   * True when the Taylor approximation skipped one or more `ImpliedVol`
+   * point shocks for a vol-exposed instrument (only aggregate Vega is
+   * available, not bucketed vol). The vega component of those scenarios is
+   * excluded, so VaR/ES understate vol risk. Always false for full
+   * revaluation.
+   */
+  skipped_vol: boolean;
+  /**
+   * Value-at-Risk at specified confidence level.
+   *
+   * Loss convention (workspace-wide): follows the P&L sign, so losses are
+   * reported as **negative** numbers (zero for all-gain distributions),
+   * matching `analytics::value_at_risk` and the portfolio risk engines.
+   * The signed P&L at the `(1 - α)` quantile of the distribution, computed
+   * by linear interpolation between bracketing order statistics.
+   */
+  var: number;
+}
+/**
  * Market conventions of one cross-currency swap pair.
  */
 export interface XccyConventions {

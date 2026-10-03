@@ -24,17 +24,19 @@ BarrierCrossing = _valuations.instruments.BarrierCrossing
 Bond = _valuations.instruments.Bond
 BondBuilder = _valuations.instruments.BondBuilder
 BorrowingBaseRules = _valuations.instruments.BorrowingBaseRules
-CdsIndex = _valuations.instruments.CdsIndex
-CdsIndexBuilder = _valuations.instruments.CdsIndexBuilder
-CdsIndexConstituent = _valuations.instruments.CdsIndexConstituent
-CdsIndexParams = _valuations.instruments.CdsIndexParams
-CdsTranche = _valuations.instruments.CdsTranche
-CdsTrancheBuilder = _valuations.instruments.CdsTrancheBuilder
-CdsTrancheParams = _valuations.instruments.CdsTrancheParams
 CallAssumption = _valuations.instruments.CallAssumption
 CallPutSchedule = _valuations.instruments.CallPutSchedule
 CapFloor = _valuations.instruments.CapFloor
 CapFloorBuilder = _valuations.instruments.CapFloorBuilder
+CdsIndex = _valuations.instruments.CdsIndex
+CdsIndexBuilder = _valuations.instruments.CdsIndexBuilder
+CdsIndexConstituent = _valuations.instruments.CdsIndexConstituent
+CdsIndexParams = _valuations.instruments.CdsIndexParams
+CdsOption = _valuations.instruments.CdsOption
+CdsOptionBuilder = _valuations.instruments.CdsOptionBuilder
+CdsTranche = _valuations.instruments.CdsTranche
+CdsTrancheBuilder = _valuations.instruments.CdsTrancheBuilder
+CdsTrancheParams = _valuations.instruments.CdsTrancheParams
 ConcentrationLimit = _valuations.instruments.ConcentrationLimit
 ConversionSpec = _valuations.instruments.ConversionSpec
 ConvertibleBond = _valuations.instruments.ConvertibleBond
@@ -55,6 +57,7 @@ FxForwardBuilder = _valuations.instruments.FxForwardBuilder
 FxOption = _valuations.instruments.FxOption
 FxOptionBuilder = _valuations.instruments.FxOptionBuilder
 HedgeSwap = _valuations.instruments.HedgeSwap
+InstrumentCashflowEnvelope = _valuations.instruments.InstrumentCashflowEnvelope
 InterestRateSwap = _valuations.instruments.InterestRateSwap
 InterestRateSwapBuilder = _valuations.instruments.InterestRateSwapBuilder
 LiquidationSpec = _valuations.instruments.LiquidationSpec
@@ -89,9 +92,13 @@ TrancheBuilder = _valuations.instruments.TrancheBuilder
 TrancheCashflows = _valuations.instruments.TrancheCashflows
 TrancheMetrics = _valuations.instruments.TrancheMetrics
 TrancheStructure = _valuations.instruments.TrancheStructure
+VarResult = _valuations.instruments.VarResult
 Waterfall = _valuations.instruments.Waterfall
 bond_from_cashflows_json = _valuations.instruments.bond_from_cashflows_json
+calculate_var_with_pricing = _valuations.instruments.calculate_var_with_pricing
+instrument_cashflows = _valuations.instruments.instrument_cashflows
 instrument_cashflows_json = _valuations.instruments.instrument_cashflows_json
+instrument_envelope_from_spec = _valuations.instruments.instrument_envelope_from_spec
 list_models = _valuations.instruments.list_models
 list_models_grouped = _valuations.instruments.list_models_grouped
 list_standard_metrics = _valuations.instruments.list_standard_metrics
@@ -126,6 +133,8 @@ __all__: list[str] = [
     "CdsIndexBuilder",
     "CdsIndexConstituent",
     "CdsIndexParams",
+    "CdsOption",
+    "CdsOptionBuilder",
     "CdsTranche",
     "CdsTrancheBuilder",
     "CdsTrancheParams",
@@ -149,6 +158,7 @@ __all__: list[str] = [
     "FxOption",
     "FxOptionBuilder",
     "HedgeSwap",
+    "InstrumentCashflowEnvelope",
     "InterestRateSwap",
     "InterestRateSwapBuilder",
     "LiquidationSpec",
@@ -183,9 +193,13 @@ __all__: list[str] = [
     "TrancheCashflows",
     "TrancheMetrics",
     "TrancheStructure",
+    "VarResult",
     "Waterfall",
     "bond_from_cashflows_json",
+    "calculate_var_with_pricing",
+    "instrument_cashflows",
     "instrument_cashflows_json",
+    "instrument_envelope_from_spec",
     "list_models",
     "list_models_grouped",
     "list_standard_metrics",

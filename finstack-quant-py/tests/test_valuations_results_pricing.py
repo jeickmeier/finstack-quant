@@ -14,9 +14,10 @@ from finstack_quant.core.dates import DayCount, StubKind, Tenor
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.core.types import Rate
-from finstack_quant.valuations import ValuationResult, instrument_cashflows
+from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments import (
     Bond,
+    CdsOption,
     CreditDefaultSwap,
     FixedLegSpec,
     FloatLegSpec,
@@ -24,6 +25,10 @@ from finstack_quant.valuations.instruments import (
     MarketHistory,
     MetricPricingOverrides,
     TermLoan,
+    VarResult,
+    calculate_var_with_pricing,
+    instrument_cashflows,
+    instrument_envelope_from_spec,
     metric_metadata,
     price_instrument,
     validate_instrument_json,
@@ -358,11 +363,13 @@ def test_market_history_typed_twin() -> None:
 
 
 def test_instrument_cashflows_accepts_typed_instrument_and_date() -> None:
-    envelope, frame = instrument_cashflows(_bond(), _market(), AS_OF, model="discounting")
-    assert envelope["instrument_id"] == "B1"
+    envelope = instrument_cashflows(_bond(), _market(), AS_OF, "discounting")
+    frame = envelope.to_dataframe()
+    assert envelope.instrument_id == "B1"
     assert isinstance(frame, pd.DataFrame)
     assert len(frame) > 0
-    assert envelope["total_pv"] == pytest.approx(price_instrument(_bond(), _market(), AS_OF).price, abs=0.01)
+    assert pickle.loads(pickle.dumps(envelope)).to_json() == envelope.to_json()  # noqa: S301
+    assert envelope.total_pv == pytest.approx(price_instrument(_bond(), _market(), AS_OF).price, abs=0.01)
 
 
 def test_metric_metadata_describes_canonical_keys() -> None:
@@ -494,3 +501,173 @@ def test_pricing_entry_points_reject_retired_pricing_options_keyword() -> None:
         validate_instrument_json(
             bond.to_json(), pricing_options="{}"
         )  # schema-rejection-test: retired kwarg pricing_options
+
+
+# VALA-006 — multi-instrument historical VaR (calculate_var_with_pricing)
+
+
+def _rate_history() -> MarketHistory:
+    shift = lambda s: [  # noqa: E731
+        {"factor": {"type": "discount_rate", "curve_id": "USD-OIS", "tenor_years": 5.0}, "shift": s}
+    ]
+    return MarketHistory(
+        AS_OF,
+        3,
+        [
+            {"date": "2024-01-12", "shifts": shift(0.0010)},
+            {"date": "2024-01-11", "shifts": shift(-0.0005)},
+            {"date": "2024-01-10", "shifts": shift(0.0020)},
+        ],
+    )
+
+
+def test_calculate_var_single_instrument_matches_hvar_metric() -> None:
+    history = _rate_history()
+    result = calculate_var_with_pricing([_bond()], _market(), history, AS_OF)
+    metric = price_instrument(_bond(), _market(), AS_OF, metrics=["hvar", "expected_shortfall"], market_history=history)
+
+    assert isinstance(result, VarResult)
+    assert result.num_scenarios == 3
+    assert result.confidence_level == 0.95
+    assert result.var < 0.0
+    assert result.var == pytest.approx(metric["hvar"], rel=1e-12, abs=1e-9)
+    assert result.expected_shortfall == pytest.approx(metric["expected_shortfall"], rel=1e-12, abs=1e-9)
+    assert result.pnl_distribution == sorted(result.pnl_distribution)
+
+
+def test_calculate_var_diversifies_offsetting_positions() -> None:
+    shift = lambda s: [  # noqa: E731
+        {"factor": {"type": "discount_rate", "curve_id": "USD-OIS", "tenor_years": 5.0}, "shift": s},
+        {"factor": {"type": "forward_rate", "curve_id": "USD-SOFR-3M", "tenor_years": 5.0}, "shift": s},
+    ]
+    history = MarketHistory(
+        AS_OF,
+        3,
+        [
+            {"date": "2024-01-12", "shifts": shift(0.0010)},
+            {"date": "2024-01-11", "shifts": shift(-0.0005)},
+            {"date": "2024-01-10", "shifts": shift(0.0020)},
+        ],
+    )
+    bond_var = calculate_var_with_pricing([_bond()], _market(), history, AS_OF).var
+    swap_var = calculate_var_with_pricing([_swap()], _market(), history, AS_OF).var
+    # Long bond (loses when rates rise) against a pay-fixed swap (gains).
+    hedged = calculate_var_with_pricing([_bond(), _swap().to_json()], _market(), history, AS_OF)
+
+    assert bond_var < -1.0
+    assert swap_var < -1.0
+    assert hedged.num_scenarios == 3
+    assert abs(hedged.var) < abs(bond_var) + abs(swap_var) - 1.0
+    doubled = calculate_var_with_pricing([_bond(), _bond()], _market(), history, AS_OF)
+    assert doubled.var == pytest.approx(2.0 * bond_var, rel=1e-12)
+
+
+def test_calculate_var_config_model_and_result_round_trip() -> None:
+    history = _rate_history()
+    result = calculate_var_with_pricing(
+        [_bond()],
+        _market(),
+        json.loads(history.to_json()),
+        AS_OF,
+        config={"confidence_level": 0.99, "method": "full_revaluation"},
+        model="discounting",
+    )
+    assert result.confidence_level == 0.99
+    assert VarResult.from_json(result.to_json()) == result
+    assert pickle.loads(pickle.dumps(result)) == result  # noqa: S301
+    frame = result.to_dataframe()
+    assert list(frame.columns) == ["pnl"]
+    assert frame["pnl"].tolist() == result.pnl_distribution
+
+    empty = calculate_var_with_pricing([], _market(), history, AS_OF)
+    assert (empty.var, empty.num_scenarios) == (0.0, 0)
+    with pytest.raises(ValueError, match="strictly between"):
+        calculate_var_with_pricing([_bond()], _market(), history, AS_OF, config={"confidence_level": 1.5})
+    with pytest.raises(ValueError, match="unknown field"):
+        calculate_var_with_pricing([_bond()], _market(), history, AS_OF, config={"confidence": 0.99})
+    with pytest.raises(ValueError, match="no_such_model"):
+        calculate_var_with_pricing([_bond()], _market(), history, AS_OF, model="no_such_model")
+
+
+# VALA-007 — instrument_envelope_from_spec for JSON-only instrument types
+
+
+def test_instrument_envelope_from_spec_wraps_and_validates_bare_spec() -> None:
+    spec = {
+        "id": "EURUSD-SPOT",
+        "base_currency": "EUR",
+        "quote_currency": "USD",
+        "settlement_date": "2025-01-17",
+        "quoted_spot": 1.2,
+        "notional": {"amount": "1000000", "currency": "EUR"},
+        "attributes": {},
+    }
+    envelope = instrument_envelope_from_spec("fx_spot", spec)
+    payload = json.loads(envelope)
+    assert payload["schema"] == "finstack_quant.instrument/1"
+    assert payload["instrument"]["type"] == "fx_spot"
+    assert validate_instrument_json(envelope) == envelope
+    assert instrument_envelope_from_spec("fx_spot", json.dumps(spec)) == envelope
+
+    with pytest.raises(ValueError, match="bare spec"):
+        instrument_envelope_from_spec("fx_spot", {"type": "fx_spot", "spec": spec})
+    with pytest.raises(ValueError, match="unknown_field"):
+        instrument_envelope_from_spec("fx_spot", {**spec, "unknown_field": 1})
+
+
+# VALB-007 — typed CdsOption
+
+
+def test_cds_option_typed_wrapper_round_trips_and_matches_example_json() -> None:
+    from finstack_quant.valuations.credit_derivatives import cds_option_example_json
+
+    option = CdsOption.example()
+    assert option.to_json() == cds_option_example_json()
+    assert CdsOption.from_json(option.to_json()).to_json() == option.to_json()
+    assert pickle.loads(pickle.dumps(option)).to_json() == option.to_json()  # noqa: S301
+    assert option.strike == {"spread": "0.01"}
+    assert (option.option_type, option.settlement, option.exercise_style) == ("call", "cash", "european")
+    assert option.expiry == datetime.date(2025, 6, 20)
+    assert option.notional.amount == 10_000_000.0
+    assert option.coupon_bp is None
+    assert option.underlying_convention == "isda_na"
+    assert option.to_dict()["vol_surface_id"] == "CDSOPT-VOL"
+    assert validate_instrument_json(option.to_json()) == option.to_json()
+
+
+def test_cds_option_builder_sets_every_field_and_validates() -> None:
+    import decimal
+
+    option = (
+        CdsOption
+        .builder()
+        .id("CDXO-1")
+        .strike({"clean_price_pct": "107.0"})
+        .option_type("put")
+        .exercise_style("european")
+        .expiry("2025-06-20")
+        .underlying_maturity(datetime.date(2030, 6, 20))
+        .notional(Money(25_000_000.0, Currency("USD")))
+        .settlement("physical")
+        .recovery_rate(0.3)
+        .discount_curve_id("USD-OIS")
+        .credit_curve_id("CDX-HY-HAZARD")
+        .vol_surface_id("CDX-HY-VOL")
+        .underlying_is_index(True)
+        .index_factor(0.98)
+        .strike_index_factor(1.0)
+        .coupon_bp(decimal.Decimal("500"))
+        .underlying_convention("isda_na")
+        .protection_start_convention("forward")
+        .build()
+    )
+    assert option.strike == {"clean_price_pct": "107.0"}
+    assert option.coupon_bp == decimal.Decimal("500")
+    assert (option.underlying_is_index, option.index_factor, option.strike_index_factor) == (True, 0.98, 1.0)
+    assert option.protection_start_convention == "forward"
+    assert CdsOption.from_json(option.to_json()).to_json() == option.to_json()
+
+    with pytest.raises(ValueError, match="missing required field"):
+        CdsOption.builder().id("X").build()
+    with pytest.raises(ValueError, match="strike"):
+        CdsOption.builder().strike({"strike": "0.01"})

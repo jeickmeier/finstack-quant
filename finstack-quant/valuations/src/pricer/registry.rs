@@ -137,6 +137,32 @@ impl PricingDispatch {
         Self::Registered { model, registry }
     }
 
+    /// Select the dispatch for a host-supplied model key.
+    ///
+    /// This is the model argument of the host `calculate_var_with_pricing`
+    /// entry points: `"default"` keeps each instrument's canonical default
+    /// path, any other key reprices every instrument through that model in the
+    /// shared standard pricer registry.
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - `"default"`, or a canonical model key such as
+    ///   `"discounting"` or `"hazard_rate"` (see [`super::list_models`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Validation` when `model` is not a recognised model key.
+    pub fn from_model(model: &str) -> finstack_quant_core::Result<Self> {
+        if model == "default" {
+            Ok(Self::InstrumentDefault)
+        } else {
+            Ok(Self::registered(
+                super::parse_model_key(model)?,
+                super::shared_standard_registry(),
+            ))
+        }
+    }
+
     /// Return the explicitly selected model, if any.
     #[must_use]
     pub fn model(&self) -> Option<ModelKey> {

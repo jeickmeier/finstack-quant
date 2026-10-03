@@ -7,7 +7,8 @@ Where things live:
   curve bootstrapping and quote ingestion: :mod:`finstack_quant.calibration`.
 - Instruments, builders and :func:`~finstack_quant.valuations.instruments.price_instrument`:
   :mod:`finstack_quant.valuations.instruments`.
-- Results: :class:`ValuationResult` (here) and :func:`instrument_cashflows`.
+- Results: :class:`ValuationResult` (here); per-flow cashflow tables come from
+  :func:`~finstack_quant.valuations.instruments.instrument_cashflows`.
 - Composites, credit-derivative examples, listed-market catalog and JSON
   schemas: ``.composite``, ``.credit_derivatives``, ``.market``, ``.schema``.
 
@@ -47,7 +48,6 @@ __all__ = [
     "inverse_floater_coupon_profile",
     "cms_spread_option_intrinsic",
     "callable_range_accrual_accrued",
-    "instrument_cashflows",
 ]
 
 class ValuationResult:
@@ -668,94 +668,6 @@ class ValuationResult:
             ``ValuationResult(id=..., price=..., currency=..., metrics=...)`` text.
         """
         ...
-
-def instrument_cashflows(
-    instrument: Any,
-    market: MarketContext | str,
-    as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-    *,
-    model: str,
-) -> tuple[dict[str, Any], pd.DataFrame]:
-    """
-    DataFrame-friendly wrapper around :func:`instrument_cashflows_json`.
-
-    Parses the JSON envelope returned by the low-level binding and constructs
-    a per-flow ``pandas.DataFrame`` with ``date`` / ``reset_date`` parsed as
-    ``datetime64``. See :func:`instrument_cashflows_json` for argument and
-    error semantics. Hazard-rate export rejects bonds with call, put, or
-    return-floor rights because static rows cannot represent their
-    exercise-contingent value.
-
-    Parameters
-    ----------
-    instrument : Bond | TermLoan | InterestRateSwap | ... | str
-        Typed instrument instance or a canonical
-        ``finstack_quant.instrument/1`` JSON envelope.
-    market : MarketContext or str
-        Market context object or canonical market JSON containing the curves,
-        fixings, and scalar data required by the requested pricing model.
-    as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-        Valuation date used to exclude settled flows and calculate
-        schedule-relative discount factors.
-    model : str
-        Must be ``"discounting"`` or ``"hazard_rate"``. ``"default"`` is
-        not accepted on cashflow export.
-
-    Returns
-    -------
-    tuple[dict[str, Any], pd.DataFrame]
-        ``(envelope, df)`` where ``envelope`` is the parsed dict and ``df``
-        carries one row per flow with columns ``date``, ``amount``,
-        ``currency``, ``kind``, ``accrual_factor``, ``year_fraction``,
-        ``rate``, ``reset_date``, ``discount_factor``, ``discount_curve_id``,
-        ``survival_probability``, ``conditional_default_prob``, ``inflation_index_ratio``,
-        ``prepayment_smm``, ``beginning_balance``, ``ending_balance``, and
-        ``pv``.
-
-    Raises
-    ------
-    TypeError
-        If ``instrument`` is neither a supported typed instrument nor
-        a JSON string, or ``market`` is neither a ``MarketContext`` nor a
-        JSON string.
-    ValueError
-        If instrument or market JSON is malformed, ``as_of`` or ``model``
-        is invalid, the instrument/model pair is unsupported, a hazard-rate
-        bond contains embedded exercise rights, or the generated cashflow
-        schedule fails validation.
-    KeyError
-        If a curve, fixing, or other market datum required for cashflow
-        generation or pricing is missing.
-    RuntimeError
-        If native pricing reports an internal, calibration, or solver failure.
-
-    Examples
-    --------
-    >>> import datetime
-    >>> from finstack_quant.core.currency import Currency
-    >>> from finstack_quant.core.dates import StubKind
-    >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
-    >>> from finstack_quant.core.money import Money
-    >>> from finstack_quant.core.types import Rate
-    >>> from finstack_quant.valuations.instruments import Bond
-    >>> as_of = datetime.date(2024, 1, 1)
-    >>> bond = Bond.fixed(
-    ...     "B",
-    ...     Money(1000.0, Currency("USD")),
-    ...     Rate(0.05),
-    ...     as_of,
-    ...     datetime.date(2026, 1, 1),
-    ...     StubKind.NONE,
-    ...     "USD-OIS",
-    ... )
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
-    >>> from finstack_quant.valuations import instrument_cashflows
-    >>> header, frame = instrument_cashflows(bond, market, as_of, model="discounting")
-    >>> (header["instrument_id"], len(frame))
-    ('B', 6)
-
-    """
-    ...
 
 def tarn_coupon_profile(
     fixed_rate: float,

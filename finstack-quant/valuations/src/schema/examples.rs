@@ -54,6 +54,14 @@ pub(super) fn instrument_cashflow() -> Result<Vec<Value>> {
     }))
 }
 
+/// 95% historical VaR over a five-scenario P&L distribution.
+pub(super) fn var_result() -> Result<Vec<Value>> {
+    example(&crate::metrics::risk::VarResult::from_distribution(
+        vec![-12_500.0, -4_200.0, 1_800.0, 3_100.0, 6_400.0],
+        0.95,
+    )?)
+}
+
 /// The canonical composite with one rebalancing trade.
 pub(super) fn composite_rebalance_result() -> Result<Vec<Value>> {
     example(&crate::instruments::CompositeRebalanceResult {

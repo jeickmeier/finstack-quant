@@ -5102,6 +5102,8 @@
       "CapFloorBuilder",
       "CdsIndex",
       "CdsIndexBuilder",
+      "CdsOption",
+      "CdsOptionBuilder",
       "CdsTranche",
       "CdsTrancheBuilder",
       "ConvertibleBond",
@@ -5134,6 +5136,7 @@
       "barrierCrossingBrownianBridge",
       "barrierCrossingDiscrete",
       "bondFromCashflowsJson",
+      "calculateVarWithPricing",
       "cdsIndexParamsCdxNaHy",
       "cdsIndexParamsCdxNaIg",
       "cdsIndexParamsItraxxEurope",
@@ -5145,6 +5148,7 @@
       "instrumentCashflowsJson",
       "instrumentCashflowsWithMarket",
       "instrumentCashflowsWithMarketJson",
+      "instrumentEnvelopeFromSpec",
       "listModels",
       "listModelsGrouped",
       "listStandardMetrics",
@@ -5374,6 +5378,9 @@
   "valuations.instruments.instrumentCashflowsWithMarket": {
     "kind": "function"
   },
+  "valuations.instruments.calculateVarWithPricing": {
+    "kind": "function"
+  },
   "valuations.instruments.listModels": {
     "kind": "function"
   },
@@ -5578,6 +5585,38 @@
       "startDate",
       "stub",
       "upfront"
+    ]
+  },
+  "valuations.instruments.CdsOption": {
+    "kind": "class",
+    "statics": ["builder", "example", "fromJson"],
+    "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
+    "getters": [
+      "attributes",
+      "couponBp",
+      "creditCurveId",
+      "defaultModel",
+      "discountCurveId",
+      "exerciseSettlementDate",
+      "exerciseStyle",
+      "expiry",
+      "id",
+      "indexFactor",
+      "knockout",
+      "notional",
+      "optionType",
+      "premiumSettlementDate",
+      "protectionStartConvention",
+      "realizedLoss",
+      "recoveryRate",
+      "settlement",
+      "strike",
+      "strikeIndexFactor",
+      "underlyingConvention",
+      "underlyingIsIndex",
+      "underlyingMaturity",
+      "underlyingStartDate",
+      "volSurfaceId"
     ]
   },
   "valuations.instruments.ConvertibleBond": {
@@ -5981,6 +6020,39 @@
     ],
     "getters": []
   },
+  "valuations.instruments.CdsOptionBuilder": {
+    "kind": "class",
+    "statics": [],
+    "methods": [
+      "attributes",
+      "build",
+      "couponBp",
+      "creditCurveId",
+      "discountCurveId",
+      "exerciseSettlementDate",
+      "exerciseStyle",
+      "expiry",
+      "free",
+      "id",
+      "indexFactor",
+      "knockout",
+      "notional",
+      "optionType",
+      "premiumSettlementDate",
+      "protectionStartConvention",
+      "realizedLoss",
+      "recoveryRate",
+      "settlement",
+      "strike",
+      "strikeIndexFactor",
+      "underlyingConvention",
+      "underlyingIsIndex",
+      "underlyingMaturity",
+      "underlyingStartDate",
+      "volSurfaceId"
+    ],
+    "getters": []
+  },
   "valuations.instruments.ConvertibleBondBuilder": {
     "kind": "class",
     "statics": [],
@@ -6230,6 +6302,9 @@
     "kind": "function"
   },
   "valuations.instruments.validateTypedInstrumentJson": {
+    "kind": "function"
+  },
+  "valuations.instruments.instrumentEnvelopeFromSpec": {
     "kind": "function"
   },
   "valuations.instruments.prettyInstrumentJson": {
