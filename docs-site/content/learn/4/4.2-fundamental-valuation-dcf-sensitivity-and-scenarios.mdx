@@ -282,7 +282,7 @@ Divide the undiscounted Gordon terminal value by the final annualized EBITDA met
 ```python exec id=equivalent-terminal-multiple role=exercise
 exit_ebitda = sum(valuation_results.get("ebitda", p) for p in PERIODS[4:])
 equivalent_multiple = terminal_undiscounted / exit_ebitda
-exit_value = evaluate_dcf(valuation_model,cost_of_capital,TerminalValueSpec.exit_multiple(equivalent_multiple),
+exit_value = evaluate_dcf(valuation_model,cost_of_capital,TerminalValueSpec.exit_multiple(equivalent_multiple, 0.0),
                          ufcf_node="ufcf_usd",options={"exit_multiple_metric_node":"ebitda_usd"})
 print(f"Equivalent exit EV / trailing-year EBITDA={equivalent_multiple:.6f}x")
 print(f"Gordon EV={base_dcf.enterprise_value.amount:,.2f}; exit-multiple EV={exit_value.enterprise_value.amount:,.2f}")

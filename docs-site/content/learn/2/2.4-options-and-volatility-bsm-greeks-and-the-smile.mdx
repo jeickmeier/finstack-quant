@@ -130,7 +130,7 @@ print({'options_stage_added': sorted(set(option_inputs) - rates_ids),
        'option_terms': {key: option_terms[key] for key in
                         ['id', 'underlying_ticker', 'strike', 'option_type', 'expiry',
                          'discount_curve_id', 'spot_id', 'vol_surface_id', 'div_yield_id']},
-       'contract_units': option_terms['notional']})
+       'contract_units': (option_terms['quantity'], option_terms['currency'])})
 option = EquityOption.from_json(json.dumps(option_wire))
 priced = price_instrument(option, market, AS_OF, metrics=['delta', 'gamma', 'vega', 'theta'])
 expiry = (option.expiry - AS_OF).days / 365.0
@@ -247,14 +247,13 @@ The builder exposes the 100-unit multiplier, spot, dividend, discount and volati
 ```python exec id=equity-typed-builder role=build
 from datetime import date
 import json
-from finstack_quant.core.money import Money
 from finstack_quant.valuations.instruments import EquityOption,price_instrument
 from finstack_quant.models.volatility import get_surface_vol
 from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
 market=build_market('options');raw=instruments('options')['SPX-CALL']['instrument']['spec']
 option=(EquityOption.builder().id('TYPED-SPX-CALL').underlying_ticker('SPX').strike(5200).option_type('call')
- .expiry(raw['expiry']).notional(Money(100,'USD')).discount_curve_id('USD-OIS').spot_id('SPX-SPOT')
+ .expiry(raw['expiry']).quantity(100.0).currency('USD').discount_curve_id('USD-OIS').spot_id('SPX-SPOT')
  .div_yield_id('SPX-DIV').vol_surface_id('SPX-VOL').build())
 r=price_instrument(option,market,AS_OF,metrics=['delta','gamma','vega','theta'])
 original=price_instrument(json.dumps(instruments('options')['SPX-CALL']),market,AS_OF)
@@ -390,7 +389,7 @@ forward=100.;strikes=[80.,90.,100.,110.,120.];expiry=1.
 quotes=SabrSmile(SabrParameters(.2,1.,.3,-.2),forward,expiry).generate_smile(strikes)
 fits=[]
 for beta in (.5,1.):
- fitted=SabrCalibrator().calibrate(forward,strikes,quotes,expiry,beta)
+ fitted=SabrCalibrator().with_tolerance(.002 / max(quotes)).calibrate(forward,strikes,quotes,expiry,beta)
  values=SabrSmile(fitted,forward,expiry).generate_smile(strikes)
  error=max(abs(a-b) for a,b in zip(quotes,values))
  fits.append({'beta':beta,'alpha':fitted.alpha,'rho':fitted.rho,'nu':fitted.nu,'max_vol_error':error})

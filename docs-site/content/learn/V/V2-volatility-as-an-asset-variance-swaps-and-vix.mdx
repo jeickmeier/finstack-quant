@@ -183,12 +183,18 @@ seasoned["instrument"]["spec"]["instrument_pricing_overrides"]={"market_quotes":
 seasoned_result=price_instrument(json.dumps(seasoned),seasoned_market,seasoned_date,model="discounting",
     metrics=["variance_expected","variance_realized","variance_vega","vega","variance_strike_vol"])
 elapsed=(seasoned_date-AS_OF).days/365;remaining=1-elapsed
-accrued=float(np.square(np.diff(np.log([value for _,value in closes]))).sum())
-blended=accrued+remaining*.20**2
+# Settlement counts N daily returns on the weekday schedule and pays 252/N * sum(r^2).
+maturity=AS_OF+timedelta(days=365)
+schedule=[AS_OF+timedelta(days=i) for i in range((maturity-AS_OF).days+1) if (AS_OF+timedelta(days=i)).weekday()<5]
+total_returns=len(schedule)-1
+observed_returns=sum(day<=seasoned_date for day in schedule)-1
+observed_fraction=observed_returns/total_returns
+accrued=252/total_returns*float(np.square(np.diff(np.log([value for _,value in closes]))).sum())
+blended=accrued+(1-observed_fraction)*.20**2
 remaining_df=seasoned_market.get_discount("USD-OIS").df(remaining)
-print(pd.Series({"elapsed_fraction":elapsed,"accrued_variance_contribution":accrued,
-    "future_variance_contribution":remaining*.04,"blended_variance":blended,"pv_usd":seasoned_result.value.amount,
-    **seasoned_result.metrics}))
+print(pd.Series({"elapsed_fraction":elapsed,"observed_return_fraction":observed_fraction,
+    "accrued_variance_contribution":accrued,"future_variance_contribution":(1-observed_fraction)*.04,
+    "blended_variance":blended,"pv_usd":seasoned_result.value.amount,**seasoned_result.metrics}))
 ```
 {/* /notebook-block */}
 

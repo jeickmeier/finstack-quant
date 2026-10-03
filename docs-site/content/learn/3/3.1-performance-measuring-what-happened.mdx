@@ -147,19 +147,19 @@ for when in timeline:
 investor_flows.append({"date": end_date.isoformat(), "amount": nav})
 years = (date.fromisoformat(history[-1]["end"]) - date.fromisoformat(history[0]["start"])).days / 365.0
 linked = json.loads(twrr_linked_json(json.dumps(returns), years))
-xirr = mwr_xirr(json.dumps(investor_flows))
-anchor = date.fromisoformat(investor_flows[0]["date"])
-npv = sum(
-    flow["amount"] / (1 + xirr) ** ((date.fromisoformat(flow["date"]) - anchor).days / 365.0)
-    for flow in investor_flows
-)
-# Native XIRR normalizes cash amounts before applying its 1e-8 tolerance.
+# Keep the actual deposits and withdrawals: their sign pattern is nonconventional.
+xirr_error = None
+try:
+    mwr_xirr(json.dumps(investor_flows))
+except ValueError as error:
+    xirr_error = str(error)
+print("Expected XIRR validation error:", xirr_error)
 print("Dated native valuations and settled USD cash")
 print(pd.DataFrame(nav_rows).to_string(index=False))
 print("Valuations immediately around each external flow")
 print(pd.DataFrame(flow_rows).to_string(index=False))
 print(pd.DataFrame({"period_end": history_dates[1:], "linked_subperiod_return": returns, "modified_dietz": dietz_returns}).to_string(index=False))
-print({"linked_return": linked["cumulative"], "annualized_xirr": xirr, "normalized_xirr_npv_residual": npv / max(abs(flow["amount"]) for flow in investor_flows)})
+print({"linked_return": linked["cumulative"], "xirr_status": "rejected nonconventional investor cashflows"})
 
 ```
 {/* /notebook-block */}

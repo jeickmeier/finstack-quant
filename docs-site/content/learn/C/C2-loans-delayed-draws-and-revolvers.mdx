@@ -122,7 +122,7 @@ print(pd.DataFrame(mc_rows))
 ```python exec id=c2-loan-economics role=build
 from _shared.analyst_book import instruments as common_instruments
 from finstack_quant.valuations.instruments import validate_instrument_json
-from finstack_quant.valuations import instrument_cashflows
+from finstack_quant.valuations.instruments import instrument_cashflows
 loan=common_instruments("common")["BORROWER-TL"]
 l=loan["instrument"]["spec"]
 l.update({"id":"C2-FLOORED-LOAN","settlement_days":2,"upfront_fee":{"amount":{"amount":"20000","currency":"USD"}},
@@ -155,7 +155,8 @@ penalty["instrument"]["spec"]["covenants"]={"margin_steps":[{"date":"2025-07-15"
     "cash_sweeps":[],"draw_stop_dates":[]}
 event_rows=[]
 for name,payload in [("contract",contract),("penalty_and_toggle",penalty)]:
-    env,flows=instrument_cashflows(json.dumps(payload),credit_market,AS_OF,model="discounting")
+    env=instrument_cashflows(json.dumps(payload),credit_market,AS_OF,"discounting")
+    flows=env.to_dataframe()
     print(name,flows[["date","kind","amount"]].head(10))
     dated_payload=deepcopy(payload)
     if name=="penalty_and_toggle":

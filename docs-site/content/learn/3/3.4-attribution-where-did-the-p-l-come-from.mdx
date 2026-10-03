@@ -88,7 +88,7 @@ for start, end in zip(history_dates[:-1], history_dates[1:], strict=True):
                'portfolio_return': returns_by_id[iid], 'benchmark_return': returns_by_id[iid]} for iid in ids]
     bf = brinson_fachler(json.dumps(period))
     pnl = sum(ending.values()) + sum(receipts.values()) - total_begin
-    brinson_periods.append(period)
+    brinson_periods.append(json.loads(bf.to_json()))
     p_snap, b_snap = [], []
     for iid in ids:
         risk = price_instrument(json.dumps(instruments('base')[iid]), start_market, start, metrics=['ytm','duration_mod','z_spread'])
@@ -196,7 +196,7 @@ clean=campisi_periods[0]
 corrupt=dict(clean);corrupt["total_active_carry"]+=.001
 income_row=next(row for row in rows if row["receipts_usd"]>0)
 missing_income=income_row["receipts_usd"]/income_row["opening_usd"]
-naive=sum(brinson_fachler(json.dumps(period)).total_excess_return for period in brinson_periods)
+naive=sum(period["total_excess_return"] for period in brinson_periods)
 print({"omitted_coupon_error_return":missing_income,"naive_active_sum":naive,"Carino_linked_active":active,"linking_difference":active-naive})
 ```
 {/* /notebook-block */}

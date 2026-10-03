@@ -159,7 +159,7 @@ from finstack_quant.reporting.charts import line_chart,waterfall_chart
 from finstack_quant.models.factor.risk import parametric_var_decomposition,parametric_es_decomposition
 from _shared.analyst_liquidity import position_factor_panel
 perf_report=performance_tearsheet(perf_source["book_performance"],sections=["summary","stats","cumulative","drawdown"],title="Account performance: January 15-October 15, 2025",subtitle="Three observed periods; base holdings before the report-date loan purchase",generated=report_date)
-# Replace the convenience function's static numeric-mode label with verified provenance.
+# Add verified provenance: Performance carries no numeric-mode stamp, so the helper prints none.
 perf_report.meta_lines=["Native analytical returns (f64); display formatting only", "Three quarterly observations; zero risk-free rate"]
 perf_report.save("performance-report.html")
 # The convenience report is composed entirely of the public primitives.
@@ -212,8 +212,11 @@ from finstack_quant.reporting.tables import data_table
 
 qualified_dv01={k:v["total"] for k,v in report_risk.aggregated.items() if k.startswith("bucketed_dv01::USD-OIS::")}
 qualified_cs01={k:v["total"] for k,v in report_risk.aggregated.items() if k.startswith("cs01::")}
-kpi_values={"NAV USD":float(report_nav),"Linked TWR Jan-Oct":perf_source["linked"]["cumulative"],"Annualized investor XIRR":perf_source["xirr"],"USD-OIS bucketed DV01 sum USD/bp":sum(qualified_dv01.values()),"ACME-HZD CS01 USD/bp":qualified_cs01["cs01::ACME-HZD"],"USD-OIS +100 bp P&L USD":float(stress_pnl)}
-kpis=[KPI(k,f"{v:.2%}" if "TWR" in k or "XIRR" in k else f"{v:,.2f}") for k,v in kpi_values.items()]
+# The source history has a withdrawal followed by a subscription, so `mwr_xirr` rejects it
+# (more than one sign change). Report the flow-weighted Modified Dietz return instead.
+linked_dietz=float(np.prod([1.0+value for value in perf_source["dietz_returns"]])-1.0)
+kpi_values={"NAV USD":float(report_nav),"Linked TWR Jan-Oct":perf_source["linked"]["cumulative"],"Linked Modified Dietz Jan-Oct":linked_dietz,"USD-OIS bucketed DV01 sum USD/bp":sum(qualified_dv01.values()),"ACME-HZD CS01 USD/bp":qualified_cs01["cs01::ACME-HZD"],"USD-OIS +100 bp P&L USD":float(stress_pnl)}
+kpis=[KPI(k,f"{v:.2%}" if "TWR" in k or "Dietz" in k else f"{v:,.2f}") for k,v in kpi_values.items()]
 reconciliation=pd.DataFrame([{"component":"Native current positions","USD":native_total},{"component":"Settled USD cash after loan acquisition","USD":settled_cash},{"component":"Account NAV","USD":report_nav}])
 stress_row=pd.DataFrame([{"scenario":"USD-OIS zeros +100 bp","PnL_USD":stress_pnl,"NAV_change":stress_pnl/report_nav,"assumptions":"Immediate; fixed credit hazard and other inputs; cash unchanged"}])
 # Preserve Decimal values for reconciliation; round only the HTML display.
@@ -259,7 +262,7 @@ pm_report=TearSheet(INSTITUTIONAL,"PM decision brief",[
  Section("Decision and conditions",pm_brief_css+"<p>Maintain the current allocation pending review of the private loan's covenant breach and unobservable exit capacity. Use the qualified USD-OIS sensitivity to size a rates hedge; assess credit separately.</p>"),
  Section("Account reconciliation",reconciliation_html),
  Section("Stress the PM can act on",stress_html,subtitle=stress_row.assumptions.iloc[0]),
- Section("What these numbers mean","<p>TWR removes external-flow timing; XIRR measures the investor's dated cash experience. The loan was bought at today's native PV using settled cash, so historical returns precede that acquisition. Risk KPIs cover the named curve and hazard only, not every factor. Three observed return periods cannot establish skill. Synthetic liquidity is not an executable quote.</p>"),
+ Section("What these numbers mean","<p>TWR removes external-flow timing; Modified Dietz weights each external flow by the share of its quarter remaining, so it keeps the investor's flow timing. XIRR is not reported: the withdrawal followed by a subscription gives the investor cashflows more than one sign change, outside the solver's single-root contract. The loan was bought at today's native PV using settled cash, so historical returns precede that acquisition. Risk KPIs cover the named curve and hazard only, not every factor. Three observed return periods cannot establish skill. Synthetic liquidity is not an executable quote.</p>"),
 ],kpis=kpis,generated=report_date,subtitle="Common-book account after deposit maturities; synthetic teaching case",meta_lines=["As of "+str(report_date),"Amounts in USD; qualified sensitivities retain their sign"],footer_left="Source pack: holdings, provenance, performance, attribution, proxy risk and stress")
 pm_report.save("one-page-pm-report.html")
 Path("one-page-kpis.json").write_text(json.dumps(kpi_values,indent=2))

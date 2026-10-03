@@ -182,7 +182,7 @@ floor = json.loads(cap.to_json())
 floor['instrument']['spec']['rate_option_type'] = 'floor'
 floor_result = price_instrument(json.dumps(floor), parity_market, AS_OF, model='black76')
 swap = instruments('rates')['USD-PAYER-IRS']
-for leg in ('fixed', 'float'):
+for leg in ('fixed_leg', 'float_leg'):
     swap['instrument']['spec'][leg]['end'] = '2026-04-15'
     swap['instrument']['spec'][leg]['frequency'] = {'count': 3, 'unit': 'months'}
     swap['instrument']['spec'][leg]['day_count'] = 'act_360'
@@ -292,7 +292,7 @@ floor = json.loads(cap.to_json())
 floor['instrument']['spec']['rate_option_type'] = 'floor'
 floor_result = price_instrument(json.dumps(floor), parity_market, AS_OF, model='black76')
 swap = instruments('rates')['USD-PAYER-IRS']
-for leg in ('fixed', 'float'):
+for leg in ('fixed_leg', 'float_leg'):
     swap['instrument']['spec'][leg]['end'] = '2026-04-15'
     swap['instrument']['spec'][leg]['frequency'] = {'count': 3, 'unit': 'months'}
     swap['instrument']['spec'][leg]['day_count'] = 'act_360'

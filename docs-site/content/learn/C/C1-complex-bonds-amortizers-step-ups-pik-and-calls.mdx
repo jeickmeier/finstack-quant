@@ -115,11 +115,12 @@ Remove issuer exercise only in the contractual twin used to inspect scheduled pa
 
 {/* notebook-block notebook="02_pricing/instruments/complex_cashflows.ipynb" cell="pik-cash-ladder" role="build" */}
 ```python exec id=pik-cash-ladder role=build
-from finstack_quant.valuations import instrument_cashflows
+from finstack_quant.valuations.instruments import instrument_cashflows
 contractual=deepcopy(complex_payload)
 contractual["instrument"]["spec"]["call_put"]=None
 contractual["instrument"]["spec"]["id"]="PIK-CONTRACTUAL-TWIN"
-flow_envelope,flows=instrument_cashflows(json.dumps(contractual),credit_market,AS_OF,model="discounting")
+flow_envelope=instrument_cashflows(json.dumps(contractual),credit_market,AS_OF,"discounting")
+flows=flow_envelope.to_dataframe()
 coupons=flows.loc[flows["kind"]=="fixed"].copy()
 first_cash=1_000_000*.06*.25
 first_pik=1_000_000*.02*.25

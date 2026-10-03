@@ -275,7 +275,7 @@ Two explicit forward identifiers preserve the two delivery contracts even though
 ```python exec id=v3-exercise-calendar role=exercise
 calendar=deepcopy(inputs["WTI-BRENT-SPREAD"]);s=calendar["instrument"]["spec"]
 s.update(id="NG-CALENDAR",expiry="2025-06-15",leg1_forward_curve_id="NG-JUL25",leg2_forward_curve_id="NG-JAN26",
-    leg1_vol_surface_id="NG-VOL",leg2_vol_surface_id="NG-VOL",strike=0.,notional=10_000.,correlation=.90)
+    leg1_vol_surface_id="NG-VOL",leg2_vol_surface_id="NG-VOL",strike=0.,quantity=10_000.,correlation=.90)
 front_t=(date(2025,7,15)-AS_OF).days/365;back_t=(date(2026,1,15)-AS_OF).days/365
 ng=market.get_price_curve("NG-FORWARD");front,back=ng.price(front_t),ng.price(back_t)
 calendar_rows=[]

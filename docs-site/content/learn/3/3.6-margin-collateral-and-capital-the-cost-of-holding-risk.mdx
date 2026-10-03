@@ -134,7 +134,7 @@ capital = FrtbSbaEngine().calculate(frtb)
 one_bucket = SimmSensitivities("USD")
 one_bucket.add_ir_delta("USD", "5Y", 1000.0)
 one_result = SimmCalculator("v2_6").calculate_from_sensitivities(one_bucket, "USD", AS_OF)
-manual = abs(1000.0 * 51.0)  # Embedded SIMM v2.6: 5Y weight 51bp, 2023 vintage.
+manual = abs(1000.0 * 60.0)  # ISDA SIMM v2.6 D.1 p14: regular-currency 5Y weight 60bp.
 invalid_bucket_error = None
 try:
     invalid = SimmSensitivities("USD")
@@ -234,8 +234,8 @@ schedule_rows=[{**terms,"maturity_years":(date.fromisoformat(terms["end"])-AS_OF
 
 for row in schedule_rows:row["gross_schedule_im_usd"]=schedule.calculate_for_notional(row["notional_usd"],"USD",row["asset_class"],row["maturity_years"],AS_OF).amount
 gross_schedule=sum(r["gross_schedule_im_usd"] for r in schedule_rows)
-# Apply one NGR to the trade-specific gross amounts.
-# The credit example below explicitly elects a BBB supervisory category.
+# Apply the same netting-set NGR once to the trade-specific gross amounts.
+# The credit trade below elects a BBB supervisory category for this example.
 schedule_net=gross_schedule*(.4+.6*ngr)
 print(pd.DataFrame(schedule_rows).to_string(index=False))
 print({"net_mtm_usd":net_mtm,"NGR":ngr,"schedule_net_usd":schedule_net,"SIMM_net_usd":netting_im.amount})
@@ -251,7 +251,7 @@ for row in full_mapping[full_mapping.framework=="FRTB"].itertuples():capital_sen
 for row in full_mapping[(full_mapping.framework=="SIMM") & (full_mapping.factor=="ACME-HZD par CDS")].itertuples():capital_sens.add_csr_nonsec_delta("ACME",16,row.tenor,"cds",100*row.amount)
 capital_result=FrtbSbaEngine().calculate(capital_sens)
 print("FRTB BCBSd457 embedded parameter vintage; two-trade delta-only charge:",capital_result.total,capital_result.binding_scenario)
-trades=[margin_api.SaCcrTrade(trade_id=terms["position"],asset_class=terms["asset_class"],notional=terms["notional_usd"],start_date=terms["start"],end_date=terms["end"],underlier="USD" if terms["asset_class"]=="interest_rate" else "ACME",hedging_set="USD-IRS" if terms["asset_class"]=="interest_rate" else "ACME",direction=1.,supervisory_delta=1.,mtm=swap_pv if terms["asset_class"]=="interest_rate" else cds_base,supervisory_category=None if terms["asset_class"]=="interest_rate" else "credit_bbb") for terms in trade_terms]
+trades=[margin_api.SaCcrTrade(trade_id=terms["position"],asset_class=terms["asset_class"],notional=terms["notional_usd"],start_date=terms["start"],end_date=terms["end"],underlier="USD" if terms["asset_class"]=="interest_rate" else "ACME",hedging_set="USD-IRS" if terms["asset_class"]=="interest_rate" else "ACME",direction=1.,supervisory_delta=1.,mtm=swap_pv if terms["asset_class"]=="interest_rate" else cds_base,is_option=False,supervisory_category=None if terms["asset_class"]=="interest_rate" else "credit_bbb") for terms in trade_terms]
 
 config=margin_api.SaCcrNettingSetConfig.unmargined(margin_api.NettingSetId.bilateral("ACME-DEALER","CSA-ANALYST"),collateral=0.,as_of=AS_OF)
 ead=margin_api.SaCcrEngine().calculate_ead(config,trades)

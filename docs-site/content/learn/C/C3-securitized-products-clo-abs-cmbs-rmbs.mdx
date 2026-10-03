@@ -161,12 +161,11 @@ fee_deal=deepcopy(deal)
 fee_deal["instrument"]["spec"]["fees"]={"trustee_fee":{"amount":"50000","currency":"USD"},
     "senior_mgmt_fee_bp":40.,"subordinated_mgmt_fee_bp":20.,"servicing_fee_bp":0.,
     "master_servicer_fee_bp":None,"special_servicer_fee_bp":None}
-reinvest=deepcopy(fee_deal);reinvest["instrument"]["spec"]["reinvestment_end_date"]="2027-01-15"
+reinvest=deepcopy(fee_deal)
 reinvest["instrument"]["spec"]["pool"]["reinvestment_period"]={"end":"2027-01-15","is_active":True,
-    "criteria":{"max_price_pct":100.,"min_yield":0.,"maintain_credit_quality":True,"maintain_wal":True,"apply_eligibility_criteria":True}}
+    "criteria":{"max_price_pct":100.,"min_yield":0.}}
 for payload in [fee_deal,reinvest]:
     payload["instrument"]["spec"]["prepayment_spec"]={"cpr":.15,"curve":None}
-    payload["instrument"]["spec"]["default_assumptions"]["base_cpr_annual"]=.15
 fee_rows=[]
 for name,payload in [("fees_no_reinvestment",fee_deal),("fees_reinvest_2y",reinvest)]:
     for tranche in ["AAA","BBB","EQUITY"]:
@@ -203,7 +202,7 @@ loss_oc_rows=[]
 for cdr in [0.,.08]:
     for trigger in [None,1.249]:
         payload=tracks.clo_deal(oc_trigger=trigger);s=payload["instrument"]["spec"]
-        s["default_spec"]={"cdr":cdr};s["default_assumptions"]["base_cdr_annual"]=cdr
+        s["default_spec"]={"cdr":cdr}
         for tranche in ["AAA","BBB"]:
             out=structured_credit_tranche_metrics(json.dumps(payload),tranche,market,AS_OF)
             loss_oc_rows.append({"CDR":cdr,"OC_trigger":trigger,"tranche":tranche,"PV":out.pv,"WAL":out.wal})
@@ -336,7 +335,6 @@ enhancement_rows=[]
 for name,payload in [("original_5m_equity",deal),("10m_equity_funded",subordinated),("5m_spread_account_target",spread_enhanced)]:
     for cdr in [0.,.05]:
         x=deepcopy(payload);z=x["instrument"]["spec"];z["default_spec"]={"cdr":cdr}
-        z["default_assumptions"]["base_cdr_annual"]=cdr
         out=structured_credit_tranche_metrics(json.dumps(x),"BBB",market,AS_OF)
         enhancement_rows.append({"enhancement":name,"CDR":cdr,"BBB_PV":out.pv,"BBB_WAL":out.wal})
 print(pd.DataFrame(enhancement_rows))

@@ -124,7 +124,7 @@ cds_terms = cds['instrument']['spec']
 print({'base_stage_added': sorted(set(base_inputs) - option_ids),
        'cds_terms': {'id': cds_terms['id'], 'currency': cds_terms['notional']['currency'],
                      'notional': cds_terms['notional']['amount'],
-                     'spread_bp': cds_terms['premium_leg']['coupon_bp'],
+                     'coupon_bp': cds_terms['premium_leg']['coupon_bp'],
                      'discount_curve': cds_terms['premium_leg']['discount_curve_id'],
                      'credit_curve': cds_terms['protection_leg']['credit_curve_id']}})
 priced = price_instrument(CreditDefaultSwap.from_json(json.dumps(cds)), market, AS_OF,

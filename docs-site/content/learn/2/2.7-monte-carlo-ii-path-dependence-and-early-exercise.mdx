@@ -170,6 +170,7 @@ for spot in spot_grid:
     estimate=pricer.price_american_put_unbiased(float(spot),100.,.05,0.,.30,1.,pricing_seed=1017)
     european=bs_price(float(spot),100.,.05,0.,.30,1.,False)
     intrinsic=max(100.-float(spot),0.)
+    # Zero sampling error occurs only when the trained policy exercises at time zero.
     price_rows.append((spot,estimate.mean.amount,estimate.stderr,european,intrinsic))
 price_grid=np.asarray(price_rows)
 fig,ax=plt.subplots(figsize=(9,5.2))

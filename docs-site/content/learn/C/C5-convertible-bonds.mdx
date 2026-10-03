@@ -97,7 +97,7 @@ The straight bond uses the same debt cashflows, risk-free curve and issuer hazar
 {/* notebook-block notebook="02_pricing/instruments/convertible_bonds.ipynb" cell="convertible-floor-proof" role="build" */}
 ```python exec id=convertible-floor-proof role=build
 from _shared.instrument_fixtures import fixed_bond,instrument_envelope
-from finstack_quant.valuations import instrument_cashflows
+from finstack_quant.valuations.instruments import instrument_cashflows
 _,floor_bond=fixed_bond(0)
 spec=convert["instrument"]["spec"]
 floor_bond["spec"].update({"id":"CONVERT-FLOOR-BOND","notional":spec["notional"],
@@ -105,8 +105,12 @@ floor_bond["spec"].update({"id":"CONVERT-FLOOR-BOND","notional":spec["notional"]
     "discount_curve_id":spec["discount_curve_id"],"credit_curve_id":spec["credit_curve_id"],"settlement_days":0})
 floor_payload=json.dumps(instrument_envelope(floor_bond))
 floor_value=price_instrument(floor_payload,credit_market,AS_OF,model="hazard_rate").value.amount
-floor_envelope,floor_flows=instrument_cashflows(floor_payload,credit_market,AS_OF,model="hazard_rate")
-print(pd.Series({"matched_bond_floor_usd":floor_value,"native_convert_floor_usd":regimes[1]["bond_floor"]}))
+floor_flows=instrument_cashflows(floor_payload,credit_market,AS_OF,model="hazard_rate").to_dataframe()
+# The native floor snaps each coupon to the nearest tree step; the matched bond
+# discounts on exact payment dates. The residual is lattice timing, well under 1bp.
+lattice_timing_gap=regimes[1]["bond_floor"]-floor_value
+print(pd.Series({"matched_bond_floor_usd":floor_value,"native_convert_floor_usd":regimes[1]["bond_floor"],
+    "lattice_timing_gap_usd":lattice_timing_gap}))
 ```
 {/* /notebook-block */}
 
@@ -151,7 +155,7 @@ from finstack_quant.core.money import Money
 s=convert["instrument"]["spec"]
 rebuilt=(ConvertibleBond.builder().id("C5-REBUILT").notional(Money(1_000_000.,"USD"))
     .issue_date(AS_OF).maturity(date(2030,1,15)).discount_curve_id("USD-OIS").credit_curve_id("CONVERT-RISKY")
-    .conversion(ConversionSpec(ratio=10_000.)).spot_id("CONVERT").vol_surface_id("CONVERT-VOL").div_yield_id("CONVERT-DIVYIELD")
+    .conversion(ConversionSpec(ratio=10_000., policy="voluntary", anti_dilution="none", dividend_adjustment="none")).spot_id("CONVERT").vol_surface_id("CONVERT-VOL").div_yield_id("CONVERT-DIVYIELD")
     .cashflow_spec(s["cashflow_spec"]).recovery_rate(0.).build())
 validate_instrument_json(rebuilt.to_json())
 greeks=price_instrument(rebuilt.to_json(),credit_market,AS_OF,model="tree",metrics=["delta","conversion01","dividend01"])

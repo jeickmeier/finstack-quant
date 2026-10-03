@@ -142,7 +142,7 @@ for scenario in ("base","downside"):
     credit_scenarios[scenario] = values
     engine = CovenantEngine.from_specs(credit_specs)
     for quarter,as_of in zip(PERIODS[4:],forecast_dates):
-        metrics = {"net_leverage":values.get("net_leverage",quarter),"dscr":values.get("dscr",quarter)}
+        metrics = {"net_leverage":values.get("net_leverage",quarter),"dscr":values.get("dscr",quarter),"ebitda":values.get("ebitda",quarter)}
         reports = engine.evaluate(metrics,as_of)
         bridged = evaluate_engine(CovenantEngine.from_specs(credit_specs).to_json(),metrics,as_of)
         for identifier,report in reports.items():
@@ -265,7 +265,7 @@ quarterly_times = np.arange(0,5.001,0.25)
 physical_schedules = {name:[(float(t),1-(1-credit_data["credit"][name]["pd"])**float(t)) for t in quarterly_times]
                       for name in ["base","downside","severe"]}
 base_lifetime_pd = physical_schedules["base"][-1][1]
-staging_policy = StagingConfig(pd_delta_absolute=0.05,pd_delta_relative=float("inf"))
+staging_policy = StagingConfig(pd_delta_absolute=0.05,pd_delta_relative=None)
 performing_comparator = Exposure("performing-comparator",ead43,lgd43,eir43,maturity43,base_lifetime_pd,base_lifetime_pd)
 # Explicit analyst policy for this case: the observed covenant weakness warrants a watchlist review/SICR flag.
 watched_borrower = Exposure("BORROWER-TL",ead43,lgd43,eir43,maturity43,base_lifetime_pd,base_lifetime_pd,qualitative_flags=QualitativeFlags(watchlist=True))
@@ -364,7 +364,7 @@ bear_model = ModelBuilder.from_spec(credit_model).forecast("revenue",ForecastSpe
 bear_values = Evaluator().evaluate(bear_model)
 headroom_rows = []
 for quarter,as_of in zip(PERIODS[4:],forecast_dates):
-    metrics = {"net_leverage":bear_values.get("net_leverage",quarter),"dscr":bear_values.get("dscr",quarter)}
+    metrics = {"net_leverage":bear_values.get("net_leverage",quarter),"dscr":bear_values.get("dscr",quarter),"ebitda":bear_values.get("ebitda",quarter)}
     reports = CovenantEngine.from_specs(credit_specs).evaluate(metrics,as_of)
     for identifier,node,limit,direction in [("net-leverage","net_leverage",4.5,-1),("debt-service","dscr",1.1,1)]:
         headroom = direction*(metrics[node]-limit)

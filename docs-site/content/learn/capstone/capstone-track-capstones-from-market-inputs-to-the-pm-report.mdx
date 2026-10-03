@@ -167,7 +167,7 @@ K=float(equity["strike"]);sigma=market.get_surface(equity["vol_surface_id"]).vol
 discount=market.get_discount(equity["discount_curve_id"]).df(tau);r=-math.log(discount)/tau
 d1=(math.log(spot/K)+(r-q+.5*sigma*sigma)*tau)/(sigma*math.sqrt(tau));d2=d1-sigma*math.sqrt(tau)
 N1=.5*(1+math.erf(d1/math.sqrt(2)));N2=.5*(1+math.erf(d2/math.sqrt(2)))
-analytical_call=(spot*math.exp(-q*tau)*N1-K*discount*N2)*float(equity["notional"]["amount"])
+analytical_call=(spot*math.exp(-q*tau)*N1-K*discount*N2)*float(equity["quantity"])
 native_call=float(wire["position_values"]["SPX-CALL"]["value_native"]["amount"])
 analytical_price_error=analytical_call-native_call
 print({"independent_BSM_USD":analytical_call,"native_equity_call_USD":native_call,"difference_USD":analytical_price_error})
@@ -254,7 +254,6 @@ def capstone_scenario_value(shock):
     # is an explicit synthetic assumption, not an estimated pricing PD.
     cdr=spec["default_spec"]["cdr"]+.10*max(hazard,0.)
     spec["default_spec"]["cdr"]=cdr
-    spec["default_assumptions"]["base_cdr_annual"]=cdr
     tranche_value=holding["quantity"]*structured_credit_tranche_metrics(
         json.dumps(scenario_deal),"BBB",scenario_market,AS_OF).pv
     return native_value,tranche_value
@@ -269,7 +268,10 @@ confidence=.95
 q=float(daily_risk.value_at_risk(confidence).iloc[0])
 tail=float(daily_risk.expected_shortfall(confidence).iloc[0])
 manual_q=float(np.quantile(scenario_returns,1-confidence,method="linear"))
-manual_tail=float(scenario_returns[scenario_returns<=manual_q].mean())
+ordered=np.sort(scenario_returns)
+mass=(1-confidence)*len(ordered)
+whole=min(int(np.floor(mass)),len(ordered))
+manual_tail=float(ordered[0] if whole==0 else ordered[:whole].sum()/mass+(0 if whole>=len(ordered) else ordered[whole]*((mass-whole)/mass)))
 bootstrap_rng=np.random.default_rng(2025011595)
 bootstrap_risk=[]
 for _ in range(500):
@@ -329,7 +331,6 @@ stress.insert_price("CONVERT",80.,"USD")
 stressed_deal=deepcopy(holding["deal"])
 stressed_deal["instrument"]["spec"].update({"default_spec":{"cdr":.05,"curve":None},
     "recovery_spec":{"rate":.25,"recovery_lag":6}})
-stressed_deal["instrument"]["spec"]["default_assumptions"].update({"base_cdr_annual":.05,"base_recovery_rate":.25})
 bbb_stress=structured_credit_tranche_metrics(json.dumps(stressed_deal),"BBB",stress,AS_OF).pv*holding["quantity"]
 stressed=value_portfolio(book,stress,metrics=[])
 stress_wire=json.loads(stressed.to_json())
@@ -411,7 +412,6 @@ print(waterfall_table.to_string(index=False));print({"BBB_first_loss_CDR_base":f
 # One-period stressed trace has immediate recovery so every distribution shares one known date.
 trace=tracks.clo_deal(one_period=True);ts=trace["instrument"]["spec"]
 ts.update(default_spec={"cdr":.05},recovery_spec={"rate":.25,"recovery_lag":0})
-ts["default_assumptions"].update(base_cdr_annual=.05,base_recovery_rate=.25)
 flows=json.loads(instrument_cashflows_json(json.dumps(trace),market,AS_OF,"discounting"))["flows"]
 cash_flows=[flow for flow in flows if flow["date"]>AS_OF.isoformat() and flow["kind"]!="defaulted_notional"]
 trace_df=market.get_discount("USD-OIS").df(90/365)
@@ -495,7 +495,7 @@ covenant_engine=CovenantEngine.from_specs([
     CovenantSpec(Covenant(CovenantType.max_net_debt_to_ebitda(4.5),"3M","Net leverage"),"net_leverage"),
     CovenantSpec(Covenant(CovenantType.min_dscr(1.1),"3M","DSCR"),"dscr")])
 reports=covenant_engine.evaluate({"net_leverage":float(financials.loc["net_leverage",period]),
-    "dscr":float(financials.loc["dscr",period])},"2025-12-31")
+    "dscr":float(financials.loc["dscr",period]),"ebitda":float(financials.loc["ebitda",period])},"2025-12-31")
 credit_table=pd.DataFrame([{"covenant":name,"actual":report.actual_value,"threshold":report.threshold,
     "headroom":report.headroom,"passed":report.passed} for name,report in reports.items()])
 print(credit_table)
@@ -522,7 +522,7 @@ for scenario_name in ["base","downside"]:
         CovenantSpec(Covenant(CovenantType.max_net_debt_to_ebitda(4.5),"3M","Net leverage"),"net_leverage"),
         CovenantSpec(Covenant(CovenantType.min_dscr(1.1),"3M","DSCR"),"dscr")])
     for quarter,day in zip(PERIODS[4:],["2025-03-31","2025-06-30","2025-09-30","2025-12-31"]):
-        reports=engine.evaluate({"net_leverage":forecast.get("net_leverage",quarter),"dscr":forecast.get("dscr",quarter)},day)
+        reports=engine.evaluate({"net_leverage":forecast.get("net_leverage",quarter),"dscr":forecast.get("dscr",quarter),"ebitda":forecast.get("ebitda",quarter)},day)
         for name,out in reports.items():
             headroom=out.threshold-out.actual_value if name=="Net leverage" else out.actual_value-out.threshold
             quarter_rows.append({"scenario":scenario_name,"quarter":str(quarter),"covenant":name,
@@ -549,7 +549,7 @@ ead_knots=[(0.,held_ead),*midpoints,(5.,0.)]
 # Explicit teaching policy: forecast covenant weakness prompts a watchlist/SICR review.
 exposure=Exposure("BORROWER-TL",held_ead,lgd,eir,5.,physical_curve[-1][1],physical_curve[-1][1],
     qualitative_flags=QualitativeFlags(watchlist=True),ead_schedule=ead_knots)
-stage=classify_stage(exposure,StagingConfig(pd_delta_absolute=.05,pd_delta_relative=float("inf")))
+stage=classify_stage(exposure,StagingConfig(pd_delta_absolute=.05,pd_delta_relative=None))
 physical_loss=compute_ecl(exposure,physical_curve,stage=stage.stage,bucket_width_years=.25)
 manual_ecl=sum((physical_curve[i+1][1]-physical_curve[i][1])*balance*lgd/(1+eir)**t
                for i,(t,balance) in enumerate(midpoints))
@@ -615,7 +615,7 @@ for i in range(3):
             "benchmark_weight":1/len(sleeve_rows[i]),"portfolio_return":sleeve_return,"benchmark_return":benchmark_return})
     attribution=brinson_fachler(json.dumps(sectors))
     actual_return=nav.iloc[i+1].combined_nav_usd/start_total-1
-    periods.append(sectors);returns.append(actual_return)
+    periods.append(json.loads(attribution.to_json()));returns.append(actual_return)
 linked=carino_link(json.dumps(periods))
 linked_effects=linked.linked_allocation+linked.linked_selection+linked.linked_interaction
 active=linked.portfolio_return_compounded-linked.benchmark_return_compounded
@@ -792,7 +792,7 @@ K=float(equity["strike"]);sigma=market.get_surface(equity["vol_surface_id"]).vol
 discount=market.get_discount(equity["discount_curve_id"]).df(tau);r=-math.log(discount)/tau
 d1=(math.log(spot/K)+(r-q+.5*sigma*sigma)*tau)/(sigma*math.sqrt(tau));d2=d1-sigma*math.sqrt(tau)
 N1=.5*(1+math.erf(d1/math.sqrt(2)));N2=.5*(1+math.erf(d2/math.sqrt(2)))
-analytical_call=(spot*math.exp(-q*tau)*N1-K*discount*N2)*float(equity["notional"]["amount"])
+analytical_call=(spot*math.exp(-q*tau)*N1-K*discount*N2)*float(equity["quantity"])
 native_call=float(wire["position_values"]["SPX-CALL"]["value_native"]["amount"])
 analytical_price_error=analytical_call-native_call
 print({"independent_BSM_USD":analytical_call,"native_equity_call_USD":native_call,"difference_USD":analytical_price_error})
@@ -858,6 +858,7 @@ def capstone_scenario_value(shock):
             curve.pop("hazard_calibration",None);curve["par_points"]=[]
         elif curve["type"]=="price":
             log_move=energy+(basis if curve["id"]=="WTI-FORWARD" else 0.)
+            curve["spot_price"]*=math.exp(log_move)
             curve["knot_points"]=[[t,price*math.exp(log_move)] for t,price in curve["knot_points"]]
     for surface in snapshot["surfaces"]:
         surface["vols_row_major"]=[value+volatility for value in surface["vols_row_major"]]
@@ -882,7 +883,10 @@ confidence=.95
 q=float(daily_risk.value_at_risk(confidence).iloc[0])
 tail=float(daily_risk.expected_shortfall(confidence).iloc[0])
 manual_q=float(np.quantile(scenario_returns,1-confidence,method="linear"))
-manual_tail=float(scenario_returns[scenario_returns<=manual_q].mean())
+ordered=np.sort(scenario_returns)
+mass=(1-confidence)*len(ordered)
+whole=min(int(np.floor(mass)),len(ordered))
+manual_tail=float(ordered[0] if whole==0 else ordered[:whole].sum()/mass+(0 if whole>=len(ordered) else ordered[whole]*((mass-whole)/mass)))
 bootstrap_rng=np.random.default_rng(2025011595)
 bootstrap_risk=[]
 for _ in range(500):
@@ -1105,7 +1109,7 @@ covenant_engine=CovenantEngine.from_specs([
     CovenantSpec(Covenant(CovenantType.max_net_debt_to_ebitda(4.5),"3M","Net leverage"),"net_leverage"),
     CovenantSpec(Covenant(CovenantType.min_dscr(1.1),"3M","DSCR"),"dscr")])
 reports=covenant_engine.evaluate({"net_leverage":float(financials.loc["net_leverage",period]),
-    "dscr":float(financials.loc["dscr",period])},"2025-12-31")
+    "dscr":float(financials.loc["dscr",period]),"ebitda":float(financials.loc["ebitda",period])},"2025-12-31")
 credit_table=pd.DataFrame([{"covenant":name,"actual":report.actual_value,"threshold":report.threshold,
     "headroom":report.headroom,"passed":report.passed} for name,report in reports.items()])
 print(credit_table)
@@ -1132,7 +1136,7 @@ for scenario_name in ["base","downside"]:
         CovenantSpec(Covenant(CovenantType.max_net_debt_to_ebitda(4.5),"3M","Net leverage"),"net_leverage"),
         CovenantSpec(Covenant(CovenantType.min_dscr(1.1),"3M","DSCR"),"dscr")])
     for quarter,day in zip(PERIODS[4:],["2025-03-31","2025-06-30","2025-09-30","2025-12-31"]):
-        reports=engine.evaluate({"net_leverage":forecast.get("net_leverage",quarter),"dscr":forecast.get("dscr",quarter)},day)
+        reports=engine.evaluate({"net_leverage":forecast.get("net_leverage",quarter),"dscr":forecast.get("dscr",quarter),"ebitda":forecast.get("ebitda",quarter)},day)
         for name,out in reports.items():
             headroom=out.threshold-out.actual_value if name=="Net leverage" else out.actual_value-out.threshold
             quarter_rows.append({"scenario":scenario_name,"quarter":str(quarter),"covenant":name,
@@ -1159,7 +1163,7 @@ ead_knots=[(0.,held_ead),*midpoints,(5.,0.)]
 # Explicit teaching policy: forecast covenant weakness prompts a watchlist/SICR review.
 exposure=Exposure("BORROWER-TL",held_ead,lgd,eir,5.,physical_curve[-1][1],physical_curve[-1][1],
     qualitative_flags=QualitativeFlags(watchlist=True),ead_schedule=ead_knots)
-stage=classify_stage(exposure,StagingConfig(pd_delta_absolute=.05,pd_delta_relative=float("inf")))
+stage=classify_stage(exposure,StagingConfig(pd_delta_absolute=.05,pd_delta_relative=None))
 physical_loss=compute_ecl(exposure,physical_curve,stage=stage.stage,bucket_width_years=.25)
 manual_ecl=sum((physical_curve[i+1][1]-physical_curve[i][1])*balance*lgd/(1+eir)**t
                for i,(t,balance) in enumerate(midpoints))
@@ -1217,6 +1221,7 @@ print(nav)
 {/* notebook-block notebook="08_capstone/end_to_end_volatility_portfolio_workflow.ipynb" cell="vol-realized-implied-attribution" role="build" */}
 ```python exec id=vol-realized-implied-attribution role=build
 from finstack_quant.core.market_data import ScalarTimeSeries
+from datetime import date
 # Use the actual final history date/market and only observations known at that date.
 end_date=dates[-1];elapsed=(end_date-AS_OF).days/365;remaining=1-elapsed
 observed=[(AS_OF+timedelta(days=i),history_quotes(AS_OF+timedelta(days=i))["spx"]) for i in range((end_date-AS_OF).days+1) if (AS_OF+timedelta(days=i)).weekday()<5]
@@ -1225,15 +1230,24 @@ full=price_instrument(json.dumps(variance),dated,end_date,metrics=["variance_exp
 forward_only=deepcopy(variance);forward_only["instrument"]["spec"]["start_date"]=end_date.isoformat()
 forward_result=price_instrument(json.dumps(forward_only),dated,end_date,metrics=["variance_expected"])
 initial=price_instrument(json.dumps(variance),market,AS_OF,metrics=["variance_expected"])
-accrued=float(np.square(np.diff(np.log([close for _,close in observed]))).sum())
+# This daily-close contract annualizes at 252 and blends by return-sample count.
+# Calendar year fractions are used only to discount to settlement.
+maturity=date.fromisoformat(variance["instrument"]["spec"]["maturity"])
+contract_closes=[AS_OF+timedelta(days=i) for i in range((maturity-AS_OF).days+1)
+                 if (AS_OF+timedelta(days=i)).weekday()<5]
+total_returns=len(contract_closes)-1
+observed_returns=len(observed)-1
+remaining_samples=1-observed_returns/total_returns
+raw_squared_returns=float(np.square(np.diff(np.log([close for _,close in observed]))).sum())
+accrued=252.0*raw_squared_returns/total_returns
 v0=initial.metrics["variance_expected"];v1=forward_result.metrics["variance_expected"]
 df1=dated.get_discount("USD-OIS").df(remaining);df0=market.get_discount("USD-OIS").df(1.)
-carry_pnl=1_000_000*df1*(remaining*v0-.04)-initial.value.amount
+carry_pnl=1_000_000*df1*(remaining_samples*v0-.04)-initial.value.amount
 realized_pnl=1_000_000*df1*accrued
-implied_pnl=1_000_000*df1*remaining*(v1-v0)
+implied_pnl=1_000_000*df1*remaining_samples*(v1-v0)
 variance_attribution=pd.DataFrame([{"component":"elapsed accrual/financing at initial forward variance","PnL":carry_pnl},
     {"component":"realized squared returns","PnL":realized_pnl},{"component":"remaining implied forward variance","PnL":implied_pnl}])
-print(variance_attribution.to_string(index=False));print({"total_native_variance_PnL":full.value.amount-initial.value.amount,"realized_variance_sum":accrued,"initial_forward_variance":v0,"ending_forward_variance":v1})
+print(variance_attribution.to_string(index=False));print({"total_native_variance_PnL":full.value.amount-initial.value.amount,"realized_variance_contribution":accrued,"observed_returns":observed_returns,"total_returns":total_returns,"initial_forward_variance":v0,"ending_forward_variance":v1})
 ```
 {/* /notebook-block */}
 
@@ -1253,7 +1267,7 @@ for i in range(3):
             "benchmark_weight":1/len(sleeve_rows[i]),"portfolio_return":sleeve_return,"benchmark_return":benchmark_return})
     attribution=brinson_fachler(json.dumps(sectors))
     actual_return=nav.iloc[i+1].combined_nav_usd/start_total-1
-    periods.append(sectors);returns.append(actual_return)
+    periods.append(json.loads(attribution.to_json()));returns.append(actual_return)
 linked=carino_link(json.dumps(periods))
 linked_effects=linked.linked_allocation+linked.linked_selection+linked.linked_interaction
 active=linked.portfolio_return_compounded-linked.benchmark_return_compounded
