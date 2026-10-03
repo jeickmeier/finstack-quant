@@ -223,6 +223,27 @@
     }
   ],
   "spec_modifiers": {
+    "new": {
+      "covenant": {
+        "covenant_type": {
+          "max_net_debt_to_ebitda": {
+            "threshold": 3.5
+          }
+        },
+        "test_frequency": {
+          "count": 3,
+          "unit": "months"
+        },
+        "cure_period_days": 30,
+        "consequences": [],
+        "is_active": true,
+        "scope": "maintenance",
+        "springing_condition": null,
+        "label": "max_net_leverage"
+      },
+      "metric_id": null,
+      "denominator_metric_id": "ebitda"
+    },
     "with_metric": [
       {
         "covenant": {

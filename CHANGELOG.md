@@ -12,6 +12,19 @@
 - Python and WASM: `RatingFactorTable` / `MasterScale` / `DownturnLgd` `from_registry_id` with an unknown id raise `KeyError` / throw kind `not_found` (was `ValueError` / `validation`); the Rust credit registry returns `InputError::NotFound`.
 - Python: typed Rust errors at the remaining statements-analytics, attribution, calibration, margin, portfolio and scenarios binding sites now go through their kind-aware mapper; `display_to_py` accepts only kind-less parse/serde errors (`KindlessError`), so routing a typed error through it no longer compiles.
 
+### Covenants: spec rules and parsing in Rust
+
+#### Added
+
+- Rust `CovenantSpec::new(covenant)` builds a metric-less spec with the same net-debt/EBITDA `ebitda` denominator default as `with_metric`; Python `CovenantSpec(covenant)` calls it and WASM gains its twin `covenants.covenantSpecNew`.
+- Rust `ThresholdTest::new(test, value)` / `label()` / `value()` and `evaluate_engine_with_source(engine_json, &HashMapMetricSource, as_of)`.
+
+#### Changed
+
+- Python covenant scope strings (`Covenant.with_scope`, `CovenantForecastConfig.with_scope`, `CovenantEngine.evaluate_and_track`) are parsed by serde, so all three report the same `ValueError` for an unknown scope; scope and bound-kind labels are rendered from the serde names.
+- `CovenantType.custom` / `SpringingCondition` test labels (Python) and `covenants.covenantTypeCustom` (WASM) parse through Rust `ThresholdTest::new`; the WASM error message for an unknown test is now `test must be "maximum" or "minimum", got "<label>"`.
+- Python `evaluate_engine(engine_json, dict, as_of)` no longer serialises the dict to JSON: a NaN/infinite metric that no covenant reads is ignored and one that is read raises `metric '<id>' must be finite`, exactly as `CovenantEngine.evaluate`.
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

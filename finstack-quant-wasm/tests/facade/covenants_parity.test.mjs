@@ -94,6 +94,13 @@ const cases = {
       ['2026-07-01', 4.0],
     ];
     return {
+      new: covenants.covenantSpecNew(
+        covenants.covenantNew(
+          covenants.covenantTypeMaxNetDebtToEbitda(3.5),
+          QUARTERLY,
+          'max_net_leverage'
+        )
+      ),
       with_metric: [leverageSpec(), netLeverage],
       with_denominator_metric: covenants.covenantSpecWithDenominatorMetric(
         netLeverage,
@@ -250,7 +257,7 @@ test('covenant errors are structured and Rust-owned', () => {
   assert.throws(() => covenants.covLite('7', 4.5), kind('invalid_type', /^maxLeverage: /));
   assert.throws(
     () => covenants.covenantTypeCustom('m', 'between', 1),
-    kind('validation', /test: unknown variant `between`/)
+    kind('validation', /test must be "maximum" or "minimum", got "between"/)
   );
   assert.throws(
     () => covenants.covenantWithScope(leverage(), 'sometimes'),

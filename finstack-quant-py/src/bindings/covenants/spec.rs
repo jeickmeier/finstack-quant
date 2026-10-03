@@ -8,44 +8,21 @@
 use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
 use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::repr_support::repr_from_serde;
-use crate::errors::{core_to_py, display_to_py, value_error};
+use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_covenants::{
     Covenant, CovenantConsequence, CovenantScope, CovenantSpec, CovenantType, CovenantWaiver,
     SpringingCondition, ThresholdSchedule, ThresholdTest,
 };
 use pyo3::prelude::*;
 
-/// Parse a `"maximum"` / `"minimum"` test direction plus bound value.
-fn parse_threshold_test(test: &str, value: f64) -> PyResult<ThresholdTest> {
-    match test {
-        "maximum" => Ok(ThresholdTest::Maximum(value)),
-        "minimum" => Ok(ThresholdTest::Minimum(value)),
-        other => Err(value_error(format!(
-            "test must be \"maximum\" or \"minimum\", got {other:?}"
-        ))),
-    }
-}
-
-fn threshold_test_parts(test: ThresholdTest) -> (&'static str, f64) {
-    match test {
-        ThresholdTest::Maximum(v) => ("maximum", v),
-        ThresholdTest::Minimum(v) => ("minimum", v),
-    }
-}
-
-pub(crate) fn scope_name(scope: &CovenantScope) -> &'static str {
-    match scope {
-        CovenantScope::Maintenance => "maintenance",
-        CovenantScope::Incurrence => "incurrence",
-    }
-}
-
+/// Parse a covenant scope label (`"maintenance"` / `"incurrence"`) with its serde name.
 pub(crate) fn parse_scope(scope: &str) -> PyResult<CovenantScope> {
-    match scope {
-        "maintenance" => Ok(CovenantScope::Maintenance),
-        "incurrence" => Ok(CovenantScope::Incurrence),
-        _ => Err(value_error("scope must be maintenance or incurrence")),
-    }
+    finstack_quant_core::wire::serde_parse(scope).map_err(core_to_py)
+}
+
+/// Serde label of a covenant scope or bound kind.
+pub(crate) fn wire_label<T: serde::Serialize>(value: &T) -> PyResult<String> {
+    finstack_quant_core::wire::serde_label(value).map_err(core_to_py)
 }
 
 /// Type of financial or operational covenant with its static threshold.
@@ -145,7 +122,7 @@ impl PyCovenantType {
     fn custom(metric: String, test: &str, value: f64) -> PyResult<Self> {
         Ok(Self::from_inner(CovenantType::Custom {
             metric,
-            test: parse_threshold_test(test, value)?,
+            test: ThresholdTest::new(test, value).map_err(core_to_py)?,
         }))
     }
 
@@ -224,11 +201,8 @@ impl PyCovenantType {
     /// Inequality direction: ``"at_most"``, ``"at_least"``, or ``None`` for
     /// non-numeric covenants.
     #[getter]
-    fn bound_kind(&self) -> Option<&'static str> {
-        self.inner.bound_kind().map(|kind| match kind {
-            finstack_quant_covenants::BoundKind::AtMost => "at_most",
-            finstack_quant_covenants::BoundKind::AtLeast => "at_least",
-        })
+    fn bound_kind(&self) -> PyResult<Option<String>> {
+        self.inner.bound_kind().as_ref().map(wire_label).transpose()
     }
 
     /// Human-readable description, e.g. ``"Debt/EBITDA <= 4.50x"``.
@@ -419,7 +393,7 @@ impl PySpringingCondition {
     fn new(metric_id: String, test: &str, value: f64) -> PyResult<Self> {
         Ok(Self::from_inner(SpringingCondition {
             metric_id: metric_id.into(),
-            test: parse_threshold_test(test, value)?,
+            test: ThresholdTest::new(test, value).map_err(core_to_py)?,
         }))
     }
 
@@ -451,17 +425,17 @@ impl PySpringingCondition {
     /// Test direction: ``"maximum"`` or ``"minimum"``.
     #[getter]
     fn test(&self) -> &'static str {
-        threshold_test_parts(self.inner.test).0
+        self.inner.test.label()
     }
 
     /// Bound the activation metric is compared against.
     #[getter]
     fn value(&self) -> f64 {
-        threshold_test_parts(self.inner.test).1
+        self.inner.test.value()
     }
 
     fn __repr__(&self) -> String {
-        let (test, value) = threshold_test_parts(self.inner.test);
+        let (test, value) = (self.inner.test.label(), self.inner.test.value());
         format!(
             "SpringingCondition(metric_id={:?}, test={test:?}, value={value})",
             self.inner.metric_id.as_str()
@@ -540,16 +514,9 @@ impl PyCovenant {
     /// Raises ``ValueError`` for any other scope string.
     #[pyo3(text_signature = "(scope)")]
     fn with_scope(&self, scope: &str) -> PyResult<Self> {
-        let scope = match scope {
-            "maintenance" => CovenantScope::Maintenance,
-            "incurrence" => CovenantScope::Incurrence,
-            other => {
-                return Err(value_error(format!(
-                    "scope must be \"maintenance\" or \"incurrence\", got {other:?}"
-                )))
-            }
-        };
-        Ok(Self::from_inner(self.inner.clone().with_scope(scope)))
+        Ok(Self::from_inner(
+            self.inner.clone().with_scope(parse_scope(scope)?),
+        ))
     }
 
     /// Return a copy activated only while ``condition`` is met.
@@ -618,8 +585,8 @@ impl PyCovenant {
 
     /// ``"maintenance"`` or ``"incurrence"``.
     #[getter]
-    fn scope(&self) -> &'static str {
-        scope_name(&self.inner.scope)
+    fn scope(&self) -> PyResult<String> {
+        wire_label(&self.inner.scope)
     }
 
     /// Activation condition, or ``None`` for an always-on covenant.
@@ -643,8 +610,8 @@ impl PyCovenant {
         self.inner.description()
     }
 
-    fn __repr__(&self) -> String {
-        format!(
+    fn __repr__(&self) -> PyResult<String> {
+        Ok(format!(
             "Covenant(label={:?}, covenant_type={:?}, test_frequency=\"{}\", cure_period_days={}, scope={:?}, is_active={})",
             self.inner.label,
             self.inner.description(),
@@ -652,9 +619,9 @@ impl PyCovenant {
             self.inner
                 .cure_period_days
                 .map_or("None".to_string(), |d| d.to_string()),
-            scope_name(&self.inner.scope),
+            wire_label(&self.inner.scope)?,
             if self.inner.is_active { "True" } else { "False" },
-        )
+        ))
     }
 }
 
@@ -892,16 +859,7 @@ impl PyCovenantSpec {
     fn new(covenant: PyRef<'_, PyCovenant>, metric_id: Option<String>) -> Self {
         let inner = match metric_id {
             Some(metric_id) => CovenantSpec::with_metric(covenant.inner.clone(), metric_id),
-            None => CovenantSpec {
-                covenant: covenant.inner.clone(),
-                metric_id: None,
-                denominator_metric_id: matches!(
-                    covenant.inner.covenant_type,
-                    CovenantType::MaxNetDebtToEbitda { .. }
-                )
-                .then(|| "ebitda".into()),
-                threshold_schedule: None,
-            },
+            None => CovenantSpec::new(covenant.inner.clone()),
         };
         Self::from_inner(inner)
     }

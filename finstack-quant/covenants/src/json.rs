@@ -139,12 +139,50 @@ pub fn evaluate_engine(
     metrics_json: &str,
     as_of: &str,
 ) -> Result<indexmap::IndexMap<String, CovenantReport>> {
+    let engine = parse_engine(engine_json)?;
+    let source = HashMapMetricSource::from_json(metrics_json)?;
+    engine.evaluate(&source, parse_iso_date(as_of)?)
+}
+
+/// Evaluate a covenant engine document against an already-built metric source.
+///
+/// Same evaluation as [`evaluate_engine`], for hosts that hold the metrics as
+/// numbers rather than JSON text (a Python `dict`). The values are not
+/// serialized, so finiteness is checked only by the covenant tests that read
+/// a metric, exactly as in [`CovenantEngine::evaluate`].
+///
+/// # Arguments
+///
+/// * `engine_json` - UTF-8 JSON document for a valid covenant engine.
+/// * `source` - Metric values keyed by the metric identifiers the engine
+///   reads, in the units required by each covenant test (ratios in turns,
+///   amounts in the engine's reporting currency).
+/// * `as_of` - ISO-8601 calendar date at which all covenant tests are
+///   evaluated.
+///
+/// # Returns
+///
+/// Reports keyed by covenant instance key, in spec order.
+///
+/// # Errors
+///
+/// Returns an error if the engine document is malformed or fails validation,
+/// `as_of` is not an ISO-8601 date, or a required metric is absent or not
+/// finite.
+pub fn evaluate_engine_with_source(
+    engine_json: &str,
+    source: &HashMapMetricSource,
+    as_of: &str,
+) -> Result<indexmap::IndexMap<String, CovenantReport>> {
+    parse_engine(engine_json)?.evaluate(source, parse_iso_date(as_of)?)
+}
+
+fn parse_engine(engine_json: &str) -> Result<CovenantEngine> {
     let engine: CovenantEngine = serde_json::from_str(engine_json).map_err(|e| {
         finstack_quant_core::Error::Validation(format!("Invalid covenant engine JSON: {e}"))
     })?;
     engine.validate()?;
-    let source = HashMapMetricSource::from_json(metrics_json)?;
-    engine.evaluate(&source, parse_iso_date(as_of)?)
+    Ok(engine)
 }
 
 /// Build the standard leveraged-buyout covenant package as compact JSON.

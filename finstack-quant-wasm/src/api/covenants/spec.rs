@@ -161,13 +161,7 @@ pub fn covenant_type_affirmative(requirement: JsValue) -> Result<JsValue, JsValu
 
 /// Read a `("maximum" | "minimum", value)` pair as a threshold test.
 fn threshold_test(test: &JsValue, value: &JsValue) -> Result<ThresholdTest, JsValue> {
-    let test = js_string(test, "test")?;
-    let value = js_f64(value, "value")?;
-    serde_json::from_value(serde_json::json!({ test: value })).map_err(|error| {
-        to_js_err(finstack_quant_core::Error::Validation(format!(
-            "test: {error}"
-        )))
-    })
+    ThresholdTest::new(&js_string(test, "test")?, js_f64(value, "value")?).map_err(to_js_err)
 }
 
 /// Custom covenant on a caller-named metric.
@@ -359,6 +353,22 @@ pub fn covenant_with_springing_condition(
 }
 
 // --- CovenantSpec / ThresholdSchedule ----------------------------------------------
+
+/// Covenant specification that reads the covenant type's default metric.
+///
+/// Mirrors Rust `CovenantSpec::new` (the Python `CovenantSpec(covenant)`
+/// constructor without a metric id): a net debt / EBITDA covenant also gets
+/// the default `"ebitda"` earnings denominator.
+///
+/// @param covenant - `Covenant` wire object.
+/// @returns `CovenantSpec` wire object with no `metric_id`; evaluation reads the covenant type's conventional metric (for example `"debt_to_ebitda"`) or the `metric` / `name` of a custom or basket covenant.
+/// @throws If `covenant` is not a `Covenant` (kind `validation`).
+#[wasm_bindgen(js_name = covenantSpecNew)]
+pub fn covenant_spec_new(covenant: JsValue) -> Result<JsValue, JsValue> {
+    to_js_value(&CovenantSpec::new(js_wire::<Covenant>(
+        &covenant, "covenant",
+    )?))
+}
 
 /// Covenant specification that reads its test value from a named metric.
 ///

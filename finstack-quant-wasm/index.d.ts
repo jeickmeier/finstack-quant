@@ -16128,6 +16128,19 @@ export interface CovenantsNamespace {
   covenantWithSpringingCondition(covenant: generated.covenants.Covenant, condition: generated.covenants.SpringingCondition): generated.covenants.Covenant;
 
   /**
+   * Covenant specification that reads the covenant type's default metric.
+   *
+   * Mirrors Rust `CovenantSpec::new` (the Python `CovenantSpec(covenant)`
+   * constructor without a metric id): a net debt / EBITDA covenant also gets
+   * the default `"ebitda"` earnings denominator.
+   *
+   * @param covenant - `Covenant` wire object.
+   * @returns `CovenantSpec` wire object with no `metric_id`; evaluation reads the covenant type's conventional metric (for example `"debt_to_ebitda"`) or the `metric` / `name` of a custom or basket covenant.
+   * @throws If `covenant` is not a `Covenant` (kind `validation`).
+   */
+  covenantSpecNew(covenant: generated.covenants.Covenant): generated.covenants.CovenantSpec;
+
+  /**
    * Covenant specification that reads its test value from a named metric.
    *
    * Mirrors Rust `CovenantSpec::with_metric` (the Python `CovenantSpec(...)`
