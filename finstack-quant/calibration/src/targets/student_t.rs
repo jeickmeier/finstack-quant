@@ -38,7 +38,6 @@ use crate::solver::helpers::bracket_solve_1d_nearest_first_with_diagnostics;
 use crate::CalibrationReport;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::CreditIndexData;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
@@ -149,23 +148,19 @@ impl StudentTTarget {
     /// Execute the full calibration for a Student-t df step.
     ///
     /// This is a scalar calibration: it finds a single `df` value that
-    /// minimizes the pricing residual for a reference tranche, then stores
-    /// the result as a `MarketScalar::Unitless` in the market context.
+    /// minimizes the pricing residual for a reference tranche. The runtime
+    /// stores the returned scalar in the market context.
     ///
     /// # Returns
     ///
-    /// A tuple of `(MarketContext, f64, CalibrationReport)` where:
-    /// - The context contains the calibrated `df` stored under the scalar key
-    ///   `"{tranche_instrument_id}_STUDENT_T_DF"`.
-    /// - The extra `f64` is the calibrated degrees-of-freedom value, returned
-    ///   separately because `step_runtime` needs it to build a `StepOutput::Scalar`
-    ///   without parsing it back from report metadata.
+    /// The calibrated degrees of freedom and its fit report, ready for the
+    /// runtime to publish under `"{tranche_instrument_id}_STUDENT_T_DF"`.
     pub(crate) fn solve(
         params: &StudentTParams,
         quotes: &[MarketQuote],
         context: &MarketContext,
         global_config: &CalibrationConfig,
-    ) -> Result<(MarketContext, f64, CalibrationReport)> {
+    ) -> Result<(f64, CalibrationReport)> {
         Self::validate_params(params)?;
         let tranche_quote = quotes
             .iter()
@@ -220,31 +215,18 @@ impl StudentTTarget {
         curve_ids.insert("discount".to_string(), discount_curve_id.to_string());
         curve_ids.insert("credit".to_string(), index_id);
         let build_context = BuildCtx::new(as_of, 1.0 / tranche_width, curve_ids);
-        let instrument = build_cds_tranche_instrument(
+        let tranche = build_cds_tranche_instrument(
             &tranche_quote,
             &build_context,
             &CdsTrancheBuildOverrides::default(),
         )?;
-        let tranche = instrument
-            .as_any()
-            .downcast_ref::<CdsTranche>()
-            .ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "shared tranche quote builder did not return CdsTranche".to_string(),
-                )
-            })?
-            .clone();
 
         let calibrator = Self::new(params.clone(), pricing_context, global_config.clone())?;
         calibrator.calibrate_df(&tranche, as_of)
     }
 
     /// Run the Brent root-finding calibration over the df domain.
-    fn calibrate_df(
-        &self,
-        tranche: &CdsTranche,
-        as_of: Date,
-    ) -> Result<(MarketContext, f64, CalibrationReport)> {
+    fn calibrate_df(&self, tranche: &CdsTranche, as_of: Date) -> Result<(f64, CalibrationReport)> {
         let (df_lo, df_hi) = self.params.df_bounds;
         let initial_df = self.params.initial_df;
         let max_iters = self.config.solver.max_iterations();
@@ -351,13 +333,7 @@ impl StudentTTarget {
         let mut report = report;
         report.update_solver_config(self.config.solver.clone());
 
-        let scalar_key = format!("{}_STUDENT_T_DF", self.params.tranche_instrument_id);
-        let new_context = self
-            .base_context
-            .clone()
-            .insert_price(&scalar_key, MarketScalar::Unitless(calibrated_df));
-
-        Ok((new_context, calibrated_df, report))
+        Ok((calibrated_df, report))
     }
 
     /// Build a scan grid for the Brent solver over the df domain.
@@ -469,7 +445,7 @@ mod tests {
             ("discount".to_string(), "USD-OIS".to_string()),
             ("credit".to_string(), "CDX.NA.IG".to_string()),
         ]);
-        let instrument = build_cds_tranche_instrument(
+        build_cds_tranche_instrument(
             quote,
             &BuildCtx::new(
                 base_date,
@@ -478,12 +454,7 @@ mod tests {
             ),
             &CdsTrancheBuildOverrides::default(),
         )
-        .expect("quote-built unit-notional tranche");
-        instrument
-            .as_any()
-            .downcast_ref::<CdsTranche>()
-            .expect("CDS tranche")
-            .clone()
+        .expect("quote-built unit-notional tranche")
     }
 
     fn pricer(df: f64) -> CdsTranchePricer {
@@ -658,7 +629,7 @@ mod tests {
             (no_upfront_pv - quote.upfront_pct).abs() > 1e-5,
             "the fixture must distinguish today's PV from cash due at settlement"
         );
-        let (_, df, report) = StudentTTarget::solve(
+        let (df, report) = StudentTTarget::solve(
             &params(),
             &[MarketQuote::CdsTranche(quote.clone())],
             &market,
@@ -683,7 +654,7 @@ mod tests {
         let quote = settled_quote(&market, base_date, 6.0);
         let mut params = params();
         params.initial_df = 3.0;
-        let (_, df, report) = StudentTTarget::solve(
+        let (df, report) = StudentTTarget::solve(
             &params,
             &[MarketQuote::CdsTranche(quote.clone())],
             &market,

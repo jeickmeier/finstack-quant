@@ -320,24 +320,6 @@
           "type": "object"
         },
         {
-          "description": "Two steps (or a step and an explicit quote set) define the same\nquote-set name with different quote ids.",
-          "properties": {
-            "kind": {
-              "const": "quote_set_conflict",
-              "type": "string"
-            },
-            "quote_set": {
-              "description": "The conflicting quote-set name.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "kind",
-            "quote_set"
-          ],
-          "type": "object"
-        },
-        {
           "description": "One market-datum id of a kind is attached to steps, or merged into an\nenvelope, with two different payloads.",
           "properties": {
             "id": {

@@ -19,6 +19,7 @@ use finstack_quant_core::market_data::term_structures::Seniority;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::HashMap;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use finstack_quant_valuations::recalibration::QuoteBump;
 use time::Month;
@@ -625,7 +626,7 @@ fn hazard_calibration_handles_extreme_high_spread() {
         }],
     };
 
-    let envelope = CalibrationEnvelope {
+    let mut envelope = CalibrationEnvelope {
         schema_url: None,
 
         schema: crate::api::schema::CalibrationSchema::CURRENT,
@@ -634,7 +635,13 @@ fn hazard_calibration_handles_extreme_high_spread() {
         prior_market: prior,
     };
 
-    let result = engine::calibrate(&envelope).expect("high spread calibration should succeed");
+    assert!(
+        engine::calibrate(&envelope).is_err(),
+        "default hazard cap must be respected"
+    );
+    envelope.plan.settings.validation.max_hazard_rate = 2.0;
+    let result =
+        engine::calibrate(&envelope).expect("explicit distressed-credit cap permits calibration");
     assert!(result.result.report.success);
 
     let ctx = MarketContext::try_from(result.result.final_market).expect("restore context");
@@ -775,9 +782,6 @@ fn hazard_calibration_global_solve_sqrt_time_is_not_rougher_than_bootstrap() {
 
     let mut global_settings = CalibrationConfig::default();
     global_settings.discount_curve.weighting_scheme = ResidualWeightingScheme::SqrtTime;
-    global_settings.calibration_method = CalibrationMethod::GlobalSolve {
-        use_analytical_jacobian: false,
-    };
 
     let global_plan = CalibrationPlan {
         id: "plan-global".to_string(),

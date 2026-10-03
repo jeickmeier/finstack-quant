@@ -15,7 +15,6 @@ use finstack_quant_core::{Error, Result};
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
     CdsTranche, CdsTrancheParams,
 };
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
 
@@ -85,7 +84,7 @@ impl Default for CdsTrancheBuildOverrides {
 ///
 /// # Returns
 ///
-/// `Ok(Box<dyn Instrument>)` with the constructed CDS tranche instrument, or `Err` if:
+/// `Ok(CdsTranche)` with the constructed CDS tranche instrument, or `Err` if:
 /// - Convention lookup fails (missing CDS convention key)
 /// - Calendar resolution fails
 /// - Invalid tranche width (detachment <= attachment or non-finite values)
@@ -159,7 +158,7 @@ pub fn build_cds_tranche_instrument(
     quote: &CdsTrancheQuote,
     ctx: &BuildCtx,
     overrides: &CdsTrancheBuildOverrides,
-) -> Result<Box<dyn Instrument>> {
+) -> Result<CdsTranche> {
     tracing::debug!(quote_id = %quote.id(), "building CDS tranche instrument");
     quote.validate()?;
     let registry = ConventionRegistry::try_global()?;
@@ -283,7 +282,7 @@ pub fn build_cds_tranche_instrument(
     instrument.start_date = Some(effective_date);
     instrument.upfront = upfront;
 
-    Ok(Box::new(instrument))
+    Ok(instrument)
 }
 
 #[cfg(test)]
@@ -330,10 +329,7 @@ mod tests {
 
         let instrument = build_cds_tranche_instrument(&quote, &ctx, &overrides)
             .expect("non-IMM tranche build should succeed");
-        let tranche = instrument
-            .as_any()
-            .downcast_ref::<CdsTranche>()
-            .expect("should be CdsTranche");
+        let tranche = instrument;
 
         assert_eq!(tranche.roll_rule, RollRule::None);
 
@@ -388,10 +384,7 @@ mod tests {
         let overrides = CdsTrancheBuildOverrides::default();
         let instrument = build_cds_tranche_instrument(&quote, &ctx, &overrides)
             .expect("tranche build should succeed");
-        let tranche = instrument
-            .as_any()
-            .downcast_ref::<CdsTranche>()
-            .expect("should be CdsTranche");
+        let tranche = instrument;
 
         // Tranche notional = 100M * 0.04 = 4M
         // Upfront = 4M * (-0.025) = -100,000 USD
@@ -445,7 +438,7 @@ mod tests {
 
         assert!(result.is_err(), "Should reject upfront_pct with abs > 1.0");
 
-        let err_str = result.err().expect("should be error").to_string();
+        let err_str = result.expect_err("should be error").to_string();
         assert!(
             err_str.contains("decimal fraction") || err_str.contains("upfront_pct"),
             "Error should mention decimal fraction format: {}",
@@ -483,10 +476,7 @@ mod tests {
         let overrides = CdsTrancheBuildOverrides::default();
         let instrument = build_cds_tranche_instrument(&quote, &ctx, &overrides)
             .expect("tranche build should succeed");
-        let tranche = instrument
-            .as_any()
-            .downcast_ref::<CdsTranche>()
-            .expect("should be CdsTranche");
+        let tranche = instrument;
 
         assert!(
             tranche.upfront.is_none(),

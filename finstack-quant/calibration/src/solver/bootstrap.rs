@@ -271,7 +271,7 @@ fn validate_residual(time: f64, residual: f64, tolerance: f64) -> Result<()> {
     Ok(())
 }
 
-/// Validate solved value and commit to knots, returning the residual.
+/// Validate the solved value and commit its knot, rolling back on failure.
 fn validate_and_commit_knot<T: BootstrapTarget>(
     target: &T,
     knots: &mut Vec<(f64, f64)>,
@@ -279,7 +279,7 @@ fn validate_and_commit_knot<T: BootstrapTarget>(
     solved_value: f64,
     quote: &T::Quote,
     validation_tolerance: f64,
-) -> Result<f64> {
+) -> Result<()> {
     target.validate_knot(time, solved_value)?;
 
     // PERF: avoid `knots.clone()` by temporarily pushing the candidate knot and popping
@@ -289,7 +289,7 @@ fn validate_and_commit_knot<T: BootstrapTarget>(
         let curve = target.build_curve_for_solver(knots)?;
         let residual = target.calculate_residual(&curve, quote)?;
         validate_residual(time, residual, validation_tolerance)?;
-        Ok(residual)
+        Ok(())
     })();
 
     if result.is_err() {
@@ -354,7 +354,6 @@ impl SequentialBootstrapper {
         let sorted_quotes = sort_quotes_by_time(target, quotes)?;
 
         let mut knots = initial_knots;
-        let mut residuals = BTreeMap::new();
         let mut total_iterations = 0;
         let mut last_time = knots.iter().map(|(t, _)| *t).fold(0.0_f64, f64::max);
         // W-40: track knot times accepted without a sign-change bracket so the
@@ -362,7 +361,7 @@ impl SequentialBootstrapper {
         // as true bracketed roots.
         let mut approximate_knot_times: Vec<f64> = Vec::new();
 
-        for (sorted_idx, sq) in sorted_quotes.iter().enumerate() {
+        for sq in &sorted_quotes {
             validate_time_ordering(sq.time, last_time, sq.original_idx)?;
             let quote = &quotes[sq.original_idx];
             let time = sq.time;
@@ -374,7 +373,7 @@ impl SequentialBootstrapper {
                 approximate_knot_times.push(time);
             }
 
-            let residual = validate_and_commit_knot(
+            validate_and_commit_knot(
                 target,
                 &mut knots,
                 time,
@@ -385,7 +384,6 @@ impl SequentialBootstrapper {
 
             total_iterations += eval_count;
             last_time = time;
-            residuals.insert(target.residual_key(quote, sorted_idx), residual);
         }
 
         let final_curve = target.build_curve_final(&knots)?;
@@ -393,7 +391,7 @@ impl SequentialBootstrapper {
         // schemes such as PCHIP and MonotoneConvex. Reprice every quote on the
         // final curve instead of reporting the stale residual captured when
         // each knot was first committed.
-        residuals = sorted_quotes
+        let residuals = sorted_quotes
             .iter()
             .map(|sq| target.calculate_residual(&final_curve, &quotes[sq.original_idx]))
             .collect::<Result<Vec<_>>>()?

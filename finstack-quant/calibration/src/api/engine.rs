@@ -411,14 +411,12 @@ impl ExecutionState {
     }
 
     /// Record a step's execution result.
-    fn record_result(&mut self, step_id: &str, report: CalibrationReport) {
-        let tolerance = report
-            .metadata
-            .get("success_tolerance")
-            .or_else(|| report.metadata.get("tolerance"))
-            .and_then(|value| value.parse::<f64>().ok())
-            .filter(|value| value.is_finite() && *value > 0.0)
-            .unwrap_or_else(|| report.solver_config.tolerance());
+    fn record_result(
+        &mut self,
+        step_id: &str,
+        report: CalibrationReport,
+    ) -> std::result::Result<(), ExecuteError> {
+        let tolerance = step_success_tolerance(step_id, &report)?;
         for (key, residual) in &report.residuals {
             self.aggregated_residuals.insert(
                 format!("{step_id}:{key}:tolerance_ratio"),
@@ -427,6 +425,7 @@ impl ExecutionState {
         }
         self.total_iterations += report.iterations;
         self.step_reports.insert(step_id.to_string(), report);
+        Ok(())
     }
 }
 
@@ -589,7 +588,7 @@ fn apply_batch_results(
         {
             return Err(ExecuteError::envelope(
                 ExecutionStage::Solver,
-                bad_fit_envelope_error(&item.step.id, &failing.report),
+                bad_fit_envelope_error(&item.step.id, &failing.report)?,
             ));
         }
     }
@@ -602,7 +601,7 @@ fn apply_batch_results(
         step_runtime::apply_output(context, output, credit_index_update).map_err(|error| {
             ExecuteError::other(ExecutionStage::Context, Some(item.step.id.clone()), error)
         })?;
-        state.record_result(&item.step.id, report);
+        state.record_result(&item.step.id, report)?;
     }
     Ok(())
 }
@@ -684,40 +683,49 @@ fn execute_sequential(
         if plan.settings.fail_on_bad_fit && !report.success {
             return Err(ExecuteError::envelope(
                 ExecutionStage::Solver,
-                bad_fit_envelope_error(&step.id, &report),
+                bad_fit_envelope_error(&step.id, &report)?,
             ));
         }
         step_runtime::apply_output(context, output, credit_index_update).map_err(|error| {
             ExecuteError::other(ExecutionStage::Context, Some(step.id.clone()), error)
         })?;
-        state.record_result(&step.id, report);
+        state.record_result(&step.id, report)?;
     }
     Ok(())
 }
 
-/// Build the structured envelope error describing a step that failed to
-/// converge.
-///
-/// Carries the worst-fitting quote derived from `report.residuals` so
-/// downstream code can pattern-match on the error kind and surface the
-/// failing quote ID without re-parsing the message.
-fn bad_fit_envelope_error(step_id: &str, report: &CalibrationReport) -> EnvelopeError {
-    // Prefer the actual success-gate tolerance (recorded in metadata by
-    // `for_type_with_tolerance`) over the solver's internal root-finder
-    // tolerance, which is a different quantity and misleading here.
-    let tolerance = report
-        .metadata
-        .get("success_tolerance")
-        .and_then(|s| s.parse::<f64>().ok())
-        .unwrap_or_else(|| report.solver_config.tolerance());
-    EnvelopeError::SolverNotConverged {
+/// Require the exact acceptance gate used to judge this step's residuals.
+fn step_success_tolerance(
+    step_id: &str,
+    report: &CalibrationReport,
+) -> std::result::Result<f64, ExecuteError> {
+    report
+        .success_tolerance
+        .filter(|value| value.is_finite() && *value > 0.0)
+        .ok_or_else(|| {
+            ExecuteError::other(
+                ExecutionStage::Solver,
+                Some(step_id.to_string()),
+                finstack_quant_core::Error::Validation(
+                    "calibration step report requires a positive finite acceptance tolerance"
+                        .to_string(),
+                ),
+            )
+        })
+}
+
+fn bad_fit_envelope_error(
+    step_id: &str,
+    report: &CalibrationReport,
+) -> std::result::Result<EnvelopeError, ExecuteError> {
+    Ok(EnvelopeError::SolverNotConverged {
         step_id: step_id.to_string(),
         max_residual: report.max_residual,
-        tolerance,
+        tolerance: step_success_tolerance(step_id, report)?,
         iterations: report.iterations.try_into().unwrap_or(u32::MAX),
         worst_quote_id: report.worst_quote_id.clone(),
         worst_quote_residual: report.worst_quote_residual,
-    }
+    })
 }
 
 /// Parse a JSON calibration envelope and calibrate it.
@@ -850,30 +858,70 @@ mod tests {
     }
 
     #[test]
+    fn aggregation_uses_exact_typed_fit_tolerance_and_requires_a_gate() {
+        for (tolerance, residual, expected) in
+            [(1e-3, 5e-4, 0.5), (1.004e-3, 1.003e-3, 1.003 / 1.004)]
+        {
+            let report = CalibrationReport::new(
+                BTreeMap::from([("quote".to_string(), residual)]),
+                1,
+                true,
+                "fit",
+            )
+            .with_success_tolerance(tolerance);
+            let mut state = ExecutionState::new();
+            state
+                .record_result("step", report.clone())
+                .expect("typed tolerance");
+            assert!(
+                (state.aggregated_residuals["step:quote:tolerance_ratio"] - expected).abs() < 1e-12
+            );
+            let EnvelopeError::SolverNotConverged {
+                tolerance: actual, ..
+            } = bad_fit_envelope_error("step", &report).expect("fit error")
+            else {
+                panic!("wrong error")
+            };
+            assert_eq!(actual, tolerance);
+        }
+        let mut state = ExecutionState::new();
+        assert!(state
+            .record_result(
+                "step",
+                CalibrationReport::new(BTreeMap::new(), 0, true, "no gate")
+            )
+            .is_err());
+    }
+
+    #[test]
     fn aggregated_report_uses_dimensionless_tolerance_ratios() {
         let cfg = crate::config::CalibrationConfig {
             solver: crate::solver::SolverConfig::default().with_tolerance(1e-12),
             ..Default::default()
         };
         let mut state = ExecutionState::new();
-        state.record_result(
-            "s1",
-            CalibrationReport::for_type_with_tolerance(
-                "pv",
-                BTreeMap::from([("a".to_string(), 3.0)]),
-                2,
-                3.0,
-            ),
-        );
-        state.record_result(
-            "s2",
-            CalibrationReport::for_type_with_tolerance(
-                "vol",
-                BTreeMap::from([("b".to_string(), 4.0)]),
-                3,
-                2.0,
-            ),
-        );
+        state
+            .record_result(
+                "s1",
+                CalibrationReport::for_type_with_tolerance(
+                    "pv",
+                    BTreeMap::from([("a".to_string(), 3.0)]),
+                    2,
+                    3.0,
+                ),
+            )
+            .expect("record step");
+        state
+            .record_result(
+                "s2",
+                CalibrationReport::for_type_with_tolerance(
+                    "vol",
+                    BTreeMap::from([("b".to_string(), 4.0)]),
+                    3,
+                    2.0,
+                ),
+            )
+            .expect("record step");
         let report = aggregate_plan_report(
             state.aggregated_residuals,
             state.total_iterations,

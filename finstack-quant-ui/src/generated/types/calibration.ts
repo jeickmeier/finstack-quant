@@ -2262,10 +2262,6 @@ export type D_08Aea844Abd10Cb00E40 =
       expiry_extrapolation?: "error" | "clamp";
       kind: "vol_surface";
       /**
-       * Volatility model used for calibration.
-       */
-      model: "sabr";
-      /**
        * Optional spot price override.
        */
       spot_override?: number | null;
@@ -5651,25 +5647,6 @@ export interface DE5Cd95285D6C312C656E {
  */
 export interface DE1605Cebc97720Bf2277 {
   /**
-   * High-level calibration method (bootstrap vs global solve).
-   *
-   * **Note**: When using the plan-driven API, this field is typically overwritten
-   * by the step-level `params.method` for each calibration step. The step-level
-   * method always takes precedence. This field serves as runtime state passed
-   * from calibration targets to the underlying solvers.
-   */
-  calibration_method?:
-    | "bootstrap"
-    | {
-        global_solve: {
-          /**
-           * Use analytical Jacobian if available (otherwise finite-difference).
-           */
-          use_analytical_jacobian: boolean;
-          [k: string]: unknown;
-        };
-      };
-  /**
    * Whether to compute detailed calibration diagnostics (condition number,
    * per-quote quality metrics, singular values, R-squared, etc.).
    *
@@ -6001,15 +5978,15 @@ export interface D_62F16222Adf57Cd5E917 {
   /**
    * Enable arbitrage checks
    */
-  check_arbitrage: boolean;
+  check_arbitrage?: boolean;
   /**
    * Enable forward rate positivity check
    */
-  check_forward_positivity: boolean;
+  check_forward_positivity?: boolean;
   /**
    * Enable monotonicity checks
    */
-  check_monotonicity: boolean;
+  check_monotonicity?: boolean;
   /**
    * When true, arbitrage violations (calendar/butterfly) produce warnings instead of errors.
    * Default is false - arbitrage violations fail validation.
@@ -6019,35 +5996,35 @@ export interface D_62F16222Adf57Cd5E917 {
   /**
    * Maximum allowed annual CPI growth (default 0.50 = 50%)
    */
-  max_cpi_growth: number;
+  max_cpi_growth?: number;
   /**
    * Maximum allowed forward rate
    */
-  max_forward_rate: number;
+  max_forward_rate?: number;
   /**
    * Maximum allowed forward inflation (default 0.50 = 50%)
    */
-  max_fwd_inflation: number;
+  max_fwd_inflation?: number;
   /**
    * Maximum allowed hazard rate (default 0.5 = 50%)
    */
-  max_hazard_rate: number;
+  max_hazard_rate?: number;
   /**
    * Maximum allowed volatility (default 5.0 = 500%)
    */
-  max_volatility: number;
+  max_volatility?: number;
   /**
    * Minimum allowed annual CPI growth (default -0.10 = -10%)
    */
-  min_cpi_growth: number;
+  min_cpi_growth?: number;
   /**
    * Minimum allowed forward rate (can be slightly negative)
    */
-  min_forward_rate: number;
+  min_forward_rate?: number;
   /**
    * Minimum allowed forward inflation (default -0.20 = -20%)
    */
-  min_fwd_inflation: number;
+  min_fwd_inflation?: number;
   /**
    * Minimum LGD denominator used for hazard-rate initial guesses.
    */
@@ -6059,7 +6036,7 @@ export interface D_62F16222Adf57Cd5E917 {
   /**
    * Numerical tolerance for comparisons
    */
-  tolerance: number;
+  tolerance?: number;
 }
 /**
  * Volatility-surface specific solver configuration (SABR and SVI).

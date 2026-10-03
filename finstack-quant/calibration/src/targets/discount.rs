@@ -282,10 +282,9 @@ Global solve requires strictly increasing times.",
         quotes: &[MarketQuote],
         context: &MarketContext,
         global_config: &CalibrationConfig,
-    ) -> Result<(MarketContext, CalibrationReport)> {
-        // Apply step-level calibration method preferences to the shared config.
-        let mut config = global_config.clone();
-        config.calibration_method = params.method.clone();
+    ) -> Result<(DiscountCurve, CalibrationReport)> {
+        // Retain the caller's numerical and acceptance policy.
+        let config = global_config.clone();
 
         // Build rate_calibration sidecar before consuming rates_quotes so that the
         // produced curve carries the original benchmark quotes.  Downstream metrics
@@ -409,23 +408,28 @@ Global solve requires strictly increasing times.",
                     // the caller's requested final interpolation while meeting
                     // the same fit tolerance.
                     target.initial_curve = Some(seed_curve);
-                    let refinement_config = CalibrationConfig {
-                        calibration_method: CalibrationMethod::GlobalSolve {
-                            use_analytical_jacobian: true,
-                        },
-                        ..config.clone()
-                    };
+
                     GlobalFitOptimizer::optimize(
                         &target,
                         &prepared_quotes,
-                        &refinement_config,
+                        &config,
                         success_tolerance,
+                        true,
                     )?
                 }
             }
-            CalibrationMethod::GlobalSolve { .. } => {
-                GlobalFitOptimizer::optimize(&target, &prepared_quotes, &config, success_tolerance)?
-            }
+            CalibrationMethod::GlobalSolve { .. } => GlobalFitOptimizer::optimize(
+                &target,
+                &prepared_quotes,
+                &config,
+                success_tolerance,
+                matches!(
+                    params.method,
+                    CalibrationMethod::GlobalSolve {
+                        use_analytical_jacobian: true
+                    }
+                ),
+            )?,
         };
 
         // Prefer a high-quality bootstrap seed if it outperforms the global solve.
@@ -451,8 +455,6 @@ Global solve requires strictly increasing times.",
             .to_builder_with_id(id)
             .rate_calibration(rate_calibration)
             .build()?;
-
-        let new_context = context.clone().insert(curve);
 
         // Track solver configuration used and any seed diagnostics for transparency.
         report.update_solver_config(config.solver);
@@ -484,7 +486,7 @@ Global solve requires strictly increasing times.",
             .metadata
             .insert("currency".to_string(), params.currency.to_string());
 
-        Ok((new_context, report))
+        Ok((curve, report))
     }
 
     fn rate_calibration(
@@ -694,79 +696,15 @@ impl BootstrapTarget for DiscountCurveTarget {
         })
     }
 
-    fn initial_guess(&self, quote: &Self::Quote, previous_knots: &[(f64, f64)]) -> Result<f64> {
+    fn initial_guess(&self, quote: &Self::Quote, _previous_knots: &[(f64, f64)]) -> Result<f64> {
         let t = self.quote_time(quote)?;
         let (df_lo, df_hi) = self.df_bounds_for_time(t);
-
-        // Try exact match for Deposit/FRA/Swap using simple discounting guess
-        // We use pillar_time as proxy for duration.
-        // df = 1 / (1 + rate * t)
-        if let CalibrationQuote::Rates(pq) = quote {
-            use crate::quotes::rates::RateQuote;
-            match pq.quote.as_ref() {
-                RateQuote::Deposit { rate, .. }
-                | RateQuote::Fra { rate, .. }
-                | RateQuote::Swap { rate, .. } => {
-                    // Simple guess: ACT/360 or similar effect using pillar time
-                    // For initial guess, accuracy isn't critical, just finding the basin of attraction.
-                    // df = 1 / (1 + r * t)
-                    let df = 1.0 / (1.0 + rate * t);
-                    return Ok(df.clamp(df_lo, df_hi));
-                }
-                RateQuote::Futures {
-                    price,
-                    convexity_adjustment,
-                    ..
-                } => {
-                    // Hull convention: forward = futures - convexity_adjustment
-                    let futures_rate = (100.0 - price) / 100.0;
-                    let forward_rate = futures_rate - convexity_adjustment;
-                    let df = 1.0 / (1.0 + forward_rate * t);
-                    return Ok(df.clamp(df_lo, df_hi));
-                }
-            }
-        }
-
-        // Try to get a rate for deposit-like guess?
-        // Since we abstracted the quote types, let's use a robust extrapolation fallback.
-        let mut guess = None;
-        let last_two: Vec<(f64, f64)> = previous_knots
-            .iter()
-            .copied()
-            .rev()
-            .filter(|(ti, dfi)| *ti > MIN_GRID_SPACING && dfi.is_finite() && *dfi > 0.0)
-            .take(2)
-            .collect();
-
-        if last_two.len() == 2 {
-            let (t1, df1) = last_two[0];
-            let (t0, df0) = last_two[1];
-            let dt = t1 - t0;
-            if dt > MIN_GRID_SPACING {
-                let f = (df0.ln() - df1.ln()) / dt;
-                let ln_df = df1.ln() - f * (t - t1);
-                let df = ln_df.exp();
-                if df.is_finite() && df > 0.0 {
-                    guess = Some(df);
-                }
-            }
-        } else if last_two.len() == 1 {
-            let (t1, df1) = last_two[0];
-            if t1 > MIN_GRID_SPACING {
-                let df = df1.powf(t / t1);
-                if df.is_finite() && df > 0.0 {
-                    guess = Some(df);
-                }
-            }
-        }
-
-        // If no previous knots (first point), try a safe default (e.g. rate=0.03 or similar)
-        let df = guess.unwrap_or_else(|| {
-            // Fallback: 3% rate
-            (-0.03 * t).exp()
-        });
-
-        Ok(df.clamp(df_lo, df_hi))
+        let CalibrationQuote::Rates(prepared) = quote else {
+            return Err(finstack_quant_core::Error::Validation(
+                "discount curve calibration requires a rates quote".to_string(),
+            ));
+        };
+        Ok((1.0 / (1.0 + prepared.quote.implied_rate() * t)).clamp(df_lo, df_hi))
     }
 
     fn scan_points(&self, quote: &Self::Quote, initial_guess: f64) -> Result<Vec<f64>> {
@@ -1162,9 +1100,6 @@ mod tests {
         let base_date = Date::from_calendar_date(2025, Month::December, 10).expect("base_date");
         let mut config = CalibrationConfig::default();
         config.solver = config.solver.with_tolerance(1e-9);
-        config.calibration_method = crate::config::CalibrationMethod::GlobalSolve {
-            use_analytical_jacobian: true,
-        };
 
         let target = DiscountCurveTarget::new(DiscountCurveTargetParams {
             base_date,
@@ -1220,6 +1155,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect("solve");
         println!("Max residual: {}", report.max_residual);
@@ -1233,9 +1169,6 @@ mod tests {
         let base_date = Date::from_calendar_date(2025, Month::December, 10).expect("base_date");
         let mut config = CalibrationConfig::default();
         config.solver = config.solver.with_tolerance(1e-9);
-        config.calibration_method = crate::config::CalibrationMethod::GlobalSolve {
-            use_analytical_jacobian: true,
-        };
 
         // Helper function to run calibration with a given notional
         let run_calibration = |notional: f64| -> DiscountCurve {
@@ -1298,6 +1231,7 @@ mod tests {
                 &quotes,
                 &config,
                 config.discount_curve.validation_tolerance,
+                true,
             )
             .expect("solve");
 

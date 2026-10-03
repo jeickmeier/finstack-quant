@@ -31510,7 +31510,6 @@ export interface CalibrationNamespace {
    * @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
    * @param baseDate - ISO-8601 surface base date.
    * @param underlyingTicker - Underlying identifier the quotes reference.
-   * @param model - Surface model label; defaults to `"sabr"`.
    * @param quoteSet - Name of the quote set in `plan.quote_sets`; defaults to `id`.
    * @param volSurfaceId - Identifier of the produced surface; defaults to `id`.
    * @param params - Optional object (or JSON) of further wire fields: `discount_curve_id`, `beta`, `target_expiries`, `target_strikes`, `spot_override`, `dividend_yield_override`, `expiry_extrapolation`. An entry named like another argument is replaced by that argument.
@@ -31521,7 +31520,6 @@ export interface CalibrationNamespace {
     id: string,
     baseDate: string,
     underlyingTicker: string,
-    model?: string | null,
     quoteSet?: string | null,
     volSurfaceId?: string | null,
     params?: Record<string, unknown> | string | null

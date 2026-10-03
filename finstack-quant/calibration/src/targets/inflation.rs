@@ -276,7 +276,7 @@ impl InflationCurveTarget {
         quotes: &[MarketQuote],
         context: &MarketContext,
         global_config: &CalibrationConfig,
-    ) -> Result<(MarketContext, CalibrationReport)> {
+    ) -> Result<(InflationCurve, CalibrationReport)> {
         let inflation_quotes: Vec<InflationQuote> = quotes.extract_quotes();
 
         if inflation_quotes.is_empty() {
@@ -285,8 +285,7 @@ impl InflationCurveTarget {
             ));
         }
 
-        let mut config = global_config.clone();
-        config.calibration_method = params.method.clone();
+        let config = global_config.clone();
 
         let target = InflationCurveTarget::new(params.clone(), context.clone(), config.clone());
         let prepared_quotes = target.prepare_quotes(inflation_quotes)?;
@@ -302,9 +301,18 @@ impl InflationCurveTarget {
                 &config,
                 success_tolerance,
             )?,
-            CalibrationMethod::GlobalSolve { .. } => {
-                GlobalFitOptimizer::optimize(&target, &prepared_quotes, &config, success_tolerance)?
-            }
+            CalibrationMethod::GlobalSolve { .. } => GlobalFitOptimizer::optimize(
+                &target,
+                &prepared_quotes,
+                &config,
+                success_tolerance,
+                matches!(
+                    params.method,
+                    CalibrationMethod::GlobalSolve {
+                        use_analytical_jacobian: true
+                    }
+                ),
+            )?,
         };
 
         report.update_solver_config(config.solver);
@@ -319,8 +327,7 @@ impl InflationCurveTarget {
             .metadata
             .insert("index".to_string(), params.index.clone());
 
-        let new_context = context.clone().insert(curve);
-        Ok((new_context, report))
+        Ok((curve, report))
     }
 
     fn cpi_hard_min(&self) -> f64 {

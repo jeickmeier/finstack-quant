@@ -535,14 +535,6 @@ pub struct CalibrationConfig {
     /// Rate bounds for forward/zero rate calibration (when policy is `Explicit`).
     #[serde(default)]
     pub rate_bounds: RateBounds,
-    /// High-level calibration method (bootstrap vs global solve).
-    ///
-    /// **Note**: When using the plan-driven API, this field is typically overwritten
-    /// by the step-level `params.method` for each calibration step. The step-level
-    /// method always takes precedence. This field serves as runtime state passed
-    /// from calibration targets to the underlying solvers.
-    #[serde(default)]
-    pub calibration_method: CalibrationMethod,
 
     /// Whether to compute detailed calibration diagnostics (condition number,
     /// per-quote quality metrics, singular values, R-squared, etc.).
@@ -636,7 +628,6 @@ impl Default for CalibrationConfig {
             validation: crate::validation::ValidationConfig::default(),
             rate_bounds_policy: RateBoundsPolicy::AutoCurrency,
             rate_bounds: RateBounds::default(),
-            calibration_method: CalibrationMethod::default(),
             compute_diagnostics: false,
             discount_curve: DiscountCurveSolveConfig::default(),
             forward_curve: ForwardCurveSolveConfig::default(),
@@ -853,13 +844,6 @@ impl CalibrationConfig {
         self
     }
 
-    /// Set the calibration method (bootstrap vs global solve).
-    #[must_use]
-    pub fn with_calibration_method(mut self, method: CalibrationMethod) -> Self {
-        self.calibration_method = method;
-        self
-    }
-
     /// Set the solver tolerance.
     #[must_use]
     pub fn with_tolerance(mut self, tolerance: f64) -> Self {
@@ -916,9 +900,10 @@ impl CalibrationConfig {
             ))
         })?;
         merge_json(&mut base, overrides);
-        let merged: Self = serde_json::from_value(base).map_err(|e| {
+        let mut merged: Self = serde_json::from_value(base).map_err(|e| {
             finstack_quant_core::Error::Validation(format!("invalid calibration config: {e}"))
         })?;
+        merged.explain = self.explain;
         merged.validate()?;
         Ok(merged)
     }
@@ -1142,5 +1127,22 @@ mod fx_and_hierarchy_settings_tests {
         let config = CalibrationConfig::default().with_max_iterations(0);
         assert!(config.validate().is_err());
         assert!(config.create_lm_solver().is_err());
+    }
+}
+
+#[cfg(test)]
+mod override_regressions {
+    use super::*;
+
+    #[test]
+    fn json_overrides_preserve_nonserialized_explanation_options() {
+        let config = CalibrationConfig {
+            explain: ExplainOpts::enabled(),
+            ..Default::default()
+        };
+        let merged = config
+            .with_json_overrides(serde_json::json!({}))
+            .expect("empty override");
+        assert!(merged.explain.enabled);
     }
 }

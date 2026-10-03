@@ -4,7 +4,7 @@ use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::pickle_support::reduce_via_json;
 use crate::bindings::repr_support::repr_from_serde;
-use crate::errors::{core_to_py, serde_json_to_py, value_error};
+use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_calibration::{CalibrationConfig, RateBounds, SolverConfig, ValidationConfig};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -28,35 +28,6 @@ pub(crate) fn extract_config(
     CalibrationConfig::default()
         .with_json_overrides(overrides)
         .map_err(core_to_py)
-}
-
-/// Overlay ``**overrides`` (top-level wire fields) onto a serde value.
-fn overlay_kwargs<T>(
-    py: Python<'_>,
-    base: &T,
-    overrides: Option<&Bound<'_, PyDict>>,
-    label: &str,
-) -> PyResult<T>
-where
-    T: serde::Serialize + serde::de::DeserializeOwned,
-{
-    let mut value = serde_json::to_value(base)
-        .map_err(|e| serde_json_to_py(e, &format!("failed to serialize {label}")))?;
-    if let Some(overrides) = overrides {
-        let Value::Object(map) = &mut value else {
-            return Err(value_error(format!("{label} is not a JSON object")));
-        };
-        for (key, item) in overrides.iter() {
-            let key: String = key.extract()?;
-            let item = if item.is_none() {
-                Value::Null
-            } else {
-                py_to_json_value(py, &item, &format!("{label} field '{key}'"))?
-            };
-            map.insert(key, item);
-        }
-    }
-    serde_json::from_value(value).map_err(|e| serde_json_to_py(e, &format!("invalid {label}")))
 }
 
 /// Numerical convergence settings shared by calibration solvers.
@@ -354,12 +325,12 @@ impl PyValidationConfig {
     #[pyo3(signature = (**overrides))]
     #[pyo3(text_signature = "(**overrides)")]
     fn new(py: Python<'_>, overrides: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
-        let inner: ValidationConfig = overlay_kwargs(
-            py,
-            &ValidationConfig::default(),
-            overrides,
-            "ValidationConfig",
-        )?;
+        let value = match overrides {
+            Some(overrides) => py_to_json_value(py, overrides.as_any(), "ValidationConfig")?,
+            None => serde_json::json!({}),
+        };
+        let inner: ValidationConfig = serde_json::from_value(value)
+            .map_err(|e| serde_json_to_py(e, "invalid ValidationConfig"))?;
         inner.validate().map_err(core_to_py)?;
         Ok(Self::from_inner(inner))
     }
