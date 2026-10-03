@@ -19,6 +19,8 @@ Examples
 
 from __future__ import annotations
 
+from typing import Any
+
 __all__ = [
     "get",
     "index",
@@ -151,7 +153,7 @@ def valuation_result_schema() -> str:
 
     """
 
-def validate_instrument_envelope_json(instrument_json: str) -> str:
+def validate_instrument_envelope_json(instrument_json: dict[str, Any] | str) -> str:
     """
     Validate an instrument envelope payload against the canonical schemas.
 
@@ -161,9 +163,9 @@ def validate_instrument_envelope_json(instrument_json: str) -> str:
 
     Parameters
     ----------
-    instrument_json : str
-        JSON text of a ``finstack_quant.instrument/1`` envelope. Pass
-        ``json.dumps(payload)`` when starting from a Python dictionary.
+    instrument_json : dict[str, Any] | str
+        A ``finstack_quant.instrument/1`` envelope, as a dict (the form
+        ``instrument_envelope_from_spec`` returns) or JSON text.
 
     Returns
     -------
@@ -178,6 +180,8 @@ def validate_instrument_envelope_json(instrument_json: str) -> str:
         If ``instrument_json`` is not valid JSON, or if it violates the
         envelope or the selected type schema. The message enumerates every
         violation with its instance path.
+    TypeError
+        If ``instrument_json`` is neither a dict nor a string.
 
     Examples
     --------
@@ -189,7 +193,7 @@ def validate_instrument_envelope_json(instrument_json: str) -> str:
 
     """
 
-def validate_instrument_type_json(instrument_type: str, instrument_json: str) -> str:
+def validate_instrument_type_json(instrument_type: str, instrument_json: dict[str, Any] | str) -> str:
     """
     Validate a payload against one specific instrument type's schema.
 
@@ -202,9 +206,8 @@ def validate_instrument_type_json(instrument_type: str, instrument_json: str) ->
     instrument_type : str
         Canonical registry discriminator whose schema is used for validation.
         Call :func:`instrument_types` for the complete set of valid values.
-    instrument_json : str
-        JSON text to validate against that type schema. Pass
-        ``json.dumps(payload)`` when starting from a Python dictionary.
+    instrument_json : dict[str, Any] | str
+        Payload to validate against that type schema, as a dict or JSON text.
 
     Returns
     -------
@@ -220,6 +223,8 @@ def validate_instrument_type_json(instrument_type: str, instrument_json: str) ->
     ValueError
         If ``instrument_json`` is not valid JSON, or if it violates the
         selected type schema.
+    TypeError
+        If ``instrument_json`` is neither a dict nor a string.
 
     Examples
     --------

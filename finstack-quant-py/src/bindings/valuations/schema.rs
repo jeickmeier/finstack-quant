@@ -206,9 +206,9 @@ fn valuation_result_schema() -> PyResult<String> {
 ///
 /// Parameters
 /// ----------
-/// instrument_json : str
-///     JSON text of a ``finstack_quant.instrument/1`` envelope. Pass
-///     ``json.dumps(payload)`` when starting from a Python dictionary.
+/// instrument_json : dict | str
+///     A ``finstack_quant.instrument/1`` envelope, as a dict (the form
+///     ``instrument_envelope_from_spec`` returns) or JSON text.
 ///
 /// Returns
 /// -------
@@ -223,6 +223,8 @@ fn valuation_result_schema() -> PyResult<String> {
 ///     If ``instrument_json`` is not valid JSON, or if it violates the
 ///     envelope or the selected type schema. The message enumerates every
 ///     violation with its instance path.
+/// TypeError
+///     If ``instrument_json`` is neither a dict nor a string.
 ///
 /// Examples
 /// --------
@@ -233,8 +235,9 @@ fn valuation_result_schema() -> PyResult<String> {
 /// 'finstack_quant.instrument/1'
 #[pyfunction]
 #[pyo3(text_signature = "(instrument_json)")]
-fn validate_instrument_envelope_json(instrument_json: &str) -> PyResult<String> {
-    let instance = parse_instance(instrument_json)?;
+fn validate_instrument_envelope_json(instrument_json: &Bound<'_, PyAny>) -> PyResult<String> {
+    let instrument_json = crate::bindings::extract::envelope_json_text(instrument_json)?;
+    let instance = parse_instance(&instrument_json)?;
     let envelope = canonical::instrument_envelope_schema().map_err(core_to_py)?;
     ensure_valid_against(envelope, &instance, "instrument envelope")?;
 
@@ -247,7 +250,7 @@ fn validate_instrument_envelope_json(instrument_json: &str) -> PyResult<String> 
             )
         })?
         .to_string();
-    validate_instrument_type_json(&instrument_type, instrument_json)
+    validate_instance_as_type(&instrument_type, &instance)
 }
 
 /// Validate a payload against one specific instrument type's schema.
@@ -261,9 +264,8 @@ fn validate_instrument_envelope_json(instrument_json: &str) -> PyResult<String> 
 /// instrument_type : str
 ///     Canonical registry discriminator whose schema is used for validation.
 ///     Call :func:`instrument_types` for the complete set of valid values.
-/// instrument_json : str
-///     JSON text to validate against that type schema. Pass
-///     ``json.dumps(payload)`` when starting from a Python dictionary.
+/// instrument_json : dict | str
+///     Payload to validate against that type schema, as a dict or JSON text.
 ///
 /// Returns
 /// -------
@@ -279,6 +281,8 @@ fn validate_instrument_envelope_json(instrument_json: &str) -> PyResult<String> 
 /// ValueError
 ///     If ``instrument_json`` is not valid JSON, or if it violates the
 ///     selected type schema.
+/// TypeError
+///     If ``instrument_json`` is neither a dict nor a string.
 ///
 /// Examples
 /// --------
@@ -289,11 +293,20 @@ fn validate_instrument_envelope_json(instrument_json: &str) -> PyResult<String> 
 /// 'finstack_quant.instrument/1'
 #[pyfunction]
 #[pyo3(text_signature = "(instrument_type, instrument_json)")]
-fn validate_instrument_type_json(instrument_type: &str, instrument_json: &str) -> PyResult<String> {
-    let instance = parse_instance(instrument_json)?;
+fn validate_instrument_type_json(
+    instrument_type: &str,
+    instrument_json: &Bound<'_, PyAny>,
+) -> PyResult<String> {
+    let instrument_json = crate::bindings::extract::envelope_json_text(instrument_json)?;
+    validate_instance_as_type(instrument_type, &parse_instance(&instrument_json)?)
+}
+
+/// Validate a decoded payload against one instrument type's schema and
+/// return its canonical compact JSON.
+fn validate_instance_as_type(instrument_type: &str, instance: &Value) -> PyResult<String> {
     let schema = canonical::instrument_schema(instrument_type).map_err(core_to_py)?;
-    ensure_valid_against(&schema, &instance, instrument_type)?;
-    canonical_json(&instance)
+    ensure_valid_against(&schema, instance, instrument_type)?;
+    canonical_json(instance)
 }
 
 /// Re-serialize a validated instance as canonical compact JSON.

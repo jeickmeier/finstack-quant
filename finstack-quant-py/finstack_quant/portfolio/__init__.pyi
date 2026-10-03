@@ -659,7 +659,7 @@ class PortfolioBuilder:
         Raises
         ------
         TypeError
-            If ``instrument`` is neither a typed instrument nor a JSON string.
+            If ``instrument`` is not a typed instrument, an envelope dict or a JSON string.
         ValueError
             If the instrument payload is invalid, ``quantity`` is not finite,
             ``unit`` is unknown, or the builder was already consumed.
@@ -12297,7 +12297,7 @@ class CandidatePosition:
         Raises
         ------
         TypeError
-            If ``instrument`` is neither a typed instrument nor a string.
+            If ``instrument`` is not a typed instrument, an envelope dict or a string.
         ValueError
             If the instrument payload is invalid or ``unit`` is unknown.
 

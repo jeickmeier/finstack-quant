@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Instrument envelope is a value (Python-binding audit FUP-003)
+
+#### Changed (breaking)
+
+- `instrument_envelope_from_spec` returns the envelope as a value instead of JSON text: Rust `pricer::instrument_envelope_from_spec` returns `InstrumentEnvelope`, Python returns a `dict`, WASM `valuations.instruments.instrumentEnvelopeFromSpec` returns a plain `InstrumentEnvelope` object. Drop the `json.loads` / `JSON.parse` around it; serialize with `serde_json` / `json.dumps` / `JSON.stringify` when the wire text is needed.
+
+#### Added
+
+- Python: every entry point that takes an instrument (`price_instrument`, `instrument_cashflows`, `calculate_var_with_pricing`, `Position`, attribution, scenarios, calibration, statements) accepts the envelope `dict` as well as JSON text or a typed instance, and `validate_instrument_json`, `validate_typed_instrument_json`, `pretty_instrument_json` and `schema.validate_instrument_envelope_json` / `schema.validate_instrument_type_json` accept a `dict` or JSON text.
+
 ### Cashflows and number parsing (Python-binding audit PR 4)
 
 #### Added

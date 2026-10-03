@@ -27935,7 +27935,7 @@ def bond_from_cashflows_json(
     ...
 
 def validate_instrument_json(
-    json: str,
+    json: dict[str, Any] | str,
     metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
 ) -> str:
     """
@@ -27943,9 +27943,10 @@ def validate_instrument_json(
 
     Parameters
     ----------
-    json : str
-        A ``finstack_quant.instrument/1`` envelope. Bare instrument payloads
-        are rejected.
+    json : dict[str, Any] | str
+        A ``finstack_quant.instrument/1`` envelope, as a dict (the form
+        :func:`instrument_envelope_from_spec` returns) or JSON text. Bare
+        instrument payloads are rejected.
     metric_pricing_overrides : MetricPricingOverrides or dict or str, optional
         Metric-time overrides merged into
         ``instrument.spec.metric_pricing_overrides`` before instrument
@@ -27965,6 +27966,8 @@ def validate_instrument_json(
         If the JSON is malformed, ``metric_pricing_overrides`` is invalid
         override JSON, the merged payload has an unknown instrument tag, or
         instrument-specific validation fails.
+    TypeError
+        If ``json`` is neither a dict nor a string.
 
     Examples
     --------
@@ -27977,7 +27980,7 @@ def validate_instrument_json(
     """
     ...
 
-def validate_typed_instrument_json(type_tag: str, json: str) -> str:
+def validate_typed_instrument_json(type_tag: str, json: dict[str, Any] | str) -> str:
     """
     Validate a payload as one exact instrument type and return the envelope.
 
@@ -27986,9 +27989,9 @@ def validate_typed_instrument_json(type_tag: str, json: str) -> str:
     type_tag : str
         Canonical instrument discriminator, such as ``"term_loan"`` or
         ``"fx_forward"``.
-    json : str
-        A ``finstack_quant.instrument/1`` envelope whose instrument type must
-        match *type_tag*.
+    json : dict[str, Any] | str
+        A ``finstack_quant.instrument/1`` envelope, as a dict or JSON text,
+        whose instrument type must match *type_tag*.
 
     Returns
     -------
@@ -28000,6 +28003,8 @@ def validate_typed_instrument_json(type_tag: str, json: str) -> str:
     ValueError
         If ``json`` is malformed, carries a different instrument type, or
         fails instrument validation.
+    TypeError
+        If ``json`` is neither a dict nor a string.
 
     Examples
     --------
@@ -28012,7 +28017,7 @@ def validate_typed_instrument_json(type_tag: str, json: str) -> str:
     """
     ...
 
-def pretty_instrument_json(json: str) -> str:
+def pretty_instrument_json(json: dict[str, Any] | str) -> str:
     """
     Re-render a canonical instrument envelope as pretty-printed JSON.
 
@@ -28030,6 +28035,8 @@ def pretty_instrument_json(json: str) -> str:
     ------
     ValueError
         If ``json`` is malformed or cannot be rendered.
+    TypeError
+        If ``json`` is neither a dict nor a string.
 
     Examples
     --------
@@ -28042,6 +28049,7 @@ def pretty_instrument_json(json: str) -> str:
 
 def price_instrument(
     instrument: str
+    | dict[str, Any]
     | Bond
     | TermLoan
     | InterestRateSwap
@@ -28069,14 +28077,15 @@ def price_instrument(
 
     Parameters
     ----------
-    instrument : str or Bond or TermLoan or InterestRateSwap or Swaption or CapFloor or CreditDefaultSwap or CdsIndex or FxForward or FxOption or CdsTranche or ConvertibleBond or EquityOption or StructuredCredit or CompositeInstrument
+    instrument : str or dict[str, Any] or Bond or TermLoan or InterestRateSwap or Swaption or CapFloor or CreditDefaultSwap or CdsIndex or FxForward or FxOption or CdsTranche or ConvertibleBond or EquityOption or StructuredCredit or CompositeInstrument
         Typed instrument instance (:class:`Bond`, :class:`TermLoan`,
         :class:`InterestRateSwap`, :class:`Swaption`, :class:`CapFloor`,
         :class:`CreditDefaultSwap`, :class:`CdsIndex`, :class:`FxForward`,
         :class:`FxOption`, :class:`CdsTranche`, :class:`ConvertibleBond`,
         :class:`EquityOption`, :class:`StructuredCredit`,
         :class:`~finstack_quant.valuations.composite.CompositeInstrument`) or a
-        canonical ``finstack_quant.instrument/1`` JSON envelope.
+        canonical ``finstack_quant.instrument/1`` envelope, as the dict
+        :func:`instrument_envelope_from_spec` returns or as JSON text.
     market : MarketContext or str
         Typed ``MarketContext`` or serialized market-context JSON.
     as_of : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -28140,7 +28149,7 @@ def price_instrument(
         quanto inputs, asset-currency mismatches, and an analytical barrier model
         requested for discrete monitoring; the message retains the cause.
     TypeError
-        If ``instrument`` is neither a typed instrument nor a string, or
+        If ``instrument`` is not a typed instrument, an envelope dict or a string, or
         ``market`` is neither a ``MarketContext`` nor a string.
 
     Notes
@@ -35633,7 +35642,7 @@ class MarketHistory:
         """
         ...
 
-def instrument_envelope_from_spec(type_tag: str, spec: dict[str, Any] | str) -> str:
+def instrument_envelope_from_spec(type_tag: str, spec: dict[str, Any] | str) -> dict[str, Any]:
     """
     Wrap a bare instrument spec in the canonical envelope after validating it.
 
@@ -35642,8 +35651,9 @@ def instrument_envelope_from_spec(type_tag: str, spec: dict[str, Any] | str) -> 
     class (FRA, deposit, FX spot/swap, inflation swaps, exotics, ...): build
     the type's ``spec`` object (see
     ``finstack_quant.valuations.schema.instrument_type_schema(type_tag)``) and
-    pass the returned envelope to :func:`price_instrument` or
-    :func:`instrument_cashflows`.
+    pass the returned envelope dict straight to :func:`price_instrument`,
+    :func:`instrument_cashflows` or any other entry point that takes an
+    instrument.
 
     Parameters
     ----------
@@ -35657,8 +35667,10 @@ def instrument_envelope_from_spec(type_tag: str, spec: dict[str, Any] | str) -> 
 
     Returns
     -------
-    str
-        The compact canonical ``finstack_quant.instrument/1`` envelope.
+    dict[str, Any]
+        The canonical ``finstack_quant.instrument/1`` envelope, with keys
+        ``schema`` and ``instrument`` (``{"type", "spec"}``). Use
+        ``json.dumps`` when the wire text is needed.
 
     Raises
     ------
@@ -35669,21 +35681,18 @@ def instrument_envelope_from_spec(type_tag: str, spec: dict[str, Any] | str) -> 
 
     Examples
     --------
-    >>> import json
     >>> from finstack_quant.valuations.instruments import instrument_envelope_from_spec
-    >>> envelope = json.loads(
-    ...     instrument_envelope_from_spec(
-    ...         "fx_spot",
-    ...         {
-    ...             "id": "EURUSD-SPOT",
-    ...             "base_currency": "EUR",
-    ...             "quote_currency": "USD",
-    ...             "settlement_date": "2025-01-17",
-    ...             "quoted_spot": 1.2,
-    ...             "notional": {"amount": "1000000", "currency": "EUR"},
-    ...             "attributes": {},
-    ...         },
-    ...     )
+    >>> envelope = instrument_envelope_from_spec(
+    ...     "fx_spot",
+    ...     {
+    ...         "id": "EURUSD-SPOT",
+    ...         "base_currency": "EUR",
+    ...         "quote_currency": "USD",
+    ...         "settlement_date": "2025-01-17",
+    ...         "quoted_spot": 1.2,
+    ...         "notional": {"amount": "1000000", "currency": "EUR"},
+    ...         "attributes": {},
+    ...     },
     ... )
     >>> (envelope["instrument"]["type"], envelope["instrument"]["spec"]["id"])
     ('fx_spot', 'EURUSD-SPOT')
@@ -35708,9 +35717,10 @@ def instrument_cashflows(
 
     Parameters
     ----------
-    instrument : Bond | TermLoan | InterestRateSwap | CdsOption | ... | str
+    instrument : Bond | TermLoan | InterestRateSwap | CdsOption | ... | dict | str
         Typed instrument instance or a canonical
-        ``finstack_quant.instrument/1`` JSON envelope.
+        ``finstack_quant.instrument/1`` envelope, as the dict
+        :func:`instrument_envelope_from_spec` returns or as JSON text.
     market : MarketContext | str
         Typed ``MarketContext`` or serialized market-context JSON.
     as_of : datetime.date | datetime.datetime | pd.Timestamp | str
@@ -35727,7 +35737,7 @@ def instrument_cashflows(
     Raises
     ------
     TypeError
-        If ``instrument`` is neither a typed instrument nor a JSON string.
+        If ``instrument`` is not a typed instrument, an envelope dict or a JSON string.
     KeyError
         If a curve or fixing series the instrument depends on is missing
         from ``market``.
@@ -36048,7 +36058,7 @@ def calculate_var_with_pricing(
     Raises
     ------
     TypeError
-        If an ``instruments`` entry is neither a typed instrument nor a JSON string.
+        If an ``instruments`` entry is not a typed instrument, an envelope dict or a JSON string.
     ValueError
         If an instrument, ``config``, ``history`` or ``model`` is invalid, the
         confidence level is outside ``(0, 1)``, a non-empty portfolio has no
