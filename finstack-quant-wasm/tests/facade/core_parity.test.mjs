@@ -612,6 +612,59 @@ test('ScheduleBuilder setters update the builder in place and round-trip its spe
   assert.deepEqual([imm.imm_mode, imm.cds_imm_mode], [true, false]);
 });
 
+test('cdsImm / imm set quarterly short_back like Rust ScheduleBuilder; a later frequency wins', () => {
+  const builder = core.Schedule.builder(ep('2025-01-15'), ep('2026-01-15'))
+    .cdsImm()
+    .frequency('1M');
+  const spec = builder.toSpec();
+  assert.deepEqual([spec.frequency, spec.stub], [{ count: 1, unit: 'months' }, 'short_back']);
+  assert.equal(core.Schedule.fromSpec(spec).toJson(), builder.build().toJson());
+  assert.equal(builder.build().dates.length, 14);
+  const imm = core.Schedule.builder(ep('2025-01-15'), ep('2026-01-15'))
+    .frequency('1M')
+    .imm()
+    .toSpec();
+  assert.deepEqual([imm.frequency, imm.stub], [{ count: 3, unit: 'months' }, 'short_back']);
+});
+
+test('MarketContext.len counts the FX matrix and collateral mappings', () => {
+  assert.equal(new core.MarketContext().len(), 0);
+  const fxOnly = new core.MarketContext();
+  fxOnly.insertFx(fx());
+  assert.deepEqual([fxOnly.len(), fxOnly.isEmpty()], [1, false]);
+  const collateralOnly = new core.MarketContext();
+  collateralOnly.mapCollateral('USD-CSA', 'USD-OIS');
+  assert.deepEqual([collateralOnly.len(), collateralOnly.isEmpty()], [1, false]);
+});
+
+test('CreditIndexData issuer accessors fall back to the index data', () => {
+  const hazard = core.HazardCurve.flat('CDX-IG-HZD', '2025-01-02', 0.01, 0.4);
+  const data = new core.CreditIndexData(4, 0.4, hazard, baseCorrelation());
+  assert.equal(data.hasIssuerCurves(), false);
+  assert.deepEqual(data.issuerIds(), []);
+  assert.equal(data.getIssuerCurve('A').id, 'CDX-IG-HZD');
+  assert.equal(data.getIssuerRecovery('A'), 0.4);
+  assert.equal(data.getIssuerWeight('A'), 0.25);
+  assert.throws(() => data.getIssuerWeight(1), { name: 'TypeError' });
+
+  const context = new core.MarketContext();
+  context.insert(hazard);
+  context.insert(core.HazardCurve.flat('A-HZD', '2025-01-02', 0.02, 0.3));
+  context.insert(baseCorrelation());
+  context.insertCreditIndex('CDX', new core.CreditIndexData(2, 0.4, hazard, baseCorrelation()));
+  const state = JSON.parse(context.toJson());
+  Object.assign(state.credit_indices[0], {
+    issuer_credit_curve_ids: { A: 'A-HZD', B: 'CDX-IG-HZD' },
+    issuer_recovery_rates: { A: 0.3 },
+    issuer_weights: { A: 0.25, B: 0.75 },
+  });
+  const loaded = core.MarketContext.fromJson(JSON.stringify(state)).getCreditIndex('CDX');
+  assert.deepEqual(loaded.issuerIds(), ['A', 'B']);
+  assert.equal(loaded.getIssuerCurve('A').id, 'A-HZD');
+  assert.deepEqual([loaded.getIssuerRecovery('A'), loaded.getIssuerRecovery('B')], [0.3, 0.4]);
+  assert.deepEqual([loaded.getIssuerWeight('A'), loaded.getIssuerWeight('B')], [0.25, 0.75]);
+});
+
 test('MarketContext inserts change the context in place and share curve data', () => {
   const context = new core.MarketContext();
   assert.equal(context.isEmpty(), true);

@@ -103,7 +103,7 @@ want it; domain-specific numerics (stochastic processes, payoffs) belong in
 |------|------------|
 | `types::{Rate, Bps, Percentage}` | Rate wrappers. See "Rate units" below. |
 | `types::{Id, CurveId, InstrumentId, IssuerId, IndexId, DealId, PoolId, PriceId, CalendarId, UnderlyingId}` | Phantom-typed identifiers; `#[serde(transparent)]`, so they stay plain strings on the wire. |
-| `types::{CreditRating, RatingLabel}` | Neutral rating enum, parsing, ordering, and stable labels. Rating-factor calculations live in `finstack-quant-models`. |
+| `types::CreditRating` | Neutral rating enum, parsing, ordering, and stable labels. Rating-factor calculations live in `finstack-quant-models`. |
 | `types::{Attributes, BarrierType}` | Attribute bags for matching/metadata; barrier taxonomy. |
 | `error::{Error, InputError, NonFiniteKind, Result}` | The unified error type, re-exported at the crate root. `Error` and `InputError` are `#[non_exhaustive]`; match with a wildcard arm. |
 | `config::{FinstackConfig, RoundingMode, RoundingPolicy, CurrencyScalePolicy, ToleranceConfig, ConfigExtensions}` | Explicit, caller-supplied configuration — there is no global state. |

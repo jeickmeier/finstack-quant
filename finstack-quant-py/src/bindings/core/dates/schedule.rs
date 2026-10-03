@@ -540,17 +540,24 @@ impl PyScheduleBuilder {
         slf
     }
 
-    /// Enable CDS IMM date mode and disable standard IMM mode.
+    /// Use CDS IMM dates (the 20th of March, June, September and December).
+    ///
+    /// Same semantics as the Rust ``ScheduleBuilder::cds_imm``: sets the
+    /// frequency to quarterly and the stub rule to ``short_back``, turns CDS
+    /// IMM mode on and standard IMM mode off. A later ``frequency`` or
+    /// ``stub_rule`` call wins, and ``to_spec()`` reports what ``build()`` uses.
     fn cds_imm(mut slf: PyRefMut<'_, Self>) -> PyRefMut<'_, Self> {
-        slf.spec.cds_imm_mode = true;
-        slf.spec.imm_mode = false;
+        slf.spec = slf.spec.clone().with_cds_imm();
         slf
     }
 
-    /// Enable standard IMM date mode and disable CDS IMM mode.
+    /// Use standard IMM dates (the third Wednesday of quarterly months).
+    ///
+    /// Same semantics as the Rust ``ScheduleBuilder::imm``: sets the frequency
+    /// to quarterly and the stub rule to ``short_back``, turns standard IMM
+    /// mode on and CDS IMM mode off.
     fn imm(mut slf: PyRefMut<'_, Self>) -> PyRefMut<'_, Self> {
-        slf.spec.imm_mode = true;
-        slf.spec.cds_imm_mode = false;
+        slf.spec = slf.spec.clone().with_imm();
         slf
     }
 

@@ -107,7 +107,7 @@ def test_to_hazard_curve_accepts_a_day_count_override() -> None:
     base_date = datetime.date(2024, 1, 15)
     curve = model.to_hazard_curve("ACME", base_date, [1.0, 5.0], 0.40, "act_360")
     assert curve.sp(5.0) == pytest.approx(1.0 - model.default_probability(5.0))
-    with pytest.raises(ValueError, match="Invalid day_count"):
+    with pytest.raises(ValueError, match="unknown day-count convention"):
         model.to_hazard_curve("ACME", base_date, [1.0, 5.0], 0.40, "not_a_day_count")
 
 

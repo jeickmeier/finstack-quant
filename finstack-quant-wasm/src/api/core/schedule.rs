@@ -451,20 +451,26 @@ impl JsScheduleBuilder {
 
     /// Use CDS IMM dates (the 20th of March, June, September and December).
     ///
+    /// Same semantics as the Rust `ScheduleBuilder::cds_imm`: sets the
+    /// frequency to quarterly and the stub rule to `short_back`. A later
+    /// `frequency` or `stubRule` call wins, and `toSpec()` reports what
+    /// `build()` uses.
+    ///
     /// @returns This builder, with CDS IMM mode on and standard IMM mode off.
     #[wasm_bindgen(js_name = cdsImm)]
     pub fn cds_imm(&mut self) {
-        self.spec.cds_imm_mode = true;
-        self.spec.imm_mode = false;
+        self.spec = self.spec.clone().with_cds_imm();
     }
 
     /// Use standard IMM dates (the third Wednesday of quarterly months).
     ///
+    /// Same semantics as the Rust `ScheduleBuilder::imm`: sets the frequency
+    /// to quarterly and the stub rule to `short_back`.
+    ///
     /// @returns This builder, with standard IMM mode on and CDS IMM mode off.
     #[wasm_bindgen(js_name = imm)]
     pub fn imm(&mut self) {
-        self.spec.imm_mode = true;
-        self.spec.cds_imm_mode = false;
+        self.spec = self.spec.clone().with_imm();
     }
 
     /// Set the policy for recoverable construction errors.

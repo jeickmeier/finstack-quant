@@ -187,3 +187,48 @@ fn schedule_spec_rejects_dual_imm_modes() {
     };
     assert!(spec.build().is_err());
 }
+
+/// `ScheduleSpec::with_cds_imm` / `with_imm` follow `ScheduleBuilder` setter
+/// semantics: they set quarterly/ShortBack, and a later frequency or stub
+/// change wins in `build` exactly as it does on the builder.
+#[test]
+fn schedule_spec_imm_setters_match_builder_semantics() {
+    let start = Date::from_calendar_date(2025, Month::January, 15).unwrap();
+    let end = Date::from_calendar_date(2026, Month::January, 15).unwrap();
+
+    // Bare CDS IMM: the spec carries quarterly/ShortBack and builds the
+    // same dates as the builder.
+    let spec = ScheduleSpec::new(start, end).unwrap().with_cds_imm();
+    assert_eq!(spec.frequency, Tenor::quarterly());
+    assert_eq!(spec.stub, StubKind::ShortBack);
+    let builder = ScheduleBuilder::new(start, end).unwrap().cds_imm();
+    assert_eq!(spec.build().unwrap().dates, builder.build().unwrap().dates);
+
+    // CDS IMM then monthly: the later frequency wins on both paths.
+    let mut spec = ScheduleSpec::new(start, end).unwrap().with_cds_imm();
+    spec.frequency = Tenor::monthly();
+    let built = spec.build().unwrap().dates;
+    let expected = ScheduleBuilder::new(start, end)
+        .unwrap()
+        .cds_imm()
+        .frequency(Tenor::monthly())
+        .build()
+        .unwrap()
+        .dates;
+    assert_eq!(built, expected);
+    assert!(built.len() > 6, "monthly CDS schedule, got {built:?}");
+
+    // Standard IMM: quarterly/ShortBack, same dates as the builder.
+    let spec = ScheduleSpec::new(start, end).unwrap().with_imm();
+    assert!(spec.imm_mode && !spec.cds_imm_mode);
+    assert_eq!(spec.frequency, Tenor::quarterly());
+    assert_eq!(
+        spec.build().unwrap().dates,
+        ScheduleBuilder::new(start, end)
+            .unwrap()
+            .imm()
+            .build()
+            .unwrap()
+            .dates
+    );
+}

@@ -29,6 +29,7 @@ from typing import Any, Optional, Sequence, Union
 import pandas as pd
 
 from finstack_quant.core.currency import Currency
+from finstack_quant.core.dates import DayCount
 from finstack_quant.core.money import Money
 from finstack_quant.core.market_data import context as context
 from finstack_quant.core.market_data import curves as curves
@@ -104,7 +105,7 @@ class DiscountCurve:
         *,
         interp: Optional[str] = None,
         extrapolation: Optional[str] = None,
-        day_count: Optional[str] = None,
+        day_count: Optional[Union[DayCount, str]] = None,
         validation_mode: Optional[str] = None,
         forward_floor: Optional[float] = None,
     ) -> None:
@@ -128,7 +129,7 @@ class DiscountCurve:
             Extrapolation policy (``"flat_forward"``, ``"flat_zero"``, or
             ``"none"``, which returns NaN outside the pillar range). Default
             ``"flat_forward"``.
-        day_count : str, optional
+        day_count : DayCount | str, optional
             Day-count label used to convert query dates to curve time. The
             default is fixed at ``"act_365f"`` (it is not inferred from ``id``).
         validation_mode : str, optional
@@ -246,7 +247,7 @@ class DiscountCurve:
         id: str,
         base_date: DateLike,
         points: Sequence[tuple[DateLike, float]],
-        day_count: Optional[str] = None,
+        day_count: Optional[Union[DayCount, str]] = None,
     ) -> DiscountCurve:
         """
         Construct a discount curve from dated discount-factor pillars.
@@ -259,7 +260,7 @@ class DiscountCurve:
             Valuation date anchoring ``t = 0``.
         points : Sequence[tuple[datetime.date or str, float]]
             ``(date, discount_factor)`` pillars on or after ``base_date``.
-        day_count : str, optional
+        day_count : DayCount | str, optional
             Day count used to convert pillar dates to years; default ``"act_365f"``.
 
         Returns
@@ -697,7 +698,7 @@ class ForwardCurve:
         base_date: DateLike,
         knots: Sequence[tuple[float, float]],
         *,
-        day_count: Optional[str] = None,
+        day_count: Optional[Union[DayCount, str]] = None,
         interp: Optional[str] = None,
         extrapolation: Optional[str] = None,
         projection_grid: Optional[Sequence[float]] = None,
@@ -717,7 +718,7 @@ class ForwardCurve:
             Valuation date anchoring ``t = 0``.
         knots : Sequence[tuple[float, float]]
             ``(time_years, forward_rate)`` pairs with rates as decimals.
-        day_count : str, optional
+        day_count : DayCount | str, optional
             Day-count label (``"act_360"``, ``"act_365f"``, ...). When
             omitted, Rust infers a market default from ``id``.
         interp : str, optional
@@ -1160,7 +1161,7 @@ class HazardCurve:
         knots: Sequence[tuple[float, float]],
         *,
         recovery_rate: float,
-        day_count: Optional[str] = None,
+        day_count: Optional[Union[DayCount, str]] = None,
         par_spreads: Optional[Sequence[tuple[float, float]]] = None,
         interp: Optional[str] = None,
         par_interp: Optional[str] = None,
@@ -1183,7 +1184,7 @@ class HazardCurve:
             default intensities as decimals (``0.02`` is 2% per year).
         recovery_rate : float
             Recovery on default as a decimal fraction in ``[0, 1]`` (keyword-only).
-        day_count : str, optional
+        day_count : DayCount | str, optional
             Day-count label; default ``"act_365f"``.
         par_spreads : Sequence[tuple[float, float]], optional
             ``(time_years, par_spread_bp)`` market quotes in **basis points**
@@ -1946,9 +1947,18 @@ class CreditIndexData:
         recovery_rate: float,
         index_credit_curve: HazardCurve,
         base_correlation_curve: BaseCorrelationCurve,
+        *,
+        issuer_curves: Optional[dict[str, HazardCurve]] = None,
+        issuer_recovery_rates: Optional[dict[str, float]] = None,
+        issuer_weights: Optional[dict[str, float]] = None,
     ) -> None:
         """
-        Construct homogeneous credit index data.
+        Construct credit index data, optionally with issuer-level detail.
+
+        Without the keyword arguments the bundle is homogeneous: every
+        constituent uses the index curve, the index recovery and weight
+        ``1 / num_constituents``. Supplying ``issuer_curves`` enables
+        heterogeneous (bespoke) tranche pricing.
 
         Parameters
         ----------
@@ -1960,11 +1970,29 @@ class CreditIndexData:
             Hazard curve for the index as a whole.
         base_correlation_curve : BaseCorrelationCurve
             Base correlations by detachment point.
+        issuer_curves : dict[str, HazardCurve], optional
+            Hazard curve per issuer identifier (ticker, CUSIP, ...). When
+            given it must cover exactly ``num_constituents`` distinct issuers.
+        issuer_recovery_rates : dict[str, float], optional
+            Recovery per issuer as a decimal in ``[0, 1]``; requires
+            ``issuer_curves`` and only its identifiers. Issuers left out use
+            ``recovery_rate``.
+        issuer_weights : dict[str, float], optional
+            Non-negative notional weight per issuer (decimal fractions summing
+            to ``1.0`` within ``1e-9``); requires ``issuer_curves`` and must
+            cover exactly its identifiers. Without it each issuer weighs
+            ``1 / num_constituents``.
 
         Raises
         ------
         ValueError
-            If ``num_constituents`` is zero or ``recovery_rate`` is outside ``[0, 1]``.
+            If ``num_constituents`` is zero, a recovery is outside ``[0, 1]``,
+            the issuer curves do not cover ``num_constituents`` issuers, the
+            issuer recoveries or weights name an unknown issuer (or are given
+            without ``issuer_curves``), or the weights are negative, do not
+            cover every issuer or do not sum to ``1.0``.
+        TypeError
+            If ``issuer_curves`` values are not :class:`HazardCurve` objects.
 
         Examples
         --------
@@ -1985,7 +2013,7 @@ class CreditIndexData:
         Returns
         -------
         int
-            Count of reference names in the index (``125`` for a standard CDX or iTraxx series); each carries equal weight.
+            Count of reference names in the index (``125`` for a standard CDX or iTraxx series); each carries equal weight unless ``issuer_weights`` was supplied.
 
         Notes
         -----
@@ -2001,7 +2029,7 @@ class CreditIndexData:
         Returns
         -------
         float
-            Recovery as a decimal fraction of notional (``0.4`` is 40%) used for every constituent.
+            Recovery as a decimal fraction of notional (``0.4`` is 40%) used for every constituent without an issuer-level recovery.
 
         Notes
         -----
@@ -2041,6 +2069,184 @@ class CreditIndexData:
         """
         ...
 
+    def get_issuer_curve(self, issuer_id: str) -> HazardCurve:
+        """
+        Hazard curve of one issuer, falling back to the index curve.
+
+        Parameters
+        ----------
+        issuer_id : str
+            Issuer identifier as supplied in ``issuer_curves``.
+
+        Returns
+        -------
+        HazardCurve
+            The issuer's curve, or ``index_credit_curve`` when the bundle has
+            no curve for ``issuer_id`` (homogeneous assumption).
+
+        Notes
+        -----
+        This method does not raise for an unknown issuer.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import BaseCorrelationCurve, CreditIndexData, HazardCurve
+        >>> hazard = HazardCurve.flat("CDX-IG", "2025-01-01", 0.01, 0.4)
+        >>> base_corr = BaseCorrelationCurve("CDX-IG-BC", [(3.0, 0.25), (10.0, 0.55)])
+        >>> data = CreditIndexData(
+        ...     2,
+        ...     0.4,
+        ...     hazard,
+        ...     base_corr,
+        ...     issuer_curves={"A": HazardCurve.flat("A", "2025-01-01", 0.02, 0.3), "B": hazard},
+        ...     issuer_recovery_rates={"A": 0.3},
+        ...     issuer_weights={"A": 0.25, "B": 0.75},
+        ... )
+        >>> data.get_issuer_curve("A").id, data.get_issuer_curve("Z").id
+        ('A', 'CDX-IG')
+        """
+        ...
+
+    def has_issuer_curves(self) -> bool:
+        """
+        Whether issuer-level curves are present (heterogeneous pricing mode).
+
+        Returns
+        -------
+        bool
+            ``True`` when the bundle carries per-issuer hazard curves.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import BaseCorrelationCurve, CreditIndexData, HazardCurve
+        >>> hazard = HazardCurve.flat("CDX-IG", "2025-01-01", 0.01, 0.4)
+        >>> base_corr = BaseCorrelationCurve("CDX-IG-BC", [(3.0, 0.25), (10.0, 0.55)])
+        >>> data = CreditIndexData(
+        ...     2,
+        ...     0.4,
+        ...     hazard,
+        ...     base_corr,
+        ...     issuer_curves={"A": HazardCurve.flat("A", "2025-01-01", 0.02, 0.3), "B": hazard},
+        ...     issuer_recovery_rates={"A": 0.3},
+        ...     issuer_weights={"A": 0.25, "B": 0.75},
+        ... )
+        >>> data.has_issuer_curves()
+        True
+        """
+        ...
+
+    def issuer_ids(self) -> list[str]:
+        """
+        Issuer identifiers with their own curve, sorted.
+
+        Returns
+        -------
+        list[str]
+            Sorted identifiers; empty for a homogeneous bundle.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import BaseCorrelationCurve, CreditIndexData, HazardCurve
+        >>> hazard = HazardCurve.flat("CDX-IG", "2025-01-01", 0.01, 0.4)
+        >>> base_corr = BaseCorrelationCurve("CDX-IG-BC", [(3.0, 0.25), (10.0, 0.55)])
+        >>> data = CreditIndexData(
+        ...     2,
+        ...     0.4,
+        ...     hazard,
+        ...     base_corr,
+        ...     issuer_curves={"A": HazardCurve.flat("A", "2025-01-01", 0.02, 0.3), "B": hazard},
+        ...     issuer_recovery_rates={"A": 0.3},
+        ...     issuer_weights={"A": 0.25, "B": 0.75},
+        ... )
+        >>> data.issuer_ids()
+        ['A', 'B']
+        """
+        ...
+
+    def get_issuer_recovery(self, issuer_id: str) -> float:
+        """
+        Recovery rate of one issuer, falling back to the index recovery.
+
+        Parameters
+        ----------
+        issuer_id : str
+            Issuer identifier.
+
+        Returns
+        -------
+        float
+            The issuer's recovery as a decimal, or ``recovery_rate`` when none
+            was supplied for ``issuer_id``.
+
+        Notes
+        -----
+        This method does not raise for an unknown issuer.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import BaseCorrelationCurve, CreditIndexData, HazardCurve
+        >>> hazard = HazardCurve.flat("CDX-IG", "2025-01-01", 0.01, 0.4)
+        >>> base_corr = BaseCorrelationCurve("CDX-IG-BC", [(3.0, 0.25), (10.0, 0.55)])
+        >>> data = CreditIndexData(
+        ...     2,
+        ...     0.4,
+        ...     hazard,
+        ...     base_corr,
+        ...     issuer_curves={"A": HazardCurve.flat("A", "2025-01-01", 0.02, 0.3), "B": hazard},
+        ...     issuer_recovery_rates={"A": 0.3},
+        ...     issuer_weights={"A": 0.25, "B": 0.75},
+        ... )
+        >>> data.get_issuer_recovery("A"), data.get_issuer_recovery("B")
+        (0.3, 0.4)
+        """
+        ...
+
+    def get_issuer_weight(self, issuer_id: str) -> float:
+        """
+        Notional weight of one issuer, falling back to equal weighting.
+
+        Parameters
+        ----------
+        issuer_id : str
+            Issuer identifier.
+
+        Returns
+        -------
+        float
+            The issuer's weight as a decimal fraction, or
+            ``1 / num_constituents`` when none was supplied for ``issuer_id``.
+
+        Notes
+        -----
+        This method does not raise for an unknown issuer.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.market_data import BaseCorrelationCurve, CreditIndexData, HazardCurve
+        >>> hazard = HazardCurve.flat("CDX-IG", "2025-01-01", 0.01, 0.4)
+        >>> base_corr = BaseCorrelationCurve("CDX-IG-BC", [(3.0, 0.25), (10.0, 0.55)])
+        >>> data = CreditIndexData(
+        ...     2,
+        ...     0.4,
+        ...     hazard,
+        ...     base_corr,
+        ...     issuer_curves={"A": HazardCurve.flat("A", "2025-01-01", 0.02, 0.3), "B": hazard},
+        ...     issuer_recovery_rates={"A": 0.3},
+        ...     issuer_weights={"A": 0.25, "B": 0.75},
+        ... )
+        >>> data.get_issuer_weight("A"), data.get_issuer_weight("B")
+        (0.25, 0.75)
+        """
+        ...
+
     def __repr__(self) -> str: ...
 
 class PriceCurve:
@@ -2074,7 +2280,7 @@ class PriceCurve:
         spot_price: Optional[float] = None,
         extrapolation: Optional[str] = None,
         interp: Optional[str] = None,
-        day_count: Optional[str] = None,
+        day_count: Optional[Union[DayCount, str]] = None,
     ) -> None:
         """
         Construct a price curve from ``(time_years, forward_price)`` knots.
@@ -2102,7 +2308,7 @@ class PriceCurve:
             Extrapolation policy; default ``"flat_zero"``.
         interp : str, optional
             Interpolation style; default ``"linear"``.
-        day_count : str, optional
+        day_count : DayCount | str, optional
             Day-count label; default ``"act_365f"``.
 
         Raises
@@ -2401,7 +2607,7 @@ class InflationCurve:
         base_cpi: float,
         knots: Sequence[tuple[float, float]],
         *,
-        day_count: Optional[str] = None,
+        day_count: Optional[Union[DayCount, str]] = None,
         indexation_lag_months: Optional[int] = None,
         interp: Optional[str] = None,
         extrapolation: Optional[str] = None,
@@ -2421,7 +2627,7 @@ class InflationCurve:
             Inserted as the zero-time interpolation knot when absent.
         knots : Sequence[tuple[float, float]]
             ``(time_years, cpi_level)`` pairs; levels must be positive.
-        day_count : str, optional
+        day_count : DayCount | str, optional
             Day-count label; default ``"act_365f"``.
         indexation_lag_months : int, optional
             Indexation lag in months applied by :meth:`cpi_with_lag`; default ``3``.
@@ -6070,7 +6276,8 @@ class MarketContext:
         -------
         bool
             ``True`` when the context holds no curves, surfaces, scalars,
-            series, indices or collateral mappings.
+            series, indices, dividend schedules, FX matrix or collateral
+            mappings (``len(ctx) == 0``).
 
         Notes
         -----
@@ -6123,6 +6330,33 @@ class MarketContext:
         ...
 
     def __contains__(self, id: str) -> bool: ...
-    def __len__(self) -> int: ...
+    def __len__(self) -> int:
+        """
+        Number of stored market-data objects (Rust ``MarketContext::len``).
+
+        Counts curves, surfaces, cubes, scalars, series, inflation and credit
+        indices, dividend schedules, FX delta-vol surfaces and collateral
+        mappings, plus one for an attached FX matrix.
+
+        Returns
+        -------
+        int
+            Stored object count; ``0`` exactly when ``is_empty()`` is true.
+        """
+        ...
+
+    def __bool__(self) -> bool:
+        """
+        ``True`` when anything has been inserted (``not is_empty()``).
+
+        An FX-only or collateral-only context is truthy.
+
+        Returns
+        -------
+        bool
+            ``not self.is_empty()``.
+        """
+        ...
+
     def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...

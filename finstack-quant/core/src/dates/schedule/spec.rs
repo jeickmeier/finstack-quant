@@ -122,11 +122,73 @@ impl ScheduleSpec {
         })
     }
 
+    /// Switch the specification to standard IMM dates, with
+    /// [`ScheduleBuilder::imm`] semantics.
+    ///
+    /// Sets `frequency` to quarterly, `stub` to [`StubKind::ShortBack`],
+    /// turns `imm_mode` on and `cds_imm_mode` off. As on the builder, a later
+    /// change to `frequency` or `stub` wins: [`build`](Self::build) uses the
+    /// stored values as they are.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::dates::{ScheduleSpec, StubKind, Tenor};
+    /// use time::{Date, Month};
+    ///
+    /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
+    /// let end = Date::from_calendar_date(2025, Month::December, 31)?;
+    /// let spec = ScheduleSpec::new(start, end)?.with_imm();
+    /// assert!(spec.imm_mode && !spec.cds_imm_mode);
+    /// assert_eq!(spec.frequency, Tenor::quarterly());
+    /// assert_eq!(spec.stub, StubKind::ShortBack);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[must_use]
+    pub fn with_imm(mut self) -> Self {
+        self.frequency = Tenor::quarterly();
+        self.stub = StubKind::ShortBack;
+        self.imm_mode = true;
+        self.cds_imm_mode = false;
+        self
+    }
+
+    /// Switch the specification to CDS IMM dates (the 20th of March, June,
+    /// September and December), with [`ScheduleBuilder::cds_imm`] semantics.
+    ///
+    /// Sets `frequency` to quarterly, `stub` to [`StubKind::ShortBack`],
+    /// turns `cds_imm_mode` on and `imm_mode` off. As on the builder, a later
+    /// change to `frequency` or `stub` wins: CDS IMM generation uses the stored
+    /// values.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::dates::{ScheduleSpec, StubKind, Tenor};
+    /// use time::{Date, Month};
+    ///
+    /// let start = Date::from_calendar_date(2025, Month::January, 15)?;
+    /// let end = Date::from_calendar_date(2026, Month::January, 15)?;
+    /// let spec = ScheduleSpec::new(start, end)?.with_cds_imm();
+    /// assert!(spec.cds_imm_mode && !spec.imm_mode);
+    /// assert_eq!(spec.frequency, Tenor::quarterly());
+    /// assert_eq!(spec.stub, StubKind::ShortBack);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[must_use]
+    pub fn with_cds_imm(mut self) -> Self {
+        self.frequency = Tenor::quarterly();
+        self.stub = StubKind::ShortBack;
+        self.cds_imm_mode = true;
+        self.imm_mode = false;
+        self
+    }
+
     /// Reconstruct a [`Schedule`] using the persisted configuration.
     ///
     /// This applies the same scheduling rules as [`ScheduleBuilder`], including
     /// stub handling, end-of-month logic, standard or CDS IMM mode, and the
-    /// configured error policy. Business-day adjustment is enabled only when
+    /// configured error policy. The stored `frequency` and `stub` are used as
+    /// they are in every mode; [`with_imm`](Self::with_imm) and
+    /// [`with_cds_imm`](Self::with_cds_imm) set them to the IMM defaults. Business-day adjustment is enabled only when
     /// both `business_day_convention` and `calendar_id` are present; either
     /// value alone leaves dates unadjusted.
     ///
@@ -146,7 +208,15 @@ impl ScheduleSpec {
                 "standard IMM and CDS IMM modes are mutually exclusive".to_string(),
             ));
         }
-        let mut builder = ScheduleBuilder::new(self.start, self.end)?
+        let mut builder = ScheduleBuilder::new(self.start, self.end)?;
+        // The IMM mode setters also reset frequency and stub; apply them first
+        // so the stored `frequency` and `stub` are what generation uses.
+        if self.imm_mode {
+            builder = builder.imm();
+        } else if self.cds_imm_mode {
+            builder = builder.cds_imm();
+        }
+        builder = builder
             .frequency(self.frequency)
             .stub_rule(self.stub)
             .end_of_month(self.end_of_month);
@@ -163,12 +233,6 @@ impl ScheduleSpec {
         }
         if let Some(lag) = self.fixing_lag_business_days {
             builder = builder.fixing_lag_business_days(lag);
-        }
-
-        if self.imm_mode {
-            builder = builder.imm();
-        } else if self.cds_imm_mode {
-            builder = builder.cds_imm();
         }
 
         builder.build()

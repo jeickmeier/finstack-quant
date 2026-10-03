@@ -8,9 +8,9 @@ use pyo3::prelude::*;
 
 use super::helpers::{
     columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods,
-    impl_repr_html_via_dataframe, parse_day_count, parse_extrapolation, parse_interp_style,
-    TimePoint,
+    impl_repr_html_via_dataframe, parse_extrapolation, parse_interp_style, TimePoint,
 };
+use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 
@@ -66,7 +66,7 @@ impl PyForwardCurve {
     ///     Valuation date anchoring ``t = 0``.
     /// knots : list[tuple[float, float]]
     ///     ``(time_years, forward_rate)`` pairs with rates as decimals.
-    /// day_count : str, optional
+    /// day_count : DayCount | str, optional
     ///     Day-count convention (``"act_360"``, ``"act_365f"``, ...). When
     ///     omitted, Rust infers a market default from the curve ID.
     /// interp : str, optional
@@ -102,7 +102,7 @@ impl PyForwardCurve {
         tenor: f64,
         base_date: &Bound<'_, PyAny>,
         knots: Vec<(f64, f64)>,
-        day_count: Option<&str>,
+        day_count: Option<&Bound<'_, PyAny>>,
         interp: Option<&str>,
         extrapolation: Option<&str>,
         projection_grid: Option<Vec<f64>>,
@@ -121,7 +121,7 @@ impl PyForwardCurve {
             builder = builder.extrapolation(parse_extrapolation(extrapolation)?);
         }
         if let Some(day_count) = day_count {
-            builder = builder.day_count(parse_day_count(day_count)?);
+            builder = builder.day_count(extract_day_count(day_count)?);
         }
         if let Some(reset_lag) = reset_lag {
             builder = builder.reset_lag(reset_lag);

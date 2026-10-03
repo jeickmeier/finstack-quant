@@ -8,9 +8,10 @@ use pyo3::prelude::*;
 
 use super::helpers::{
     columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods,
-    impl_repr_html_via_dataframe, parse_day_count, parse_extrapolation, parse_interp_style,
-    parse_price_curve_kind, price_curve_kind_name, TimePoint,
+    impl_repr_html_via_dataframe, parse_extrapolation, parse_interp_style, parse_price_curve_kind,
+    price_curve_kind_name, TimePoint,
 };
+use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 
@@ -73,7 +74,7 @@ impl PyPriceCurve {
     ///     Extrapolation policy; default ``"flat_zero"``.
     /// interp : str, optional
     ///     Interpolation style; default ``"linear"``.
-    /// day_count : str, optional
+    /// day_count : DayCount | str, optional
     ///     Day-count convention; default ``"act_365f"``.
     ///
     /// Raises
@@ -104,7 +105,7 @@ impl PyPriceCurve {
         spot_price: Option<f64>,
         extrapolation: Option<&str>,
         interp: Option<&str>,
-        day_count: Option<&str>,
+        day_count: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
         let mut builder = PriceCurve::builder(id)
             .base_date(py_to_date(base_date)?)
@@ -122,7 +123,7 @@ impl PyPriceCurve {
             builder = builder.interp(parse_interp_style(interp)?);
         }
         if let Some(day_count) = day_count {
-            builder = builder.day_count(parse_day_count(day_count)?);
+            builder = builder.day_count(extract_day_count(day_count)?);
         }
         builder
             .build()

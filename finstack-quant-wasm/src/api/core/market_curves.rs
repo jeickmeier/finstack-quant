@@ -611,6 +611,11 @@ impl JsBaseCorrelationCurve {
 /// Market data of one credit index: constituent count, recovery, the index
 /// hazard curve and its base-correlation curve.
 ///
+/// The constructor builds homogeneous data. Issuer-level curves, recoveries
+/// and weights (heterogeneous tranche pricing) arrive through
+/// `MarketContext.fromJson` (`issuer_credit_curve_ids`, `issuer_recovery_rates`,
+/// `issuer_weights`) and are read with the `getIssuer*` accessors.
+///
 /// @example
 /// ```typescript
 /// import init, { core } from "finstack-quant-wasm";
@@ -687,5 +692,69 @@ impl JsCreditIndexData {
     #[wasm_bindgen(getter, js_name = baseCorrelationCurve)]
     pub fn base_correlation_curve(&self) -> JsBaseCorrelationCurve {
         JsBaseCorrelationCurve::from_inner(Arc::clone(&self.inner.base_correlation_curve))
+    }
+
+    /// Hazard curve of one issuer (Rust `CreditIndexData::get_issuer_curve`).
+    ///
+    /// # Arguments
+    ///
+    /// * `issuer_id` - Issuer identifier as stored in the index data (ticker,
+    ///   CUSIP, ...).
+    ///
+    /// @returns The issuer's `HazardCurve`, or `indexCreditCurve` when the
+    /// data has no curve for `issuerId` (homogeneous assumption).
+    /// @throws `TypeError` if `issuerId` is not a string.
+    #[wasm_bindgen(js_name = getIssuerCurve)]
+    pub fn get_issuer_curve(&self, issuer_id: JsValue) -> Result<JsHazardCurve, JsValue> {
+        let issuer_id = js_string(&issuer_id, "issuerId")?;
+        Ok(JsHazardCurve {
+            inner: Arc::new(self.inner.get_issuer_curve(&issuer_id).clone()),
+        })
+    }
+
+    /// Whether issuer-level curves are present (heterogeneous pricing mode).
+    ///
+    /// @returns `true` when the data carries per-issuer hazard curves.
+    #[wasm_bindgen(js_name = hasIssuerCurves)]
+    pub fn has_issuer_curves(&self) -> bool {
+        self.inner.has_issuer_curves()
+    }
+
+    /// Issuer identifiers with their own curve.
+    ///
+    /// @returns Identifiers in sorted order; empty for homogeneous data.
+    #[wasm_bindgen(js_name = issuerIds)]
+    pub fn issuer_ids(&self) -> Vec<String> {
+        self.inner.issuer_ids()
+    }
+
+    /// Recovery rate of one issuer (Rust `CreditIndexData::get_issuer_recovery`).
+    ///
+    /// # Arguments
+    ///
+    /// * `issuer_id` - Issuer identifier as stored in the index data.
+    ///
+    /// @returns The issuer's recovery as a decimal, or `recoveryRate` when
+    /// none was supplied for `issuerId`.
+    /// @throws `TypeError` if `issuerId` is not a string.
+    #[wasm_bindgen(js_name = getIssuerRecovery)]
+    pub fn get_issuer_recovery(&self, issuer_id: JsValue) -> Result<f64, JsValue> {
+        let issuer_id = js_string(&issuer_id, "issuerId")?;
+        Ok(self.inner.get_issuer_recovery(&issuer_id))
+    }
+
+    /// Notional weight of one issuer (Rust `CreditIndexData::get_issuer_weight`).
+    ///
+    /// # Arguments
+    ///
+    /// * `issuer_id` - Issuer identifier as stored in the index data.
+    ///
+    /// @returns The issuer's weight as a decimal fraction, or
+    /// `1 / numConstituents` when none was supplied for `issuerId`.
+    /// @throws `TypeError` if `issuerId` is not a string.
+    #[wasm_bindgen(js_name = getIssuerWeight)]
+    pub fn get_issuer_weight(&self, issuer_id: JsValue) -> Result<f64, JsValue> {
+        let issuer_id = js_string(&issuer_id, "issuerId")?;
+        Ok(self.inner.get_issuer_weight(&issuer_id))
     }
 }
