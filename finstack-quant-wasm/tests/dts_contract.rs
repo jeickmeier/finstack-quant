@@ -691,11 +691,11 @@ fn portfolio_cashflow_api_uses_full_cashflow_name_everywhere() {
 
     assert!(contains_signature(
         &dts,
-        "aggregateFullCashflows(specJson: JsonInput, marketJson: JsonInput, allowPartial?: boolean): PortfolioCashflows;",
+        "aggregateFullCashflows(portfolio: Portfolio, market: MarketContext, allowPartial?: boolean): PortfolioCashflows;",
     ));
     assert!(contains_signature(
         &dts,
-        "aggregateFullCashflowsBuilt(portfolio: Portfolio, marketJson: JsonInput, allowPartial?: boolean): PortfolioCashflows;",
+        "aggregateFullCashflows(portfolio: Portfolio, market: MarketContext, allowPartial?: boolean): PortfolioCashflows;",
     ));
     assert!(!dts.contains("aggregateCashflows("));
     assert!(bench.contains("aggregateFullCashflows"));
@@ -787,11 +787,11 @@ fn portfolio_dts_pins_python_parity_optional_parameters() {
 
     assert!(contains_ignoring_ws(
         &dts,
-        "valuePortfolio(specJson: JsonInput, marketJson: JsonInput, strictRisk?: boolean, metrics?: string[]): PortfolioValuation;",
+        "valuePortfolio(portfolio: Portfolio, market: MarketContext, strictRisk?: boolean, metrics?: string[]): PortfolioValuation;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "valuePortfolioBuilt(portfolio: Portfolio, marketJson: JsonInput, strictRisk?: boolean, metrics?: string[]): PortfolioValuation;",
+        "valuePortfolio(portfolio: Portfolio, market: MarketContext, strictRisk?: boolean, metrics?: string[]): PortfolioValuation;",
     ));
     // Python defaults `confidence` from the Rust 95% presets; WASM does too.
     assert!(contains_ignoring_ws(

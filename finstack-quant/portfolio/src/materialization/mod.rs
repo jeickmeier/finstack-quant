@@ -338,7 +338,6 @@ impl Portfolio {
             dependency_count,
         } = validate_and_decode(bytes, cache, limits)?;
         let semantic_started = report::start_timer();
-        let _book_by_position = position_book_index(&bundle);
         for (index, position) in bundle.positions.iter().enumerate() {
             let Some(artifact) = decoded.get(&position.artifact_id) else {
                 diagnostics.push_bounded(limits, missing_artifact_diagnostic(index, position));

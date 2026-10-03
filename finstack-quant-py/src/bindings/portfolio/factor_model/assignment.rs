@@ -8,7 +8,7 @@ use finstack_quant_portfolio::factor_model::{
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::display_to_py;
 
-use super::super::json_bridge::{deserialize_json, serialize_json};
+use crate::bindings::json_bridge::{deserialize_json, serialize_json};
 
 /// Matched factor assignments for a single portfolio position.
 ///

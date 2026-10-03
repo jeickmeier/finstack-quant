@@ -3,7 +3,7 @@
 //! [`FactorModelConfig`] is the top-level configuration consumed by pricing
 //! engines in `finstack-quant-portfolio::sensitivity`. It bundles factor
 //! definitions, a matching config, an optional covariance matrix, and
-//! sensitivity extraction settings ([`PricingMode`], [`RiskMeasure`],
+//! sensitivity extraction settings ([`RiskMeasure`],
 //! [`BumpSizeConfig`]).
 
 use super::covariance::FactorCovarianceMatrix;
@@ -42,34 +42,6 @@ impl fmt::Display for UnmatchedPolicy {
         match self {
             Self::Strict => write!(f, "strict"),
             Self::Warn => write!(f, "warn"),
-        }
-    }
-}
-
-/// Strategy used when extracting factor sensitivities.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum PricingMode {
-    /// Use central finite differences to approximate linear deltas.
-    ///
-    /// This is the lightweight choice when a downstream engine can reprice under
-    /// small symmetric bumps and the risk report only needs first-order factor
-    /// sensitivities.
-    DeltaBased,
-    /// Select the engine that can also compute explicit scenario P&L profiles.
-    ///
-    /// Sensitivity extraction uses the same two central endpoints as
-    /// `DeltaBased`; full grids are evaluated only when P&L profiles are requested.
-    FullRepricing,
-}
-
-impl fmt::Display for PricingMode {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::DeltaBased => write!(f, "delta_based"),
-            Self::FullRepricing => write!(f, "full_repricing"),
         }
     }
 }
@@ -297,8 +269,6 @@ pub struct FactorModelConfig {
     pub covariance: FactorCovarianceMatrix,
     /// Declarative dependency-to-factor matching configuration.
     pub matching: MatchingConfig,
-    /// Sensitivity extraction strategy used by the analysis pipeline.
-    pub pricing_mode: PricingMode,
     /// Risk measure used when aggregating factor sensitivities.
     #[serde(default)]
     pub risk_measure: RiskMeasure,
@@ -527,25 +497,6 @@ mod tests {
             assert!(result.is_err());
         }
     }
-
-    #[test]
-    fn test_pricing_mode_serde() {
-        let mode = PricingMode::DeltaBased;
-        let json_result = serde_json::to_string(&mode);
-        assert!(json_result.is_ok());
-        let Ok(json) = json_result else {
-            return;
-        };
-
-        let back_result: Result<PricingMode, _> = serde_json::from_str(&json);
-        assert!(back_result.is_ok());
-        let Ok(back) = back_result else {
-            return;
-        };
-
-        assert_eq!(mode, back);
-    }
-
     #[test]
     fn test_bump_size_config_defaults() {
         let config = BumpSizeConfig::default();
@@ -615,7 +566,7 @@ mod tests {
                 covariance
             },
             matching: MatchingConfig::MappingTable(vec![]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Warn),
@@ -633,7 +584,7 @@ mod tests {
         };
 
         assert_eq!(back.factors.len(), 1);
-        assert_eq!(back.pricing_mode, PricingMode::DeltaBased);
+
         assert_eq!(back.risk_measure, RiskMeasure::Variance);
         assert_eq!(back.unmatched_policy, Some(UnmatchedPolicy::Warn));
     }
@@ -660,7 +611,7 @@ mod tests {
                 covariance
             },
             matching: MatchingConfig::MappingTable(vec![]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: None,
@@ -719,7 +670,7 @@ mod tests {
             "factors": [],
             "covariance": {"data": [], "factor_ids": [], "n": 0},
             "matching": {"mapping_table": []},
-            "pricing_mode": "delta_based",
+
         });
         assert!(serde_json::from_value::<FactorModelConfig>(value.clone()).is_ok());
         value["bump_size"] = serde_json::json!({}); // schema-rejection-test
@@ -792,7 +743,7 @@ mod tests {
             factors,
             covariance,
             matching: MatchingConfig::CreditHierarchical(credit_config),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: None,
@@ -832,7 +783,7 @@ mod tests {
                 attribute_filter: crate::factor::matching::AttributeFilter::default(),
                 factor_id,
             }]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: None,
@@ -856,7 +807,7 @@ mod tests {
             covariance: FactorCovarianceMatrix::new(vec![FactorId::new("Other")], vec![0.04])
                 .unwrap(),
             matching: MatchingConfig::MappingTable(Vec::new()),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: None,
@@ -919,7 +870,7 @@ mod tests {
                 issuer_betas: vec![row(20.0), row(200.0)],
                 require_issuer_id: false,
             }),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: None,
@@ -992,7 +943,7 @@ mod tests {
             )
             .unwrap(),
             matching: MatchingConfig::Cascade(vec![member(row()), member(row())]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: None,

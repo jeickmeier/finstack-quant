@@ -12,9 +12,11 @@ use crate::bindings::pickle_support::reduce_via_json;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, value_error};
 
-use super::super::json_bridge::{deserialize_json, serialize_json};
-use super::super::matrix_input::{extract_position_pnls, extract_square_matrix, PositionPnlMatrix};
 use super::contributions::PyPositionRiskDecomposition;
+use crate::bindings::json_bridge::{deserialize_json, serialize_json};
+use crate::bindings::models::factor::matrix_input::{
+    extract_position_pnls, extract_square_matrix, PositionPnlMatrix,
+};
 
 /// `True` when `obj` is a `pandas.DataFrame` (checked by module + type name so
 /// pandas is not imported when it is not already loaded).

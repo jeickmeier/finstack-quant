@@ -22,13 +22,13 @@ use finstack_quant_models::factor::credit::hierarchy::{
 use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
 
 use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::models::factor::config::extract_vol_horizon;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py,
     ColumnSchema,
 };
 use crate::bindings::pickle_support::reduce_via_json;
-use crate::bindings::portfolio::factor_model::config::extract_vol_horizon;
 use crate::errors::{core_to_py, decomposition_error_to_py, serde_json_to_py, value_error};
 
 /// Column schema of `PyLevelsAtDate::to_dataframe`, kept so a level-free
@@ -1223,7 +1223,7 @@ impl PyFactorCovarianceMatrix {
 ///
 /// Example:
 ///     >>> from finstack_quant.models.factor.credit import FactorModelConfig
-///     >>> config = FactorModelConfig.from_json('{"factors":[],"covariance":{"factor_ids":[],"n":0,"data":[]},"matching":{"mapping_table":[]},"pricing_mode":"delta_based","risk_measure":"variance"}')
+///     >>> config = FactorModelConfig.from_json('{"factors":[],"covariance":{"factor_ids":[],"n":0,"data":[]},"matching":{"mapping_table":[]},"risk_measure":"variance"}')
 ///     >>> config.n_factors
 ///     0
 #[pyclass(
@@ -1297,13 +1297,6 @@ impl PyFactorModelConfig {
     fn matching<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.matching)
     }
-
-    /// Sensitivity extraction strategy (``delta_based`` or ``full_repricing``).
-    #[getter]
-    fn pricing_mode(&self) -> String {
-        self.inner.pricing_mode.to_string()
-    }
-
     /// Risk measure as its canonical Python value: ``"variance"``,
     /// ``"volatility"``, ``{"var": {"confidence": c}}`` or
     /// ``{"expected_shortfall": {"confidence": c}}``.
@@ -1344,11 +1337,7 @@ impl PyFactorModelConfig {
     }
 
     fn __repr__(&self) -> String {
-        format!(
-            "FactorModelConfig(n_factors={}, pricing_mode={:?})",
-            self.inner.factors.len(),
-            self.inner.pricing_mode.to_string(),
-        )
+        format!("FactorModelConfig(n_factors={})", self.inner.factors.len(),)
     }
 }
 

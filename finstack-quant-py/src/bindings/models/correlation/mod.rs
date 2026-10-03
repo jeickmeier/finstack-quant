@@ -1491,7 +1491,7 @@ fn extract_square_matrix(
     if let Ok(flat) = matrix.extract::<Vec<f64>>() {
         return Ok(flat);
     }
-    crate::bindings::portfolio::matrix_input::extract_square_matrix(py, matrix, n, "matrix")
+    crate::bindings::models::factor::matrix_input::extract_square_matrix(py, matrix, n, "matrix")
 }
 
 /// Fréchet-Hoeffding correlation bounds for two Bernoulli marginals.

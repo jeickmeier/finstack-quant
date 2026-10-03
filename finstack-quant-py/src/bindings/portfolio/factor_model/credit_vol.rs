@@ -8,8 +8,8 @@ use finstack_quant_portfolio::factor_model::{
 use crate::bindings::models::factor::credit::PyCreditFactorModel;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 
-use super::super::json_bridge::serialize_json;
-use super::contributions::PyRiskDecomposition;
+use crate::bindings::json_bridge::serialize_json;
+use crate::bindings::models::factor::contributions::PyRiskDecomposition;
 
 /// Aggregated risk contribution for a single hierarchy level.
 #[pyclass(

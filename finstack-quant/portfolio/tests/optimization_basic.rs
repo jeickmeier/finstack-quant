@@ -539,8 +539,7 @@ fn value_weighted_average_bound_with_negative_filtered_weight_sum_errors() {
 /// `PvBase` in an aggregated objective must be rejected when candidate
 /// positions are in scope: candidates carry `pv_base = 0` (no held value),
 /// so their objective coefficient would silently be zero and the LP would
-/// ignore their actual value — a fail-open. Mirror of the `PvNative`
-/// rejection already enforced for aggregated expressions.
+/// ignore their actual value instead of optimizing their economic exposure.
 #[test]
 fn pv_base_objective_with_candidate_in_scope_is_rejected() {
     let as_of = base_date();

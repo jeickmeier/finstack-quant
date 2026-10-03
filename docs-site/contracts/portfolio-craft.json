@@ -41,7 +41,7 @@
       "finstack_quant.portfolio.Portfolio",
       "finstack_quant.portfolio.aggregate_full_cashflows",
       "finstack_quant.portfolio.mwr_xirr",
-      "finstack_quant.portfolio.twrr_linked_json",
+      "finstack_quant.portfolio.twrr_linked",
       "finstack_quant.portfolio.twrr_modified_dietz",
       "finstack_quant.portfolio.value_portfolio"
     ],

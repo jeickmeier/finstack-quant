@@ -471,7 +471,10 @@ test('Portfolio getters project the Rust fields', () => {
 });
 
 test('portfolio cashflow readers net and collapse the Rust ladder', () => {
-  const ladder = portfolio.aggregateFullCashflows(BOOK, FLAT_USD_MARKET);
+  const ladder = portfolio.aggregateFullCashflows(
+    portfolio.Portfolio.fromSpec(BOOK),
+    core.MarketContext.fromJson(FLAT_USD_MARKET)
+  );
   assert.deepEqual(portfolio.netInCurrencyByDate(ladder, 'USD'), [
     ['2024-01-15', -1500000],
     ['2025-01-15', 0],
@@ -499,7 +502,12 @@ test('portfolio cashflow readers net and collapse the Rust ladder', () => {
 });
 
 test('portfolioMetricsSeries decodes bucketed metrics', () => {
-  const valuation = portfolio.valuePortfolio(BOOK, FLAT_USD_MARKET, false, ['bucketed_dv01']);
+  const valuation = portfolio.valuePortfolio(
+    portfolio.Portfolio.fromSpec(BOOK),
+    core.MarketContext.fromJson(FLAT_USD_MARKET),
+    false,
+    ['bucketed_dv01']
+  );
   const metrics = portfolio.aggregateMetrics(
     JSON.stringify(valuation, (_, v) => (typeof v === 'bigint' ? Number(v) : v)),
     'USD',

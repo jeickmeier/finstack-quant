@@ -35551,7 +35551,6 @@ declare class Portfolio {
  *   matching: {
  *     mapping_table: [{ dependency_filter: {}, attribute_filter: {}, factor_id: "usd_rates" }],
  *   },
- *   pricing_mode: "full_repricing",
  *   risk_measure: "variance",
  * });
  * model.free();
@@ -35965,24 +35964,12 @@ export interface PortfolioNamespace {
   /**
    * Compute money-weighted return via XIRR from dated cashflow JSON.
    *
-   * Binds Rust `mwr_xirr_from_cashflows` (Act/365F).
+   * Binds Rust `mwr_xirr` (Act/365F).
    * @returns Annualized money-weighted return as a decimal.
    * @param cashflowsJson - JSON array of `{ date, amount }` flows from the investor's cash account (contributions negative, distributions and terminal value positive). Dates are sorted and equal-date amounts netted; remaining nonzero flows must change sign exactly once.
    * @throws Error - Throws a JavaScript exception if `cashflowsJson` is malformed, contains an invalid date or insufficient net cash flows, the nonzero net flows do not change sign exactly once, or no sufficiently accurate finite return greater than -1 can be found.
    */
   mwrXirr(cashflowsJson: JsonInput): number;
-  /**
-   * Build a runtime portfolio from a JSON spec, validate, and round-trip.
-   *
-   * Wire/validator surface: deserializes the spec, constructs the portfolio
-   * with live instruments, validates structural invariants, then
-   * re-serializes the canonical JSON **string** for confirmation or
-   * re-ingest.
-   * @returns Canonical portfolio JSON after construction and validation.
-   * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
-   * @throws Error - Throws a JavaScript exception if `specJson` is malformed or violates the portfolio schema, a position has an invalid quantity or instrument specification, portfolio validation fails, or the round-trip form cannot be serialized.
-   */
-  buildPortfolioFromSpecJson(specJson: JsonInput): string;
   /**
    * Aggregate portfolio metrics from a valuation JSON.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
@@ -36010,51 +35997,23 @@ export interface PortfolioNamespace {
     base: string
   ): PortfolioMetricSeriesEntry[];
   /**
-   * Value a portfolio from its spec and market context.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param strictRisk - Optional; when omitted or `undefined`, uses the Rust `PortfolioValuationOptions` default, `true` (fail closed when a requested risk metric fails to compute). Pass `false` only for an intentional PV-preserving fallback.
-   * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names resolve exactly as in `priceInstrument`: every id `listStandardMetrics()` returns is accepted and an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument can compute (a composite position: the additive entries at least one leg supports), and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
-   * @throws Error - Throws a JavaScript exception if the portfolio or market JSON is malformed, a requested metric name is unknown, portfolio construction or valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.
-   */
-  valuePortfolio(
-    specJson: JsonInput,
-    marketJson: JsonInput,
-    strictRisk?: boolean,
-    metrics?: string[]
-  ): PortfolioValuation;
-  /**
    * Value an already-built `Portfolio` handle. Skips the per-call
    * `PortfolioSpec` parse + `Portfolio::from_spec` rebuild that
    * `valuePortfolio` performs; use this when sweeping market scenarios
    * against a fixed portfolio.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
    * @param strictRisk - Optional; when omitted or `undefined`, uses the Rust `PortfolioValuationOptions` default, `true` (fail closed when a requested risk metric fails to compute). Pass `false` only for an intentional PV-preserving fallback.
    * @param metrics - Optional risk-metric ids to offer every position. Omit for the standard set (PV plus `dv01`; pricer-specific metrics such as `theta` or `cs01` must be listed explicitly); an empty array performs PV-only valuation. Names resolve exactly as in `priceInstrument`: every id `listStandardMetrics()` returns is accepted and an unknown name throws. The list is a menu, not a per-position request: one list is chosen for a book of mixed instrument types, so each position is asked for exactly the entries its own instrument can compute (a composite position: the additive entries at least one leg supports), and the rest appear on that position's `inapplicable_metrics`. Narrowing covers structural inapplicability only; `strictRisk` still governs a metric an instrument supports but fails to compute. `priceInstrument` keeps the opposite contract and throws on a metric its instrument cannot produce. Mirrors the Python `metrics=` keyword. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
-   * @throws Error - Throws a JavaScript exception if `marketJson` is malformed, a requested metric name is unknown, portfolio valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if a requested metric name is unknown, portfolio valuation fails, strict risk calculation cannot produce a requested metric, a required FX conversion is unavailable, or the valuation cannot be converted to a JavaScript value.
    */
-  valuePortfolioBuilt(
+  valuePortfolio(
     portfolio: Portfolio,
-    marketJson: JsonInput,
+    market: MarketContext,
     strictRisk?: boolean,
     metrics?: string[]
   ): PortfolioValuation;
-  /**
-   * Aggregate the full classified cashflow ladder for a portfolio.
-   * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
-   * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param allowPartial - Optional; when omitted or `undefined`, uses the Rust `CashflowAggregationOptions` default, `false` (fail closed if any position fails schedule construction). Pass `true` to keep a partial ladder with issues on the result.
-   * @throws Error - Throws a JavaScript exception if the portfolio or market JSON is malformed, portfolio construction fails, any position fails schedule construction while `allowPartial` is not `true`, monetary cash-flow aggregation overflows, or the aggregate cannot be converted to a JavaScript value.
-   */
-  aggregateFullCashflows(
-    specJson: JsonInput,
-    marketJson: JsonInput,
-    allowPartial?: boolean
-  ): PortfolioCashflows;
   /**
    * Aggregate the full classified cashflow ladder for an already-built
    * `Portfolio` handle.
@@ -36064,13 +36023,13 @@ export interface PortfolioNamespace {
    * scenarios on the same portfolio), this is the cheap path.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
+   * @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
    * @param allowPartial - Optional; when omitted or `undefined`, uses the Rust `CashflowAggregationOptions` default, `false` (fail closed if any position fails schedule construction). Pass `true` to keep a partial ladder with issues on the result.
-   * @throws Error - Throws a JavaScript exception if `marketJson` is malformed, any position fails schedule construction while `allowPartial` is not `true`, monetary cash-flow aggregation overflows, or the aggregate cannot be converted to a JavaScript value.
+   * @throws Error - Throws a JavaScript exception if any position fails schedule construction while `allowPartial` is not `true`, monetary cash-flow aggregation overflows, or the aggregate cannot be converted to a JavaScript value.
    */
-  aggregateFullCashflowsBuilt(
+  aggregateFullCashflows(
     portfolio: Portfolio,
-    marketJson: JsonInput,
+    market: MarketContext,
     allowPartial?: boolean
   ): PortfolioCashflows;
   /**
@@ -36102,47 +36061,19 @@ export interface PortfolioNamespace {
     discountCurves?: Record<string, string> | null
   ): Record<string, Record<string, MoneyValue>>;
   /**
-   * Apply a scenario to a portfolio and revalue.
-   *
-   * Returns a JS object with structured `valuation` and `report` values.
-   * @returns Revalued result object and scenario application report.
-   * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
-   * @param scenarioJson - Scenario specification JSON.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
-   * @throws Error - Throws a JavaScript exception if the portfolio, scenario, or market JSON is malformed; portfolio construction, scenario application, or revaluation fails; or the structured result cannot be converted to a JavaScript value.
-   */
-  applyScenarioAndRevalue(
-    specJson: JsonInput,
-    scenarioJson: JsonInput,
-    marketJson: JsonInput
-  ): ScenarioRevalueView;
-  /**
    * Apply a scenario to an already-built `Portfolio` handle and revalue.
    * Returns a JS object with structured `valuation` and `report` values.
    * @returns Revalued result object and scenario application report.
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param scenarioJson - Scenario specification JSON.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
-   * @throws Error - Throws a JavaScript exception if the scenario or market JSON is malformed, scenario application or portfolio revaluation fails, or the structured result cannot be converted to a JavaScript value.
+   * @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data. Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns them; serialize one with `valuations.valuationResultToJson`. `position_values` and `by_entity` are plain objects keyed by id: JavaScript enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric order before other keys, not in the Rust (and Python) insertion order; take valuation order from `spec.positions` when it matters.
+   * @throws Error - Throws a JavaScript exception if the scenario JSON is malformed or invalid, scenario application or portfolio revaluation fails, or the structured result cannot be converted to a JavaScript value.
    */
-  applyScenarioAndRevalueBuilt(
+  applyScenarioAndRevalue(
     portfolio: Portfolio,
     scenarioJson: JsonInput,
-    marketJson: JsonInput
+    market: MarketContext
   ): ScenarioRevalueView;
-  /**
-   * Compute the profit and loss attributable to a scenario.
-   *
-   * Values the portfolio against the unshocked market and against the
-   * scenario-shocked market, and returns a JS object with structured `pnl`
-   * (base-currency `total` plus `by_position`) and `report` values.
-   * @returns Scenario-attributable P&L ladder and application report.
-   * @param specJson - Canonical portfolio specification JSON defining positions, quantities, and base currency.
-   * @param scenarioJson - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
-   * @param marketJson - Canonical market-context JSON supplying the unshocked curves, quotes, and FX data used for the base leg.
-   * @throws Error - Throws a JavaScript exception if the portfolio, scenario, or market JSON is malformed; portfolio construction, scenario application, or either valuation fails; valuation currencies are inconsistent; or the structured result cannot be converted to JavaScript.
-   */
-  scenarioPnl(specJson: JsonInput, scenarioJson: JsonInput, marketJson: JsonInput): ScenarioPnlView;
   /**
    * Compute the profit and loss attributable to a scenario for an
    * already-built `Portfolio` handle.
@@ -36155,13 +36086,13 @@ export interface PortfolioNamespace {
    * @returns Scenario-attributable P&L ladder and application report.
    * @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
    * @param scenarioJson - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
-   * @param marketJson - Canonical market-context JSON supplying the unshocked curves, quotes, and FX data used for the base leg.
-   * @throws Error - Throws a JavaScript exception if the scenario or market JSON is malformed, scenario application or either valuation fails, valuation currencies are inconsistent, or the structured result cannot be converted to JavaScript.
+   * @param market - Constructed `core.MarketContext` handle supplying the unshocked curves, quotes, and FX data used for the base leg.
+   * @throws Error - Throws a JavaScript exception if the scenario JSON is malformed or invalid, scenario application or either valuation fails, valuation currencies are inconsistent, or the structured result cannot be converted to JavaScript.
    */
-  scenarioPnlBuilt(
+  scenarioPnl(
     portfolio: Portfolio,
     scenarioJson: JsonInput,
-    marketJson: JsonInput
+    market: MarketContext
   ): ScenarioPnlView;
   /**
    * Optimize portfolio weights using the LP-based optimizer.
@@ -36203,32 +36134,6 @@ export interface PortfolioNamespace {
     configJson: JsonInput
   ): ReplayResult;
   /**
-   * Compute first-order factor sensitivities and return the matrix.
-   *
-   * Accepts a JSON array of positions, a JSON array of `FactorDefinition`,
-   * a `MarketContext` JSON, an ISO 8601 date, and an optional `BumpSizeConfig`
-   * JSON.  Returns the canonical sensitivity-matrix wire object
-   * `{ base_currency, position_ids, factor_ids, data }` with `data` as nested
-   * rows (`data[position][factor]`): the same shape `decomposeFactorRisk`
-   * accepts and the Python `SensitivityMatrix.to_json` emits.
-   * @returns Returns a structured `SensitivityMatrixJson` object.
-   * @param positionsJson - Canonical portfolio-positions JSON to bump and revalue.
-   * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
-   * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-   * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; any JSON input is malformed; a factor definition or bump configuration is invalid or unsupported; bumping or repricing fails; or the sensitivity matrix cannot be converted to a JavaScript value.
-   */
-  computeFactorSensitivities(
-    positionsJson: JsonInput,
-    factorsJson: JsonInput,
-    marketJson: JsonInput,
-    asOf: string,
-    baseCurrency: string,
-    bumpConfigJson?: JsonInput
-  ): SensitivityMatrixJson;
-  /**
    * Compute first-order factor sensitivities using a pre-parsed `core.MarketContext` handle.
    *
    * Avoids reparsing market JSON for repeated factor analytics calls.
@@ -36241,7 +36146,7 @@ export interface PortfolioNamespace {
    * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
    * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor definition is invalid or unsupported; bumping or repricing fails; or the sensitivity matrix cannot be converted to a JavaScript value.
    */
-  computeFactorSensitivitiesWithMarket(
+  computeFactorSensitivities(
     positionsJson: JsonInput,
     factorsJson: JsonInput,
     market: MarketContext,
@@ -36249,32 +36154,6 @@ export interface PortfolioNamespace {
     baseCurrency: string,
     bumpConfigJson?: JsonInput
   ): SensitivityMatrixJson;
-  /**
-   * Compute scenario P&L profiles via full repricing.
-   *
-   * Same position/factor/market inputs as `computeFactorSensitivities`, plus
-   * an optional `n_scenario_points` integer. Returns a structured array with
-   * one `FactorPnlProfile` (`{ base_currency, factor_id, position_ids, shifts,
-   * position_pnls }`, the Rust serde form) per shocked factor.
-   * @returns Returns a structured `FactorPnlProfile` array.
-   * @param positionsJson - Canonical portfolio-positions JSON to bump and revalue.
-   * @param factorsJson - Canonical factor-definition JSON identifying the market factors to shock.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param baseCurrency - ISO reporting currency for all returned monetary exposures; missing FX throws an error.
-   * @param bumpConfigJson - Canonical bump-configuration JSON defining factor shock sizes and conventions.
-   * @param nScenarioPoints - Odd number of evenly spaced bump levels in each P-and-L profile, in `3..=1001`; omit for 5.
-   * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; any JSON input is malformed; a factor, bump configuration, or scenario-point count is invalid or unsupported; bumping or repricing fails; or the profiles cannot be converted to a JavaScript value.
-   */
-  computePnlProfiles(
-    positionsJson: JsonInput,
-    factorsJson: JsonInput,
-    marketJson: JsonInput,
-    asOf: string,
-    baseCurrency: string,
-    bumpConfigJson?: JsonInput,
-    nScenarioPoints?: number
-  ): FactorPnlProfile[];
   /**
    * Compute scenario P&L profiles using a pre-parsed `core.MarketContext` handle.
    * @returns Returns a structured `FactorPnlProfile` array.
@@ -36287,7 +36166,7 @@ export interface PortfolioNamespace {
    * @param nScenarioPoints - Odd number of evenly spaced bump levels in each P-and-L profile, in `3..=1001`; omit for 5.
    * @throws Error - Throws a JavaScript exception if `asOf` is not a valid ISO date; a position, factor, or bump-config JSON input is malformed; a factor or scenario-point count is invalid or unsupported; bumping or repricing fails; or the profiles cannot be converted to a JavaScript value.
    */
-  computePnlProfilesWithMarket(
+  computePnlProfiles(
     positionsJson: JsonInput,
     factorsJson: JsonInput,
     market: MarketContext,

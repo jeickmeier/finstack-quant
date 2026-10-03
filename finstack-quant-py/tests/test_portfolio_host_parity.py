@@ -104,7 +104,6 @@ def _inputs() -> dict[str, Any]:
             "matching": {
                 "mapping_table": [{"dependency_filter": {}, "attribute_filter": {}, "factor_id": "usd_rates"}]
             },
-            "pricing_mode": "full_repricing",
             "risk_measure": "variance",
         },
         "stresses": [["usd_rates", 1.0]],
@@ -147,7 +146,6 @@ def _inputs() -> dict[str, Any]:
                 "factors": [],
                 "covariance": {"n": 0, "factor_ids": [], "data": []},
                 "matching": {"mapping_table": []},
-                "pricing_mode": "delta_based",
             },
             "issuer_betas": [],
             "anchor_state": {"pc": 0.0, "by_level": []},

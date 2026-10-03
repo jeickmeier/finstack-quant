@@ -76,3 +76,5 @@ pub fn register_root(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 
     Ok(())
 }
+
+pub(crate) mod json_bridge;

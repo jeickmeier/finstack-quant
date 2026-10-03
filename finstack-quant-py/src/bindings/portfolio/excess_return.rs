@@ -276,7 +276,7 @@ fn run_excess_returns(
 /// -------
 /// DurationCellTable
 ///     Typed cell table with ``to_dataframe()`` / ``to_json()`` exits. Use
-///     :func:`cell_returns_from_reference_json` for the raw wire string.
+///     :meth:`to_json` for the raw wire string.
 ///
 /// Raises
 /// ------
@@ -321,34 +321,6 @@ fn cell_returns_from_reference(
         inner: run_cell_returns_from_reference(py, reference_json, base_label, config_json)?,
     })
 }
-
-/// Build a reference-universe duration-cell table and return wire JSON.
-///
-/// Wire twin of :func:`cell_returns_from_reference`; same inputs,
-/// JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``DurationCellTable``.
-#[pyfunction]
-#[pyo3(text_signature = "(reference_json, base_label, config_json)")]
-fn cell_returns_from_reference_json(
-    py: Python<'_>,
-    reference_json: &Bound<'_, PyAny>,
-    base_label: &str,
-    config_json: &Bound<'_, PyAny>,
-) -> PyResult<String> {
-    let reference_json =
-        crate::bindings::extract::extract_records_json(py, reference_json, "reference")?;
-    let reference_json: &str = &reference_json;
-    let config_json = crate::bindings::extract::extract_records_json(py, config_json, "config")?;
-    let config_json: &str = &config_json;
-    let table = run_cell_returns_from_reference(py, reference_json, base_label, config_json)?;
-    serde_json::to_string(&table)
-        .map_err(|err| serde_json_to_py(err, "serialize DurationCellTable"))
-}
-
 /// Build a duration-cell base-return table from start/end discount curves.
 ///
 /// Binds Rust `finstack_quant_portfolio::cell_returns_from_curves`: each
@@ -380,7 +352,7 @@ fn cell_returns_from_reference_json(
 /// -------
 /// DurationCellTable
 ///     Typed cell table with ``to_dataframe()`` / ``to_json()`` exits. Use
-///     :func:`cell_returns_from_curves_json` for the raw wire string.
+///     :meth:`to_json` for the raw wire string.
 ///
 /// Raises
 /// ------
@@ -437,42 +409,6 @@ fn cell_returns_from_curves(
         )?,
     })
 }
-
-/// Build a curve-snapshot duration-cell table and return wire JSON.
-///
-/// Wire twin of :func:`cell_returns_from_curves`; same inputs, JSON-string
-/// output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``DurationCellTable``.
-#[pyfunction]
-#[pyo3(text_signature = "(start, end, horizon_years, max_duration, base_label, config_json)")]
-fn cell_returns_from_curves_json(
-    py: Python<'_>,
-    start: &PyDiscountCurve,
-    end: &PyDiscountCurve,
-    horizon_years: f64,
-    max_duration: f64,
-    base_label: &str,
-    config_json: &Bound<'_, PyAny>,
-) -> PyResult<String> {
-    let config_json = crate::bindings::extract::extract_records_json(py, config_json, "config")?;
-    let config_json: &str = &config_json;
-    let table = run_cell_returns_from_curves(
-        py,
-        start,
-        end,
-        horizon_years,
-        max_duration,
-        base_label,
-        config_json,
-    )?;
-    serde_json::to_string(&table)
-        .map_err(|err| serde_json_to_py(err, "serialize DurationCellTable"))
-}
-
 /// Compute duration-matched credit excess returns against a base-return table.
 ///
 /// Binds Rust `finstack_quant_portfolio::excess_returns` (Dynkin, Hyman &
@@ -489,15 +425,15 @@ fn cell_returns_from_curves_json(
 ///     ``1e-6``.
 /// table_json : str | dict | list | pandas.DataFrame
 ///     JSON ``DurationCellTable``, as returned by
-///     :func:`cell_returns_from_reference_json`,
-///     :func:`cell_returns_from_curves_json`, or
+///     :meth:`to_json`,
+///     :meth:`to_json`, or
 ///     ``DurationCellTable.to_json()``.
 ///
 /// Returns
 /// -------
 /// ExcessReturnResult
 ///     Typed result with per-position and portfolio-level total/base/excess
-///     returns. Use :func:`excess_returns_json` for the raw wire string.
+///     returns. Use :meth:`to_json` for the raw wire string.
 ///
 /// Raises
 /// ------
@@ -542,41 +478,12 @@ fn excess_returns(
         inner: run_excess_returns(py, positions_json, table_json)?,
     })
 }
-
-/// Compute duration-matched credit excess returns and return wire JSON.
-///
-/// Wire twin of :func:`excess_returns`; same inputs, JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``ExcessReturnResult``.
-#[pyfunction]
-#[pyo3(text_signature = "(positions_json, table_json)")]
-fn excess_returns_json(
-    py: Python<'_>,
-    positions_json: &Bound<'_, PyAny>,
-    table_json: &Bound<'_, PyAny>,
-) -> PyResult<String> {
-    let positions_json =
-        crate::bindings::extract::extract_records_json(py, positions_json, "positions")?;
-    let positions_json: &str = &positions_json;
-    let table_json = crate::bindings::extract::extract_records_json(py, table_json, "table")?;
-    let table_json: &str = &table_json;
-    let result = run_excess_returns(py, positions_json, table_json)?;
-    serde_json::to_string(&result)
-        .map_err(|err| serde_json_to_py(err, "serialize ExcessReturnResult"))
-}
-
 /// Register duration-matched credit excess return functions on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDurationCellTable>()?;
     m.add_class::<PyExcessReturnResult>()?;
     m.add_function(wrap_pyfunction!(cell_returns_from_reference, m)?)?;
-    m.add_function(wrap_pyfunction!(cell_returns_from_reference_json, m)?)?;
     m.add_function(wrap_pyfunction!(cell_returns_from_curves, m)?)?;
-    m.add_function(wrap_pyfunction!(cell_returns_from_curves_json, m)?)?;
     m.add_function(wrap_pyfunction!(excess_returns, m)?)?;
-    m.add_function(wrap_pyfunction!(excess_returns_json, m)?)?;
     Ok(())
 }

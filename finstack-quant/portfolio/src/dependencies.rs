@@ -213,19 +213,6 @@ pub(crate) fn resolved_dependencies(
     Ok(keys)
 }
 
-fn finalize_dependency_map(
-    staged: HashMap<MarketFactorKey, HashSet<usize>>,
-) -> HashMap<MarketFactorKey, Vec<usize>> {
-    staged
-        .into_iter()
-        .map(|(key, indices)| {
-            let mut indices: Vec<_> = indices.into_iter().collect();
-            indices.sort_unstable();
-            (key, indices)
-        })
-        .collect()
-}
-
 /// Inverted index mapping market factor keys to affected position indices.
 ///
 /// Stored alongside the `position_index` on [`Portfolio`](crate::portfolio::Portfolio)
@@ -267,27 +254,11 @@ impl DependencyIndex {
     ///
     /// Newly built dependency index.
     pub fn build(positions: &[crate::position::Position]) -> Self {
-        let mut staged: HashMap<MarketFactorKey, HashSet<usize>> = HashMap::default();
-        let mut unresolved = Vec::new();
-
+        let mut index = Self::default();
         for (idx, position) in positions.iter().enumerate() {
-            let Ok(deps) = position.instrument.market_dependencies() else {
-                unresolved.push(idx);
-                continue;
-            };
-
-            let keys = flatten_dependencies(&deps);
-            for key in keys {
-                staged.entry(key).or_default().insert(idx);
-            }
+            index.add_position(idx, position);
         }
-
-        let inner = finalize_dependency_map(staged);
-        Self {
-            inner,
-            unresolved,
-            indexed_positions: positions.len(),
-        }
+        index
     }
 
     /// Incrementally index a single appended position (avoids full rebuild).
@@ -322,7 +293,7 @@ impl DependencyIndex {
         // in an entry. Push unconditionally: the previous `entry.contains(&idx)`
         // guard was a dead O(entry_len) scan that made repeated `add_position`
         // calls O(n²) for a widely-shared factor. Each entry therefore stays
-        // sorted and duplicate-free, matching `finalize_dependency_map`.
+        // sorted and duplicate-free, matching the bulk construction path.
         for key in keys {
             self.inner.entry(key).or_default().push(idx);
         }
@@ -647,28 +618,12 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn finalize_dependency_map_sorts_and_deduplicates_indices() {
-        let key = MarketFactorKey::spot("SPX");
-        let mut staged: HashMap<MarketFactorKey, HashSet<usize>> = HashMap::default();
-        staged
-            .entry(key.clone())
-            .or_default()
-            .extend([3usize, 1, 3, 2]);
-
-        let finalized = finalize_dependency_map(staged);
-
-        assert_eq!(finalized.get(&key).map(Vec::as_slice), Some(&[1, 2, 3][..]));
-    }
-
-    #[test]
     fn affected_positions_conservatively_includes_all_fx_dependencies() {
         let direct = MarketFactorKey::fx(Currency::EUR, Currency::USD);
         let triangulated_cross = MarketFactorKey::fx(Currency::EUR, Currency::JPY);
-        let mut staged: HashMap<MarketFactorKey, HashSet<usize>> = HashMap::default();
-        staged.entry(direct).or_default().insert(7);
-        staged.entry(triangulated_cross).or_default().insert(11);
+        let inner = HashMap::from_iter([(direct, vec![7]), (triangulated_cross, vec![11])]);
         let index = DependencyIndex {
-            inner: finalize_dependency_map(staged),
+            inner,
             unresolved: Vec::new(),
             indexed_positions: 12,
         };

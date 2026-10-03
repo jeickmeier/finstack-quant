@@ -12,6 +12,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
+use finstack_quant_wasm::api::core::market_context::JsMarketContext;
 use finstack_quant_wasm::api::portfolio::sensitivity::decompose_factor_risk;
 use finstack_quant_wasm::api::portfolio::*;
 use finstack_quant_wasm::api::scenarios::build_scenario_spec;
@@ -58,8 +59,8 @@ fn value_portfolio_returns_a_structured_object() {
     let spec = portfolio_spec_json();
     let market = empty_market_json();
     let valuation = value_portfolio(
-        JsValue::from(&spec),
-        JsValue::from(&market),
+        &JsPortfolio::from_spec(JsValue::from(&spec)).expect("portfolio"),
+        &JsMarketContext::from_json(JsValue::from(&market)).expect("market"),
         Some(JsValue::from(false)),
         None,
     )
@@ -82,8 +83,12 @@ fn value_portfolio_returns_a_structured_object() {
 fn aggregate_full_cashflows_returns_a_structured_object_for_an_empty_portfolio() {
     let spec = portfolio_spec_json();
     let market = empty_market_json();
-    let result =
-        aggregate_full_cashflows(JsValue::from(&spec), JsValue::from(&market), None).unwrap();
+    let result = aggregate_full_cashflows(
+        &JsPortfolio::from_spec(JsValue::from(&spec)).expect("portfolio"),
+        &JsMarketContext::from_json(JsValue::from(&market)).expect("market"),
+        None,
+    )
+    .unwrap();
     let parsed = as_json(&result);
 
     assert_eq!(parsed["events"], serde_json::json!([]));
@@ -99,9 +104,18 @@ fn aggregate_full_cashflows_built_matches_the_spec_path() {
     let handle = JsPortfolio::from_spec(JsValue::from(&spec_json)).unwrap();
     let market = empty_market_json();
 
-    let via_built = aggregate_full_cashflows_built(&handle, JsValue::from(&market), None).unwrap();
-    let via_spec =
-        aggregate_full_cashflows(JsValue::from(&spec_json), JsValue::from(&market), None).unwrap();
+    let via_built = aggregate_full_cashflows(
+        &handle,
+        &JsMarketContext::from_json(JsValue::from(&market)).expect("market"),
+        None,
+    )
+    .unwrap();
+    let via_spec = aggregate_full_cashflows(
+        &JsPortfolio::from_spec(JsValue::from(&spec_json)).expect("portfolio"),
+        &JsMarketContext::from_json(JsValue::from(&market)).expect("market"),
+        None,
+    )
+    .unwrap();
     assert_eq!(as_json(&via_built), as_json(&via_spec));
 }
 
@@ -110,8 +124,8 @@ fn aggregate_metrics_returns_a_structured_object() {
     let spec = portfolio_spec_json();
     let market = empty_market_json();
     let valuation = value_portfolio(
-        JsValue::from(&spec),
-        JsValue::from(&market),
+        &JsPortfolio::from_spec(JsValue::from(&spec)).expect("portfolio"),
+        &JsMarketContext::from_json(JsValue::from(&market)).expect("market"),
         Some(JsValue::from(false)),
         None,
     )
@@ -616,9 +630,9 @@ fn apply_scenario_and_revalue_empty_portfolio() {
     let scenario = empty_scenario_json();
     let market = empty_market_json();
     let result = apply_scenario_and_revalue(
-        JsValue::from(&spec),
+        &JsPortfolio::from_spec(JsValue::from(&spec)).expect("portfolio"),
         JsValue::from(&scenario),
-        JsValue::from(&market),
+        &JsMarketContext::from_json(JsValue::from(&market)).expect("market"),
     )
     .unwrap();
     let obj = as_json(&result);
@@ -632,10 +646,10 @@ fn apply_scenario_and_revalue_built_empty_portfolio() {
     let portfolio = JsPortfolio::from_spec(JsValue::from(&spec)).unwrap();
     let scenario = empty_scenario_json();
     let market = empty_market_json();
-    let result = apply_scenario_and_revalue_built(
+    let result = apply_scenario_and_revalue(
         &portfolio,
         JsValue::from(&scenario),
-        JsValue::from(&market),
+        &JsMarketContext::from_json(JsValue::from(&market)).expect("market"),
     )
     .unwrap();
     let obj = as_json(&result);
@@ -706,9 +720,12 @@ fn parse_portfolio_spec_json_roundtrip() {
 }
 
 #[wasm_bindgen_test]
-fn build_portfolio_from_spec_json_empty() {
+fn portfolio_from_spec_empty() {
     let json = minimal_portfolio_spec_json();
-    let result = build_portfolio_from_spec_json(JsValue::from(&json)).expect("build");
+    let result = JsPortfolio::from_spec(JsValue::from(&json))
+        .expect("portfolio")
+        .to_json()
+        .expect("build");
     let parsed: serde_json::Value = serde_json::from_str(&result).expect("valid json");
     assert_eq!(parsed["id"], "test_portfolio");
 }
@@ -717,7 +734,10 @@ fn build_portfolio_from_spec_json_empty() {
 fn parse_and_rebuild_roundtrip() {
     let json = minimal_portfolio_spec_json();
     let canonical = parse_portfolio_spec_json(JsValue::from(&json)).expect("parse");
-    let rebuilt = build_portfolio_from_spec_json(JsValue::from(&canonical)).expect("rebuild");
+    let rebuilt = JsPortfolio::from_spec(JsValue::from(&canonical))
+        .expect("portfolio")
+        .to_json()
+        .expect("rebuild");
     let a: serde_json::Value = serde_json::from_str(&canonical).expect("a");
     let b: serde_json::Value = serde_json::from_str(&rebuilt).expect("b");
     assert_eq!(a["id"], b["id"]);

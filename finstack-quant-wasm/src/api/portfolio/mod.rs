@@ -15,8 +15,7 @@
 //!   chain into an entry point that still takes a `*Json` argument).
 //! - **Wire / spec / validator surfaces** — anything whose purpose is to echo a
 //!   canonical document for re-ingest — return a **JSON string** and their
-//!   names end in `Json` (`Portfolio.toJson`, `parsePortfolioSpecJson`,
-//!   `buildPortfolioFromSpecJson`).
+//!   names end in `Json` (`Portfolio.toJson`, `parsePortfolioSpecJson`).
 //!
 //! The materialization entry points (`Portfolio.fromMaterialization`,
 //! `Portfolio.validateMaterialization`) return plain structured objects
@@ -32,11 +31,11 @@
 //! - `Portfolio` (typed handle: `builder`, `fromSpec`, `toJson`, `id`, `name`,
 //!   `asOf`, `baseCurrency`, `tags`, `meta`, `entityIds`, `positionIds`,
 //!   `numPositions`) and its `PortfolioBuilder`
-//! - `parsePortfolioSpecJson`, `buildPortfolioFromSpecJson`
-//! - `valuePortfolio`, `valuePortfolioBuilt`,
-//!   `aggregateFullCashflows`, `aggregateFullCashflowsBuilt`,
-//!   `applyScenarioAndRevalue`, `applyScenarioAndRevalueBuilt`,
-//!   `scenarioPnl`, `scenarioPnlBuilt`, `scenarioPnlBatch`,
+//! - `parsePortfolioSpecJson`
+//! - `valuePortfolio`,
+//!   `aggregateFullCashflows`,
+//!   `applyScenarioAndRevalue`,
+//!   `scenarioPnl`, `scenarioPnlBatch`,
 //!   `attributePortfolioPnl`
 //! - `aggregateMetrics`
 //! - `replayPortfolio`
@@ -57,13 +56,12 @@
 //! the `results` module.
 //!
 //! For repeated calls against the same portfolio (scenario sweeps,
-//! interactive dashboards), prefer the `*Built` variants which take a
-//! `Portfolio` handle and skip the per-call `from_spec` rebuild.
+//! interactive dashboards), reuse the `Portfolio` and `MarketContext` handles
+//! accepted by the calculation entry points.
 
 use crate::utils::input::{
     js_f64, js_f64_seq, js_opt_bool, js_opt_string_seq, js_string, json_text,
 };
-use std::sync::Arc;
 
 use crate::api::core::market_context::JsMarketContext;
 use crate::api::core::market_data::JsDiscountCurve;
@@ -87,7 +85,7 @@ pub mod sensitivity;
 /// avoids paying that cost twice.
 #[wasm_bindgen(js_name = Portfolio)]
 pub struct JsPortfolio {
-    pub(crate) inner: Arc<finstack_quant_portfolio::Portfolio>,
+    pub(crate) inner: finstack_quant_portfolio::Portfolio,
 }
 
 #[wasm_bindgen(js_class = Portfolio)]
@@ -126,9 +124,7 @@ impl JsPortfolio {
         let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
             serde_json::from_str(spec_json).map_err(to_js_err)?;
         let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
-        Ok(Self {
-            inner: Arc::new(portfolio),
-        })
+        Ok(Self { inner: portfolio })
     }
 
     /// Portfolio identifier.
@@ -707,7 +703,7 @@ pub fn twrr_linked(returns_json: JsValue, horizon_years: JsValue) -> Result<JsVa
 
 /// Compute money-weighted return via XIRR from dated cashflow JSON.
 ///
-/// Binds Rust `mwr_xirr_from_cashflows`. Returns the unique annualized decimal
+/// Binds Rust `mwr_xirr`. Returns the unique annualized decimal
 /// return under Act/365F, finite and greater than -1. Nonconventional streams
 /// are rejected rather than selecting one of their potentially multiple roots.
 ///
@@ -729,34 +725,8 @@ pub fn mwr_xirr(cashflows_json: JsValue) -> Result<f64, JsValue> {
     let cashflows_json: &str = &json_text(&cashflows_json, "cashflowsJson")?;
     let cashflows: Vec<finstack_quant_portfolio::DatedCashflow> =
         serde_json::from_str(cashflows_json).map_err(to_js_err)?;
-    finstack_quant_portfolio::mwr_xirr_from_cashflows(&cashflows).map_err(to_js_err)
+    finstack_quant_portfolio::mwr_xirr(&cashflows).map_err(to_js_err)
 }
-
-/// Build a runtime portfolio from a JSON spec, validate, and round-trip.
-///
-/// Wire/validator surface: deserializes the spec, constructs the portfolio with
-/// live instruments, validates structural invariants, then re-serializes the
-/// canonical JSON **string** for confirmation or re-ingest.
-/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `specJson` is malformed or violates the
-/// portfolio schema, a position has an invalid quantity or instrument
-/// specification, portfolio validation fails, or the round-trip form cannot be
-/// serialized.
-#[wasm_bindgen(js_name = buildPortfolioFromSpecJson)]
-pub fn build_portfolio_from_spec_json(spec_json: JsValue) -> Result<String, JsValue> {
-    let spec_json: &str = &json_text(&spec_json, "specJson")?;
-    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec =
-        serde_json::from_str(spec_json).map_err(to_js_err)?;
-
-    let portfolio = finstack_quant_portfolio::Portfolio::from_spec(spec).map_err(to_js_err)?;
-
-    let round_tripped = portfolio.to_spec();
-    serde_json::to_string(&round_tripped).map_err(to_js_err)
-}
-
 /// Aggregate portfolio metrics from a valuation JSON.
 /// @param valuation_json - `PortfolioValuation` JSON, for example `JSON.stringify(valuePortfolio(...))`.
 /// @param base_currency - ISO-4217 base currency in which aggregate portfolio values are reported.
@@ -791,87 +761,9 @@ pub fn aggregate_metrics(
             .map_err(to_js_err)?;
     to_js_value(&metrics)
 }
-
-/// Value a portfolio from its spec and market context.
-/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
-/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param strict_risk - Optional; when omitted or `undefined`, uses the Rust
-///   `PortfolioValuationOptions` default, `true` (fail closed when a requested
-///   risk metric fails to compute). Pass `false` only for an intentional
-///   PV-preserving fallback.
-/// @param metrics - Optional risk-metric ids to offer every position. Omit for
-///   the standard set (PV plus `dv01`; pricer-specific metrics such as `theta`
-///   or `cs01` must be listed explicitly); an empty array performs PV-only
-///   valuation. Names resolve exactly as in `priceInstrument`: every id
-///   `listStandardMetrics()` returns is accepted and an unknown name throws.
-///   The list is a menu, not a per-position request: one list is chosen for a
-///   book of mixed instrument types, so each position is asked for exactly the
-///   entries its own instrument can compute (a composite position: the additive
-///   entries at least one leg supports), and the rest appear on that position's
-///   `inapplicable_metrics`. Narrowing covers structural inapplicability only;
-///   `strictRisk` still governs a metric an instrument supports but fails to
-///   compute. `priceInstrument` keeps the opposite contract and throws on a
-///   metric its instrument cannot produce. Mirrors the Python `metrics=`
-///   keyword.
-///
-/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
-/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
-/// them; serialize one with `valuations.valuationResultToJson`.
-/// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
-/// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
-/// order before other keys, not in the Rust (and Python) insertion order; take
-/// valuation order from `spec.positions` when it matters.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if the portfolio or market JSON is malformed,
-/// a requested metric name is unknown, portfolio construction or valuation
-/// fails, strict risk calculation cannot produce a requested metric, a
-/// required FX conversion is unavailable, or the valuation cannot be
-/// converted to a JavaScript value.
-#[wasm_bindgen(js_name = valuePortfolio)]
-pub fn value_portfolio(
-    spec_json: JsValue,
-    market_json: JsValue,
-    strict_risk: Option<JsValue>,
-    metrics: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let portfolio = JsPortfolio::from_spec(spec_json)?;
-    value_portfolio_built(&portfolio, market_json, strict_risk, metrics)
-}
-
-/// Aggregate the full classified cashflow ladder for a portfolio.
-/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
-/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param allow_partial - Optional; when omitted or `undefined`, uses the Rust
-///   `CashflowAggregationOptions` default, `false` (fail closed if any
-///   position fails schedule construction). Pass `true` to keep a partial
-///   ladder with issues on the result.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if the portfolio or market JSON is malformed,
-/// portfolio construction fails, any position fails schedule construction
-/// while `allowPartial` is not `true`, monetary cash-flow aggregation
-/// overflows, or the aggregate cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = aggregateFullCashflows)]
-pub fn aggregate_full_cashflows(
-    spec_json: JsValue,
-    market_json: JsValue,
-    allow_partial: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let portfolio = JsPortfolio::from_spec(spec_json)?;
-    aggregate_full_cashflows_built(&portfolio, market_json, allow_partial)
-}
-
-/// Aggregate the full classified cashflow ladder for an already-built
-/// `Portfolio` handle.
-///
-/// Skips the per-call `PortfolioSpec` parse + `Portfolio::from_spec` rebuild.
-/// For batched or chained workflows (repeated cashflow builds across market
-/// scenarios on the same portfolio), this is the cheap path.
+/// Aggregate the full classified cashflow ladder using reusable portfolio and market handles.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
-/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
 /// @param allow_partial - Optional; when omitted or `undefined`, uses the Rust
 ///   `CashflowAggregationOptions` default, `false` (fail closed if any
 ///   position fails schedule construction). Pass `true` to keep a partial
@@ -879,39 +771,33 @@ pub fn aggregate_full_cashflows(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `marketJson` is malformed, any position
+/// Throws a JavaScript exception if any position
 /// fails schedule construction while `allowPartial` is not `true`, monetary
 /// cash-flow aggregation overflows, or the aggregate cannot be converted to
 /// a JavaScript value.
-#[wasm_bindgen(js_name = aggregateFullCashflowsBuilt)]
-pub fn aggregate_full_cashflows_built(
+#[wasm_bindgen(js_name = aggregateFullCashflows)]
+pub fn aggregate_full_cashflows(
     portfolio: &JsPortfolio,
-    market_json: JsValue,
+    market: &JsMarketContext,
     allow_partial: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
     let allow_partial = js_opt_bool(allow_partial.as_ref(), "allowPartial")?;
-    let market: finstack_quant_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
     let mut options = finstack_quant_portfolio::cashflows::CashflowAggregationOptions::default();
     if let Some(allow_partial) = allow_partial {
         options.allow_partial = allow_partial;
     }
     let cashflows = finstack_quant_portfolio::cashflows::aggregate_full_cashflows(
         &portfolio.inner,
-        &market,
+        market.inner(),
         &options,
     )
     .map_err(to_js_err)?;
     to_js_value(&cashflows)
 }
 
-/// Value an already-built `Portfolio` handle. Skips the per-call
-/// `PortfolioSpec` parse + `Portfolio::from_spec` rebuild that
-/// [`value_portfolio`] performs; use this when sweeping market scenarios
-/// against a fixed portfolio.
+/// Value a portfolio using constructed portfolio and market handles.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
-/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
 /// @param strict_risk - Optional; when omitted or `undefined`, uses the Rust
 ///   `PortfolioValuationOptions` default, `true` (fail closed when a requested
 ///   risk metric fails to compute). Pass `false` only for an intentional
@@ -941,22 +827,19 @@ pub fn aggregate_full_cashflows_built(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if `marketJson` is malformed, a requested
+/// Throws a JavaScript exception if a requested
 /// metric name is unknown, portfolio valuation fails, strict risk calculation
 /// cannot produce a requested metric, a required FX conversion is unavailable,
 /// or the valuation cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = valuePortfolioBuilt)]
-pub fn value_portfolio_built(
+#[wasm_bindgen(js_name = valuePortfolio)]
+pub fn value_portfolio(
     portfolio: &JsPortfolio,
-    market_json: JsValue,
+    market: &JsMarketContext,
     strict_risk: Option<JsValue>,
     metrics: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
     let strict_risk = js_opt_bool(strict_risk.as_ref(), "strictRisk")?;
     let metrics = js_opt_string_seq(metrics.as_ref(), "metrics")?;
-    let market: finstack_quant_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
     // Strict parsing via the canonical portfolio-crate helper (shared with
     // the Python binding): an unknown metric name throws instead of silently
@@ -973,7 +856,7 @@ pub fn value_portfolio_built(
     }
     let valuation = finstack_quant_portfolio::valuation::value_portfolio(
         &portfolio.inner,
-        &market,
+        market.inner(),
         &config,
         &options,
     )
@@ -985,7 +868,7 @@ pub fn value_portfolio_built(
 /// Returns a JS object with structured `valuation` and `report` values.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param scenario_json - Scenario specification JSON.
-/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
+/// @param market - Constructed `core.MarketContext` handle supplying curves, quotes, and FX data.
 ///
 /// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
 /// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
@@ -997,62 +880,28 @@ pub fn value_portfolio_built(
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the scenario or market JSON is malformed,
+/// Throws a JavaScript exception if the scenario JSON is malformed or invalid,
 /// scenario application or portfolio revaluation fails, or the structured
 /// result cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = applyScenarioAndRevalueBuilt)]
-pub fn apply_scenario_and_revalue_built(
+#[wasm_bindgen(js_name = applyScenarioAndRevalue)]
+pub fn apply_scenario_and_revalue(
     portfolio: &JsPortfolio,
     scenario_json: JsValue,
-    market_json: JsValue,
+    market: &JsMarketContext,
 ) -> Result<JsValue, JsValue> {
     let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
     let scenario =
         finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
-    let market: finstack_quant_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
-    let out = finstack_quant_portfolio::scenarios::apply_and_revalue_view(
+    let out = finstack_quant_portfolio::scenarios::apply_and_revalue(
         &portfolio.inner,
         &scenario,
-        &market,
+        market.inner(),
         &config,
     )
     .map_err(to_js_err)?;
     to_js_value_with_bigints(&out)
 }
-
-/// Apply a scenario to a portfolio and revalue.
-///
-/// Returns a JS object with structured `valuation` and `report` values.
-/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
-/// @param scenario_json - Scenario specification JSON.
-/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-///
-/// Each position's `valuation_result` keeps 64-bit fields (the Monte Carlo
-/// `seed` and path counts) as `BigInt`, exactly as `priceInstrument` returns
-/// them; serialize one with `valuations.valuationResultToJson`.
-/// `position_values` and `by_entity` are plain objects keyed by id: JavaScript
-/// enumerates integer-like ids (such as `"10"`, `"2"`) in ascending numeric
-/// order before other keys, not in the Rust (and Python) insertion order; take
-/// valuation order from `spec.positions` when it matters.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if the portfolio, scenario, or market JSON is
-/// malformed; portfolio construction, scenario application, or revaluation
-/// fails; or the structured result cannot be converted to a JavaScript value.
-#[wasm_bindgen(js_name = applyScenarioAndRevalue)]
-pub fn apply_scenario_and_revalue(
-    spec_json: JsValue,
-    scenario_json: JsValue,
-    market_json: JsValue,
-) -> Result<JsValue, JsValue> {
-    let portfolio = JsPortfolio::from_spec(spec_json)?;
-    apply_scenario_and_revalue_built(&portfolio, scenario_json, market_json)
-}
-
 /// Compute the profit and loss attributable to a scenario for an already-built
 /// `Portfolio` handle.
 ///
@@ -1063,61 +912,32 @@ pub fn apply_scenario_and_revalue(
 /// so the drill-down always sums to the total.
 /// @param portfolio - Built portfolio object whose positions and weights are used by the calculation.
 /// @param scenario_json - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
-/// @param market_json - Canonical market-context JSON supplying the unshocked curves, quotes, and FX data used for the base leg.
+/// @param market - Constructed `core.MarketContext` handle supplying the unshocked curves, quotes, and FX data used for the base leg.
 ///
 /// # Errors
 ///
-/// Throws a JavaScript exception if the scenario or market JSON is malformed,
+/// Throws a JavaScript exception if the scenario JSON is malformed or invalid,
 /// scenario application or either valuation fails, valuation currencies are
 /// inconsistent, or the structured result cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = scenarioPnlBuilt)]
-pub fn scenario_pnl_built(
+#[wasm_bindgen(js_name = scenarioPnl)]
+pub fn scenario_pnl(
     portfolio: &JsPortfolio,
     scenario_json: JsValue,
-    market_json: JsValue,
+    market: &JsMarketContext,
 ) -> Result<JsValue, JsValue> {
     let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
     let scenario =
         finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
-    let market: finstack_quant_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
     let config = finstack_quant_core::config::FinstackConfig::default();
-    let out = finstack_quant_portfolio::scenarios::scenario_pnl_view(
+    let out = finstack_quant_portfolio::scenarios::scenario_pnl(
         &portfolio.inner,
         &scenario,
-        &market,
+        market.inner(),
         &config,
     )
     .map_err(to_js_err)?;
     to_js_value(&out)
 }
-
-/// Compute the profit and loss attributable to a scenario.
-///
-/// Values the portfolio against the unshocked market and against the
-/// scenario-shocked market, and returns a JS object with structured `pnl`
-/// (base-currency `total` plus `by_position`) and `report` values.
-/// @param spec_json - Canonical portfolio specification JSON defining positions, quantities, and base currency.
-/// @param scenario_json - Canonical JSON payload representing the scenario whose profit-and-loss impact is measured.
-/// @param market_json - Canonical market-context JSON supplying the unshocked curves, quotes, and FX data used for the base leg.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if the portfolio, scenario, or market JSON is
-/// malformed; portfolio construction, scenario application, or either
-/// valuation fails; valuation currencies are inconsistent; or the structured
-/// result cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = scenarioPnl)]
-pub fn scenario_pnl(
-    spec_json: JsValue,
-    scenario_json: JsValue,
-    market_json: JsValue,
-) -> Result<JsValue, JsValue> {
-    let portfolio = JsPortfolio::from_spec(spec_json)?;
-    scenario_pnl_built(&portfolio, scenario_json, market_json)
-}
-
 /// Compute ordered portfolio P&L for a batch of scenarios.
 ///
 /// The Rust batch engine values the unstressed base leg once for the whole
@@ -1144,9 +964,6 @@ pub fn scenario_pnl_batch(
 ) -> Result<JsValue, JsValue> {
     let scenarios: Vec<finstack_quant_scenarios::ScenarioSpec> =
         from_js_json(&scenarios, "scenarios")?;
-    for scenario in &scenarios {
-        scenario.validate().map_err(to_js_err)?;
-    }
     let config = finstack_quant_core::config::FinstackConfig::default();
     let items = finstack_quant_portfolio::scenarios::scenario_pnl_batch(
         &portfolio.inner,
@@ -1243,8 +1060,7 @@ pub fn optimize_portfolio(spec_json: JsValue, market_json: JsValue) -> Result<Js
 
 /// Rebalance a spec's portfolio to an optimization result.
 ///
-/// Wire twin of Python `PortfolioOptimizationResult.to_rebalanced_portfolio`
-/// (Rust `optimization::rebalance_from_spec`): held positions take the
+/// Wire twin of Python and Rust `optimization::rebalance_from_spec`: held positions take the
 /// result's implied quantities and trade-universe candidates with a
 /// non-negligible target weight and quantity are added as new positions.
 /// @param spec_json - The `PortfolioOptimizationSpec` JSON passed to `optimizePortfolio`.
@@ -1268,9 +1084,7 @@ pub fn rebalance_from_spec(
         serde_json::from_str(&json_text(&result_json, "resultJson")?).map_err(to_js_err)?;
     let portfolio = finstack_quant_portfolio::optimization::rebalance_from_spec(&spec, &result)
         .map_err(to_js_err)?;
-    Ok(JsPortfolio {
-        inner: Arc::new(portfolio),
-    })
+    Ok(JsPortfolio { inner: portfolio })
 }
 
 /// Net same-currency cashflow amounts per date from a cashflow ladder.

@@ -315,6 +315,61 @@ pub fn carino_link(periods: &[BrinsonPeriodResult]) -> Result<CarinoLinkedAttrib
         ));
     }
 
+    for period in periods {
+        let mut sums = [NeumaierAccumulator::new(); 3];
+        for sector in &period.sectors {
+            let effects = [sector.allocation, sector.selection, sector.interaction];
+            let mut effect_sum = NeumaierAccumulator::new();
+            for effect in effects {
+                effect_sum.add(effect);
+            }
+            let expected = effect_sum.total();
+            if effects.iter().any(|value| !value.is_finite())
+                || !sector.total.is_finite()
+                || !expected.is_finite()
+                || (sector.total - expected).abs()
+                    > 3e-10
+                        * effects
+                            .iter()
+                            .map(|value| value.abs())
+                            .fold(1.0_f64, f64::max)
+            {
+                return Err(Error::invalid_input(
+                    "Brinson sector effects must be finite and reconcile to the sector total",
+                ));
+            }
+            for (sum, effect) in sums.iter_mut().zip(effects) {
+                sum.add(effect);
+            }
+        }
+        let totals = [
+            period.total_allocation,
+            period.total_selection,
+            period.total_interaction,
+        ];
+        let reconstructed = sums.iter().map(|sum| sum.total()).sum::<f64>();
+        let expected = period.portfolio_return - period.benchmark_return;
+        let scale = totals
+            .iter()
+            .map(|value| value.abs())
+            .fold(1.0_f64, f64::max)
+            .max(expected.abs());
+        let tolerance = 1e-10 * scale;
+        if !expected.is_finite()
+            || !period.total_excess_return.is_finite()
+            || !reconstructed.is_finite()
+            || sums.iter().zip(totals).any(|(sum, total)| {
+                !total.is_finite()
+                    || !sum.total().is_finite()
+                    || (sum.total() - total).abs() > tolerance
+            })
+            || (period.total_excess_return - expected).abs() > tolerance
+            || (reconstructed - expected).abs() > tolerance
+        {
+            return Err(Error::invalid_input("Brinson period effects must be finite and reconcile to portfolio minus benchmark return"));
+        }
+    }
+
     // Enforce consistent sector ordering so summing per-sector across
     // periods is well-defined.
     let sector_names: Vec<String> = periods[0]
@@ -571,6 +626,31 @@ mod tests {
     /// The three Brinson-Fachler effects must sum to the active return
     /// exactly — this is the definitional invariant that separates a
     /// correct BF implementation from a drift-prone one.
+    #[test]
+    fn carino_rejects_unreconciled_supplied_effects() {
+        let mut period = BrinsonPeriodResult {
+            sectors: vec![SectorEffect {
+                sector: "A".to_string(),
+                allocation: 1.0,
+                selection: 0.0,
+                interaction: 0.0,
+                total: 1.0,
+            }],
+            total_allocation: 1.0,
+            total_selection: 0.0,
+            total_interaction: 0.0,
+            portfolio_return: 0.0,
+            benchmark_return: 0.0,
+            total_excess_return: 0.0,
+        };
+        assert!(carino_link(&[period.clone()]).is_err());
+        period.portfolio_return = 1.0;
+        period.total_excess_return = 1.0;
+        assert!(carino_link(&[period.clone()]).is_ok());
+        period.sectors[0].selection = f64::INFINITY;
+        assert!(carino_link(&[period]).is_err());
+    }
+
     #[test]
     fn brinson_effects_reconstruct_active_return() {
         let sectors = period_two_sector(0.60, 0.40, 0.08, 0.06, 0.01, 0.03);

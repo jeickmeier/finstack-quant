@@ -13,7 +13,7 @@ contract about how disruptive future changes are likely to be.
 * ``Portfolio``, ``PortfolioBuilder``, ``PortfolioValuation``,
   ``PositionValue``, ``PortfolioResult``, ``PortfolioCashflows`` (the typed
   handles)
-* ``parse_portfolio_spec_json``, ``build_portfolio_from_spec_json``
+* ``parse_portfolio_spec_json`` and ``Portfolio.from_spec``
 * ``value_portfolio``, ``aggregate_full_cashflows``,
   ``apply_scenario_and_revalue``
 * ``aggregate_metrics`` (scalar reads go through ``PortfolioResult``
@@ -91,9 +91,7 @@ ReplayResult = _portfolio.ReplayResult
 WeightAllocationResult = _portfolio.WeightAllocationResult
 
 parse_portfolio_spec_json = _portfolio.parse_portfolio_spec_json
-build_portfolio_from_spec_json = _portfolio.build_portfolio_from_spec_json
 aggregate_metrics = _portfolio.aggregate_metrics
-aggregate_metrics_json = _portfolio.aggregate_metrics_json
 value_portfolio = _portfolio.value_portfolio
 aggregate_full_cashflows = _portfolio.aggregate_full_cashflows
 net_in_currency_by_date = _portfolio.net_in_currency_by_date
@@ -110,34 +108,20 @@ rebalance_from_spec = _portfolio.rebalance_from_spec
 replay_portfolio = _portfolio.replay_portfolio
 replay_portfolio_json = _portfolio.replay_portfolio_json
 brinson_fachler = _portfolio.brinson_fachler
-brinson_fachler_json = _portfolio.brinson_fachler_json
 carino_link = _portfolio.carino_link
-carino_link_json = _portfolio.carino_link_json
 carino_link_from_sector_periods = _portfolio.carino_link_from_sector_periods
-carino_link_from_sector_periods_json = _portfolio.carino_link_from_sector_periods_json
 campisi_attribution = _portfolio.campisi_attribution
-campisi_attribution_json = _portfolio.campisi_attribution_json
 campisi_carino_link = _portfolio.campisi_carino_link
-campisi_carino_link_json = _portfolio.campisi_carino_link_json
 campisi_carino_link_from_snapshots = _portfolio.campisi_carino_link_from_snapshots
-campisi_carino_link_from_snapshots_json = _portfolio.campisi_carino_link_from_snapshots_json
 campisi_reconciliation_check = _portfolio.campisi_reconciliation_check
-campisi_reconciliation_check_json = _portfolio.campisi_reconciliation_check_json
 cell_returns_from_curves = _portfolio.cell_returns_from_curves
-cell_returns_from_curves_json = _portfolio.cell_returns_from_curves_json
 cell_returns_from_reference = _portfolio.cell_returns_from_reference
-cell_returns_from_reference_json = _portfolio.cell_returns_from_reference_json
 excess_returns = _portfolio.excess_returns
-excess_returns_json = _portfolio.excess_returns_json
 factor_brinson_attribution = _portfolio.factor_brinson_attribution
-factor_brinson_attribution_json = _portfolio.factor_brinson_attribution_json
 grid_attribution = _portfolio.grid_attribution
-grid_attribution_json = _portfolio.grid_attribution_json
 grid_carino_link = _portfolio.grid_carino_link
-grid_carino_link_json = _portfolio.grid_carino_link_json
 twrr_modified_dietz = _portfolio.twrr_modified_dietz
 twrr_linked = _portfolio.twrr_linked
-twrr_linked_json = _portfolio.twrr_linked_json
 mwr_xirr = _portfolio.mwr_xirr
 
 # Portfolio factor-model workflow results
@@ -246,42 +230,27 @@ __all__ = [
     "WhatIfResult",
     "aggregate_full_cashflows",
     "aggregate_metrics",
-    "aggregate_metrics_json",
     "allocate_weights",
     "allocate_weights_json",
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
     "brinson_fachler",
-    "brinson_fachler_json",
     "build_credit_vol_report",
-    "build_portfolio_from_spec_json",
     "campisi_attribution",
-    "campisi_attribution_json",
     "campisi_carino_link",
     "campisi_carino_link_from_snapshots",
-    "campisi_carino_link_from_snapshots_json",
-    "campisi_carino_link_json",
     "campisi_reconciliation_check",
-    "campisi_reconciliation_check_json",
     "carino_link",
     "carino_link_from_sector_periods",
-    "carino_link_from_sector_periods_json",
-    "carino_link_json",
     "cell_returns_from_curves",
-    "cell_returns_from_curves_json",
     "cell_returns_from_reference",
-    "cell_returns_from_reference_json",
     "compute_factor_sensitivities",
     "compute_pnl_profiles",
     "decompose_factor_risk",
     "excess_returns",
-    "excess_returns_json",
     "factor_brinson_attribution",
-    "factor_brinson_attribution_json",
     "grid_attribution",
-    "grid_attribution_json",
     "grid_carino_link",
-    "grid_carino_link_json",
     "mwr_xirr",
     "net_in_currency_by_date",
     "optimize_portfolio",
@@ -295,7 +264,6 @@ __all__ = [
     "scenario_pnl_batch_json",
     "schema",
     "twrr_linked",
-    "twrr_linked_json",
     "twrr_modified_dietz",
     "validate_allocation_json",
     "value_portfolio",

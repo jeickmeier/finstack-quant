@@ -247,7 +247,7 @@ fn factor_model_config_examples() -> finstack_quant_core::Result<Vec<serde_json:
         factors: vec![factor],
         covariance,
         matching,
-        pricing_mode: crate::factor::PricingMode::DeltaBased,
+
         risk_measure: Default::default(),
         bump_config: None,
         unmatched_policy: None,

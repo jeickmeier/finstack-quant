@@ -13475,10 +13475,6 @@
           "$ref": "#/$defs/MatchingConfig",
           "description": "Declarative dependency-to-factor matching configuration."
         },
-        "pricing_mode": {
-          "$ref": "#/$defs/PricingMode",
-          "description": "Sensitivity extraction strategy used by the analysis pipeline."
-        },
         "risk_measure": {
           "$ref": "#/$defs/RiskMeasure",
           "default": "variance",
@@ -13499,8 +13495,7 @@
       "required": [
         "factors",
         "covariance",
-        "matching",
-        "pricing_mode"
+        "matching"
       ],
       "type": "object"
     },
@@ -23921,21 +23916,6 @@
         "required_days_above"
       ],
       "type": "object"
-    },
-    "PricingMode": {
-      "description": "Strategy used when extracting factor sensitivities.",
-      "oneOf": [
-        {
-          "const": "delta_based",
-          "description": "Use central finite differences to approximate linear deltas.\n\nThis is the lightweight choice when a downstream engine can reprice under\nsmall symmetric bumps and the risk report only needs first-order factor\nsensitivities.",
-          "type": "string"
-        },
-        {
-          "const": "full_repricing",
-          "description": "Select the engine that can also compute explicit scenario P&L profiles.\n\nSensitivity extraction uses the same two central endpoints as\n`DeltaBased`; full grids are evaluated only when P&L profiles are requested.",
-          "type": "string"
-        }
-      ]
     },
     "PrivateMarketsFund": {
       "additionalProperties": false,

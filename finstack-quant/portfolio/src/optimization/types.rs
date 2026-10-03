@@ -89,16 +89,6 @@ pub enum PerPositionMetric {
     /// Use the base currency PV of the position (after scaling).
     PvBase,
 
-    /// Use the native‑currency PV of the position (after scaling).
-    ///
-    /// Values are returned in each position's own currency and are therefore
-    /// **not commensurable** across a mixed-currency portfolio. The LP
-    /// coefficient builder rejects `PvNative` inside aggregated objectives
-    /// ([`MetricExpr::WeightedSum`] or [`MetricExpr::ValueWeightedAverage`]) —
-    /// use [`PerPositionMetric::PvBase`] in those contexts so all positions
-    /// are summed in a single numeraire.
-    PvNative,
-
     /// Numeric attribute value from position attributes.
     Attribute(String),
 
@@ -126,19 +116,16 @@ impl PerPositionMetric {
     /// * `measures` - Instrument metric values keyed by canonical metric name.
     /// * `attributes` - Position attributes supplying numeric values or indicator tests.
     /// * `pv_base` - Held present value in the portfolio reporting currency.
-    /// * `pv_native` - Held present value in the instrument's native currency.
     pub(crate) fn resolve(
         &self,
         measures: &IndexMap<String, f64>,
         attributes: &IndexMap<String, AttributeValue>,
         pv_base: f64,
-        pv_native: f64,
     ) -> Option<f64> {
         match self {
             Self::Metric(id) => measures.get(id.as_str()).copied(),
             Self::CustomKey(key) => measures.get(key).copied(),
             Self::PvBase => Some(pv_base),
-            Self::PvNative => Some(pv_native),
             Self::Attribute(key) => attributes.get(key).and_then(AttributeValue::as_number),
             Self::AttributeIndicator(test) => {
                 Some(if test.evaluate(attributes) { 1.0 } else { 0.0 })

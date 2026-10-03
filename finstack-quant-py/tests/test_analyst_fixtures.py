@@ -20,7 +20,7 @@ from finstack_quant.portfolio import (
     aggregate_full_cashflows,
     aggregate_metrics,
     mwr_xirr,
-    twrr_linked_json,
+    twrr_linked,
     twrr_modified_dietz,
     value_portfolio,
 )
@@ -198,7 +198,7 @@ def test_dated_flow_history_drives_native_performance(fixtures: SimpleNamespace)
             period_begin, segment_start, factor, period_flows = nav, nav, 1.0, []
     investor_flows.append({"date": end_date.isoformat(), "amount": nav})
     years = (date.fromisoformat(history[-1]["end"]) - date.fromisoformat(history[0]["start"])).days / 365.0
-    linked = json.loads(twrr_linked_json(json.dumps(returns), years))
+    linked = json.loads(twrr_linked(json.dumps(returns), years).to_json())
     assert len(returns) == len(dietz_returns) == 3
     assert linked["cumulative"] == pytest.approx(math.prod(1 + value for value in returns) - 1)
     assert all(math.isfinite(value) for value in returns + dietz_returns)

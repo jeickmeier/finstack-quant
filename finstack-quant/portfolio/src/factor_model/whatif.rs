@@ -396,7 +396,7 @@ mod tests {
     use finstack_quant_models::factor::matching::{DependencyFilter, MappingRule, MatchingConfig};
     use finstack_quant_models::factor::{
         CurveType, DependencyType, FactorCovarianceMatrix, FactorDefinition, FactorId,
-        FactorModelConfig, FactorType, MarketMapping, PricingMode, RiskMeasure, UnmatchedPolicy,
+        FactorModelConfig, FactorType, MarketMapping, RiskMeasure, UnmatchedPolicy,
     };
     use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::MarketDependencies;
@@ -892,7 +892,7 @@ mod tests {
                 }],
                 require_issuer_id: false,
             }),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Warn),
@@ -1058,7 +1058,7 @@ mod tests {
                 attribute_filter: finstack_quant_models::factor::AttributeFilter::default(),
                 factor_id: FactorId::new("Rates"),
             }]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Warn),

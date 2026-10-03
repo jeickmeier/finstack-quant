@@ -293,32 +293,13 @@ pub fn twrr_linked(
 /// Propagates XIRR validation and numerical-solver errors, including an
 /// insufficient or invalid cashflow series, more than one net sign change,
 /// and failure to find an accurate finite return greater than -1.
-pub fn mwr_xirr(cashflows: &[(Date, f64)]) -> finstack_quant_core::Result<f64> {
-    finstack_quant_core::cashflow::xirr(cashflows, None)
-}
-
-/// Money-weighted return via XIRR from serde-friendly dated cashflow objects.
-///
-/// This is equivalent to [`mwr_xirr`] after projecting each object to its
-/// `(date, amount)` pair, including the same investor-sign convention and
-/// `Act/365F` annualization.
-///
-/// # Arguments
-///
-/// * `cashflows` - Serde-friendly dated investor-perspective cashflows whose
-///   contributions are negative and terminal value is positive.
-///
-/// # Errors
-///
-/// Propagates the errors returned by [`mwr_xirr`].
-pub fn mwr_xirr_from_cashflows(cashflows: &[DatedCashflow]) -> finstack_quant_core::Result<f64> {
-    let flows = cashflows
+pub fn mwr_xirr(cashflows: &[DatedCashflow]) -> finstack_quant_core::Result<f64> {
+    let flows: Vec<_> = cashflows
         .iter()
-        .map(|cashflow| (cashflow.date, cashflow.amount))
-        .collect::<Vec<_>>();
-    mwr_xirr(&flows)
+        .map(|flow| (flow.date, flow.amount))
+        .collect();
+    finstack_quant_core::cashflow::xirr(&flows, None)
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -465,7 +446,13 @@ mod tests {
             (date!(2025 - 01 - 01), -100.0),
             (date!(2026 - 01 - 01), 110.0),
         ];
-        let irr = mwr_xirr(&flows).expect("solver converges");
+        let irr = mwr_xirr(
+            &flows
+                .iter()
+                .map(|&(date, amount)| DatedCashflow { date, amount })
+                .collect::<Vec<_>>(),
+        )
+        .expect("solver converges");
         assert!((irr - 0.10).abs() < 1e-6);
     }
 }

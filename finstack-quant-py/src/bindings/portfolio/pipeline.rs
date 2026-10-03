@@ -269,7 +269,7 @@ fn apply_scenario_and_revalue(
     let config = finstack_quant_core::config::FinstackConfig::default();
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
-    let (valuation, report) = py
+    let finstack_quant_portfolio::scenarios::ScenarioRevalueView { valuation, report } = py
         .detach(|| {
             finstack_quant_portfolio::scenarios::apply_and_revalue(
                 portfolio_ref,
@@ -318,7 +318,7 @@ fn scenario_pnl(
     let config = finstack_quant_core::config::FinstackConfig::default();
     let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
-    let (pnl, report) = py
+    let finstack_quant_portfolio::scenarios::ScenarioPnlView { pnl, report } = py
         .detach(|| {
             finstack_quant_portfolio::scenarios::scenario_pnl(
                 portfolio_ref,

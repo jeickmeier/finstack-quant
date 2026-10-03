@@ -4,9 +4,9 @@
 //! full-repricing factor sensitivities from Python, with DataFrame export.
 
 use crate::bindings::extract::extract_market;
+use crate::bindings::models::factor::contributions::PyRiskDecomposition;
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::bindings::portfolio::factor_model::PyRiskDecomposition;
 use crate::errors::{core_to_py, display_to_py};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
@@ -262,14 +262,10 @@ impl PyFactorPnlProfile {
     /// columns (column labels are the profile's own ``position_ids``).
     #[pyo3(text_signature = "(self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        self.inner.validate().map_err(crate::errors::core_to_py)?;
         let data = PyDict::new(py);
         for (pi, pid) in self.inner.position_ids.iter().enumerate() {
-            let column: Vec<f64> = self
-                .inner
-                .position_pnls
-                .iter()
-                .map(|row| row.get(pi).copied().unwrap_or(f64::NAN))
-                .collect();
+            let column: Vec<f64> = self.inner.position_pnls.iter().map(|row| row[pi]).collect();
             data.set_item(pid, column)?;
         }
         let index = PyList::new(py, &self.inner.shifts)?;

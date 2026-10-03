@@ -252,7 +252,6 @@ def _credit_model() -> CreditFactorModel:
                 "factors": [],
                 "covariance": {"n": 0, "factor_ids": [], "data": []},
                 "matching": {"mapping_table": []},
-                "pricing_mode": "delta_based",
             },
             "issuer_betas": [],
             "anchor_state": {"pc": 0.0, "by_level": []},

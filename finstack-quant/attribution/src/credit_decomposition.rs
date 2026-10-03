@@ -431,7 +431,7 @@ mod tests {
     };
     use finstack_quant_models::factor::matching::ISSUER_ID_META_KEY;
     use finstack_quant_models::factor::{
-        FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
+        FactorCovarianceMatrix, FactorModelConfig, MatchingConfig,
     };
     use finstack_quant_valuations::instruments::{Attributes, Bond, Instrument, InstrumentJson};
     use std::sync::Arc;
@@ -442,7 +442,7 @@ mod tests {
             factors: vec![],
             covariance: FactorCovarianceMatrix::new(vec![], vec![]).unwrap(),
             matching: MatchingConfig::MappingTable(vec![]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: Default::default(),
             bump_config: None,
             unmatched_policy: None,

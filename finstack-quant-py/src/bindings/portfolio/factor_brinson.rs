@@ -193,7 +193,7 @@ fn run_factor_brinson_attribution(
 /// FactorBrinsonResult
 ///     Typed result with ``allocation``, ``selection``, and their
 ///     per-factor / per-asset breakdowns. Use
-///     :func:`factor_brinson_attribution_json` for the raw wire string.
+///     :meth:`to_json` for the raw wire string.
 ///
 /// Raises
 /// ------
@@ -242,34 +242,9 @@ fn factor_brinson_attribution(
         inner: run_factor_brinson_attribution(py, input_json, factor_returns)?,
     })
 }
-
-/// Compute factor-Brinson unified attribution and return wire JSON.
-///
-/// Wire twin of :func:`factor_brinson_attribution`; same inputs,
-/// JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``FactorBrinsonResult``.
-#[pyfunction]
-#[pyo3(text_signature = "(input_json, factor_returns)")]
-fn factor_brinson_attribution_json(
-    py: Python<'_>,
-    input_json: &Bound<'_, PyAny>,
-    factor_returns: Vec<f64>,
-) -> PyResult<String> {
-    let input_json = crate::bindings::extract::extract_records_json(py, input_json, "input")?;
-    let input_json: &str = &input_json;
-    let result = run_factor_brinson_attribution(py, input_json, factor_returns)?;
-    serde_json::to_string(&result)
-        .map_err(|err| serde_json_to_py(err, "serialize FactorBrinsonResult"))
-}
-
 /// Register factor-Brinson attribution functions on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFactorBrinsonResult>()?;
     m.add_function(wrap_pyfunction!(factor_brinson_attribution, m)?)?;
-    m.add_function(wrap_pyfunction!(factor_brinson_attribution_json, m)?)?;
     Ok(())
 }

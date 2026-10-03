@@ -16,8 +16,8 @@ use crate::errors::{portfolio_to_py, serde_json_to_py};
 
 use super::assignment::PyFactorAssignmentReport;
 use super::budget_whatif::{parse_position_changes, PyWhatIfResult};
-use super::contributions::PyRiskDecomposition;
 use super::stress::{PyStressPnl, PyStressResult};
+use crate::bindings::models::factor::contributions::PyRiskDecomposition;
 
 /// Convert ``(factor_id, shift)`` pairs into Rust factor stresses.
 fn to_stresses(stresses: Vec<(String, f64)>) -> Vec<(FactorId, f64)> {

@@ -458,10 +458,6 @@ export type DependencyType = "discount" | "forward" | "credit" | "spot" | "vol" 
  */
 export type IssuerBetaMode = "issuer_beta" | "bucket_only";
 /**
- * Strategy used when extracting factor sensitivities.
- */
-export type PricingMode = "delta_based" | "full_repricing";
-/**
  * Risk measure used when aggregating factor exposures.
  */
 export type RiskMeasure =
@@ -2438,10 +2434,6 @@ export interface FactorModelConfig {
    * Declarative dependency-to-factor matching configuration.
    */
   matching: MatchingConfig;
-  /**
-   * Sensitivity extraction strategy used by the analysis pipeline.
-   */
-  pricing_mode: PricingMode;
   /**
    * Risk measure used when aggregating factor sensitivities.
    */

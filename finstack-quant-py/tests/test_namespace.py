@@ -307,23 +307,6 @@ class TestPortfolioNamespace:
 
     def test_portfolio_exports(self) -> None:
         """Portfolio should export parsing, building, metric functions, and typed wrappers."""
-        from finstack_quant.portfolio import (  # noqa: F401
-            FactorModel,
-            FactorPnlProfile,
-            Portfolio,
-            PortfolioError,
-            PortfolioResult,
-            PortfolioValuation,
-            SensitivityMatrix,
-            aggregate_full_cashflows,
-            aggregate_metrics,
-            build_credit_vol_report,
-            build_portfolio_from_spec_json,
-            compute_factor_sensitivities,
-            compute_pnl_profiles,
-            decompose_factor_risk,
-            parse_portfolio_spec_json,
-        )
 
     def test_factor_risk_exports(self) -> None:
         """Pure factor-risk kernels should live under models.factor.risk."""
@@ -349,7 +332,7 @@ class TestPortfolioNamespace:
 
     def test_portfolio_domain_errors_are_typed(self) -> None:
         """Portfolio domain failures should expose a portfolio-specific exception."""
-        from finstack_quant.portfolio import PortfolioError, build_portfolio_from_spec_json
+        from finstack_quant.portfolio import Portfolio, PortfolioError
 
         spec_json = json.dumps({
             "id": "bad_portfolio",
@@ -370,7 +353,7 @@ class TestPortfolioNamespace:
         })
 
         with pytest.raises(PortfolioError):
-            build_portfolio_from_spec_json(spec_json)
+            Portfolio.from_spec(spec_json).to_json()
 
     def test_portfolio_full_cashflows_empty_portfolio(self) -> None:
         """Full cashflow ladder should be exposed and preserve the rich empty shape."""

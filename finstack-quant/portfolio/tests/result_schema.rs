@@ -48,6 +48,7 @@ fn optimization_result_schema_matches_serde_wire_type() {
     assert_eq!(
         property_names(&schema),
         BTreeSet::from([
+            "meta",
             "schema_version",
             "status",
             "status_label",

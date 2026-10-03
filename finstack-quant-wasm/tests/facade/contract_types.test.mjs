@@ -446,7 +446,12 @@ test('namespace results match their published result types', () => {
     ],
   });
   const barrierMarket = JSON.stringify(golden.market.data);
-  const valuation = portfolio.valuePortfolio(book, barrierMarket, false, []);
+  const valuation = portfolio.valuePortfolio(
+    portfolio.Portfolio.fromSpec(book),
+    core.MarketContext.fromJson(barrierMarket),
+    false,
+    []
+  );
   assert.equal(
     typeof valuation.position_values.BARRIER.valuation_result.details.data.seed,
     'bigint'
@@ -456,9 +461,9 @@ test('namespace results match their published result types', () => {
     'scenario_revalue',
     'fq.ScenarioRevalueView',
     portfolio.applyScenarioAndRevalue(
-      book,
+      portfolio.Portfolio.fromSpec(book),
       JSON.stringify({ id: 's', operations: [] }),
-      barrierMarket
+      core.MarketContext.fromJson(barrierMarket)
     ),
   ]);
 

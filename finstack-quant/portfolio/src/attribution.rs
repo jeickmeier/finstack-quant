@@ -161,27 +161,6 @@ pub struct PortfolioAttribution {
     /// base-currency totals.
     pub by_position: IndexMap<PositionId, PnlAttribution>,
 
-    /// Aggregate rates curves detail (optional).
-    pub rates_detail: Option<RatesCurvesAttribution>,
-
-    /// Aggregate credit curves detail (optional).
-    pub credit_detail: Option<CreditCurvesAttribution>,
-
-    /// Aggregate inflation curves detail (optional).
-    pub inflation_detail: Option<InflationCurvesAttribution>,
-
-    /// Aggregate correlations detail (optional).
-    pub correlations_detail: Option<CorrelationsAttribution>,
-
-    /// Aggregate FX detail (optional).
-    pub fx_detail: Option<FxAttribution>,
-
-    /// Aggregate volatility detail (optional).
-    pub vol_detail: Option<VolAttribution>,
-
-    /// Aggregate scalars detail (optional).
-    pub scalars_detail: Option<ScalarsAttribution>,
-
     /// True if any constituent position's attribution was flagged invalid
     /// (for example, a non-finite factor sensitivity — see
     /// [`PnlAttribution::result_invalid`]). When `true`, the portfolio
@@ -343,13 +322,6 @@ impl FactorAccumulator {
             )?,
             residual: Money::new(self.total(FactorBucket::Residual), base_currency)?,
             by_position,
-            rates_detail: None,
-            credit_detail: None,
-            inflation_detail: None,
-            correlations_detail: None,
-            fx_detail: None,
-            vol_detail: None,
-            scalars_detail: None,
             result_invalid: self.result_invalid,
         })
     }
@@ -504,26 +476,6 @@ fn translate_primitive_attribution(
             )
         })
         .transpose()?;
-    attribution.carry = translated(attribution.carry, rate_t1, reporting_currency)?;
-    attribution.rates_curves_pnl =
-        translated(attribution.rates_curves_pnl, rate_t1, reporting_currency)?;
-    attribution.credit_curves_pnl =
-        translated(attribution.credit_curves_pnl, rate_t1, reporting_currency)?;
-    attribution.inflation_curves_pnl = translated(
-        attribution.inflation_curves_pnl,
-        rate_t1,
-        reporting_currency,
-    )?;
-    attribution.correlations_pnl =
-        translated(attribution.correlations_pnl, rate_t1, reporting_currency)?;
-    attribution.fx_pnl = translated(attribution.fx_pnl, rate_t1, reporting_currency)?;
-    attribution.vol_pnl = translated(attribution.vol_pnl, rate_t1, reporting_currency)?;
-    attribution.cross_factor_pnl =
-        translated(attribution.cross_factor_pnl, rate_t1, reporting_currency)?;
-    attribution.model_params_pnl =
-        translated(attribution.model_params_pnl, rate_t1, reporting_currency)?;
-    attribution.market_scalars_pnl =
-        translated(attribution.market_scalars_pnl, rate_t1, reporting_currency)?;
     attribution.fx_translation_pnl = Money::new(
         attribution.fx_translation_pnl.amount() * rate_t1 + principal_translation,
         reporting_currency,
@@ -541,6 +493,10 @@ fn translate_primitive_attribution(
     attribution.scalars_detail = None;
     attribution.credit_factor_detail = None;
     attribution.credit_carry_decomposition = None;
+    attribution.for_each_money_mut(|money| {
+        *money = translated(*money, rate_t1, reporting_currency)?;
+        Ok(())
+    })?;
     Ok(())
 }
 
@@ -614,7 +570,7 @@ pub(crate) fn attribution_endpoint_profile(method: &AttributionMethod) -> Evalua
 ///
 /// Metrics-based attribution is deliberately excluded: it consumes the
 /// portfolio-level prepared endpoint valuations in
-/// [`reduce_metrics_based_prepared`] so a portfolio call does not perform two
+/// [`reduce_prepared`] so a portfolio call does not perform two
 /// additional metric valuations per position.
 fn attribute_single_position_method_owned(
     position: &crate::position::Position,
@@ -694,15 +650,16 @@ fn attribute_single_position_method_owned(
 /// Both endpoints enter through the canonical portfolio executor once. The
 /// attribution methods then perform only their financially distinct carry,
 /// factor-restoration, and sensitivity repricings.
-fn prepare_ordinary_endpoints(
+fn prepare_endpoints(
     portfolio: &Portfolio,
     market_t0: &MarketContext,
     market_t1: &MarketContext,
     as_of_t0: Date,
     as_of_t1: Date,
     config: &FinstackConfig,
+    method: &AttributionMethod,
 ) -> Result<(PortfolioValuation, PortfolioValuation)> {
-    let profile = attribution_endpoint_profile(&AttributionMethod::Parallel);
+    let profile = attribution_endpoint_profile(method);
     let mut plan = PortfolioEvaluationPlan::new(config);
     let portfolio_state = plan.register_portfolio(portfolio);
     let market_t0_state = plan.register_market(market_t0, as_of_t0);
@@ -791,154 +748,20 @@ fn prepared_valuation_result<'a>(
 
     Ok(valuation_result)
 }
-
-/// Reduce strict, prepared endpoint valuations into metrics-based attribution.
-///
-/// The endpoint results contain unit instrument valuations. Attribution is
-/// therefore calculated before applying the position scale, while the T0
-/// principal used for portfolio FX translation is taken from the prepared,
-/// already-scaled `PositionValue`.
-pub(crate) fn reduce_metrics_based_prepared(
+/// Reduce exact ordinary endpoint valuations through a repricing attribution
+/// method without pricing either endpoint again.
+pub(crate) fn reduce_prepared(
     portfolio: &Portfolio,
     markets: (&MarketContext, &MarketContext),
     dates: (Date, Date),
-    config: &FinstackConfig,
-    prepared_t0: &PortfolioValuation,
-    prepared_t1: &PortfolioValuation,
-) -> Result<PortfolioAttribution> {
-    let (market_t0, market_t1) = markets;
-    let (as_of_t0, as_of_t1) = dates;
-    if prepared_t0.as_of != as_of_t0 {
-        return Err(Error::invalid_input(format!(
-            "prepared attribution T0 portfolio valuation is stamped {} instead of {as_of_t0}",
-            prepared_t0.as_of
-        )));
-    }
-    if prepared_t1.as_of != as_of_t1 {
-        return Err(Error::invalid_input(format!(
-            "prepared attribution T1 portfolio valuation is stamped {} instead of {as_of_t1}",
-            prepared_t1.as_of
-        )));
-    }
-
-    let reduce_position =
-        |position: &crate::position::Position| -> Result<PositionAttributionData> {
-            let position_t0 = prepared_t0
-                .get_position_value(position.position_id.as_str())
-                .ok_or_else(|| {
-                    Error::valuation(
-                        position.position_id.clone(),
-                        finstack_quant_core::error::ErrorKind::NotFound,
-                        "Attribution T0 prepared position valuation is missing",
-                    )
-                })?;
-            let position_t1 = prepared_t1
-                .get_position_value(position.position_id.as_str())
-                .ok_or_else(|| {
-                    Error::valuation(
-                        position.position_id.clone(),
-                        finstack_quant_core::error::ErrorKind::NotFound,
-                        "Attribution T1 prepared position valuation is missing",
-                    )
-                })?;
-
-            let val_t0 = prepared_valuation_result(position, position_t0, as_of_t0, "T0", true)?;
-            let val_t1 = prepared_valuation_result(position, position_t1, as_of_t1, "T1", true)?;
-            let mut pos_attr = if let Some(composite) = position
-                .instrument
-                .as_any()
-                .downcast_ref::<CompositeInstrument>()
-            {
-                attribute_composite_primitives(
-                    composite,
-                    market_t0,
-                    market_t1,
-                    as_of_t0,
-                    as_of_t1,
-                    config,
-                    &AttributionMethod::MetricsBased,
-                )?
-            } else {
-                attribute_pnl_metrics_based(
-                    &position.instrument,
-                    market_t0,
-                    market_t1,
-                    val_t0,
-                    val_t1,
-                    as_of_t0,
-                    as_of_t1,
-                )
-                .map_err(|error| Error::ValuationError {
-                    position_id: position.position_id.clone(),
-                    message: format!("Attribution failed: {error}"),
-                    kind: error.kind(),
-                })?
-            };
-
-            pos_attr
-                .scale(position.scale_factor())
-                .map_err(|error| Error::ValuationError {
-                    position_id: position.position_id.clone(),
-                    message: format!("Attribution scaling failed: {error}"),
-                    kind: error.kind(),
-                })?;
-            let inst_currency = pos_attr.total_pnl.currency();
-            Ok(PositionAttributionData {
-                position_id: position.position_id.clone(),
-                pos_attr,
-                val_t0_native: position_t0.value_native,
-                inst_currency,
-            })
-        };
-
-    #[cfg(not(target_arch = "wasm32"))]
-    let position_results: Vec<Result<PositionAttributionData>> =
-        if portfolio.positions.len() >= POSITION_PARALLEL_MIN_POSITIONS {
-            use rayon::prelude::*;
-            portfolio
-                .positions
-                .par_iter()
-                .map(reduce_position)
-                .collect()
-        } else {
-            portfolio.positions.iter().map(reduce_position).collect()
-        };
-
-    #[cfg(target_arch = "wasm32")]
-    let position_results: Vec<Result<PositionAttributionData>> =
-        portfolio.positions.iter().map(reduce_position).collect();
-
-    let position_data = position_results.into_iter().collect::<Result<Vec<_>>>()?;
-
-    aggregate_position_attributions(
-        portfolio,
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-        position_data,
-    )
-}
-
-/// Reduce exact ordinary endpoint valuations through a repricing attribution
-/// method without pricing either endpoint again.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn reduce_method_owned_prepared(
-    portfolio: &Portfolio,
-    market_t0: &MarketContext,
-    market_t1: &MarketContext,
-    as_of_t0: Date,
-    as_of_t1: Date,
     config: &FinstackConfig,
     method: &AttributionMethod,
     prepared_t0: &PortfolioValuation,
     prepared_t1: &PortfolioValuation,
 ) -> Result<PortfolioAttribution> {
-    if matches!(method, AttributionMethod::MetricsBased) {
-        return Err(Error::invalid_input(
-            "metrics-based attribution requires complete prepared valuation results",
-        ));
-    }
+    let (market_t0, market_t1) = markets;
+    let (as_of_t0, as_of_t1) = dates;
+    let require_complete_metrics = matches!(method, AttributionMethod::MetricsBased);
     if prepared_t0.as_of != as_of_t0 {
         return Err(Error::invalid_input(format!(
             "prepared attribution T0 portfolio valuation is stamped {} instead of {as_of_t0}",
@@ -981,15 +804,75 @@ pub(crate) fn reduce_method_owned_prepared(
                         "Attribution T1 prepared position valuation is missing",
                     )
                 })?;
-            let val_t0 = prepared_valuation_result(position, position_t0, as_of_t0, "T0", false)?;
-            let val_t1 = prepared_valuation_result(position, position_t1, as_of_t1, "T1", false)?;
-            attribute_single_position_method_owned(
+            let val_t0 = prepared_valuation_result(
                 position,
-                &request,
-                position_t0.value_native,
-                val_t0.value,
-                val_t1.value,
-            )
+                position_t0,
+                as_of_t0,
+                "T0",
+                require_complete_metrics,
+            )?;
+            let val_t1 = prepared_valuation_result(
+                position,
+                position_t1,
+                as_of_t1,
+                "T1",
+                require_complete_metrics,
+            )?;
+            if require_complete_metrics {
+                let mut pos_attr = if let Some(composite) = position
+                    .instrument
+                    .as_any()
+                    .downcast_ref::<CompositeInstrument>()
+                {
+                    attribute_composite_primitives(
+                        composite,
+                        market_t0,
+                        market_t1,
+                        as_of_t0,
+                        as_of_t1,
+                        config,
+                        &AttributionMethod::MetricsBased,
+                    )?
+                } else {
+                    attribute_pnl_metrics_based(
+                        &position.instrument,
+                        market_t0,
+                        market_t1,
+                        val_t0,
+                        val_t1,
+                        as_of_t0,
+                        as_of_t1,
+                    )
+                    .map_err(|error| Error::ValuationError {
+                        position_id: position.position_id.clone(),
+                        message: format!("Attribution failed: {error}"),
+                        kind: error.kind(),
+                    })?
+                };
+
+                pos_attr
+                    .scale(position.scale_factor())
+                    .map_err(|error| Error::ValuationError {
+                        position_id: position.position_id.clone(),
+                        message: format!("Attribution scaling failed: {error}"),
+                        kind: error.kind(),
+                    })?;
+                let inst_currency = pos_attr.total_pnl.currency();
+                Ok(PositionAttributionData {
+                    position_id: position.position_id.clone(),
+                    pos_attr,
+                    val_t0_native: position_t0.value_native,
+                    inst_currency,
+                })
+            } else {
+                attribute_single_position_method_owned(
+                    position,
+                    &request,
+                    position_t0.value_native,
+                    val_t0.value,
+                    val_t1.value,
+                )
+            }
         };
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -1075,39 +958,24 @@ fn attribute_portfolio_pnl_metrics_prepared(
     as_of_t1: Date,
     config: &FinstackConfig,
 ) -> Result<PortfolioAttribution> {
-    let profile = attribution_endpoint_profile(&AttributionMethod::MetricsBased);
-    let mut plan = PortfolioEvaluationPlan::new(config);
-    let portfolio_state = plan.register_portfolio(portfolio);
-    let market_t0_state = plan.register_market(market_t0, as_of_t0);
-    let market_t1_state = plan.register_market(market_t1, as_of_t1);
-    let t0_job = plan.register_evaluation(
-        market_t0_state,
-        portfolio_state,
-        profile.clone(),
-        PositionExecution::Parallel,
+    let (prepared_t0, prepared_t1) = prepare_endpoints(
+        portfolio,
+        market_t0,
+        market_t1,
+        as_of_t0,
+        as_of_t1,
+        config,
+        &AttributionMethod::MetricsBased,
     )?;
-    let t1_job = plan.register_evaluation(
-        market_t1_state,
-        portfolio_state,
-        profile,
-        PositionExecution::Parallel,
-    )?;
-    let outcome = plan.execute();
 
-    let prepared_t0 = outcome
-        .get(t0_job)
-        .map_err(|error| attribution_endpoint_error(error, "T0"))?;
-    let prepared_t1 = outcome
-        .get(t1_job)
-        .map_err(|error| attribution_endpoint_error(error, "T1"))?;
-
-    reduce_metrics_based_prepared(
+    reduce_prepared(
         portfolio,
         (market_t0, market_t1),
         (as_of_t0, as_of_t1),
         config,
-        prepared_t0.as_ref(),
-        prepared_t1.as_ref(),
+        &AttributionMethod::MetricsBased,
+        &prepared_t0,
+        &prepared_t1,
     )
 }
 
@@ -1213,14 +1081,13 @@ pub fn attribute_portfolio_pnl(
         );
     }
 
-    let (prepared_t0, prepared_t1) =
-        prepare_ordinary_endpoints(portfolio, market_t0, market_t1, as_of_t0, as_of_t1, config)?;
-    reduce_method_owned_prepared(
+    let (prepared_t0, prepared_t1) = prepare_endpoints(
+        portfolio, market_t0, market_t1, as_of_t0, as_of_t1, config, &method,
+    )?;
+    reduce_prepared(
         portfolio,
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
+        (market_t0, market_t1),
+        (as_of_t0, as_of_t1),
         config,
         &method,
         &prepared_t0,
@@ -1919,13 +1786,6 @@ mod tests {
             market_scalars_pnl: zero,
             residual: zero,
             by_position: IndexMap::new(),
-            rates_detail: None,
-            credit_detail: None,
-            inflation_detail: None,
-            correlations_detail: None,
-            fx_detail: None,
-            vol_detail: None,
-            scalars_detail: None,
             result_invalid: false,
         };
         let mut value = serde_json::to_value(&attr).expect("serialize attribution");
@@ -1957,13 +1817,6 @@ mod tests {
             market_scalars_pnl: Money::from((3_i64, Currency::USD)),
             residual: Money::from((2_i64, Currency::USD)),
             by_position: IndexMap::new(),
-            rates_detail: None,
-            credit_detail: None,
-            inflation_detail: None,
-            correlations_detail: None,
-            fx_detail: None,
-            vol_detail: None,
-            scalars_detail: None,
             result_invalid: false,
         };
         let rendered = explained.explain();
@@ -1987,13 +1840,6 @@ mod tests {
             market_scalars_pnl: zero,
             residual: Money::from((-5_i64, Currency::USD)),
             by_position: IndexMap::new(),
-            rates_detail: None,
-            credit_detail: None,
-            inflation_detail: None,
-            correlations_detail: None,
-            fx_detail: None,
-            vol_detail: None,
-            scalars_detail: None,
             result_invalid: false,
         };
         let zero_rendered = zero_total.explain();
@@ -2019,13 +1865,6 @@ mod tests {
             market_scalars_pnl: Money::from((3_i64, base_currency)),
             residual: Money::from((2_i64, base_currency)),
             by_position: IndexMap::new(),
-            rates_detail: None,
-            credit_detail: None,
-            inflation_detail: None,
-            correlations_detail: None,
-            fx_detail: None,
-            vol_detail: None,
-            scalars_detail: None,
             result_invalid: false,
         };
 
@@ -2061,13 +1900,6 @@ mod tests {
             market_scalars_pnl: zero,
             residual: zero,
             by_position: IndexMap::new(),
-            rates_detail: None,
-            credit_detail: None,
-            inflation_detail: None,
-            correlations_detail: None,
-            fx_detail: None,
-            vol_detail: None,
-            scalars_detail: None,
             result_invalid: false,
         };
 
@@ -2096,13 +1928,6 @@ mod tests {
             market_scalars_pnl: zero,
             residual: zero,
             by_position: IndexMap::new(),
-            rates_detail: None,
-            credit_detail: None,
-            inflation_detail: None,
-            correlations_detail: None,
-            fx_detail: None,
-            vol_detail: None,
-            scalars_detail: None,
             result_invalid: false,
         };
 
@@ -2177,13 +2002,6 @@ mod tests {
             market_scalars_pnl: zero,
             residual: zero,
             by_position: IndexMap::new(),
-            rates_detail: None,
-            credit_detail: None,
-            inflation_detail: None,
-            correlations_detail: None,
-            fx_detail: None,
-            vol_detail: None,
-            scalars_detail: None,
             result_invalid: true,
         };
         // The buckets net exactly to total_pnl, so a numeric-only check would

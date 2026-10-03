@@ -95,42 +95,27 @@ __all__ = [
     "WhatIfResult",
     "aggregate_full_cashflows",
     "aggregate_metrics",
-    "aggregate_metrics_json",
     "allocate_weights",
     "allocate_weights_json",
     "apply_scenario_and_revalue",
     "attribute_portfolio_pnl",
     "brinson_fachler",
-    "brinson_fachler_json",
     "build_credit_vol_report",
-    "build_portfolio_from_spec_json",
     "campisi_attribution",
-    "campisi_attribution_json",
     "campisi_carino_link",
     "campisi_carino_link_from_snapshots",
-    "campisi_carino_link_from_snapshots_json",
-    "campisi_carino_link_json",
     "campisi_reconciliation_check",
-    "campisi_reconciliation_check_json",
     "carino_link",
     "carino_link_from_sector_periods",
-    "carino_link_from_sector_periods_json",
-    "carino_link_json",
     "cell_returns_from_curves",
-    "cell_returns_from_curves_json",
     "cell_returns_from_reference",
-    "cell_returns_from_reference_json",
     "compute_factor_sensitivities",
     "compute_pnl_profiles",
     "decompose_factor_risk",
     "excess_returns",
-    "excess_returns_json",
     "factor_brinson_attribution",
-    "factor_brinson_attribution_json",
     "grid_attribution",
-    "grid_attribution_json",
     "grid_carino_link",
-    "grid_carino_link_json",
     "mwr_xirr",
     "net_in_currency_by_date",
     "optimize_portfolio",
@@ -144,7 +129,6 @@ __all__ = [
     "scenario_pnl_batch_json",
     "schema",
     "twrr_linked",
-    "twrr_linked_json",
     "twrr_modified_dietz",
     "validate_allocation_json",
     "value_portfolio",
@@ -1646,118 +1630,6 @@ class PortfolioAttribution:
         Notes
         -----
         This method does not raise; it formats stored values.
-        """
-        ...
-
-    @property
-    def rates_detail(self) -> dict[str, Any] | None:
-        """
-        Aggregate rates-curve detail (per-curve breakdown).
-
-        Returns
-        -------
-        dict[str, Any] | None
-            JSON-shaped detail, or ``None`` when the method did not produce it.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def credit_detail(self) -> dict[str, Any] | None:
-        """
-        Aggregate credit-curve detail.
-
-        Returns
-        -------
-        dict[str, Any] | None
-            JSON-shaped detail, or ``None`` when absent.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def inflation_detail(self) -> dict[str, Any] | None:
-        """
-        Aggregate inflation-curve detail.
-
-        Returns
-        -------
-        dict[str, Any] | None
-            JSON-shaped detail, or ``None`` when absent.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def correlations_detail(self) -> dict[str, Any] | None:
-        """
-        Aggregate correlation detail.
-
-        Returns
-        -------
-        dict[str, Any] | None
-            JSON-shaped detail, or ``None`` when absent.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def fx_detail(self) -> dict[str, Any] | None:
-        """
-        Aggregate FX detail.
-
-        Returns
-        -------
-        dict[str, Any] | None
-            JSON-shaped detail, or ``None`` when absent.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def vol_detail(self) -> dict[str, Any] | None:
-        """
-        Aggregate volatility detail.
-
-        Returns
-        -------
-        dict[str, Any] | None
-            JSON-shaped detail, or ``None`` when absent.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
-    def scalars_detail(self) -> dict[str, Any] | None:
-        """
-        Aggregate market-scalar detail.
-
-        Returns
-        -------
-        dict[str, Any] | None
-            JSON-shaped detail, or ``None`` when absent.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
         """
         ...
 
@@ -3623,41 +3495,6 @@ def parse_portfolio_spec_json(json_str: str) -> str:
     """
     ...
 
-def build_portfolio_from_spec_json(spec_json: str) -> str:
-    """
-    Build a runtime portfolio from JSON and return the round-tripped spec.
-
-    Prefer :meth:`Portfolio.from_spec` for real work — it returns the typed
-    object that pipeline functions reuse without rebuilding.
-
-    Parameters
-    ----------
-    spec_json : str
-        Portfolio specification JSON to validate, compile, and serialize back.
-
-    Returns
-    -------
-    str
-        Canonical compact JSON for the validated, constructed portfolio specification.
-
-    Raises
-    ------
-    ValueError
-        If ``spec_json`` is malformed or does not match the ``PortfolioSpec`` schema.
-    PortfolioError
-        If the decoded positions or portfolio identifiers violate portfolio
-        construction invariants.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import build_portfolio_from_spec_json
-    >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> json.loads(build_portfolio_from_spec_json(spec))["positions"]
-    []
-    """
-    ...
-
 def aggregate_metrics(
     valuation: PortfolioValuation | str,
     base_currency: Currency | str,
@@ -3686,7 +3523,7 @@ def aggregate_metrics(
     PortfolioMetrics
         Typed aggregate-metrics wrapper with ``aggregated`` /
         ``by_position`` getters and DataFrame exits; use
-        :func:`aggregate_metrics_json` for the raw wire string.
+        serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -3708,58 +3545,6 @@ def aggregate_metrics(
     >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> valuation = value_portfolio(Portfolio.from_spec(spec), MarketContext())
     >>> aggregate_metrics(valuation, "USD", MarketContext(), "2025-01-01").aggregated
-    {}
-    """
-    ...
-
-def aggregate_metrics_json(
-    valuation: PortfolioValuation | str,
-    base_currency: Currency | str,
-    market: MarketContext | str,
-    as_of: datetime.date | str,
-) -> str:
-    """
-    Aggregate portfolio metrics from a valuation and return wire JSON.
-
-    Wire twin of :func:`aggregate_metrics`: same inputs and validation,
-    returning the canonical JSON string instead of the typed wrapper.
-
-    Parameters
-    ----------
-    valuation : PortfolioValuation or str
-        Typed valuation or canonical valuation JSON to aggregate.
-    base_currency : Currency | str
-        ISO base-currency code in which aggregate values are stated.
-    market : MarketContext or str
-        Market context object or JSON supplying conversion inputs.
-    as_of : datetime.date | str
-        Valuation date, either a date-like object or an ISO 8601 string.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``PortfolioMetrics`` wire document.
-
-    Raises
-    ------
-    TypeError
-        If ``valuation`` or ``market`` is neither its typed wrapper nor a
-        JSON string.
-    ValueError
-        If supplied JSON, ``base_currency``, or ``as_of`` is invalid.
-    PortfolioError
-        If the valuation is inconsistent with the aggregation context.
-    KeyError
-        If a required FX rate is unavailable.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import Portfolio, aggregate_metrics_json, value_portfolio
-    >>> spec = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> valuation = value_portfolio(Portfolio.from_spec(spec), MarketContext())
-    >>> json.loads(aggregate_metrics_json(valuation, "USD", MarketContext(), "2025-01-01"))["aggregated"]
     {}
     """
     ...
@@ -4069,7 +3854,7 @@ def scenario_pnl_batch(
         One ordered item per input scenario, each carrying ``scenario_id``,
         a typed ``pnl`` (:class:`ScenarioPnl`) and ``report``
         (:class:`~finstack_quant.scenarios.ApplicationReport`); use
-        :func:`scenario_pnl_batch_json` for the raw wire string.
+        serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -4354,7 +4139,7 @@ def allocate_weights(spec_json: str | dict[str, Any] | list[Any] | pd.DataFrame)
     WeightAllocationResult
         Typed result with ``scheme``, ``allocations`` and ``diagnostics``
         getters plus ``to_dataframe()``; use :func:`allocate_weights_json`
-        for the raw wire string.
+        serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -4624,7 +4409,7 @@ def replay_portfolio(
     ReplayResult
         Typed result with ``steps``, ``summary`` and ``skipped_dates``
         getters plus ``to_dataframe()``; use :func:`replay_portfolio_json`
-        for the raw wire string.
+        serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -5117,7 +4902,7 @@ def brinson_fachler(sectors_json: str | dict[str, Any] | list[Any] | pd.DataFram
     BrinsonPeriodResult
         Typed result with per-sector effects, effect totals, and
         ``to_dataframe()`` / ``to_json()`` exits; use
-        :func:`brinson_fachler_json` for the raw wire string.
+        serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -5148,49 +4933,6 @@ def brinson_fachler(sectors_json: str | dict[str, Any] | list[Any] | pd.DataFram
     """
     ...
 
-def brinson_fachler_json(sectors_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> str:
-    """
-    Compute single-period Brinson-Fachler attribution and return wire JSON.
-
-    Wire twin of :func:`brinson_fachler`: same inputs and validation,
-    returning the canonical JSON string instead of the typed wrapper.
-
-    Parameters
-    ----------
-    sectors_json : str | dict | list | pandas.DataFrame
-        JSON array of ``SectorPeriod`` objects; same schema as
-        :func:`brinson_fachler`.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``BrinsonPeriodResult`` wire document.
-
-    Raises
-    ------
-    PortfolioError
-        If sector weights do not sum to one or returns are invalid.
-    ValueError
-        If ``sectors_json`` is malformed.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import brinson_fachler_json
-    >>> sectors = [
-    ...     {
-    ...         "sector": "A",
-    ...         "portfolio_weight": 1.0,
-    ...         "benchmark_weight": 1.0,
-    ...         "portfolio_return": 0.02,
-    ...         "benchmark_return": 0.01,
-    ...     }
-    ... ]
-    >>> json.loads(brinson_fachler_json(json.dumps(sectors)))["total_excess_return"]
-    0.01
-    """
-    ...
-
 def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> CarinoLinkedAttribution:
     """
     Carino-link already-computed single-period Brinson-Fachler results.
@@ -5205,14 +4947,14 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
     periods_json : str | dict | list | pandas.DataFrame
         Chronological list of typed ``BrinsonPeriodResult`` objects (as
         returned by :func:`brinson_fachler`) or their JSON form (for example
-        ``json.loads(brinson_fachler_json(...))`` per period) with identical
+        ``json.loads(brinson_fachler(...).to_json())`` per period) with identical
         sector ordering in every period.
 
     Returns
     -------
     CarinoLinkedAttribution
         Typed result with linked per-sector effects and compounded returns;
-        use :func:`carino_link_json` for the raw wire string.
+        use serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -5229,7 +4971,7 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
     Examples
     --------
     >>> import json
-    >>> from finstack_quant.portfolio import brinson_fachler_json, carino_link
+    >>> from finstack_quant.portfolio import brinson_fachler, carino_link
     >>> period = [
     ...     {
     ...         "sector": "A",
@@ -5239,7 +4981,7 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
     ...         "benchmark_return": 0.01,
     ...     }
     ... ]
-    >>> result = json.loads(brinson_fachler_json(json.dumps(period)))
+    >>> result = json.loads(brinson_fachler(json.dumps(period)).to_json())
     >>> linked = carino_link(json.dumps([result, result]))
     >>> round(linked.linked_selection, 4)
     0.0203
@@ -5266,8 +5008,7 @@ def carino_link_from_sector_periods(
     -------
     CarinoLinkedAttribution
         Typed result with linked per-sector effects and compounded returns;
-        use :func:`carino_link_from_sector_periods_json` for the raw wire
-        string.
+        use serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -5297,55 +5038,6 @@ def carino_link_from_sector_periods(
     ... ]
     >>> result = carino_link_from_sector_periods(json.dumps([period, period]))
     >>> round(result.linked_selection, 4)
-    0.0203
-    """
-    ...
-
-def carino_link_from_sector_periods_json(
-    periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-) -> str:
-    """
-    Carino-link raw sector periods and return wire JSON.
-
-    Wire twin of :func:`carino_link_from_sector_periods`: same inputs and
-    validation, returning the canonical JSON string instead of the typed
-    wrapper.
-
-    Parameters
-    ----------
-    periods_json : str | dict | list | pandas.DataFrame
-        JSON array of periods of ``SectorPeriod`` objects; same schema as
-        :func:`carino_link_from_sector_periods`.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``CarinoLinkedAttribution`` wire document.
-
-    Raises
-    ------
-    PortfolioError
-        If any period fails Brinson validation, the sequence is empty or
-        changes sector ordering, or a period return is non-finite or at most
-        ``-1``.
-    ValueError
-        If ``periods_json`` is malformed.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import carino_link_from_sector_periods_json
-    >>> period = [
-    ...     {
-    ...         "sector": "A",
-    ...         "portfolio_weight": 1.0,
-    ...         "benchmark_weight": 1.0,
-    ...         "portfolio_return": 0.02,
-    ...         "benchmark_return": 0.01,
-    ...     }
-    ... ]
-    >>> result = json.loads(carino_link_from_sector_periods_json(json.dumps([period, period])))
-    >>> round(result["linked_selection"], 4)
     0.0203
     """
     ...
@@ -6034,52 +5726,6 @@ class FiReconciliationReport:
         """
         ...
 
-def carino_link_json(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> str:
-    """
-    Carino-link precomputed Brinson period results and return wire JSON.
-
-    Wire twin of :func:`carino_link`: same inputs and validation, returning
-    the canonical JSON string instead of the typed wrapper.
-
-    Parameters
-    ----------
-    periods_json : str | dict | list | pandas.DataFrame
-        Chronological JSON array of ``BrinsonPeriodResult`` objects; same
-        schema as :func:`carino_link`.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``CarinoLinkedAttribution`` wire document.
-
-    Raises
-    ------
-    PortfolioError
-        If the sequence is empty or changes sector ordering, or a period
-        return is non-finite or at most ``-1``.
-    ValueError
-        If ``periods_json`` is malformed.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import brinson_fachler_json, carino_link_json
-    >>> period = [
-    ...     {
-    ...         "sector": "A",
-    ...         "portfolio_weight": 1.0,
-    ...         "benchmark_weight": 1.0,
-    ...         "portfolio_return": 0.02,
-    ...         "benchmark_return": 0.01,
-    ...     }
-    ... ]
-    >>> result = json.loads(brinson_fachler_json(json.dumps(period)))
-    >>> linked = json.loads(carino_link_json(json.dumps([result, result])))
-    >>> round(linked["linked_selection"], 4)
-    0.0203
-    """
-    ...
-
 def campisi_attribution(
     portfolio_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
     benchmark_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
@@ -6119,7 +5765,7 @@ def campisi_attribution(
     FiAttributionResult
         Typed result with per-sector effects, the five effect totals, and
         ``to_dataframe()`` / ``to_json()`` exits; use
-        :func:`campisi_attribution_json` for the raw wire string.
+        serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -6174,63 +5820,6 @@ def campisi_attribution(
     """
     ...
 
-def campisi_attribution_json(
-    portfolio_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    benchmark_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    config_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-) -> str:
-    """
-    Compute single-period Campisi attribution and return wire JSON.
-
-    Wire twin of :func:`campisi_attribution`: same inputs and validation,
-    returning the canonical JSON string instead of the typed wrapper.
-
-    Parameters
-    ----------
-    portfolio_json : str | dict | list | pandas.DataFrame
-        JSON array of ``FiPositionSnapshot`` objects; same schema and
-        Z-spread basis contract as :func:`campisi_attribution`.
-    benchmark_json : str | dict | list | pandas.DataFrame
-        JSON array of ``FiPositionSnapshot`` objects for the benchmark side.
-    config_json : str | dict | list | pandas.DataFrame
-        JSON ``FiAttributionConfig`` whose only field is ``period_years``.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``FiAttributionResult`` wire document.
-
-    Raises
-    ------
-    PortfolioError
-        If the canonical Rust validation rejects the inputs (same conditions
-        as :func:`campisi_attribution`).
-    ValueError
-        If any JSON argument is malformed.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import campisi_attribution_json
-    >>> snap = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.02,
-    ...         "yield_annual": 0.04,
-    ...         "modified_duration": 5.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> result = json.loads(campisi_attribution_json(json.dumps(snap), json.dumps(snap), '{"period_years":0.25}'))
-    >>> round(result["active_return"], 6)
-    0.0
-    """
-    ...
-
 def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> FiCarinoLinkedResult:
     """
     Carino-link already-computed single-period Campisi attribution results.
@@ -6249,7 +5838,7 @@ def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.Data
     periods_json : str | dict | list | pandas.DataFrame
         Chronological list of typed ``FiAttributionResult`` objects (as
         returned by :func:`campisi_attribution`) or their JSON form, each the
-        parsed output of :func:`campisi_attribution_json` (or
+        parsed output of :func:`campisi_attribution` (or
         ``FiAttributionResult.to_json()``). Every period
         must carry the same sector ordering. Unknown fields are rejected.
 
@@ -6257,7 +5846,7 @@ def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.Data
     -------
     FiCarinoLinkedResult
         Typed result whose five linked totals sum to the geometrically
-        compounded active return; use :func:`campisi_carino_link_json` for
+        compounded active return; use :func:`campisi_carino_link` for
         the raw wire string.
 
     Raises
@@ -6283,7 +5872,7 @@ def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.Data
     Examples
     --------
     >>> import json
-    >>> from finstack_quant.portfolio import campisi_attribution_json, campisi_carino_link
+    >>> from finstack_quant.portfolio import campisi_attribution, campisi_carino_link
     >>> portfolio = [
     ...     {
     ...         "sector": "GOVT",
@@ -6311,62 +5900,11 @@ def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.Data
     ...     }
     ... ]
     >>> period = json.loads(
-    ...     campisi_attribution_json(json.dumps(portfolio), json.dumps(benchmark), '{"period_years":0.25}')
+    ...     campisi_attribution(json.dumps(portfolio), json.dumps(benchmark), '{"period_years":0.25}').to_json()
     ... )
     >>> linked = campisi_carino_link(json.dumps([period, period]))
     >>> round(linked.linked_selection, 6)
     0.013195
-    """
-    ...
-
-def campisi_carino_link_json(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> str:
-    """
-    Carino-link single-period Campisi results and return wire JSON.
-
-    Wire twin of :func:`campisi_carino_link`: same inputs and validation,
-    returning the canonical JSON string instead of the typed wrapper.
-
-    Parameters
-    ----------
-    periods_json : str | dict | list | pandas.DataFrame
-        JSON array of ``FiAttributionResult`` objects in chronological
-        order; same schema as :func:`campisi_carino_link`.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``FiCarinoLinkedResult`` wire document.
-
-    Raises
-    ------
-    PortfolioError
-        If linking validation rejects the periods (same conditions as
-        :func:`campisi_carino_link`).
-    ValueError
-        If ``periods_json`` is malformed or does not match the
-        ``FiAttributionResult`` schema.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import campisi_attribution_json, campisi_carino_link_json
-    >>> snap = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.02,
-    ...         "yield_annual": 0.04,
-    ...         "modified_duration": 5.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> period = json.loads(campisi_attribution_json(json.dumps(snap), json.dumps(snap), '{"period_years":0.25}'))
-    >>> linked = json.loads(campisi_carino_link_json(json.dumps([period, period])))
-    >>> round(linked["linked_selection"], 6)
-    0.0
     """
     ...
 
@@ -6400,8 +5938,7 @@ def campisi_carino_link_from_snapshots(
     FiCarinoLinkedResult
         Typed result whose five linked totals sum to the geometrically
         compounded active return; use
-        :func:`campisi_carino_link_from_snapshots_json` for the raw wire
-        string.
+        serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -6452,62 +5989,6 @@ def campisi_carino_link_from_snapshots(
     """
     ...
 
-def campisi_carino_link_from_snapshots_json(
-    periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    config_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-) -> str:
-    """
-    Compute snapshot-level Carino-linked Campisi attribution as wire JSON.
-
-    Wire twin of :func:`campisi_carino_link_from_snapshots`: same inputs and
-    validation, returning the canonical JSON string instead of the typed
-    wrapper.
-
-    Parameters
-    ----------
-    periods_json : str | dict | list | pandas.DataFrame
-        JSON array of period objects with ``portfolio`` and ``benchmark``
-        snapshot arrays; same schema as
-        :func:`campisi_carino_link_from_snapshots`.
-    config_json : str | dict | list | pandas.DataFrame
-        JSON ``FiAttributionConfig`` shared across periods.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``FiCarinoLinkedResult`` wire document.
-
-    Raises
-    ------
-    PortfolioError
-        If any period fails Campisi validation or sector orderings differ.
-    ValueError
-        If any JSON argument is malformed.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import campisi_carino_link_from_snapshots_json
-    >>> snap = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.02,
-    ...         "yield_annual": 0.04,
-    ...         "modified_duration": 5.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> periods = json.dumps([{"portfolio": snap, "benchmark": snap}])
-    >>> result = json.loads(campisi_carino_link_from_snapshots_json(periods, '{"period_years":0.25}'))
-    >>> round(result["linked_selection"], 6)
-    0.0
-    """
-    ...
-
 def campisi_reconciliation_check(
     result_json: FiAttributionResult | str | dict[str, Any] | list[Any] | pd.DataFrame, tolerance: float
 ) -> FiReconciliationReport:
@@ -6529,7 +6010,7 @@ def campisi_reconciliation_check(
     result_json : FiAttributionResult | str | dict | list | pandas.DataFrame
         Typed ``FiAttributionResult`` (as returned by
         :func:`campisi_attribution`) or its JSON form, as returned by
-        :func:`campisi_attribution_json` (or
+        :func:`campisi_attribution` (or
         ``FiAttributionResult.to_json()``). Unknown fields are rejected.
     tolerance : float
         Absolute tolerance in return units; ``1e-10`` is appropriate for
@@ -6540,7 +6021,7 @@ def campisi_reconciliation_check(
     FiReconciliationReport
         Typed report with ``total_residual`` (``active_return`` minus the
         five totals), ``is_reconciled`` and the applied ``tolerance``; use
-        :func:`campisi_reconciliation_check_json` for the raw wire string.
+        serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -6554,7 +6035,7 @@ def campisi_reconciliation_check(
     Examples
     --------
     >>> import json
-    >>> from finstack_quant.portfolio import campisi_attribution_json, campisi_reconciliation_check
+    >>> from finstack_quant.portfolio import campisi_attribution, campisi_reconciliation_check
     >>> portfolio = [
     ...     {
     ...         "sector": "GOVT",
@@ -6581,60 +6062,8 @@ def campisi_reconciliation_check(
     ...         "delta_spread": 0.0,
     ...     }
     ... ]
-    >>> result = campisi_attribution_json(json.dumps(portfolio), json.dumps(benchmark), '{"period_years":0.25}')
+    >>> result = campisi_attribution(json.dumps(portfolio), json.dumps(benchmark), '{"period_years":0.25}').to_json()
     >>> campisi_reconciliation_check(result, 1e-10).is_reconciled
-    True
-    """
-    ...
-
-def campisi_reconciliation_check_json(
-    result_json: FiAttributionResult | str | dict[str, Any] | list[Any] | pd.DataFrame, tolerance: float
-) -> str:
-    """
-    Reconcile the five Campisi effect totals and return wire JSON.
-
-    Wire twin of :func:`campisi_reconciliation_check`: same inputs and
-    validation, returning the canonical JSON string instead of the typed
-    report.
-
-    Parameters
-    ----------
-    result_json : str | dict | list | pandas.DataFrame
-        JSON ``FiAttributionResult``, as returned by
-        :func:`campisi_attribution_json`.
-    tolerance : float
-        Absolute tolerance in return units; ``1e-10`` is appropriate for
-        return-space values.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``FiReconciliationReport`` wire document.
-
-    Raises
-    ------
-    ValueError
-        If ``result_json`` is malformed or carries unknown fields.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import campisi_attribution_json, campisi_reconciliation_check_json
-    >>> snap = [
-    ...     {
-    ...         "sector": "GOVT",
-    ...         "weight": 1.0,
-    ...         "total_return": 0.02,
-    ...         "yield_annual": 0.04,
-    ...         "modified_duration": 5.0,
-    ...         "spread_duration": 0.0,
-    ...         "spread": 0.0,
-    ...         "delta_treasury_yield": -0.001,
-    ...         "delta_spread": 0.0,
-    ...     }
-    ... ]
-    >>> result = campisi_attribution_json(json.dumps(snap), json.dumps(snap), '{"period_years":0.25}')
-    >>> json.loads(campisi_reconciliation_check_json(result, 1e-10))["is_reconciled"]
     True
     """
     ...
@@ -6952,7 +6381,7 @@ def cell_returns_from_reference(
     -------
     DurationCellTable
         Typed cell table with ``to_dataframe()`` / ``to_json()`` exits; use
-        :func:`cell_returns_from_reference_json` for the raw wire string.
+        serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -6979,52 +6408,6 @@ def cell_returns_from_reference(
     >>> reference = [{"duration": 1.0, "total_return": 0.02}]
     >>> table = cell_returns_from_reference(json.dumps(reference), "UST", '{"width":2.0}')
     >>> table.cells[0]["base_return"]
-    0.02
-    """
-    ...
-
-def cell_returns_from_reference_json(
-    reference_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    base_label: str,
-    config_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-) -> str:
-    """
-    Build a reference-universe duration-cell table and return wire JSON.
-
-    Wire twin of :func:`cell_returns_from_reference`: same inputs and
-    validation, returning the canonical JSON string instead of the typed
-    table.
-
-    Parameters
-    ----------
-    reference_json : str | dict | list | pandas.DataFrame
-        JSON array of ``ReferenceReturn`` objects; same schema as
-        :func:`cell_returns_from_reference`.
-    base_label : str
-        Label identifying the resulting curve (e.g. ``"UST"``).
-    config_json : str | dict | list | pandas.DataFrame
-        JSON ``CellConfig``; ``width`` is its only field and is required.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``DurationCellTable`` wire document.
-
-    Raises
-    ------
-    PortfolioError
-        If the canonical Rust validation rejects the inputs (same conditions
-        as :func:`cell_returns_from_reference`).
-    ValueError
-        If any JSON argument is malformed or carries unknown fields.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import cell_returns_from_reference_json
-    >>> reference = [{"duration": 1.0, "total_return": 0.02}]
-    >>> table = json.loads(cell_returns_from_reference_json(json.dumps(reference), "UST", '{"width":2.0}'))
-    >>> table["cells"][0]["base_return"]
     0.02
     """
     ...
@@ -7069,7 +6452,7 @@ def cell_returns_from_curves(
     -------
     DurationCellTable
         Typed cell table with ``to_dataframe()`` / ``to_json()`` exits; use
-        :func:`cell_returns_from_curves_json` for the raw wire string.
+        serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -7105,64 +6488,6 @@ def cell_returns_from_curves(
     """
     ...
 
-def cell_returns_from_curves_json(
-    start: DiscountCurve,
-    end: DiscountCurve,
-    horizon_years: float,
-    max_duration: float,
-    base_label: str,
-    config_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-) -> str:
-    """
-    Build a curve-snapshot duration-cell table and return wire JSON.
-
-    Wire twin of :func:`cell_returns_from_curves`: same inputs and
-    validation, returning the canonical JSON string instead of the typed
-    table.
-
-    Parameters
-    ----------
-    start : DiscountCurve
-        Discount curve observed at the start of the holding period.
-    end : DiscountCurve
-        Discount curve observed ``horizon_years`` later, at period end.
-    horizon_years : float
-        Length of the holding period, in years; finite and positive.
-    max_duration : float
-        Upper bound of the duration grid, in years; strictly greater than
-        ``horizon_years``.
-    base_label : str
-        Label identifying the base curve, stamped for policy visibility.
-    config_json : str | dict | list | pandas.DataFrame
-        JSON ``CellConfig``; ``width`` is its only field and is required.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``DurationCellTable`` wire document.
-
-    Raises
-    ------
-    PortfolioError
-        If the canonical Rust validation rejects the inputs (same conditions
-        as :func:`cell_returns_from_curves`).
-    ValueError
-        If ``config_json`` is malformed.
-
-    Examples
-    --------
-    >>> from datetime import date
-    >>> import json
-    >>> from finstack_quant.core.market_data import DiscountCurve
-    >>> from finstack_quant.portfolio import cell_returns_from_curves_json
-    >>> start = DiscountCurve.flat("start", date(2025, 1, 1), 0.02)
-    >>> end = DiscountCurve.flat("end", date(2025, 4, 1), 0.03)
-    >>> table = json.loads(cell_returns_from_curves_json(start, end, 0.25, 2.0, "UST", '{"width":1.0}'))
-    >>> len(table["cells"])
-    2
-    """
-    ...
-
 def excess_returns(
     positions_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
     table_json: DurationCellTable | str | dict[str, Any] | list[Any] | pd.DataFrame,
@@ -7184,15 +6509,15 @@ def excess_returns(
         ``1e-6``.
     table_json : DurationCellTable | str | dict | list | pandas.DataFrame
         Typed ``DurationCellTable`` or its JSON form, as returned by
-        :func:`cell_returns_from_reference_json`,
-        :func:`cell_returns_from_curves_json`, or
+        :func:`cell_returns_from_reference`,
+        :func:`cell_returns_from_curves`, or
         ``DurationCellTable.to_json()``.
 
     Returns
     -------
     ExcessReturnResult
         Typed result with per-position and portfolio-level
-        total/base/excess returns; use :func:`excess_returns_json` for the
+        total/base/excess returns; use :func:`excess_returns` for the
         raw wire string.
 
     Raises
@@ -7221,50 +6546,6 @@ def excess_returns(
     >>> positions = [{"id": "B1", "weight": 1.0, "duration": 1.0, "total_return": 0.03}]
     >>> result = excess_returns(json.dumps(positions), table.to_json())
     >>> round(result.portfolio_excess_return, 4)
-    0.01
-    """
-    ...
-
-def excess_returns_json(
-    positions_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    table_json: DurationCellTable | str | dict[str, Any] | list[Any] | pd.DataFrame,
-) -> str:
-    """
-    Compute duration-matched credit excess returns and return wire JSON.
-
-    Wire twin of :func:`excess_returns`: same inputs and validation,
-    returning the canonical JSON string instead of the typed wrapper.
-
-    Parameters
-    ----------
-    positions_json : str | dict | list | pandas.DataFrame
-        JSON array of ``ExcessReturnPosition`` objects; same schema as
-        :func:`excess_returns`.
-    table_json : str | dict | list | pandas.DataFrame
-        JSON ``DurationCellTable`` base-return table.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``ExcessReturnResult`` wire document.
-
-    Raises
-    ------
-    PortfolioError
-        If the canonical Rust validation rejects the table or positions
-        (same conditions as :func:`excess_returns`).
-    ValueError
-        If any JSON argument is malformed.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import cell_returns_from_reference_json, excess_returns_json
-    >>> reference = [{"duration": 1.0, "total_return": 0.02}]
-    >>> table = cell_returns_from_reference_json(json.dumps(reference), "UST", '{"width":2.0}')
-    >>> positions = [{"id": "B1", "weight": 1.0, "duration": 1.0, "total_return": 0.03}]
-    >>> result = json.loads(excess_returns_json(json.dumps(positions), table))
-    >>> round(result["portfolio_excess_return"], 4)
     0.01
     """
     ...
@@ -7369,22 +6650,6 @@ class GridAttributionResult:
         ...
 
     @property
-    def selection_effects(self) -> list[dict[str, object]]:
-        """
-        Per-(cell, sector) selection effects as records, aligned with ``sector_effects``.
-
-        Returns
-        -------
-        list[dict[str, object]]
-            JSON-shaped view of the canonical Rust field.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored or derived value.
-        """
-        ...
-
-    @property
     def total_curve(self) -> float:
         """
         Sum of the per-cell curve effects.
@@ -7440,7 +6705,7 @@ class GridAttributionResult:
         same dtypes as a populated one.
         The primary frame is the duration-cell axis; the two (cell,
         sector) tables come from :meth:`to_sector_effects_dataframe` and
-        :meth:`to_selection_effects_dataframe`.
+        the ``selection_effect`` column of :meth:`to_sector_effects_dataframe`.
 
         Returns
         -------
@@ -7458,26 +6723,7 @@ class GridAttributionResult:
         """
         Per-(cell, sector) allocation effects as a pandas DataFrame.
 
-        Columns: ``cell``, ``sector``, ``allocation_effect``. The schema is pinned, so an empty result keeps the
-        same dtypes as a populated one.
-
-        Returns
-        -------
-        pd.DataFrame
-            One row per entry, with the pinned column schema above.
-
-        Raises
-        ------
-        ValueError
-            If the result cannot be serialized into a pandas object.
-        """
-        ...
-
-    def to_selection_effects_dataframe(self) -> pd.DataFrame:
-        """
-        Per-(cell, sector) selection effects as a pandas DataFrame.
-
-        Columns: ``cell``, ``sector``, ``selection_effect``. The schema is pinned, so an empty result keeps the
+        Columns: ``cell``, ``sector``, ``allocation_effect``, ``selection_effect``. The schema is pinned, so an empty result keeps the
         same dtypes as a populated one.
 
         Returns
@@ -7534,7 +6780,7 @@ class GridAttributionResult:
         Examples
         --------
         >>> from finstack_quant.portfolio import GridAttributionResult
-        >>> doc = '{"portfolio_return": 0.0, "benchmark_return": 0.0, "active_return": 0.0, "curve_effects": [], "sector_effects": [], "selection_effects": [], "total_curve": 0.0, "total_sector": 0.0, "total_selection": 0.0}'
+        >>> doc = '{"portfolio_return": 0.0, "benchmark_return": 0.0, "active_return": 0.0, "curve_effects": [], "sector_effects": [], "total_curve": 0.0, "total_sector": 0.0, "total_selection": 0.0}'
         >>> GridAttributionResult.from_json(doc).active_return
         0.0
         """
@@ -7550,10 +6796,10 @@ class GridCarinoLinkedResult:
     Examples
     --------
     >>> import json
-    >>> from finstack_quant.portfolio import grid_attribution_json, grid_carino_link
+    >>> from finstack_quant.portfolio import grid_attribution, grid_carino_link
     >>> portfolio = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.02}]
     >>> benchmark = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.01}]
-    >>> period = json.loads(grid_attribution_json(json.dumps(portfolio), json.dumps(benchmark)))
+    >>> period = json.loads(grid_attribution(json.dumps(portfolio), json.dumps(benchmark)).to_json())
     >>> result = grid_carino_link(json.dumps([period, period]))
     >>> round(result.linked_selection, 4)
     0.0203
@@ -7783,49 +7029,6 @@ def grid_attribution(
     """
     ...
 
-def grid_attribution_json(
-    portfolio_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    benchmark_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-) -> str:
-    """
-    Compute a single-period grid attribution and return wire JSON.
-
-    Wire twin of :func:`grid_attribution`: same inputs and validation,
-    returning the canonical JSON string instead of the typed wrapper.
-
-    Parameters
-    ----------
-    portfolio_json : str | dict | list | pandas.DataFrame
-        JSON array of ``GridPosition`` objects for the portfolio side; same
-        schema as :func:`grid_attribution`.
-    benchmark_json : str | dict | list | pandas.DataFrame
-        JSON array of ``GridPosition`` objects for the benchmark side.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``GridAttributionResult`` wire document.
-
-    Raises
-    ------
-    PortfolioError
-        If the canonical Rust validation rejects the inputs (same conditions
-        as :func:`grid_attribution`).
-    ValueError
-        If either JSON argument is malformed or carries unknown fields.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import grid_attribution_json
-    >>> portfolio = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.02}]
-    >>> benchmark = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.01}]
-    >>> result = json.loads(grid_attribution_json(json.dumps(portfolio), json.dumps(benchmark)))
-    >>> round(result["total_selection"], 4)
-    0.01
-    """
-    ...
-
 def grid_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> GridCarinoLinkedResult:
     """
     Carino-link multi-period hierarchical grid attribution results.
@@ -7843,14 +7046,14 @@ def grid_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFra
     periods_json : str | dict | list | pandas.DataFrame
         Chronological list of typed ``GridAttributionResult`` objects (as
         returned by :func:`grid_attribution`) or their JSON form, each the
-        wire output of :func:`grid_attribution_json` (or
+        wire output of :func:`grid_attribution` (or
         ``GridAttributionResult.to_json()``).
 
     Returns
     -------
     GridCarinoLinkedResult
         Typed result with the three linked effects and compounded returns;
-        use :func:`grid_carino_link_json` for the raw wire string.
+        use serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -7874,52 +7077,12 @@ def grid_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFra
     Examples
     --------
     >>> import json
-    >>> from finstack_quant.portfolio import grid_attribution_json, grid_carino_link
+    >>> from finstack_quant.portfolio import grid_attribution, grid_carino_link
     >>> portfolio = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.02}]
     >>> benchmark = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.01}]
-    >>> period = json.loads(grid_attribution_json(json.dumps(portfolio), json.dumps(benchmark)))
+    >>> period = json.loads(grid_attribution(json.dumps(portfolio), json.dumps(benchmark)).to_json())
     >>> result = grid_carino_link(json.dumps([period, period]))
     >>> round(result.linked_selection, 4)
-    0.0203
-    """
-    ...
-
-def grid_carino_link_json(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -> str:
-    """
-    Carino-link multi-period grid attribution results and return wire JSON.
-
-    Wire twin of :func:`grid_carino_link`: same inputs and validation,
-    returning the canonical JSON string instead of the typed wrapper.
-
-    Parameters
-    ----------
-    periods_json : str | dict | list | pandas.DataFrame
-        JSON array of ``GridAttributionResult`` objects in chronological
-        order; same schema as :func:`grid_carino_link`.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``GridCarinoLinkedResult`` wire document.
-
-    Raises
-    ------
-    PortfolioError
-        If linking validation rejects the periods (same conditions as
-        :func:`grid_carino_link`).
-    ValueError
-        If ``periods_json`` is malformed or does not match the
-        ``GridAttributionResult`` schema.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import grid_attribution_json, grid_carino_link_json
-    >>> portfolio = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.02}]
-    >>> benchmark = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.01}]
-    >>> period = json.loads(grid_attribution_json(json.dumps(portfolio), json.dumps(benchmark)))
-    >>> result = json.loads(grid_carino_link_json(json.dumps([period, period])))
-    >>> round(result["linked_selection"], 4)
     0.0203
     """
     ...
@@ -8178,7 +7341,7 @@ def factor_brinson_attribution(
     FactorBrinsonResult
         Typed result with ``allocation``, ``selection``, and their
         per-factor / per-asset breakdowns; use
-        :func:`factor_brinson_attribution_json` for the raw wire string.
+        serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -8211,55 +7374,6 @@ def factor_brinson_attribution(
     ...     "benchmark_weights": [1.0],
     ... }
     >>> factor_brinson_attribution(json.dumps(inputs), [0.02]).active_return
-    0.0
-    """
-    ...
-
-def factor_brinson_attribution_json(
-    input_json: str | dict[str, Any] | list[Any] | pd.DataFrame, factor_returns: list[float]
-) -> str:
-    """
-    Compute factor-Brinson unified attribution and return wire JSON.
-
-    Wire twin of :func:`factor_brinson_attribution`: same inputs and
-    validation, returning the canonical JSON string instead of the typed
-    wrapper.
-
-    Parameters
-    ----------
-    input_json : str | dict | list | pandas.DataFrame
-        JSON ``FactorBrinsonInput``; same schema as
-        :func:`factor_brinson_attribution`.
-    factor_returns : list[float]
-        Caller-supplied benchmark factor returns, length
-        ``input.factor_names``.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``FactorBrinsonResult`` wire document.
-
-    Raises
-    ------
-    PortfolioError
-        If the canonical Rust validation rejects the inputs (same conditions
-        as :func:`factor_brinson_attribution`).
-    ValueError
-        If ``input_json`` is malformed or carries unknown fields.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import factor_brinson_attribution_json
-    >>> inputs = {
-    ...     "asset_ids": ["A"],
-    ...     "asset_returns": [0.02],
-    ...     "exposures": [1.0],
-    ...     "factor_names": ["Market"],
-    ...     "portfolio_weights": [1.0],
-    ...     "benchmark_weights": [1.0],
-    ... }
-    >>> json.loads(factor_brinson_attribution_json(json.dumps(inputs), [0.02]))["active_return"]
     0.0
     """
     ...
@@ -8450,8 +7564,7 @@ def twrr_linked(returns_json: str | dict[str, Any] | list[Any] | pd.DataFrame, h
     -------
     LinkedReturn
         Typed result with ``cumulative``, ``annualised`` and
-        ``num_periods``; use :func:`twrr_linked_json` for the raw wire
-        string.
+        ``num_periods``; use serialize with ``to_json()`` for the wire string.
 
     Raises
     ------
@@ -8469,48 +7582,13 @@ def twrr_linked(returns_json: str | dict[str, Any] | list[Any] | pd.DataFrame, h
     """
     ...
 
-def twrr_linked_json(returns_json: str | dict[str, Any] | list[Any] | pd.DataFrame, horizon_years: float) -> str:
-    """
-    Geometrically link TWRR sub-period returns and return wire JSON.
-
-    Wire twin of :func:`twrr_linked`: same inputs and validation, returning
-    the canonical JSON string instead of the typed wrapper.
-
-    Parameters
-    ----------
-    returns_json : str | dict | list | pandas.DataFrame
-        JSON array of sub-period decimal returns.
-    horizon_years : float
-        Reporting horizon in years used to annualize the linked return.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``LinkedReturn`` wire document.
-
-    Raises
-    ------
-    ValueError
-        If ``returns_json`` is malformed, any sub-period return is
-        non-finite or at most -1, or the compounded growth factor is non-positive.
-
-    Examples
-    --------
-    >>> import json
-    >>> from finstack_quant.portfolio import twrr_linked_json
-    >>> result = json.loads(twrr_linked_json("[0.05,0.03]", 1.0))
-    >>> round(result["cumulative"], 4)
-    0.0815
-    """
-    ...
-
 def mwr_xirr(
     cashflows: list[tuple[datetime.date | str, float]] | list[dict[str, Any]] | pd.DataFrame | str,
 ) -> float:
     """
     Compute the money-weighted return (XIRR, Act/365F) from dated cashflows.
 
-    Binds Rust ``mwr_xirr_from_cashflows``.
+    Binds Rust ``mwr_xirr``.
 
     Parameters
     ----------
@@ -9077,7 +8155,6 @@ class FactorModel:
     ...     "matching": {
     ...         "mapping_table": [{"dependency_filter": {}, "attribute_filter": {}, "factor_id": "usd_rates"}]
     ...     },
-    ...     "pricing_mode": "full_repricing",
     ...     "risk_measure": "variance",
     ... })
     >>> deposit = {
@@ -9163,7 +8240,6 @@ class FactorModel:
         ...     "matching": {
         ...         "mapping_table": [{"dependency_filter": {}, "attribute_filter": {}, "factor_id": "missing"}]
         ...     },
-        ...     "pricing_mode": "full_repricing",
         ...     "risk_measure": "variance",
         ... }
         >>> try:
@@ -11136,28 +10212,6 @@ class PerPositionMetric:
         >>> from finstack_quant.portfolio import PerPositionMetric
         >>> PerPositionMetric.pv_base().kind
         'pv_base'
-        """
-        ...
-
-    @classmethod
-    def pv_native(cls) -> PerPositionMetric:
-        """
-        Use present value in the instrument native currency.
-
-        Returns
-        -------
-        PerPositionMetric
-            Metric source using each scaled position PV in its native currency.
-
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
-
-        Examples
-        --------
-        >>> from finstack_quant.portfolio import PerPositionMetric
-        >>> PerPositionMetric.pv_native().kind
-        'pv_native'
         """
         ...
 
@@ -13553,6 +12607,22 @@ class PortfolioOptimizationResult:
     cannot create 'finstack_quant.portfolio.PortfolioOptimizationResult' instances
     """
 
+    @property
+    def meta(self) -> dict[str, Any]:
+        """Return Rust solver configuration and numerical provenance.
+
+        Returns
+        -------
+        dict[str, Any]
+            Canonical ResultsMeta fields, including numeric mode, rounding policy, and execution stamps.
+
+        Raises
+        ------
+        ValueError
+            If metadata cannot be converted to Python.
+        """
+        ...
+
     @staticmethod
     def from_json(json_str: str) -> PortfolioOptimizationResult:
         """
@@ -13755,29 +12825,6 @@ class PortfolioOptimizationResult:
         """
         ...
 
-    def to_rebalanced_portfolio(self) -> Portfolio:
-        """
-        Rebuild the portfolio with the implied post-trade quantities.
-
-        Existing positions take their ``implied_quantities`` entry (positions
-        outside the trade universe keep their quantity) and traded candidates
-        become new positions.
-
-        Returns
-        -------
-        Portfolio
-            Built portfolio ready for ``value_portfolio``.
-
-        Raises
-        ------
-        PortfolioError
-            If the solution is infeasible.
-        RuntimeError
-            If this result was rebuilt from JSON / unpickled (the live problem
-            is not part of the wire form).
-        """
-        ...
-
     def to_trade_list(self) -> list[TradeSpec]:
         """
         Convert weight deltas into trade specifications.
@@ -13946,9 +12993,8 @@ def rebalance_from_spec(
     Mirrors Rust ``optimization::rebalance_from_spec`` (WASM
     ``rebalanceFromSpec``): held positions take ``result.implied_quantities``
     and trade-universe candidates with a non-negligible target weight and
-    quantity are added as new positions. Unlike
-    :meth:`PortfolioOptimizationResult.to_rebalanced_portfolio`, it also works
-    on a result rebuilt with ``from_json`` or unpickled.
+    quantity are added as new positions. The same path works for results
+    rebuilt with ``from_json`` or unpickled. Retain the matching original specification.
 
     Parameters
     ----------
@@ -13984,7 +13030,7 @@ def rebalance_from_spec(
     >>> portfolio = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
     >>> spec = PortfolioOptimizationSpec.new(portfolio, objective)
     >>> foreign = PortfolioOptimizationResult.from_json(
-    ...     '{"schema_version":1,"status":"optimal","status_label":"optimal","is_feasible":true,'
+    ...     '{"meta":{"numeric_mode":"f64","rounding":{"mode":"bankers","ingest_scale_by_currency":{},"output_scale_by_currency":{},"version":1}},"schema_version":1,"status":"optimal","status_label":"optimal","is_feasible":true,'
     ...     '"objective_value":0.0,"turnover":0.0,"optimal_weights":{"X":1.0},"current_weights":{},'
     ...     '"weight_deltas":{},"implied_quantities":{"X":1.0},"metric_values":{},"trades":[],'
     ...     '"constraint_slacks":{},"binding_constraints":[]}'

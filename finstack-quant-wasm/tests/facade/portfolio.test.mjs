@@ -1,3 +1,4 @@
+import { core as portfolioCore } from '../../index.js';
 /**
  * Portfolio-namespace facade runtime contract test.
  *
@@ -32,16 +33,13 @@ const EXPORTED_KEYS = [
   'Portfolio',
   'PortfolioBuilder',
   'aggregateFullCashflows',
-  'aggregateFullCashflowsBuilt',
   'aggregateMetrics',
   'allocateWeights',
   'allocateWeightsJson',
   'applyScenarioAndRevalue',
-  'applyScenarioAndRevalueBuilt',
   'attributePortfolioPnl',
   'brinsonFachler',
   'buildCreditVolReport',
-  'buildPortfolioFromSpecJson',
   'campisiAttribution',
   'campisiCarinoLink',
   'campisiCarinoLinkFromSnapshots',
@@ -52,9 +50,7 @@ const EXPORTED_KEYS = [
   'cellReturnsFromReference',
   'collapseToBaseByDateKind',
   'computeFactorSensitivities',
-  'computeFactorSensitivitiesWithMarket',
   'computePnlProfiles',
-  'computePnlProfilesWithMarket',
   'constraintBudget',
   'constraintExposureLimit',
   'constraintExposureMinimum',
@@ -86,7 +82,6 @@ const EXPORTED_KEYS = [
   'replayPortfolio',
   'scenarioPnl',
   'scenarioPnlBatch',
-  'scenarioPnlBuilt',
   'schema',
   'sensitivityMatrixDelta',
   'sensitivityMatrixFactorDeltas',
@@ -95,7 +90,6 @@ const EXPORTED_KEYS = [
   'twrrModifiedDietz',
   'validateAllocationJson',
   'valuePortfolio',
-  'valuePortfolioBuilt',
 ];
 
 /**
@@ -904,8 +898,8 @@ test('portfolio spec wire surfaces keep returning canonical JSON strings', () =>
   assert.equal(typeof canonical, 'string', 'parsePortfolioSpecJson is a wire surface');
   assert.equal(JSON.parse(canonical).id, 'facade_portfolio');
 
-  const rebuilt = portfolio.buildPortfolioFromSpecJson(canonical);
-  assert.equal(typeof rebuilt, 'string', 'buildPortfolioFromSpecJson is a wire surface');
+  const rebuilt = portfolio.Portfolio.fromSpec(canonical).toJson();
+  assert.equal(typeof rebuilt, 'string', 'Portfolio.fromSpec(...).toJson() is a wire surface');
   assert.equal(JSON.parse(rebuilt).id, 'facade_portfolio');
 
   const handle = portfolio.Portfolio.fromSpec(canonical);
@@ -915,7 +909,11 @@ test('portfolio spec wire surfaces keep returning canonical JSON strings', () =>
 
 test('portfolio.valuePortfolio returns a structured valuation', () => {
   const valuation = assertStructured(
-    portfolio.valuePortfolio(EMPTY_SPEC, EMPTY_MARKET, false),
+    portfolio.valuePortfolio(
+      portfolio.Portfolio.fromSpec(EMPTY_SPEC),
+      portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
+      false
+    ),
     'valuePortfolio result'
   );
   // Direct property reads: an ES2015 Map would yield `undefined` for all of
@@ -928,7 +926,10 @@ test('portfolio.valuePortfolio returns a structured valuation', () => {
 
 test('portfolio.aggregateFullCashflows returns a structured ladder', () => {
   const ladder = assertStructured(
-    portfolio.aggregateFullCashflows(EMPTY_SPEC, EMPTY_MARKET),
+    portfolio.aggregateFullCashflows(
+      portfolio.Portfolio.fromSpec(EMPTY_SPEC),
+      portfolioCore.MarketContext.fromJson(EMPTY_MARKET)
+    ),
     'aggregateFullCashflows result'
   );
   assert.deepEqual(ladder.events, []);
@@ -936,15 +937,19 @@ test('portfolio.aggregateFullCashflows returns a structured ladder', () => {
 
   const handle = portfolio.Portfolio.fromSpec(EMPTY_SPEC);
   const built = assertStructured(
-    portfolio.aggregateFullCashflowsBuilt(handle, EMPTY_MARKET),
-    'aggregateFullCashflowsBuilt result'
+    portfolio.aggregateFullCashflows(handle, portfolioCore.MarketContext.fromJson(EMPTY_MARKET)),
+    'aggregateFullCashflows result'
   );
   assert.deepEqual(built, ladder);
   handle.free();
 });
 
 test('portfolio.aggregateMetrics returns a structured metrics object', () => {
-  const valuation = portfolio.valuePortfolio(EMPTY_SPEC, EMPTY_MARKET, false);
+  const valuation = portfolio.valuePortfolio(
+    portfolio.Portfolio.fromSpec(EMPTY_SPEC),
+    portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
+    false
+  );
   const metrics = assertStructured(
     portfolio.aggregateMetrics(JSON.stringify(valuation), 'USD', EMPTY_MARKET, '2024-01-15'),
     'aggregateMetrics result'
@@ -1256,15 +1261,30 @@ test('standalone sensitivity outputs require and retain the reporting currency',
   const result = portfolio.computeFactorSensitivities(
     '[]',
     '[]',
-    EMPTY_MARKET,
+    portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
     '2025-01-15',
     'EUR'
   );
   assert.equal(result.base_currency, 'EUR');
   assert.deepEqual(result.position_ids, []);
   assert.deepEqual(result.data, []);
-  assert.deepEqual(portfolio.computePnlProfiles('[]', '[]', EMPTY_MARKET, '2025-01-15', 'EUR'), []);
+  assert.deepEqual(
+    portfolio.computePnlProfiles(
+      '[]',
+      '[]',
+      portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
+      '2025-01-15',
+      'EUR'
+    ),
+    []
+  );
   assert.throws(() =>
-    portfolio.computeFactorSensitivities('[]', '[]', EMPTY_MARKET, '2025-01-15', 'INVALID')
+    portfolio.computeFactorSensitivities(
+      '[]',
+      '[]',
+      portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
+      '2025-01-15',
+      'INVALID'
+    )
   );
 });

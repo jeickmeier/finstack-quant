@@ -5,8 +5,8 @@ use finstack_quant_portfolio::optimization::{OptimizationStatus, TradeDirection,
 
 use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe;
 
-use super::super::json_bridge::{deserialize_json, serialize_json};
 use super::enums::{PyTradeDirection, PyTradeType};
+use crate::bindings::json_bridge::{deserialize_json, serialize_json};
 
 /// Status of an optimization run (mirrors `OptimizationStatus`).
 #[pyclass(

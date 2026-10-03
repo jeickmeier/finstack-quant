@@ -14,8 +14,8 @@ use crate::bindings::pandas_utils::{
 };
 use crate::bindings::repr_support::repr_from_serde;
 
-use super::super::json_bridge::{deserialize_json, serialize_json};
 use super::config::decomposition_method_label;
+use crate::bindings::json_bridge::{deserialize_json, serialize_json};
 
 /// Python-style rendering of an optional float (`None` or the number).
 fn py_opt(value: Option<f64>) -> String {
@@ -734,7 +734,7 @@ pub(super) struct PyPositionRiskDecomposition {
 }
 
 impl PyPositionRiskDecomposition {
-    pub(super) fn from_inner(inner: PositionRiskDecomposition) -> Self {
+    pub(crate) fn from_inner(inner: PositionRiskDecomposition) -> Self {
         Self { inner }
     }
 }

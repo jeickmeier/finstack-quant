@@ -30,9 +30,9 @@ def test_twrr_modified_dietz_binding_matches_gips_example() -> None:
 
 def test_twrr_linked_binding_geometrically_links_returns() -> None:
     """The Python binding exposes geometric TWRR linking."""
-    from finstack_quant.portfolio import twrr_linked_json
+    from finstack_quant.portfolio import twrr_linked
 
-    result = json.loads(twrr_linked_json(json.dumps([0.05, 0.03]), 1.0))
+    result = json.loads(twrr_linked(json.dumps([0.05, 0.03]), 1.0).to_json())
 
     assert result["cumulative"] == pytest.approx(0.0815, abs=1e-12)
     assert result["annualised"] == pytest.approx(0.0815, abs=1e-12)

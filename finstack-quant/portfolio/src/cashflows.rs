@@ -16,7 +16,9 @@ use crate::error::{Error, Result};
 use crate::evaluation::POSITION_PARALLEL_MIN_POSITIONS;
 use crate::portfolio::Portfolio;
 use crate::types::PositionId;
-use finstack_quant_cashflows::builder::{CashFlowSchedule, CashflowRepresentation};
+#[cfg(test)]
+use finstack_quant_cashflows::builder::CashFlowSchedule;
+use finstack_quant_cashflows::builder::CashflowRepresentation;
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -251,7 +253,7 @@ impl PortfolioCashflows {
 /// * `by_date` - Classified totals keyed by payment date, currency, and kind.
 /// * `currency` - ISO currency whose kind buckets are summed at each date.
 #[must_use]
-pub fn net_amounts_by_date(
+fn net_amounts_by_date(
     by_date: &IndexMap<Date, IndexMap<Currency, IndexMap<CFKind, Money>>>,
     currency: Currency,
 ) -> Vec<(Date, f64)> {
@@ -395,47 +397,40 @@ pub fn aggregate_full_cashflows(
         position_id: PositionId,
         instrument_id: String,
         instrument_type: InstrumentType,
-        schedule: std::result::Result<CashFlowSchedule, finstack_quant_core::Error>,
-        scaled_flows: Vec<(finstack_quant_core::cashflow::CashFlow, Money)>,
+        flows: finstack_quant_core::Result<(CashflowRepresentation, Vec<PortfolioCashflowEvent>)>,
     }
 
     let schedule_position = |position: &crate::position::Position| -> PositionCashflowResult {
         let instrument_id = position.instrument.id().to_string();
         let instrument_type = position.instrument.key();
-        match position
+        let flows = position
             .instrument
-            .as_ref()
             .cashflow_schedule(market, portfolio.as_of)
-        {
-            Ok(schedule) => {
-                let scaled_flows = schedule
+            .and_then(|schedule| {
+                let events = schedule
                     .get_flows()
                     .iter()
                     .map(|flow| {
-                        position
-                            .scale_value(flow.amount)
-                            .map(|amount| (flow.clone(), amount))
+                        Ok(PortfolioCashflowEvent {
+                            position_id: position.position_id.clone(),
+                            instrument_id: instrument_id.clone(),
+                            instrument_type,
+                            date: flow.date,
+                            amount: position.scale_value(flow.amount)?,
+                            kind: flow.kind,
+                            reset_date: flow.reset_date,
+                            accrual_factor: flow.accrual_factor,
+                            rate: flow.rate,
+                        })
                     })
-                    .collect::<finstack_quant_core::Result<Vec<_>>>();
-                let (schedule, scaled_flows) = match scaled_flows {
-                    Ok(flows) => (Ok(schedule), flows),
-                    Err(error) => (Err(error), Vec::new()),
-                };
-                PositionCashflowResult {
-                    position_id: position.position_id.clone(),
-                    instrument_id,
-                    instrument_type,
-                    schedule,
-                    scaled_flows,
-                }
-            }
-            Err(err) => PositionCashflowResult {
-                position_id: position.position_id.clone(),
-                instrument_id,
-                instrument_type,
-                schedule: Err(err),
-                scaled_flows: Vec::new(),
-            },
+                    .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+                Ok((schedule.get_meta().representation, events))
+            });
+        PositionCashflowResult {
+            position_id: position.position_id.clone(),
+            instrument_id,
+            instrument_type,
+            flows,
         }
     };
 
@@ -463,24 +458,9 @@ pub fn aggregate_full_cashflows(
     let mut issues = Vec::new();
 
     for result in per_position {
-        match result.schedule {
-            Ok(schedule) => {
-                let event_count = schedule.get_flows().len();
-                let representation = schedule.get_meta().representation;
-                let mut position_events = Vec::with_capacity(event_count);
-                for (flow, scaled_amount) in result.scaled_flows {
-                    position_events.push(PortfolioCashflowEvent {
-                        position_id: result.position_id.clone(),
-                        instrument_id: result.instrument_id.clone(),
-                        instrument_type: result.instrument_type,
-                        date: flow.date,
-                        amount: scaled_amount,
-                        kind: flow.kind,
-                        reset_date: flow.reset_date,
-                        accrual_factor: flow.accrual_factor,
-                        rate: flow.rate,
-                    });
-                }
+        match result.flows {
+            Ok((representation, position_events)) => {
+                let event_count = position_events.len();
                 events.extend(position_events.iter().cloned());
                 by_position.insert(result.position_id.clone(), position_events);
                 position_summaries.insert(
