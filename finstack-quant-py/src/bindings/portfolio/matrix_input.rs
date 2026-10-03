@@ -90,7 +90,7 @@ pub(crate) fn extract_square_matrix(
     let nested = matrix.extract::<Vec<Vec<f64>>>()?;
     let label = label.to_owned();
     py.detach(move || core_flatten_square_matrix(nested, n, &label))
-        .map_err(|error| crate::errors::value_error(error.to_string()))
+        .map_err(crate::errors::core_to_py)
 }
 
 /// Extract position-major P&Ls from lists or a two-dimensional NumPy array.
@@ -124,7 +124,7 @@ pub(crate) fn extract_position_pnls(
     let nested = position_pnls.extract::<Vec<Vec<f64>>>()?;
     let (data, n_scenarios) = py
         .detach(move || core_flatten_position_pnls(nested, n_positions))
-        .map_err(|error| crate::errors::value_error(error.to_string()))?;
+        .map_err(crate::errors::core_to_py)?;
     Ok(PositionPnlMatrix {
         data,
         n_scenarios,

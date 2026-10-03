@@ -10,7 +10,7 @@ use crate::bindings::extract::extract_results_ref;
 use crate::bindings::pandas_utils::{
     serde_rows_to_dataframe_with_schema, table_to_dataframe, ColumnSchema,
 };
-use crate::errors::{display_to_py, serde_json_to_py};
+use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::dates::PeriodId;
 use finstack_quant_statements::evaluator::StatementResult;
 use finstack_quant_statements_analytics::analysis::{
@@ -27,7 +27,7 @@ const SERIES_COLUMNS: [ColumnSchema<'static>; 4] = [
 ];
 
 fn parse_period(period: &str) -> PyResult<PeriodId> {
-    period.parse().map_err(display_to_py)
+    period.parse().map_err(core_to_py)
 }
 
 /// One period's structured credit metrics.
@@ -328,10 +328,7 @@ impl PyPLSummaryReport {
     /// Columns: ``line_item``, ``period``, ``value`` (nullable; missing line
     /// items are null rather than ``0.0``).
     fn to_table(&self) -> PyResult<crate::bindings::core::table::PyArrowTable> {
-        let table = self
-            .report()
-            .to_table()
-            .map_err(crate::errors::core_to_py)?;
+        let table = self.report().to_table().map_err(core_to_py)?;
         crate::bindings::core::table::PyArrowTable::from_envelope(&table)
     }
 
@@ -343,10 +340,7 @@ impl PyPLSummaryReport {
     /// ``df.pivot(index="line_item", columns="period", values="value")`` for
     /// the line-items-by-periods layout of the text report.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let table = self
-            .report()
-            .to_table()
-            .map_err(crate::errors::core_to_py)?;
+        let table = self.report().to_table().map_err(core_to_py)?;
         table_to_dataframe(py, &table)
     }
 

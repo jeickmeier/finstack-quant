@@ -190,6 +190,17 @@ impl DownturnLgd {
     }
 
     /// Load a downturn LGD preset from the credit assumptions registry.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - Exact registry identifier of the downturn preset, such as
+    ///   `"basel_secured"`. An unknown ID never falls back to a default preset.
+    ///
+    /// # Errors
+    ///
+    /// Returns a not-found error (`InputError::NotFound`) if `id` is unknown,
+    /// and a validation error if the registry cannot load or the preset uses
+    /// an unsupported method or out-of-range parameters.
     pub fn from_registry_id(id: &str) -> Result<Self> {
         let preset = crate::credit::registry::embedded_registry()?.downturn_lgd_preset(id)?;
         if preset.method == "regulatory_floor" {

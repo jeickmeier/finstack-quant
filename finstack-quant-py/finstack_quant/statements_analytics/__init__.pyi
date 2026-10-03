@@ -7931,6 +7931,8 @@ class ScenarioResults:
         ------
         ValueError
             If the result set or `metrics` is empty.
+        KeyError
+            If a metric in ``metrics`` is not a node of the baseline scenario.
         """
     def to_dataframe(self, metrics: list[str]) -> pd.DataFrame:
         """
@@ -7962,6 +7964,8 @@ class ScenarioResults:
         ------
         ValueError
             If the result set or ``metrics`` is empty.
+        KeyError
+            If a metric in ``metrics`` is not a node of the baseline scenario.
         """
 
 class ScenarioSet:

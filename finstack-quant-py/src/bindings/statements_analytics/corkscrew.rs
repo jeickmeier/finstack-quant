@@ -481,7 +481,7 @@ impl PyCorkscrewExtension {
         let inner = self
             .inner
             .execute(&model, &results)
-            .map_err(display_to_py)?;
+            .map_err(crate::errors::statements_to_py)?;
         Ok(PyCorkscrewReport { inner })
     }
 }

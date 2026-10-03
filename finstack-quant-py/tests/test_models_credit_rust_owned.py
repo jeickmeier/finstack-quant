@@ -94,3 +94,15 @@ def test_spec_json_goes_through_the_rust_constructors() -> None:
         )
     spec = DynamicRecoverySpec.inverse_linear(0.4, 100.0)
     assert DynamicRecoverySpec.from_json(spec.to_json()).to_json() == spec.to_json()
+
+
+def test_unknown_registry_ids_raise_key_error() -> None:
+    """The registry lookup miss is Rust ``InputError::NotFound``; WASM reports ``not_found``."""
+    from finstack_quant.models.credit import RatingFactorTable, lgd, pd
+
+    with pytest.raises(KeyError, match="rating factor table 'nope'"):
+        RatingFactorTable.from_registry_id(id="nope")
+    with pytest.raises(KeyError, match="PD master scale 'nope'"):
+        pd.MasterScale.from_registry_id(scale_id="nope")
+    with pytest.raises(KeyError, match="downturn LGD preset 'nope'"):
+        lgd.DownturnLgd.from_registry_id(id="nope")

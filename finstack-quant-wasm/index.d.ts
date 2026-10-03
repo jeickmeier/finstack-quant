@@ -24639,7 +24639,7 @@ export interface DownturnLgdConstructor {
    * Downturn adjustment registered under an explicit registry identifier.
    * @param id - Registry identifier of the downturn calibration.
    * @returns The registered downturn adjustment.
-   * @throws Error - Throws a `validation` error if no calibration is registered under `id`.
+   * @throws Error - Throws a `not_found` error if no calibration is registered under `id`.
    */
   fromRegistryId(id: string): DownturnLgd;
   /**
@@ -25154,7 +25154,7 @@ export interface MasterScaleConstructor {
    * Master scale registered under an explicit registry identifier.
    * @param scaleId - Registry identifier of the master scale.
    * @returns The registered master scale.
-   * @throws Error - Throws a `validation` error if no scale is registered under `scaleId`.
+   * @throws Error - Throws a `not_found` error if no scale is registered under `scaleId`.
    */
   fromRegistryId(scaleId: string): MasterScale;
   /**
@@ -25677,7 +25677,7 @@ export interface RatingFactorTableConstructor {
    * Rating-factor table registered under an explicit registry identifier.
    * @param id - Registry identifier of the table, such as `"moodys_standard"`.
    * @returns The rating-factor table registered under `id`.
-   * @throws Error - Throws a `TypeError` if `id` is not a string, and a `validation` error if no table is registered under it.
+   * @throws Error - Throws a `TypeError` if `id` is not a string, and a `not_found` error if no table is registered under it.
    */
   fromRegistryId(id: string): RatingFactorTable;
   /**

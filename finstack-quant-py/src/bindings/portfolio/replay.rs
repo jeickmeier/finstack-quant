@@ -172,7 +172,7 @@ fn extract_replay_timeline(
         serde_json::Value::Array(entries).to_string()
     };
     py.detach(move || finstack_quant_portfolio::replay::ReplayTimeline::from_json_snapshots(&json))
-        .map_err(display_to_py)
+        .map_err(crate::errors::portfolio_to_py)
 }
 
 /// Run the canonical Rust replay engine for both entry points.

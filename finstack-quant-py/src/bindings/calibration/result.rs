@@ -4,7 +4,7 @@ use super::report::{quote_quality_dataframe, PyCalibrationReport};
 use crate::bindings::core::market_data::context::PyMarketContext;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::bindings::pickle_support::reduce_via_json;
-use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
+use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_calibration::api::schema::CalibrationResultEnvelope;
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -151,8 +151,8 @@ impl PyCalibrationResult {
     ///     If the stored market snapshot cannot be rehydrated.
     #[getter]
     fn market(&self) -> PyResult<PyMarketContext> {
-        let ctx = MarketContext::try_from(self.inner.result.final_market.clone())
-            .map_err(display_to_py)?;
+        let ctx =
+            MarketContext::try_from(self.inner.result.final_market.clone()).map_err(core_to_py)?;
         Ok(PyMarketContext::from_inner(ctx))
     }
 
@@ -165,7 +165,7 @@ impl PyCalibrationResult {
         if let Some(value) = self.cached_market_json.get() {
             return Ok(PyString::new(py, value));
         }
-        MarketContext::try_from(self.inner.result.final_market.clone()).map_err(display_to_py)?;
+        MarketContext::try_from(self.inner.result.final_market.clone()).map_err(core_to_py)?;
         cached_json(py, &self.cached_market_json, || {
             serde_json::to_string(&self.inner.result.final_market)
         })

@@ -432,7 +432,7 @@ impl PyPortfolioBuilder {
         let envelope_json = extract_instrument_json(instrument)?;
         let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
             serde_json::from_str(&envelope_json).map_err(display_to_py)?;
-        let boxed = envelope.into_boxed().map_err(display_to_py)?;
+        let boxed = envelope.into_boxed().map_err(crate::errors::core_to_py)?;
         let instrument_id = boxed.id().to_owned();
         let unit = extract_position_unit(py, unit)?;
         let attributes: IndexMap<String, AttributeValue> = match attributes {

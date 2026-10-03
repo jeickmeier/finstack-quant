@@ -1,8 +1,9 @@
 //! Centralized error mapping from Rust crate errors to Python exceptions.
 //!
 //! All binding callers should route error conversions through [`core_to_py`]
-//! (for `finstack_quant_core::Error`) or [`display_to_py`] (for any `Display`-able
-//! error). Avoid inline `PyValueError::new_err(e.to_string())` patterns —
+//! (for `finstack_quant_core::Error`), the other kind-aware mappers for typed
+//! domain errors, or [`display_to_py`] (only for kind-less parse/serde errors,
+//! see [`KindlessError`]). Avoid inline `PyValueError::new_err(e.to_string())` patterns —
 //! they bypass this module and break the error-chain-preservation contract
 //! the helpers below provide.
 //!
@@ -299,20 +300,26 @@ pub fn statements_to_py(e: finstack_quant_statements::Error) -> PyErr {
     }
 }
 
-/// Convert any `Display`-able error into a Python `ValueError`.
+/// Errors that carry no Rust-owned [`ErrorKind`](finstack_quant_core::error::ErrorKind)
+/// and may therefore be raised as a plain `ValueError` by [`display_to_py`].
 ///
-/// If the error implements `std::error::Error`, the full source chain is
-/// flattened into the message; otherwise only the top-level `Display`
-/// string is used.
-pub fn display_to_py<E>(e: E) -> PyErr
-where
-    E: std::fmt::Display,
-{
-    // We can't generically detect `std::error::Error` without specialization,
-    // so callers with rich chains should prefer `core_to_py` or the helpers
-    // that accept `&dyn Error`. This path still beats the inline
-    // `PyValueError::new_err(e.to_string())` pattern it replaces because it
-    // routes through one place.
+/// Only parse/serde errors from outside the workspace belong here. A typed
+/// workspace error (`finstack_quant_core::Error`, `finstack_quant_statements::Error`,
+/// `finstack_quant_portfolio::Error`, ...) has a `kind()` and must go through its
+/// kind-aware mapper (`core_to_py`, `statements_to_py`, `portfolio_to_py`, ...);
+/// leaving it out of this list makes `display_to_py` on it a compile error.
+pub trait KindlessError: std::fmt::Display {}
+
+impl KindlessError for serde_json::Error {}
+impl KindlessError for String {}
+impl KindlessError for finstack_quant_core::currency::TryFromCurrencyError {}
+impl KindlessError for time::error::ComponentRange {}
+
+/// Convert a kind-less parse/serde error into a Python `ValueError`.
+///
+/// Restricted to [`KindlessError`] so a typed workspace error cannot bypass
+/// its Rust-owned kind (`KeyError` / `RuntimeError` / domain subclasses).
+pub fn display_to_py<E: KindlessError>(e: E) -> PyErr {
     PyValueError::new_err(e.to_string())
 }
 

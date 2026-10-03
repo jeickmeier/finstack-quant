@@ -13,7 +13,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
 fn money(amount: f64, currency: &str) -> PyResult<Money> {
-    let ccy: Currency = currency.parse().map_err(display_to_py)?;
+    let ccy: Currency = currency.parse().map_err(crate::errors::core_to_py)?;
     Money::new(amount, ccy).map_err(core_to_py)
 }
 

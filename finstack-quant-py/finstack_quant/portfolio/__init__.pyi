@@ -11342,7 +11342,7 @@ class Constraint:
 
         Raises
         ------
-        ValueError
+        PortfolioError
             If ``min`` is greater than ``max``.
 
         Examples
@@ -11376,7 +11376,7 @@ class Constraint:
 
         Raises
         ------
-        ValueError
+        PortfolioError
             If ``max_turnover`` is negative.
 
         Examples
@@ -11405,7 +11405,7 @@ class Constraint:
 
         Raises
         ------
-        ValueError
+        PortfolioError
             If ``rhs`` is non-finite or negative.
 
         Examples
@@ -11445,7 +11445,7 @@ class Constraint:
 
         Raises
         ------
-        ValueError
+        PortfolioError
             If ``max_share`` is outside ``[0, 1]`` or is non-finite.
 
         Examples
@@ -11485,7 +11485,7 @@ class Constraint:
 
         Raises
         ------
-        ValueError
+        PortfolioError
             If ``min_share`` is outside ``[0, 1]`` or is non-finite.
 
         Examples
@@ -13128,9 +13128,11 @@ class PortfolioOptimizationResult:
 
         Raises
         ------
+        PortfolioError
+            If the solution is infeasible.
         RuntimeError
-            If the solution is infeasible, or this result was rebuilt from
-            JSON / unpickled (the live problem is not part of the wire form).
+            If this result was rebuilt from JSON / unpickled (the live problem
+            is not part of the wire form).
         """
         ...
 

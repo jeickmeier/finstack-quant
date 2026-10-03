@@ -75,7 +75,7 @@ impl JsRatingFactorTable {
     ///
     /// # Errors
     ///
-    /// Throws a `TypeError` if `id` is not a string, and a `validation` error
+    /// Throws a `TypeError` if `id` is not a string, and a `not_found` error
     /// if no table is registered under it.
     #[wasm_bindgen(js_name = fromRegistryId)]
     pub fn from_registry_id(id: JsValue) -> Result<JsRatingFactorTable, JsValue> {

@@ -22,7 +22,7 @@ use crate::errors::{display_to_py, value_error};
 /// `ValueError` when a string is not valid ISO 8601.
 pub(crate) fn py_to_date(obj: &Bound<'_, PyAny>) -> PyResult<time::Date> {
     if let Ok(s) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        return finstack_quant_core::dates::parse_iso_date(&s).map_err(display_to_py);
+        return finstack_quant_core::dates::parse_iso_date(&s).map_err(crate::errors::core_to_py);
     }
     if !(obj.hasattr("year")? && obj.hasattr("month")? && obj.hasattr("day")?) {
         return Err(pyo3::exceptions::PyTypeError::new_err(format!(
@@ -83,7 +83,7 @@ pub(crate) fn extract_date(obj: &Bound<'_, PyAny>) -> PyResult<time::Date> {
 /// formatting happens on the date-object path.
 pub(crate) fn extract_date_iso(obj: &Bound<'_, PyAny>) -> PyResult<String> {
     if let Ok(s) = obj.extract::<std::borrow::Cow<'_, str>>() {
-        finstack_quant_core::dates::parse_iso_date(&s).map_err(display_to_py)?;
+        finstack_quant_core::dates::parse_iso_date(&s).map_err(crate::errors::core_to_py)?;
         return Ok(s.into_owned());
     }
     Ok(py_to_date(obj)?.to_string())

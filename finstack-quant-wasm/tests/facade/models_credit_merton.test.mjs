@@ -327,7 +327,7 @@ test('rating-factor tables come from the Rust registry', () => {
   );
   assert.throws(
     () => credit.RatingFactorTable.fromRegistryId('nope'),
-    (e) => e.kind === 'validation'
+    (e) => e.kind === 'not_found'
   );
   assert.throws(
     () => credit.moodysWarfFactor('not-a-rating'),

@@ -147,3 +147,70 @@ def test_rebalance_from_spec_works_on_a_result_rebuilt_from_json() -> None:
     foreign["implied_quantities"]["ZZZ"] = 1.0
     with pytest.raises(PortfolioError, match="ZZZ"):
         rebalance_from_spec(spec, PortfolioOptimizationResult.from_json(json.dumps(foreign)))
+
+
+def test_portfolio_input_errors_keep_their_rust_kind() -> None:
+    """Constraint and replay-timeline validation raise ``PortfolioError``, as Rust's kind says."""
+    from finstack_quant.portfolio import Portfolio, PositionFilter, replay_portfolio
+
+    with pytest.raises(PortfolioError, match="weight bounds"):
+        Constraint.weight_bounds(filter=PositionFilter.all(), min=1.0, max=0.0)
+    with pytest.raises(PortfolioError, match="max_turnover"):
+        Constraint.max_turnover(max_turnover=-1.0)
+    with pytest.raises(PortfolioError, match="budget"):
+        Constraint.budget(float("nan"))
+    with pytest.raises(PortfolioError, match="max_share"):
+        Constraint.exposure_limit(key="rating", value="AAA", max_share=2.0)
+    with pytest.raises(PortfolioError, match="min_share"):
+        Constraint.exposure_minimum(key="rating", value="AAA", min_share=-1.0)
+
+    portfolio = Portfolio.from_spec(json.dumps(_book()))
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04))
+    with pytest.raises(PortfolioError, match="strictly ascending"):
+        replay_portfolio(
+            portfolio,
+            [(datetime.date(2024, 1, 17), market), (datetime.date(2024, 1, 16), market)],
+            {"mode": "pv_only"},
+        )
+
+
+def test_infeasible_rebalance_raises_portfolio_error() -> None:
+    """The method and ``rebalance_from_spec`` raise the same Rust-owned class."""
+    from finstack_quant.portfolio import PositionFilter
+
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04))
+    spec = (
+        PortfolioOptimizationSpec
+        .new(
+            json.dumps(_book()),
+            Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.constant(1.0))),
+        )
+        .with_weighting(WeightingScheme.notional_weight())
+        .with_constraint(Constraint.budget(1.0))
+        .with_constraint(Constraint.weight_bounds(filter=PositionFilter.all(), min=0.0, max=0.1))
+    )
+    result = optimize_portfolio(spec, market)
+    assert result.status.kind == "infeasible"
+    with pytest.raises(PortfolioError, match="infeasible"):
+        result.to_rebalanced_portfolio()
+    with pytest.raises(PortfolioError, match="infeasible"):
+        rebalance_from_spec(spec, result)
+
+
+def test_rebalanced_portfolio_needs_the_live_result() -> None:
+    """A result rebuilt from JSON has no live problem; the method says so."""
+    market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04))
+    spec = (
+        PortfolioOptimizationSpec
+        .new(
+            json.dumps(_book()),
+            Objective.maximize(MetricExpr.weighted_sum(PerPositionMetric.constant(1.0))),
+        )
+        .with_weighting(WeightingScheme.notional_weight())
+        .with_constraint(Constraint.budget(1.0))
+    )
+    result = optimize_portfolio(spec, market)
+    quantities = [p["quantity"] for p in json.loads(result.to_rebalanced_portfolio().to_json())["positions"]]
+    assert quantities == [0.0, 3.0]
+    with pytest.raises(RuntimeError, match="rebuilt from JSON"):
+        PortfolioOptimizationResult.from_json(result.to_json()).to_rebalanced_portfolio()
