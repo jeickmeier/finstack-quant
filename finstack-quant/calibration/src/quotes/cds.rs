@@ -242,6 +242,29 @@ impl CdsQuote {
         }
     }
 
+    /// Reference entity named by the quote.
+    pub fn entity(&self) -> &str {
+        match self {
+            Self::CdsParSpread { entity, .. } | Self::CdsUpfront { entity, .. } => entity,
+        }
+    }
+
+    /// Maturity pillar of the quoted CDS.
+    pub fn pillar(&self) -> &Pillar {
+        match self {
+            Self::CdsParSpread { pillar, .. } | Self::CdsUpfront { pillar, .. } => pillar,
+        }
+    }
+
+    /// Recovery rate assumed by the quote, as a decimal in `[0, 1]`.
+    pub fn recovery_rate(&self) -> f64 {
+        match self {
+            Self::CdsParSpread { recovery_rate, .. } | Self::CdsUpfront { recovery_rate, .. } => {
+                *recovery_rate
+            }
+        }
+    }
+
     /// Running coupon, in basis points, of the CDS built from this quote.
     ///
     /// Par-spread quotes return the par spread (the built CDS runs at par).

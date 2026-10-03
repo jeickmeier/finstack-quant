@@ -127,6 +127,28 @@
         "quote_type": "normal",
         "is_cap": false
       }
+    },
+    "inflation_swap": {
+      "inflation_swap": {
+        "id": "ZC5Y",
+        "maturity": "2031-05-08",
+        "rate": 0.025,
+        "index": "USA-CPI-U",
+        "convention": "USD"
+      }
+    },
+    "yoy_inflation_swap": {
+      "yoy_inflation_swap": {
+        "id": "YOY5Y",
+        "maturity": "2031-05-08",
+        "rate": 0.024,
+        "index": "USA-CPI-U",
+        "frequency": {
+          "count": 1,
+          "unit": "years"
+        },
+        "convention": "USD"
+      }
     }
   },
   "rate_bounds": {
@@ -550,5 +572,25 @@
       },
       "success": true
     }
+  },
+  "validation_config": {
+    "check_forward_positivity": true,
+    "min_forward_rate": -0.01,
+    "max_forward_rate": 0.5,
+    "check_monotonicity": true,
+    "check_arbitrage": true,
+    "tolerance": 1e-10,
+    "max_hazard_rate": 0.5,
+    "min_cpi_growth": -0.1,
+    "max_cpi_growth": 0.5,
+    "min_fwd_inflation": -0.2,
+    "max_fwd_inflation": 0.5,
+    "max_volatility": 5.0,
+    "allow_negative_rates": false,
+    "lenient_arbitrage": false,
+    "butterfly_upper_ratio": 1.1,
+    "butterfly_lower_ratio": 0.9,
+    "recovery_rate_abs_tolerance": 1e-12,
+    "minimum_lgd_for_hazard_guess": 1e-06
   }
 }

@@ -743,47 +743,77 @@ public = [
     "CalibrationStep",
     "CalibrationValidationReport",
     "CdsQuote",
+    "CdsTrancheQuote",
+    "CollateralEntry",
+    "DividendScheduleDatum",
+    "FxSpotDatum",
+    "InflationQuote",
+    "PriceDatum",
     "QuoteQuality",
     "RateBounds",
     "RateQuote",
     "SolverConfig",
     "ValidationConfig",
     "VolQuote",
+    "XccyQuote",
     "calibrate",
     "calibrate_bermudan_lmm_base_vol",
     "dry_run",
     "dry_run_json",
+    "validate_butterfly_call_convexity",
+    "validate_butterfly_spread",
+    "validate_calendar_spread",
+    "validate_calendar_spread_with_forwards",
     "validate_calibration",
     "validate_calibration_json",
+    "validate_surface",
+    "validate_surface_with_forwards",
+    "validate_vol_bounds",
 ]
 
-# Engine internals, recalibration plumbing, validators and report builders stay
-# Rust-only: hosts reach them through `calibrate` / `dry_run` / the typed
-# envelope classes rather than as parallel Python constructors.
+# Public calibration items with no Python twin of the same name: engine and
+# validation plumbing, the curve-validator trait, JSON wire twins, wire-shape
+# types bound as dicts, and the recalibration helpers. Hosts reach them through
+# `calibrate` / `dry_run` / `validate_calibration` and the typed envelope classes.
 [crates.calibration.symbols.rust_only]
 symbols = [
     "api::engine::ExecuteError",
     "api::engine::ExecutionErrorDetails",
     "api::engine::ExecutionSolverDiagnostics",
     "api::engine::ExecutionStage",
+    "api::engine::calibrate_from_json",
+    "api::errors::EnvelopeError",
+    "api::errors::StrictLoadDiagnostic",
     "api::host_error::HostExecuteError",
+    "api::market_datum::MarketDatum",
+    "api::prior_market::PriorMarketObject",
+    "api::schema::StepParams",
     "api::validate::DependencyGraph",
     "api::validate::DependencyNode",
+    "api::validate::parse_envelope",
     "api::validate::validate",
+    "api::validate::validate_fail_fast",
     "hull_white::CapFloorSchedule",
     "hull_white::CapletSchedule",
     "hull_white::SwaptionFloatingPeriod",
+    "hull_white::SwapFrequency",
     "hull_white::SwaptionSchedule",
     "hull_white::bootstrap_hull_white_sigma_schedule_to_cap_floors_with_fn",
     "hull_white::calibrate_hull_white_to_cap_floors_with_fn",
     "hull_white::calibrate_hull_white_to_swaptions_with_fn",
+    "lmm::calibrate_bermudan_lmm_base_vol_from_json",
+    "quotes::MarketQuote",
+    "quotes::ids::Pillar",
+    "quotes::ids::QuoteId",
     "recalibration::CachedRecalibrationProvider",
     "recalibration::bump_discount_curve_from_rate_calibration",
     "recalibration::bump_forward_curve_from_rate_calibration",
     "recalibration::bump_hazard_spreads",
-    "recalibration::recalibrate_hazard_with_recovery",
+    "recalibration::pricing_options",
+    "validation::CurveValidator",
+    "validation::RateBoundsPolicy",
 ]
-note = "Engine execution plumbing, the host-error funnel, dependency-graph validation and the recalibration helpers are driven from Rust (and from the scenarios crate); hosts reach them through the calibration envelope entry points. Solver, target and prepared-plan internals are pub(crate), so there is nothing public to list for them. Canonical curve-based Hull-White entry points own model-time and projection defaults behind the existing Python functions; specialized callback variants with contractual schedules stay Rust-only."
+note = "Engine execution plumbing, the host-error funnel, dependency-graph validation (`validate`, `validate_fail_fast`, `parse_envelope`) and the recalibration helpers (including `pricing_options`) are driven from Rust (and from the scenarios crate); hosts reach them through the calibration envelope entry points. `calibrate_from_json` and `calibrate_bermudan_lmm_base_vol_from_json` are Rust JSON twins of `calibrate` / `calibrate_bermudan_lmm_base_vol`, which both hosts call with parsed input. `MarketDatum`, `PriorMarketObject`, `StepParams`, `Pillar`, `QuoteId`, `SwapFrequency` and `RateBoundsPolicy` cross the boundary as wire values (dicts / strings in Python, generated TypeScript types in WASM), and `EnvelopeError` / `StrictLoadDiagnostic` surface as `CalibrationEnvelopeError` and its `diagnostics`. `MarketQuote` is the Rust umbrella over the typed quote classes. `CurveValidator` is a Rust trait over calibrated curves that the calibration steps apply after each solve (configured by `ValidationConfig`); the vol-surface checks are bound as the `validate_*` functions. Solver, target and prepared-plan internals are pub(crate), so there is nothing public to list for them. Canonical curve-based Hull-White entry points own model-time and projection defaults behind the existing Python functions; specialized callback variants with contractual schedules stay Rust-only."
 
 [crates.valuations]
 rust_crate = "finstack-quant-valuations"
@@ -1906,7 +1936,7 @@ js = "attribution.schema"
 
 [parity.modules."finstack_quant.calibration"]
 js = "calibration"
-types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationEnvelopeError = "CalibrationEnvelopeError", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResult = "CalibrationResult", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", ValidationConfig = "ValidationConfig", VolQuote = "VolQuote" }
+types = { CalibrationConfig = "CalibrationConfig", CalibrationDiagnostics = "CalibrationDiagnostics", CalibrationEnvelope = "CalibrationEnvelope", CalibrationEnvelopeError = "CalibrationEnvelopeError", CalibrationPlan = "CalibrationPlan", CalibrationReport = "CalibrationReport", CalibrationResult = "CalibrationResult", CalibrationStep = "CalibrationStep", CalibrationValidationReport = "CalibrationValidationReport", CdsQuote = "CdsQuote", CdsTrancheQuote = "CdsTrancheQuote", CollateralEntry = "CollateralEntry", DividendScheduleDatum = "DividendScheduleDatum", FxSpotDatum = "FxSpotDatum", InflationQuote = "InflationQuote", PriceDatum = "PriceDatum", QuoteQuality = "QuoteQuality", RateBounds = "RateBounds", RateQuote = "RateQuote", SolverConfig = "SolverConfig", ValidationConfig = "ValidationConfig", VolQuote = "VolQuote", XccyQuote = "XccyQuote" }
 
 [parity.modules."finstack_quant.calibration.hull_white"]
 js = "calibration"
@@ -2190,6 +2220,8 @@ calibrationStepVolSurface = "free-function twin of Python CalibrationStep.vol_su
 calibrationStepXccyBasis = "free-function twin of Python CalibrationStep.xccy_basis (Rust CalibrationStep::from_wire_fields; member rename)"
 cdsQuoteParSpread = "free-function twin of Python CdsQuote.par_spread (Rust CdsQuote::from_wire_fields; member rename)"
 cdsQuoteUpfront = "free-function twin of Python CdsQuote.upfront (Rust CdsQuote::from_wire_fields; member rename)"
+inflationQuoteInflationSwap = "free-function twin of Python InflationQuote.inflation_swap (Rust InflationQuote::from_wire_fields; member rename)"
+inflationQuoteYoyInflationSwap = "free-function twin of Python InflationQuote.yoy_inflation_swap (Rust InflationQuote::from_wire_fields; member rename)"
 hullWhiteParamsSigmaAt = "free-function twin of Python HullWhiteParams.sigma_at (Rust HullWhiteParams::volatility value_at; member rename)"
 rateBoundsEmergingMarkets = "free-function twin of Python RateBounds.emerging_markets (Rust RateBounds::emerging_markets; member rename)"
 rateBoundsForCurrency = "free-function twin of Python RateBounds.for_currency (Rust RateBounds::for_currency; member rename)"
@@ -2790,6 +2822,9 @@ xccy_basis = { js = "calibration.calibrationStepXccyBasis", reason = "WASM steps
 
 [parity.members."finstack_quant.calibration.CdsQuote"]
 renames = { par_spread = { js = "calibration.cdsQuoteParSpread", reason = "WASM quotes are plain objects; the constructor is a free function returning the CdsQuote object (Rust CdsQuote::from_wire_fields)" }, upfront = { js = "calibration.cdsQuoteUpfront", reason = "WASM quotes are plain objects; the constructor is a free function returning the CdsQuote object (Rust CdsQuote::from_wire_fields)" } }
+
+[parity.members."finstack_quant.calibration.InflationQuote"]
+renames = { inflation_swap = { js = "calibration.inflationQuoteInflationSwap", reason = "WASM quotes are plain objects; the constructor is a free function returning the InflationQuote object (Rust InflationQuote::from_wire_fields)" }, yoy_inflation_swap = { js = "calibration.inflationQuoteYoyInflationSwap", reason = "WASM quotes are plain objects; the constructor is a free function returning the InflationQuote object (Rust InflationQuote::from_wire_fields)" } }
 
 [parity.members."finstack_quant.calibration.RateBounds"]
 renames = { emerging_markets = { js = "calibration.rateBoundsEmergingMarkets", reason = "WASM rate bounds are plain objects; the Rust RateBounds::emerging_markets constructor is a free function returning the object" }, for_currency = { js = "calibration.rateBoundsForCurrency", reason = "WASM rate bounds are plain objects; the Rust RateBounds::for_currency constructor is a free function returning the object" } }

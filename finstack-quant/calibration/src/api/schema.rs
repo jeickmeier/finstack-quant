@@ -370,6 +370,34 @@ pub struct CalibrationEnvelope {
     pub prior_market: Vec<PriorMarketObject>,
 }
 
+/// Serialized payloads of the market data collected so far, keyed by `(kind, id)`.
+type DatumPayloads = IndexMap<(&'static str, String), serde_json::Value>;
+
+/// Append `datum` unless an identical datum of the same kind and id is already collected.
+fn push_distinct_datum(
+    market_data: &mut Vec<MarketDatum>,
+    payloads: &mut DatumPayloads,
+    datum: MarketDatum,
+) -> Result<(), super::errors::EnvelopeError> {
+    use super::errors::EnvelopeError;
+    let payload = serde_json::to_value(&datum).map_err(|error| EnvelopeError::JsonSerialize {
+        target: "MarketDatum".to_string(),
+        message: error.to_string(),
+    })?;
+    let key = (datum.kind_name(), datum.id().to_string());
+    match payloads.get(&key) {
+        Some(existing) if existing != &payload => Err(EnvelopeError::ConflictingMarketDatum {
+            id: datum.id().to_string(),
+        }),
+        Some(_) => Ok(()),
+        None => {
+            payloads.insert(key, payload);
+            market_data.push(datum);
+            Ok(())
+        }
+    }
+}
+
 impl CalibrationEnvelope {
     /// Create a current-version calibration request envelope.
     ///
@@ -400,8 +428,8 @@ impl CalibrationEnvelope {
     /// Each step's attached quotes become the quote set named by the step's
     /// `quote_set` (unless `quote_sets` already defines that name with the
     /// same ids), and every distinct attached quote is appended once to
-    /// `market_data`, in first-seen order. Identical quotes attached by more
-    /// than one step are collected once. Steps without attached quotes keep
+    /// `market_data`, in first-seen order. Identical quotes (same kind, id and
+    /// payload) attached by more than one step are collected once. Steps without attached quotes keep
     /// referencing `quote_sets` only. `prior_market` starts empty.
     ///
     /// # Arguments
@@ -431,7 +459,7 @@ impl CalibrationEnvelope {
     ) -> Result<Self, super::errors::EnvelopeError> {
         use super::errors::EnvelopeError;
         let mut market_data = Vec::new();
-        let mut payloads: IndexMap<String, serde_json::Value> = IndexMap::new();
+        let mut payloads = DatumPayloads::new();
         let mut plan_steps = Vec::with_capacity(steps.len());
         for (step, quotes) in steps {
             if !quotes.is_empty() {
@@ -448,24 +476,7 @@ impl CalibrationEnvelope {
                     }
                 }
                 for quote in quotes {
-                    let payload = serde_json::to_value(&quote).map_err(|error| {
-                        EnvelopeError::JsonSerialize {
-                            target: "MarketDatum".to_string(),
-                            message: error.to_string(),
-                        }
-                    })?;
-                    match payloads.get(quote.id()) {
-                        Some(existing) if existing != &payload => {
-                            return Err(EnvelopeError::ConflictingMarketDatum {
-                                id: quote.id().to_string(),
-                            });
-                        }
-                        Some(_) => {}
-                        None => {
-                            payloads.insert(quote.id().to_string(), payload);
-                            market_data.push(quote);
-                        }
-                    }
+                    push_distinct_datum(&mut market_data, &mut payloads, quote)?;
                 }
             }
             plan_steps.push(step);
@@ -478,6 +489,37 @@ impl CalibrationEnvelope {
             settings,
         };
         Ok(Self::new(plan, market_data, Vec::new()))
+    }
+
+    /// Append market data to this envelope under the attached-quote rule.
+    ///
+    /// Each datum is appended in order unless a datum of the same kind and id
+    /// with an identical payload is already present (in the envelope or
+    /// earlier in `market_data`), in which case it is collected once. This is
+    /// the rule [`Self::from_attached_steps`] applies to step-attached quotes,
+    /// so extra market data that repeats an attached quote merges cleanly.
+    ///
+    /// # Arguments
+    ///
+    /// * `market_data` - Additional flat market-data inputs, in the order they
+    ///   should follow the envelope's existing `market_data`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`super::errors::EnvelopeError::ConflictingMarketDatum`] when a
+    /// datum repeats the kind and id of one already present with a different
+    /// payload, and [`super::errors::EnvelopeError::JsonSerialize`] if a datum
+    /// cannot be serialized for the comparison.
+    pub fn with_market_data(
+        mut self,
+        market_data: Vec<MarketDatum>,
+    ) -> Result<Self, super::errors::EnvelopeError> {
+        let mut payloads = DatumPayloads::new();
+        let existing = std::mem::take(&mut self.market_data);
+        for datum in existing.into_iter().chain(market_data) {
+            push_distinct_datum(&mut self.market_data, &mut payloads, datum)?;
+        }
+        Ok(self)
     }
 
     /// Serialize this request envelope as canonical pretty-printed JSON.

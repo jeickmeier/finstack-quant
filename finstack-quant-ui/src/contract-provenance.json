@@ -579,7 +579,7 @@
           "uri": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json",
           "pointer": "#",
           "source": "finstack-quant/calibration/schemas/calibration/1/calibration.schema.json",
-          "sha256": "04cd5da756ffaacfd4ff6e990f460012a28d419f4d0fac243057c2982aad88fe",
+          "sha256": "83532f3a2fd89823a1b3cdee59bc0b68695f404f0bd96f879b237786fba1f58a",
           "description": "Canonical typed calibration request and result envelope."
         }
       ]

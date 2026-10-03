@@ -8,14 +8,20 @@
 mod config;
 mod envelope;
 mod hull_white;
+mod quotes;
 mod report;
 mod result;
 mod schema;
+mod validation;
 
 pub(crate) use config::{PyCalibrationConfig, PyRateBounds, PySolverConfig, PyValidationConfig};
 pub(crate) use envelope::{
     PyCalibrationEnvelope, PyCalibrationPlan, PyCalibrationStep, PyCdsQuote, PyRateQuote,
     PyVolQuote,
+};
+pub(crate) use quotes::{
+    PyCdsTrancheQuote, PyCollateralEntry, PyDividendScheduleDatum, PyFxSpotDatum, PyInflationQuote,
+    PyPriceDatum, PyXccyQuote,
 };
 pub(crate) use report::{
     PyCalibrationDiagnostics, PyCalibrationReport, PyCalibrationValidationReport, PyQuoteQuality,
@@ -141,7 +147,7 @@ pub(crate) fn extract_envelope(
         return Ok(envelope.borrow().inner.clone());
     }
     if let Ok(plan) = obj.cast::<PyCalibrationPlan>() {
-        return Ok(plan.borrow().to_envelope(Vec::new(), Vec::new()));
+        return plan.borrow().to_envelope(py, Vec::new(), Vec::new());
     }
     if let Ok(json) = obj.extract::<std::borrow::Cow<'_, str>>() {
         return parse_envelope(py, &json);
@@ -347,12 +353,19 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyCalibrationStep>()?;
     m.add_class::<PyCalibrationValidationReport>()?;
     m.add_class::<PyCdsQuote>()?;
+    m.add_class::<PyCdsTrancheQuote>()?;
+    m.add_class::<PyCollateralEntry>()?;
+    m.add_class::<PyDividendScheduleDatum>()?;
+    m.add_class::<PyFxSpotDatum>()?;
+    m.add_class::<PyInflationQuote>()?;
+    m.add_class::<PyPriceDatum>()?;
     m.add_class::<PyQuoteQuality>()?;
     m.add_class::<PyRateBounds>()?;
     m.add_class::<PyRateQuote>()?;
     m.add_class::<PySolverConfig>()?;
     m.add_class::<PyValidationConfig>()?;
     m.add_class::<PyVolQuote>()?;
+    m.add_class::<PyXccyQuote>()?;
     m.add(
         "CalibrationEnvelopeError",
         py.get_type::<CalibrationEnvelopeError>(),
@@ -363,6 +376,28 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(dry_run_json, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(validate_calibration, &m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(validate_calibration_json, &m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(
+        validation::validate_butterfly_call_convexity,
+        &m
+    )?)?;
+    m.add_function(pyo3::wrap_pyfunction!(
+        validation::validate_butterfly_spread,
+        &m
+    )?)?;
+    m.add_function(pyo3::wrap_pyfunction!(
+        validation::validate_calendar_spread,
+        &m
+    )?)?;
+    m.add_function(pyo3::wrap_pyfunction!(
+        validation::validate_calendar_spread_with_forwards,
+        &m
+    )?)?;
+    m.add_function(pyo3::wrap_pyfunction!(validation::validate_surface, &m)?)?;
+    m.add_function(pyo3::wrap_pyfunction!(
+        validation::validate_surface_with_forwards,
+        &m
+    )?)?;
+    m.add_function(pyo3::wrap_pyfunction!(validation::validate_vol_bounds, &m)?)?;
     hull_white::register(py, &m)?;
     schema::register(py, &m)?;
     m.setattr(
@@ -380,20 +415,34 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "CalibrationStep",
                 "CalibrationValidationReport",
                 "CdsQuote",
+                "CdsTrancheQuote",
+                "CollateralEntry",
+                "DividendScheduleDatum",
+                "FxSpotDatum",
+                "InflationQuote",
+                "PriceDatum",
                 "QuoteQuality",
                 "RateBounds",
                 "RateQuote",
                 "SolverConfig",
                 "ValidationConfig",
                 "VolQuote",
+                "XccyQuote",
                 "calibrate",
                 "calibrate_bermudan_lmm_base_vol",
                 "dry_run",
                 "dry_run_json",
                 "hull_white",
                 "schema",
+                "validate_butterfly_call_convexity",
+                "validate_butterfly_spread",
+                "validate_calendar_spread",
+                "validate_calendar_spread_with_forwards",
                 "validate_calibration",
                 "validate_calibration_json",
+                "validate_surface",
+                "validate_surface_with_forwards",
+                "validate_vol_bounds",
             ],
         )?,
     )?;

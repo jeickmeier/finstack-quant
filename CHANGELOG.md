@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Calibration: authoring defaults, envelope merge, coverage
+
+#### Changed
+
+- **Breaking:** Python `hull_white.SwaptionQuote(expiry, tenor, volatility, is_normal_vol)` and `hull_white.CapFloorQuote(maturity, strike, volatility, is_cap, is_normal_vol)` require the flags; the `True` defaults (normal vol, cap) are removed, matching Rust and WASM.
+- Python `RateQuote.futures(convexity_adjustment=None)`, `VolQuote.option_vol(option_type=None)`, `CalibrationStep.hazard(seniority=None)`, `CalibrationStep.vol_surface(model=None)` and `CalibrationStep.parametric(model=None)` take the default from the Rust authoring consts (`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`, `VolQuote::DEFAULT_OPTION_TYPE`, `CalibrationStep::DEFAULT_*`) instead of repeating the value; omitted arguments give the same wire values as before, and `None` is now accepted.
+- `CalibrationEnvelope(plan, market_data=...)` merges the extra market data onto the plan's attached quotes with the new Rust `CalibrationEnvelope::with_market_data`: an identical repeat (same kind, id and payload) is collected once instead of failing with `duplicate_market_datum_id`, and a repeat with a different payload raises `CalibrationEnvelopeError` (`kind == "conflicting_market_datum"`). The `ConflictingMarketDatum` message is now "market datum id '...' has conflicting payloads".
+
+#### Added
+
+- Python typed market data: `InflationQuote` (`inflation_swap`, `yoy_inflation_swap`), `XccyQuote`, `CdsTrancheQuote`, `FxSpotDatum`, `PriceDatum`, `DividendScheduleDatum` and `CollateralEntry`, accepted wherever calibration market data is. Rust `InflationQuote::from_wire_fields`, `XccyQuote::from_wire_fields` and `CdsTrancheQuote::from_wire_fields` own their validation; WASM adds `calibration.inflationQuoteInflationSwap` / `inflationQuoteYoyInflationSwap` and the `FxSpotDatum`, `PriceDatum`, `DividendScheduleDatum` and `CollateralEntry` TypeScript types.
+- Python `CdsQuote.entity`, `convention`, `pillar` and `recovery_rate` getters (Rust `CdsQuote::entity`, `pillar`, `recovery_rate`).
+- The vol-surface no-arbitrage checks on a standalone surface: Python `calibration.validate_surface`, `validate_surface_with_forwards`, `validate_calendar_spread`, `validate_calendar_spread_with_forwards`, `validate_butterfly_spread`, `validate_butterfly_call_convexity` and `validate_vol_bounds`, with WASM twins `calibration.validateSurface` etc.
+
+#### Fixed
+
+- The calibration `rust_only` contract list no longer names the crate-private `recalibrate_hazard_with_recovery` and now records every public calibration item without a Python twin (`calibrate_from_json`, `CurveValidator`, `MarketQuote`, `SwapFrequency`, ...).
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

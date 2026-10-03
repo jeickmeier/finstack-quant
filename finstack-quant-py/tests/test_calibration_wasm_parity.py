@@ -24,8 +24,10 @@ from finstack_quant.calibration import (
     CalibrationEnvelopeError,
     CalibrationStep,
     CdsQuote,
+    InflationQuote,
     RateBounds,
     RateQuote,
+    ValidationConfig,
     VolQuote,
     calibrate,
     dry_run,
@@ -58,6 +60,10 @@ QUOTES = {
     "option_vol": lambda: VolQuote.option_vol("O", "AAPL", "2027-05-08", 155.0, 0.28),
     "swaption_vol": lambda: VolQuote.swaption_vol("SV", "2027-05-08", "2032-05-08", 0.04, 0.0072, "normal"),
     "cap_floor_vol": lambda: VolQuote.cap_floor_vol("CF", "2027-05-08", 0.04, 0.0072, "normal", False),
+    "inflation_swap": lambda: InflationQuote.inflation_swap("ZC5Y", "2031-05-08", 0.025, "USA-CPI-U", "USD"),
+    "yoy_inflation_swap": lambda: InflationQuote.yoy_inflation_swap(
+        "YOY5Y", "2031-05-08", 0.024, "USA-CPI-U", "1Y", "USD"
+    ),
 }
 
 STEPS = {
@@ -119,6 +125,11 @@ def test_step_constructors_match_the_shared_golden(name: str) -> None:
 def test_step_constructors_reject_unknown_fields() -> None:
     with pytest.raises(ValueError, match="invalid discount step"):
         CalibrationStep.discount("USD-OIS", "USD", BASE, bogus=1)
+
+
+def test_validation_config_matches_the_shared_golden() -> None:
+    """The WASM surface-validator tests pass this default config object."""
+    assert ValidationConfig().to_dict() == GOLDEN["validation_config"]
 
 
 def test_rate_bounds_match_the_shared_golden() -> None:

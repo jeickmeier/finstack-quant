@@ -338,10 +338,10 @@
           "type": "object"
         },
         {
-          "description": "One quote id is attached to steps with two different payloads.",
+          "description": "One market-datum id of a kind is attached to steps, or merged into an\nenvelope, with two different payloads.",
           "properties": {
             "id": {
-              "description": "The quote identifier attached with conflicting payloads.",
+              "description": "The datum identifier supplied with conflicting payloads.",
               "type": "string"
             },
             "kind": {

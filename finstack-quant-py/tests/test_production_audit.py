@@ -281,7 +281,7 @@ def test_hull_white_quote_budget_controls_fit_and_survives_pickle() -> None:
 
     curve = DiscountCurve.flat("HW", date(2025, 1, 1), 0.03)
     strike = math.expm1(0.03 * 0.25) / 0.25
-    quotes = [CapFloorQuote(5.0, strike, vol) for vol in [0.009, 0.010, 0.011]]
+    quotes = [CapFloorQuote(5.0, strike, vol, True, True) for vol in [0.009, 0.010, 0.011]]
     results = []
     for budget in [0.0005, 0.0011]:
         config = CapFloorCalibrationConfig(budget, frequency="quarterly", fixed_kappa=0.05)

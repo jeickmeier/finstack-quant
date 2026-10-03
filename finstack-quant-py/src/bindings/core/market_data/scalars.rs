@@ -16,7 +16,7 @@ use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
 use crate::errors::core_to_py;
 
 /// Extract a finite `f64`, rejecting `Decimal` values without an exact binary representation.
-pub(super) fn extract_exact_f64(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64> {
+pub(crate) fn extract_exact_f64(value: &Bound<'_, PyAny>, field: &str) -> PyResult<f64> {
     if is_python_decimal(value)? {
         let decimal = decimal_from_py(value)?;
         return finstack_quant_core::decimal::decimal_to_f64_exact(decimal).map_err(core_to_py);

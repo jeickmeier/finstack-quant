@@ -133,11 +133,15 @@ test('volQuoteOptionVol defaults the option type in Rust', () => {
 
 test('volQuoteSwaptionVol defaults the convention in Rust and requires the quote type', () => {
   assert.deepEqual(
-    plain(calibration.volQuoteSwaptionVol('SV', '2027-05-08', '2032-05-08', 0.04, 0.0072, 'normal')),
+    plain(
+      calibration.volQuoteSwaptionVol('SV', '2027-05-08', '2032-05-08', 0.04, 0.0072, 'normal')
+    ),
     GOLDEN.quotes.swaption_vol
   );
   // The quote type decides the unit of `vol`, so omitting it is an error.
-  assert.throws(() => calibration.volQuoteSwaptionVol('SV', '2027-05-08', '2032-05-08', 0.04, 0.0072));
+  assert.throws(() =>
+    calibration.volQuoteSwaptionVol('SV', '2027-05-08', '2032-05-08', 0.04, 0.0072)
+  );
 });
 
 test('volQuoteCapFloorVol builds the Python VolQuote.cap_floor_vol object', () => {
@@ -146,7 +150,8 @@ test('volQuoteCapFloorVol builds the Python VolQuote.cap_floor_vol object', () =
     GOLDEN.quotes.cap_floor_vol
   );
   assert.equal(
-    calibration.volQuoteCapFloorVol('CF', '2027-05-08', 0.04, 0.0072, 'normal').cap_floor_vol.is_cap,
+    calibration.volQuoteCapFloorVol('CF', '2027-05-08', 0.04, 0.0072, 'normal').cap_floor_vol
+      .is_cap,
     true
   );
   assert.throws(() => calibration.volQuoteCapFloorVol('CF', '2027-05-08', 0.04, 0.0072));
@@ -418,6 +423,52 @@ test('calibrateHullWhiteToSwaptions matches the Python swaption fit', () => {
         HW.swaption_quotes.slice(0, 1),
         HW.swaption_fit_tolerance
       ),
+    validation
+  );
+});
+
+test('inflationQuote constructors build the Python InflationQuote objects', () => {
+  assert.deepEqual(
+    plain(calibration.inflationQuoteInflationSwap('ZC5Y', '2031-05-08', 0.025, 'USA-CPI-U', 'USD')),
+    GOLDEN.quotes.inflation_swap
+  );
+  assert.deepEqual(
+    plain(
+      calibration.inflationQuoteYoyInflationSwap(
+        'YOY5Y',
+        '2031-05-08',
+        0.024,
+        'USA-CPI-U',
+        '1Y',
+        'USD'
+      )
+    ),
+    GOLDEN.quotes.yoy_inflation_swap
+  );
+  assert.throws(
+    () => calibration.inflationQuoteInflationSwap('ZC', '2031-05-08', NaN, 'USA-CPI-U', 'USD'),
+    validation
+  );
+});
+
+test('surface validators match the Python validate_* functions', () => {
+  const config = GOLDEN.validation_config;
+  const surface = (vols) => new core.VolSurface('EQ-VOL', [1.0, 2.0], [90, 100, 110], vols);
+  const clean = surface([0.205, 0.2, 0.205, 0.215, 0.21, 0.215]);
+  calibration.validateSurface(clean, config);
+  calibration.validateCalendarSpread(clean, config);
+  calibration.validateButterflySpread(clean, config);
+  calibration.validateVolBounds(clean, config);
+  calibration.validateSurfaceWithForwards(clean, config, [100, 100]);
+  calibration.validateCalendarSpreadWithForwards(clean, config, [100, 100]);
+  calibration.validateButterflyCallConvexity(clean, config, [100, 100]);
+
+  const inverted = surface([0.3, 0.3, 0.3, 0.1, 0.1, 0.1]);
+  assert.throws(() => calibration.validateCalendarSpread(inverted, config), validation);
+  calibration.validateCalendarSpread(inverted, { ...config, check_arbitrage: false });
+  assert.throws(() => calibration.validateSurfaceWithForwards(clean, config, [100]), validation);
+  assert.throws(
+    () => calibration.validateVolBounds(clean, { ...config, max_volatility: 0.1 }),
     validation
   );
 });

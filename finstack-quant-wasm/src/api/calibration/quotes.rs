@@ -13,6 +13,7 @@ use super::fields::Fields;
 use crate::utils::input::js_string;
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_calibration::quotes::cds::CdsQuote;
+use finstack_quant_calibration::quotes::inflation::InflationQuote;
 use finstack_quant_calibration::quotes::rates::RateQuote;
 use finstack_quant_calibration::quotes::vol::VolQuote;
 use finstack_quant_calibration::RateBounds;
@@ -29,6 +30,10 @@ fn cds_quote(kind: &str, fields: Fields) -> Result<JsValue, JsValue> {
 
 fn vol_quote(kind: &str, fields: Fields) -> Result<JsValue, JsValue> {
     to_js_value(&VolQuote::from_wire_fields(kind, fields.0).map_err(to_js_err)?)
+}
+
+fn inflation_quote(kind: &str, fields: Fields) -> Result<JsValue, JsValue> {
+    to_js_value(&InflationQuote::from_wire_fields(kind, fields.0).map_err(to_js_err)?)
 }
 
 /// Build a money-market deposit rate quote.
@@ -369,4 +374,69 @@ pub fn rate_bounds_for_currency(currency: JsValue) -> Result<JsValue, JsValue> {
 #[wasm_bindgen(js_name = rateBoundsEmergingMarkets)]
 pub fn rate_bounds_emerging_markets() -> Result<JsValue, JsValue> {
     to_js_value(&RateBounds::emerging_markets())
+}
+
+/// Build a zero-coupon inflation swap quote.
+///
+/// Free-function twin of Python `InflationQuote.inflation_swap` (Rust `InflationQuote::from_wire_fields`).
+/// @param id - Unique quote identifier.
+/// @param maturity - ISO-8601 swap maturity date.
+/// @param rate - Fixed zero-coupon swap rate as a decimal (`0.025` is 2.5%).
+/// @param index - Inflation index identifier (for example `"USA-CPI-U"`).
+/// @param convention - Inflation-swap convention identifier (for example `"USD"`).
+/// @returns A validated `InflationQuote` object tagged `inflation_swap`.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
+/// a `FinstackError` (`kind: "validation"`) if the maturity is not an ISO-8601 date or the rate is not finite.
+#[wasm_bindgen(js_name = inflationQuoteInflationSwap)]
+pub fn inflation_quote_inflation_swap(
+    id: JsValue,
+    maturity: JsValue,
+    rate: JsValue,
+    index: JsValue,
+    convention: JsValue,
+) -> Result<JsValue, JsValue> {
+    let fields = Fields::new()
+        .string("id", &id, "id")?
+        .date("maturity", &maturity, "maturity")?
+        .number("rate", &rate, "rate")?
+        .string("index", &index, "index")?
+        .string("convention", &convention, "convention")?;
+    inflation_quote("inflation_swap", fields)
+}
+
+/// Build a year-on-year inflation swap quote.
+///
+/// Free-function twin of Python `InflationQuote.yoy_inflation_swap` (Rust `InflationQuote::from_wire_fields`).
+/// @param id - Unique quote identifier.
+/// @param maturity - ISO-8601 swap maturity date.
+/// @param rate - Fixed year-on-year swap rate as a decimal.
+/// @param index - Inflation index identifier (for example `"USA-CPI-U"`).
+/// @param frequency - Payment frequency tenor (for example `"1Y"`).
+/// @param convention - Inflation-swap convention identifier (for example `"USD"`).
+/// @returns A validated `InflationQuote` object tagged `yoy_inflation_swap`.
+///
+/// # Errors
+///
+/// Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and
+/// a `FinstackError` (`kind: "validation"`) if the maturity is not an ISO-8601 date, the frequency is not a tenor or the rate is not finite.
+#[wasm_bindgen(js_name = inflationQuoteYoyInflationSwap)]
+pub fn inflation_quote_yoy_inflation_swap(
+    id: JsValue,
+    maturity: JsValue,
+    rate: JsValue,
+    index: JsValue,
+    frequency: JsValue,
+    convention: JsValue,
+) -> Result<JsValue, JsValue> {
+    let fields = Fields::new()
+        .string("id", &id, "id")?
+        .date("maturity", &maturity, "maturity")?
+        .number("rate", &rate, "rate")?
+        .string("index", &index, "index")?
+        .string("frequency", &frequency, "frequency")?
+        .string("convention", &convention, "convention")?;
+    inflation_quote("yoy_inflation_swap", fields)
 }

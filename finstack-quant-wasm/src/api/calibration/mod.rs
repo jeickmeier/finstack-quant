@@ -51,6 +51,7 @@ mod hull_white;
 mod quotes;
 mod result;
 mod steps;
+mod validation;
 
 use crate::utils::input::{js_string, json_text};
 #[cfg(target_arch = "wasm32")]
