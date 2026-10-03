@@ -19,6 +19,7 @@ from typing import Any, Final
 
 import pandas as pd
 
+from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.market_data import DiscountCurve, HazardCurve
 from finstack_quant.margin import schema as schema
 
@@ -1331,6 +1332,49 @@ class CsaSpec:
         """
         ...
 
+    @staticmethod
+    def regulatory_from_config(config: FinstackConfig, currency: str, id: str, collateral_curve: str) -> CsaSpec:
+        """
+        Standard regulatory CSA built from a config's margin-registry overlay.
+
+        Same terms as ``regulatory``, except that a ``"margin.registry.v1"``
+        extension in ``config`` takes precedence over the embedded margin
+        registry (a deep object merge; see the margin crate README).
+
+        Parameters
+        ----------
+        config : FinstackConfig
+            Config whose ``"margin.registry.v1"`` extension (if any) overlays
+            the embedded registry; without one the result equals
+            ``CsaSpec.regulatory(currency, id, collateral_curve)``.
+        currency : str
+            ISO-4217 base currency for thresholds, MTA and collateral values.
+        id : str
+            CSA identifier used in margin lookups; must be non-empty.
+        collateral_curve : str
+            Discount-curve id for collateral valuation (e.g. ``"USD-OIS"``).
+
+        Returns
+        -------
+        CsaSpec
+            Validated regulatory CSA using the merged registry terms.
+
+        Raises
+        ------
+        ValueError
+            If ``currency`` is unknown, ``id`` is empty, or the overlay is
+            malformed or fails registry validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.config import FinstackConfig
+        >>> config = FinstackConfig()
+        >>> config.set_extension("margin.registry.v1", {"defaults": {"defaults": {"vm": {"mta": 250_000.0}}}})
+        >>> CsaSpec.regulatory_from_config(config, "USD", "CSA-1", "USD-OIS").vm_mta
+        250000.0
+        """
+        ...
+
     def with_vm_threshold(
         self,
         threshold: float,
@@ -1404,7 +1448,7 @@ class CsaSpec:
         mpor_days: int,
         threshold: float,
         mta: float,
-        segregated: bool = True,
+        segregated: bool | None = None,
     ) -> CsaSpec:
         """
         Return a copy with explicit initial-margin terms.
@@ -1421,8 +1465,11 @@ class CsaSpec:
             IM threshold in ``base_currency``.
         mta : float
             IM minimum transfer amount in ``base_currency``.
-        segregated : bool, default True
-            Whether IM must be held with a third-party custodian.
+        segregated : bool | None, default None
+            Whether IM must be held with a third-party custodian. ``None``
+            keeps the margin-registry default for ``methodology`` (``True``
+            for SIMM and schedule IM, ``False`` for clearing-house and
+            haircut IM).
 
         Returns
         -------
@@ -1440,6 +1487,8 @@ class CsaSpec:
         >>> csa = CsaSpec.usd_regulatory().with_im("schedule", 5, 1_000_000.0, 0.0)
         >>> (str(csa.im_methodology), csa.im_mpor_days, csa.im_threshold)
         ('schedule', 5, 1000000.0)
+        >>> CsaSpec.usd_regulatory().with_im("clearing_house", 5, 0.0, 0.0).im_segregated
+        False
         """
         ...
 
@@ -2013,6 +2062,40 @@ class EligibleCollateralSchedule:
         Examples
         --------
         >>> EligibleCollateralSchedule.us_treasuries().eligible_count > 0
+        True
+        """
+        ...
+
+    @staticmethod
+    def from_finstack_config(config: FinstackConfig, schedule_id: str) -> EligibleCollateralSchedule:
+        """
+        Load a named schedule from a config's margin-registry overlay.
+
+        Parameters
+        ----------
+        config : FinstackConfig
+            Config whose ``"margin.registry.v1"`` extension (if any) overlays
+            the embedded margin registry; configured schedules take
+            precedence.
+        schedule_id : str
+            Registry id of the schedule, e.g. ``"bcbs_standard"``,
+            ``"cash_only"``, ``"us_treasuries"`` or an id the overlay adds.
+
+        Returns
+        -------
+        EligibleCollateralSchedule
+            A copy of the merged registry's schedule.
+
+        Raises
+        ------
+        ValueError
+            If the overlay is malformed or ``schedule_id`` names no schedule.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.config import FinstackConfig
+        >>> schedule = EligibleCollateralSchedule.from_finstack_config(FinstackConfig(), "bcbs_standard")
+        >>> schedule.eligible_count == EligibleCollateralSchedule.bcbs_standard().eligible_count
         True
         """
         ...
@@ -3213,14 +3296,14 @@ class SimmSensitivities:
     True
     """
 
-    def __init__(self, base_currency: str = "USD") -> None:
+    def __init__(self, base_currency: str) -> None:
         """
         Create an empty SIMM sensitivity set.
 
         Parameters
         ----------
-        base_currency : str, default "USD"
-            ISO currency code for the currency in which the sensitivity
+        base_currency : str
+            Required ISO currency code for the currency in which the sensitivity
             amounts are expressed.
 
         Raises
@@ -3285,7 +3368,7 @@ class SimmSensitivities:
         ...
 
     @staticmethod
-    def from_dataframe(frame: pd.DataFrame, base_currency: str = "USD") -> SimmSensitivities:
+    def from_dataframe(frame: pd.DataFrame, base_currency: str) -> SimmSensitivities:
         """
         Bulk-load sensitivities from the long-format frame ``to_dataframe``
         emits (CRIF-style).
@@ -3303,21 +3386,24 @@ class SimmSensitivities:
             Curvature requires ``expiry_tenor``, uses ``issuer`` as factor,
             ``bucket`` as the curvature bucket and ``tenor`` as risk tenor.
             Other kinds may omit the expiry column or leave it null.
-        base_currency : str, default "USD"
-            Currency in which every ``amount`` is expressed.
+        base_currency : str
+            Currency in which every ``amount`` is expressed (the frame does
+            not carry it).
 
         Returns
         -------
         SimmSensitivities
-            Container with rows of the same key accumulated.
+            Container with rows of the same key accumulated, decoded by the
+            Rust ``SimmSensitivities::from_rows`` (the inverse of
+            ``to_dataframe``).
 
         Raises
         ------
         ValueError
-            If a risk class, kind, sector or currency is unknown or a
-            required column is missing.
-        TypeError
-            If ``frame`` is not a pandas ``DataFrame``.
+            If a risk class, kind, sector or currency is unknown, a required
+            column or value is missing, or a curvature row is invalid.
+        AttributeError
+            If ``frame`` has no ``to_dict`` method (not a ``DataFrame``).
 
         Examples
         --------
@@ -3900,6 +3986,40 @@ class SimmCalculator:
         """
         ...
 
+    @staticmethod
+    def from_finstack_config(version: str, config: FinstackConfig) -> SimmCalculator:
+        """
+        Create a SIMM calculator from a config's margin-registry overlay.
+
+        Parameters
+        ----------
+        version : str
+            Canonical SIMM version label such as ``"v2_6"``.
+        config : FinstackConfig
+            Config whose ``"margin.registry.v1"`` extension (if any) overlays
+            the embedded margin registry; without one the result equals
+            ``SimmCalculator(version)``.
+
+        Returns
+        -------
+        SimmCalculator
+            Calculator using the merged registry's SIMM parameters and its
+            registry margin period of risk.
+
+        Raises
+        ------
+        ValueError
+            If the version is unknown, or the overlay is malformed or yields
+            incomplete SIMM parameters.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.config import FinstackConfig
+        >>> SimmCalculator.from_finstack_config("v2_6", FinstackConfig()).mpor_days
+        10
+        """
+        ...
+
     @property
     def version(self) -> str:
         """
@@ -4042,6 +4162,39 @@ class ScheduleImCalculator:
         --------
         >>> from finstack_quant.margin import ScheduleImCalculator
         >>> ScheduleImCalculator.from_registry_id("bcbs_iosco").rate("interest_rate", 5.0)
+        0.04
+        """
+        ...
+
+    @staticmethod
+    def from_finstack_config(config: FinstackConfig) -> ScheduleImCalculator:
+        """
+        Create the BCBS-IOSCO schedule calculator from a config's
+        margin-registry overlay.
+
+        Parameters
+        ----------
+        config : FinstackConfig
+            Config whose ``"margin.registry.v1"`` extension (if any) overlays
+            the embedded registry's ``schedule_im`` section; without one the
+            result equals ``bcbs_standard()``.
+
+        Returns
+        -------
+        ScheduleImCalculator
+            Calculator built from the merged ``bcbs_iosco`` schedule entry.
+
+        Raises
+        ------
+        ValueError
+            If the overlay is malformed or the merged registry has no
+            ``bcbs_iosco`` schedule.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.config import FinstackConfig
+        >>> from finstack_quant.margin import ScheduleImCalculator
+        >>> ScheduleImCalculator.from_finstack_config(FinstackConfig()).rate("interest_rate", 5.0)
         0.04
         """
         ...
@@ -7164,8 +7317,8 @@ class FrtbSensitivities:
 
     Parameters
     ----------
-    base_currency : str, default "USD"
-        Reporting / base currency ISO code.
+    base_currency : str
+        Reporting / base currency ISO code (required).
 
     Examples
     --------
@@ -7173,14 +7326,14 @@ class FrtbSensitivities:
     >>> sens.add_girr_delta("5Y", 100_000.0)
     """
 
-    def __init__(self, base_currency: str = "USD") -> None:
+    def __init__(self, base_currency: str) -> None:
         """
         Create an empty FRTB sensitivity set in one reporting currency.
 
         Parameters
         ----------
-        base_currency : str, default "USD"
-            Recognized ISO-4217 currency code used for all SBA sensitivities
+        base_currency : str
+            Required recognized ISO-4217 currency code used for all SBA sensitivities
             and capital amounts.
 
         Raises
@@ -7243,7 +7396,7 @@ class FrtbSensitivities:
         ...
 
     @staticmethod
-    def from_dataframe(frame: pd.DataFrame, base_currency: str = "USD") -> FrtbSensitivities:
+    def from_dataframe(frame: pd.DataFrame, base_currency: str) -> FrtbSensitivities:
         """
         Bulk-load sensitivities from the long-format frame ``to_dataframe``
         emits.
@@ -7252,32 +7405,38 @@ class FrtbSensitivities:
         ----------
         frame : pd.DataFrame
             Columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
-            ``tenor``, ``amount`` encoded as ``to_dataframe`` documents.
+            ``tenor``, ``amount`` (plus ``sector``, ``seniority``,
+            ``asset_type``, ``maturity_years``, ``pnl_adjustment`` on ``drc``
+            rows) encoded as ``to_dataframe`` documents.
             ``curvature_up`` / ``curvature_down`` rows are recombined into
             pairs; ``rrao`` rows carry ``exotic_notional`` /
-            ``other_notional``.
-        base_currency : str, default "USD"
-            Reporting currency of every ``amount``.
+            ``other_notional``; each ``drc`` row is one default-risk
+            position (a missing ``pnl_adjustment`` reads as ``0.0``).
+        base_currency : str
+            Reporting currency of every ``amount`` (the frame does not
+            carry it).
 
         Returns
         -------
         FrtbSensitivities
-            Container with rows of the same key accumulated.
+            Container with rows of the same key accumulated, decoded by the
+            Rust ``FrtbSensitivities::from_rows`` (the inverse of
+            ``to_dataframe``).
 
         Raises
         ------
         ValueError
-            If a risk class or kind is unknown, a required column is missing,
-            a currency is unknown, or the frame contains ``drc`` rows (they
-            carry no sector/seniority/asset type — use ``add_drc_position``).
-        TypeError
-            If ``frame`` is not a pandas ``DataFrame``.
+            If a risk class or kind is unknown, a required column or value
+            is missing, or a bucket, currency or DRC label is invalid.
+        AttributeError
+            If ``frame`` has no ``to_dict`` method (not a ``DataFrame``).
 
         Examples
         --------
         >>> original = FrtbSensitivities("USD")
         >>> original.add_girr_delta("5Y", 100_000.0)
-        >>> restored = FrtbSensitivities.from_dataframe(original.to_dataframe())
+        >>> original.add_drc_position("ACME", 1_000_000.0, 3, "corporate", "senior_unsecured", "corporate", 1.0)
+        >>> restored = FrtbSensitivities.from_dataframe(original.to_dataframe(), "USD")
         >>> restored.to_json() == original.to_json()
         True
         """
@@ -7966,7 +8125,7 @@ class FrtbSensitivities:
         """
         ...
 
-    def add_rrao_position(self, instrument_id: str, notional: float, is_exotic: bool = False) -> None:
+    def add_rrao_position(self, instrument_id: str, notional: float, is_exotic: bool) -> None:
         """
         Add a Residual Risk Add-On position.
 
@@ -7976,8 +8135,8 @@ class FrtbSensitivities:
             Instrument identifier.
         notional : float
             Gross notional in base currency.
-        is_exotic : bool, default False
-            ``True`` for an exotic underlying (1.0% weight); ``False`` for
+        is_exotic : bool
+            Required. ``True`` for an exotic underlying (1.0% weight); ``False`` for
             other residual risk such as gap, correlation or behavioural risk
             (0.1% weight).
 
@@ -8017,25 +8176,30 @@ class FrtbSensitivities:
         ``DataFrame``.
 
         Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
-        ``amount``, ``expiry_tenor``. One row per populated bucket; an empty container still
-        carries all seven columns. Long format is used deliberately - a column
-        per bucket would give a different schema for every portfolio.
+        ``amount``, then the DRC columns ``sector``, ``seniority``,
+        ``asset_type``, ``maturity_years``, ``pnl_adjustment`` (``None`` /
+        ``NaN`` on non-DRC rows). One row per populated bucket; an empty
+        container still carries all eleven columns. Long format is used
+        deliberately - a column per bucket would give a different schema for
+        every portfolio.
 
         ``risk_class`` uses the same labels as the ``frtb_sba_charge``
         breakdown (``girr``, ``csr_non_sec``, ``csr_sec_ctp``,
         ``csr_sec_non_ctp``, ``equity``, ``commodity``, ``fx``), plus ``drc``
         and ``rrao`` for the two position lists.
 
-        ``kind`` is ``delta``, ``vega``, ``curvature_up``, ``curvature_down``,
-        ``inflation_delta``, ``xccy_basis_delta``, ``jtd`` (DRC notional), or
-        ``exotic_notional`` / ``other_notional`` (RRAO). A curvature pair is
-        split across two rows so ``amount`` stays scalar.
+        ``kind`` is ``delta``, ``vega``, ``repo_delta``, ``curvature_up``,
+        ``curvature_down``, ``inflation_delta``, ``xccy_basis_delta``,
+        ``jtd`` (DRC notional), or ``exotic_notional`` / ``other_notional``
+        (RRAO). A curvature pair is split across two rows so ``amount`` stays
+        scalar.
 
         ``issuer`` carries the name axis: a currency code for GIRR, a
         ``"CCY1/CCY2"`` pair for FX, an issuer, tranche, underlier, commodity
         name, or instrument id elsewhere. ``bucket`` is the FRTB bucket index
-        as a **string** (``pd.to_numeric`` if you need it numeric); ``tenor``
-        is the tenor or option maturity, and for GIRR vega the
+        (or DRC rating bucket) as a **string** (``pd.to_numeric`` if you need
+        it numeric); ``tenor`` is the tenor or option maturity,
+        ``"{tenor}/{basis}"`` for CSR and commodity deltas, and for GIRR vega the
         ``"{option_maturity}/{underlying_tenor}"`` pair. Both are ``None``
         where the risk class has no such axis.
 
@@ -8043,10 +8207,11 @@ class FrtbSensitivities:
         base-currency P&L per **1 percentage point** of curve shift (that is,
         ``100 x DV01``), DRC rows are signed JTD notionals before LGD, and
         RRAO rows are gross notionals. ``from_dataframe`` accepts this frame
-        back (except ``drc`` rows).
+        back, ``drc`` rows included.
 
-        Rows are sorted by ``(risk_class, kind, issuer, bucket, tenor, expiry_tenor)`` so
-        repeated exports of the same portfolio are identical.
+        Rows are sorted by ``(risk_class, kind, issuer, bucket, tenor)`` and
+        then the DRC columns, so repeated exports of the same portfolio are
+        identical.
 
         Returns
         -------
@@ -8785,8 +8950,8 @@ class SaCcrTrade:
         sign-consistent with ``option_type`` (BCBS 279 ¶112).
     mtm : float
         Current mark-to-market in the reporting currency.
-    is_option : bool, default False
-        Whether the trade is an option.
+    is_option : bool
+        Whether the trade is an option (required, as in the wire form).
     option_type : str | None, optional
         ``"call_long"``, ``"call_short"``, ``"put_long"`` or
         ``"put_short"``; required when ``is_option`` is ``True``.
@@ -8805,7 +8970,7 @@ class SaCcrTrade:
     --------
     >>> from finstack_quant.margin import SaCcrTrade
     >>> trade = SaCcrTrade(
-    ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+    ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
     ... )
     >>> (trade.trade_id, trade.asset_class, trade.is_option)
     ('t1', 'interest_rate', False)
@@ -8823,7 +8988,7 @@ class SaCcrTrade:
         direction: float,
         supervisory_delta: float,
         mtm: float,
-        is_option: bool = False,
+        is_option: bool,
         option_type: str | None = None,
         supervisory_category: str | None = None,
         option_maturity_date: datetime.date | str | None = None,
@@ -8854,7 +9019,7 @@ class SaCcrTrade:
             Supervisory delta in ``[-1, 1]``.
         mtm : float
             Current mark-to-market in the reporting currency.
-        is_option : bool, default False
+        is_option : bool
             Whether the trade is an option.
         option_type : str | None, optional
             Option type label, required when ``is_option`` is ``True``.
@@ -8921,9 +9086,10 @@ class SaCcrTrade:
         frame : pd.DataFrame
             Columns ``trade_id``, ``asset_class``, ``notional``,
             ``start_date``, ``end_date``, ``underlier``, ``hedging_set``,
-            ``direction``, ``supervisory_delta``, ``mtm``; ``is_option`` and
-            ``option_type`` are optional and default to a linear trade.
-            Dates may be ISO strings or date-like values.
+            ``direction``, ``supervisory_delta``, ``mtm``, ``is_option``;
+            ``option_type``, ``supervisory_category`` and
+            ``option_maturity_date`` may be null. Dates may be ISO strings or
+            date-like values.
 
         Returns
         -------
@@ -8941,7 +9107,7 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
         ... )
         >>> [t.trade_id for t in SaCcrTrade.from_dataframe(trade.to_dataframe())]
         ['t1']
@@ -8969,7 +9135,7 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
         ... )
         >>> trade.to_dataframe().iloc[0]["end_date"]
         '2030-01-01'
@@ -9118,7 +9284,7 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
         ... )
         >>> trade.start_date
         datetime.date(2025, 1, 1)
@@ -9142,7 +9308,7 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
         ... )
         >>> trade.end_date
         datetime.date(2030, 1, 1)
@@ -9166,7 +9332,7 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
         ... )
         >>> trade.underlier
         'USD-SOFR'
@@ -9190,7 +9356,7 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
         ... )
         >>> trade.hedging_set
         'rates'
@@ -9214,7 +9380,7 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
         ... )
         >>> trade.direction
         1.0
@@ -9238,7 +9404,7 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
         ... )
         >>> trade.supervisory_delta
         1.0
@@ -9262,7 +9428,7 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
         ... )
         >>> trade.is_option
         False
@@ -9286,7 +9452,7 @@ class SaCcrTrade:
         Examples
         --------
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
         ... )
         >>> trade.option_type is None
         True
@@ -9761,7 +9927,7 @@ class SaCcrEngine:
         --------
         >>> config = SaCcrNettingSetConfig.unmargined(NettingSetId.bilateral("CPTY", "CSA"), 0.0, "2025-01-01")
         >>> trade = SaCcrTrade(
-        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+        ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
         ... )
         >>> round(SaCcrEngine().calculate_ead(config, [trade]).ead, 2)
         30982.83
@@ -9951,7 +10117,7 @@ def saccr_ead(
     --------
     >>> from finstack_quant.margin import NettingSetId, SaCcrNettingSetConfig, SaCcrTrade, saccr_ead
     >>> trade = SaCcrTrade(
-    ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0
+    ...     "t1", "interest_rate", 1_000_000, "2025-01-01", "2030-01-01", "USD-SOFR", "rates", 1.0, 1.0, 0.0, False
     ... )
     >>> config = SaCcrNettingSetConfig.unmargined(NettingSetId.bilateral("CPTY", "CSA"), 0.0, "2025-01-01")
     >>> result = saccr_ead([trade], config)

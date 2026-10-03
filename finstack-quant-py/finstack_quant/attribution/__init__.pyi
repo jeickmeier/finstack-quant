@@ -1748,14 +1748,19 @@ def attribute_return_contribution(
         ``group:<dimension>`` label columns; missing optional cells may be
         ``NaN``.
     as_of : datetime.date or str, optional
-        Attribution date label. Required with a ``DataFrame`` spec; fills a
-        missing ``as_of`` in the dict form.
+        Attribution date label, set as the spec's ``as_of`` field for every
+        form. Required with a ``DataFrame`` spec (which has no other place
+        for it).
     weighting : str, optional
-        ``"gross"`` (default) or ``"net_market_value"`` for market-value
-        positions; ``DataFrame`` form only.
+        ``"gross"`` or ``"net_market_value"`` for market-value positions, set
+        as the spec's ``weighting`` field for every form; when neither the
+        keyword nor the spec gives it, the wire default ``"gross"`` applies.
     factors : list[dict[str, Any]], optional
-        Factor rows ``{"factor", "exposure", "factor_return"}``;
-        ``DataFrame`` form only.
+        Factor rows ``{"factor", "exposure", "factor_return"}``, set as the
+        spec's ``factors`` field for every form.
+
+    A keyword that duplicates a field the dict or JSON spec already carries
+    raises ``ValueError``; pass each field once.
 
     Returns
     -------
@@ -1783,11 +1788,22 @@ def attribute_return_contribution(
     ... })
     >>> round(attribute_return_contribution(frame, as_of="2026-01-02").portfolio_return, 6)
     0.008
+    >>> long_short = {
+    ...     "as_of": "2026-01-02",
+    ...     "positions": [
+    ...         {"id": "A", "market_value": 100.0, "return": 0.02},
+    ...         {"id": "B", "market_value": -60.0, "return": 0.01},
+    ...     ],
+    ... }
+    >>> attribute_return_contribution(long_short, weighting="net_market_value").portfolio_return
+    0.035
 
     Raises
     ------
     ValueError
-        If the spec is malformed; ``as_of`` is missing for a DataFrame;
+        If the spec is malformed; ``as_of`` is missing for a DataFrame; a
+        keyword duplicates a spec field; ``weighting`` or ``factors`` is
+        invalid;
         required identifiers or positions are empty; numeric inputs are
         non-finite, or a derived weight, contribution, or aggregate overflows;
         position weighting modes are mixed or incomplete; factor

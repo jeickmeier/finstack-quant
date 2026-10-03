@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import date
 import json
 
+import pandas as pd
 import pytest
 
 from finstack_quant.attribution import (
@@ -394,3 +395,39 @@ def test_brinson_rejects_offsetting_group() -> None:
     }
     with pytest.raises(ValueError, match="zero net portfolio weight"):
         attribute_return_contribution(spec)
+
+
+def test_return_contribution_keywords_apply_to_every_spec_form() -> None:
+    """MSAF-006: ``as_of``/``weighting``/``factors`` keywords are never silently ignored."""
+    positions = [
+        {"id": "A", "market_value": 100.0, "return": 0.02},
+        {"id": "B", "market_value": -60.0, "return": 0.01},
+    ]
+    factors = [{"factor": "mkt", "exposure": 1.0, "factor_return": 0.01}]
+    spec = {"as_of": "2026-01-02", "positions": positions}
+    gross = attribute_return_contribution(spec).portfolio_return
+    assert gross == pytest.approx(0.00875)
+
+    net_dict = attribute_return_contribution(spec, weighting="net_market_value", factors=factors)
+    net_str = attribute_return_contribution(
+        json.dumps({"positions": positions}),
+        as_of="2026-01-02",
+        weighting="net_market_value",
+        factors=factors,
+    )
+    net_frame = attribute_return_contribution(
+        pd.DataFrame(positions), as_of="2026-01-02", weighting="net_market_value", factors=factors
+    )
+    for result in (net_dict, net_str, net_frame):
+        assert result.portfolio_return == pytest.approx(0.035)
+        assert result.factor_contribution[0]["contribution"] == pytest.approx(0.01)
+    assert net_dict.to_json() == net_str.to_json() == net_frame.to_json()
+
+    with pytest.raises(ValueError, match="as_of is given both"):
+        attribute_return_contribution(spec, as_of="2030-01-01")
+    with pytest.raises(ValueError, match="weighting is given both"):
+        attribute_return_contribution(dict(spec, weighting="gross"), weighting="net_market_value")
+    with pytest.raises(ValueError, match="unknown variant"):
+        attribute_return_contribution(spec, weighting="nonsense")
+    with pytest.raises(ValueError, match="unknown field"):
+        attribute_return_contribution(spec, factors=[{"bogus": 1}])

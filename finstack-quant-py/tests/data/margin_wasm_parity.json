@@ -149,6 +149,91 @@
         }
       }
     },
+    "regulatory_from_config": {
+      "base_currency": "USD",
+      "calendar_id": "usny",
+      "call_timing": {
+        "delivery_grace_days": 0,
+        "dispute_resolution_days": 1,
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2
+      },
+      "collateral_curve_id": "USD-OIS",
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.0
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.005,
+            "maturity_constraints": {
+              "max_remaining_years": 1.0,
+              "min_remaining_years": null
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.02,
+            "maturity_constraints": {
+              "max_remaining_years": 5.0,
+              "min_remaining_years": 1.0
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.04,
+            "maturity_constraints": {
+              "max_remaining_years": null,
+              "min_remaining_years": 5.0
+            },
+            "min_rating": "AA-"
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "id": "CSA-CFG",
+      "im_params": {
+        "methodology": "simm",
+        "mpor_days": 10,
+        "mta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "segregated": true,
+        "threshold": {
+          "amount": "50000000",
+          "currency": "USD"
+        }
+      },
+      "vm_params": {
+        "frequency": "daily",
+        "independent_amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "mta": {
+          "amount": "250000",
+          "currency": "USD"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "USD"
+        },
+        "settlement_lag": 1,
+        "threshold": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      }
+    },
     "regulatory_gbp": {
       "base_currency": "GBP",
       "calendar_id": "gblo",
@@ -380,6 +465,91 @@
         "segregated": false,
         "threshold": {
           "amount": "50000000",
+          "currency": "USD"
+        }
+      },
+      "vm_params": {
+        "frequency": "daily",
+        "independent_amount": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "mta": {
+          "amount": "500000",
+          "currency": "USD"
+        },
+        "rounding": {
+          "amount": "10000",
+          "currency": "USD"
+        },
+        "settlement_lag": 1,
+        "threshold": {
+          "amount": "0",
+          "currency": "USD"
+        }
+      }
+    },
+    "with_im_cleared_default_segregated": {
+      "base_currency": "USD",
+      "calendar_id": "usny",
+      "call_timing": {
+        "delivery_grace_days": 0,
+        "dispute_resolution_days": 1,
+        "notification_deadline_hours": 13,
+        "response_deadline_hours": 2
+      },
+      "collateral_curve_id": "USD-OIS",
+      "eligible_collateral": {
+        "eligible": [
+          {
+            "asset_class": "cash",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.0
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.005,
+            "maturity_constraints": {
+              "max_remaining_years": 1.0,
+              "min_remaining_years": null
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.02,
+            "maturity_constraints": {
+              "max_remaining_years": 5.0,
+              "min_remaining_years": 1.0
+            },
+            "min_rating": "AA-"
+          },
+          {
+            "asset_class": "government_bonds",
+            "fx_haircut_addon": 0.08,
+            "haircut": 0.04,
+            "maturity_constraints": {
+              "max_remaining_years": null,
+              "min_remaining_years": 5.0
+            },
+            "min_rating": "AA-"
+          }
+        ],
+        "rehypothecation_allowed": false
+      },
+      "id": "USD-REGULATORY-CSA",
+      "im_params": {
+        "methodology": "clearing_house",
+        "mpor_days": 5,
+        "mta": {
+          "amount": "0",
+          "currency": "USD"
+        },
+        "segregated": false,
+        "threshold": {
+          "amount": "0",
           "currency": "USD"
         }
       },
@@ -1401,6 +1571,46 @@
           "asset_class": "cash",
           "fx_haircut_addon": 0.08,
           "haircut": 0.0
+        }
+      ],
+      "rehypothecation_allowed": false
+    },
+    "from_finstack_config": {
+      "eligible": [
+        {
+          "asset_class": "cash",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.0
+        },
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.005,
+          "maturity_constraints": {
+            "max_remaining_years": 1.0,
+            "min_remaining_years": null
+          },
+          "min_rating": "AA-"
+        },
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.02,
+          "maturity_constraints": {
+            "max_remaining_years": 5.0,
+            "min_remaining_years": 1.0
+          },
+          "min_rating": "AA-"
+        },
+        {
+          "asset_class": "government_bonds",
+          "fx_haircut_addon": 0.08,
+          "haircut": 0.04,
+          "maturity_constraints": {
+            "max_remaining_years": null,
+            "min_remaining_years": 5.0
+          },
+          "min_rating": "AA-"
         }
       ],
       "rehypothecation_allowed": false

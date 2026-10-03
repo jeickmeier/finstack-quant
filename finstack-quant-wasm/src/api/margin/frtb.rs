@@ -6,8 +6,7 @@
 
 use super::js_currency;
 use crate::utils::input::{
-    from_js_json, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_opt_string_seq, js_string,
-    js_uint,
+    from_js_json, js_bool, js_f64, js_opt_f64, js_opt_string, js_opt_string_seq, js_string, js_uint,
 };
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
@@ -761,7 +760,7 @@ impl JsFrtbSensitivities {
     /// Add a Residual Risk Add-On position.
     /// @param instrument_id - Instrument identifier.
     /// @param notional - Gross notional in the base currency.
-    /// @param is_exotic - `true` for an exotic underlying (1.0% weight); `false` (the default) for other residual risk such as gap, correlation or behavioural risk (0.1% weight).
+    /// @param is_exotic - Required: `true` for an exotic underlying (1.0% weight); `false` for other residual risk such as gap, correlation or behavioural risk (0.1% weight).
     ///
     /// # Errors
     ///
@@ -771,11 +770,11 @@ impl JsFrtbSensitivities {
         &mut self,
         instrument_id: JsValue,
         notional: JsValue,
-        is_exotic: Option<JsValue>,
+        is_exotic: JsValue,
     ) -> Result<(), JsValue> {
         let instrument_id = js_string(&instrument_id, "instrumentId")?;
         let notional = js_f64(&notional, "notional")?;
-        let is_exotic = js_opt_bool(is_exotic.as_ref(), "isExotic")?.unwrap_or_default();
+        let is_exotic = js_bool(&is_exotic, "isExotic")?;
         self.inner
             .add_rrao_position(&instrument_id, notional, is_exotic);
         Ok(())

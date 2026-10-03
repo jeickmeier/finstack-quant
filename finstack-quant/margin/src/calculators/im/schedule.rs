@@ -366,6 +366,11 @@ impl ScheduleImCalculator {
     /// Loads the schedule entry identified by [`BCBS_IOSCO_SCHEDULE_ID`] after
     /// applying any margin-registry overlay in the config.
     ///
+    /// # Arguments
+    ///
+    /// * `cfg` - Config whose `margin.registry.v1` extension (if any) overlays
+    ///   the embedded margin registry, replacing schedule rates and defaults.
+    ///
     /// # Errors
     ///
     /// Returns an error if the registry cannot be loaded from the config or if the

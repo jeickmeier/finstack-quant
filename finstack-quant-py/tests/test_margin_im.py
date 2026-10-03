@@ -7,8 +7,11 @@ import json
 
 import pytest
 
+from finstack_quant.core.config import FinstackConfig
 from finstack_quant.margin import (
     CollateralAssetClass,
+    CsaSpec,
+    EligibleCollateralSchedule,
     HaircutImCalculator,
     ImResult,
     ScheduleImCalculator,
@@ -165,3 +168,78 @@ def test_simm_sensitivities_dataframe_round_trip_and_helpers() -> None:
     with pytest.raises(ValueError, match="scaled_to_currency"):
         merged.merge(eur)
     assert "ir_delta=1" in repr(sens)
+
+
+def test_simm_dataframe_requires_and_keeps_the_base_currency() -> None:
+    """MSAF-002/004: no invented USD; the Rust ``from_rows`` decodes the frame."""
+    with pytest.raises(TypeError):
+        SimmSensitivities()  # type: ignore[call-arg]
+    sens = SimmSensitivities("EUR")
+    sens.add_ir_delta("EUR", "5Y", 1_000.0)
+    sens.add_fx_vega("EUR", "USD", 2.0)
+    with pytest.raises(TypeError):
+        SimmSensitivities.from_dataframe(sens.to_dataframe())  # type: ignore[call-arg]
+    restored = SimmSensitivities.from_dataframe(sens.to_dataframe(), "EUR")
+    assert restored.base_currency == "EUR"
+    assert json.loads(restored.to_json()) == json.loads(sens.to_json())
+    with pytest.raises(ValueError, match="unsupported SIMM"):
+        SimmSensitivities.from_dataframe(sens.to_dataframe().assign(kind="gamma"), "EUR")
+
+
+def _margin_overlay(overlay: dict[str, object]) -> FinstackConfig:
+    config = FinstackConfig()
+    config.set_extension("margin.registry.v1", overlay)
+    return config
+
+
+def test_margin_constructors_apply_a_finstack_config_registry_overlay() -> None:
+    """MSAF-007: the FinstackConfig registry-overlay constructors are bound."""
+    empty = FinstackConfig()
+    assert SimmCalculator.from_finstack_config("v2_6", empty).mpor_days == SimmCalculator("v2_6").mpor_days
+    with pytest.raises(ValueError, match="not_a_section"):
+        SimmCalculator.from_finstack_config("v2_6", _margin_overlay({"simm": {"not_a_section": 1}}))
+
+    vm = _margin_overlay({"defaults": {"defaults": {"vm": {"mta": 250_000.0}}}})
+    configured = json.loads(CsaSpec.regulatory_from_config(vm, "USD", "CSA-1", "USD-OIS").to_json())
+    embedded = json.loads(CsaSpec.regulatory("USD", "CSA-1", "USD-OIS").to_json())
+    assert configured["vm_params"]["mta"]["amount"] == "250000"
+    assert configured["vm_params"]["mta"] != embedded["vm_params"]["mta"]
+
+    desk = _margin_overlay({
+        "collateral_schedules": {
+            "entries": [
+                {
+                    "ids": ["desk_cash"],
+                    "record": {
+                        "eligible": [{"asset_class": "cash", "haircut": 0.01, "fx_haircut_addon": 0.0}],
+                        "default_haircut": None,
+                        "rehypothecation_allowed": True,
+                    },
+                }
+            ]
+        }
+    })
+    schedule = EligibleCollateralSchedule.from_finstack_config(desk, "desk_cash")
+    assert schedule.haircut_for("cash") == pytest.approx(0.01)
+    with pytest.raises(ValueError, match="not found"):
+        EligibleCollateralSchedule.from_finstack_config(empty, "desk_cash")
+
+    grid = _margin_overlay({
+        "schedule_im": {
+            "entries": [
+                {
+                    "ids": ["bcbs_iosco"],
+                    "record": {
+                        "bucket_boundaries_years": {"short_to_medium": 2.0, "medium_to_long": 5.0},
+                        "default_rate": 0.15,
+                        "default_asset_class": "interest_rate",
+                        "default_maturity_years": 5.0,
+                        "mpor_days": 7,
+                        "rates": [{"asset_class": "interest_rate", "bucket": "short", "rate": 0.03}],
+                    },
+                }
+            ]
+        }
+    })
+    assert ScheduleImCalculator.from_finstack_config(grid).mpor_days == 7
+    assert ScheduleImCalculator.from_finstack_config(empty).mpor_days == ScheduleImCalculator.bcbs_standard().mpor_days

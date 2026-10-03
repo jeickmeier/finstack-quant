@@ -4,9 +4,7 @@
 //! (or bulk-load a long-format frame), then run an engine or the matching
 //! free function to get a typed result with a per-component breakdown.
 
-use super::frame::{
-    opt_str, records, req_bool, req_bucket, req_date, req_f64, req_str, split_pair,
-};
+use super::frame::{opt_str, records, req_bool, req_date, req_f64, req_str, sensitivity_rows};
 use super::types::{extract_netting_set_id, PyNettingSetId};
 use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::module_utils::parse_currency;
@@ -94,10 +92,10 @@ pub struct PyFrtbSensitivities {
 impl PyFrtbSensitivities {
     /// Create an empty sensitivity container.
     ///
-    /// ``base_currency`` is the reporting currency (e.g. ``"USD"``); raises
-    /// ``ValueError`` for an unknown code.
+    /// ``base_currency`` is the reporting currency (e.g. ``"USD"``) and is
+    /// required; raises ``ValueError`` for an unknown code.
     #[new]
-    #[pyo3(signature = (base_currency = "USD"))]
+    #[pyo3(signature = (base_currency))]
     fn new(base_currency: &str) -> PyResult<Self> {
         let ccy = parse_currency(base_currency)?;
         Ok(Self {
@@ -135,155 +133,27 @@ impl PyFrtbSensitivities {
     /// ----------
     /// frame : pandas.DataFrame
     ///     Columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
-    ///     ``tenor``, ``amount`` encoded as ``to_dataframe`` documents.
-    ///     ``curvature_up`` / ``curvature_down`` rows are recombined into
-    ///     pairs; ``rrao`` rows carry ``exotic_notional`` / ``other_notional``.
-    /// base_currency : str, default "USD"
-    ///     Reporting currency of every ``amount``.
+    ///     ``tenor``, ``amount`` (plus the DRC columns ``sector``,
+    ///     ``seniority``, ``asset_type``, ``maturity_years``,
+    ///     ``pnl_adjustment`` on ``drc`` rows) encoded as ``to_dataframe``
+    ///     documents. ``curvature_up`` / ``curvature_down`` rows are
+    ///     recombined into pairs; ``rrao`` rows carry ``exotic_notional`` /
+    ///     ``other_notional``; each ``drc`` row is one default-risk position.
+    /// base_currency : str
+    ///     Reporting currency of every ``amount`` (the frame does not carry
+    ///     it).
     ///
-    /// Rows with the same key accumulate. ``drc`` rows are rejected because
-    /// the frame does not carry sector, seniority or asset type — add DRC
-    /// positions with ``add_drc_position``. Raises ``ValueError`` for an
-    /// unknown risk class or kind, a missing column, or a bad currency.
+    /// Rows with the same key accumulate. Decoding is the Rust
+    /// ``FrtbSensitivities::from_rows``, the inverse of ``to_dataframe``.
+    /// Raises ``ValueError`` for an unknown risk class or kind, a missing
+    /// column or value, a bad bucket, currency or DRC label.
     #[staticmethod]
-    #[pyo3(signature = (frame, base_currency = "USD"))]
-    #[allow(clippy::too_many_lines)]
+    #[pyo3(signature = (frame, base_currency))]
     fn from_dataframe(frame: &Bound<'_, PyAny>, base_currency: &str) -> PyResult<Self> {
-        let mut sens = FrtbSensitivities::new(parse_currency(base_currency)?);
-        for row in records(frame)? {
-            let risk_class = req_str(&row, "risk_class")?;
-            let kind = req_str(&row, "kind")?;
-            let amount = req_f64(&row, "amount")?;
-            let issuer = opt_str(&row, "issuer")?;
-            let tenor = opt_str(&row, "tenor")?;
-            let need = |value: &Option<String>, name: &str| -> PyResult<String> {
-                value.clone().ok_or_else(|| {
-                    crate::errors::value_error(format!(
-                        "from_dataframe: {risk_class} {kind} row needs a '{name}' value"
-                    ))
-                })
-            };
-            let unsupported = || {
-                crate::errors::value_error(format!(
-                    "from_dataframe: unsupported FRTB row risk_class={risk_class:?} kind={kind:?}"
-                ))
-            };
-            let (up, down) = match kind.as_str() {
-                "curvature_up" => (amount, 0.0),
-                "curvature_down" => (0.0, amount),
-                _ => (0.0, 0.0),
-            };
-            let is_curvature = kind == "curvature_up" || kind == "curvature_down";
-            match risk_class.as_str() {
-                "girr" => {
-                    let ccy = parse_currency(&need(&issuer, "issuer")?)?;
-                    match kind.as_str() {
-                        "delta" => sens.add_girr_delta(ccy, &need(&tenor, "tenor")?, amount),
-                        "inflation_delta" => sens.add_girr_inflation_delta(ccy, amount),
-                        "xccy_basis_delta" => sens.add_girr_xccy_basis_delta(ccy, amount),
-                        "vega" => {
-                            let (option_maturity, underlying_tenor) =
-                                split_pair(&need(&tenor, "tenor")?, "girr vega tenor")?;
-                            sens.add_girr_vega(ccy, &option_maturity, &underlying_tenor, amount);
-                        }
-                        _ if is_curvature => sens.add_girr_curvature(ccy, up, down),
-                        _ => return Err(unsupported()),
-                    }
-                }
-                "csr_non_sec" | "csr_sec_ctp" | "csr_sec_non_ctp" | "commodity" => {
-                    let name = need(&issuer, "issuer")?;
-                    let bucket = req_bucket(&row, "bucket")?;
-                    let label = || need(&tenor, "tenor");
-                    match (risk_class.as_str(), kind.as_str()) {
-                        ("csr_non_sec", "delta") => {
-                            let (tenor, basis) = split_pair(&label()?, "delta tenor/basis")?;
-                            sens.add_csr_nonsec_delta(&name, bucket, &tenor, &basis, amount)
-                        }
-                        ("csr_non_sec", "vega") => {
-                            sens.add_csr_nonsec_vega(&name, bucket, &label()?, amount)
-                        }
-                        ("csr_non_sec", _) if is_curvature => {
-                            sens.add_csr_nonsec_curvature(&name, bucket, up, down)
-                        }
-                        ("csr_sec_ctp", "delta") => {
-                            let (tenor, basis) = split_pair(&label()?, "delta tenor/basis")?;
-                            sens.add_csr_sec_ctp_delta(&name, bucket, &tenor, &basis, amount)
-                        }
-                        ("csr_sec_ctp", "vega") => {
-                            sens.add_csr_sec_ctp_vega(&name, bucket, &label()?, amount)
-                        }
-                        ("csr_sec_ctp", _) if is_curvature => {
-                            sens.add_csr_sec_ctp_curvature(&name, bucket, up, down)
-                        }
-                        ("csr_sec_non_ctp", "delta") => {
-                            let (tenor, basis) = split_pair(&label()?, "delta tenor/basis")?;
-                            sens.add_csr_sec_nonctp_delta(&name, bucket, &tenor, &basis, amount)
-                        }
-                        ("csr_sec_non_ctp", "vega") => {
-                            sens.add_csr_sec_nonctp_vega(&name, bucket, &label()?, amount)
-                        }
-                        ("csr_sec_non_ctp", _) if is_curvature => {
-                            sens.add_csr_sec_nonctp_curvature(&name, bucket, up, down)
-                        }
-                        ("commodity", "delta") => {
-                            let (tenor, basis) = split_pair(&label()?, "delta tenor/basis")?;
-                            sens.add_commodity_delta(&name, bucket, &tenor, &basis, amount)
-                        }
-                        ("commodity", "vega") => {
-                            sens.add_commodity_vega(&name, bucket, &label()?, amount)
-                        }
-                        ("commodity", _) if is_curvature => {
-                            sens.add_commodity_curvature(&name, bucket, up, down)
-                        }
-                        _ => return Err(unsupported()),
-                    }
-                }
-                "equity" => {
-                    let underlier = need(&issuer, "issuer")?;
-                    let bucket = req_bucket(&row, "bucket")?;
-                    match kind.as_str() {
-                        "delta" => sens.add_equity_delta(&underlier, bucket, amount),
-                        "repo_delta" => sens.add_equity_repo_delta(&underlier, bucket, amount),
-                        "vega" => sens.add_equity_vega(
-                            &underlier,
-                            bucket,
-                            &need(&tenor, "tenor")?,
-                            amount,
-                        ),
-                        _ if is_curvature => {
-                            sens.add_equity_curvature(&underlier, bucket, up, down)
-                        }
-                        _ => return Err(unsupported()),
-                    }
-                }
-                "fx" => {
-                    let (c1, c2) = split_pair(&need(&issuer, "issuer")?, "fx issuer")?;
-                    let (c1, c2) = (parse_currency(&c1)?, parse_currency(&c2)?);
-                    match kind.as_str() {
-                        "delta" => sens.add_fx_delta(c1, c2, amount),
-                        "vega" => sens.add_fx_vega(c1, c2, &need(&tenor, "tenor")?, amount),
-                        _ if is_curvature => sens.add_fx_curvature(c1, c2, up, down),
-                        _ => return Err(unsupported()),
-                    }
-                }
-                "rrao" => {
-                    let is_exotic = match kind.as_str() {
-                        "exotic_notional" => true,
-                        "other_notional" => false,
-                        _ => return Err(unsupported()),
-                    };
-                    sens.add_rrao_position(&need(&issuer, "issuer")?, amount, is_exotic);
-                }
-                "drc" => {
-                    return Err(crate::errors::value_error(
-                        "from_dataframe: drc rows carry no sector/seniority/asset_type; add \
-                         default-risk positions with add_drc_position",
-                    ))
-                }
-                _ => return Err(unsupported()),
-            }
-        }
-        Ok(Self { inner: sens })
+        let inner =
+            FrtbSensitivities::from_rows(parse_currency(base_currency)?, &sensitivity_rows(frame)?)
+                .map_err(core_to_py)?;
+        Ok(Self { inner })
     }
 
     /// Validate labels, buckets, identifiers and amounts without pricing.
@@ -614,10 +484,10 @@ impl PyFrtbSensitivities {
     }
 
     /// Add an RRAO (residual risk add-on) position: ``notional`` is the
-    /// gross notional in base currency. Set ``is_exotic=True`` for the 1%
-    /// weight (exotic underlying), leave as ``False`` for the 0.1% weight
+    /// gross notional in base currency. ``is_exotic`` is required: ``True``
+    /// for the 1% weight (exotic underlying), ``False`` for the 0.1% weight
     /// (other residual risk: gap, correlation, behavioural).
-    #[pyo3(signature = (instrument_id, notional, is_exotic = false))]
+    #[pyo3(signature = (instrument_id, notional, is_exotic))]
     fn add_rrao_position(&mut self, instrument_id: &str, notional: f64, is_exotic: bool) {
         self.inner
             .add_rrao_position(instrument_id, notional, is_exotic);
@@ -633,17 +503,21 @@ impl PyFrtbSensitivities {
     /// ``DataFrame``.
     ///
     /// Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
-    /// ``amount``. One row per populated bucket; an empty container still
-    /// carries all six columns. Long format is used deliberately — a column
-    /// per bucket would give a different schema for every portfolio.
+    /// ``amount``, then the DRC columns ``sector``, ``seniority``,
+    /// ``asset_type``, ``maturity_years``, ``pnl_adjustment`` (``None`` /
+    /// ``NaN`` on non-DRC rows). One row per populated bucket; an empty
+    /// container still carries all eleven columns. Long format is used
+    /// deliberately — a column per bucket would give a different schema for
+    /// every portfolio.
     ///
     /// ``risk_class`` uses the same labels as the ``frtb_sba_charge``
     /// breakdown (``girr``, ``csr_non_sec``, ``csr_sec_ctp``,
     /// ``csr_sec_non_ctp``, ``equity``, ``commodity``, ``fx``), plus ``drc``
     /// and ``rrao`` for the two position lists.
     ///
-    /// ``kind`` is ``delta``, ``vega``, ``curvature_up``, ``curvature_down``,
-    /// ``inflation_delta``, ``xccy_basis_delta``, ``jtd`` (DRC notional), or
+    /// ``kind`` is ``delta``, ``vega``, ``repo_delta``, ``curvature_up``,
+    /// ``curvature_down``, ``inflation_delta``, ``xccy_basis_delta``, ``jtd``
+    /// (DRC notional), or
     /// ``exotic_notional`` / ``other_notional`` (RRAO). A curvature pair is
     /// split across two rows so ``amount`` stays scalar.
     ///
@@ -651,7 +525,8 @@ impl PyFrtbSensitivities {
     /// ``"CCY1/CCY2"`` pair for FX, an issuer, tranche, underlier, commodity
     /// name, or instrument id elsewhere. ``bucket`` is the FRTB bucket index
     /// as a **string** (``pd.to_numeric`` if you need it numeric);
-    /// ``tenor`` is the tenor or option maturity, and for GIRR vega the
+    /// ``tenor`` is the tenor or option maturity, ``"{tenor}/{basis}"`` for
+    /// CSR and commodity deltas, and for GIRR vega the
     /// ``"{option_maturity}/{underlying_tenor}"`` pair. Both are ``None``
     /// where the risk class has no such axis.
     ///
@@ -659,7 +534,7 @@ impl PyFrtbSensitivities {
     /// base-currency P&L per **1 percentage point** of curve shift (that is,
     /// ``100 x DV01``), DRC rows are signed JTD notionals before LGD, and
     /// RRAO rows are gross notionals. ``from_dataframe`` accepts this frame
-    /// back (except ``drc`` rows).
+    /// back, DRC rows included.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         table_to_dataframe(py, &self.inner.to_table().map_err(core_to_py)?)
     }
@@ -902,8 +777,8 @@ impl PySaCcrTrade {
     ///     otherwise, sign-consistent with ``option_type`` (BCBS 279 ¶112).
     /// mtm : float
     ///     Current mark-to-market in the reporting currency.
-    /// is_option : bool, default False
-    ///     Whether the trade is an option.
+    /// is_option : bool
+    ///     Whether the trade is an option (required, as in the wire form).
     /// option_type : str | None
     ///     ``"call_long"``, ``"call_short"``, ``"put_long"`` or
     ///     ``"put_short"``; required when ``is_option`` is ``True``.
@@ -911,7 +786,7 @@ impl PySaCcrTrade {
     /// Raises ``ValueError`` when a label is unknown or the trade fails the
     /// BCBS 279 coherence checks, ``TypeError`` for a non-date-like date.
     #[new]
-    #[pyo3(signature = (trade_id, asset_class, notional, start_date, end_date, underlier, hedging_set, direction, supervisory_delta, mtm, is_option = false, option_type = None, supervisory_category = None, option_maturity_date = None))]
+    #[pyo3(signature = (trade_id, asset_class, notional, start_date, end_date, underlier, hedging_set, direction, supervisory_delta, mtm, is_option, option_type = None, supervisory_category = None, option_maturity_date = None))]
     #[allow(clippy::too_many_arguments)]
     fn new(
         trade_id: &str,
@@ -982,8 +857,9 @@ impl PySaCcrTrade {
     /// ``frame`` must carry the columns ``to_dataframe`` emits (``trade_id``,
     /// ``asset_class``, ``notional``, ``start_date``, ``end_date``,
     /// ``underlier``, ``hedging_set``, ``direction``, ``supervisory_delta``,
-    /// ``mtm``; ``is_option`` and ``option_type`` are optional and default to
-    /// a linear trade). Dates may be ISO strings or date-like values.
+    /// ``mtm``, ``is_option``; ``option_type``, ``supervisory_category`` and
+    /// ``option_maturity_date`` may be null). Dates may be ISO strings or
+    /// date-like values.
     /// Returns a list of ``SaCcrTrade``; raises ``ValueError`` naming the
     /// first invalid row.
     #[staticmethod]
@@ -991,10 +867,6 @@ impl PySaCcrTrade {
         records(frame)?
             .iter()
             .map(|row| {
-                let is_option = match row.get_item("is_option")? {
-                    Some(v) if !v.is_none() => req_bool(row, "is_option")?,
-                    _ => false,
-                };
                 let inner = SaCcrTrade {
                     supervisory_category: opt_str(row, "supervisory_category")?
                         .map(|s| parse_label::<SaCcrSupervisoryCategory>(&s))
@@ -1015,7 +887,7 @@ impl PySaCcrTrade {
                     direction: req_f64(row, "direction")?,
                     supervisory_delta: req_f64(row, "supervisory_delta")?,
                     mtm: req_f64(row, "mtm")?,
-                    is_option,
+                    is_option: req_bool(row, "is_option")?,
                     option_type: opt_str(row, "option_type")?
                         .map(|label| parse_label::<SaCcrOptionType>(&label))
                         .transpose()?,
