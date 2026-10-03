@@ -87,11 +87,13 @@ beforeEach(() => {
       case "formatMoney":
         return formatMoney(request.value, request.rounding, native);
       case "cashflows":
-        return native.instrumentCashflowsJson(
-          request.instrumentJson,
-          request.marketJson,
-          request.asOf,
-          request.model,
+        return JSON.stringify(
+          native.instrumentCashflows(
+            request.instrumentJson,
+            request.marketJson,
+            request.asOf,
+            request.model,
+          ),
         );
       case "price":
         try {

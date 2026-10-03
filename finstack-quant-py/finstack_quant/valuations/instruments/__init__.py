@@ -100,7 +100,6 @@ bond_from_cashflows_json = _valuations.instruments.bond_from_cashflows_json
 calculate_pool_stats = _valuations.instruments.calculate_pool_stats
 calculate_var_with_pricing = _valuations.instruments.calculate_var_with_pricing
 instrument_cashflows = _valuations.instruments.instrument_cashflows
-instrument_cashflows_json = _valuations.instruments.instrument_cashflows_json
 instrument_envelope_from_spec = _valuations.instruments.instrument_envelope_from_spec
 list_models = _valuations.instruments.list_models
 list_models_grouped = _valuations.instruments.list_models_grouped
@@ -204,7 +203,6 @@ __all__: list[str] = [
     "calculate_pool_stats",
     "calculate_var_with_pricing",
     "instrument_cashflows",
-    "instrument_cashflows_json",
     "instrument_envelope_from_spec",
     "list_models",
     "list_models_grouped",

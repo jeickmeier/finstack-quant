@@ -1,14 +1,11 @@
 //! Factor-model orchestration for portfolio-level risk decomposition.
 //!
-//! This file contains the top-level builder and runtime model used to connect:
+//! The runtime model connects:
 //!
 //! - declarative factor definitions and covariance inputs
 //! - dependency-to-factor matching
 //! - sensitivity generation
 //! - downstream decomposition engines
-//!
-//! The public API is intentionally split between a configuration-time builder
-//! ([`FactorModelBuilder`]) and an execution-time model ([`FactorModel`]).
 //!
 //! Credit hierarchy factors shock stored CDS spread quotes and require a lossless
 //! calibration recipe on every matched hazard curve. Intensity-only curves cannot
@@ -51,109 +48,6 @@ use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::recalibration::QuoteBump;
 use std::collections::{BTreeMap, HashMap};
 
-/// Builder for the top-level portfolio factor-model orchestrator.
-///
-/// Use this type to inject a declarative factor-model configuration and, in
-/// tests, override the sensitivity engine.
-pub struct FactorModelBuilder {
-    config: Option<FactorModelConfig>,
-    #[cfg(test)]
-    custom_sensitivity_engine: Option<Box<dyn FactorSensitivityEngine>>,
-}
-
-impl FactorModelBuilder {
-    /// Create an empty builder.
-    ///
-    /// # Returns
-    ///
-    /// Builder with no configuration or overrides installed yet.
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            config: None,
-            #[cfg(test)]
-            custom_sensitivity_engine: None,
-        }
-    }
-
-    /// Supply the declarative factor-model configuration.
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - Factor definitions, covariance matrix, matching rules, and
-    ///   risk-measure configuration.
-    ///
-    /// # Returns
-    ///
-    /// The updated builder for fluent chaining.
-    #[must_use]
-    pub fn config(mut self, config: FactorModelConfig) -> Self {
-        self.config = Some(config);
-        self
-    }
-
-    /// Override the sensitivity engine selected from the pricing mode (test-only).
-    #[cfg(test)]
-    #[must_use]
-    pub(crate) fn with_custom_sensitivity_engine(
-        mut self,
-        sensitivity_engine: impl FactorSensitivityEngine + 'static,
-    ) -> Self {
-        self.custom_sensitivity_engine = Some(Box::new(sensitivity_engine));
-        self
-    }
-
-    /// Build the configured factor model.
-    ///
-    /// # Returns
-    ///
-    /// A fully configured [`FactorModel`] ready to assign factors, compute
-    /// sensitivities, and decompose risk.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error::InvalidInput`] when the configuration is missing,
-    /// and the [`FactorModelConfig::validate`] error when matching rules
-    /// reference undeclared factor IDs, the risk measure is invalid, or the
-    /// covariance axes do not align with the configured factors.
-    pub fn build(self) -> Result<FactorModel> {
-        let config = self
-            .config
-            .ok_or_else(|| Error::invalid_input("FactorModelConfig is required"))?;
-        config.validate()?;
-
-        let matcher = config.matching.build_matcher();
-        let bump_config = config.bump_config.clone().unwrap_or_default();
-        let sensitivity_engine = {
-            #[cfg(test)]
-            let engine = match self.custom_sensitivity_engine {
-                Some(engine) => engine,
-                None => default_sensitivity_engine(config.pricing_mode, &bump_config)?,
-            };
-            #[cfg(not(test))]
-            let engine = default_sensitivity_engine(config.pricing_mode, &bump_config)?;
-            engine
-        };
-        Ok(FactorModel {
-            credit_idiosyncratic_variance: credit_idiosyncratic_variance(&config.matching),
-            factors: config.factors,
-            covariance: config.covariance,
-            matcher,
-            sensitivity_engine,
-            decomposer: ParametricDecomposer,
-            risk_measure: config.risk_measure,
-            unmatched_policy: config.unmatched_policy.unwrap_or_default(),
-            bump_config,
-        })
-    }
-}
-
-impl Default for FactorModelBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 fn default_sensitivity_engine(
     pricing_mode: PricingMode,
     bump_config: &BumpSizeConfig,
@@ -182,19 +76,9 @@ pub struct FactorModel {
 }
 
 impl FactorModel {
-    /// Start building a factor model configuration.
-    ///
-    /// This is the preferred entry point, consistent with other builders
-    /// in the workspace.
-    #[must_use]
-    pub fn builder() -> FactorModelBuilder {
-        FactorModelBuilder::new()
-    }
-
     /// Build a factor model directly from a declarative configuration.
     ///
-    /// Equivalent to `FactorModel::builder().config(config).build()`; this is
-    /// the entry point the Python and WASM `FactorModel` handles call.
+    /// Python and WASM handles use the same validated constructor.
     ///
     /// # Arguments
     ///
@@ -214,7 +98,32 @@ impl FactorModel {
     /// covariance axes do not align with the configured factors, and a
     /// sensitivity-engine construction error for invalid bump settings.
     pub fn from_config(config: FactorModelConfig) -> Result<Self> {
-        FactorModelBuilder::new().config(config).build()
+        config.validate()?;
+
+        let matcher = config.matching.build_matcher();
+        let bump_config = config.bump_config.clone().unwrap_or_default();
+        let sensitivity_engine = default_sensitivity_engine(config.pricing_mode, &bump_config)?;
+        Ok(FactorModel {
+            credit_idiosyncratic_variance: credit_idiosyncratic_variance(&config.matching),
+            factors: config.factors,
+            covariance: config.covariance,
+            matcher,
+            sensitivity_engine,
+            decomposer: ParametricDecomposer,
+            risk_measure: config.risk_measure,
+            unmatched_policy: config.unmatched_policy.unwrap_or_default(),
+            bump_config,
+        })
+    }
+
+    /// Replace the sensitivity engine for module tests.
+    #[cfg(test)]
+    pub(super) fn with_custom_sensitivity_engine(
+        mut self,
+        sensitivity_engine: impl FactorSensitivityEngine + 'static,
+    ) -> Self {
+        self.sensitivity_engine = Box::new(sensitivity_engine);
+        self
     }
 
     /// Borrow the factor definitions configured on the model.
@@ -1221,8 +1130,8 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn test_builder_from_config_exposes_factors() {
-        let build_result = FactorModelBuilder::new().config(simple_config()).build();
+    fn test_from_config_from_config_exposes_factors() {
+        let build_result = FactorModel::from_config(simple_config());
         assert!(build_result.is_ok());
         let Ok(model) = build_result else {
             return;
@@ -1233,13 +1142,7 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn test_builder_missing_config_fails() {
-        let result = FactorModelBuilder::new().build();
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_builder_rejects_covariance_axes_not_aligned_to_factors() {
+    fn test_from_config_rejects_covariance_axes_not_aligned_to_factors() {
         let covariance_result = FactorCovarianceMatrix::new(
             vec![FactorId::new("Credit"), FactorId::new("Rates")],
             vec![0.09, 0.01, 0.01, 0.04],
@@ -1249,42 +1152,40 @@ pub(super) mod tests {
             return;
         };
 
-        let result = FactorModelBuilder::new()
-            .config(FactorModelConfig {
-                factors: vec![
-                    FactorDefinition {
-                        id: FactorId::new("Rates"),
-                        factor_type: FactorType::Rates,
-                        market_mapping: MarketMapping::CurveParallel {
-                            curve_ids: vec![CurveId::new("USD-OIS")],
-                            units: BumpUnits::RateBp,
-                        },
-                        description: None,
+        let result = FactorModel::from_config(FactorModelConfig {
+            factors: vec![
+                FactorDefinition {
+                    id: FactorId::new("Rates"),
+                    factor_type: FactorType::Rates,
+                    market_mapping: MarketMapping::CurveParallel {
+                        curve_ids: vec![CurveId::new("USD-OIS")],
+                        units: BumpUnits::RateBp,
                     },
-                    FactorDefinition {
-                        id: FactorId::new("Credit"),
-                        factor_type: FactorType::Credit,
-                        market_mapping: MarketMapping::CurveParallel {
-                            curve_ids: vec![CurveId::new("ACME-HAZARD")],
-                            units: BumpUnits::RateBp,
-                        },
-                        description: None,
+                    description: None,
+                },
+                FactorDefinition {
+                    id: FactorId::new("Credit"),
+                    factor_type: FactorType::Credit,
+                    market_mapping: MarketMapping::CurveParallel {
+                        curve_ids: vec![CurveId::new("ACME-HAZARD")],
+                        units: BumpUnits::RateBp,
                     },
-                ],
-                covariance,
-                matching: MatchingConfig::MappingTable(vec![]),
-                pricing_mode: PricingMode::DeltaBased,
-                risk_measure: RiskMeasure::Variance,
-                bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Warn),
-            })
-            .build();
+                    description: None,
+                },
+            ],
+            covariance,
+            matching: MatchingConfig::MappingTable(vec![]),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: RiskMeasure::Variance,
+            bump_config: None,
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
+        });
 
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_builder_rejects_matching_factor_ids_not_declared_by_config() {
+    fn test_from_config_rejects_matching_factor_ids_not_declared_by_config() {
         let mut config = simple_config();
         config.matching = MatchingConfig::MappingTable(vec![MappingRule {
             dependency_filter: DependencyFilter::default(),
@@ -1292,7 +1193,7 @@ pub(super) mod tests {
             factor_id: FactorId::new("MissingFactor"),
         }]);
 
-        let Err(error) = FactorModelBuilder::new().config(config).build() else {
+        let Err(error) = FactorModel::from_config(config) else {
             panic!("builder must validate matching factor IDs");
         };
         assert!(error.to_string().contains("MissingFactor"), "{error}");
@@ -1317,7 +1218,7 @@ pub(super) mod tests {
 
     #[test]
     fn test_assign_factors_collects_matches_and_unmatched() {
-        let build_result = FactorModelBuilder::new().config(simple_config()).build();
+        let build_result = FactorModel::from_config(simple_config());
         assert!(build_result.is_ok());
         let Ok(model) = build_result else {
             return;
@@ -1371,28 +1272,28 @@ pub(super) mod tests {
         };
 
         let sensitivity_calls = Arc::new(AtomicUsize::new(0));
-        let model_result = FactorModelBuilder::new()
-            .config(FactorModelConfig {
-                factors: vec![FactorDefinition {
-                    id: FactorId::new("Rates"),
-                    factor_type: FactorType::Rates,
-                    market_mapping: MarketMapping::CurveParallel {
-                        curve_ids: vec![CurveId::new("USD-OIS")],
-                        units: BumpUnits::RateBp,
-                    },
-                    description: None,
-                }],
-                covariance,
-                matching: MatchingConfig::MappingTable(vec![]),
-                pricing_mode: PricingMode::DeltaBased,
-                risk_measure: RiskMeasure::Variance,
-                bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Warn),
-            })
-            .with_custom_sensitivity_engine(CountingSensitivityEngine {
+        let model_result = FactorModel::from_config(FactorModelConfig {
+            factors: vec![FactorDefinition {
+                id: FactorId::new("Rates"),
+                factor_type: FactorType::Rates,
+                market_mapping: MarketMapping::CurveParallel {
+                    curve_ids: vec![CurveId::new("USD-OIS")],
+                    units: BumpUnits::RateBp,
+                },
+                description: None,
+            }],
+            covariance,
+            matching: MatchingConfig::MappingTable(vec![]),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: RiskMeasure::Variance,
+            bump_config: None,
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
+        })
+        .map(|model| {
+            model.with_custom_sensitivity_engine(CountingSensitivityEngine {
                 calls: Arc::clone(&sensitivity_calls),
             })
-            .build();
+        });
         assert!(model_result.is_ok());
         let Ok(model) = model_result else {
             return;
@@ -1432,26 +1333,24 @@ pub(super) mod tests {
             return;
         };
 
-        let model_result = FactorModelBuilder::new()
-            .config(FactorModelConfig {
-                factors: vec![FactorDefinition {
-                    id: FactorId::new("Rates"),
-                    factor_type: FactorType::Rates,
-                    market_mapping: MarketMapping::CurveParallel {
-                        curve_ids: vec![CurveId::new("USD-OIS")],
-                        units: BumpUnits::RateBp,
-                    },
-                    description: None,
-                }],
-                covariance,
-                matching: MatchingConfig::MappingTable(vec![]),
-                pricing_mode: PricingMode::DeltaBased,
-                risk_measure: RiskMeasure::Variance,
-                bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Strict),
-            })
-            .with_custom_sensitivity_engine(FixedSensitivityEngine)
-            .build();
+        let model_result = FactorModel::from_config(FactorModelConfig {
+            factors: vec![FactorDefinition {
+                id: FactorId::new("Rates"),
+                factor_type: FactorType::Rates,
+                market_mapping: MarketMapping::CurveParallel {
+                    curve_ids: vec![CurveId::new("USD-OIS")],
+                    units: BumpUnits::RateBp,
+                },
+                description: None,
+            }],
+            covariance,
+            matching: MatchingConfig::MappingTable(vec![]),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: RiskMeasure::Variance,
+            bump_config: None,
+            unmatched_policy: Some(UnmatchedPolicy::Strict),
+        })
+        .map(|model| model.with_custom_sensitivity_engine(FixedSensitivityEngine));
         assert!(model_result.is_ok());
         let Ok(model) = model_result else {
             return;
@@ -1669,10 +1568,8 @@ pub(super) mod tests {
 
     #[test]
     fn test_b1_percentage_position_uses_scale_factor_for_sensitivities() {
-        let model = FactorModelBuilder::new()
-            .config(simple_config())
-            .with_custom_sensitivity_engine(WeightEchoEngine)
-            .build()
+        let model = FactorModel::from_config(simple_config())
+            .map(|model| model.with_custom_sensitivity_engine(WeightEchoEngine))
             .expect("model should build");
 
         let position = Position::new(
@@ -1714,26 +1611,24 @@ pub(super) mod tests {
             return;
         };
 
-        let model_result = FactorModelBuilder::new()
-            .config(FactorModelConfig {
-                factors: vec![FactorDefinition {
-                    id: FactorId::new("Rates"),
-                    factor_type: FactorType::Rates,
-                    market_mapping: MarketMapping::CurveParallel {
-                        curve_ids: vec![CurveId::new("USD-OIS")],
-                        units: BumpUnits::RateBp,
-                    },
-                    description: None,
-                }],
-                covariance,
-                matching: MatchingConfig::MappingTable(vec![]),
-                pricing_mode: PricingMode::DeltaBased,
-                risk_measure: RiskMeasure::Variance,
-                bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Warn),
-            })
-            .with_custom_sensitivity_engine(KnownDeltaEngine { deltas: vec![10.0] })
-            .build();
+        let model_result = FactorModel::from_config(FactorModelConfig {
+            factors: vec![FactorDefinition {
+                id: FactorId::new("Rates"),
+                factor_type: FactorType::Rates,
+                market_mapping: MarketMapping::CurveParallel {
+                    curve_ids: vec![CurveId::new("USD-OIS")],
+                    units: BumpUnits::RateBp,
+                },
+                description: None,
+            }],
+            covariance,
+            matching: MatchingConfig::MappingTable(vec![]),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: RiskMeasure::Variance,
+            bump_config: None,
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
+        })
+        .map(|model| model.with_custom_sensitivity_engine(KnownDeltaEngine { deltas: vec![10.0] }));
         assert!(model_result.is_ok());
         let Ok(model) = model_result else {
             return;
@@ -1794,39 +1689,39 @@ pub(super) mod tests {
             return;
         };
 
-        let model_result = FactorModelBuilder::new()
-            .config(FactorModelConfig {
-                factors: vec![
-                    FactorDefinition {
-                        id: FactorId::new("Rates"),
-                        factor_type: FactorType::Rates,
-                        market_mapping: MarketMapping::CurveParallel {
-                            curve_ids: vec![CurveId::new("USD-OIS")],
-                            units: BumpUnits::RateBp,
-                        },
-                        description: None,
+        let model_result = FactorModel::from_config(FactorModelConfig {
+            factors: vec![
+                FactorDefinition {
+                    id: FactorId::new("Rates"),
+                    factor_type: FactorType::Rates,
+                    market_mapping: MarketMapping::CurveParallel {
+                        curve_ids: vec![CurveId::new("USD-OIS")],
+                        units: BumpUnits::RateBp,
                     },
-                    FactorDefinition {
-                        id: FactorId::new("Credit"),
-                        factor_type: FactorType::Credit,
-                        market_mapping: MarketMapping::CurveParallel {
-                            curve_ids: vec![CurveId::new("ACME-HAZARD")],
-                            units: BumpUnits::RateBp,
-                        },
-                        description: None,
+                    description: None,
+                },
+                FactorDefinition {
+                    id: FactorId::new("Credit"),
+                    factor_type: FactorType::Credit,
+                    market_mapping: MarketMapping::CurveParallel {
+                        curve_ids: vec![CurveId::new("ACME-HAZARD")],
+                        units: BumpUnits::RateBp,
                     },
-                ],
-                covariance,
-                matching: MatchingConfig::MappingTable(vec![]),
-                pricing_mode: PricingMode::DeltaBased,
-                risk_measure: RiskMeasure::Variance,
-                bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Warn),
-            })
-            .with_custom_sensitivity_engine(KnownDeltaEngine {
+                    description: None,
+                },
+            ],
+            covariance,
+            matching: MatchingConfig::MappingTable(vec![]),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: RiskMeasure::Variance,
+            bump_config: None,
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
+        })
+        .map(|model| {
+            model.with_custom_sensitivity_engine(KnownDeltaEngine {
                 deltas: vec![10.0, 5.0],
             })
-            .build();
+        });
         assert!(model_result.is_ok());
         let Ok(model) = model_result else {
             return;
@@ -2132,25 +2027,23 @@ pub(super) mod tests {
             vec![1.0, 0.0, 0.0, 1.0],
         )
         .unwrap();
-        let model = FactorModelBuilder::new()
-            .config(FactorModelConfig {
-                factors,
-                covariance,
-                matching: MatchingConfig::CreditHierarchical(CreditHierarchicalConfig {
-                    dependency_filter: Default::default(),
-                    hierarchy: CreditHierarchySpec {
-                        levels: vec![HierarchyDimension::Rating],
-                    },
-                    issuer_betas: vec![issuer_row],
-                    require_issuer_id: false,
-                }),
-                pricing_mode: PricingMode::DeltaBased,
-                risk_measure: RiskMeasure::Variance,
-                bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Warn),
-            })
-            .build()
-            .unwrap();
+        let model = FactorModel::from_config(FactorModelConfig {
+            factors,
+            covariance,
+            matching: MatchingConfig::CreditHierarchical(CreditHierarchicalConfig {
+                dependency_filter: Default::default(),
+                hierarchy: CreditHierarchySpec {
+                    levels: vec![HierarchyDimension::Rating],
+                },
+                issuer_betas: vec![issuer_row],
+                require_issuer_id: false,
+            }),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: RiskMeasure::Variance,
+            bump_config: None,
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
+        })
+        .unwrap();
         let position = Position::new(
             "pos-credit",
             DUMMY_ENTITY_ID,
@@ -2257,37 +2150,35 @@ pub(super) mod tests {
         )
         .unwrap();
         let build = |policy: UnmatchedPolicy| {
-            FactorModelBuilder::new()
-                .config(FactorModelConfig {
-                    factors: factors.clone(),
-                    covariance: covariance.clone(),
-                    // Cascade: credit deps hit the hierarchy; everything else
-                    // (the discount curve) falls through to a catch-all rates
-                    // rule so the only unmatched surface is the credit drop.
-                    matching: MatchingConfig::Cascade(vec![
-                        MatchingConfig::CreditHierarchical(CreditHierarchicalConfig {
+            FactorModel::from_config(FactorModelConfig {
+                factors: factors.clone(),
+                covariance: covariance.clone(),
+                // Cascade: credit deps hit the hierarchy; everything else
+                // (the discount curve) falls through to a catch-all rates
+                // rule so the only unmatched surface is the credit drop.
+                matching: MatchingConfig::Cascade(vec![
+                    MatchingConfig::CreditHierarchical(CreditHierarchicalConfig {
+                        dependency_filter: Default::default(),
+                        hierarchy: CreditHierarchySpec {
+                            levels: vec![HierarchyDimension::Rating],
+                        },
+                        issuer_betas: vec![issuer_row.clone()],
+                        require_issuer_id: false,
+                    }),
+                    MatchingConfig::MappingTable(vec![
+                        finstack_quant_models::factor::matching::MappingRule {
                             dependency_filter: Default::default(),
-                            hierarchy: CreditHierarchySpec {
-                                levels: vec![HierarchyDimension::Rating],
-                            },
-                            issuer_betas: vec![issuer_row.clone()],
-                            require_issuer_id: false,
-                        }),
-                        MatchingConfig::MappingTable(vec![
-                            finstack_quant_models::factor::matching::MappingRule {
-                                dependency_filter: Default::default(),
-                                attribute_filter: Default::default(),
-                                factor_id: FactorId::new("rates::usd"),
-                            },
-                        ]),
+                            attribute_filter: Default::default(),
+                            factor_id: FactorId::new("rates::usd"),
+                        },
                     ]),
-                    pricing_mode: PricingMode::DeltaBased,
-                    risk_measure: RiskMeasure::Variance,
-                    bump_config: None,
-                    unmatched_policy: Some(policy),
-                })
-                .build()
-                .unwrap()
+                ]),
+                pricing_mode: PricingMode::DeltaBased,
+                risk_measure: RiskMeasure::Variance,
+                bump_config: None,
+                unmatched_policy: Some(policy),
+            })
+            .unwrap()
         };
 
         // Runtime issuer NEWCO (not calibrated) tagged rating HY: the matcher
@@ -2380,25 +2271,23 @@ pub(super) mod tests {
             vec![1.0, 0.0, 0.0, 1.0],
         )
         .unwrap();
-        let model = FactorModelBuilder::new()
-            .config(FactorModelConfig {
-                factors,
-                covariance,
-                matching: MatchingConfig::CreditHierarchical(CreditHierarchicalConfig {
-                    dependency_filter: Default::default(),
-                    hierarchy: CreditHierarchySpec {
-                        levels: vec![HierarchyDimension::Rating],
-                    },
-                    issuer_betas: vec![issuer_row],
-                    require_issuer_id: false,
-                }),
-                pricing_mode: PricingMode::DeltaBased,
-                risk_measure: RiskMeasure::Variance,
-                bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Warn),
-            })
-            .build()
-            .unwrap();
+        let model = FactorModel::from_config(FactorModelConfig {
+            factors,
+            covariance,
+            matching: MatchingConfig::CreditHierarchical(CreditHierarchicalConfig {
+                dependency_filter: Default::default(),
+                hierarchy: CreditHierarchySpec {
+                    levels: vec![HierarchyDimension::Rating],
+                },
+                issuer_betas: vec![issuer_row],
+                require_issuer_id: false,
+            }),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: RiskMeasure::Variance,
+            bump_config: None,
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
+        })
+        .unwrap();
         let position = Position::new(
             "pos-credit",
             DUMMY_ENTITY_ID,
@@ -2497,25 +2386,23 @@ pub(super) mod tests {
             vec![1.0, 0.0, 0.0, 1.0],
         )
         .unwrap();
-        FactorModelBuilder::new()
-            .config(FactorModelConfig {
-                factors,
-                covariance,
-                matching: MatchingConfig::CreditHierarchical(CreditHierarchicalConfig {
-                    dependency_filter: Default::default(),
-                    hierarchy: CreditHierarchySpec {
-                        levels: vec![HierarchyDimension::Rating],
-                    },
-                    issuer_betas: vec![issuer_row],
-                    require_issuer_id: false,
-                }),
-                pricing_mode: PricingMode::DeltaBased,
-                risk_measure: RiskMeasure::Variance,
-                bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Warn),
-            })
-            .build()
-            .unwrap()
+        FactorModel::from_config(FactorModelConfig {
+            factors,
+            covariance,
+            matching: MatchingConfig::CreditHierarchical(CreditHierarchicalConfig {
+                dependency_filter: Default::default(),
+                hierarchy: CreditHierarchySpec {
+                    levels: vec![HierarchyDimension::Rating],
+                },
+                issuer_betas: vec![issuer_row],
+                require_issuer_id: false,
+            }),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: RiskMeasure::Variance,
+            bump_config: None,
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
+        })
+        .unwrap()
     }
 
     /// Portfolio holding `canonical_credit_bond` positions with the given
@@ -2699,38 +2586,36 @@ pub(super) mod tests {
             description: None,
         })
         .collect();
-        let model = FactorModel::builder()
-            .config(FactorModelConfig {
-                covariance: FactorCovarianceMatrix::new(
-                    factors.iter().map(|factor| factor.id.clone()).collect(),
-                    vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
-                )
-                .expect("covariance"),
-                matching: MatchingConfig::MappingTable(
-                    [
-                        ("discount", "USD-OIS"),
-                        ("hazard", "INDEX-HZ"),
-                        ("correlation", "INDEX-BC"),
-                    ]
-                    .into_iter()
-                    .map(|(factor, curve)| MappingRule {
-                        dependency_filter: DependencyFilter {
-                            id: Some(curve.into()),
-                            ..Default::default()
-                        },
-                        attribute_filter: Default::default(),
-                        factor_id: FactorId::new(factor),
-                    })
-                    .collect(),
-                ),
-                factors: factors.clone(),
-                pricing_mode: PricingMode::DeltaBased,
-                risk_measure: RiskMeasure::Variance,
-                bump_config: None,
-                unmatched_policy: None,
-            })
-            .build()
-            .expect("factor model");
+        let model = FactorModel::from_config(FactorModelConfig {
+            covariance: FactorCovarianceMatrix::new(
+                factors.iter().map(|factor| factor.id.clone()).collect(),
+                vec![1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            )
+            .expect("covariance"),
+            matching: MatchingConfig::MappingTable(
+                [
+                    ("discount", "USD-OIS"),
+                    ("hazard", "INDEX-HZ"),
+                    ("correlation", "INDEX-BC"),
+                ]
+                .into_iter()
+                .map(|(factor, curve)| MappingRule {
+                    dependency_filter: DependencyFilter {
+                        id: Some(curve.into()),
+                        ..Default::default()
+                    },
+                    attribute_filter: Default::default(),
+                    factor_id: FactorId::new(factor),
+                })
+                .collect(),
+            ),
+            factors: factors.clone(),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: RiskMeasure::Variance,
+            bump_config: None,
+            unmatched_policy: None,
+        })
+        .expect("factor model");
         let portfolio = Portfolio::builder("tranche-book")
             .base_currency(Currency::USD)
             .as_of(as_of)
@@ -2814,10 +2699,7 @@ pub(super) mod tests {
         let mut config = simple_config();
         config.unmatched_policy = None;
         config.matching = MatchingConfig::MappingTable(vec![]);
-        let model = FactorModel::builder()
-            .config(config)
-            .build()
-            .expect("strict model");
+        let model = FactorModel::from_config(config).expect("strict model");
         let error = model
             .analyze(&portfolio, &MarketContext::new(), date!(2025 - 01 - 01))
             .expect_err("unmapped risk must not be returned as zero risk");

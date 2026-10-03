@@ -15,12 +15,6 @@ use finstack_quant_portfolio::factor_model::{
 use finstack_quant_portfolio::sensitivity::SensitivityMatrixJson;
 use wasm_bindgen::prelude::*;
 
-/// Build the portfolio factor model a `FactorModelConfig` describes.
-fn build_model(factor_model_config: &JsValue) -> Result<FactorModel, JsValue> {
-    let config: FactorModelConfig = from_js_json(factor_model_config, "factorModelConfig")?;
-    FactorModel::from_config(config).map_err(to_js_err)
-}
-
 /// Convert `[factorId, shift]` pairs into Rust factor stresses.
 fn parse_stresses(stresses: &JsValue) -> Result<Vec<(FactorId, f64)>, JsValue> {
     let stresses: Vec<(String, f64)> = from_js_json(stresses, "stresses")?;
@@ -301,77 +295,6 @@ pub fn allocate_weights_json(spec_json: JsValue) -> Result<String, JsValue> {
 pub fn validate_allocation_json(spec_json: JsValue) -> Result<String, JsValue> {
     let spec_json = json_text(&spec_json, "specJson")?;
     fm::validate_allocation_json(&spec_json).map_err(to_js_err)
-}
-
-/// Run a factor-stress scenario and revalue the portfolio under the stressed market.
-///
-/// Each stress shifts one configured factor by an absolute amount in that
-/// factor's own bump units. Returns the `StressResult`: base-currency
-/// `total_pnl`, per-position `position_pnl`, and the `stressed_decomposition`
-/// of risk under the stressed market.
-/// @param portfolio - Built portfolio whose positions are revalued.
-/// @param market - `core.MarketContext` handle holding the unstressed curves, quotes and FX data.
-/// @param factor_model_config - `FactorModelConfig` object or JSON: factor definitions, matching rules, covariance and risk measure.
-/// @param as_of - ISO-8601 valuation date.
-/// @param stresses - Array of `[factorId, shift]` pairs; every `factorId` must be a factor of the configured model.
-/// @returns The `StressResult`.
-///
-/// # Errors
-///
-/// Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a
-/// `FinstackError` if the config or stresses are malformed, `asOf` is not an
-/// ISO date, a stress names an unknown factor, or the market bump, valuation,
-/// sensitivity or decomposition step fails.
-#[wasm_bindgen(js_name = factorStress)]
-pub fn factor_stress(
-    portfolio: &JsPortfolio,
-    market: &JsMarketContext,
-    factor_model_config: JsValue,
-    as_of: JsValue,
-    stresses: JsValue,
-) -> Result<JsValue, JsValue> {
-    let model = build_model(&factor_model_config)?;
-    let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
-    let stresses = parse_stresses(&stresses)?;
-    let result = model
-        .factor_stress(&portfolio.inner, market.inner(), as_of, &stresses)
-        .map_err(to_js_err)?;
-    to_js_value(&result)
-}
-
-/// Run a position remove/resize what-if analysis against a factor model.
-///
-/// Decomposes the portfolio's baseline risk, applies the changes and
-/// decomposes again. Returns the `WhatIfResult`: the `before` and `after`
-/// risk decompositions and the per-factor `delta`.
-/// @param portfolio - Built portfolio the changes are applied to.
-/// @param market - `core.MarketContext` handle holding the curves, quotes and FX data.
-/// @param factor_model_config - `FactorModelConfig` object or JSON: factor definitions, matching rules, covariance and risk measure.
-/// @param as_of - ISO-8601 valuation date.
-/// @param changes - Array of `PositionChange` objects: `{ kind: "remove", position_id }` or `{ kind: "resize", position_id, new_quantity }`.
-/// @returns The `WhatIfResult`.
-///
-/// # Errors
-///
-/// Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a
-/// `FinstackError` if the config or changes are malformed, `asOf` is not an
-/// ISO date, a change names an unknown position, or factor assignment,
-/// sensitivity or decomposition fails.
-#[wasm_bindgen(js_name = positionWhatIf)]
-pub fn position_what_if(
-    portfolio: &JsPortfolio,
-    market: &JsMarketContext,
-    factor_model_config: JsValue,
-    as_of: JsValue,
-    changes: JsValue,
-) -> Result<JsValue, JsValue> {
-    let model = build_model(&factor_model_config)?;
-    let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
-    let changes: Vec<PositionChange> = from_js_json(&changes, "changes")?;
-    let result = model
-        .position_what_if(&portfolio.inner, market.inner(), as_of, &changes)
-        .map_err(to_js_err)?;
-    to_js_value(&result)
 }
 
 /// Build a credit volatility report from a risk decomposition and a credit factor model.

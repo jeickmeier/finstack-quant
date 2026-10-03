@@ -186,8 +186,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "LevelVolContribution",
         "PositionVolContribution",
         "CreditVolReport",
-        "factor_stress",
-        "position_what_if",
         "build_credit_vol_report",
         "PortfolioPrimitiveExposureReport",
         "primitive_exposures",

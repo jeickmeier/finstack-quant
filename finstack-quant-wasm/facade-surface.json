@@ -461,7 +461,6 @@
       "feeSpecPeriodicBp",
       "floatingLegCompoundingCompoundedInArrears",
       "floatingLegCompoundingCompoundedWithObservationShift",
-      "floatingLegCompoundingCompoundedWithRateCutoff",
       "floatingLegCompoundingEstr",
       "floatingLegCompoundingFedfunds",
       "floatingLegCompoundingIsOvernight",
@@ -699,9 +698,6 @@
     "kind": "function"
   },
   "cashflows.floatingLegCompoundingCompoundedWithObservationShift": {
-    "kind": "function"
-  },
-  "cashflows.floatingLegCompoundingCompoundedWithRateCutoff": {
     "kind": "function"
   },
   "cashflows.floatingLegCompoundingEstr": {
@@ -3573,7 +3569,6 @@
     "kind": "class",
     "statics": [
       "equityDefault",
-      "equityStandard",
       "fromJson",
       "lognormal",
       "normal",
@@ -3786,7 +3781,6 @@
       "decomposeFactorRisk",
       "excessReturns",
       "factorBrinsonAttribution",
-      "factorStress",
       "gridAttribution",
       "gridCarinoLink",
       "mwrXirr",
@@ -3805,7 +3799,6 @@
       "portfolioOptimizationResultToTradeList",
       "portfolioValuationGetEntityValue",
       "portfolioValuationGetPositionValue",
-      "positionWhatIf",
       "primitiveExposures",
       "rebalanceFromSpec",
       "replayPortfolio",
@@ -3976,12 +3969,6 @@
     "kind": "function"
   },
   "portfolio.validateAllocationJson": {
-    "kind": "function"
-  },
-  "portfolio.factorStress": {
-    "kind": "function"
-  },
-  "portfolio.positionWhatIf": {
     "kind": "function"
   },
   "portfolio.buildCreditVolReport": {
@@ -5336,9 +5323,7 @@
       "coverageRulesCloStandard",
       "coverageRulesValidate",
       "instrumentCashflows",
-      "instrumentCashflowsJson",
       "instrumentCashflowsWithMarket",
-      "instrumentCashflowsWithMarketJson",
       "instrumentEnvelopeFromSpec",
       "listModels",
       "listModelsGrouped",
@@ -5567,12 +5552,6 @@
     "kind": "function"
   },
   "valuations.instruments.priceInstrumentWithMarket": {
-    "kind": "function"
-  },
-  "valuations.instruments.instrumentCashflowsJson": {
-    "kind": "function"
-  },
-  "valuations.instruments.instrumentCashflowsWithMarketJson": {
     "kind": "function"
   },
   "valuations.instruments.instrumentCashflows": {

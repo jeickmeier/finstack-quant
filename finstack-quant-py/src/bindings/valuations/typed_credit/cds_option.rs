@@ -5,7 +5,6 @@ use pyo3::prelude::*;
 
 use crate::bindings::core::money::{decimal_from_py, decimal_to_py, is_python_decimal, PyMoney};
 use crate::bindings::date_utils::{date_to_py, extract_date};
-use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -17,7 +16,7 @@ use super::super::convert::{
     attributes_from_py, bool_repr, builder_repr, date_repr, enum_to_py_string, float_repr,
     money_repr, money_to_py,
 };
-use super::super::instruments::{enum_from_str, serialize_typed_instrument_json};
+use super::super::instruments::{enum_from_str, serialize_typed_instrument_json, spec_from_py};
 use super::super::typed_fx::{
     instrument_envelope_methods, instrument_pricing_methods, take_builder,
 };
@@ -353,12 +352,7 @@ impl PyCdsOptionBuilder {
         py: Python<'py>,
         value: &Bound<'py, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let strike: CdsOptionStrike = if let Ok(text) = value.extract::<String>() {
-            serde_json::from_str(&text)
-                .map_err(|e| crate::errors::serde_json_to_py(e, "invalid strike JSON"))?
-        } else {
-            py_to_serde(py, value, "strike")?
-        };
+        let strike: CdsOptionStrike = spec_from_py(py, value, "strike")?;
         let shown = value.repr()?.to_string();
         cdso_set!(slf, strike, shown, |b: CdsOptionBuilderInner| b
             .strike(strike))

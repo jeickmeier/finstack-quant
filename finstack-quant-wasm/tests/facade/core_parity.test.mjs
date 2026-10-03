@@ -485,6 +485,17 @@ test('Rate and Percentage report fractional basis points without binary noise', 
   assert.equal(new core.Rate(0.00625).asBp, 63);
   assert.equal(new core.Percentage(1.1).asBpF64, 110);
   assert.equal(new core.Percentage(0.07).asBpF64, 7);
+  for (const value of [1e-30, -1e-30, 1e-300, Number.MIN_VALUE]) {
+    const rate = new core.Rate(value);
+    const percentage = new core.Percentage(value);
+    try {
+      assert.equal(rate.asBpF64, value * 10_000);
+      assert.equal(percentage.asBpF64, value * 100);
+    } finally {
+      rate.free();
+      percentage.free();
+    }
+  }
 });
 
 test('F350: FX pair keys are parsed by Rust in both hosts', () => {

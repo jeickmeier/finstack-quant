@@ -917,12 +917,12 @@
     {
       "id": "cashflow-viewer",
       "route": "native-json-table",
-      "convention": "Rust-generated cashflow schema and lossless presentation tokens. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. Original JSON export stays unchanged.",
+      "convention": "Rust-generated cashflow schema and lossless presentation tokens. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. The service serializes the typed Rust envelope for presentation.",
       "api": {
-        "name": "valuations.instruments.instrumentCashflowsJson",
+        "name": "valuations.instruments.instrumentCashflows",
         "source": "finstack-quant-wasm/index.d.ts",
         "owner": "ValuationInstrumentsNamespace",
-        "member": "instrumentCashflowsJson",
+        "member": "instrumentCashflows",
         "inputs": [
           {
             "name": "instrumentJson",
@@ -945,9 +945,9 @@
             "optional": false
           }
         ],
-        "returns": "string",
-        "declaration": "/**\n   * Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.\n   *\n   * `model` must be `\"discounting\"` or `\"hazard_rate\"`. Unsupported models or\n   * incompatible instrument types throw. Hazard-rate export also rejects bonds\n   * with call, put, or return-floor rights because static rows cannot represent\n   * exercise-contingent value. For supported static-flow pairs, the envelope's\n   * `total_pv` matches the instrument's `base_value` within rounding.\n   * @returns Per-flow cashflow envelope JSON (discount factor, survival, PV).\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Must be `\"discounting\"` or `\"hazard_rate\"`; `\"default\"` is not accepted.\n   * @throws Error - Throws a JavaScript exception if the instrument or market JSON or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, a bond with embedded exercise rights is requested under a static cashflow model, required curves are missing, the schedule mixes currencies, canonical pricing fails, or the cash-flow envelope cannot be serialized.\n   */\n  instrumentCashflowsJson(\n    instrumentJson: JsonInput,\n    marketJson: JsonInput,\n    asOf: string,\n    model: string\n  ): string;",
-        "sha256": "88ef7e42f95f7e726d7ffc18254cb1b1f049342c1a4883dcb4986eba489cd8e7"
+        "returns": "generated.valuations.InstrumentCashflowEnvelope",
+        "declaration": "/**\n   * Per-flow cashflow envelope for an instrument, as a plain object.\n   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.\n   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.\n   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.\n   * @param model - Must be `\"discounting\"` or `\"hazard_rate\"`; `\"default\"` is not accepted.\n   * @returns `InstrumentCashflowEnvelope` with one row per flow and the total PV.\n   * @throws Error - Throws a JavaScript exception if the instrument or market JSON or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, a bond with embedded exercise rights is requested under a static cashflow model, required curves are missing, the schedule mixes currencies, or canonical pricing fails.\n   */\n  instrumentCashflows(\n    instrumentJson: JsonInput,\n    marketJson: JsonInput,\n    asOf: string,\n    model: string\n  ): generated.valuations.InstrumentCashflowEnvelope;",
+        "sha256": "98fedbdf68db55fd1edfa7af37684109aa375f14090ef89a23c8131948e6a501"
       },
       "schemas": [
         {

@@ -88,11 +88,11 @@ fn position_from_record(record: &Bound<'_, PyDict>) -> PyResult<ReturnContributi
     })
 }
 
-/// Read the positions of a pandas ``DataFrame`` spec as their wire JSON.
+/// Read typed position rows from a pandas ``DataFrame``.
 fn positions_from_dataframe(
     py: Python<'_>,
     frame: &Bound<'_, PyAny>,
-) -> PyResult<serde_json::Value> {
+) -> PyResult<Vec<ReturnContributionPosition>> {
     let columns: Vec<String> = frame
         .getattr("columns")?
         .call_method0("tolist")?
@@ -110,22 +110,15 @@ fn positions_from_dataframe(
     kwargs.set_item("orient", "records")?;
     let records: Vec<Bound<'_, PyDict>> =
         frame.call_method("to_dict", (), Some(&kwargs))?.extract()?;
-    let positions = records
-        .iter()
-        .map(position_from_record)
-        .collect::<PyResult<Vec<ReturnContributionPosition>>>()?;
-    serde_json::to_value(positions).map_err(display_to_py)
+    records.iter().map(position_from_record).collect()
 }
 
 /// Extract a [`ReturnContributionSpec`] from a dict, JSON string, or
 /// pandas ``DataFrame``.
 ///
-/// Every form becomes the wire JSON object first; the ``as_of``,
-/// ``weighting`` and ``factors`` keywords are then set on it as the wire
-/// fields of the same name, and the object is deserialized once, so the
-/// keywords mean the same thing for every form. A keyword that duplicates a
-/// field the spec already carries raises ``ValueError`` instead of silently
-/// winning or losing.
+/// DataFrame rows stay typed so non-finite values reach Rust validation.
+/// Dict/JSON inputs merge keywords before deserialization; duplicate fields
+/// raise ``ValueError`` rather than silently overriding either value.
 pub(crate) fn extract_return_contribution_spec(
     py: Python<'_>,
     spec: &Bound<'_, PyAny>,
@@ -146,12 +139,24 @@ pub(crate) fn extract_return_contribution_spec(
         }
         py_to_json_value(py, dict.as_any(), "spec")?
     } else if spec.is_instance(&pd.getattr("DataFrame")?)? {
-        if as_of.is_none() {
-            return Err(value_error(
-                "as_of is required when spec is a pandas DataFrame",
-            ));
-        }
-        serde_json::json!({ "positions": positions_from_dataframe(py, spec)? })
+        let as_of = as_of
+            .ok_or_else(|| value_error("as_of is required when spec is a pandas DataFrame"))?;
+        return Ok(ReturnContributionSpec {
+            as_of: extract_date_iso(as_of)?,
+            positions: positions_from_dataframe(py, spec)?,
+            weighting: weighting
+                .map(|label| serde_json::from_value(serde_json::Value::String(label.to_owned())))
+                .transpose()
+                .map_err(|e| serde_json_to_py(e, "invalid return contribution spec"))?
+                .unwrap_or_default(),
+            factors: factors
+                .map(|value| {
+                    serde_json::from_value(py_to_json_value(py, value, "factors")?)
+                        .map_err(|e| serde_json_to_py(e, "invalid return contribution spec"))
+                })
+                .transpose()?
+                .unwrap_or_default(),
+        });
     } else {
         return Err(PyTypeError::new_err(
             "spec must be a dict, a JSON str, or a pandas DataFrame of positions",

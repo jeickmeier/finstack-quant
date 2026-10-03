@@ -121,7 +121,7 @@ def test_sabr_parameters_round_trip_compare_and_pickle() -> None:
 
 
 def test_sabr_parameter_factories_fix_beta_and_shift() -> None:
-    assert SabrParameters.equity_standard(0.2, 0.3, -0.2).beta == 1.0
+    assert SabrParameters.lognormal(0.2, 0.3, -0.2).beta == 1.0
     assert SabrParameters.rates_standard(0.2, 0.3, -0.2).beta == 0.5
     assert SabrParameters.normal(0.01, 0.3, -0.2).beta == 0.0
     assert SabrParameters.lognormal(0.2, 0.3, -0.2).beta == 1.0

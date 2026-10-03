@@ -3949,34 +3949,6 @@ class FloatingLegCompounding:
         ...
 
     @staticmethod
-    def compounded_with_rate_cutoff(cutoff_days: int) -> FloatingLegCompounding:
-        """
-        Compounded in arrears with a rate cut-off near period end.
-
-        Parameters
-        ----------
-        cutoff_days : int
-            Number of final business-day observations frozen at the fixing immediately preceding them (ARRC lockout). Zero disables the cut-off; building a schedule raises ValueError if a positive cut-off leaves no preceding fixing.
-
-        Returns
-        -------
-        FloatingLegCompounding
-            A rate-cut-off compounding convention with the given window.
-
-        Raises
-        ------
-        OverflowError
-            If *cutoff_days* is outside the unsigned 32-bit integer range.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
-        >>> FloatingLegCompounding.compounded_with_rate_cutoff(2) is not None
-        True
-        """
-        ...
-
-    @staticmethod
     def sofr() -> FloatingLegCompounding:
         """
         USD SOFR OIS convention: plain compounded in arrears.
@@ -4195,7 +4167,8 @@ class FloatingLegCompounding:
         Returns
         -------
         FloatingLegCompounding
-            The convention, equal to ``compounded_with_rate_cutoff(cutoff_days)``.
+            Compounded overnight convention that freezes the final ``cutoff_days``
+            business days at the last observation before the cutoff.
 
         Raises
         ------
@@ -4205,7 +4178,7 @@ class FloatingLegCompounding:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
-        >>> FloatingLegCompounding.rate_cutoff(2) == FloatingLegCompounding.compounded_with_rate_cutoff(2)
+        >>> FloatingLegCompounding.rate_cutoff(2).is_overnight()
         True
         """
         ...

@@ -33,13 +33,13 @@ use crate::Result;
 
 /// Multiply `value` by a power of ten in decimal arithmetic.
 ///
-/// `value` is read through its shortest round-trip decimal form
-/// (`Decimal::from_f64`), scaled exactly, and converted back to the nearest
-/// `f64`, so the result carries no binary-multiplication noise. Values outside
-/// the `Decimal` range fall back to the plain `f64` product.
+/// Parse the shortest round-trip decimal form without rounding, scale it
+/// exactly, and convert back to `f64`. Values outside Decimal's range or
+/// precision use the `f64` product, preserving tiny nonzero inputs.
 fn shift_decimal_point(value: f64, factor: u32) -> f64 {
-    use rust_decimal::prelude::{FromPrimitive, ToPrimitive};
-    rust_decimal::Decimal::from_f64(value)
+    use rust_decimal::prelude::ToPrimitive;
+    rust_decimal::Decimal::from_str_exact(&value.to_string())
+        .ok()
         .and_then(|decimal| decimal.checked_mul(rust_decimal::Decimal::from(factor)))
         .and_then(|scaled| scaled.to_f64())
         .unwrap_or(value * f64::from(factor))
@@ -826,6 +826,20 @@ mod tests {
         assert_eq!(pct(0.0).as_bp_f64(), 0.0);
         // Rounded integer accessors are unchanged.
         assert_eq!(rate(0.00625).as_bp(), 63);
+    }
+
+    #[test]
+    fn fractional_bp_accessors_preserve_tiny_finite_values() {
+        for value in [1e-30, -1e-30, 1e-300, -1e-300, f64::from_bits(1)] {
+            assert_eq!(
+                Rate::from_decimal(value).expect("finite rate").as_bp_f64(),
+                value * 10_000.0
+            );
+            assert_eq!(
+                Percentage::new(value).expect("finite percent").as_bp_f64(),
+                value * 100.0
+            );
+        }
     }
 
     #[test]

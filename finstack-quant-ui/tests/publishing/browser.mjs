@@ -154,11 +154,13 @@ export async function verifyPublishing(page, evidence, repo) {
       assert.equal(JSON.parse(instrument).instrument.type, kind);
       assert.equal(instrument, request.instrumentJson);
       assert.equal(market, request.marketJson);
-      const expected = native.instrumentCashflowsJson(
-        instrument,
-        market,
-        request.asOf,
-        request.model ?? "default",
+      const expected = JSON.stringify(
+        native.instrumentCashflows(
+          instrument,
+          market,
+          request.asOf,
+          request.model ?? "default",
+        ),
       );
       const cashflows = workbench.getByRole("region", {
         name: "Cashflows",

@@ -96,13 +96,13 @@ const displays = [
     schema: `${base}results/1/instrument_cashflow.schema.json`,
     pointer: "#",
     api: [
-      "valuations.instruments.instrumentCashflowsJson",
+      "valuations.instruments.instrumentCashflows",
       "ValuationInstrumentsNamespace",
-      "instrumentCashflowsJson",
+      "instrumentCashflows",
     ],
     route: "native-json-table",
     convention:
-      "Rust-generated cashflow schema and lossless presentation tokens. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. Original JSON export stays unchanged.",
+      "Rust-generated cashflow schema and lossless presentation tokens. Native row currency and reporting-currency PV; Rust supplies total and reconciliation. The service serializes the typed Rust envelope for presentation.",
   },
   {
     id: "curve-chart",

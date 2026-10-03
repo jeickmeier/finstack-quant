@@ -113,7 +113,6 @@ __all__ = [
     "calculate_pool_stats",
     "calculate_var_with_pricing",
     "instrument_cashflows",
-    "instrument_cashflows_json",
     "instrument_envelope_from_spec",
     "list_models",
     "list_models_grouped",
@@ -143,7 +142,7 @@ class Bond:
     presets or :meth:`Bond.from_json`. Every public Rust field is readable
     as a property; :meth:`Bond.price` / :meth:`Bond.metric` run the same
     pricer as :func:`price_instrument`. Instances are accepted directly by
-    :func:`price_instrument` and :func:`instrument_cashflows_json`.
+    :func:`price_instrument` and :func:`instrument_cashflows`.
 
     Examples
     --------
@@ -3099,7 +3098,7 @@ class TermLoan:
     public Rust field is readable as a property; :meth:`TermLoan.price` /
     :meth:`TermLoan.metric` run the same pricer as :func:`price_instrument`.
     Instances are accepted directly by :func:`price_instrument` and
-    :func:`instrument_cashflows_json`.
+    :func:`instrument_cashflows`.
 
     Examples
     --------
@@ -28177,86 +28176,6 @@ def price_instrument(
     """
     ...
 
-def instrument_cashflows_json(
-    instrument: str
-    | Bond
-    | TermLoan
-    | InterestRateSwap
-    | Swaption
-    | CapFloor
-    | CreditDefaultSwap
-    | CdsIndex
-    | FxForward
-    | FxOption
-    | CdsTranche
-    | ConvertibleBond
-    | EquityOption
-    | StructuredCredit
-    | RevolvingCredit
-    | CompositeInstrument,
-    market: MarketContext | str,
-    as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-    model: str,
-) -> str:
-    """
-    Per-flow cashflow envelope for a discountable instrument.
-
-    Hazard-rate export rejects bonds with call, put, or return-floor rights
-    because static rows cannot represent their exercise-contingent value.
-
-    Parameters
-    ----------
-    instrument : str or Bond or TermLoan or InterestRateSwap or Swaption or CapFloor or CreditDefaultSwap or CdsIndex or FxForward or FxOption or CdsTranche or ConvertibleBond or EquityOption or StructuredCredit or CompositeInstrument
-        Typed instrument instance or a canonical
-        ``finstack_quant.instrument/1`` JSON envelope.
-    market : MarketContext or str
-        Typed ``MarketContext`` or serialized market-context JSON.
-    as_of : datetime.date | datetime.datetime | pd.Timestamp | str
-        Valuation date, either a date-like object or an ISO 8601 string.
-    model : str
-        Must be ``"discounting"`` or ``"hazard_rate"``. ``"default"`` is not
-        accepted on cashflow export.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``InstrumentCashflowEnvelope``.
-
-    Raises
-    ------
-    KeyError
-        If a curve or fixing series the instrument depends on is missing
-        from ``market``.
-    ValueError
-        If ``model`` is unsupported, the instrument/model pair is not
-        registered for cashflow export, a bond with embedded exercise rights
-        is requested under a static cashflow model, or a payload is malformed.
-    RuntimeError
-        If the pricer fails numerically.
-
-    Examples
-    --------
-    >>> import datetime
-    >>> from finstack_quant.core.currency import Currency
-    >>> from finstack_quant.core.dates import StubKind
-    >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
-    >>> from finstack_quant.core.money import Money
-    >>> from finstack_quant.core.types import Rate
-    >>> from finstack_quant.valuations.instruments import Bond
-    >>> as_of = datetime.date(2024, 1, 1)
-    >>> bond = Bond.fixed(
-    ...     "B", Money(1000.0, Currency("USD")), Rate(0.05), as_of, datetime.date(2026, 1, 1), StubKind.NONE, "USD-OIS"
-    ... )
-    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
-    >>> import json
-    >>> from finstack_quant.valuations.instruments import instrument_cashflows_json
-    >>> payload = json.loads(instrument_cashflows_json(bond, market, "2024-01-01", "discounting"))
-    >>> (payload["instrument_id"], len(payload["flows"]))
-    ('B', 6)
-
-    """
-    ...
-
 def list_models() -> list[str]:
     """
     Return every pricing model key registered in the standard pricer registry.
@@ -35780,7 +35699,7 @@ def instrument_cashflows(
     """
     Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
 
-    Typed twin of :func:`instrument_cashflows_json`: the same Rust
+    The Rust
     ``instrument_cashflows`` export, returned as an
     :class:`InstrumentCashflowEnvelope`. Hazard-rate export rejects bonds with
     call, put, or return-floor rights because static rows cannot represent
@@ -36034,7 +35953,7 @@ class InstrumentCashflowEnvelope:
     @staticmethod
     def from_json(json: str) -> InstrumentCashflowEnvelope:
         """
-        Deserialize an envelope from ``to_json`` / ``instrument_cashflows_json`` output.
+        Deserialize an envelope from ``to_json`` output.
 
         Parameters
         ----------
@@ -36065,7 +35984,7 @@ class InstrumentCashflowEnvelope:
         ...
     def to_json(self) -> str:
         """
-        Serialize to compact JSON, identical to ``instrument_cashflows_json``.
+        Serialize to compact JSON, for storage or transport.
 
         Returns
         -------

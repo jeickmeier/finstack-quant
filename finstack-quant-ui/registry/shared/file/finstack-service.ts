@@ -299,11 +299,13 @@ export function createService(native: {
         const instrument = instruments.validateInstrumentJson(
           request.instrumentJson,
         );
-        return instruments.instrumentCashflowsWithMarketJson(
-          instrument,
-          market(request.marketJson).handle,
-          request.asOf,
-          resolveModel(request.model),
+        return JSON.stringify(
+          instruments.instrumentCashflowsWithMarket(
+            instrument,
+            market(request.marketJson).handle,
+            request.asOf,
+            resolveModel(request.model),
+          ),
         );
       });
     },

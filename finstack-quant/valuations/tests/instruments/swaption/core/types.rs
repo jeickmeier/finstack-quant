@@ -173,7 +173,7 @@ fn test_sabr_parameter_constructors_and_internal_conversion() {
     let shifted = SabrParameters::new_with_shift(0.2, 0.5, 0.4, -0.2, 0.01).unwrap();
     assert_eq!(shifted.shift, Some(0.01));
 
-    let eq = SabrParameters::equity_standard(0.2, 0.5, -0.3).unwrap();
+    let eq = SabrParameters::lognormal(0.2, 0.5, -0.3).unwrap();
     let rates = SabrParameters::rates_standard(0.2, 0.5, -0.3).unwrap();
     let normal = SabrParameters::normal(0.2, 0.5, -0.3).unwrap();
     let lognormal = SabrParameters::lognormal(0.2, 0.5, -0.3).unwrap();

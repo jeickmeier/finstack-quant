@@ -22,7 +22,7 @@ api:
 - finstack_quant.core.market_data.ForwardCurve
 - finstack_quant.core.market_data.MarketContext
 - finstack_quant.core.money.Money
-- finstack_quant.valuations.instruments.instrument_cashflows_json
+- finstack_quant.valuations.instruments.instrument_cashflows
 - finstack_quant.valuations.instruments.price_instrument
 status: published
 ---
@@ -86,7 +86,7 @@ The USD 100m comparison holds the numerical quote fixed. The bond calculation us
 import json, math
 from datetime import date
 from finstack_quant.core.dates import DayCount
-from finstack_quant.valuations.instruments import price_instrument, instrument_cashflows_json
+from finstack_quant.valuations.instruments import price_instrument, instrument_cashflows
 from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
 
@@ -96,7 +96,7 @@ discounts = {'simple': 1 / (1 + r * years), 'annual': (1 + r) ** -years,
 market = build_market('foundations')
 curve = market.get_discount('USD-OIS')
 bond = json.dumps(instruments('foundations')['USD-CORP'])
-flows = json.loads(instrument_cashflows_json(bond, market, AS_OF, 'discounting'))
+flows = json.loads(instrument_cashflows(bond, market, AS_OF, 'discounting').to_json())
 manual_pv = sum(flow['amount'] * curve.df(DayCount.ACT_365F.year_fraction(AS_OF, date.fromisoformat(flow['date'])))
                 for flow in flows['flows'] if date.fromisoformat(flow['date']) > AS_OF)
 native_pv = price_instrument(bond, market, AS_OF).price

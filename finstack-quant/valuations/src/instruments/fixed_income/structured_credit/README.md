@@ -855,7 +855,7 @@ Both bindings expose structured credit under their `instruments` namespace:
   `structuredCreditTrancheDiscountMargin`,
   `structuredCreditTrancheBreakevenCdr`,
   `structuredCreditTrancheScenarioTable`, plus `priceInstrument` and
-  `instrumentCashflowsJson` on the `InstrumentJson::StructuredCredit` envelope.
+  `instrumentCashflows` on the `InstrumentJson::StructuredCredit` envelope.
 
 Deep sub-configs (`WaterfallRules`, the stochastic specs, `DealFees`,
 `DelinquencyModel`, `CardPortfolioSpec`, `CoverageTestSpec`,

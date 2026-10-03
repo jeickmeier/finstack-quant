@@ -983,64 +983,8 @@ fn listed_product_catalog<'py>(
     serde_to_py(py, &rows)
 }
 
-/// Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
-///
-/// Supported ``model`` values are ``"discounting"`` (DF-only PV) and
-/// ``"hazard_rate"`` (DF × survival + recovery on principal). Any other model
-/// key, or an instrument type that isn't priced under the chosen model in the
-/// standard registry, raises ``ValueError``. Hazard-rate export also rejects a
-/// bond with call, put, or return-floor rights because static rows cannot
-/// represent its exercise-contingent value. For supported static-flow
-/// combinations, the returned envelope's ``total_pv`` reconciles with the
-/// instrument's ``base_value``.
-///
-/// Parameters
-/// ----------
-/// instrument : str | Bond | TermLoan | InterestRateSwap | Swaption |
-///     CapFloor | CreditDefaultSwap | CdsIndex | FxForward | FxOption |
-///     CdsTranche | ConvertibleBond | EquityOption | StructuredCredit |
-///     CompositeInstrument
-///     A typed instrument instance or a ``finstack_quant.instrument/1``
-///     JSON envelope.
-/// market : MarketContext | str
-///     A ``MarketContext`` object or a JSON string.
-/// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-///     Valuation date, either a date-like object or an ISO 8601 string.
-/// model : str
-///     ``"discounting"`` or ``"hazard_rate"``. ``"default"`` is not accepted.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``InstrumentCashflowEnvelope``; the typed twin
-///     :func:`instrument_cashflows` returns the same envelope as an
-///     ``InstrumentCashflowEnvelope`` object.
-///
-/// Raises
-/// ------
-/// KeyError
-///     If a curve or fixing series the instrument depends on is missing.
-/// ValueError
-///     If ``model`` is unsupported, the instrument/model pair is not
-///     registered, a bond with embedded exercise rights is requested under a
-///     static cashflow model, or a payload is malformed.
-/// RuntimeError
-///     If the pricer fails numerically.
-#[pyfunction]
-#[pyo3(text_signature = "(instrument, market, as_of, model)")]
-fn instrument_cashflows_json(
-    py: Python<'_>,
-    instrument: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-    model: &str,
-) -> PyResult<String> {
-    let envelope = cashflow_envelope(py, instrument, market, as_of, model)?;
-    serde_json::to_string(&envelope).map_err(display_to_py)
-}
-
 /// Parse the instrument (before the market) and run the Rust
-/// `instrument_cashflows` export shared by both cashflow entry points.
+/// `instrument_cashflows` export for the typed cashflow envelope.
 fn cashflow_envelope(
     py: Python<'_>,
     instrument: &Bound<'_, PyAny>,
@@ -1069,7 +1013,7 @@ fn cashflow_envelope(
 
 /// Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
 ///
-/// Typed twin of :func:`instrument_cashflows_json`: the same Rust
+/// The Rust
 /// ``instrument_cashflows`` export, returned as an
 /// :class:`InstrumentCashflowEnvelope` (``to_dataframe()`` gives one row per
 /// flow). Supported ``model`` values are ``"discounting"`` (DF-only PV) and
@@ -1271,8 +1215,7 @@ impl PyInstrumentCashflowEnvelope {
         frame.call_method("assign", (), Some(&parsed))
     }
 
-    /// Deserialize an envelope from the JSON produced by ``to_json`` or
-    /// ``instrument_cashflows_json``.
+    /// Deserialize an envelope from the JSON produced by ``to_json``.
     ///
     /// Parameters
     /// ----------
@@ -1298,7 +1241,7 @@ impl PyInstrumentCashflowEnvelope {
         })
     }
 
-    /// Serialize to compact JSON, identical to ``instrument_cashflows_json``.
+    /// Serialize to compact JSON, for storage or transport.
     ///
     /// Returns
     /// -------
@@ -1343,7 +1286,6 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(list_standard_metrics_grouped, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(metric_metadata, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(instrument_cashflows_json, m)?)?;
     Ok(())
 }
 

@@ -162,7 +162,6 @@ fn json_suffixed_exports_return_strings() {
         ("CovenantsNamespace", "validateCovenantEngineJson"),
         ("ValuationsNamespace", "validateValuationResultJson"),
         ("ValuationsNamespace", "valuationResultToJson"),
-        ("ValuationInstrumentsNamespace", "instrumentCashflowsJson"),
         ("CalibrationNamespace", "dryRunJson"),
         ("AttributionNamespace", "attributePnlEnvelopeJson"),
     ] {

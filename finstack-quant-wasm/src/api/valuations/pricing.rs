@@ -422,46 +422,10 @@ impl PriceRequest {
     }
 }
 
-/// Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
-///
-/// `model` must be `"discounting"` or `"hazard_rate"`. Unsupported models or
-/// incompatible instrument types throw. Hazard-rate export also rejects bonds
-/// with call, put, or return-floor rights because static rows cannot represent
-/// exercise-contingent value. For supported static-flow pairs, the envelope's
-/// `total_pv` matches the instrument's `base_value` within rounding.
-/// @param instrument_json - Required `finstack_quant.instrument/1` envelope.
-/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-/// @param model - Must be `"discounting"` or `"hazard_rate"`; `"default"` is not accepted.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if the instrument or market JSON or `asOf` is
-/// invalid, `model` is unsupported or incompatible with the instrument, a
-/// bond with embedded exercise rights is requested under a static cashflow
-/// model, required curves are missing, the schedule mixes currencies,
-/// canonical pricing fails, or the cash-flow envelope cannot be serialized.
-#[wasm_bindgen(js_name = instrumentCashflowsJson)]
-pub fn instrument_cashflows_json(
-    instrument_json: JsValue,
-    market_json: JsValue,
-    as_of: JsValue,
-    model: JsValue,
-) -> Result<String, JsValue> {
-    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
-    let model: &str = &js_string(&model, "model")?;
-    let envelope = cashflows_envelope_from_json(instrument_json, market_json, as_of, model)?;
-    serde_json::to_string(&envelope).map_err(to_js_err)
-}
-
 /// Per-flow cashflow envelope for an instrument, as a plain object.
 ///
-/// Typed twin of `instrumentCashflowsJson`: the same Rust
-/// `instrument_cashflows` call, returned as the `InstrumentCashflowEnvelope`
-/// object instead of JSON text (`JSON.stringify` of the result equals the
-/// `*Json` string). Hazard-rate export rejects bonds with call, put, or
+/// Returns the Rust `InstrumentCashflowEnvelope` as a structured value.
+/// Hazard-rate export rejects bonds with call, put, or
 /// return-floor rights because static rows cannot represent
 /// exercise-contingent value.
 /// @param instrument_json - Required `finstack_quant.instrument/1` envelope.
@@ -693,45 +657,10 @@ pub fn price_instrument_with_market(
     valuation_result_value(&result)
 }
 
-/// Per-flow cashflow envelope using a pre-parsed `MarketContext` handle. Hazard-rate
-/// export rejects bonds with call, put, or return-floor rights because static
-/// rows cannot represent exercise-contingent value.
-/// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.
-/// @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
-/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-/// @param model - Must be `"discounting"` or `"hazard_rate"`; `"default"` is not accepted.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `instrumentJson` or `asOf` is invalid,
-/// `model` is unsupported or incompatible with the instrument, a bond with
-/// embedded exercise rights is requested under a static cashflow model,
-/// required curves are missing, the schedule mixes currencies, canonical
-/// pricing fails, or the cash-flow envelope cannot be serialized.
-#[wasm_bindgen(js_name = instrumentCashflowsWithMarketJson)]
-pub fn instrument_cashflows_with_market_json(
-    instrument_json: JsValue,
-    market: &JsMarketContext,
-    as_of: JsValue,
-    model: JsValue,
-) -> Result<String, JsValue> {
-    let instrument_json: &str = &json_text(&instrument_json, "instrumentJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
-    let model: &str = &js_string(&model, "model")?;
-    let instrument = parse_pricing_instrument_json(instrument_json, None)?;
-    serde_json::to_string(&cashflows_envelope(
-        &instrument,
-        market.inner(),
-        as_of,
-        model,
-    )?)
-    .map_err(to_js_err)
-}
-
 /// Per-flow cashflow envelope using a pre-parsed `MarketContext` handle, as a
 /// plain object.
 ///
-/// Typed twin of `instrumentCashflowsWithMarketJson`. Hazard-rate export
+/// Hazard-rate export
 /// rejects bonds with call, put, or return-floor rights because static rows
 /// cannot represent exercise-contingent value.
 /// @param instrument_json - Canonical instrument envelope JSON in the Finstack v1 schema.

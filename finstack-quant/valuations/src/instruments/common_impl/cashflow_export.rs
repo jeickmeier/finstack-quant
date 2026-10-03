@@ -1,6 +1,6 @@
 //! Per-flow cashflow export with discount-factor / survival-probability / PV enrichment.
 //!
-//! Designed as the single Rust entry point behind the `instrument_cashflows_json`
+//! Provides the Rust cashflow envelope behind the `instrument_cashflows`
 //! Python and WASM bindings. Produces a structured envelope for any instrument
 //! that is priceable under either the `Discounting` or `HazardRate` model. For
 //! those two models, `sum(flows.pv) ≈ base_value` within rounding.

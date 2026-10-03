@@ -538,7 +538,7 @@ fn valuations_dts_exposes_reusable_market_handle_pricing() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "instrumentCashflowsWithMarketJson(instrumentJson: JsonInput, market: MarketContext, asOf: string, model: string): string;",
+        "instrumentCashflowsWithMarket(instrumentJson: JsonInput, market: MarketContext, asOf: string, model: string): generated.valuations.InstrumentCashflowEnvelope;",
     ));
 }
 

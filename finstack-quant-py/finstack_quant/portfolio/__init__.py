@@ -157,8 +157,6 @@ FactorAssignmentReport = _portfolio.FactorAssignmentReport
 LevelVolContribution = _portfolio.LevelVolContribution
 PositionVolContribution = _portfolio.PositionVolContribution
 CreditVolReport = _portfolio.CreditVolReport
-factor_stress = _portfolio.factor_stress
-position_what_if = _portfolio.position_what_if
 build_credit_vol_report = _portfolio.build_credit_vol_report
 PortfolioPrimitiveExposureReport = _portfolio.PortfolioPrimitiveExposureReport
 primitive_exposures = _portfolio.primitive_exposures
@@ -280,7 +278,6 @@ __all__ = [
     "excess_returns_json",
     "factor_brinson_attribution",
     "factor_brinson_attribution_json",
-    "factor_stress",
     "grid_attribution",
     "grid_attribution_json",
     "grid_carino_link",
@@ -289,7 +286,6 @@ __all__ = [
     "net_in_currency_by_date",
     "optimize_portfolio",
     "parse_portfolio_spec_json",
-    "position_what_if",
     "primitive_exposures",
     "rebalance_from_spec",
     "replay_portfolio",

@@ -128,11 +128,13 @@ try {
       );
     }
   }
-  const originalText = valuations.instruments.instrumentCashflowsJson(
-    requests.bond.instrumentJson,
-    requests.bond.marketJson,
-    requests.bond.asOf,
-    requests.bond.model,
+  const originalText = JSON.stringify(
+    valuations.instruments.instrumentCashflows(
+      requests.bond.instrumentJson,
+      requests.bond.marketJson,
+      requests.bond.asOf,
+      requests.bond.model,
+    ),
   );
   assert.deepEqual(
     await page.evaluate(

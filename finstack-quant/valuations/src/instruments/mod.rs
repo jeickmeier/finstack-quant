@@ -163,7 +163,7 @@ pub mod pricing {
 
 /// Per-flow cashflow export with DF / survival / PV columns.
 ///
-/// See [`cashflow_export::instrument_cashflows_json`] for the primary entry
+/// See [`cashflow_export::instrument_cashflows`] for the primary entry
 /// point used by the Python and WASM bindings.
 pub mod cashflow_export {
     pub use super::common_impl::cashflow_export::*;

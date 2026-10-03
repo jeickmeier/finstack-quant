@@ -80,7 +80,7 @@ class TestBuilderSpecs:
             assert preset() == C.compounded_in_arrears(0)
         assert C.sofr_observation_shift() == C.compounded_with_observation_shift(2)
         assert C.sonia_observation_shift() == C.compounded_with_observation_shift(5)
-        assert C.rate_cutoff(3) == C.compounded_with_rate_cutoff(3)
+        assert C.rate_cutoff(3).is_overnight()
         assert [c.is_overnight() for c in (C.SIMPLE, C.SIMPLE_AVERAGE, C.sofr())] == [False, True, True]
         with pytest.raises(TypeError):
             C.compounded_in_arrears()  # type: ignore[call-arg]

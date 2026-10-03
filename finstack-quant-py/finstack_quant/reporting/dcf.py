@@ -23,7 +23,7 @@ from typing import Any
 
 from . import charts, format as fmt
 from .document import KPI, Section, TearSheet, _resolve_sections
-from .statements_common import json_or_dict, parse_statement, pl_matrix_table, tornado_entries
+from .statements_common import StatementView, json_or_dict, parse_statement, pl_matrix_table, tornado_entries
 from .theme import INSTITUTIONAL, Theme
 
 __all__ = [
@@ -72,10 +72,9 @@ def _section_bridge(val: dict[str, Any], theme: Theme) -> Section | None:
     )
 
 
-def _section_ufcf(results: Any, ufcf_node: str, theme: Theme) -> Section | None:
-    if results is None:
+def _section_ufcf(view: StatementView | None, ufcf_node: str, theme: Theme) -> Section | None:
+    if view is None:
         return None
-    view = parse_statement(results)
     periods = view.periods()
     vals = [view.get(ufcf_node, p) for p in periods]
     if all(v is None or (isinstance(v, float) and math.isnan(v)) for v in vals):
@@ -95,10 +94,9 @@ def _section_sensitivity(sensitivity: Any, theme: Theme) -> Section | None:
     )
 
 
-def _section_pl(results: Any) -> Section | None:
-    if results is None:
+def _section_pl(view: StatementView | None) -> Section | None:
+    if view is None:
         return None
-    view = parse_statement(results)
     present = set(view.node_ids())
     rows = [row for row in _PL_ROWS if row[1] in present]
     if not rows:
@@ -169,15 +167,16 @@ def dcf_tearsheet(
     wanted = _resolve_sections(sections, ALL_SECTIONS)
 
     val = json_or_dict(valuation, noun="valuation")
+    view = parse_statement(results) if results is not None else None
 
     secs: list[Section] = []
     if "bridge" in wanted and (s := _section_bridge(val, theme)) is not None:
         secs.append(s)
-    if "ufcf" in wanted and (s := _section_ufcf(results, ufcf_node, theme)) is not None:
+    if "ufcf" in wanted and (s := _section_ufcf(view, ufcf_node, theme)) is not None:
         secs.append(s)
     if "sensitivity" in wanted and (s := _section_sensitivity(sensitivity, theme)) is not None:
         secs.append(s)
-    if "pl" in wanted and (s := _section_pl(results)) is not None:
+    if "pl" in wanted and (s := _section_pl(view)) is not None:
         secs.append(s)
 
     ev, ccy = _money_parts(val.get("enterprise_value"))
@@ -197,7 +196,7 @@ def dcf_tearsheet(
         eyebrow="Corporate Valuation",
         title=title or "DCF Valuation",
         subtitle=subtitle,
-        meta_lines=parse_statement(results).meta_lines() if results is not None else [],
+        meta_lines=view.meta_lines() if view is not None else [],
         kpis=kpis,
         sections=secs,
         generated=generated,

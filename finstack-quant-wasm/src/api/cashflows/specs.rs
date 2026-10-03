@@ -212,20 +212,6 @@ pub fn floating_leg_compounding_compounded_with_observation_shift(
     })
 }
 
-/// Overnight compounding with a rate cutoff before period end.
-///
-/// @param cutoff_days - Business days before period end from which the last observed rate is repeated (non-negative integer).
-/// @returns `FloatingLegCompounding` wire value `{ compounded_with_rate_cutoff: { cutoff_days } }`.
-/// @throws If `cutoffDays` is not a non-negative integer (kind `invalid_type`).
-#[wasm_bindgen(js_name = floatingLegCompoundingCompoundedWithRateCutoff)]
-pub fn floating_leg_compounding_compounded_with_rate_cutoff(
-    cutoff_days: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingLegCompounding::CompoundedWithRateCutoff {
-        cutoff_days: js_uint(&cutoff_days, "cutoffDays")?,
-    })
-}
-
 /// USD SOFR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::sofr`).
 ///
 /// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.

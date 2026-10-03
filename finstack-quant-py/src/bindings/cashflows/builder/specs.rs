@@ -424,17 +424,6 @@ impl PyFloatingLegCompounding {
         }
     }
 
-    /// Freeze the last ``cutoff_days`` business-day observations at the fixing
-    /// immediately preceding them (ARRC lockout). Zero disables the cut-off;
-    /// schedule construction rejects a window with no preceding fixing.
-    #[staticmethod]
-    #[pyo3(text_signature = "(cutoff_days)")]
-    fn compounded_with_rate_cutoff(cutoff_days: u32) -> Self {
-        Self {
-            inner: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days },
-        }
-    }
-
     /// USD SOFR OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::sofr``).
     #[staticmethod]
     #[pyo3(text_signature = "()")]

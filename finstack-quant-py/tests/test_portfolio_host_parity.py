@@ -35,8 +35,6 @@ from finstack_quant.portfolio import (
     allocate_weights,
     attribute_portfolio_pnl,
     build_credit_vol_report,
-    factor_stress,
-    position_what_if,
     scenario_pnl_batch_json,
     validate_allocation_json,
     value_portfolio,
@@ -203,10 +201,9 @@ def _compute(inputs: dict[str, Any]) -> dict[str, Any]:
     attribution = attribute_portfolio_pnl(
         portfolio, market_t0, market_t1, inputs["as_of_t0"], inputs["as_of_t1"], inputs["attribution_method"]
     )
-    stress = factor_stress(
-        portfolio, market_t0, config, inputs["as_of_t0"], [tuple(pair) for pair in inputs["stresses"]]
-    )
-    what_if = position_what_if(portfolio, market_t0, config, inputs["as_of_t0"], inputs["changes"])
+    model = FactorModel.from_config(config)
+    stress = model.factor_stress(portfolio, market_t0, inputs["as_of_t0"], [tuple(pair) for pair in inputs["stresses"]])
+    what_if = model.position_what_if(portfolio, market_t0, inputs["as_of_t0"], inputs["changes"])
     report = build_credit_vol_report(
         RiskDecomposition.from_json(json.dumps(inputs["credit_decomposition"])),
         CreditFactorModel.from_json(json.dumps(inputs["credit_model"])),
@@ -288,12 +285,8 @@ def test_require_metric_and_what_if_errors_come_from_rust() -> None:
     portfolio = Portfolio.from_spec(json.dumps(fixture["portfolio_spec"]))
     market = MarketContext.from_json(json.dumps(fixture["market_t0"]))
     with pytest.raises(PortfolioError):
-        position_what_if(
-            portfolio,
-            market,
-            json.dumps(fixture["factor_model_config"]),
-            fixture["as_of_t0"],
-            [{"kind": "remove", "position_id": "NOPE"}],
+        FactorModel.from_config(json.dumps(fixture["factor_model_config"])).position_what_if(
+            portfolio, market, fixture["as_of_t0"], [{"kind": "remove", "position_id": "NOPE"}]
         )
 
 

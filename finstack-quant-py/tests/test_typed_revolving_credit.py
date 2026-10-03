@@ -26,7 +26,7 @@ from finstack_quant.valuations.instruments import (
     EnhancedMonteCarloResult,
     RevolvingCredit,
     RevolvingCreditBuilder,
-    instrument_cashflows_json,
+    instrument_cashflows,
     price_instrument,
 )
 
@@ -198,7 +198,7 @@ def test_expected_cashflows_matches_the_json_schedule() -> None:
     schedule = facility.expected_cashflows(ctx, AS_OF)
     frame = schedule.to_dataframe()
     assert not frame.empty
-    via_json = json.loads(instrument_cashflows_json(facility.to_json(), ctx, AS_OF, "discounting"))
+    via_json = json.loads(instrument_cashflows(facility.to_json(), ctx, AS_OF, "discounting").to_json())
     assert len(json.loads(schedule.to_json())["flows"]) == len(via_json["flows"])
 
 

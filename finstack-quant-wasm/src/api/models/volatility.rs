@@ -80,35 +80,6 @@ impl JsSabrParameters {
         }
     }
 
-    /// Equity market standard SABR parameters (`beta = 1.0`).
-    ///
-    /// # Arguments
-    ///
-    /// * `alpha` - Positive initial Black volatility as a decimal.
-    /// * `nu` - Finite non-negative volatility of volatility per square-root year.
-    /// * `rho` - Forward/volatility correlation in `[-1, 1]`.
-    ///
-    /// @returns A validated `SabrParameters` handle.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `FinstackError` (kind `validation`) if `alpha` is not finite
-    /// and positive, `nu` is negative or non-finite, `rho` is outside
-    /// `[-1, 1]`.
-    #[wasm_bindgen(js_name = equityStandard)]
-    pub fn equity_standard(
-        alpha: JsValue,
-        nu: JsValue,
-        rho: JsValue,
-    ) -> Result<JsSabrParameters, JsValue> {
-        let alpha = js_f64(&alpha, "alpha")?;
-        let nu = js_f64(&nu, "nu")?;
-        let rho = js_f64(&rho, "rho")?;
-        SabrParameters::equity_standard(alpha, nu, rho)
-            .map(Self::from_inner)
-            .map_err(to_js_err)
-    }
-
     /// Rates market standard SABR parameters (`beta = 0.5`).
     ///
     /// # Arguments

@@ -24,7 +24,7 @@ use finstack_quant_models::factor::{
     BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorId, FactorType, MarketMapping,
     PricingMode, RiskMeasure, SensitivityMatrix, UnmatchedPolicy,
 };
-use finstack_quant_portfolio::factor_model::FactorModelBuilder;
+use finstack_quant_portfolio::factor_model::FactorModel;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::sensitivity::{
     DeltaBasedEngine, FactorSensitivityEngine, FullRepricingEngine,
@@ -323,34 +323,32 @@ fn factor_stress_model() -> finstack_quant_portfolio::factor_model::FactorModel 
     let factor_id = FactorId::new("rates_stress");
     let covariance = FactorCovarianceMatrix::new(vec![factor_id.clone()], vec![0.04])
         .expect("bench: factor covariance should build");
-    FactorModelBuilder::new()
-        .config(FactorModelConfig {
-            factors: vec![FactorDefinition {
-                id: factor_id.clone(),
-                factor_type: FactorType::Rates,
-                market_mapping: MarketMapping::CurveParallel {
-                    curve_ids: vec![CurveId::new(CURVE_ID)],
-                    units: finstack_quant_core::market_data::bumps::BumpUnits::RateBp,
-                },
-                description: None,
-            }],
-            covariance,
-            matching: MatchingConfig::MappingTable(vec![MappingRule {
-                dependency_filter: DependencyFilter {
-                    dependency_type: Some(DependencyType::Discount),
-                    curve_type: Some(CurveType::Discount),
-                    id: Some(CURVE_ID.to_string()),
-                },
-                attribute_filter: finstack_quant_models::factor::AttributeFilter::default(),
-                factor_id,
-            }]),
-            pricing_mode: PricingMode::DeltaBased,
-            risk_measure: RiskMeasure::Variance,
-            bump_config: Some(BumpSizeConfig::default()),
-            unmatched_policy: Some(UnmatchedPolicy::Warn),
-        })
-        .build()
-        .expect("bench: factor model should build")
+    FactorModel::from_config(FactorModelConfig {
+        factors: vec![FactorDefinition {
+            id: factor_id.clone(),
+            factor_type: FactorType::Rates,
+            market_mapping: MarketMapping::CurveParallel {
+                curve_ids: vec![CurveId::new(CURVE_ID)],
+                units: finstack_quant_core::market_data::bumps::BumpUnits::RateBp,
+            },
+            description: None,
+        }],
+        covariance,
+        matching: MatchingConfig::MappingTable(vec![MappingRule {
+            dependency_filter: DependencyFilter {
+                dependency_type: Some(DependencyType::Discount),
+                curve_type: Some(CurveType::Discount),
+                id: Some(CURVE_ID.to_string()),
+            },
+            attribute_filter: finstack_quant_models::factor::AttributeFilter::default(),
+            factor_id,
+        }]),
+        pricing_mode: PricingMode::DeltaBased,
+        risk_measure: RiskMeasure::Variance,
+        bump_config: Some(BumpSizeConfig::default()),
+        unmatched_policy: Some(UnmatchedPolicy::Warn),
+    })
+    .expect("bench: factor model should build")
 }
 
 fn factor_stress_portfolio(n_positions: usize, as_of: Date) -> Portfolio {

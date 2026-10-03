@@ -14,7 +14,7 @@ use finstack_quant_models::factor::{
     BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig,
     FactorType, MarketMapping, PricingMode, RiskMeasure, UnmatchedPolicy,
 };
-use finstack_quant_portfolio::factor_model::FactorModelBuilder;
+use finstack_quant_portfolio::factor_model::FactorModel;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
 use finstack_quant_portfolio::sensitivity::{
     DeltaBasedEngine, FactorSensitivityEngine, FullRepricingEngine,
@@ -284,17 +284,15 @@ fn portfolio_wrap_uses_scale_factor_weight_for_eur_fx_factor() -> Result<()> {
     let market = create_two_currency_market_with_fx(as_of)?;
     let factor = fx_factor();
     let covariance = FactorCovarianceMatrix::new(vec![factor.id.clone()], vec![0.01])?;
-    let model = FactorModelBuilder::new()
-        .config(FactorModelConfig {
-            factors: vec![factor],
-            covariance,
-            matching: finstack_quant_models::factor::MatchingConfig::MappingTable(vec![]),
-            pricing_mode: PricingMode::DeltaBased,
-            risk_measure: RiskMeasure::Variance,
-            bump_config: None,
-            unmatched_policy: Some(UnmatchedPolicy::Warn),
-        })
-        .build()?;
+    let model = FactorModel::from_config(FactorModelConfig {
+        factors: vec![factor],
+        covariance,
+        matching: finstack_quant_models::factor::MatchingConfig::MappingTable(vec![]),
+        pricing_mode: PricingMode::DeltaBased,
+        risk_measure: RiskMeasure::Variance,
+        bump_config: None,
+        unmatched_policy: Some(UnmatchedPolicy::Warn),
+    })?;
 
     let two_lot = Position::new(
         "eur-pos",

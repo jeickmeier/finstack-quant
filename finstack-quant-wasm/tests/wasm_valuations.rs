@@ -7,7 +7,7 @@
 
 use finstack_quant_wasm::api::valuations::exotic_rates::*;
 use finstack_quant_wasm::api::valuations::pricing::{
-    instrument_cashflows_json, list_standard_metrics, price_instrument,
+    instrument_cashflows, list_standard_metrics, price_instrument,
 };
 use finstack_quant_wasm::api::valuations::structured_credit::*;
 use wasm_bindgen::{JsCast, JsValue};
@@ -282,7 +282,7 @@ fn public_json_routes_validate_instrument_before_malformed_market() {
             None,
         )
         .unwrap_err(),
-        instrument_cashflows_json(
+        instrument_cashflows(
             JsValue::from(&instrument),
             JsValue::from(market),
             JsValue::from("not-a-date"),

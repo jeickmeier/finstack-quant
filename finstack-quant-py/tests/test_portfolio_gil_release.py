@@ -19,6 +19,7 @@ from finstack_quant.models.liquidity import (
     roll_effective_spread,
 )
 from finstack_quant.portfolio import (
+    FactorModel,
     Portfolio,
     aggregate_metrics_json,
     attribute_portfolio_pnl,
@@ -26,8 +27,6 @@ from finstack_quant.portfolio import (
     carino_link_from_sector_periods_json,
     compute_factor_sensitivities,
     decompose_factor_risk,
-    factor_stress,
-    position_what_if,
     replay_portfolio_json,
     twrr_linked_json,
     value_portfolio,
@@ -287,12 +286,8 @@ def test_factor_stress_releases_gil_and_returns_position_results() -> None:
     config_json = _factor_model_config_json()
 
     result = _assert_releases_gil(
-        lambda: factor_stress(
-            portfolio,
-            market,
-            config_json,
-            AS_OF.isoformat(),
-            [("usd_rates", 1.0)],
+        lambda: FactorModel.from_config(config_json).factor_stress(
+            portfolio, market, AS_OF.isoformat(), [("usd_rates", 1.0)]
         )
     )
 
@@ -309,23 +304,15 @@ def test_factor_stress_rejects_invalid_config_after_detached_parse() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(1))
 
     with pytest.raises(ValueError, match="EOF"):
-        factor_stress(
-            portfolio,
-            _market(),
-            '{"factors":',
-            AS_OF.isoformat(),
-            [("usd_rates", 1.0)],
+        FactorModel.from_config('{"factors":').factor_stress(
+            portfolio, _market(), AS_OF.isoformat(), [("usd_rates", 1.0)]
         )
 
 
 def test_position_what_if_uses_combined_baseline_analysis() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(2))
-    result = position_what_if(
-        portfolio,
-        _market(),
-        _factor_model_config_json(),
-        AS_OF.isoformat(),
-        [{"kind": "remove", "position_id": "POS-1"}],
+    result = FactorModel.from_config(_factor_model_config_json()).position_what_if(
+        portfolio, _market(), AS_OF.isoformat(), [{"kind": "remove", "position_id": "POS-1"}]
     )
 
     assert result.before.total_risk > result.after.total_risk
@@ -335,12 +322,8 @@ def test_position_what_if_uses_combined_baseline_analysis() -> None:
 def test_position_what_if_rejects_unsupported_add() -> None:
     portfolio = Portfolio.from_spec(_portfolio_spec_json(2))
     with pytest.raises(ValueError, match=r"unknown variant.*add"):
-        position_what_if(
-            portfolio,
-            _market(),
-            _factor_model_config_json(),
-            AS_OF.isoformat(),
-            [{"kind": "add", "position": {}}],
+        FactorModel.from_config(_factor_model_config_json()).position_what_if(
+            portfolio, _market(), AS_OF.isoformat(), [{"kind": "add", "position": {}}]
         )
 
 

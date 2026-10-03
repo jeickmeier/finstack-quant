@@ -9,8 +9,6 @@ export const instruments = {
   validateInstrumentJson: wasm.validateInstrumentJson,
   priceInstrument: wasm.priceInstrument,
   priceInstrumentWithMarket: wasm.priceInstrumentWithMarket,
-  instrumentCashflowsJson: wasm.instrumentCashflowsJson,
-  instrumentCashflowsWithMarketJson: wasm.instrumentCashflowsWithMarketJson,
   instrumentCashflows: wasm.instrumentCashflows,
   instrumentCashflowsWithMarket: wasm.instrumentCashflowsWithMarket,
   calculateVarWithPricing: wasm.calculateVarWithPricing,

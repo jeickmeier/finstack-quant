@@ -136,50 +136,21 @@ test('attributePortfolioPnl and its result methods match Python', () => {
   );
 });
 
-test('factorStress and positionWhatIf match Python', () => {
-  assertClose(
-    wire(
-      portfolio.factorStress(
-        book,
-        marketT0,
-        inputs.factor_model_config,
-        inputs.as_of_t0,
-        inputs.stresses
-      )
-    ),
-    expected.factor_stress
-  );
-  const whatIf = portfolio.positionWhatIf(
-    book,
-    marketT0,
-    inputs.factor_model_config,
-    inputs.as_of_t0,
-    inputs.changes
-  );
-  assertClose(wire(whatIf), expected.position_what_if);
-  assert.ok(whatIf.before.total_risk > whatIf.after.total_risk);
-  assert.throws(
-    () =>
-      portfolio.positionWhatIf(book, marketT0, inputs.factor_model_config, inputs.as_of_t0, [
-        { kind: 'add', position: {} },
-      ]),
-    (error) => error.kind === 'validation' && /unknown variant/.test(error.message)
-  );
-  assert.throws(
-    () =>
-      portfolio.positionWhatIf(book, marketT0, inputs.factor_model_config, inputs.as_of_t0, [
-        { kind: 'remove', position_id: 'NOPE' },
-      ]),
-    (error) => error.kind === 'validation'
-  );
-});
-
-test('FactorModel handle reuses one model and matches the free functions', () => {
+test('FactorModel handle reuses one model and matches Python', () => {
   const model = portfolio.FactorModel.fromConfig(inputs.factor_model_config);
   try {
     const asOf = inputs.as_of_t0;
     const whatIf = model.positionWhatIf(book, marketT0, asOf, inputs.changes);
     assertClose(wire(whatIf), expected.position_what_if);
+    assert.ok(whatIf.before.total_risk > whatIf.after.total_risk);
+    assert.throws(
+      () => model.positionWhatIf(book, marketT0, asOf, [{ kind: 'add', position: {} }]),
+      (error) => error.kind === 'validation' && /unknown variant/.test(error.message)
+    );
+    assert.throws(
+      () => model.positionWhatIf(book, marketT0, asOf, [{ kind: 'remove', position_id: 'NOPE' }]),
+      (error) => error.kind === 'validation'
+    );
     const stress = model.factorStress(book, marketT0, asOf, inputs.stresses);
     assertClose(wire(stress), expected.factor_stress);
 

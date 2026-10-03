@@ -233,7 +233,7 @@ test('SABR parameters, smile and calibrator expose the Rust members', () => {
   assert.throws(() => SabrParameters.fromJson('{"alpha":-0.2,"beta":1,"nu":0.3,"rho":0}'), {
     kind: 'validation',
   });
-  assert.equal(SabrParameters.equityStandard(0.2, 0.3, -0.2).beta, 1.0);
+  assert.equal(SabrParameters.lognormal(0.2, 0.3, -0.2).beta, 1.0);
   assert.equal(SabrParameters.ratesStandard(0.2, 0.3, -0.2).beta, 0.5);
   assert.equal(SabrParameters.normal(0.01, 0.3, -0.2).beta, 0.0);
   assert.equal(SabrParameters.lognormal(0.2, 0.3, -0.2).beta, 1.0);

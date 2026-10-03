@@ -4,12 +4,11 @@ use pyo3::types::{PyDict, PyList};
 use finstack_quant_models::factor::risk::{
     self as model_risk, StressAttribution, StressPositionEntry, TailScenarioBreakdown,
 };
-use finstack_quant_portfolio::factor_model::{self as fm, StressPnl, StressResult};
+use finstack_quant_portfolio::factor_model::{StressPnl, StressResult};
 
-use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
 use crate::bindings::pandas_utils::{dict_to_dataframe, serde_object_to_single_row_dataframe};
 use crate::bindings::repr_support::repr_from_serde;
-use crate::errors::{core_to_py, display_to_py, portfolio_to_py, value_error};
+use crate::errors::{core_to_py, value_error};
 
 use super::super::json_bridge::{deserialize_json, serialize_json};
 use super::contributions::PyRiskDecomposition;
@@ -635,49 +634,6 @@ impl PyStressAttribution {
         let frame = self.to_dataframe(py).ok()?;
         frame.call_method0("_repr_html_").ok()?.extract().ok()
     }
-}
-
-/// Run a factor-stress scenario and revalue the portfolio under the stressed market.
-///
-/// ``as_of`` accepts either a date-like object (``datetime.date``,
-/// ``pandas.Timestamp``) or an ISO 8601 string.
-#[pyfunction]
-#[pyo3(signature = (portfolio, market, factor_model_config_json, as_of, stresses))]
-pub(super) fn factor_stress(
-    py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
-    factor_model_config_json: &str,
-    as_of: &Bound<'_, PyAny>,
-    stresses: Vec<(String, f64)>,
-) -> PyResult<PyStressResult> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let market = extract_market_ref(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
-    let config_json = factor_model_config_json.to_owned();
-    let config: finstack_quant_models::factor::FactorModelConfig = py
-        .detach(move || serde_json::from_str(&config_json))
-        .map_err(display_to_py)?;
-
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
-    let result = py
-        .detach(move || {
-            let stresses = stresses
-                .into_iter()
-                .map(|(factor_id, shift)| {
-                    (
-                        finstack_quant_models::factor::FactorId::new(factor_id),
-                        shift,
-                    )
-                })
-                .collect::<Vec<_>>();
-            let model = fm::FactorModelBuilder::new().config(config).build()?;
-            model.factor_stress(portfolio_ref, market_ref, as_of, &stresses)
-        })
-        .map_err(portfolio_to_py)?;
-
-    Ok(PyStressResult::from_inner(result))
 }
 
 /// Build tail-scenario stress attribution from position x scenario P&Ls.

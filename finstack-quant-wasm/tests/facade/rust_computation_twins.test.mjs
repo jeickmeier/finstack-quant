@@ -237,7 +237,7 @@ test('Bond presets, zeroCoupon and return floors construct validated bonds', () 
   );
 });
 
-test('instrumentCashflows is the typed twin of instrumentCashflowsJson', () => {
+test('instrumentCashflows accepts JSON and market handles', () => {
   const zc = valuations.instruments.Bond.zeroCoupon(
     'ZC',
     new core.Money(1_000_000, usd()),
@@ -248,8 +248,6 @@ test('instrumentCashflows is the typed twin of instrumentCashflowsJson', () => {
   const args = [zc.toJson(), FLAT_USD_MARKET, '2024-01-15', 'discounting'];
   const envelope = valuations.instruments.instrumentCashflows(...args);
   assert.equal(typeof envelope, 'object');
-  // Same Rust envelope; JSON.stringify spells whole floats without `.0`.
-  assert.deepEqual(envelope, JSON.parse(valuations.instruments.instrumentCashflowsJson(...args)));
   const market = core.MarketContext.fromJson(FLAT_USD_MARKET);
   const handled = valuations.instruments.instrumentCashflowsWithMarket(
     zc.toJson(),

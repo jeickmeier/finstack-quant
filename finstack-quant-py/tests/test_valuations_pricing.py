@@ -8,7 +8,7 @@ import json
 import pytest
 
 from finstack_quant.valuations.instruments import (
-    instrument_cashflows_json,
+    instrument_cashflows,
     price_instrument,
     structured_credit_tranche_breakeven_cdr,
     structured_credit_tranche_discount_margin,
@@ -632,7 +632,7 @@ def test_python_pricing_routes_validate_instrument_before_other_inputs() -> None
             model="not-a-model",
             metrics=["not-a-metric"],
         ),
-        lambda: instrument_cashflows_json(invalid, market, "not-a-date", "not-a-model"),
+        lambda: instrument_cashflows(invalid, market, "not-a-date", "not-a-model").to_json(),
         lambda: structured_credit_tranche_discount_margin(invalid, "missing", market, "not-a-date", float("nan")),
         lambda: structured_credit_tranche_breakeven_cdr(invalid, "missing", market, "not-a-date"),
         lambda: structured_credit_tranche_oas(invalid, "missing", market, "not-a-date", float("nan"), "not-json"),

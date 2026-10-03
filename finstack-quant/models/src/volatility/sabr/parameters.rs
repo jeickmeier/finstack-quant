@@ -123,15 +123,6 @@ impl SabrParameters {
         Ok(())
     }
 
-    /// Equity market standard (beta = 1.0).
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any SABR parameter is invalid.
-    pub fn equity_standard(alpha: f64, nu: f64, rho: f64) -> Result<Self> {
-        Self::new(alpha, 1.0, nu, rho)
-    }
-
     /// Rates market standard (beta = 0.5).
     ///
     /// # Errors

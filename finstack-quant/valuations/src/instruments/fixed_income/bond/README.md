@@ -382,7 +382,7 @@ the unit tests in `pricing/return_floor.rs` and by
   `finstack_quant.valuations.instruments.price_instrument(instrument_json, market, as_of, ...)`.
 - **WASM**: `valuations.instruments.Bond`, plus the JSON-envelope entry points
   `valuations.instruments.priceInstrument`,
-  `valuations.instruments.instrumentCashflowsJson` and
+  `valuations.instruments.instrumentCashflows` and
   `valuations.instruments.bondFromCashflowsJson`.
 
 Both paths use the canonical `finstack_quant.instrument/1` envelope with

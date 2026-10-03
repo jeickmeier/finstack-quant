@@ -376,7 +376,7 @@ def _coupon_fee_floating() -> Any:
         _rate_spec_field("fallback", FloatingRateFallback.fixed_rate("0.03")),
         _rate_spec_field("compounding", FloatingLegCompounding.compounded_in_arrears(5)),
         _rate_spec_field("compounding", FloatingLegCompounding.compounded_with_observation_shift(2)),
-        _rate_spec_field("compounding", FloatingLegCompounding.compounded_with_rate_cutoff(3)),
+        _rate_spec_field("compounding", FloatingLegCompounding.rate_cutoff(3)),
         wire(FloatingRateSpec.sofr("150")),
         wire(FloatingRateSpec.sonia("25.5")),
         wire(FloatingRateSpec.euribor_3m("-10")),

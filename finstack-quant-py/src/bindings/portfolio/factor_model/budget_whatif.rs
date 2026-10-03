@@ -8,9 +8,6 @@ use finstack_quant_models::factor::risk::{
 };
 use finstack_quant_portfolio::factor_model::{self as fm, FactorContributionDelta, WhatIfResult};
 
-use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
-use crate::errors::portfolio_to_py;
-
 use super::super::json_bridge::{deserialize_json, serialize_json};
 use super::contributions::PyRiskDecomposition;
 
@@ -509,39 +506,4 @@ pub(super) fn evaluate_risk_budget(
         .map_err(crate::errors::core_to_py)?;
 
     Ok(PyRiskBudgetResult::from_inner(result))
-}
-
-/// Run position remove/resize what-if analysis from a factor-model config.
-///
-/// ``as_of`` accepts either a date-like object (``datetime.date``,
-/// ``pandas.Timestamp``) or an ISO 8601 string.
-#[pyfunction]
-#[pyo3(signature = (portfolio, market, factor_model_config_json, as_of, changes))]
-pub(super) fn position_what_if(
-    py: Python<'_>,
-    portfolio: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
-    factor_model_config_json: &str,
-    as_of: &Bound<'_, PyAny>,
-    changes: &Bound<'_, PyAny>,
-) -> PyResult<PyWhatIfResult> {
-    let portfolio = extract_portfolio_ref(py, portfolio)?;
-    let market = extract_market_ref(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
-    let config_json = factor_model_config_json.to_owned();
-    let config: finstack_quant_models::factor::FactorModelConfig = py
-        .detach(move || serde_json::from_str(&config_json))
-        .map_err(crate::errors::display_to_py)?;
-    let changes = parse_position_changes(py, changes)?;
-
-    let portfolio_ref: &finstack_quant_portfolio::Portfolio = &portfolio;
-    let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
-    let result = py
-        .detach(move || {
-            let model = fm::FactorModelBuilder::new().config(config).build()?;
-            model.position_what_if(portfolio_ref, market_ref, as_of, &changes)
-        })
-        .map_err(portfolio_to_py)?;
-
-    Ok(PyWhatIfResult::from_inner(result))
 }

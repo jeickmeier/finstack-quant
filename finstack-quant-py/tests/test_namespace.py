@@ -308,6 +308,7 @@ class TestPortfolioNamespace:
     def test_portfolio_exports(self) -> None:
         """Portfolio should export parsing, building, metric functions, and typed wrappers."""
         from finstack_quant.portfolio import (  # noqa: F401
+            FactorModel,
             FactorPnlProfile,
             Portfolio,
             PortfolioError,
@@ -321,9 +322,7 @@ class TestPortfolioNamespace:
             compute_factor_sensitivities,
             compute_pnl_profiles,
             decompose_factor_risk,
-            factor_stress,
             parse_portfolio_spec_json,
-            position_what_if,
         )
 
     def test_factor_risk_exports(self) -> None:

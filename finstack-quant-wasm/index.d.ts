@@ -15367,14 +15367,6 @@ export interface CashflowsNamespace {
    */
   floatingLegCompoundingCompoundedWithObservationShift(shiftDays: number): generated.cashflows.FloatingLegCompounding;
 
-  /**
-   * Overnight compounding with a rate cutoff before period end.
-   *
-   * @param cutoffDays - Business days before period end from which the last observed rate is repeated (non-negative integer).
-   * @returns `FloatingLegCompounding` wire value `{ compounded_with_rate_cutoff: { cutoff_days } }`.
-   * @throws If `cutoffDays` is not a non-negative integer (kind `invalid_type`).
-   */
-  floatingLegCompoundingCompoundedWithRateCutoff(cutoffDays: number): generated.cashflows.FloatingLegCompounding;
 
   /**
    * USD SOFR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::sofr`).
@@ -24039,45 +24031,7 @@ export interface ValuationInstrumentsNamespace {
     marketHistory?: JsonInput | null
   ): ValuationResult;
   /**
-   * Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
-   *
-   * `model` must be `"discounting"` or `"hazard_rate"`. Unsupported models or
-   * incompatible instrument types throw. Hazard-rate export also rejects bonds
-   * with call, put, or return-floor rights because static rows cannot represent
-   * exercise-contingent value. For supported static-flow pairs, the envelope's
-   * `total_pv` matches the instrument's `base_value` within rounding.
-   * @returns Per-flow cashflow envelope JSON (discount factor, survival, PV).
-   * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Must be `"discounting"` or `"hazard_rate"`; `"default"` is not accepted.
-   * @throws Error - Throws a JavaScript exception if the instrument or market JSON or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, a bond with embedded exercise rights is requested under a static cashflow model, required curves are missing, the schedule mixes currencies, canonical pricing fails, or the cash-flow envelope cannot be serialized.
-   */
-  instrumentCashflowsJson(
-    instrumentJson: JsonInput,
-    marketJson: JsonInput,
-    asOf: string,
-    model: string
-  ): string;
-  /**
-   * Per-flow cashflow envelope using a pre-parsed `core.MarketContext` handle. Hazard-rate export
-   * rejects bonds with call, put, or return-floor rights because static rows
-   * cannot represent exercise-contingent value.
-   * @returns Per-flow cashflow envelope JSON using the pre-parsed market.
-   * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
-   * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param model - Must be `"discounting"` or `"hazard_rate"`; `"default"` is not accepted.
-   * @throws Error - Throws a JavaScript exception if `instrumentJson` or `asOf` is invalid, `model` is unsupported or incompatible with the instrument, a bond with embedded exercise rights is requested under a static cashflow model, required curves are missing, the schedule mixes currencies, canonical pricing fails, or the cash-flow envelope cannot be serialized.
-   */
-  instrumentCashflowsWithMarketJson(
-    instrumentJson: JsonInput,
-    market: MarketContext,
-    asOf: string,
-    model: string
-  ): string;
-  /**
-   * Per-flow cashflow envelope for an instrument, as a plain object (typed twin of `instrumentCashflowsJson`; `JSON.stringify` of the result equals that string).
+   * Per-flow cashflow envelope for an instrument, as a plain object.
    * @param instrumentJson - Required `finstack_quant.instrument/1` envelope.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -24092,7 +24046,7 @@ export interface ValuationInstrumentsNamespace {
     model: string
   ): generated.valuations.InstrumentCashflowEnvelope;
   /**
-   * Per-flow cashflow envelope using a pre-parsed `core.MarketContext` handle, as a plain object (typed twin of `instrumentCashflowsWithMarketJson`).
+   * Per-flow cashflow envelope using a pre-parsed `core.MarketContext` handle, as a plain object.
    * @param instrumentJson - Canonical instrument envelope JSON in the Finstack v1 schema.
    * @param market - Pre-parsed `core.MarketContext` handle supplying curves, quotes, and FX data.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
@@ -25697,15 +25651,6 @@ export interface SabrParametersConstructor {
    * @returns A `SabrParameters` handle.
    */
   ratesDefault(): SabrParameters;
-  /**
-   * Equity market standard SABR parameters (`beta = 1.0`).
-   * @param alpha - Positive initial Black volatility as a decimal.
-   * @param nu - Finite non-negative volatility of volatility per square-root year.
-   * @param rho - Forward/volatility correlation in `[-1, 1]`.
-   * @returns A validated `SabrParameters` handle.
-   * @throws Error - Throws a `FinstackError` (kind `validation`) if `alpha` is not finite and positive, `nu` is negative or non-finite, `rho` is outside `[-1, 1]`.
-   */
-  equityStandard(alpha: number, nu: number, rho: number): SabrParameters;
   /**
    * Rates market standard SABR parameters (`beta = 0.5`).
    * @param alpha - Positive initial volatility on the `beta = 0.5` CEV backbone (decimal).
@@ -35945,49 +35890,6 @@ export interface PortfolioNamespace {
    * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `specJson` is not a JSON string or plain object, and a `FinstackError` (kind `validation`) if it does not match the `WeightAllocationSpec` schema or violates a scheme invariant.
    */
   validateAllocationJson(specJson: WeightAllocationSpec | string): string;
-  /**
-   * Run a factor-stress scenario and revalue the portfolio under the stressed market.
-   *
-   * Each stress shifts one configured factor by an absolute amount in that
-   * factor's own bump units. Returns the `StressResult`: base-currency
-   * `total_pnl`, per-position `position_pnl`, and the `stressed_decomposition`
-   * of risk under the stressed market.
-   * @param portfolio - Built portfolio whose positions are revalued.
-   * @param market - `core.MarketContext` handle holding the unstressed curves, quotes and FX data.
-   * @param factorModelConfig - `FactorModelConfig` object or JSON: factor definitions, matching rules, covariance and risk measure.
-   * @param asOf - ISO-8601 valuation date.
-   * @param stresses - Array of `[factorId, shift]` pairs; every `factorId` must be a factor of the configured model.
-   * @returns The `StressResult`.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a `FinstackError` if the config or stresses are malformed, `asOf` is not an ISO date, a stress names an unknown factor, or the market bump, valuation, sensitivity or decomposition step fails.
-   */
-  factorStress(
-    portfolio: Portfolio,
-    market: MarketContext,
-    factorModelConfig: FactorModelConfig | string,
-    asOf: string,
-    stresses: [string, number][] | string
-  ): StressResult;
-  /**
-   * Run a position remove/resize what-if analysis against a factor model.
-   *
-   * Decomposes the portfolio's baseline risk, applies the changes and
-   * decomposes again. Returns the `WhatIfResult`: the `before` and `after`
-   * risk decompositions and the per-factor `delta`.
-   * @param portfolio - Built portfolio the changes are applied to.
-   * @param market - `core.MarketContext` handle holding the curves, quotes and FX data.
-   * @param factorModelConfig - `FactorModelConfig` object or JSON: factor definitions, matching rules, covariance and risk measure.
-   * @param asOf - ISO-8601 valuation date.
-   * @param changes - Array of `PositionChange` objects: `{ kind: "remove", position_id }` or `{ kind: "resize", position_id, new_quantity }`.
-   * @returns The `WhatIfResult`.
-   * @throws Error - Throws a `TypeError` (kind `invalid_type`) for a mistyped argument, and a `FinstackError` if the config or changes are malformed, `asOf` is not an ISO date, a change names an unknown position, or factor assignment, sensitivity or decomposition fails.
-   */
-  positionWhatIf(
-    portfolio: Portfolio,
-    market: MarketContext,
-    factorModelConfig: FactorModelConfig | string,
-    asOf: string,
-    changes: PositionChange[] | string
-  ): WhatIfResult;
   /**
    * Decompose every portfolio position into primitive economic exposures.
    *

@@ -110,7 +110,6 @@ const EXPORTED_KEYS = [
   'feeSpecPeriodicBp',
   'floatingLegCompoundingCompoundedInArrears',
   'floatingLegCompoundingCompoundedWithObservationShift',
-  'floatingLegCompoundingCompoundedWithRateCutoff',
   'floatingLegCompoundingEstr',
   'floatingLegCompoundingFedfunds',
   'floatingLegCompoundingIsOvernight',

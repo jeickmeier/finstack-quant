@@ -15,7 +15,7 @@ from finstack_quant.valuations import ValuationResult
 from finstack_quant.valuations.instruments import (
     Bond,
     TermLoan,
-    instrument_cashflows_json,
+    instrument_cashflows,
     price_instrument,
 )
 
@@ -204,11 +204,11 @@ class TestBondTyped:
         reparsed = json.loads(ValuationResult.from_json(wire).to_json())
         assert reparsed == _approx_payload(json.loads(wire))
 
-    def test_instrument_cashflows_json_accepts_typed(self) -> None:
+    def test_instrument_cashflows_accepts_typed(self) -> None:
         bond = _fixed_bond()
         market = _market_json()
-        typed = instrument_cashflows_json(bond, market, "2024-06-30", "discounting")
-        via_json = instrument_cashflows_json(bond.to_json(), market, "2024-06-30", "discounting")
+        typed = instrument_cashflows(bond, market, "2024-06-30", "discounting").to_json()
+        via_json = instrument_cashflows(bond.to_json(), market, "2024-06-30", "discounting").to_json()
         assert json.loads(typed) == json.loads(via_json)
 
 

@@ -54,11 +54,13 @@ const cases = inputs.map(({ type, request }) => {
   let cashflows = null,
     error = null;
   try {
-    cashflows = native.instrumentCashflowsJson(
-      request.instrumentJson,
-      request.marketJson,
-      request.asOf,
-      request.model,
+    cashflows = JSON.stringify(
+      native.instrumentCashflows(
+        request.instrumentJson,
+        request.marketJson,
+        request.asOf,
+        request.model,
+      ),
     );
   } catch (failure) {
     error = failure.message;
@@ -83,7 +85,7 @@ const sources = await Promise.all(
 const output = await prettier.format(
   JSON.stringify({
     description:
-      "Actual native cashflow text, retained verbatim; no inferred row schema or financial reconciliation.",
+      "Serialized native cashflow envelopes; no inferred row schema or financial reconciliation.",
     sources,
     cases,
   }),

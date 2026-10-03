@@ -381,7 +381,7 @@ fn factor_deltas(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::factor_model::{FactorModel, FactorModelBuilder};
+    use crate::factor_model::FactorModel;
     use crate::position::{Position, PositionUnit};
     use crate::sensitivity::{FactorSensitivityEngine, SensitivityMatrix};
     use crate::test_utils::build_test_market_at;
@@ -867,40 +867,38 @@ mod tests {
         .expect("covariance");
         let mut tags = BTreeMap::new();
         tags.insert("rating".to_string(), "B".to_string());
-        let model = FactorModelBuilder::new()
-            .config(FactorModelConfig {
-                factors,
-                covariance,
-                matching: MatchingConfig::CreditHierarchical(CreditHierarchicalConfig {
-                    dependency_filter: Default::default(),
-                    hierarchy: CreditHierarchySpec {
-                        levels: vec![HierarchyDimension::Rating],
+        let model = FactorModel::from_config(FactorModelConfig {
+            factors,
+            covariance,
+            matching: MatchingConfig::CreditHierarchical(CreditHierarchicalConfig {
+                dependency_filter: Default::default(),
+                hierarchy: CreditHierarchySpec {
+                    levels: vec![HierarchyDimension::Rating],
+                },
+                issuer_betas: vec![IssuerBetaRow {
+                    issuer_id: finstack_quant_core::types::IssuerId::new("ISSUER-B"),
+                    tags: IssuerTags(tags),
+                    mode: IssuerBetaMode::IssuerBeta,
+                    betas: IssuerBetas {
+                        pc: 9.0,
+                        levels: vec![11.0],
                     },
-                    issuer_betas: vec![IssuerBetaRow {
-                        issuer_id: finstack_quant_core::types::IssuerId::new("ISSUER-B"),
-                        tags: IssuerTags(tags),
-                        mode: IssuerBetaMode::IssuerBeta,
-                        betas: IssuerBetas {
-                            pc: 9.0,
-                            levels: vec![11.0],
-                        },
-                        adder_at_anchor: 0.0,
-                        adder_vol_annualized: 0.0,
-                        adder_vol_source: AdderVolSource::Default,
-                        fit_quality: None,
-                        level_fit_quality: vec![],
-                        spread_duration: 1.0,
-                    }],
-                    require_issuer_id: false,
-                }),
-                pricing_mode: PricingMode::DeltaBased,
-                risk_measure: RiskMeasure::Variance,
-                bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Warn),
-            })
-            .with_custom_sensitivity_engine(FixedSensitivityEngine)
-            .build()
-            .expect("model");
+                    adder_at_anchor: 0.0,
+                    adder_vol_annualized: 0.0,
+                    adder_vol_source: AdderVolSource::Default,
+                    fit_quality: None,
+                    level_fit_quality: vec![],
+                    spread_duration: 1.0,
+                }],
+                require_issuer_id: false,
+            }),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: RiskMeasure::Variance,
+            bump_config: None,
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
+        })
+        .map(|model| model.with_custom_sensitivity_engine(FixedSensitivityEngine))
+        .expect("model");
         let mut bond = finstack_quant_valuations::instruments::Bond::fixed(
             "BOND-ISSUER-B",
             Money::from((1_000_000_i64, Currency::USD)),
@@ -1040,34 +1038,32 @@ mod tests {
             return None;
         };
 
-        let model_result = FactorModelBuilder::new()
-            .config(FactorModelConfig {
-                factors: vec![FactorDefinition {
-                    id: FactorId::new("Rates"),
-                    factor_type: FactorType::Rates,
-                    market_mapping: MarketMapping::CurveParallel {
-                        curve_ids: vec![CurveId::new("USD-OIS")],
-                        units: BumpUnits::RateBp,
-                    },
-                    description: None,
-                }],
-                covariance,
-                matching: MatchingConfig::MappingTable(vec![MappingRule {
-                    dependency_filter: DependencyFilter {
-                        dependency_type: Some(DependencyType::Discount),
-                        curve_type: Some(CurveType::Discount),
-                        id: None,
-                    },
-                    attribute_filter: finstack_quant_models::factor::AttributeFilter::default(),
-                    factor_id: FactorId::new("Rates"),
-                }]),
-                pricing_mode: PricingMode::DeltaBased,
-                risk_measure: RiskMeasure::Variance,
-                bump_config: None,
-                unmatched_policy: Some(UnmatchedPolicy::Warn),
-            })
-            .with_custom_sensitivity_engine(FixedSensitivityEngine)
-            .build();
+        let model_result = FactorModel::from_config(FactorModelConfig {
+            factors: vec![FactorDefinition {
+                id: FactorId::new("Rates"),
+                factor_type: FactorType::Rates,
+                market_mapping: MarketMapping::CurveParallel {
+                    curve_ids: vec![CurveId::new("USD-OIS")],
+                    units: BumpUnits::RateBp,
+                },
+                description: None,
+            }],
+            covariance,
+            matching: MatchingConfig::MappingTable(vec![MappingRule {
+                dependency_filter: DependencyFilter {
+                    dependency_type: Some(DependencyType::Discount),
+                    curve_type: Some(CurveType::Discount),
+                    id: None,
+                },
+                attribute_filter: finstack_quant_models::factor::AttributeFilter::default(),
+                factor_id: FactorId::new("Rates"),
+            }]),
+            pricing_mode: PricingMode::DeltaBased,
+            risk_measure: RiskMeasure::Variance,
+            bump_config: None,
+            unmatched_policy: Some(UnmatchedPolicy::Warn),
+        })
+        .map(|model| model.with_custom_sensitivity_engine(FixedSensitivityEngine));
         assert!(model_result.is_ok());
         let Ok(model) = model_result else {
             return None;

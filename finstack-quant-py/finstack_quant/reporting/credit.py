@@ -21,7 +21,7 @@ from typing import Any
 
 from . import charts, format as fmt, tables
 from .document import KPI, Section, TearSheet, _resolve_sections
-from .statements_common import json_or_dict, parse_statement, pl_matrix_table
+from .statements_common import StatementView, json_or_dict, parse_statement, pl_matrix_table
 from .theme import INSTITUTIONAL, Theme
 
 __all__ = [
@@ -110,10 +110,9 @@ def _section_covenants(covenants: Any) -> Section | None:
     )
 
 
-def _section_pl(results: Any) -> Section | None:
-    if results is None:
+def _section_pl(view: StatementView | None) -> Section | None:
+    if view is None:
         return None
-    view = parse_statement(results)
     present = set(view.node_ids())
     rows = [row for row in _EBITDA_BUILD if row[1] in present]
     if not rows:
@@ -179,6 +178,7 @@ def credit_tearsheet(
     wanted = _resolve_sections(sections, ALL_SECTIONS)
 
     asmt = json_or_dict(assessment, noun="assessment")
+    view = parse_statement(results) if results is not None else None
 
     secs: list[Section] = []
     if "ratios" in wanted and (s := _section_ratios(asmt, theme)) is not None:
@@ -187,7 +187,7 @@ def credit_tearsheet(
         secs.append(s)
     if "covenants" in wanted and (s := _section_covenants(covenants)) is not None:
         secs.append(s)
-    if "pl" in wanted and (s := _section_pl(results)) is not None:
+    if "pl" in wanted and (s := _section_pl(view)) is not None:
         secs.append(s)
 
     lev = asmt.get("leverage_ratio")
@@ -206,7 +206,7 @@ def credit_tearsheet(
         eyebrow="Credit Profile",
         title=title or "Credit Assessment",
         subtitle=subtitle if subtitle is not None else (f"As of {as_of}" if as_of else None),
-        meta_lines=parse_statement(results).meta_lines() if results is not None else [],
+        meta_lines=view.meta_lines() if view is not None else [],
         kpis=kpis,
         sections=secs,
         generated=generated,

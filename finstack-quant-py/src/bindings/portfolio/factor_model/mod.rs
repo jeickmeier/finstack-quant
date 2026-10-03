@@ -9,8 +9,7 @@
 //! ``FactorModel`` is a stateful handle built once from a ``FactorModelConfig``
 //! (Rust ``FactorModel::from_config``) and reused for assignment,
 //! sensitivities, risk decomposition, position what-if and factor stress. The
-//! Rust ``FactorModelBuilder`` and borrowed ``WhatIfEngine`` stay Rust-only:
-//! ``FactorModel.from_config`` and ``FactorModel.position_what_if`` cover them.
+//! Borrowed ``WhatIfEngine`` stays Rust-only; the handle owns its lifecycle.
 
 mod assignment;
 mod budget_whatif;
@@ -25,8 +24,8 @@ use pyo3::prelude::*;
 
 use assignment::{PyFactorAssignmentReport, PyPositionAssignment, PyUnmatchedEntry};
 use budget_whatif::{
-    evaluate_risk_budget, position_what_if, PyFactorContributionDelta, PyPositionBudgetEntry,
-    PyRiskBudgetResult, PyWhatIfResult,
+    evaluate_risk_budget, PyFactorContributionDelta, PyPositionBudgetEntry, PyRiskBudgetResult,
+    PyWhatIfResult,
 };
 use config::{PyDecompositionConfig, PyVolHorizon};
 pub(crate) use contributions::PyRiskDecomposition;
@@ -43,8 +42,8 @@ use functions::{
 };
 use model::PyFactorModel;
 use stress::{
-    build_stress_attribution, factor_stress, PyStressAttribution, PyStressPnl,
-    PyStressPositionEntry, PyStressResult, PyTailScenarioBreakdown,
+    build_stress_attribution, PyStressAttribution, PyStressPnl, PyStressPositionEntry,
+    PyStressResult, PyTailScenarioBreakdown,
 };
 
 /// Register factor_model typed result classes and typed-sibling functions on
@@ -61,8 +60,6 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyLevelVolContribution>()?;
     m.add_class::<PyPositionVolContribution>()?;
     m.add_class::<PyCreditVolReport>()?;
-    m.add_function(wrap_pyfunction!(factor_stress, m)?)?;
-    m.add_function(wrap_pyfunction!(position_what_if, m)?)?;
     m.add_function(wrap_pyfunction!(build_credit_vol_report, m)?)?;
 
     Ok(())

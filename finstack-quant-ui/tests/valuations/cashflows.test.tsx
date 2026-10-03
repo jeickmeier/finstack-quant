@@ -98,20 +98,24 @@ it("pins authoritative fixture sources and exact current native exports", () => 
     ).toEqual(entry.pricedValue);
     if (entry.cashflows !== null)
       expect(
-        native.instrumentCashflowsJson(
-          r.instrumentJson,
-          r.marketJson,
-          r.asOf,
-          r.model,
+        JSON.stringify(
+          native.instrumentCashflows(
+            r.instrumentJson,
+            r.marketJson,
+            r.asOf,
+            r.model,
+          ),
         ),
       ).toBe(entry.cashflows);
     else
       expect(() =>
-        native.instrumentCashflowsJson(
-          r.instrumentJson,
-          r.marketJson,
-          r.asOf,
-          r.model,
+        JSON.stringify(
+          native.instrumentCashflows(
+            r.instrumentJson,
+            r.marketJson,
+            r.asOf,
+            r.model,
+          ),
         ),
       ).toThrow(entry.error!);
   }
@@ -295,8 +299,8 @@ it.each([
   fixture.cases[0].cashflows!.replace(/,"discount_curve_id":"[^"]+"/, ""),
   '{"flows":[]}',
   fixture.cases[0].cashflows!.replace(
-    '"amount":-1000000.0',
-    '"amount":"-1000000.0"',
+    '"amount":-1000000',
+    '"amount":"-1000000"',
   ),
 ])(
   "rejects malformed/unsupported envelopes visibly and preserves the source",

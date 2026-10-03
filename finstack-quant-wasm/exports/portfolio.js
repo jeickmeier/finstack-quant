@@ -84,8 +84,6 @@ export const portfolio = {
   allocateWeights: wasm.allocateWeights,
   allocateWeightsJson: wasm.allocateWeightsJson,
   validateAllocationJson: wasm.validateAllocationJson,
-  factorStress: wasm.factorStress,
-  positionWhatIf: wasm.positionWhatIf,
   buildCreditVolReport: wasm.buildCreditVolReport,
   // Raw export is prefixed: `primitiveExposures` is also the composite
   // namespace name (valuations.composite), so the raw names must differ.

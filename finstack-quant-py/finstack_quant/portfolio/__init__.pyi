@@ -127,7 +127,6 @@ __all__ = [
     "excess_returns_json",
     "factor_brinson_attribution",
     "factor_brinson_attribution_json",
-    "factor_stress",
     "grid_attribution",
     "grid_attribution_json",
     "grid_carino_link",
@@ -136,7 +135,6 @@ __all__ = [
     "net_in_currency_by_date",
     "optimize_portfolio",
     "parse_portfolio_spec_json",
-    "position_what_if",
     "primitive_exposures",
     "rebalance_from_spec",
     "replay_portfolio",
@@ -10294,125 +10292,6 @@ class CreditVolReport:
         str
         """
         ...
-
-def factor_stress(
-    portfolio: Portfolio | str,
-    market: MarketContext | str,
-    factor_model_config_json: str,
-    as_of: datetime.date | str,
-    stresses: list[tuple[str, float]],
-) -> StressResult:
-    """
-    Run a factor-stress scenario and revalue the portfolio.
-
-    Builds the Rust factor model from ``factor_model_config_json``, analyzes
-    the base portfolio, computes sensitivities, applies the requested factor
-    shifts, and returns the stressed result.
-
-    Parameters
-    ----------
-    portfolio : Portfolio or str
-        Portfolio instance or JSON portfolio specification accepted
-        by the compiled portfolio extractor.
-    market : MarketContext or str
-        MarketContext instance or JSON market context accepted by the
-        compiled market extractor.
-    factor_model_config_json : str
-        JSON-encoded ``finstack_quant_models::factor::FactorModelConfig``.
-    as_of : datetime.date | str
-        Calculation date, either a date-like object or an ISO 8601 string.
-    stresses : list[tuple[str, float]]
-        ``(factor_id, shift)`` pairs. Factor IDs must match the
-        configured model; shifts use the Rust factor model's units for that
-        factor.
-
-    Returns
-    -------
-    StressResult
-        StressResult containing base/stressed portfolio risk and per-factor
-        deltas.
-
-    Raises
-    ------
-    ValueError
-        If JSON parsing, date parsing, model construction, market
-        lookup, or portfolio valuation fails.
-    TypeError
-        If ``portfolio`` or ``market`` cannot be converted to the
-        expected Rust types.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import factor_stress
-    >>> portfolio = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> try:
-    ...     factor_stress(portfolio, MarketContext(), "{}", "2025-01-01", [])
-    ... except ValueError as exc:
-    ...     print("missing field `factors`" in str(exc))
-    True
-    """
-    ...
-
-def position_what_if(
-    portfolio: Portfolio | str,
-    market: MarketContext | str,
-    factor_model_config_json: str,
-    as_of: datetime.date | str,
-    changes: list[dict[str, Any]],
-) -> WhatIfResult:
-    """
-    Run position remove/resize what-if analysis.
-
-    The Python binding accepts JSON-like dictionaries for remove and resize
-    changes, then delegates the sensitivity reallocation and result generation
-    to Rust.
-
-    Parameters
-    ----------
-    portfolio : Portfolio or str
-        Portfolio instance or JSON portfolio specification accepted
-        by the compiled portfolio extractor.
-    market : MarketContext or str
-        MarketContext instance or JSON market context accepted by the
-        compiled market extractor.
-    factor_model_config_json : str
-        JSON-encoded ``finstack_quant_models::factor::FactorModelConfig``.
-    as_of : datetime.date | str
-        Calculation date, either a date-like object or an ISO 8601 string.
-    changes : list[dict[str, Any]]
-        List of dictionaries. Remove changes use
-        ``{"kind": "remove", "position_id": "..."}``; resize changes use
-        ``{"kind": "resize", "position_id": "...", "new_quantity": 123.0}``.
-        Supply at most one final change per position; duplicate IDs raise ValueError.
-
-    Returns
-    -------
-    WhatIfResult
-        WhatIfResult with base and scenario risk decomposition deltas.
-
-    Raises
-    ------
-    ValueError
-        If a change kind is unknown, resize omits
-        ``new_quantity``, JSON/config parsing fails, or
-        Rust factor-model evaluation fails.
-    TypeError
-        If ``portfolio`` or ``market`` cannot be converted to the
-        expected Rust types.
-
-    Examples
-    --------
-    >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.portfolio import position_what_if
-    >>> portfolio = '{"id":"empty","base_currency":"USD","as_of":"2025-01-01","entities":{},"positions":[]}'
-    >>> try:
-    ...     position_what_if(portfolio, MarketContext(), "{}", "2025-01-01", [])
-    ... except ValueError as exc:
-    ...     print("missing field `factors`" in str(exc))
-    True
-    """
-    ...
 
 def primitive_exposures(
     portfolio: Portfolio | str,

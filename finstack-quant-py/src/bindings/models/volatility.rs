@@ -111,28 +111,6 @@ impl PySabrParameters {
         }
     }
 
-    /// Equity market standard: ``beta = 1.0`` with the supplied ``alpha``, ``nu``, ``rho``.
-    ///
-    /// Parameters
-    /// ----------
-    /// alpha : float
-    ///     Positive initial Black volatility as a decimal.
-    /// nu : float
-    ///     Non-negative volatility of volatility as a decimal.
-    /// rho : float
-    ///     Forward/volatility correlation in ``[-1, 1]``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If any parameter is outside its domain.
-    #[staticmethod]
-    fn equity_standard(alpha: f64, nu: f64, rho: f64) -> PyResult<Self> {
-        SabrParameters::equity_standard(alpha, nu, rho)
-            .map(|inner| Self { inner })
-            .map_err(core_to_py)
-    }
-
     /// Rates market standard: ``beta = 0.5`` with the supplied ``alpha``, ``nu``, ``rho``.
     ///
     /// Raises ``ValueError`` if any parameter is outside its domain.

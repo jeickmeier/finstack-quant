@@ -5,9 +5,9 @@
 //! instrument; this entry point reprices a whole list under every scenario and
 //! takes the quantile of the summed P&L, so diversification is preserved.
 
+use super::instruments::spec_from_py;
 use super::pricing::PyMarketHistory;
 use crate::bindings::extract::{extract_instrument_json, extract_market};
-use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_valuations::metrics::risk::{
@@ -16,18 +16,14 @@ use finstack_quant_valuations::metrics::risk::{
 };
 use finstack_quant_valuations::pricer::PricingDispatch;
 use pyo3::prelude::*;
-use pyo3::types::{PyDict, PyString};
+use pyo3::types::PyDict;
 
 /// Coerce ``MarketHistory | dict | str`` into the Rust history.
 fn extract_history(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<MarketHistory> {
     if let Ok(typed) = obj.cast::<PyMarketHistory>() {
         return Ok(typed.borrow().inner.clone());
     }
-    if let Ok(text) = obj.cast::<PyString>() {
-        return serde_json::from_str(text.to_str()?)
-            .map_err(|e| crate::errors::serde_json_to_py(e, "invalid MarketHistory JSON"));
-    }
-    py_to_serde(py, obj, "MarketHistory")
+    spec_from_py(py, obj, "MarketHistory")
 }
 
 /// Coerce ``dict | str | None`` into a `VarConfig`; ``None`` is Rust's default.
@@ -35,13 +31,7 @@ fn extract_config(py: Python<'_>, obj: Option<&Bound<'_, PyAny>>) -> PyResult<Va
     match obj {
         None => Ok(VarConfig::default()),
         Some(obj) if obj.is_none() => Ok(VarConfig::default()),
-        Some(obj) => {
-            if let Ok(text) = obj.cast::<PyString>() {
-                return serde_json::from_str(text.to_str()?)
-                    .map_err(|e| crate::errors::serde_json_to_py(e, "invalid VarConfig JSON"));
-            }
-            py_to_serde(py, obj, "VarConfig")
-        }
+        Some(obj) => spec_from_py(py, obj, "VarConfig"),
     }
 }
 

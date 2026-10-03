@@ -160,40 +160,6 @@ class SabrParameters:
         ...
 
     @staticmethod
-    def equity_standard(alpha: float, nu: float, rho: float) -> SabrParameters:
-        """
-        Equity market standard SABR parameters with ``beta = 1.0``.
-
-        Parameters
-        ----------
-        alpha : float
-            Positive initial Black volatility as a decimal.
-        nu : float
-            Non-negative volatility of volatility per square-root year.
-        rho : float
-            Forward/volatility correlation in ``[-1, 1]``.
-
-        Returns
-        -------
-        SabrParameters
-            Validated parameters with ``beta = 1.0``.
-
-        Raises
-        ------
-        ValueError
-            If any parameter is non-finite; ``alpha`` is non-positive; ``nu``
-            is negative; ``rho`` is outside ``[-1, 1]``.
-
-        Examples
-        --------
-        >>> from finstack_quant.models.volatility import SabrParameters
-        >>> params = SabrParameters.equity_standard(0.25, 0.3, -0.2)
-        >>> (params.alpha, params.beta)
-        (0.25, 1.0)
-        """
-        ...
-
-    @staticmethod
     def rates_standard(alpha: float, nu: float, rho: float) -> SabrParameters:
         """
         Rates market standard SABR parameters with ``beta = 0.5``.

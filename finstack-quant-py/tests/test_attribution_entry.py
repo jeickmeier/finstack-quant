@@ -431,3 +431,27 @@ def test_return_contribution_keywords_apply_to_every_spec_form() -> None:
         attribute_return_contribution(spec, weighting="nonsense")
     with pytest.raises(ValueError, match="unknown field"):
         attribute_return_contribution(spec, factors=[{"bogus": 1}])
+
+
+@pytest.mark.parametrize("benchmark_value", [float("inf"), float("-inf")])
+def test_return_contribution_dataframe_rejects_infinite_benchmarks(benchmark_value: float) -> None:
+    frame = pd.DataFrame([
+        {
+            "id": "A",
+            "weight": 1.0,
+            "return": 0.02,
+            "benchmark_weight": benchmark_value,
+            "benchmark_return": benchmark_value,
+        },
+    ])
+    with pytest.raises(ValueError, match=r"benchmark fields.*must be finite"):
+        attribute_return_contribution(frame, as_of="2026-01-02")
+
+
+def test_return_contribution_dataframe_keeps_missing_benchmarks_absent() -> None:
+    frame = pd.DataFrame([
+        {"id": "A", "weight": 1.0, "return": 0.02, "benchmark_weight": float("nan"), "benchmark_return": float("nan")},
+    ])
+    result = attribute_return_contribution(frame, as_of="2026-01-02")
+    assert result.portfolio_return == pytest.approx(0.02)
+    assert result.benchmark_relative is None

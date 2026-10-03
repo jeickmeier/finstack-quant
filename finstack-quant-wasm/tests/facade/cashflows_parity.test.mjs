@@ -400,7 +400,7 @@ const cases = {
     cashflows.floatingRateFallbackFixedRate('0.03'),
     cashflows.floatingLegCompoundingCompoundedInArrears(5),
     cashflows.floatingLegCompoundingCompoundedWithObservationShift(2),
-    cashflows.floatingLegCompoundingCompoundedWithRateCutoff(3),
+    cashflows.floatingLegCompoundingRateCutoff(3),
     cashflows.floatingRateSpecSofr('150'),
     cashflows.floatingRateSpecSonia('25.5'),
     cashflows.floatingRateSpecEuribor3m('-10'),
@@ -771,10 +771,9 @@ test('CFCC-010: compounding presets and default-model survival helpers come from
   assert.deepEqual(cashflows.floatingLegCompoundingSoniaObservationShift(), {
     compounded_with_observation_shift: { shift_days: 5 },
   });
-  assert.deepEqual(
-    cashflows.floatingLegCompoundingRateCutoff(2),
-    cashflows.floatingLegCompoundingCompoundedWithRateCutoff(2)
-  );
+  assert.deepEqual(cashflows.floatingLegCompoundingRateCutoff(2), {
+    compounded_with_rate_cutoff: { cutoff_days: 2 },
+  });
   assert.equal(cashflows.floatingLegCompoundingIsOvernight('simple'), false);
   assert.equal(cashflows.floatingLegCompoundingIsOvernight('simple_average'), true);
   assert.equal(cashflows.floatingLegCompoundingIsOvernight(inArrears), true);

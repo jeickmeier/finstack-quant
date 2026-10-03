@@ -120,7 +120,6 @@ calibrating with β ≈ 0 and lognormal quotes otherwise.
 |-------------|---|-------|
 | `new(α, β, ν, ρ)` | free | Validated, `-> Result<Self>` |
 | `new_with_shift(α, β, ν, ρ, shift)` | free | Shifted variant |
-| `equity_standard(α, ν, ρ)` | 1.0 | Lognormal backbone |
 | `rates_standard(α, ν, ρ)` | 0.5 | Mixed |
 | `normal(α, ν, ρ)` / `lognormal(α, ν, ρ)` | 0 / 1 | Endpoint backbones |
 | `shifted_normal(...)` / `shifted_lognormal(...)` | 0 / 1 | With displacement |

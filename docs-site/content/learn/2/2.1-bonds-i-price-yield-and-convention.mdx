@@ -20,7 +20,7 @@ api:
 - finstack_quant.portfolio.mwr_xirr
 - finstack_quant.valuations.instruments.Bond
 - finstack_quant.valuations.instruments.bond_from_cashflows_json
-- finstack_quant.valuations.instruments.instrument_cashflows_json
+- finstack_quant.valuations.instruments.instrument_cashflows
 - finstack_quant.valuations.instruments.list_models_grouped
 - finstack_quant.valuations.instruments.list_standard_metrics
 - finstack_quant.valuations.instruments.price_instrument
@@ -192,7 +192,7 @@ from datetime import date
 from finstack_quant.cashflows.builder import CashFlowSchedule,StepUpCouponSpec,ScheduleParams
 from finstack_quant.core.dates import DayCount
 from finstack_quant.core.money import Money
-from finstack_quant.valuations.instruments import bond_from_cashflows_json,price_instrument,instrument_cashflows_json
+from finstack_quant.valuations.instruments import bond_from_cashflows_json,price_instrument,instrument_cashflows
 from _shared.analyst_book import build_market
 AS_OF = date(2025, 1, 15)
 step_schedule=(CashFlowSchedule.builder().principal(Money(2_000_000,'USD'),date(2024,1,15),date(2030,1,15))
@@ -200,7 +200,7 @@ step_schedule=(CashFlowSchedule.builder().principal(Money(2_000_000,'USD'),date(
 step_bond=bond_from_cashflows_json('STEP-UP',step_schedule.to_json(),'USD-OIS')
 step_price=price_instrument(step_bond,build_market('foundations'),AS_OF,metrics=['ytm'])
 print({'stepup_price_USD':step_price.price,'curve_implied_street_ytm':step_price.get_metric('ytm')})
-print(json.loads(instrument_cashflows_json(step_bond,build_market('foundations'),AS_OF,'discounting'))['flows'][:3])
+print(json.loads(instrument_cashflows(step_bond,build_market('foundations'),AS_OF,'discounting').to_json())['flows'][:3])
 ```
 {/* /notebook-block */}
 
@@ -292,7 +292,7 @@ import json,math
 from datetime import date
 from finstack_quant.core.dates import add_business_days
 from finstack_quant.portfolio import mwr_xirr
-from finstack_quant.valuations.instruments import price_instrument,instrument_cashflows_json
+from finstack_quant.valuations.instruments import price_instrument,instrument_cashflows
 from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
 contract=instruments('foundations')['USD-CORP']
@@ -301,7 +301,7 @@ market=build_market('foundations')
 result=price_instrument(json.dumps(contract),market,AS_OF,metrics=['ytm','dirty_price'])
 settle=add_business_days(AS_OF,1,'usny')
 flow_contract=instruments('foundations')['USD-CORP']
-flows=json.loads(instrument_cashflows_json(json.dumps(flow_contract),market,AS_OF,'discounting'))['flows']
+flows=json.loads(instrument_cashflows(json.dumps(flow_contract),market,AS_OF,'discounting').to_json())['flows']
 dated=[(date.fromisoformat(f['date']),float(f['amount'])) for f in flows if date.fromisoformat(f['date'])>settle]
 price=result.get_metric('dirty_price');xirr=mwr_xirr([(settle,-price)]+dated)
 npv=-price+sum(amount/(1+xirr)**((day-settle).days/365) for day,amount in dated)

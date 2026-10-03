@@ -230,7 +230,7 @@ Reachable from Python and WASM through the JSON envelope
   `price_instrument(...)` and `instrument_cashflows_json(...)` in the same
   namespace.
 - **WASM**: `valuations.instruments.priceInstrument` and
-  `valuations.instruments.instrumentCashflowsJson`.
+  `valuations.instruments.instrumentCashflows`.
 
 ## Limitations
 

@@ -761,7 +761,6 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
         "TrancheStructure",
         "bond_from_cashflows_json",
         "instrument_cashflows",
-        "instrument_cashflows_json",
         "instrument_envelope_from_spec",
         "list_models",
         "list_models_grouped",

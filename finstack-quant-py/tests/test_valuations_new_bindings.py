@@ -1,7 +1,7 @@
 """Smoke tests for valuation-owned cashflow and coupon-profile bindings.
 
 Covers:
-- B4: `instrument_cashflows_json` and its typed twin `instrument_cashflows`
+- B4: `instrument_cashflows` and its typed twin `instrument_cashflows`
       (``InstrumentCashflowEnvelope``).
 - Product-specific coupon-profile entry points.
 """
@@ -21,7 +21,6 @@ from finstack_quant.valuations import (
 from finstack_quant.valuations.instruments import (
     InstrumentCashflowEnvelope,
     instrument_cashflows,
-    instrument_cashflows_json,
     price_instrument,
     validate_instrument_json,
 )
@@ -85,17 +84,16 @@ def test_instrument_cashflows_deposit_reconciles_with_price() -> None:
     assert abs(pv_sum - envelope.total_pv) < 1e-6
 
 
-def test_instrument_cashflows_is_the_compiled_typed_twin_of_the_json_export() -> None:
-    """PYPY-010: the typed twin is compiled Rust, not a Python dict wrapper."""
+def test_instrument_cashflows_serialization_and_dataframe() -> None:
+    """PYPY-010: the envelope is compiled Rust and supports serialization and tabular views."""
     from finstack_quant import valuations
 
     inst_json, market = _build_deposit_market()
     envelope = instrument_cashflows(inst_json, market, "2025-01-15", "discounting")
-    text = instrument_cashflows_json(inst_json, market, "2025-01-15", "discounting")
+    text = envelope.to_json()
 
     assert not hasattr(valuations, "instrument_cashflows")
     assert type(instrument_cashflows).__name__ == "builtin_function_or_method"
-    assert json.loads(envelope.to_json()) == json.loads(text)
     assert InstrumentCashflowEnvelope.from_json(text).to_json() == envelope.to_json()
     df = envelope.to_dataframe()
     assert str(df["date"].dtype).startswith("datetime64")
@@ -105,7 +103,7 @@ def test_instrument_cashflows_is_the_compiled_typed_twin_of_the_json_export() ->
 def test_instrument_cashflows_unsupported_model_raises() -> None:
     inst_json, market = _build_deposit_market()
     with pytest.raises(ValueError, match=r"monte_carlo_gbm|supported|not priced"):
-        instrument_cashflows_json(inst_json, market, "2025-01-15", "monte_carlo_gbm")
+        instrument_cashflows(inst_json, market, "2025-01-15", "monte_carlo_gbm").to_json()
 
 
 def _revolving_credit_json(*, gearing: str | None = None, credit_curve: bool = False) -> str:
@@ -218,12 +216,12 @@ def test_revolving_credit_rejects_events_on_or_before_the_valuation_date() -> No
 
 def test_revolving_credit_credit_cashflows_fail_closed() -> None:
     with pytest.raises(ValueError, match="model-specific cashflow decomposition"):
-        instrument_cashflows_json(
+        instrument_cashflows(
             _revolving_credit_json(credit_curve=True),
             _revolving_credit_market(credit_curve=True),
             "2024-01-01",
             "discounting",
-        )
+        ).to_json()
 
 
 def test_coupon_profile_entrypoints_have_distinct_explicit_inputs() -> None:

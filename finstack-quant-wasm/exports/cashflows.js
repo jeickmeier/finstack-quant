@@ -74,8 +74,6 @@ export const cashflows = {
   floatingLegCompoundingCompoundedInArrears: wasm.floatingLegCompoundingCompoundedInArrears,
   floatingLegCompoundingCompoundedWithObservationShift:
     wasm.floatingLegCompoundingCompoundedWithObservationShift,
-  floatingLegCompoundingCompoundedWithRateCutoff:
-    wasm.floatingLegCompoundingCompoundedWithRateCutoff,
   floatingLegCompoundingEstr: wasm.floatingLegCompoundingEstr,
   floatingLegCompoundingFedfunds: wasm.floatingLegCompoundingFedfunds,
   floatingLegCompoundingIsOvernight: wasm.floatingLegCompoundingIsOvernight,

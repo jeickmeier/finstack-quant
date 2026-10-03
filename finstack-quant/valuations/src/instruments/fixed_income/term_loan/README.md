@@ -176,7 +176,7 @@ Registered for `InstrumentType::TermLoan` in `metrics/mod.rs`:
   runs through `finstack_quant.valuations.instruments.price_instrument(...)`.
 - **WASM**: `valuations.instruments.TermLoan`, plus
   `valuations.instruments.priceInstrument` and
-  `valuations.instruments.instrumentCashflowsJson`.
+  `valuations.instruments.instrumentCashflows`.
 
 Both use `InstrumentJson::TermLoan` inside the `finstack_quant.instrument/1`
 envelope; unknown fields are rejected on deserialize.

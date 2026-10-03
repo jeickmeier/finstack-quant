@@ -178,11 +178,13 @@ it("tests u64::MAX as a transport boundary on an actual result, not a repricing 
 });
 it("transports original bond and mixed-currency cashflow text byte for byte", () => {
   for (const instrument of [bond, fxSwap]) {
-    const text = valuations.instruments.instrumentCashflowsJson(
-      JSON.stringify(instrument),
-      JSON.stringify(instrument === bond ? creditMarket : market),
-      instrument === bond ? "2025-01-01" : "2024-01-01",
-      "discounting",
+    const text = JSON.stringify(
+      valuations.instruments.instrumentCashflows(
+        JSON.stringify(instrument),
+        JSON.stringify(instrument === bond ? creditMarket : market),
+        instrument === bond ? "2025-01-01" : "2024-01-01",
+        "discounting",
+      ),
     );
     expect(typeof text).toBe("string");
     expect(Buffer.from(structuredClone({ text }).text)).toEqual(
@@ -196,11 +198,13 @@ it("transports original bond and mixed-currency cashflow text byte for byte", ()
     }
   }
   expect(() =>
-    valuations.instruments.instrumentCashflowsJson(
-      JSON.stringify(fxSwap),
-      JSON.stringify(market),
-      "2024-01-01",
-      "invalid",
+    JSON.stringify(
+      valuations.instruments.instrumentCashflows(
+        JSON.stringify(fxSwap),
+        JSON.stringify(market),
+        "2024-01-01",
+        "invalid",
+      ),
     ),
   ).toThrow();
 });

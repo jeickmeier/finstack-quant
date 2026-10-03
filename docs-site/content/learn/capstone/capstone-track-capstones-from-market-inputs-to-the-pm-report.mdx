@@ -398,7 +398,7 @@ print("Synthetic 2025Q2 observation-pattern replay onto the 15 January book: the
 
 {/* notebook-block notebook="08_capstone/end_to_end_credit_portfolio_workflow.ipynb" cell="credit-track-diagnostics" role="build" */}
 ```python exec id=credit-track-diagnostics role=build
-from finstack_quant.valuations.instruments import structured_credit_tranche_breakeven_cdr,structured_credit_tranche_scenario_table,instrument_cashflows_json
+from finstack_quant.valuations.instruments import structured_credit_tranche_breakeven_cdr,structured_credit_tranche_scenario_table,instrument_cashflows
 from finstack_quant.models.correlation import CorrelatedBernoulli
 waterfall_rows=[]
 for label,payload,m in [("base",holding["deal"],market),("joint_stress",stressed_deal,stress)]:
@@ -412,7 +412,7 @@ print(waterfall_table.to_string(index=False));print({"BBB_first_loss_CDR_base":f
 # One-period stressed trace has immediate recovery so every distribution shares one known date.
 trace=tracks.clo_deal(one_period=True);ts=trace["instrument"]["spec"]
 ts.update(default_spec={"cdr":.05},recovery_spec={"rate":.25,"recovery_lag":0})
-flows=json.loads(instrument_cashflows_json(json.dumps(trace),market,AS_OF,"discounting"))["flows"]
+flows=json.loads(instrument_cashflows(json.dumps(trace),market,AS_OF,"discounting").to_json())["flows"]
 cash_flows=[flow for flow in flows if flow["date"]>AS_OF.isoformat() and flow["kind"]!="defaulted_notional"]
 trace_df=market.get_discount("USD-OIS").df(90/365)
 trace_rows=[{"tranche":tranche,"stressed_one_period_cash":structured_credit_tranche_metrics(json.dumps(trace),tranche,market,AS_OF).pv/trace_df} for tranche in ["AAA","BBB","EQUITY"]]

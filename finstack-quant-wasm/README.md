@@ -207,7 +207,7 @@ structured JavaScript values, `*Json`-suffixed exports return JSON strings,
 `*Text`-suffixed exports return prose, and numeric vectors cross as `Float64Array`.
 The declaration surface pins each return shape explicitly. Wire entry points use
 the `*Json` suffix, including `attributePnlEnvelopeJson`, `transformPanelJson`, and
-`instrumentCashflowsWithMarketJson`; read `index.d.ts` for the authoritative type.
+`instrumentCashflowsWithMarket`; read `index.d.ts` for the authoritative type.
 
 Map-shaped results are plain objects, never ES2015 `Map`s — bindings must serialize
 through `crate::utils::to_js_value`, never `serde_wasm_bindgen::to_value`, whose

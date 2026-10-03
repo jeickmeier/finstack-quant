@@ -24,7 +24,7 @@ api:
 - finstack_quant.valuations.instruments.FloatLegSpec
 - finstack_quant.valuations.instruments.InterestRateSwap
 - finstack_quant.valuations.instruments.Swaption
-- finstack_quant.valuations.instruments.instrument_cashflows_json
+- finstack_quant.valuations.instruments.instrument_cashflows
 - finstack_quant.valuations.instruments.price_instrument
 status: published
 ---
@@ -134,14 +134,14 @@ import json
 from datetime import date
 from finstack_quant.core.dates import Tenor,DayCount
 from finstack_quant.core.money import Money
-from finstack_quant.valuations.instruments import FixedLegSpec,FloatLegSpec,InterestRateSwap,price_instrument,instrument_cashflows_json
+from finstack_quant.valuations.instruments import FixedLegSpec,FloatLegSpec,InterestRateSwap,price_instrument,instrument_cashflows
 from _shared.analyst_book import build_market
 AS_OF = date(2025, 1, 15)
 fixed=FixedLegSpec('USD-OIS',.045,Tenor.semi_annual(),DayCount.THIRTY_360,'2025-04-15','2028-04-15',calendar_id='weekends_only')
 floating=FloatLegSpec('USD-OIS','USD-SOFR-3M',0,Tenor.quarterly(),DayCount.ACT_360,'2025-04-15','2028-04-15',calendar_id='weekends_only')
 leg_swap=(InterestRateSwap.builder().id('TYPED-IRS').notional(Money(2_000_000,'USD')).side('pay').fixed_leg(fixed).float_leg(floating).build())
 leg_market=build_market('rates');leg_value=price_instrument(leg_swap,leg_market,AS_OF,metrics=['par_rate'])
-leg_flows=json.loads(instrument_cashflows_json(leg_swap,leg_market,AS_OF,'discounting'))['flows']
+leg_flows=json.loads(instrument_cashflows(leg_swap,leg_market,AS_OF,'discounting').to_json())['flows']
 print({'par_rate_decimal':leg_value.get_metric('par_rate'),'cashflows':leg_flows})
 ```
 {/* /notebook-block */}
@@ -326,11 +326,11 @@ The fixed-leg PV is negative for a payer. Its absolute PV divided by the positiv
 import json
 from datetime import date
 from finstack_quant.core.dates import DayCount
-from finstack_quant.valuations.instruments import price_instrument,instrument_cashflows_json
+from finstack_quant.valuations.instruments import price_instrument,instrument_cashflows
 from _shared.analyst_book import build_market, instruments
 AS_OF = date(2025, 1, 15)
 market=build_market('rates');contract=instruments('rates')['USD-PAYER-IRS'];raw=contract['instrument']['spec']
-flows=json.loads(instrument_cashflows_json(json.dumps(contract),market,AS_OF,'discounting'))['flows']
+flows=json.loads(instrument_cashflows(json.dumps(contract),market,AS_OF,'discounting').to_json())['flows']
 curve=market.get_discount('USD-OIS');fixed_pv=0.;float_pv=0.
 for flow in flows:
  t=DayCount.ACT_365F.year_fraction(AS_OF,date.fromisoformat(flow['date']))
