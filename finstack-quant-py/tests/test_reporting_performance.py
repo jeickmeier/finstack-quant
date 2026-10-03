@@ -75,3 +75,17 @@ def _golden_html() -> str:
 def test_performance_tearsheet_matches_golden() -> None:
     assert GOLDEN.exists(), "golden file missing — regenerate (see plan Task 11 Step 3)"
     assert _golden_html() == GOLDEN.read_text(encoding="utf-8")
+
+
+def test_rolling_window_is_one_year_at_the_panel_frequency() -> None:
+    """PYPY-009: the rolling window comes from Rust periods-per-year, not 252."""
+    import math
+
+    idx = pd.date_range("2019-01-31", periods=60, freq="ME")
+    rets = [0.005 + 0.02 * math.sin(i / 3.0) for i in range(60)]
+    perf = Performance.from_returns(pd.DataFrame({"Fund": rets}, index=idx), frequency="monthly")
+    section = performance_tearsheet(perf, sections=["rolling"]).sections[0]
+    # 60 monthly observations with a 12-observation window give 49 points per
+    # series; a fixed 252 window gave none (two empty charts).
+    assert section.body.count("<polyline") == 2
+    assert len(perf.rolling_sharpe(0, window=12).to_dataframe()) == 49

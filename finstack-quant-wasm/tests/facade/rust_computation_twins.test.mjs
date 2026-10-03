@@ -733,6 +733,10 @@ test('pnlBridge and attributePnlMany run the Rust attribution entry points', () 
       single.meta.tolerance_abs
     )
   );
+  const total = Number(single.total_pnl.amount);
+  assert.equal(attribution.pnlAttributionPctOfTotal(single, total), 100);
+  const zeroTotal = { ...single, total_pnl: { ...single.total_pnl, amount: '0' } };
+  assert.equal(attribution.pnlAttributionPctOfTotal(zeroTotal, 5), undefined);
   attribution.pnlAttributionValidateCurrencies(single);
   assert.deepEqual(attribution.pnlAttributionRequiredMetrics(single), []);
 });

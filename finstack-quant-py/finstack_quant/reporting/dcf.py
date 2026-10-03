@@ -97,7 +97,7 @@ def _section_sensitivity(sensitivity: Any, theme: Theme) -> Section | None:
             entries.append((parameter_id, getattr(e, "downside", None), getattr(e, "upside", None)))
     if not entries:
         return None
-    entries.sort(key=lambda t: abs(t[1] or 0.0) + abs(t[2] or 0.0), reverse=True)
+    # Rows keep the Rust order (``generate_tornado_entries`` ranks by |swing|).
     return Section(
         "Equity Value Sensitivity",
         charts.tornado_chart(entries, theme=theme),

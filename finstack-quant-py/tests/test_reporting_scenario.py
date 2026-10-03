@@ -93,3 +93,13 @@ def test_scenario_tearsheet_excluding_montecarlo_drops_kpis() -> None:
     ).to_html()
     assert "Driver Sensitivity" in html
     assert "Median" not in html  # MC KPIs gated out
+
+
+def test_scenario_tornado_keeps_rust_swing_order() -> None:
+    """PYPY-005: rows keep the |upside - downside| order Rust returns."""
+    entries = [
+        {"parameter_id": "margin", "downside": -5.0, "upside": 5.0},  # swing 10
+        {"parameter_id": "capex", "downside": -10.0, "upside": -8.0},  # swing 2
+    ]
+    body = scenario_tearsheet(tornado=entries, sections=["tornado"]).sections[0].body
+    assert body.index("margin") < body.index("capex")

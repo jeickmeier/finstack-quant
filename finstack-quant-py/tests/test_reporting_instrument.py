@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from finstack_quant.reporting import instrument as ins
+from finstack_quant.valuations.instruments import metric_metadata
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -37,6 +38,11 @@ class _FakeResult:
 
     def get_metric(self, key: str) -> float | None:
         return self._p["measures"].get(key)
+
+    def metric_units(self) -> dict[str, str]:
+        # Units come from the Rust metric classification, as on ValuationResult.
+        keys = list(self._p["measures"].keys())
+        return {row["key"]: row["unit"] for row in metric_metadata(keys)}
 
     def metric_series(self, base: str) -> list[tuple[list[str], float]]:
         # Test double of ValuationResult.metric_series: composite entries in
@@ -121,14 +127,48 @@ def test_keyrate_section_shows_every_rust_vega_bucket() -> None:
     assert [s.title for s in sheet.sections] == ["Bucketed Vega"]
 
 
+def _units(*keys: str) -> dict[str, str]:
+    return {row["key"]: row["unit"] for row in metric_metadata(list(keys))}
+
+
 def test_metric_cell_formats_by_unit() -> None:
-    assert ins._metric_cell("ytm", 0.0394) == ("Yield to Maturity", "3.94%", "")
-    assert ins._metric_cell("z_spread", 0.0078)[1] == "78 bp"
-    assert ins._metric_cell("dv01", 6420.0)[1] in ("6,420", "6,420.00")
+    units = _units("ytm", "z_spread", "dv01", "clean_price", "jump_to_default")
+    assert ins._metric_cell("ytm", 0.0394, units) == ("Yield to Maturity", "3.94%", "")
+    assert ins._metric_cell("z_spread", 0.0078, units)[1] == "78 bp"
+    assert ins._metric_cell("dv01", 6420.0, units)[1] in ("6,420", "6,420.00")
     # clean_price is a full dollar amount (not per-100) — formatted as money (0dp)
-    assert ins._metric_cell("clean_price", 9725674.0)[1] in ("9,725,674", "$9,725,674")
-    _lbl, _val, cls = ins._metric_cell("jump_to_default", -5816000.0)
+    assert ins._metric_cell("clean_price", 9725674.0, units)[1] in ("9,725,674", "$9,725,674")
+    _lbl, _val, cls = ins._metric_cell("jump_to_default", -5816000.0, units)
     assert cls == "neg"
+
+
+def test_metric_cells_follow_rust_units_not_a_python_table() -> None:
+    """PYPY-003: the unit family is read from Rust ``metric_units()``."""
+    import datetime
+
+    from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, MarketContext
+    from finstack_quant.valuations.instruments import InterestRateSwap, price_instrument
+
+    curve_base = datetime.date(2023, 1, 2)
+    market = MarketContext()
+    market = market.insert(DiscountCurve.flat("USD-OIS", curve_base, 0.04))
+    market = market.insert(ForwardCurve.flat("USD-SOFR-3M", 0.25, curve_base, 0.04))
+    result = price_instrument(
+        InterestRateSwap.example(), market, datetime.date(2024, 1, 2), metrics=["annuity", "par_rate", "dv01"]
+    )
+    units = result.metric_units()
+    assert units["annuity"] == "dimensionless"
+    # A dimensionless annuity of ~4.49 used to render as a whole-currency "4"
+    # with the P&L sign colour.
+    label, value, cls = ins._metric_cell("annuity", result.get_metric("annuity"), units)
+    assert (label, cls) == ("Annuity", "")
+    assert value == f"{result.get_metric('annuity'):,.2f}"
+    # Greeks and risky PV01 are currency amounts in Rust.
+    greek_units = _units("delta", "vega", "risky_pv01", "risky_annuity")
+    assert ins._metric_cell("delta", 1234.5, greek_units) == ("Delta", "1,234", "pos")
+    assert ins._metric_cell("risky_annuity", 4.37, greek_units)[1:] == ("4.37", "")
+    # Custom metrics are unknown to Rust: plain number, no sign class.
+    assert ins._metric_cell("my_metric", -2.5, _units("my_metric")) == ("My Metric", "-2.50", "")
 
 
 def test_definition_terms_bond() -> None:

@@ -96,81 +96,89 @@ def _money_str(m: Any) -> str:
     return fmt.money(m, dp=0) if isinstance(m, (int, float)) else str(m)
 
 
-# metric_id -> (display label, unit kind). Unit kinds:
-#   "pct"   decimal -> N.NN%      "bp"   decimal -> NN bp
-#   "money" full-value 0dp        "ratio" 2dp
-#   "ratio4" 4dp
-# Spot-check (2026-06-19): dirty/clean/accrued are full dollar values (not per-100),
-# so "money" kind is used (0dp). Yields/vols are decimal (×100 for %). Spread metrics use decimal rates (×10000 for bp), except CDS par_spread which is already bp.
-_METRIC_FMT: dict[str, tuple[str, str]] = {
-    "dirty_price": ("Dirty Price", "money"),
-    "clean_price": ("Clean Price", "money"),
-    "accrued": ("Accrued", "money"),
-    "ytm": ("Yield to Maturity", "pct"),
-    "ytw": ("Yield to Worst", "pct"),
-    "z_spread": ("Z-Spread", "bp"),
-    "oas": ("OAS", "bp"),
-    "i_spread": ("I-Spread", "bp"),
-    "asw_par": ("ASW (par)", "bp"),
-    "g_spread": ("G-Spread", "bp"),
-    "discount_margin": ("Discount Margin", "bp"),
-    "duration_mod": ("Mod. Duration", "ratio"),
-    "duration_mac": ("Mac. Duration", "ratio"),
-    "convexity": ("Convexity", "ratio"),
-    "spread_duration": ("Spread Duration", "ratio"),
-    "dv01": ("DV01", "money"),
-    "pv01": ("PV01", "money"),
-    "par_rate": ("Par Rate", "pct"),
-    "annuity": ("Annuity", "money"),
-    "pv_fixed": ("Fixed Leg PV", "money"),
-    "pv_float": ("Float Leg PV", "money"),
-    "par_spread": ("Par Spread", "bp_value"),
-    "risky_pv01": ("Risky PV01", "ratio"),
-    "risky_annuity": ("Risky Annuity", "money"),
-    "protection_leg_pv": ("Protection Leg PV", "money"),
-    "premium_leg_pv": ("Premium Leg PV", "money"),
-    "cs01": ("CS01", "money"),
-    "jump_to_default": ("Jump-to-Default", "money"),
-    "expected_loss": ("Expected Loss", "money"),
-    "default_probability": ("Default Probability", "pct"),
-    "default01": ("Default01", "money"),
-    "recovery01": ("Recovery01", "money"),
-    "delta": ("Delta", "ratio4"),
-    "gamma": ("Gamma", "ratio4"),
-    "vega": ("Vega", "ratio"),
-    "theta": ("Theta", "ratio"),
-    "rho": ("Rho", "ratio"),
-    "implied_vol": ("Implied Vol", "pct"),
-    "vanna": ("Vanna", "ratio"),
-    "volga": ("Volga", "ratio"),
-    "charm": ("Charm", "ratio4"),
+# metric_id -> display label. Only the label text lives here: each value is
+# formatted from the unit family Rust reports for it
+# (``ValuationResult.metric_units()``); ids without a label are humanized.
+_METRIC_LABELS: dict[str, str] = {
+    "dirty_price": "Dirty Price",
+    "clean_price": "Clean Price",
+    "accrued": "Accrued",
+    "ytm": "Yield to Maturity",
+    "ytw": "Yield to Worst",
+    "z_spread": "Z-Spread",
+    "oas": "OAS",
+    "i_spread": "I-Spread",
+    "asw_par": "ASW (par)",
+    "discount_margin": "Discount Margin",
+    "duration_mod": "Mod. Duration",
+    "duration_mac": "Mac. Duration",
+    "convexity": "Convexity",
+    "spread_duration": "Spread Duration",
+    "dv01": "DV01",
+    "pv01": "PV01",
+    "par_rate": "Par Rate",
+    "annuity": "Annuity",
+    "pv_fixed": "Fixed Leg PV",
+    "pv_float": "Float Leg PV",
+    "par_spread": "Par Spread",
+    "risky_pv01": "Risky PV01",
+    "risky_annuity": "Risky Annuity",
+    "protection_leg_pv": "Protection Leg PV",
+    "premium_leg_pv": "Premium Leg PV",
+    "cs01": "CS01",
+    "jump_to_default": "Jump-to-Default",
+    "expected_loss": "Expected Loss",
+    "default01": "Default01",
+    "recovery01": "Recovery01",
+    "delta": "Delta",
+    "gamma": "Gamma",
+    "vega": "Vega",
+    "theta": "Theta",
+    "rho": "Rho",
+    "implied_vol": "Implied Vol",
+    "vanna": "Vanna",
+    "volga": "Volga",
+    "charm": "Charm",
 }
+
+
+# Desk display convention: spreads that Rust reports as ``decimal`` are shown
+# in basis points. This only rescales a value whose unit Rust already
+# classified as decimal; any other unit is formatted by its own family.
+_DECIMAL_AS_BP = frozenset({"z_spread", "oas", "i_spread", "asw_par", "asw_market", "g_spread", "discount_margin"})
 
 
 def _humanize(metric_id: str) -> str:
     return metric_id.replace("_", " ").title()
 
 
-def _fmt_value(kind: str, v: float) -> str:
-    if kind == "pct":
-        return fmt.pct(v * 100.0, dp=2)
-    if kind in {"bp", "bp_value"}:
-        return f"{v * (10000.0 if kind == 'bp' else 1.0):,.0f} bp"
-    if kind == "price":
-        return f"{v:,.2f}"
-    if kind == "money":
+def _fmt_value(metric_id: str, unit: str, v: float) -> str:
+    """Format one value by its Rust ``MetricUnit`` wire name."""
+    if unit == "currency":
         return fmt.money(v, dp=0)
-    if kind == "ratio4":
-        return fmt.ratio(v, dp=4)
+    if unit == "decimal" and metric_id in _DECIMAL_AS_BP:
+        return f"{v * 10000.0:,.0f} bp"
+    if unit == "decimal":
+        return fmt.pct(v * 100.0, dp=2)
+    if unit == "percent":
+        return fmt.pct(v, dp=2)
+    if unit == "basis_points":
+        return f"{v:,.0f} bp"
+    # years, dimensionless and unknown (custom) values are plain numbers.
     return fmt.ratio(v, dp=2)
 
 
-def _metric_cell(metric_id: str, v: float | None) -> tuple[str, str, str]:
-    """Return (label, formatted_value, css_class) for one metric."""
-    label, kind = _METRIC_FMT.get(metric_id, (_humanize(metric_id), "ratio"))
+def _metric_cell(metric_id: str, v: float | None, units: dict[str, str]) -> tuple[str, str, str]:
+    """Return (label, formatted_value, css_class) for one metric.
+
+    ``units`` is ``result.metric_units()``: the Rust unit family per key.
+    Currency amounts carry the P&L sign class.
+    """
+    label = _METRIC_LABELS.get(metric_id, _humanize(metric_id))
     if v is None:
         return (label, "·", "")
-    return (label, _fmt_value(kind, float(v)), fmt.sign_class(v) if kind == "money" else "")
+    unit = units.get(metric_id, "unknown")
+    return (label, _fmt_value(metric_id, unit, float(v)), fmt.sign_class(v) if unit == "currency" else "")
 
 
 def _frequency_str(frequency: dict[str, Any]) -> str:
@@ -359,6 +367,7 @@ def _parse_definition_once(definition: Any) -> tuple[Any, json.JSONDecodeError |
 
 
 def _kpis(result: Any, itype: str) -> list[KPI]:
+    units = result.metric_units()
     ids = _KPI_METRICS.get(itype)
     if not ids:
         # generic: PV + first three present non-composite metrics
@@ -367,29 +376,30 @@ def _kpis(result: Any, itype: str) -> list[KPI]:
         for mid in result.metric_keys():
             if "::" in mid:
                 continue
-            cells.append(_metric_cell(mid, result.get_metric(mid)))
+            cells.append(_metric_cell(mid, result.get_metric(mid), units))
             count += 1
             if count == 3:
                 break
         return [KPI(lbl, val, cls) for lbl, val, cls in cells]
     out = []
     for mid in ids:
-        lbl, val, cls = _metric_cell(mid, result.get_metric(mid))
+        lbl, val, cls = _metric_cell(mid, result.get_metric(mid), units)
         out.append(KPI(lbl, val, cls))
     return out
 
 
 def _analytics_section(result: Any, itype: str) -> Section:
+    units = result.metric_units()
     groups = _ANALYTICS_GROUPS.get(itype)
     if not groups:
         # generic: one column of every present non-composite metric
         present = [(m, result.get_metric(m)) for m in result.metric_keys() if "::" not in m]
-        rows = [_metric_cell(m, v) for m, v in present]
+        rows = [_metric_cell(m, v, units) for m, v in present]
         cols_html = "".join(tables.kv_table([(lbl, val, cls) for lbl, val, cls in rows[i::3]]) for i in range(3))
         return Section("Valuation & Analytics", f'<div class="statgrid">{cols_html}</div>')
     cols_html = ""
     for group in groups:
-        rows = [_metric_cell(m, result.get_metric(m)) for m in group if result.get_metric(m) is not None]
+        rows = [_metric_cell(m, result.get_metric(m), units) for m in group if result.get_metric(m) is not None]
         cols_html += tables.kv_table([(lbl, val, cls) for lbl, val, cls in rows])
     return Section("Valuation & Analytics", f'<div class="statgrid">{cols_html}</div>')
 

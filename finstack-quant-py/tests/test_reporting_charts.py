@@ -197,3 +197,12 @@ def test_charts_escape_hostile_labels() -> None:
         assert "&lt;" in svg
         assert "&gt;" in svg
         assert "&quot;" in svg
+
+
+def test_nice_ticks_terminates_on_a_range_below_float_resolution() -> None:
+    """A near-constant rolling series (span ~1e-17 at 0.05) used to loop forever."""
+    from finstack_quant.reporting.charts import nice_ticks
+
+    ticks = nice_ticks(0.0511681719253465, 0.051168171925346506)
+    assert 2 <= len(ticks) <= 8
+    assert ticks[0] <= 0.0511681719253465 <= ticks[-1]

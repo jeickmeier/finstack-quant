@@ -89,10 +89,11 @@ def _factors_section(attribution: Any) -> Section | None:
     total = float(attribution.total_pnl)
     cur = attribution.currency
     data: list[dict[str, Any]] = []
+    # Shares come from Rust ``PnlAttribution.pct_of_total``; ``None`` (a zero
+    # total, where the share is undefined) renders as the missing marker.
     for label, v in sorted(rows, key=lambda r: abs(r[1]), reverse=True):
-        share = (v / total * 100.0) if abs(total) > _EPS else 0.0
-        data.append({"Factor": label, "Amount": v, "% of Total": share})
-    data.append({"Factor": "Total P&L", "Amount": total, "% of Total": 100.0 if abs(total) > _EPS else 0.0})
+        data.append({"Factor": label, "Amount": v, "% of Total": attribution.pct_of_total(v)})
+    data.append({"Factor": "Total P&L", "Amount": total, "% of Total": attribution.pct_of_total(total)})
     body = tables.data_table(
         data,
         columns=["Factor", "Amount", "% of Total"],

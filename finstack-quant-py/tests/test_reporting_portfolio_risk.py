@@ -5,46 +5,23 @@ import json
 
 import pytest
 
+from finstack_quant.models.factor.risk import (
+    historical_var_decomposition,
+    parametric_es_decomposition,
+    parametric_var_decomposition,
+)
 from finstack_quant.reporting import portfolio_risk_tearsheet
 from finstack_quant.reporting.document import TearSheet
 
-_DECOMP = {
-    "portfolio_var": 0.2040,
-    "portfolio_es": 0.2558,
-    "confidence": 0.95,
-    "n_positions": 3,
-    "euler_residual": 0.0,
-    "method": "parametric",
-    "contributions": [
-        {
-            "position_id": "Equity",
-            "component_var": 0.1539,
-            "marginal_var": 0.3077,
-            "pct_contribution": 0.7544,
-            "incremental_var": None,
-        },
-        {
-            "position_id": "Credit",
-            "component_var": 0.0485,
-            "marginal_var": 0.1618,
-            "pct_contribution": 0.2380,
-            "incremental_var": None,
-        },
-        {
-            "position_id": "Rates",
-            "component_var": 0.0015,
-            "marginal_var": 0.0077,
-            "pct_contribution": 0.0075,
-            "incremental_var": None,
-        },
-    ],
-}
-_ES = {
-    "contributions": [
-        {"position_id": "Equity", "component_es": 0.1930, "marginal_es": 0.3859, "pct_contribution": 0.7544},
-        {"position_id": "Credit", "component_es": 0.0609, "marginal_es": 0.2029, "pct_contribution": 0.2380},
-    ],
-}
+_IDS = ["Equity", "Credit", "Rates"]
+_WEIGHTS = [0.5, 0.3, 0.2]
+_COV = [[0.04, 0.006, 0.001], [0.006, 0.0225, 0.0015], [0.001, 0.0015, 0.0025]]
+
+# Real Rust output: ``parametric_var_decomposition`` returns the typed
+# ``PositionRiskDecomposition`` (``var_contributions`` / ``relative_var``).
+_DECOMP_TYPED = parametric_var_decomposition(_IDS, _WEIGHTS, _COV, confidence=0.95)
+_DECOMP = json.loads(_DECOMP_TYPED.to_json())
+_ES = json.loads(parametric_es_decomposition(_IDS, _WEIGHTS, _COV, confidence=0.95).to_json())
 _BUDGET = {
     "portfolio_var": 0.2040,
     "total_overbudget": 0.0519,
@@ -111,7 +88,7 @@ def test_portfolio_risk_tearsheet_rejects_unknown_section() -> None:
 
 def test_portfolio_risk_tearsheet_tolerates_bad_rows() -> None:
     decomp = dict(_DECOMP)
-    decomp["contributions"] = [*_DECOMP["contributions"], None, "bad"]
+    decomp["var_contributions"] = [*_DECOMP["var_contributions"], None, "bad"]
     html = portfolio_risk_tearsheet(decomp, generated=dt.date(2026, 6, 23)).to_html()
     assert "VaR Contributions" in html  # valid rows still render, no crash
 
@@ -128,3 +105,16 @@ def test_portfolio_risk_tearsheet_es_budget_bad_rows() -> None:
     html = portfolio_risk_tearsheet(_DECOMP, es=es, budget=budget, generated=dt.date(2026, 6, 23)).to_html()
     assert "ES Contributions" in html
     assert "Risk Budget" in html
+
+
+def test_portfolio_risk_tearsheet_renders_var_contributions_from_typed_rust_results() -> None:
+    """PYPY-007: the typed decomposition both VaR engines return renders its contributions."""
+    sheet = portfolio_risk_tearsheet(_DECOMP_TYPED, generated=dt.date(2026, 6, 23))
+    assert [s.title for s in sheet.sections] == ["VaR Contributions"]
+    body = sheet.sections[0].body
+    for row in _DECOMP["var_contributions"]:
+        # The share column is the Rust ``relative_var`` scaled to percent.
+        assert f"{row['relative_var'] * 100:.1f}%" in body
+    pnls = [[float((s * (i + 3)) % 7 - 3) * (i + 1) for s in range(60)] for i in range(3)]
+    historical = historical_var_decomposition(_IDS, pnls, confidence=0.95)
+    assert [s.title for s in portfolio_risk_tearsheet(historical).sections] == ["VaR Contributions"]

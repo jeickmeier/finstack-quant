@@ -230,3 +230,24 @@ def test_credit_detail_escapes_issuer_identifiers() -> None:
     assert "Adder By Issuer (Breakdown)" in html
     assert "&lt;img src=x onerror=alert(1)&gt;" in html
     assert issuer not in html
+
+
+def test_factor_shares_come_from_rust_and_are_undefined_for_zero_total() -> None:
+    """PYPY-004: '% of Total' is Rust ``pct_of_total``; a zero total has no share."""
+    from finstack_quant.attribution import PnlAttribution
+    from finstack_quant.reporting import attribution_tearsheet
+
+    attr = _load_attr()
+    assert attr.pct_of_total(attr.total_pnl) == pytest.approx(100.0)
+    assert attr.pct_of_total(attr.carry) == pytest.approx(attr.carry / attr.total_pnl * 100.0)
+
+    raw = json.loads((DATA / "attribution_bond.json").read_text())
+    for field in ("carry", "rates_curves_pnl"):
+        raw[field]["amount"] = "5" if field == "carry" else "-5"
+    raw["total_pnl"]["amount"] = "0"
+    raw["residual"]["amount"] = "0"
+    zero = PnlAttribution.from_json(json.dumps(raw))
+    assert zero.pct_of_total(5.0) is None
+    section = next(s for s in attribution_tearsheet(zero, sections=["factors"]).sections)
+    assert "+0.0%" not in section.body
+    assert "·" in section.body

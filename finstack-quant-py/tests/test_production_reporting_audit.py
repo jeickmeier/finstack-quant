@@ -6,6 +6,7 @@ import pandas as pd
 
 from finstack_quant.reporting import instrument as ins, portfolio as port, statement_tearsheet
 from finstack_quant.reporting.theme import INSTITUTIONAL
+from finstack_quant.valuations.instruments import metric_metadata
 
 
 def test_instrument_cashflows_keep_both_currency_ladders_and_every_flow() -> None:
@@ -49,4 +50,5 @@ def test_decimal_statement_ratios_and_basis_point_cds_spread() -> None:
     html = sheet.to_html()
     assert "25.0%" in html
     assert "+10.0%" in html
-    assert ins._metric_cell("par_spread", 125.0)[1] == "125 bp"
+    units = {row["key"]: row["unit"] for row in metric_metadata(["par_spread"])}
+    assert ins._metric_cell("par_spread", 125.0, units)[1] == "125 bp"

@@ -143,3 +143,14 @@ def test_bridge_reconciles_to_rust_equity_value_with_valuation_discounts() -> No
     bars = dict(re.findall(r'data-label="([^"]+)" data-val="([^"]+)"', html))
     assert "− Valuation Discounts" in bars
     assert float(bars["Equity Value"].replace(",", "")) == pytest.approx(equity, abs=1.0)
+
+
+def test_dcf_sensitivity_keeps_rust_swing_order() -> None:
+    """PYPY-005: rows keep the |upside - downside| order Rust returns."""
+    entries = [
+        {"parameter_id": "margin", "downside": -5.0, "upside": 5.0},  # swing 10
+        {"parameter_id": "capex", "downside": -10.0, "upside": -8.0},  # swing 2
+    ]
+    sheet = dcf_tearsheet(_VAL, sensitivity=entries, sections=["sensitivity"])
+    body = sheet.sections[0].body
+    assert body.index("margin") < body.index("capex")

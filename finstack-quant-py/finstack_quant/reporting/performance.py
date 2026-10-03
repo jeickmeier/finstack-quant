@@ -20,6 +20,8 @@ from __future__ import annotations
 import datetime as dt
 from typing import Any
 
+from finstack_quant.core.dates import PeriodKind
+
 from . import charts, format as fmt, tables
 from .document import KPI, Section, TearSheet, _resolve_sections
 from .theme import INSTITUTIONAL, Theme
@@ -103,8 +105,11 @@ def _section_drawdown(perf: Any, ticker: int, theme: Theme) -> Section:
 
 
 def _section_rolling(perf: Any, ticker: int, theme: Theme) -> Section:
-    rs = perf.rolling_sharpe(ticker, window=252).to_dataframe()
-    rv = perf.rolling_volatility(ticker, window=252).to_dataframe()
+    # One year of observations at the panel's own frequency (Rust
+    # ``PeriodKind.periods_per_year``: 252 daily, 52 weekly, 12 monthly, ...).
+    window = PeriodKind.from_name(perf.frequency).periods_per_year
+    rs = perf.rolling_sharpe(ticker, window=window).to_dataframe()
+    rv = perf.rolling_volatility(ticker, window=window).to_dataframe()
     rs_svg = charts.line_chart(fmt._dates_of(rs), rs.iloc[:, 0].tolist(), theme=theme, color=theme.ink, height=170)
     rv_svg = charts.line_chart(
         fmt._dates_of(rv),

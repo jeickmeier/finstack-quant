@@ -509,6 +509,25 @@ pub fn pnl_attribution_explain_verbose(pnl: JsValue) -> Result<String, JsValue> 
     Ok(parse_pnl(&pnl)?.explain_verbose())
 }
 
+/// Share of total P&L, in percent, that an amount represents.
+///
+/// Free-function twin of Python `PnlAttribution.pct_of_total` (Rust
+/// `PnlAttribution::pct_of_total`): `amount / total_pnl × 100`, with the
+/// zero test on `total_pnl` taken from the run's rounding context.
+/// @param pnl - `PnlAttribution` returned by `attributePnl` (object or JSON).
+/// @param amount - P&L amount in `total_pnl` currency units, normally one factor field (`carry`, `rates_curves_pnl`, `residual`, ...) or `total_pnl` itself.
+/// @returns Signed percentage points (`25` = 25% of total P&L), or `undefined` when `total_pnl` is effectively zero and the share is undefined.
+///
+/// # Errors
+///
+/// Throws with kind `validation` if `pnl` is not a `PnlAttribution`, and kind
+/// `invalid_type` if `amount` is not a number.
+#[wasm_bindgen(js_name = pnlAttributionPctOfTotal)]
+pub fn pnl_attribution_pct_of_total(pnl: JsValue, amount: JsValue) -> Result<Option<f64>, JsValue> {
+    let pnl = parse_pnl(&pnl)?;
+    Ok(pnl.pct_of_total(crate::utils::input::js_f64(&amount, "amount")?))
+}
+
 /// Whether the attribution residual is within tolerance.
 ///
 /// Free-function twin of Python `PnlAttribution.residual_within_tolerance`

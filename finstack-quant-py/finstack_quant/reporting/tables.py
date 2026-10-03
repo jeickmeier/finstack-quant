@@ -125,7 +125,12 @@ def data_table(
         cells = []
         for c in columns:
             raw = row.get(c)
-            text = formats[c](raw) if c in formats and raw is not None else fmt._escape_html(raw)
+            if raw is None:
+                text = fmt._PLACEHOLDER
+            elif c in formats:
+                text = formats[c](raw)
+            else:
+                text = fmt._escape_html(raw)
             cls = "neg" if (c in neg_columns and isinstance(raw, (int, float)) and raw < 0) else ""
             cells.append(f'<td class="{cls}">{text}</td>')
         body_rows.append(f"<tr>{''.join(cells)}</tr>")

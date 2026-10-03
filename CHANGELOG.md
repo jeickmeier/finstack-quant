@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Reporting: numbers from Rust (Python-binding audit PR 16)
+
+#### Added
+
+- `PnlAttribution.pct_of_total(amount)` (Rust `PnlAttribution::pct_of_total`, WASM `attribution.pnlAttributionPctOfTotal`): a factor's signed share of total P&L in percent, `None`/`undefined` when total P&L is effectively zero. `explain()` and `residual_pct` use the same computation.
+
+#### Fixed
+
+- `instrument_tearsheet` formats every metric from the unit Rust reports (`ValuationResult.metric_units()`) instead of a Python unit table: annuity and risky annuity render as numbers (4.49) rather than whole-currency amounts ("4"), Greeks and risky PV01 render as currency amounts, and custom metrics render as plain numbers. Decimal spreads are still shown in basis points.
+- `attribution_tearsheet` reads each factor's "% of Total" from `PnlAttribution.pct_of_total`; a zero total P&L shows `·` instead of `+0.0%` on every row.
+- `dcf_tearsheet` and `scenario_tearsheet` keep the tornado order Rust returns (ranked by swing) instead of re-sorting by |downside| + |upside|.
+- `portfolio_risk_tearsheet` reads `var_contributions` / `relative_var` from the `PositionRiskDecomposition` that `parametric_var_decomposition` and `historical_var_decomposition` return, so the VaR Contributions section renders again.
+- `performance_tearsheet` sizes its rolling Sharpe/volatility window to one year at the panel's frequency (Rust `PeriodKind.periods_per_year`): monthly data gets a 12-observation window instead of 252 observations and two empty charts.
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

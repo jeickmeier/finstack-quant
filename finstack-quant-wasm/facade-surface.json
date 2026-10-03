@@ -117,6 +117,7 @@
       "defaultWaterfallOrder",
       "pnlAttributionExplainText",
       "pnlAttributionExplainVerboseText",
+      "pnlAttributionPctOfTotal",
       "pnlAttributionRequiredMetrics",
       "pnlAttributionResidualWithinTolerance",
       "pnlAttributionValidateCurrencies",
@@ -172,6 +173,9 @@
     "kind": "function"
   },
   "attribution.pnlAttributionExplainVerboseText": {
+    "kind": "function"
+  },
+  "attribution.pnlAttributionPctOfTotal": {
     "kind": "function"
   },
   "attribution.pnlAttributionResidualWithinTolerance": {

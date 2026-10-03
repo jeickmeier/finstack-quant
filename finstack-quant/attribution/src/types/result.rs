@@ -874,16 +874,61 @@ impl PnlAttribution {
             }
         };
 
-        // Compute residual percentage (handle zero total_pnl) via RoundingContext
-        let rc = &self.meta.rounding;
-        self.meta.residual_pct =
-            if !rc.is_effectively_zero_money(self.total_pnl.amount(), self.total_pnl.currency()) {
-                (self.residual.amount() / self.total_pnl.amount()) * 100.0
-            } else {
-                0.0
-            };
+        // Residual percentage; 0.0 when total_pnl is effectively zero.
+        self.meta.residual_pct = self.pct_of_total(self.residual.amount()).unwrap_or(0.0);
 
         Ok(())
+    }
+
+    /// Share of total P&L, in percent, that an amount represents.
+    ///
+    /// Computes `amount / total_pnl × 100`, the per-factor percentage shown by
+    /// [`Self::explain`] and attribution reports. The zero test on
+    /// `total_pnl` uses the attribution's stored `RoundingContext`, the same
+    /// test as `meta.residual_pct`.
+    ///
+    /// # Arguments
+    ///
+    /// * `amount` - P&L amount in `total_pnl` currency units, normally one
+    ///   factor field (`carry`, `rates_curves_pnl`, `residual`, …) or
+    ///   `total_pnl` itself.
+    ///
+    /// # Returns
+    ///
+    /// Signed percentage points (`25.0` = 25% of total P&L), or `None` when
+    /// `total_pnl` is effectively zero and the share is undefined.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use finstack_quant_attribution::{AttributionMethod, PnlAttribution};
+    /// use finstack_quant_core::currency::Currency;
+    /// use finstack_quant_core::money::Money;
+    /// use time::macros::date;
+    ///
+    /// let mut pnl = PnlAttribution::new(
+    ///     Money::from((200_i64, Currency::USD)),
+    ///     "BOND-1",
+    ///     date!(2025 - 01 - 15),
+    ///     date!(2025 - 01 - 16),
+    ///     AttributionMethod::Parallel,
+    /// );
+    /// assert_eq!(pnl.pct_of_total(50.0), Some(25.0));
+    /// pnl.total_pnl = Money::from((0_i64, Currency::USD));
+    /// assert_eq!(pnl.pct_of_total(50.0), None);
+    /// ```
+    #[must_use]
+    pub fn pct_of_total(&self, amount: f64) -> Option<f64> {
+        let total = &self.total_pnl;
+        if self
+            .meta
+            .rounding
+            .is_effectively_zero_money(total.amount(), total.currency())
+        {
+            None
+        } else {
+            Some(amount / total.amount() * 100.0)
+        }
     }
 
     /// Check if residual is within tolerance.
@@ -974,12 +1019,8 @@ impl PnlAttribution {
     fn explain_impl(&self, show_zeros: bool) -> String {
         let rc = &self.meta.rounding;
 
-        let fmt = |amount: &Money, total: &Money| -> String {
-            let pct = if !rc.is_effectively_zero_money(total.amount(), total.currency()) {
-                (amount.amount() / total.amount()) * 100.0
-            } else {
-                0.0
-            };
+        let fmt = |amount: &Money| -> String {
+            let pct = self.pct_of_total(amount.amount()).unwrap_or(0.0);
             format!("{} ({:.1}%)", amount, pct)
         };
 
@@ -991,7 +1032,7 @@ impl PnlAttribution {
         lines.push(format!("Total P&L: {}", self.total_pnl));
 
         if show(&self.carry) {
-            lines.push(format!("  ├─ Carry: {}", fmt(&self.carry, &self.total_pnl)));
+            lines.push(format!("  ├─ Carry: {}", fmt(&self.carry)));
             if let Some(ref detail) = self.carry_detail {
                 if let Some(ref coupon_income) = detail.coupon_income {
                     lines.push(format!("  │   ├─ Coupon Income: {}", coupon_income.total));
@@ -1011,7 +1052,7 @@ impl PnlAttribution {
         if show(&self.rates_curves_pnl) {
             lines.push(format!(
                 "  ├─ Rates Curves: {}",
-                fmt(&self.rates_curves_pnl, &self.total_pnl)
+                fmt(&self.rates_curves_pnl)
             ));
             if let Some(ref detail) = self.rates_detail {
                 for (curve_id, pnl) in &detail.by_curve {
@@ -1023,7 +1064,7 @@ impl PnlAttribution {
         if show(&self.credit_curves_pnl) {
             lines.push(format!(
                 "  ├─ Credit Curves: {}",
-                fmt(&self.credit_curves_pnl, &self.total_pnl)
+                fmt(&self.credit_curves_pnl)
             ));
             if let Some(ref detail) = self.credit_detail {
                 for (curve_id, pnl) in &detail.by_curve {
@@ -1035,36 +1076,36 @@ impl PnlAttribution {
         if show(&self.inflation_curves_pnl) {
             lines.push(format!(
                 "  ├─ Inflation Curves: {}",
-                fmt(&self.inflation_curves_pnl, &self.total_pnl)
+                fmt(&self.inflation_curves_pnl)
             ));
         }
 
         if show(&self.correlations_pnl) {
             lines.push(format!(
                 "  ├─ Correlations: {}",
-                fmt(&self.correlations_pnl, &self.total_pnl)
+                fmt(&self.correlations_pnl)
             ));
         }
 
         if show(&self.fx_pnl) {
-            lines.push(format!("  ├─ FX: {}", fmt(&self.fx_pnl, &self.total_pnl)));
+            lines.push(format!("  ├─ FX: {}", fmt(&self.fx_pnl)));
         }
 
         if show(&self.fx_translation_pnl) {
             lines.push(format!(
                 "  ├─ FX Translation: {}",
-                fmt(&self.fx_translation_pnl, &self.total_pnl)
+                fmt(&self.fx_translation_pnl)
             ));
         }
 
         if show(&self.vol_pnl) {
-            lines.push(format!("  ├─ Vol: {}", fmt(&self.vol_pnl, &self.total_pnl)));
+            lines.push(format!("  ├─ Vol: {}", fmt(&self.vol_pnl)));
         }
 
         if show(&self.cross_factor_pnl) {
             lines.push(format!(
                 "  ├─ Cross-Factor: {}",
-                fmt(&self.cross_factor_pnl, &self.total_pnl)
+                fmt(&self.cross_factor_pnl)
             ));
             if let Some(ref detail) = self.cross_factor_detail {
                 for (pair_label, pnl) in &detail.by_pair {
@@ -1076,21 +1117,18 @@ impl PnlAttribution {
         if show(&self.model_params_pnl) {
             lines.push(format!(
                 "  ├─ Model Params: {}",
-                fmt(&self.model_params_pnl, &self.total_pnl)
+                fmt(&self.model_params_pnl)
             ));
         }
 
         if show(&self.market_scalars_pnl) {
             lines.push(format!(
                 "  ├─ Market Scalars: {}",
-                fmt(&self.market_scalars_pnl, &self.total_pnl)
+                fmt(&self.market_scalars_pnl)
             ));
         }
 
-        lines.push(format!(
-            "  └─ Residual: {}",
-            fmt(&self.residual, &self.total_pnl)
-        ));
+        lines.push(format!("  └─ Residual: {}", fmt(&self.residual)));
 
         lines.join("\n")
     }
@@ -1201,6 +1239,24 @@ mod tests {
     use indexmap::IndexMap;
     use std::collections::BTreeMap;
     use time::macros::date;
+
+    #[test]
+    fn pct_of_total_is_signed_share_and_none_for_zero_total() {
+        let mut pnl = PnlAttribution::new(
+            Money::new(22_733.88, Currency::USD).expect("finite total"),
+            "BOND",
+            date!(2025 - 01 - 15),
+            date!(2025 - 02 - 15),
+            AttributionMethod::Parallel,
+        );
+        let total = pnl.total_pnl.amount();
+        let carry = pnl.pct_of_total(25_112.0).expect("non-zero total");
+        assert!((carry - 25_112.0 / total * 100.0).abs() < 1e-12);
+        assert_eq!(pnl.pct_of_total(total), Some(100.0));
+        pnl.total_pnl = Money::from((0_i64, Currency::USD));
+        assert_eq!(pnl.pct_of_total(5.0), None);
+        assert_eq!(pnl.pct_of_total(0.0), None);
+    }
 
     fn attribution_with_all_details() -> serde_json::Value {
         let mut value = serde_json::to_value(PnlAttribution::new(

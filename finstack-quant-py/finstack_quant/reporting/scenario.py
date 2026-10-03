@@ -5,8 +5,8 @@ vs baseline.
 
 Pure presentation — every input is a pre-built shape (tornado entries, a
 ``{scenario: value}`` dict, a Monte-Carlo fan dict, a ``run_variance`` dict).
-No engine wiring or financial calculation; the only transforms are a magnitude
-sort key and display-unit percent scaling.
+No engine wiring or financial calculation; tornado rows keep the Rust order and
+the only transform is display-unit percent scaling.
 
 Examples:
 --------
@@ -39,7 +39,7 @@ def _section_tornado(tornado: Any, theme: Theme) -> Section | None:
     entries = [(e.get("parameter_id"), e.get("downside"), e.get("upside")) for e in tornado if isinstance(e, dict)]
     if not entries:
         return None
-    entries.sort(key=lambda t: abs(t[1] or 0.0) + abs(t[2] or 0.0), reverse=True)
+    # Rows keep the Rust order (``generate_tornado_entries`` ranks by |swing|).
     return Section(
         "Driver Sensitivity",
         charts.tornado_chart(entries, theme=theme),
