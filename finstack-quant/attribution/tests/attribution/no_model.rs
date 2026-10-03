@@ -73,16 +73,18 @@ fn run_attribution(method: AttributionMethod) -> PnlAttribution {
 
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(sample_bond()),
-        market_t0: make_market_state(as_of_t0, 0.04),
-        market_t1: make_market_state(as_of_t1, 0.0401), // 1 bp shift
-        as_of_t0,
-        as_of_t1,
-        method,
-        config: None,
-        model_params_t0: None,
-        credit_factor_model: None,
-        credit_factor_detail_options: Default::default(),
-        full_cross_attribution: false,
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: make_market_state(as_of_t0, 0.04),
+            market_t1: make_market_state(as_of_t1, 0.0401), // 1 bp shift
+            as_of_t0,
+            as_of_t1,
+            method,
+            config: None,
+            model_params_t0: None,
+            credit_factor_model: None,
+            credit_factor_detail_options: Default::default(),
+            full_cross_attribution: false,
+        },
     };
 
     AttributionEnvelope::new(spec)

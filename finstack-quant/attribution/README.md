@@ -78,7 +78,7 @@ attribution/src/
 │                           #   PnlAttribution, AttributionMeta
 ├── types/detail.rs         # Per-factor *Detail / *Attribution structs
 ├── factors.rs              # MarketSnapshot, restore flags, per-factor market mutation
-├── helpers.rs              # reprice_instrument, compute_pnl, compute_pnl_with_fx
+├── helpers.rs              # compute_pnl, compute_pnl_with_fx, period validation
 ├── parallel.rs             # parallel method
 ├── waterfall.rs            # waterfall method, default_waterfall_order
 ├── metrics_based/          # attribute_pnl_metrics_based (linear from metrics)
@@ -170,10 +170,11 @@ Two schema artifacts are checked in under
 | `PnlAttribution`, `AttributionFactor`, `AttributionMethod`, `AttributionMeta`     | `types`          | Result envelope and factor enums            |
 | `CarryDetail`, `RatesCurvesAttribution`, `CreditCurvesAttribution`, `CreditFactorAttribution`, `InflationCurvesAttribution`, `CorrelationsAttribution`, `FxAttribution`, `VolAttribution`, `ModelParamsAttribution`, `ScalarsAttribution`, `CrossFactorDetail`, `CreditCarryDecomposition`, `CreditCarryByLevel`, `LevelCarry`, `LevelPnl`, `SourceLine` | `types` | Per-factor detail structs                   |
 | `translate_to_target_currency`                                                         | `target_currency`     | Post-hoc translation of a native-currency `PnlAttribution` into a reporting currency, adding `fx_translation_pnl` |
-| `AttributionJsonInputs` | `spec` | Binding-friendly JSON fragments for `AttributionSpec::from_json_inputs` |
+| `attribute_pnl_many` | `spec` | Ordered instrument batch with shared `AttributionInputs` and one market reconstruction |
+| `AttributionInputs` | `spec` | Shared markets, dates and options for instrument batches |
 | `pnl_attribution_wide_row`, `PnlAttributionWideRow` | `long_rows` | Single-row aggregate projection used by Python `to_dataframe` |
 | `CreditFactorDetailOptions` | `credit_factor` | Controls optional per-issuer and per-bucket detail emitted by the canonical attribution methods |
-| `AttributionEnvelope`, `AttributionSpec`, `AttributionJsonInputs`, `AttributionSchema`, `AttributionConfig`, `AttributionResult`, `AttributionResultEnvelope`, `ATTRIBUTION_SCHEMA`, `default_attribution_metrics`, `validate_attribution_json` | `spec` | JSON contract |
+| `AttributionEnvelope`, `AttributionSpec`, `AttributionInputs`, `AttributionSchema`, `AttributionConfig`, `AttributionResult`, `AttributionResultEnvelope`, `ATTRIBUTION_SCHEMA`, `default_attribution_metrics`, `validate_attribution_json` | `spec` | JSON contract |
 | `attribute_return_contribution`, `attribute_return_contribution_json`, `validate_return_contribution_json`, `ReturnContributionSpec`, `ReturnContributionResult`, `ReturnContributionPosition`, `ReturnContributionFactor`, `ReturnContributionWeighting`, `InstrumentContribution`, `GroupContribution`, `FactorContribution`, `BenchmarkRelativeContribution` | `return_contribution` | Single-period weight × return contribution |
 | `pnl_attribution_long_rows`, `pnl_attribution_carry_rows`, `pnl_attribution_credit_factor_rows`, `LongDetailRow` | `long_rows` | Long-format projection of a `PnlAttribution`, consumed by the Python DataFrame exports |
 | `ARTIFACTS`, `ATTRIBUTION_SCHEMA_BASE` | `schema` | Published JSON Schema artifacts and their base URI |
@@ -230,8 +231,7 @@ Hosts reach attribution through string-dispatched and JSON entry points; the
 large typed decomposition API is deliberately Rust-only.
 
 - **Python** — `finstack_quant.attribution` binds `attribute_pnl`,
-  `attribute_pnl_envelope` (typed `AttributionResultEnvelope`) and its
-  `attribute_pnl_envelope_json` wire twin, `validate_attribution_json`,
+  `attribute_pnl_envelope` (typed `AttributionResultEnvelope`, with `.to_json()` for canonical wire JSON), `validate_attribution_json`,
   `attribute_return_contribution`, `validate_return_contribution_json`, the
   `default_waterfall_order` / `default_attribution_metrics` helpers, and the
   `PnlAttribution` / `ReturnContributionResult` wrappers. Detail structs are
@@ -240,8 +240,9 @@ large typed decomposition API is deliberately Rust-only.
 - **WASM** — [`exports/attribution.js`](../../finstack-quant-wasm/exports/attribution.js)
   exposes `attributePnl`, `attributePnlJson`, `attributePnlEnvelope`,
   `attributePnlEnvelopeJson`, `validateAttributionJson`, `defaultWaterfallOrder`,
-  `defaultAttributionMetrics`, and the `AttributionJsonInputs` helper class. There
-  is no WASM twin for the schema module or for return contribution.
+  `defaultAttributionMetrics`, `attributePnlMany`, schema validation and return contribution.
+  Single calls take a canonical `AttributionSpec` object or JSON; batches take
+  `AttributionInputs` without an instrument and an ordered envelope array.
 
 The authoritative contract, including the full Rust-only inventory, is
 [`parity_contract.toml`](../../finstack-quant-py/parity_contract.toml)

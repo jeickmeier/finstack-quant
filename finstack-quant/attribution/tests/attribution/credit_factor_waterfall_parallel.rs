@@ -228,16 +228,18 @@ fn waterfall_credit_factor_detail_reconciles_to_credit_curves_pnl() {
 
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-        method: AttributionMethod::Waterfall(default_waterfall_order()),
-        model_params_t0: None,
-        credit_factor_model: Some(Box::new(model)),
-        credit_factor_detail_options: CreditFactorDetailOptions::default(),
-        config: None,
-        full_cross_attribution: false,
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0,
+            market_t1,
+            as_of_t0,
+            as_of_t1,
+            method: AttributionMethod::Waterfall(default_waterfall_order()),
+            model_params_t0: None,
+            credit_factor_model: Some(Box::new(model)),
+            credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            config: None,
+            full_cross_attribution: false,
+        },
     };
 
     let result = AttributionEnvelope::new(spec)
@@ -308,19 +310,21 @@ fn waterfall_twisted_hazard_attributes_curve_shape_not_adder() {
 
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-        method: AttributionMethod::Waterfall(default_waterfall_order()),
-        model_params_t0: None,
-        credit_factor_model: Some(Box::new(model)),
-        credit_factor_detail_options: CreditFactorDetailOptions {
-            include_per_issuer_adder: true,
-            ..CreditFactorDetailOptions::default()
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0,
+            market_t1,
+            as_of_t0,
+            as_of_t1,
+            method: AttributionMethod::Waterfall(default_waterfall_order()),
+            model_params_t0: None,
+            credit_factor_model: Some(Box::new(model)),
+            credit_factor_detail_options: CreditFactorDetailOptions {
+                include_per_issuer_adder: true,
+                ..CreditFactorDetailOptions::default()
+            },
+            config: None,
+            full_cross_attribution: false,
         },
-        config: None,
-        full_cross_attribution: false,
     };
 
     let result = AttributionEnvelope::new(spec)
@@ -389,19 +393,21 @@ fn parallel_credit_detail_plus_cross_effects_preserves_total() {
 
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-        method: AttributionMethod::Parallel,
-        model_params_t0: None,
-        credit_factor_model: Some(Box::new(model)),
-        credit_factor_detail_options: CreditFactorDetailOptions {
-            include_per_bucket_breakdown: false,
-            ..CreditFactorDetailOptions::default()
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0,
+            market_t1,
+            as_of_t0,
+            as_of_t1,
+            method: AttributionMethod::Parallel,
+            model_params_t0: None,
+            credit_factor_model: Some(Box::new(model)),
+            credit_factor_detail_options: CreditFactorDetailOptions {
+                include_per_bucket_breakdown: false,
+                ..CreditFactorDetailOptions::default()
+            },
+            config: None,
+            full_cross_attribution: false,
         },
-        config: None,
-        full_cross_attribution: false,
     };
 
     let result = AttributionEnvelope::new(spec)
@@ -460,16 +466,18 @@ fn waterfall_no_model_keeps_default_credit_step() {
 
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0,
-        market_t1,
-        as_of_t0,
-        as_of_t1,
-        method: AttributionMethod::Waterfall(default_waterfall_order()),
-        model_params_t0: None,
-        credit_factor_model: None,
-        credit_factor_detail_options: CreditFactorDetailOptions::default(),
-        config: None,
-        full_cross_attribution: false,
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0,
+            market_t1,
+            as_of_t0,
+            as_of_t1,
+            method: AttributionMethod::Waterfall(default_waterfall_order()),
+            model_params_t0: None,
+            credit_factor_model: None,
+            credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            config: None,
+            full_cross_attribution: false,
+        },
     };
 
     let result = AttributionEnvelope::new(spec)
@@ -492,16 +500,18 @@ fn parallel_model_with_unmapped_issuer_adds_diagnostic_note() {
 
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: flat_market_state(as_of_t0, 0.01),
-        market_t1: flat_market_state(as_of_t1, 0.02),
-        as_of_t0,
-        as_of_t1,
-        method: AttributionMethod::Parallel,
-        model_params_t0: None,
-        credit_factor_model: Some(Box::new(model)),
-        credit_factor_detail_options: CreditFactorDetailOptions::default(),
-        config: None,
-        full_cross_attribution: false,
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: flat_market_state(as_of_t0, 0.01),
+            market_t1: flat_market_state(as_of_t1, 0.02),
+            as_of_t0,
+            as_of_t1,
+            method: AttributionMethod::Parallel,
+            model_params_t0: None,
+            credit_factor_model: Some(Box::new(model)),
+            credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            config: None,
+            full_cross_attribution: false,
+        },
     };
 
     let attribution = AttributionEnvelope::new(spec)
@@ -536,16 +546,18 @@ fn same_credit_total_different_hierarchy_different_detail() {
         let model = make_model(levels);
         let spec = AttributionSpec {
             instrument: InstrumentJson::Bond(bond),
-            market_t0: market_t0.clone(),
-            market_t1: market_t1.clone(),
-            as_of_t0,
-            as_of_t1,
-            method: AttributionMethod::Waterfall(default_waterfall_order()),
-            model_params_t0: None,
-            credit_factor_model: Some(Box::new(model)),
-            credit_factor_detail_options: CreditFactorDetailOptions::default(),
-            config: None,
-            full_cross_attribution: false,
+            inputs: finstack_quant_attribution::AttributionInputs {
+                market_t0: market_t0.clone(),
+                market_t1: market_t1.clone(),
+                as_of_t0,
+                as_of_t1,
+                method: AttributionMethod::Waterfall(default_waterfall_order()),
+                model_params_t0: None,
+                credit_factor_model: Some(Box::new(model)),
+                credit_factor_detail_options: CreditFactorDetailOptions::default(),
+                config: None,
+                full_cross_attribution: false,
+            },
         };
         AttributionEnvelope::new(spec)
             .execute()
@@ -608,19 +620,21 @@ fn parallel_credit_cascade_attributes_each_step_to_its_own_contribution() {
     let run = |method: AttributionMethod| {
         let spec = AttributionSpec {
             instrument: InstrumentJson::Bond(make_bond()),
-            market_t0: market_t0.clone(),
-            market_t1: market_t1.clone(),
-            as_of_t0,
-            as_of_t1,
-            method,
-            model_params_t0: None,
-            credit_factor_model: Some(Box::new(make_model(vec![
-                HierarchyDimension::Rating,
-                HierarchyDimension::Region,
-            ]))),
-            credit_factor_detail_options: CreditFactorDetailOptions::default(),
-            config: None,
-            full_cross_attribution: false,
+            inputs: finstack_quant_attribution::AttributionInputs {
+                market_t0: market_t0.clone(),
+                market_t1: market_t1.clone(),
+                as_of_t0,
+                as_of_t1,
+                method,
+                model_params_t0: None,
+                credit_factor_model: Some(Box::new(make_model(vec![
+                    HierarchyDimension::Rating,
+                    HierarchyDimension::Region,
+                ]))),
+                credit_factor_detail_options: CreditFactorDetailOptions::default(),
+                config: None,
+                full_cross_attribution: false,
+            },
         };
         AttributionEnvelope::new(spec)
             .execute()
@@ -749,16 +763,18 @@ fn metrics_based_credit_factor_detail_uses_t1_cs01_baseline() {
     let run = |method: AttributionMethod| {
         let spec = AttributionSpec {
             instrument: InstrumentJson::Bond(bond.clone()),
-            market_t0: market_t0.clone(),
-            market_t1: market_t1.clone(),
-            as_of_t0,
-            as_of_t1,
-            method,
-            model_params_t0: None,
-            credit_factor_model: Some(Box::new(model.clone())),
-            credit_factor_detail_options: CreditFactorDetailOptions::default(),
-            config: None,
-            full_cross_attribution: false,
+            inputs: finstack_quant_attribution::AttributionInputs {
+                market_t0: market_t0.clone(),
+                market_t1: market_t1.clone(),
+                as_of_t0,
+                as_of_t1,
+                method,
+                model_params_t0: None,
+                credit_factor_model: Some(Box::new(model.clone())),
+                credit_factor_detail_options: CreditFactorDetailOptions::default(),
+                config: None,
+                full_cross_attribution: false,
+            },
         };
         AttributionEnvelope::new(spec)
             .execute()

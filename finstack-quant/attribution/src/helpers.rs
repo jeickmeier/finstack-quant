@@ -24,7 +24,6 @@ use finstack_quant_valuations::instruments::MarketDependencies;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::metrics::collect_period_cash;
 use finstack_quant_valuations::metrics::MetricId;
-use std::sync::Arc;
 
 /// Families the instrument declares a pricing dependency on.
 ///
@@ -98,29 +97,6 @@ impl InstrumentFactorUse {
             AttributionFactor::MarketScalars => self.scalars,
         }
     }
-}
-
-/// Reprice an instrument at a given date with a market context.
-///
-/// # Arguments
-///
-/// * `instrument` - Instrument to price
-/// * `market` - Market data context
-/// * `as_of` - Valuation date
-///
-/// # Returns
-///
-/// Present value in the instrument's native currency.
-///
-/// # Errors
-///
-/// Returns error if pricing fails (missing curves, invalid parameters, etc.).
-pub(crate) fn reprice_instrument(
-    instrument: &Arc<dyn Instrument>,
-    market: &MarketContext,
-    as_of: Date,
-) -> Result<Money> {
-    instrument.value(market, as_of)
 }
 
 /// Compute P&L between two valuations in target currency.

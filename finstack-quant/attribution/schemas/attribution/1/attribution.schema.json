@@ -2232,7 +2232,7 @@
         },
         "instrument": {
           "$ref": "#/$defs/InstrumentJson",
-          "description": "Instrument to attribute (as JSON envelope)"
+          "description": "Instrument payload to attribute, without its instrument envelope."
         },
         "market_t0": {
           "$ref": "#/$defs/MarketContextState",

@@ -64,13 +64,20 @@ fn checked_in_attribution_schemas_match_derived_types() {
     let expected_spec = finstack_quant_attribution::schema::ARTIFACTS[0]
         .generate()
         .expect("attribution schema generates");
-    let expected_result = finstack_quant_attribution::schema::ARTIFACTS[1]
+    let expected_inputs = finstack_quant_attribution::schema::ARTIFACTS[1]
+        .generate()
+        .expect("attribution inputs schema generates");
+    let expected_result = finstack_quant_attribution::schema::ARTIFACTS[2]
         .generate()
         .expect("attribution result schema generates");
 
     assert_eq!(
         read_schema(&schema_root().join("attribution.schema.json")),
         expected_spec
+    );
+    assert_eq!(
+        read_schema(&schema_root().join("attribution_inputs.schema.json")),
+        expected_inputs
     );
     assert_eq!(
         read_schema(&schema_root().join("attribution_result.schema.json")),
@@ -124,7 +131,11 @@ fn attribution_schema_inventory_is_exact() {
         .collect();
     assert_eq!(
         filenames,
-        ["attribution.schema.json", "attribution_result.schema.json"]
+        [
+            "attribution.schema.json",
+            "attribution_inputs.schema.json",
+            "attribution_result.schema.json",
+        ]
     );
 }
 

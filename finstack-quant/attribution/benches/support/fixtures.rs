@@ -315,16 +315,18 @@ pub fn parallel_spec_envelope(shift_bp: f64) -> AttributionEnvelope {
         MarketContextState::try_from(&markets.market_t1).expect("coherent market snapshot");
     AttributionEnvelope::new(AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0,
-        market_t1,
-        as_of_t0: markets.as_of_t0,
-        as_of_t1: markets.as_of_t1,
-        method: AttributionMethod::Parallel,
-        config: None,
-        model_params_t0: None,
-        credit_factor_model: None,
-        credit_factor_detail_options: CreditFactorDetailOptions::default(),
-        full_cross_attribution: false,
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0,
+            market_t1,
+            as_of_t0: markets.as_of_t0,
+            as_of_t1: markets.as_of_t1,
+            method: AttributionMethod::Parallel,
+            config: None,
+            model_params_t0: None,
+            credit_factor_model: None,
+            credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            full_cross_attribution: false,
+        },
     })
 }
 

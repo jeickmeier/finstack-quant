@@ -14,7 +14,6 @@ PnlAttribution = _attribution.PnlAttribution
 ReturnContributionResult = _attribution.ReturnContributionResult
 attribute_pnl = _attribution.attribute_pnl
 attribute_pnl_envelope = _attribution.attribute_pnl_envelope
-attribute_pnl_envelope_json = _attribution.attribute_pnl_envelope_json
 attribute_pnl_many = _attribution.attribute_pnl_many
 pnl_bridge = _attribution.pnl_bridge
 attribute_return_contribution = _attribution.attribute_return_contribution
@@ -30,7 +29,6 @@ __all__: list[str] = [
     "ReturnContributionResult",
     "attribute_pnl",
     "attribute_pnl_envelope",
-    "attribute_pnl_envelope_json",
     "attribute_pnl_many",
     "attribute_return_contribution",
     "default_attribution_metrics",

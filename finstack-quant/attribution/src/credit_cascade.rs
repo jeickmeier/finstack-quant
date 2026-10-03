@@ -32,7 +32,7 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, IssuerId};
 use finstack_quant_core::Result;
 use finstack_quant_models::factor::credit::hierarchy::{
-    dimension_key, CreditFactorModel, HierarchyDimension, IssuerBetaRow,
+    dimension_key, CreditFactorModel, IssuerBetaRow,
 };
 use finstack_quant_models::factor::matching::{
     bucket_factor_id, CREDIT_GENERIC_FACTOR_ID, ISSUER_ID_META_KEY,
@@ -128,21 +128,13 @@ pub(crate) struct CreditCascade {
     pub warnings: Vec<String>,
 }
 
-/// Human-readable name for a credit hierarchy dimension.
-pub(crate) fn hierarchy_level_name(dim: &HierarchyDimension) -> String {
-    match dim {
-        HierarchyDimension::Custom(s) => s.clone(),
-        _ => dimension_key(dim).to_owned(),
-    }
-}
-
 /// Human-readable names for every level in model order.
 pub(crate) fn hierarchy_level_names(model: &CreditFactorModel) -> Vec<String> {
     model
         .hierarchy
         .levels
         .iter()
-        .map(hierarchy_level_name)
+        .map(|dimension| dimension_key(dimension).to_owned())
         .collect()
 }
 

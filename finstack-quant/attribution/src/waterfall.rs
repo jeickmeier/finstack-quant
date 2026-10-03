@@ -252,8 +252,8 @@ pub(crate) fn attribute_pnl_waterfall(
         endpoints
     } else {
         (
-            reprice_instrument(&instrument_t0, market_t0, as_of_t0)?,
-            reprice_instrument(instrument, market_t1, as_of_t1)?,
+            instrument_t0.value(market_t0, as_of_t0)?,
+            instrument.value(market_t1, as_of_t1)?,
         )
     };
 
@@ -472,7 +472,7 @@ impl<'a> WaterfallContext<'a> {
                     )?
                 }
             };
-            let new_val = reprice_instrument(&self.current_instrument, &new_market, self.as_of_t1)?;
+            let new_val = self.current_instrument.value(&new_market, self.as_of_t1)?;
             self.num_repricings += 1;
             let step_pnl =
                 compute_pnl(prev_val, new_val, base_currency, &new_market, self.as_of_t1)?;
@@ -510,11 +510,9 @@ impl<'a> WaterfallContext<'a> {
 
         // Carry only changes the date, not the market — skip the clone
         if matches!(factor, AttributionFactor::Carry) {
-            let new_val = reprice_instrument(
-                &self.current_instrument,
-                &self.current_market,
-                self.as_of_t1,
-            )?;
+            let new_val = self
+                .current_instrument
+                .value(&self.current_market, self.as_of_t1)?;
             self.num_repricings += 1;
             let factor_pnl = compute_pnl(
                 prev_val,
@@ -528,7 +526,7 @@ impl<'a> WaterfallContext<'a> {
         }
 
         let new_market = self.build_market_for_factor(factor)?;
-        let new_val = reprice_instrument(&self.current_instrument, &new_market, self.as_of_t1)?;
+        let new_val = self.current_instrument.value(&new_market, self.as_of_t1)?;
         self.num_repricings += 1;
 
         let factor_pnl = if matches!(factor, AttributionFactor::Fx) {
@@ -556,7 +554,10 @@ impl<'a> WaterfallContext<'a> {
         base_currency: Currency,
         factor: &AttributionFactor,
     ) -> Result<Money> {
-        match reprice_instrument(self.target_instrument, &self.current_market, self.as_of_t1) {
+        match self
+            .target_instrument
+            .value(&self.current_market, self.as_of_t1)
+        {
             Ok(new_val) => {
                 self.num_repricings += 1;
                 let factor_pnl = compute_pnl(

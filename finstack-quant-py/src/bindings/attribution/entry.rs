@@ -11,9 +11,9 @@ use crate::bindings::date_utils::extract_date;
 use crate::bindings::extract::{extract_instrument_json, extract_market_ref};
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
-use crate::errors::{core_to_py, display_to_py, serde_json_to_py};
+use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_attribution::{
-    AttributionConfig, AttributionEnvelope, AttributionMethod, AttributionSpec,
+    AttributionConfig, AttributionEnvelope, AttributionInputs, AttributionMethod, AttributionSpec,
 };
 use finstack_quant_core::market_data::context::MarketContextState;
 use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
@@ -36,21 +36,19 @@ struct AttributionOptions<'a, 'py> {
     credit_factor_model_json: Option<&'a str>,
 }
 
-/// Build an [`AttributionSpec`] from typed-or-JSON Python inputs.
+/// Build shared attribution inputs from typed-or-JSON Python values.
 ///
-/// `instrument` is the payload attributed; `attribute_pnl_many` swaps it per
-/// instrument after building one template this way.
+/// Single and batch execution use the same conversion of markets, dates and options.
 #[allow(clippy::too_many_arguments)]
-fn build_spec(
+fn build_inputs(
     py: Python<'_>,
-    instrument: InstrumentJson,
     market_t0: &Bound<'_, PyAny>,
     market_t1: &Bound<'_, PyAny>,
     as_of_t0: &Bound<'_, PyAny>,
     as_of_t1: &Bound<'_, PyAny>,
     method: &Bound<'_, PyAny>,
     options: AttributionOptions<'_, '_>,
-) -> PyResult<AttributionSpec> {
+) -> PyResult<AttributionInputs> {
     let market_t0 =
         MarketContextState::try_from(&*extract_market_ref(py, market_t0)?).map_err(core_to_py)?;
     let market_t1 =
@@ -81,8 +79,7 @@ fn build_spec(
                 .map_err(|e| serde_json_to_py(e, "invalid attribution credit_factor_model JSON"))
         })
         .transpose()?;
-    Ok(AttributionSpec {
-        instrument,
+    Ok(AttributionInputs {
         market_t0,
         market_t1,
         as_of_t0,
@@ -189,9 +186,8 @@ pub(crate) fn attribute_pnl(
     credit_factor_model_json: Option<&str>,
 ) -> PyResult<PyPnlAttribution> {
     let instrument = extract_instrument(instrument)?;
-    let spec = build_spec(
+    let inputs = build_inputs(
         py,
-        instrument,
         market_t0,
         market_t1,
         as_of_t0,
@@ -205,6 +201,7 @@ pub(crate) fn attribute_pnl(
         },
     )?;
 
+    let spec = AttributionSpec { instrument, inputs };
     // `execute_contained` turns a Rust panic into `Error::Internal` so it
     // surfaces as a catchable `RuntimeError` rather than a
     // `pyo3_runtime.PanicException` (a `BaseException`).
@@ -290,16 +287,15 @@ pub(crate) fn attribute_pnl_many<'py>(
     model_params_t0_json: Option<&str>,
     credit_factor_model_json: Option<&str>,
 ) -> PyResult<Bound<'py, PyAny>> {
-    let mut payloads = instruments
+    let payloads = instruments
         .iter()
         .map(extract_instrument)
         .collect::<PyResult<Vec<_>>>()?;
-    let Some(first) = payloads.first().cloned() else {
+    if payloads.is_empty() {
         return serde_rows_to_dataframe_with_schema::<serde_json::Value>(py, &[], &WIDE_COLUMNS);
-    };
-    let template = build_spec(
+    }
+    let inputs = build_inputs(
         py,
-        first,
         market_t0,
         market_t1,
         as_of_t0,
@@ -312,9 +308,8 @@ pub(crate) fn attribute_pnl_many<'py>(
             credit_factor_model_json,
         },
     )?;
-    let payloads = std::mem::take(&mut payloads);
     let attributions = py
-        .detach(|| finstack_quant_attribution::attribute_pnl_many(&template, payloads))
+        .detach(|| finstack_quant_attribution::attribute_pnl_many(&inputs, payloads))
         .map_err(core_to_py)?;
     let rows = attributions
         .iter()
@@ -420,7 +415,7 @@ fn run_attribute_pnl_envelope(
 
 /// Run attribution from a full JSON ``AttributionEnvelope``.
 ///
-/// Typed twin of ``attribute_pnl_envelope_json`` (WASM ``attributePnlEnvelope``).
+/// Returns the typed envelope; use its ``to_json()`` method for canonical JSON.
 /// Most users should prefer ``attribute_pnl``, which accepts separate
 /// arguments.
 ///
@@ -451,36 +446,6 @@ pub(crate) fn attribute_pnl_envelope(
     spec_json: &str,
 ) -> PyResult<PyAttributionResultEnvelope> {
     run_attribute_pnl_envelope(py, spec_json).map(|inner| PyAttributionResultEnvelope { inner })
-}
-
-/// Run attribution from a full JSON ``AttributionEnvelope`` and return JSON.
-///
-/// JSON wire twin of ``attribute_pnl_envelope``.
-///
-/// Parameters
-/// ----------
-/// spec_json : str
-///     JSON-serialized ``AttributionEnvelope``.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``AttributionResultEnvelope``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If ``spec_json`` is malformed or fails schema validation, or the
-///     attribution fails validation / pricing.
-/// KeyError
-///     If a required curve, market item, calendar, or FX leg is missing.
-/// RuntimeError
-///     If the engine reports an internal failure.
-#[pyfunction]
-#[pyo3(text_signature = "(spec_json)")]
-pub(crate) fn attribute_pnl_envelope_json(py: Python<'_>, spec_json: &str) -> PyResult<String> {
-    let result_envelope = run_attribute_pnl_envelope(py, spec_json)?;
-    serde_json::to_string(&result_envelope).map_err(display_to_py)
 }
 
 /// Compute single-period return contribution attribution.
