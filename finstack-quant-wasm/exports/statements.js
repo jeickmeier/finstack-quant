@@ -46,9 +46,11 @@ export const statements = {
   capitalStructureCashflowsGetTotalDebtBalance: wasm.capitalStructureCashflowsGetTotalDebtBalance,
   capitalStructureCashflowsGetTotalFees: wasm.capitalStructureCashflowsGetTotalFees,
   capitalStructureCashflowsGetTotalInterestCash: wasm.capitalStructureCashflowsGetTotalInterestCash,
-  capitalStructureCashflowsGetTotalInterestIncome: wasm.capitalStructureCashflowsGetTotalInterestIncome,
+  capitalStructureCashflowsGetTotalInterestIncome:
+    wasm.capitalStructureCashflowsGetTotalInterestIncome,
   capitalStructureCashflowsGetTotalInterestPik: wasm.capitalStructureCashflowsGetTotalInterestPik,
-  capitalStructureCashflowsGetTotalAccruedInterest: wasm.capitalStructureCashflowsGetTotalAccruedInterest,
+  capitalStructureCashflowsGetTotalAccruedInterest:
+    wasm.capitalStructureCashflowsGetTotalAccruedInterest,
   capitalStructureCashflowsGetInterestIncome: wasm.capitalStructureCashflowsGetInterestIncome,
   forecastSpecForwardFill: wasm.forecastSpecForwardFill,
   forecastSpecGrowth: wasm.forecastSpecGrowth,

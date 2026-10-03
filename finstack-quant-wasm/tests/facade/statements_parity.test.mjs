@@ -430,7 +430,10 @@ test('capital-structure interest-income and total accessors are Rust twins', () 
   const pik = statements.capitalStructureCashflowsGetTotalInterestPik(cs, Q1);
   assert.equal(cash + pik, statements.capitalStructureCashflowsGetTotalInterest(cs, Q1));
   assert.equal(typeof statements.capitalStructureCashflowsGetTotalInterestIncome(cs, Q1), 'number');
-  assert.equal(typeof statements.capitalStructureCashflowsGetTotalAccruedInterest(cs, Q1), 'number');
+  assert.equal(
+    typeof statements.capitalStructureCashflowsGetTotalAccruedInterest(cs, Q1),
+    'number'
+  );
   assert.equal(
     typeof statements.capitalStructureCashflowsGetInterestIncome(cs, 'TL-A', Q1),
     'number'
