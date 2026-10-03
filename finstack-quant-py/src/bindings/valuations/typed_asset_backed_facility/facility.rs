@@ -794,9 +794,11 @@ impl PyFacilityProjection {
     /// One row per payment date as a pandas ``DataFrame``.
     ///
     /// Columns: ``date`` (ISO 8601 string), ``interest``, ``principal``,
-    /// ``commitment_fee``, ``draw``, ``lender_total`` (interest, principal and
-    /// commitment fee less draws) and ``residual``
-    /// (cash to the residual class), all in currency units.
+    /// ``commitment_fee``, ``draw``, ``lender_total`` and ``residual``
+    /// (cash to the residual class), all in currency units. The component
+    /// columns pivot the projection's flow lists by date; ``lender_total`` is
+    /// the Rust ``lender_cashflows`` amount on that date (the same flows the
+    /// ``lender_cashflows`` property and the facility IRR use).
     ///
     /// Returns
     /// -------
@@ -806,11 +808,21 @@ impl PyFacilityProjection {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the rows cannot be serialized.
+    ///     If two lender flows on one date carry different currencies, or the
+    ///     rows cannot be serialized.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         use std::collections::BTreeMap;
-        let mut by_date: BTreeMap<finstack_quant_core::dates::Date, [f64; 5]> = BTreeMap::new();
+        let lender_total: BTreeMap<finstack_quant_core::dates::Date, f64> = self
+            .inner
+            .lender_cashflows()
+            .map_err(core_to_py)?
+            .into_iter()
+            .map(|(date, amount)| (date, amount.amount()))
+            .collect();
+        // Every lender-flow date gets a row, even when no component list has it.
+        let mut by_date: BTreeMap<finstack_quant_core::dates::Date, [f64; 5]> =
+            lender_total.keys().map(|date| (*date, [0.0; 5])).collect();
         for (index, flows) in [
             &self.inner.facility.interest_flows,
             &self.inner.facility.principal_flows,
@@ -834,7 +846,8 @@ impl PyFacilityProjection {
                     "principal": values[1],
                     "commitment_fee": values[2],
                     "draw": values[4],
-                    "lender_total": values[0] + values[1] + values[2] - values[4],
+                    // A date with only residual flows carries no lender cash.
+                    "lender_total": lender_total.get(date).copied().unwrap_or(0.0),
                     "residual": values[3],
                 })
             })
@@ -1606,9 +1619,10 @@ impl PyAssetBackedFacilityBuilder {
     ///
     /// Parameters
     /// ----------
-    /// value : Attributes | dict[str, str]
-    ///     Attribute bag; a dict populates ``meta`` (an optional ``"tags"``
-    ///     list populates ``tags``).
+    /// value : Attributes | dict | None
+    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
+    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+    ///     ``None`` clears it.
     ///
     /// Returns
     /// -------
@@ -1617,9 +1631,11 @@ impl PyAssetBackedFacilityBuilder {
     ///
     /// Raises
     /// ------
+    /// TypeError
+    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
     /// ValueError
-    ///     If ``value`` is neither ``Attributes`` nor a string dict, or this
-    ///     builder was already consumed by ``build``.
+    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or
+    ///     value, or this builder was already consumed by ``build``.
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

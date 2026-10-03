@@ -8,7 +8,6 @@ use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{enum_to_py_string, money_to_py};
 use crate::errors::value_error;
-use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetType, BalloonSpec, LiquidationSpec, PoolAsset, PrepaymentPenalty, SpecialServicingSpec,
@@ -31,6 +30,7 @@ use super::super::instruments::enum_from_str;
 /// --------
 /// >>> import datetime
 /// >>> from finstack_quant.core.currency import Currency
+/// >>> from finstack_quant.core.dates import DayCount
 /// >>> from finstack_quant.core.money import Money
 /// >>> from finstack_quant.valuations.instruments import PoolAsset
 /// >>> loan = PoolAsset(
@@ -39,6 +39,7 @@ use super::super::instruments::enum_from_str;
 /// ...     Money(10_000_000.0, Currency("USD")),
 /// ...     0.08,
 /// ...     datetime.date(2031, 1, 15),
+/// ...     day_count=DayCount.ACT_360,
 /// ...     rating="B",
 /// ...     balloon={"extension_prob": 0.3, "extension_months": 24},
 /// ... )
@@ -101,8 +102,8 @@ impl PyPoolAsset {
     ///     engine adds ``spread_bp`` to the ``forward_curve_id`` projection.
     /// maturity : datetime.date
     ///     Contractual maturity (balloon date for commercial mortgages).
-    /// day_count : DayCount, optional
-    ///     Accrual convention; Act/360 when omitted.
+    /// day_count : DayCount
+    ///     Accrual convention of the row (keyword-only, required as in Rust).
     /// spread_bp : float, optional
     ///     Floating spread over ``forward_curve_id`` in basis points.
     /// forward_curve_id : str, optional
@@ -192,7 +193,7 @@ impl PyPoolAsset {
     ///     or ``rating`` is not a known rating.
     #[new]
     #[pyo3(signature = (
-        id, asset_type, balance, rate, maturity, *, day_count=None, spread_bp=None, forward_curve_id=None,
+        id, asset_type, balance, rate, maturity, *, day_count, spread_bp=None, forward_curve_id=None,
         index_floor_bp=None, rating=None, industry=None, obligor_id=None, defaulted=false,
         recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None,
         origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None,
@@ -201,7 +202,7 @@ impl PyPoolAsset {
         prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None
     ))]
     #[pyo3(
-        text_signature = "(id, asset_type, balance, rate, maturity, *, day_count=None, spread_bp=None, forward_curve_id=None, index_floor_bp=None, rating=None, industry=None, obligor_id=None, defaulted=False, recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None, origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None, contractual_payment=None, amortization_term_months=None, io_months=None, market_price_pct=None, delinquency_buckets=None, balloon=None, prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None)"
+        text_signature = "(id, asset_type, balance, rate, maturity, *, day_count, spread_bp=None, forward_curve_id=None, index_floor_bp=None, rating=None, industry=None, obligor_id=None, defaulted=False, recovery_amount=None, default_date=None, purchase_price=None, acquisition_date=None, origination_date=None, smm_override=None, mdr_override=None, recovery_rate=None, commitment=None, contractual_payment=None, amortization_term_months=None, io_months=None, market_price_pct=None, delinquency_buckets=None, balloon=None, prepayment_penalty=None, special_servicing=None, noi=None, liquidation=None)"
     )]
     // PyO3 binding: one keyword per public Rust field.
     #[allow(clippy::too_many_arguments)]
@@ -212,7 +213,7 @@ impl PyPoolAsset {
         balance: PyRef<'_, PyMoney>,
         rate: f64,
         maturity: &Bound<'_, PyAny>,
-        day_count: Option<PyRef<'_, PyDayCount>>,
+        day_count: PyRef<'_, PyDayCount>,
         spread_bp: Option<f64>,
         forward_curve_id: Option<String>,
         index_floor_bp: Option<f64>,
@@ -269,7 +270,7 @@ impl PyPoolAsset {
             purchase_price: opt_money(purchase_price),
             acquisition_date: opt_date(acquisition_date)?,
             origination_date: opt_date(origination_date)?,
-            day_count: day_count.map_or(DayCount::Act360, |value| value.inner),
+            day_count: day_count.inner,
             smm_override,
             mdr_override,
             recovery_rate,

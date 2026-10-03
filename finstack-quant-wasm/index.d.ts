@@ -27077,7 +27077,7 @@ export interface CompositeNamespace {
    * @param metric - Canonical additive metric identifier, e.g. `"dv01"` or `"delta"`.
    * @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
    * @param anchorQuantity - Quantity of the anchor leg.
-   * @param neutralize - Optional; `true` sizes the other legs so the net metric is zero, `false` (the default) scales them by score.
+   * @param neutralize - Required; `true` sizes the other legs so the net metric is zero (the `weightingMethodDv01Neutral` / `weightingMethodDeltaNeutral` presets), `false` scales them by score.
    * @returns The `WeightingMethod` plain object.
    * @throws Error - Throws with kind `validation` if `metric` is not a canonical metric identifier, and kind `invalid_type` for a wrong argument type.
    */
@@ -27085,7 +27085,7 @@ export interface CompositeNamespace {
     metric: string,
     anchorLegId: string,
     anchorQuantity: number,
-    neutralize?: boolean | null
+    neutralize: boolean
   ): generated.valuations.WeightingMethod;
   /**
    * DV01-neutral weighting (mirrors Rust `WeightingMethod::dv01_neutral`).

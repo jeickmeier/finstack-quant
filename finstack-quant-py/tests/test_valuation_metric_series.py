@@ -74,9 +74,17 @@ def test_portfolio_metric_maps_reject_noncanonical_keys(location: str) -> None:
 
 
 def test_metric_weighted_parses_wire_keys() -> None:
-    assert isinstance(WeightingMethod.metric_weighted("pv01::USD-OIS", "A", 1.0), WeightingMethod)
+    assert isinstance(WeightingMethod.metric_weighted("pv01::USD-OIS", "A", 1.0, False), WeightingMethod)
     with pytest.raises(ValueError, match="noncanonical"):
-        WeightingMethod.metric_weighted("pv01::USD_x2dOIS", "A", 1.0)
+        WeightingMethod.metric_weighted("pv01::USD_x2dOIS", "A", 1.0, False)
+
+
+def test_metric_weighted_requires_neutralize() -> None:
+    """Rust ``MetricWeighted.neutralize`` has no default; the binding must not invent one."""
+    with pytest.raises(TypeError):
+        WeightingMethod.metric_weighted("dv01", "A", 1.0)  # type: ignore[call-arg]
+    neutral = WeightingMethod.metric_weighted("dv01", "A", 1.0, True)
+    assert json.loads(neutral.to_json()) == json.loads(WeightingMethod.dv01_neutral("A", 1.0).to_json())
 
 
 def test_metric_series_uses_canonical_custom_base_keys() -> None:

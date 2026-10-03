@@ -314,9 +314,7 @@ class WeightingMethod:
         ...
 
     @staticmethod
-    def metric_weighted(
-        metric: str, anchor_leg_id: str, anchor_quantity: float, neutralize: bool = False
-    ) -> WeightingMethod:
+    def metric_weighted(metric: str, anchor_leg_id: str, anchor_quantity: float, neutralize: bool) -> WeightingMethod:
         """
         Resolve quantities from unit metric contributions and an anchor scale.
 
@@ -330,6 +328,9 @@ class WeightingMethod:
             Finite non-zero signed quantity assigned to the anchor leg.
         neutralize : bool
             Whether positive and negative score groups normalize separately.
+            Required, as in the Rust ``WeightingMethod::MetricWeighted`` variant:
+            ``True`` sizes the book metric-neutral (the ``dv01_neutral`` /
+            ``delta_neutral`` presets), ``False`` scales every leg by its score.
 
         Returns
         -------

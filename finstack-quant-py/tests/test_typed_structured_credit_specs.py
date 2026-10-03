@@ -95,6 +95,16 @@ def test_typed_specs_validate_their_inputs() -> None:
         AmortizationEvent.cumulative_loss(4.0)
 
 
+def test_typed_constructors_require_the_fields_rust_requires() -> None:
+    """No binding-invented Act/360 day count or 0% appraisal reduction (VALB-003)."""
+    with pytest.raises(TypeError, match="appraisal_reduction_pct"):
+        SpecialServicingSpec()  # type: ignore[call-arg]
+    with pytest.raises(TypeError, match="day_count"):
+        PoolAsset("L1", {"type": "first_lien_loan"}, usd(1_000_000.0), 0.08, MATURITY)  # type: ignore[call-arg]
+    loan = PoolAsset("L1", {"type": "first_lien_loan"}, usd(1_000_000.0), 0.08, MATURITY, day_count=DayCount.THIRTY_360)
+    assert PoolAsset.from_json(loan.to_json()).to_json() == loan.to_json()
+
+
 def test_penalty_and_event_accessors_follow_the_kind() -> None:
     steps = PrepaymentPenalty.step_down([(datetime.date(2025, 12, 31), 5.0)])
     assert steps.kind == "step_down"
@@ -134,6 +144,7 @@ def test_typed_specs_are_accepted_by_pool_asset_and_the_deal_prices() -> None:
         usd(2_000_000.0),
         0.0,
         MATURITY,
+        day_count=DayCount.ACT_360,
         liquidation=LiquidationSpec(18, 65.0, carry_cost_pct=5.0),
     )
     assert npl.liquidation["months_to_resolution"] == 18

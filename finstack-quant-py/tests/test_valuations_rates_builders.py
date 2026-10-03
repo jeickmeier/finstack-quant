@@ -193,7 +193,7 @@ def test_swap_builder_margin_spec_and_attributes() -> None:
         .side("receive")
         .fixed_leg(_fixed_leg())
         .float_leg(_float_leg())
-        .attributes({"desk": "rates", "tags": ["hedge"]})
+        .attributes({"tags": ["hedge"], "meta": {"desk": "rates"}})
         .build()
     )
     assert swap.attributes.get_meta("desk") == "rates"
@@ -391,7 +391,7 @@ def test_bond_builder_credit_models_preserve_explicit_model_contract() -> None:
             .cashflow_spec(base["cashflow_spec"])
             .discount_curve_id("USD-OIS")
             .credit_curve_id("ACME-HZD")
-            .attributes({"issuer": "ACME"})
+            .attributes({"meta": {"issuer": "ACME"}})
         )
         if call_put is not None:
             builder = builder.call_put(call_put)
@@ -597,7 +597,7 @@ def test_swaption_examples_getters_and_accessors() -> None:
         .underlying_fixed_leg(_fixed_leg())
         .underlying_float_leg(_float_leg())
         .sabr_params({"alpha": 0.025, "beta": 0.5, "nu": 0.4, "rho": -0.3, "shift": None})
-        .attributes({"book": "vol"})
+        .attributes({"meta": {"book": "vol"}})
         .build()
     )
     assert built.sabr_params is not None
@@ -633,7 +633,7 @@ def test_cap_floor_example_getters_and_new_setters() -> None:
         .discount_curve_id("USD-OIS")
         .forward_curve_id("USD-SOFR-3M")
         .vol_surface_id("USD-CAP-VOL")
-        .attributes({"desk": "options"})
+        .attributes({"meta": {"desk": "options"}})
         .build()
     )
     assert built.strike == pytest.approx(0.02)

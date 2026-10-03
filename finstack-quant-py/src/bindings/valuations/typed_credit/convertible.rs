@@ -48,7 +48,7 @@ fn serde_from_py<T: serde::de::DeserializeOwned>(
 /// Examples
 /// --------
 /// >>> from finstack_quant.valuations.instruments import ConversionSpec
-/// >>> spec = ConversionSpec(ratio=25.0)
+/// >>> spec = ConversionSpec(ratio=25.0, policy="voluntary", anti_dilution="none", dividend_adjustment="none")
 /// >>> (spec.ratio, spec.policy, spec.anti_dilution)
 /// (25.0, 'voluntary', 'none')
 #[pyclass(
@@ -73,16 +73,16 @@ impl PyConversionSpec {
     ///     Conversion ratio (shares per bond); derived from ``price`` when ``None``.
     /// price : float | None
     ///     Conversion price per share; derived from ``ratio`` when ``None``.
-    /// policy : str | dict | None
-    ///     Conversion policy: ``"voluntary"`` (the default when ``None``), or a tagged dict such
-    ///     as ``{"mandatory_on": "2027-03-15"}``,
+    /// policy : str | dict
+    ///     Conversion policy (keyword-only, required as in Rust): ``"voluntary"``, or a
+    ///     tagged dict such as ``{"mandatory_on": "2027-03-15"}``,
     ///     ``{"window": {"start": ..., "end": ...}}``,
     ///     ``{"upon_event": "qualified_ipo"}`` or
     ///     ``{"mandatory_variable": {"conversion_date": ..., "upper_conversion_price": ..., "lower_conversion_price": ...}}``.
     /// anti_dilution : {"none", "full_ratchet", "weighted_average"}
-    ///     Anti-dilution protection; default ``"none"``.
+    ///     Anti-dilution protection (keyword-only, required as in Rust).
     /// dividend_adjustment : {"none", "adjust_price", "adjust_ratio"}
-    ///     Dividend protection; default ``"none"``.
+    ///     Dividend protection (keyword-only, required as in Rust).
     /// dilution_events : list[dict] | None
     ///     Dilution events (``date``, ``new_issue_price``, ``new_shares_issued``,
     ///     ``shares_outstanding_before``) in chronological order; pricing raises
@@ -102,26 +102,26 @@ impl PyConversionSpec {
     /// Examples
     /// --------
     /// >>> from finstack_quant.valuations.instruments import ConversionSpec
-    /// >>> ConversionSpec(price=50.0, dividend_adjustment="adjust_ratio").dividend_adjustment
+    /// >>> spec = ConversionSpec(
+    /// ...     price=50.0, policy="voluntary", anti_dilution="none", dividend_adjustment="adjust_ratio"
+    /// ... )
+    /// >>> spec.dividend_adjustment
     /// 'adjust_ratio'
     #[new]
-    #[pyo3(signature = (ratio=None, price=None, policy=None, anti_dilution="none", dividend_adjustment="none", dilution_events=None))]
+    #[pyo3(signature = (ratio=None, price=None, *, policy, anti_dilution, dividend_adjustment, dilution_events=None))]
     #[pyo3(
-        text_signature = "(ratio=None, price=None, policy=None, anti_dilution='none', dividend_adjustment='none', dilution_events=None)"
+        text_signature = "(ratio=None, price=None, *, policy, anti_dilution, dividend_adjustment, dilution_events=None)"
     )]
     fn new(
         py: Python<'_>,
         ratio: Option<f64>,
         price: Option<f64>,
-        policy: Option<&Bound<'_, PyAny>>,
+        policy: &Bound<'_, PyAny>,
         anti_dilution: &str,
         dividend_adjustment: &str,
         dilution_events: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        let policy: ConversionPolicy = match policy {
-            Some(p) if !p.is_none() => serde_from_py(py, p, "conversion policy")?,
-            _ => ConversionPolicy::Voluntary,
-        };
+        let policy: ConversionPolicy = serde_from_py(py, policy, "conversion policy")?;
         let anti_dilution: AntiDilutionPolicy =
             super::super::instruments::enum_from_str(anti_dilution, "anti_dilution")?;
         let dividend_adjustment: DividendAdjustment =
@@ -163,7 +163,7 @@ impl PyConversionSpec {
     /// Examples
     /// --------
     /// >>> from finstack_quant.valuations.instruments import ConversionSpec
-    /// >>> ConversionSpec.from_json(ConversionSpec(ratio=20.0).to_json()).ratio
+    /// >>> ConversionSpec.from_json(ConversionSpec(ratio=20.0, policy="voluntary", anti_dilution="none", dividend_adjustment="none").to_json()).ratio
     /// 20.0
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
@@ -1201,9 +1201,10 @@ impl PyConvertibleBondBuilder {
     ///
     /// Parameters
     /// ----------
-    /// value : Attributes | dict[str, str] | None
-    ///     Attribute bag; a dict populates metadata, with an optional
-    ///     ``"tags"`` list entry populating tags.
+    /// value : Attributes | dict | None
+    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
+    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+    ///     ``None`` clears it.
     ///
     /// Returns
     /// -------
@@ -1213,7 +1214,9 @@ impl PyConvertibleBondBuilder {
     /// Raises
     /// ------
     /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a dict, nor ``None``.
+    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+    /// ValueError
+    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

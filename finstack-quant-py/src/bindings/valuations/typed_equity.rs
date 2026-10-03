@@ -1002,9 +1002,10 @@ impl PyEquityOptionBuilder {
     ///
     /// Parameters
     /// ----------
-    /// value : Attributes | dict[str, str] | None
-    ///     Attribute bag; a dict populates metadata, with an optional
-    ///     ``"tags"`` list entry populating tags.
+    /// value : Attributes | dict | None
+    ///     Attribute bag: an ``Attributes`` or its serde ``dict`` form
+    ///     (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+    ///     ``None`` clears it.
     ///
     /// Returns
     /// -------
@@ -1014,7 +1015,9 @@ impl PyEquityOptionBuilder {
     /// Raises
     /// ------
     /// TypeError
-    ///     If ``value`` is neither ``Attributes``, a dict, nor ``None``.
+    ///     If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+    /// ValueError
+    ///     If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
     #[pyo3(text_signature = "($self, value)")]
     fn attributes<'py>(
         mut slf: PyRefMut<'py, Self>,

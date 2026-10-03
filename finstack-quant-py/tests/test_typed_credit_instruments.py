@@ -141,6 +141,16 @@ class TestCreditDefaultSwapTyped:
         with pytest.raises(ValueError, match="Recovery rate"):
             ProtectionLegSpec("ACME-CDS", 1.5, 3)
 
+    def test_protection_leg_requires_settlement_delay(self) -> None:
+        """Rust ``ProtectionLegSpec::new`` requires the lag; no binding T+3 default (VALA-003)."""
+        with pytest.raises(TypeError, match="settlement_delay"):
+            ProtectionLegSpec("ACME-CDS", 0.4)  # type: ignore[call-arg]
+        with pytest.raises(ValueError, match="settlement_delay"):
+            ProtectionLegSpec.from_json('{"credit_curve_id":"ACME-CDS","recovery_rate":0.4}')
+        assert ProtectionLegSpec("ACME-CDS", 0.4, 1).settlement_delay == 1
+        with pytest.raises(ValueError, match="Recovery rate"):
+            ProtectionLegSpec("ACME-CDS", 1.0, 3)
+
     def test_from_json_rejects_wrong_type(self) -> None:
         with pytest.raises(ValueError, match="credit_default_swap"):
             CreditDefaultSwap.from_json(TermLoan.example().to_json())

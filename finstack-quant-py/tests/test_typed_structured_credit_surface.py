@@ -116,7 +116,7 @@ def _clo() -> StructuredCredit:
         .liquidation_price_pct(99.0)
         .loss_allocation("par_preserving")
         .principal_covers_senior_interest(True)
-        .attributes({"desk": "abs"})
+        .attributes({"meta": {"desk": "abs"}})
         .build()
     )
 
@@ -176,7 +176,15 @@ def test_pool_asset_rows_round_trip_through_the_typed_pool() -> None:
     with pytest.raises(ValueError, match="assets"):
         AssetPool("P", "cmbs", USD).with_assets(42)
     with pytest.raises(ValueError, match="rating"):
-        PoolAsset("X", {"type": "high_yield_bond"}, usd(1.0), 0.05, MATURITY, rating="not-a-rating")
+        PoolAsset(
+            "X",
+            {"type": "high_yield_bond"},
+            usd(1.0),
+            0.05,
+            MATURITY,
+            day_count=DayCount.ACT_360,
+            rating="not-a-rating",
+        )
 
     seasoned = pool.with_accounts(cumulative_defaults=usd(8_000_000.0), collection_account=usd(250_000.0))
     assert seasoned.cumulative_defaults == usd(8_000_000.0)
@@ -239,7 +247,7 @@ def test_tranche_builder_sets_every_seasoned_field() -> None:
         .pik_enabled(True)
         .oc_trigger({"trigger_level": 1.15, "consequence": "divert_cash_flow"})
         .ic_trigger({"trigger_level": 1.05, "cure_level": 1.10, "consequence": "divert_cash_flow"})
-        .attributes({"desk": "alts", "tags": ["mezz"]})
+        .attributes({"tags": ["mezz"], "meta": {"desk": "alts"}})
         .build()
     )
     assert tranche.current_balance == usd(25_000_000.0)
@@ -642,7 +650,7 @@ def _typed_deal_from_golden(spec: dict) -> StructuredCredit:
             .frequency(_tenor(row["frequency"]))
             .day_count(DayCount.parse(row["day_count"]))
             .pik_enabled(row.get("pik_enabled", False))
-            .attributes(row["attributes"]["meta"] | {"tags": row["attributes"]["tags"]})
+            .attributes(row["attributes"])
         )
         if "fixed" in row["coupon"]:
             builder = builder.coupon_fixed(row["coupon"]["fixed"]["rate"])
@@ -669,7 +677,7 @@ def _typed_deal_from_golden(spec: dict) -> StructuredCredit:
         .discount_curve_id(spec["discount_curve_id"])
         .calendar_id(spec["calendar_id"])
         .business_day_convention(spec["business_day_convention"])
-        .attributes(spec["attributes"]["meta"] | {"tags": spec["attributes"]["tags"]})
+        .attributes(spec["attributes"])
         .prepayment_spec(PrepaymentModelSpec.from_json(json.dumps(spec["prepayment_spec"])))
         .default_spec(DefaultModelSpec.from_json(json.dumps(spec["default_spec"])))
         .recovery_spec(RecoveryModelSpec.from_json(json.dumps(spec["recovery_spec"])))

@@ -187,6 +187,28 @@ def test_projection_reconciles_with_the_lender_cashflows_and_the_price() -> None
     assert float(typed.price) > 0.0
 
 
+def test_projection_frame_lender_total_comes_from_rust_lender_cashflows() -> None:
+    """``lender_total`` is the Rust ``lender_cashflows`` amount, not a binding sum (VALB-002)."""
+    doc = json.loads(_facility().project(_market(), CLOSE).to_json())
+    # Perturb only facility.cashflows, the input Rust lender_cashflows sums.
+    first_date, first_money = doc["facility"]["cashflows"][0]
+    first_money["amount"] = str(float(first_money["amount"]) + 1_000_000.0)
+    tampered = FacilityProjection.from_json(json.dumps(doc))
+    frame = tampered.to_dataframe()
+    rust = {date.isoformat(): money.amount for date, money in tampered.lender_cashflows}
+    row = frame.loc[frame["date"] == first_date, "lender_total"]
+    assert float(row.iloc[0]) == pytest.approx(rust[first_date])
+    assert dict(zip(frame["date"], frame["lender_total"], strict=True)) == pytest.approx(rust)
+
+
+def test_projection_frame_keeps_the_rust_currency_check() -> None:
+    doc = json.loads(_facility().project(_market(), CLOSE).to_json())
+    doc["commitment_fees"][0][1]["currency"] = "EUR"
+    tampered = FacilityProjection.from_json(json.dumps(doc))
+    with pytest.raises(ValueError, match="Currency mismatch"):
+        tampered.to_dataframe()
+
+
 def test_facility_is_accepted_as_a_typed_composite_leg() -> None:
     facility = _facility()
     typed = CompositeLegSpec(facility.id, facility, 1.0)

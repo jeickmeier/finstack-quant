@@ -927,9 +927,13 @@ impl PyProtectionLegSpec {
     /// credit_curve_id : str
     ///     Hazard/credit curve identifier for default probabilities.
     /// recovery_rate : float
-    ///     Recovery rate in ``[0.0, 1.0]`` (e.g. 0.4 = 40%).
-    /// settlement_delay : int, default 3
-    ///     Settlement delay in business days.
+    ///     Recovery rate in ``[0.0, 1.0)`` (e.g. 0.4 = 40%).
+    /// settlement_delay : int
+    ///     Settlement delay in business days between the credit event and the
+    ///     protection payment. Required: the lag is a contract term (ISDA North
+    ///     America uses 3, ISDA Europe uses 1); read it from
+    ///     ``ConventionRegistry().resolve_cds(...).settlement_days`` when the
+    ///     contract follows a standard convention.
     ///
     /// Returns
     /// -------
@@ -939,7 +943,7 @@ impl PyProtectionLegSpec {
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``recovery_rate`` is outside ``[0.0, 1.0]``.
+    ///     If ``recovery_rate`` is outside ``[0.0, 1.0)``.
     ///
     /// Examples
     /// --------
@@ -948,8 +952,7 @@ impl PyProtectionLegSpec {
     /// >>> leg.recovery_rate
     /// 0.4
     #[new]
-    #[pyo3(signature = (credit_curve_id, recovery_rate, settlement_delay = 3))]
-    #[pyo3(text_signature = "(credit_curve_id, recovery_rate, settlement_delay=3)")]
+    #[pyo3(text_signature = "(credit_curve_id, recovery_rate, settlement_delay)")]
     fn new(credit_curve_id: &str, recovery_rate: f64, settlement_delay: u16) -> PyResult<Self> {
         let inner = finstack_quant_valuations::instruments::ProtectionLegSpec::new(
             credit_curve_id.to_string(),
@@ -982,7 +985,7 @@ impl PyProtectionLegSpec {
     /// ------
     /// ValueError
     ///     If the JSON is malformed, has unknown fields, or the recovery rate
-    ///     is outside ``[0.0, 1.0]``.
+    ///     is outside ``[0.0, 1.0)``.
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
@@ -1018,7 +1021,7 @@ impl PyProtectionLegSpec {
         self.inner.credit_curve_id.to_string()
     }
 
-    /// Recovery rate as a decimal in ``[0.0, 1.0]``.
+    /// Recovery rate as a decimal in ``[0.0, 1.0)``.
     #[getter]
     fn recovery_rate(&self) -> f64 {
         self.inner.recovery_rate
