@@ -320,7 +320,10 @@ fn bare_string_returns_are_named_or_allowlisted() {
         // Canonical instrument-envelope text of Rust
         // `pricer::instrument_envelope_from_spec` (byte-identical to
         // `validateInstrumentJson`'s output; Python twin returns `str`).
-        ("ValuationInstrumentsNamespace", "instrumentEnvelopeFromSpec"),
+        (
+            "ValuationInstrumentsNamespace",
+            "instrumentEnvelopeFromSpec",
+        ),
     ];
     let dts = index_dts();
     let offenders: Vec<String> = members(&dts)
