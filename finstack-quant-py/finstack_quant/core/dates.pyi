@@ -3552,7 +3552,14 @@ class ScheduleBuilder:
 
     def cds_imm(self) -> ScheduleBuilder:
         """
-        Enable CDS IMM date mode and disable standard IMM mode.
+        Use CDS IMM dates (the 20th of March, June, September and December).
+
+        Same semantics as the Rust ``ScheduleBuilder::cds_imm``: sets the
+        frequency to quarterly and the stub rule to ``short_back``, turns CDS
+        IMM mode on and standard IMM mode off. A later ``frequency`` or
+        ``stub_rule`` call wins, and ``to_spec()`` reports exactly what
+        ``build()`` uses.
+
         Returns
         -------
         ScheduleBuilder
@@ -3561,12 +3568,24 @@ class ScheduleBuilder:
         Notes
         -----
         This method does not raise; it returns the same instance for chaining.
+
+        Examples
+        --------
+        >>> from finstack_quant.core.dates import Schedule
+        >>> spec = Schedule.builder("2025-01-15", "2026-01-15").cds_imm().to_spec()
+        >>> spec["frequency"], spec["stub"]
+        ({'count': 3, 'unit': 'months'}, 'short_back')
         """
         ...
 
     def imm(self) -> ScheduleBuilder:
         """
-        Enable standard IMM date mode and disable CDS IMM mode.
+        Use standard IMM dates (the third Wednesday of quarterly months).
+
+        Same semantics as the Rust ``ScheduleBuilder::imm``: sets the frequency
+        to quarterly and the stub rule to ``short_back``, turns standard IMM
+        mode on and CDS IMM mode off.
+
         Returns
         -------
         ScheduleBuilder

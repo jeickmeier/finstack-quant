@@ -1,6 +1,5 @@
 //! Shared curve binding helpers.
 
-use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::market_data::surfaces::{
     VolInterpolationMode, VolQuoteType, VolSurfaceAxis,
 };
@@ -12,12 +11,6 @@ use pyo3::types::{PyDict, PyFloat, PyInt};
 
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::pandas_utils::dict_to_dataframe;
-
-/// Parse a DayCount from a Python string like `"act_365f"`, `"act_360"`, etc.
-pub(crate) fn parse_day_count(s: &str) -> PyResult<DayCount> {
-    s.parse::<DayCount>()
-        .map_err(|e| crate::errors::value_error(format!("Invalid day_count {s:?}: {e}")))
-}
 
 /// Parse an [`InterpStyle`] from a Python string.
 pub(super) fn parse_interp_style(s: &str) -> PyResult<InterpStyle> {

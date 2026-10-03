@@ -9,7 +9,7 @@ mod scoring;
 
 use std::sync::Arc;
 
-use crate::bindings::core::market_data::curves::helpers::parse_day_count;
+use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::core::market_data::curves::PyHazardCurve;
 use crate::bindings::date_utils::py_to_date;
 use crate::bindings::extract::extract_credit_rating;
@@ -797,10 +797,10 @@ impl PyMertonModel {
         base_date: &Bound<'_, PyAny>,
         tenors: Vec<f64>,
         recovery: f64,
-        day_count: &str,
+        day_count: &Bound<'_, PyAny>,
     ) -> PyResult<PyHazardCurve> {
         let base_date = py_to_date(base_date)?;
-        let day_count = parse_day_count(day_count)?;
+        let day_count = extract_day_count(day_count)?;
         let curve = self
             .inner
             .to_hazard_curve(id, base_date, &tenors, recovery, day_count)

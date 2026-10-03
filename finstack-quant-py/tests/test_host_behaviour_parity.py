@@ -44,7 +44,8 @@ def test_schedule_builder_setters_update_the_builder_in_place_and_return_it() ->
     spec = builder.to_spec()
     assert spec["frequency"] == {"count": 3, "unit": "months"}
     assert spec["end_of_month"] is True
-    assert spec["stub"] == "short_front"
+    # imm() resets the stub to short_back (Rust ScheduleBuilder::imm semantics).
+    assert spec["stub"] == "short_back"
     assert spec["calendar_id"] == "nyse"
     assert spec["payment_lag_days"] == 2
     assert spec["fixing_lag_business_days"] == 1

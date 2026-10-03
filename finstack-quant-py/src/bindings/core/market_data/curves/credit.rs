@@ -1,5 +1,6 @@
 //! Base-correlation curve and credit index data bindings.
 
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, CreditIndexData};
@@ -191,7 +192,12 @@ impl PyCreditIndexData {
 
 #[pymethods]
 impl PyCreditIndexData {
-    /// Construct homogeneous credit index data.
+    /// Construct credit index data, optionally with issuer-level detail.
+    ///
+    /// Without the keyword arguments the bundle is homogeneous: every
+    /// constituent uses the index curve, the index recovery and weight
+    /// ``1 / num_constituents``. Supplying ``issuer_curves`` enables
+    /// heterogeneous (bespoke) tranche pricing.
     ///
     /// Parameters
     /// ----------
@@ -203,11 +209,26 @@ impl PyCreditIndexData {
     ///     Hazard curve for the index as a whole.
     /// base_correlation_curve : BaseCorrelationCurve
     ///     Base correlations by detachment point.
+    /// issuer_curves : dict[str, HazardCurve], optional
+    ///     Hazard curve per issuer identifier (ticker, CUSIP, ...). When given
+    ///     it must cover exactly ``num_constituents`` distinct issuers.
+    /// issuer_recovery_rates : dict[str, float], optional
+    ///     Recovery per issuer as a decimal in ``[0, 1]``; requires
+    ///     ``issuer_curves`` and only its identifiers. Issuers left out use
+    ///     ``recovery_rate``.
+    /// issuer_weights : dict[str, float], optional
+    ///     Non-negative notional weight per issuer (decimal fractions summing
+    ///     to ``1.0`` within ``1e-9``); requires ``issuer_curves`` and must
+    ///     cover exactly its identifiers.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``num_constituents`` is zero or ``recovery_rate`` is outside ``[0, 1]``.
+    ///     If ``num_constituents`` is zero, a recovery is outside ``[0, 1]``,
+    ///     the issuer curves do not cover ``num_constituents`` issuers, the
+    ///     issuer recoveries or weights name an unknown issuer (or are given
+    ///     without ``issuer_curves``), or the weights are negative, do not
+    ///     cover every issuer or do not sum to ``1.0``.
     ///
     /// Example
     /// -------
@@ -216,24 +237,119 @@ impl PyCreditIndexData {
     /// >>> base_corr = BaseCorrelationCurve("CDX-IG-BC", [(3.0, 0.25), (10.0, 0.55)])
     /// >>> CreditIndexData(125, 0.4, hazard, base_corr).recovery_rate
     /// 0.4
+    /// >>> data = CreditIndexData(
+    /// ...     2, 0.4, hazard, base_corr,
+    /// ...     issuer_curves={"A": HazardCurve.flat("A", "2025-01-01", 0.02, 0.3), "B": hazard},
+    /// ...     issuer_recovery_rates={"A": 0.3},
+    /// ...     issuer_weights={"A": 0.25, "B": 0.75},
+    /// ... )
+    /// >>> data.issuer_ids(), data.get_issuer_recovery("A"), data.get_issuer_recovery("B")
+    /// (['A', 'B'], 0.3, 0.4)
     #[new]
-    #[pyo3(signature = (num_constituents, recovery_rate, index_credit_curve, base_correlation_curve))]
+    #[pyo3(signature = (num_constituents, recovery_rate, index_credit_curve, base_correlation_curve, *, issuer_curves=None, issuer_recovery_rates=None, issuer_weights=None))]
     fn new(
         num_constituents: u16,
         recovery_rate: f64,
         index_credit_curve: &PyHazardCurve,
         base_correlation_curve: &PyBaseCorrelationCurve,
+        issuer_curves: Option<BTreeMap<String, PyRef<'_, PyHazardCurve>>>,
+        issuer_recovery_rates: Option<BTreeMap<String, f64>>,
+        issuer_weights: Option<BTreeMap<String, f64>>,
     ) -> PyResult<Self> {
-        let data = CreditIndexData::builder()
+        let mut builder = CreditIndexData::builder()
             .num_constituents(num_constituents)
             .recovery_rate(recovery_rate)
             .index_credit_curve(Arc::clone(&index_credit_curve.inner))
-            .base_correlation_curve(Arc::clone(&base_correlation_curve.inner))
-            .build()
-            .map_err(core_to_py)?;
+            .base_correlation_curve(Arc::clone(&base_correlation_curve.inner));
+        if let Some(curves) = issuer_curves {
+            builder = builder.issuer_curves(
+                curves
+                    .into_iter()
+                    .map(|(issuer, curve)| (issuer, Arc::clone(&curve.inner))),
+            );
+        }
+        if let Some(rates) = issuer_recovery_rates {
+            builder = builder.issuer_recovery_rates(rates);
+        }
+        if let Some(weights) = issuer_weights {
+            builder = builder.issuer_weights(weights);
+        }
+        let data = builder.build().map_err(core_to_py)?;
         Ok(Self {
             inner: Arc::new(data),
         })
+    }
+
+    /// Hazard curve of one issuer, falling back to the index curve.
+    ///
+    /// Parameters
+    /// ----------
+    /// issuer_id : str
+    ///     Issuer identifier as supplied in ``issuer_curves``.
+    ///
+    /// Returns
+    /// -------
+    /// HazardCurve
+    ///     The issuer's curve, or ``index_credit_curve`` when the bundle has
+    ///     no curve for ``issuer_id`` (homogeneous assumption).
+    #[pyo3(text_signature = "(self, issuer_id)")]
+    fn get_issuer_curve(&self, issuer_id: &str) -> PyHazardCurve {
+        PyHazardCurve::from_inner(Arc::new(self.inner.get_issuer_curve(issuer_id).clone()))
+    }
+
+    /// Whether issuer-level curves are present (heterogeneous pricing mode).
+    ///
+    /// Returns
+    /// -------
+    /// bool
+    #[pyo3(text_signature = "(self)")]
+    fn has_issuer_curves(&self) -> bool {
+        self.inner.has_issuer_curves()
+    }
+
+    /// Issuer identifiers with their own curve, sorted.
+    ///
+    /// Returns
+    /// -------
+    /// list[str]
+    ///     Empty for a homogeneous bundle.
+    #[pyo3(text_signature = "(self)")]
+    fn issuer_ids(&self) -> Vec<String> {
+        self.inner.issuer_ids()
+    }
+
+    /// Recovery rate of one issuer, falling back to the index recovery.
+    ///
+    /// Parameters
+    /// ----------
+    /// issuer_id : str
+    ///     Issuer identifier.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     The issuer's recovery as a decimal, or ``recovery_rate`` when none
+    ///     was supplied for ``issuer_id``.
+    #[pyo3(text_signature = "(self, issuer_id)")]
+    fn get_issuer_recovery(&self, issuer_id: &str) -> f64 {
+        self.inner.get_issuer_recovery(issuer_id)
+    }
+
+    /// Notional weight of one issuer, falling back to equal weighting.
+    ///
+    /// Parameters
+    /// ----------
+    /// issuer_id : str
+    ///     Issuer identifier.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     The issuer's weight as a decimal fraction, or
+    ///     ``1 / num_constituents`` when none was supplied for ``issuer_id``.
+    #[pyo3(text_signature = "(self, issuer_id)")]
+    fn get_issuer_weight(&self, issuer_id: &str) -> f64 {
+        self.inner.get_issuer_weight(issuer_id)
     }
 
     /// Number of constituents in the credit index.

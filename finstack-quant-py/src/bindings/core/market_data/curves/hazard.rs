@@ -8,16 +8,17 @@ use pyo3::prelude::*;
 
 use super::helpers::{
     columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods,
-    impl_repr_html_via_dataframe, par_interp_name, parse_day_count, parse_interp_style,
-    parse_par_interp, parse_seniority, TimePoint,
+    impl_repr_html_via_dataframe, par_interp_name, parse_interp_style, parse_par_interp,
+    parse_seniority, TimePoint,
 };
 use crate::bindings::core::currency::{extract_currency, PyCurrency};
+use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 
 /// Options accepted by the ``HazardCurve`` constructor beyond the knots.
 struct HazardCurveOptions<'a> {
-    day_count: Option<&'a str>,
+    day_count: Option<&'a Bound<'a, PyAny>>,
     par_spreads: Option<Vec<(f64, f64)>>,
     interp: Option<&'a str>,
     par_interp: Option<&'a str>,
@@ -77,7 +78,7 @@ impl PyHazardCurve {
             .knots(knots)
             .recovery_rate(recovery_rate);
         if let Some(day_count) = options.day_count {
-            builder = builder.day_count(parse_day_count(day_count)?);
+            builder = builder.day_count(extract_day_count(day_count)?);
         }
         if let Some(points) = options.par_spreads {
             builder = builder.par_spreads(points);
@@ -119,7 +120,7 @@ impl PyHazardCurve {
     ///     intensities as decimals (``0.02`` is 2% per year), non-negative.
     /// recovery_rate : float
     ///     Recovery on default as a decimal fraction in ``[0, 1]`` (keyword-only).
-    /// day_count : str, optional
+    /// day_count : DayCount | str, optional
     ///     Day-count convention; default ``"act_365f"``.
     /// par_spreads : list[tuple[float, float]], optional
     ///     ``(time_years, par_spread_bp)`` market quotes in **basis points**
@@ -162,7 +163,7 @@ impl PyHazardCurve {
         base_date: &Bound<'_, PyAny>,
         knots: Vec<(f64, f64)>,
         recovery_rate: f64,
-        day_count: Option<&str>,
+        day_count: Option<&Bound<'_, PyAny>>,
         par_spreads: Option<Vec<(f64, f64)>>,
         interp: Option<&str>,
         par_interp: Option<&str>,

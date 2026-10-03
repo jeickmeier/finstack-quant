@@ -52,19 +52,6 @@ impl PyMarketContext {
     pub(crate) fn from_inner(inner: MarketContext) -> Self {
         Self { inner }
     }
-
-    fn total_items(&self) -> usize {
-        let stats = self.inner.stats();
-        stats.total_curves
-            + stats.surface_count
-            + stats.vol_cube_count
-            + stats.price_count
-            + stats.series_count
-            + stats.inflation_index_count
-            + stats.credit_index_count
-            + stats.dividend_schedule_count
-            + stats.fx_delta_vol_surface_count
-    }
 }
 
 /// Render a list of identifiers Python-style: ``['A', 'B']``.
@@ -555,7 +542,8 @@ impl PyMarketContext {
         ids
     }
 
-    /// Whether nothing has been inserted (no curves, surfaces, scalars or FX).
+    /// Whether nothing has been inserted (``len(ctx) == 0``): no curves,
+    /// surfaces, scalars, series, indices, dividends, FX or collateral mappings.
     ///
     /// Returns
     /// -------
@@ -608,9 +596,19 @@ impl PyMarketContext {
             .map_err(core_to_py)
     }
 
-    /// Number of stored objects (curves, surfaces, cubes, scalars, series, indices, credit indices).
+    /// Number of stored market-data objects (Rust ``MarketContext::len``).
+    ///
+    /// Counts curves, surfaces, cubes, scalars, series, inflation and credit
+    /// indices, dividend schedules, FX delta-vol surfaces and collateral
+    /// mappings, plus one for an attached FX matrix.
     fn __len__(&self) -> usize {
-        self.total_items()
+        self.inner.len()
+    }
+
+    /// ``True`` when anything has been inserted (``not is_empty()``), so an
+    /// FX-only or collateral-only context is truthy.
+    fn __bool__(&self) -> bool {
+        !self.inner.is_empty()
     }
 
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).

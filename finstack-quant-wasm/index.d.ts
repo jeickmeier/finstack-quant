@@ -4557,11 +4557,17 @@ export interface MarketContext extends WasmOwned {
    */
   curveIds(): string[];
   /**
-   * Whether the context holds no market data at all.
+   * Whether the context holds no market data at all (`len() === 0`).
    *
-   * @returns `true` for a context with nothing inserted.
+   * @returns `true` for a context with nothing inserted (no curves, surfaces, scalars, series, indices, dividends, FX or collateral mappings).
    */
   isEmpty(): boolean;
+  /**
+   * Number of stored market-data objects (Rust `MarketContext::len`).
+   *
+   * @returns The count of curves, surfaces, cubes, scalars, series, inflation and credit indices, dividend schedules, FX delta-vol surfaces and collateral mappings, plus one for an attached FX matrix.
+   */
+  len(): number;
   /**
    * Counts of the stored market data (Rust `MarketContext::stats`).
    *
@@ -5489,11 +5495,19 @@ export interface ScheduleBuilder extends WasmOwned {
   /**
    * Use CDS IMM dates (the 20th of March, June, September and December).
    *
+   * Same semantics as the Rust `ScheduleBuilder::cds_imm`: sets the
+   * frequency to quarterly and the stub rule to `short_back`. A later
+   * `frequency` or `stubRule` call wins, and `toSpec()` reports what
+   * `build()` uses.
+   *
    * @returns This builder, with CDS IMM mode on and standard IMM mode off.
    */
   cdsImm(): ScheduleBuilder;
   /**
    * Use standard IMM dates (the third Wednesday of quarterly months).
+   *
+   * Same semantics as the Rust `ScheduleBuilder::imm`: sets the frequency
+   * to quarterly and the stub rule to `short_back`.
    *
    * @returns This builder, with standard IMM mode on and CDS IMM mode off.
    */
@@ -7142,6 +7156,11 @@ export interface BaseCorrelationCurveConstructor {
  * Market data of one credit index: constituent count, recovery, the index
  * hazard curve and its base-correlation curve.
  *
+ * The constructor builds homogeneous data. Issuer-level curves, recoveries
+ * and weights (heterogeneous tranche pricing) arrive through
+ * `MarketContext.fromJson` (`issuer_credit_curve_ids`, `issuer_recovery_rates`,
+ * `issuer_weights`) and are read with the `getIssuer*` accessors.
+ *
  * @example
  * ```typescript
  * import init, { core } from "finstack-quant-wasm";
@@ -7169,11 +7188,52 @@ export interface CreditIndexData extends WasmOwned {
    * Base-correlation curve used for tranche pricing, as a `BaseCorrelationCurve`.
    */
   readonly baseCorrelationCurve: BaseCorrelationCurve;
+  /**
+   * Hazard curve of one issuer (Rust `CreditIndexData::get_issuer_curve`).
+   *
+   * @param issuerId - Issuer identifier as stored in the index data (ticker, CUSIP, ...).
+   * @returns The issuer's `HazardCurve`, or `indexCreditCurve` when the data has no curve for `issuerId` (homogeneous assumption).
+   * @throws `TypeError` if `issuerId` is not a string.
+   */
+  getIssuerCurve(issuerId: string): HazardCurve;
+  /**
+   * Whether issuer-level curves are present (heterogeneous pricing mode).
+   *
+   * @returns `true` when the data carries per-issuer hazard curves.
+   */
+  hasIssuerCurves(): boolean;
+  /**
+   * Issuer identifiers with their own curve.
+   *
+   * @returns Identifiers in sorted order; empty for homogeneous data.
+   */
+  issuerIds(): string[];
+  /**
+   * Recovery rate of one issuer (Rust `CreditIndexData::get_issuer_recovery`).
+   *
+   * @param issuerId - Issuer identifier as stored in the index data.
+   * @returns The issuer's recovery as a decimal, or `recoveryRate` when none was supplied for `issuerId`.
+   * @throws `TypeError` if `issuerId` is not a string.
+   */
+  getIssuerRecovery(issuerId: string): number;
+  /**
+   * Notional weight of one issuer (Rust `CreditIndexData::get_issuer_weight`).
+   *
+   * @param issuerId - Issuer identifier as stored in the index data.
+   * @returns The issuer's weight as a decimal fraction, or `1 / numConstituents` when none was supplied for `issuerId`.
+   * @throws `TypeError` if `issuerId` is not a string.
+   */
+  getIssuerWeight(issuerId: string): number;
 }
 
 /**
  * Market data of one credit index: constituent count, recovery, the index
  * hazard curve and its base-correlation curve.
+ *
+ * The constructor builds homogeneous data. Issuer-level curves, recoveries
+ * and weights (heterogeneous tranche pricing) arrive through
+ * `MarketContext.fromJson` (`issuer_credit_curve_ids`, `issuer_recovery_rates`,
+ * `issuer_weights`) and are read with the `getIssuer*` accessors.
  *
  * @example
  * ```typescript

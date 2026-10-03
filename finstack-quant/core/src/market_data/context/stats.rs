@@ -114,18 +114,39 @@ impl MarketContext {
             || self.collateral.contains_key(id)
     }
 
-    /// Return `true` when no market data has been inserted.
+    /// Number of stored market-data objects.
+    ///
+    /// Counts every curve, volatility surface, volatility cube, price/scalar,
+    /// time series, inflation index, credit index, dividend schedule, FX
+    /// delta-vol surface and collateral mapping, plus one for an attached FX
+    /// matrix. The optional data hierarchy is metadata and is not counted.
+    ///
+    /// # Examples
+    /// ```rust
+    /// use finstack_quant_core::market_data::context::MarketContext;
+    ///
+    /// let ctx = MarketContext::new().map_collateral("USD-CSA", "USD-OIS".into());
+    /// assert_eq!(ctx.len(), 1);
+    /// assert!(!ctx.is_empty());
+    /// assert_eq!(MarketContext::new().len(), 0);
+    /// ```
+    pub fn len(&self) -> usize {
+        self.curves.len()
+            + usize::from(self.fx.is_some())
+            + self.surfaces.len()
+            + self.vol_cubes.len()
+            + self.prices.len()
+            + self.series.len()
+            + self.inflation_indices.len()
+            + self.credit_indices.len()
+            + self.dividends.len()
+            + self.fx_delta_vol_surfaces.len()
+            + self.collateral.len()
+    }
+
+    /// Return `true` when no market data has been inserted (`len() == 0`).
     pub fn is_empty(&self) -> bool {
-        self.curves.is_empty()
-            && self.fx.is_none()
-            && self.surfaces.is_empty()
-            && self.vol_cubes.is_empty()
-            && self.prices.is_empty()
-            && self.series.is_empty()
-            && self.inflation_indices.is_empty()
-            && self.credit_indices.is_empty()
-            && self.fx_delta_vol_surfaces.is_empty()
-            && self.collateral.is_empty()
+        self.len() == 0
     }
     // Iterators for Market Scalars (P&L Attribution Support)
 

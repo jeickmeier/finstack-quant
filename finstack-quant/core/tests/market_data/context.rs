@@ -1717,3 +1717,36 @@ fn inflation_bumps_match_direct_curve_and_context_entry_points() {
         }])
         .is_err());
 }
+
+/// `len()` counts every store, including the FX matrix, collateral mappings
+/// and dividend schedules; `is_empty()` agrees with it (dividends included).
+#[test]
+fn market_context_len_counts_fx_collateral_and_dividends() {
+    let empty = MarketContext::new();
+    assert_eq!(empty.len(), 0);
+    assert!(empty.is_empty());
+
+    let fx_only = MarketContext::new().insert_fx(sample_fx_matrix());
+    assert_eq!(fx_only.len(), 1);
+    assert!(!fx_only.is_empty());
+
+    let collateral_only = MarketContext::new().map_collateral("USD-CSA", CurveId::from("USD-OIS"));
+    assert_eq!(collateral_only.len(), 1);
+    assert!(!collateral_only.is_empty());
+
+    let dividends = DividendSchedule::builder("AAPL-DIVS")
+        .build()
+        .expect("empty dividend schedule");
+    let dividends_only = MarketContext::new().insert_dividends(dividends);
+    assert_eq!(dividends_only.len(), 1);
+    assert!(
+        !dividends_only.is_empty(),
+        "dividends-only context is not empty"
+    );
+
+    let mixed = MarketContext::new()
+        .insert(sample_discount_curve("USD-OIS"))
+        .insert_fx(sample_fx_matrix())
+        .map_collateral("USD-CSA", CurveId::from("USD-OIS"));
+    assert_eq!(mixed.len(), 3);
+}

@@ -8,9 +8,9 @@ use pyo3::prelude::*;
 
 use super::helpers::{
     columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods,
-    impl_repr_html_via_dataframe, parse_day_count, parse_extrapolation, parse_interp_style,
-    TimePoint,
+    impl_repr_html_via_dataframe, parse_extrapolation, parse_interp_style, TimePoint,
 };
+use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 
@@ -61,7 +61,7 @@ impl PyInflationCurve {
     ///     zero-time knot.
     /// knots : list[tuple[float, float]]
     ///     ``(time_years, cpi_level)`` pairs; levels must be positive.
-    /// day_count : str, optional
+    /// day_count : DayCount | str, optional
     ///     Day-count convention; default ``"act_365f"``.
     /// indexation_lag_months : int, optional
     ///     Indexation lag in months applied by ``cpi_with_lag``; default ``3``.
@@ -93,7 +93,7 @@ impl PyInflationCurve {
         base_date: &Bound<'_, PyAny>,
         base_cpi: f64,
         knots: Vec<(f64, f64)>,
-        day_count: Option<&str>,
+        day_count: Option<&Bound<'_, PyAny>>,
         indexation_lag_months: Option<u32>,
         interp: Option<&str>,
         extrapolation: Option<&str>,
@@ -103,7 +103,7 @@ impl PyInflationCurve {
             .base_cpi(base_cpi)
             .knots(knots);
         if let Some(day_count) = day_count {
-            builder = builder.day_count(parse_day_count(day_count)?);
+            builder = builder.day_count(extract_day_count(day_count)?);
         }
         if let Some(months) = indexation_lag_months {
             builder = builder.indexation_lag_months(months);

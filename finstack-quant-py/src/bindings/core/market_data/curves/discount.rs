@@ -9,9 +9,10 @@ use pyo3::prelude::*;
 use super::forward::PyForwardCurve;
 use super::helpers::{
     columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods,
-    impl_repr_html_via_dataframe, parse_compounding, parse_day_count, parse_extrapolation,
-    parse_interp_style, TimePoint,
+    impl_repr_html_via_dataframe, parse_compounding, parse_extrapolation, parse_interp_style,
+    TimePoint,
 };
+use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 
@@ -77,7 +78,7 @@ impl PyDiscountCurve {
     ///     Extrapolation policy (``"flat_forward"``, ``"flat_zero"``, or
     ///     ``"none"``, which returns NaN outside the pillar range). Default
     ///     ``"flat_forward"``.
-    /// day_count : str, optional
+    /// day_count : DayCount | str, optional
     ///     Day-count convention used to convert query dates to curve time.
     ///     Default is fixed at ``"act_365f"`` (not inferred from the ID).
     /// validation_mode : str, optional
@@ -111,7 +112,7 @@ impl PyDiscountCurve {
         knots: Vec<(f64, f64)>,
         interp: Option<&str>,
         extrapolation: Option<&str>,
-        day_count: Option<&str>,
+        day_count: Option<&Bound<'_, PyAny>>,
         validation_mode: Option<&str>,
         forward_floor: Option<f64>,
     ) -> PyResult<Self> {
@@ -125,7 +126,7 @@ impl PyDiscountCurve {
             builder = builder.extrapolation(parse_extrapolation(extrapolation)?);
         }
         if let Some(day_count) = day_count {
-            builder = builder.day_count(parse_day_count(day_count)?);
+            builder = builder.day_count(extract_day_count(day_count)?);
         }
         builder = builder.validation(
             ValidationMode::from_preset(validation_mode, forward_floor).map_err(core_to_py)?,
@@ -228,7 +229,7 @@ impl PyDiscountCurve {
     ///     Valuation date anchoring ``t = 0``.
     /// points : list[tuple[datetime.date | str, float]]
     ///     ``(date, discount_factor)`` pillars on or after ``base_date``.
-    /// day_count : str, optional
+    /// day_count : DayCount | str, optional
     ///     Day count used to convert pillar dates to years; default ``"act_365f"``.
     ///
     /// Returns
@@ -253,13 +254,13 @@ impl PyDiscountCurve {
         id: &str,
         base_date: &Bound<'_, PyAny>,
         points: Vec<(Bound<'_, PyAny>, f64)>,
-        day_count: Option<&str>,
+        day_count: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
         let points = points
             .iter()
             .map(|(date, df)| Ok((py_to_date(date)?, *df)))
             .collect::<PyResult<Vec<_>>>()?;
-        let day_count = day_count.map(parse_day_count).transpose()?;
+        let day_count = day_count.map(extract_day_count).transpose()?;
         DiscountCurve::from_dates(id, py_to_date(base_date)?, &points, day_count)
             .map(Self::wrap)
             .map_err(core_to_py)

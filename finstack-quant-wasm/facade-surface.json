@@ -1601,7 +1601,14 @@
   "core.CreditIndexData": {
     "kind": "class",
     "statics": [],
-    "methods": ["free"],
+    "methods": [
+      "free",
+      "getIssuerCurve",
+      "getIssuerRecovery",
+      "getIssuerWeight",
+      "hasIssuerCurves",
+      "issuerIds"
+    ],
     "getters": ["baseCorrelationCurve", "indexCreditCurve", "numConstituents", "recoveryRate"]
   },
   "core.VolSurface": {
@@ -1700,6 +1707,7 @@
       "insertPrice",
       "insertSeries",
       "isEmpty",
+      "len",
       "mapCollateral",
       "rollForward",
       "stats",

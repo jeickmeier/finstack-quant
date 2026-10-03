@@ -12,6 +12,24 @@
 - Python and WASM: `RatingFactorTable` / `MasterScale` / `DownturnLgd` `from_registry_id` with an unknown id raise `KeyError` / throw kind `not_found` (was `ValueError` / `validation`); the Rust credit registry returns `InputError::NotFound`.
 - Python: typed Rust errors at the remaining statements-analytics, attribution, calibration, margin, portfolio and scenarios binding sites now go through their kind-aware mapper; `display_to_py` accepts only kind-less parse/serde errors (`KindlessError`), so routing a typed error through it no longer compiles.
 
+### Core dates and market data (Python-binding audit PR 5)
+
+#### Changed (breaking)
+
+- Rust, Python and WASM: `ScheduleSpec::build` uses the stored `frequency` and `stub` in IMM and CDS IMM modes instead of forcing quarterly/`ShortBack`; the new `ScheduleSpec::with_imm` / `with_cds_imm` set those defaults, and Python `ScheduleBuilder.imm()` / `cds_imm()` and WASM `imm()` / `cdsImm()` call them, so a later `frequency` / `stub_rule` call wins (as on the Rust builder) and `to_spec()` reports what `build()` uses.
+- Rust: `MarketContext::is_empty` now counts dividend schedules; new `MarketContext::len` counts every store including the FX matrix and collateral mappings.
+- Python: `len(MarketContext)` is `MarketContext::len` (now counts the FX matrix and collateral mappings), and `bool(ctx)` is `not ctx.is_empty()`, so an FX-only or collateral-only context is truthy.
+
+#### Added
+
+- Python: curve constructors (`DiscountCurve`, `DiscountCurve.from_dates`, `ForwardCurve`, `HazardCurve`, `InflationCurve`, `PriceCurve`) and `MertonModel.to_hazard_curve` accept `day_count` as a `DayCount` or any name `DayCount.parse` accepts (`"ACT/360"`); the strict string-only parser is removed.
+- Python: `CreditIndexData` takes keyword-only `issuer_curves`, `issuer_recovery_rates` and `issuer_weights`; Python and WASM bind `get_issuer_curve` / `has_issuer_curves` / `issuer_ids` / `get_issuer_recovery` / `get_issuer_weight` (`getIssuerCurve`, ...).
+- WASM: `MarketContext.len()`.
+
+#### Fixed
+
+- `parity_contract.toml` core notes: the Rust-only types are `BarrierDirection` / `PayoutTiming` (no `RatingLabel` type exists), and the correlation validators are bound under `models.correlation`.
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

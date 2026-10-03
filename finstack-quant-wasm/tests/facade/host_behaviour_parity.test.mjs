@@ -43,7 +43,8 @@ test('ScheduleBuilder setters update the builder in place and return it', () => 
   const spec = builder.toSpec();
   assert.deepEqual(spec.frequency, { count: 3, unit: 'months' });
   assert.equal(spec.end_of_month, true);
-  assert.equal(spec.stub, 'short_front');
+  // imm() resets the stub to short_back (Rust ScheduleBuilder::imm semantics).
+  assert.equal(spec.stub, 'short_back');
   assert.equal(spec.calendar_id, 'nyse');
   assert.equal(spec.payment_lag_days, 2);
   assert.equal(spec.fixing_lag_business_days, 1);

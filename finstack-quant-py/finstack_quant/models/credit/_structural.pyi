@@ -18,6 +18,7 @@ from __future__ import annotations
 import datetime
 import pandas as pd
 
+from finstack_quant.core.dates import DayCount
 from finstack_quant.core.market_data.curves import HazardCurve
 from finstack_quant.core.types import CreditRating
 from typing import Any
@@ -1618,7 +1619,7 @@ class MertonModel:
         base_date: datetime.date,
         tenors: list[float],
         recovery: float,
-        day_count: str,
+        day_count: DayCount | str,
     ) -> HazardCurve:
         """
         Bootstrap a piecewise-constant hazard curve from structural default probabilities.
@@ -1639,7 +1640,7 @@ class MertonModel:
             Recovery rate assumption as a decimal in ``[0, 1]``. Under
             CreditGrades dynamics it must equal the model's own
             ``mean_recovery``, since that value already sets the barrier.
-        day_count : str
+        day_count : DayCount | str
             Day-count convention the curve uses to turn dates into year
             fractions, e.g. ``"act_365f"``. Pass the convention of the discount
             curve the hazard curve will be paired with; there is no default,
