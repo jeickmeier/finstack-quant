@@ -78,7 +78,10 @@ fn validate_covenant_engine_json(py: Python<'_>, engine_json: &str) -> PyResult<
 /// * `engine_json` - Serialized covenant engine (`CovenantEngine.to_json()`
 ///   or a hand-written document; only `specs` is required)
 /// * `metrics` - `dict[str, float]` or JSON-object string mapping metric id to
-///   value; ratios in turns, amounts in the engine's reporting currency
+///   value; ratios in turns, amounts in the engine's reporting currency. A
+///   dict reaches Rust as numbers (`evaluate_engine_with_source`), so a
+///   non-finite value fails only when a covenant reads it; a string is parsed
+///   by Rust `HashMapMetricSource::from_json`
 /// * `as_of` - Evaluation date, either a date-like object (`datetime.date`,
 ///   `pandas.Timestamp`) or an ISO 8601 string
 ///
@@ -100,21 +103,20 @@ fn evaluate_engine<'py>(
     as_of: &Bound<'py, PyAny>,
 ) -> PyResult<Bound<'py, PyDict>> {
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let metrics_json = match metrics.extract::<String>() {
-        Ok(text) => text,
+    let reports = match metrics.extract::<String>() {
+        Ok(metrics_json) => py.detach(|| {
+            finstack_quant_covenants::evaluate_engine(engine_json, &metrics_json, &as_of)
+        }),
         Err(_) => {
-            let metrics: serde_json::Map<String, serde_json::Value> =
-                engine::extract_metric_dict(metrics)?
-                    .into_iter()
-                    .map(|(key, value)| (key, serde_json::Value::from(value)))
-                    .collect();
-            serde_json::to_string(&metrics).map_err(crate::errors::display_to_py)?
+            let source = finstack_quant_covenants::HashMapMetricSource::from_pairs(
+                engine::extract_metric_dict(metrics)?,
+            );
+            py.detach(|| {
+                finstack_quant_covenants::evaluate_engine_with_source(engine_json, &source, &as_of)
+            })
         }
-    };
-    let reports = py.detach(|| {
-        finstack_quant_covenants::evaluate_engine(engine_json, &metrics_json, &as_of)
-            .map_err(crate::errors::core_to_py)
-    })?;
+    }
+    .map_err(crate::errors::core_to_py)?;
     engine::reports_to_pydict(py, reports)
 }
 

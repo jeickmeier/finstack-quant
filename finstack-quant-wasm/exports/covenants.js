@@ -12,6 +12,7 @@ export const covenants = {
   covenantConsequenceRequireCollateral: wasm.covenantConsequenceRequireCollateral,
   covenantForecastConfigWithScope: wasm.covenantForecastConfigWithScope,
   covenantNew: wasm.covenantNew,
+  covenantSpecNew: wasm.covenantSpecNew,
   covenantSpecWithDenominatorMetric: wasm.covenantSpecWithDenominatorMetric,
   covenantSpecWithMetric: wasm.covenantSpecWithMetric,
   covenantSpecWithThresholdSchedule: wasm.covenantSpecWithThresholdSchedule,

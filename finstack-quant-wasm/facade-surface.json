@@ -1893,6 +1893,7 @@
       "covenantConsequenceRequireCollateral",
       "covenantForecastConfigWithScope",
       "covenantNew",
+      "covenantSpecNew",
       "covenantSpecWithDenominatorMetric",
       "covenantSpecWithMetric",
       "covenantSpecWithThresholdSchedule",
@@ -1972,6 +1973,9 @@
     "kind": "function"
   },
   "covenants.covenantNew": {
+    "kind": "function"
+  },
+  "covenants.covenantSpecNew": {
     "kind": "function"
   },
   "covenants.covenantSpecWithDenominatorMetric": {

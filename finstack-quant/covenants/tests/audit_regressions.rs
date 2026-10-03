@@ -486,3 +486,60 @@ fn forecast_rejects_reversed_dates_future_reference_and_one_independent_sample()
     };
     assert!(forecast_covenant_generic(&leverage(), &Series, &periods(), config).is_err());
 }
+
+#[test]
+fn metric_less_spec_shares_net_leverage_denominator_and_round_trips_through_json() {
+    let covenant = Covenant::new(
+        CovenantType::MaxNetDebtToEbitda { threshold: 4.0 },
+        Tenor::quarterly(),
+        "lev",
+    );
+    let spec = CovenantSpec::new(covenant.clone());
+    assert!(spec.metric_id.is_none());
+    assert_eq!(
+        spec.denominator_metric_id,
+        CovenantSpec::with_metric(covenant, "lev").denominator_metric_id
+    );
+    let json = serde_json::to_string(&spec).expect("serialize spec");
+    validate_covenant_spec_json(&json).expect("metric-less net-leverage spec is valid");
+    let parsed: CovenantSpec = serde_json::from_str(&json).expect("parse spec");
+    assert_eq!(parsed, spec);
+}
+
+#[test]
+fn threshold_test_labels_round_trip_and_reject_unknown_labels() {
+    for (label, test) in [
+        ("maximum", ThresholdTest::Maximum(0.75)),
+        ("minimum", ThresholdTest::Minimum(0.75)),
+    ] {
+        assert_eq!(ThresholdTest::new(label, 0.75).expect("known label"), test);
+        assert_eq!((test.label(), test.value()), (label, 0.75));
+        let wire = serde_json::to_value(test).expect("serialize test");
+        assert!(
+            wire.get(label).is_some(),
+            "label {label} matches the serde tag"
+        );
+    }
+    let err = ThresholdTest::new("Maximum", 0.75).expect_err("labels are case-sensitive");
+    assert!(matches!(err, finstack_quant_core::Error::Validation(_)));
+}
+
+#[test]
+fn evaluate_engine_with_source_matches_typed_evaluate_for_non_finite_metrics() {
+    let engine = engine(leverage());
+    let engine_json = serde_json::to_string(&engine).expect("serialize engine");
+    let as_of = date!(2025 - 03 - 31);
+    let unread_nan = HashMapMetricSource::from_pairs([("leverage", 3.0), ("unused", f64::NAN)]);
+    let typed = engine
+        .evaluate(&unread_nan, as_of)
+        .expect("unread NaN is ignored");
+    let via_json = evaluate_engine_with_source(&engine_json, &unread_nan, "2025-03-31")
+        .expect("unread NaN is ignored");
+    assert_eq!(via_json, typed);
+
+    let read_nan = source(f64::NAN);
+    let typed_err = engine.evaluate(&read_nan, as_of).expect_err("NaN read");
+    let json_err =
+        evaluate_engine_with_source(&engine_json, &read_nan, "2025-03-31").expect_err("NaN read");
+    assert_eq!(json_err.to_string(), typed_err.to_string());
+}

@@ -178,7 +178,7 @@ def test_typed_engine_matches_json_bridge() -> None:
     assert [c.kind for c in covenant.consequences] == ["rate_increase"]
     assert covenant.scope == "maintenance"
     assert covenant.with_scope("incurrence").scope == "incurrence"
-    with pytest.raises(ValueError, match="scope"):
+    with pytest.raises(ValueError, match="expected `maintenance` or `incurrence`"):
         covenant.with_scope("sometimes")
 
     engine = covenants.CovenantEngine().add_spec(covenants.CovenantSpec(covenant, "debt_to_ebitda"))
@@ -443,7 +443,7 @@ def test_forecast_scope_and_mc_boundaries() -> None:
     config = covenants.CovenantForecastConfig().with_scope("incurrence")
     assert config.scope == "incurrence"
     assert len(covenants.forecast_breaches(engine, frame, config)) == 2
-    with pytest.raises(ValueError, match="scope"):
+    with pytest.raises(ValueError, match="expected `maintenance` or `incurrence`"):
         config.with_scope("invalid")
     with pytest.raises(ValueError, match="independent samples"):
         covenants.forecast_breaches(
@@ -474,3 +474,57 @@ def test_json_metric_map_errors_come_from_the_rust_parser(metrics: str, message:
     with pytest.raises(ValueError, match=r"^Validation error: ") as from_method:
         engine.evaluate(metrics, "2026-03-31")
     assert str(from_method.value) == str(from_function.value)
+
+
+def test_metric_less_spec_matches_rust_and_its_json_round_trips() -> None:
+    """CFCC-004: ``CovenantSpec(covenant)`` is Rust ``CovenantSpec::new``."""
+    covenant = covenants.Covenant(covenants.CovenantType.max_net_debt_to_ebitda(4.0), "3M", "lev")
+    spec = covenants.CovenantSpec(covenant)
+    assert spec.metric_id is None
+    assert spec.denominator_metric_id == covenants.CovenantSpec(covenant, "lev").denominator_metric_id == "ebitda"
+    canonical = covenants.validate_covenant_spec_json(spec.to_json())
+    assert covenants.CovenantSpec.from_json(canonical) == spec
+
+
+def test_scope_and_threshold_labels_are_parsed_by_one_rust_parser() -> None:
+    """CFCC-006: every scope entry point reports the same serde error."""
+    covenant = covenants.Covenant(covenants.CovenantType.max_debt_to_ebitda(4.5), "3M", "lev")
+    engine = covenants.CovenantEngine.from_specs([covenants.CovenantSpec(covenant, "lev")])
+    messages = set()
+    for call in (
+        lambda: covenant.with_scope("Maintenance"),
+        lambda: covenants.CovenantForecastConfig().with_scope("Maintenance"),
+        lambda: engine.evaluate_and_track({"lev": 3.0}, "2025-03-31", "Maintenance"),
+    ):
+        with pytest.raises(ValueError, match="unknown variant") as caught:
+            call()
+        messages.add(str(caught.value))
+    assert len(messages) == 1
+    assert covenant.with_scope("incurrence").scope == "incurrence"
+    assert json.loads(covenant.to_json())["scope"] == covenant.scope == "maintenance"
+    assert covenants.CovenantType.custom("ltv", "maximum", 0.75).bound_kind == "at_most"
+    assert covenants.CovenantType.min_dscr(1.2).bound_kind == "at_least"
+    condition = covenants.SpringingCondition("u", "minimum", 0.3)
+    assert (condition.test, condition.value) == ("minimum", 0.3)
+    for build in (
+        lambda: covenants.CovenantType.custom("ltv", "Maximum", 0.75),
+        lambda: covenants.SpringingCondition("u", "Maximum", 0.3),
+    ):
+        with pytest.raises(ValueError, match=r'test must be "maximum" or "minimum", got "Maximum"'):
+            build()
+
+
+@pytest.mark.parametrize("bad", [math.nan, math.inf, -math.inf])
+def test_evaluate_engine_dict_matches_typed_evaluate_for_non_finite_metrics(bad: float) -> None:
+    """CFCC-016: a metric dict reaches Rust as numbers, never as JSON text."""
+    covenant = covenants.Covenant(covenants.CovenantType.max_debt_to_ebitda(4.5), "3M", "lev")
+    engine = covenants.CovenantEngine.from_specs([covenants.CovenantSpec(covenant, "lev")])
+    engine_json = engine.to_json()
+    unread = {"lev": 3.0, "unused": bad}
+    assert covenants.evaluate_engine(engine_json, unread, "2025-03-31") == engine.evaluate(unread, "2025-03-31")
+    read = {"lev": bad}
+    with pytest.raises(ValueError, match="must be finite") as typed:
+        engine.evaluate(read, "2025-03-31")
+    with pytest.raises(ValueError, match="must be finite") as via_json:
+        covenants.evaluate_engine(engine_json, read, "2025-03-31")
+    assert str(via_json.value) == str(typed.value) == "Validation error: metric 'lev' must be finite"

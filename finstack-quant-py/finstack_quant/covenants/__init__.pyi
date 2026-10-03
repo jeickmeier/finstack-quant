@@ -3462,7 +3462,10 @@ def evaluate_engine(engine_json: str, metrics: dict[str, float] | str, as_of: Da
         document; only ``specs`` is required).
     metrics : dict[str, float] | str
         Metric values keyed by metric id, or a JSON object string. Ratios in
-        turns, amounts in the reporting currency.
+        turns, amounts in the reporting currency. A dict is handed to Rust as
+        numbers, exactly as :meth:`CovenantEngine.evaluate` does: a NaN or
+        infinite value fails only when a covenant reads that metric. Every
+        value of a JSON string must be a JSON number.
     as_of : datetime.date | str
         Evaluation date, a date-like object or an ISO 8601 string.
 

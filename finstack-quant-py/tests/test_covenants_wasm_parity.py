@@ -141,6 +141,9 @@ def _spec_modifiers() -> Any:
     )
     schedule = ThresholdSchedule([("2026-01-01", 4.5), ("2026-07-01", 4.0)])
     return {
+        "new": wire(
+            CovenantSpec(Covenant(CovenantType.max_net_debt_to_ebitda(3.5), Tenor.parse("3M"), "max_net_leverage"))
+        ),
         "with_metric": wire([leverage_spec(), net_leverage]),
         "with_denominator_metric": wire(net_leverage.with_denominator_metric("adjusted_ebitda")),
         "with_threshold_schedule": wire(leverage_spec().with_threshold_schedule(schedule)),

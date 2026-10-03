@@ -14,7 +14,7 @@ use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnS
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_covenants::{
-    BoundKind, CovenantForecast, CovenantForecastConfig, DatedMetricSeries, FutureBreach,
+    CovenantForecast, CovenantForecastConfig, DatedMetricSeries, FutureBreach,
 };
 use pyo3::prelude::*;
 
@@ -24,13 +24,6 @@ use pyo3::prelude::*;
 /// period start, so Rust requires `reference_date` for stochastic forecasts.
 fn metric_series(frame: &Bound<'_, PyAny>) -> PyResult<DatedMetricSeries> {
     DatedMetricSeries::new(extract_metric_frame(frame)?).map_err(core_to_py)
-}
-
-fn bound_kind_name(kind: BoundKind) -> &'static str {
-    match kind {
-        BoundKind::AtMost => "at_most",
-        BoundKind::AtLeast => "at_least",
-    }
 }
 
 /// Forecast policy: deterministic pass/fail, or a lognormal stochastic
@@ -124,8 +117,8 @@ impl PyCovenantForecastConfig {
 
     /// Scope selected by batch forecasts: maintenance or hypothetical incurrence capacity.
     #[getter]
-    fn scope(&self) -> &'static str {
-        super::spec::scope_name(&self.inner.scope)
+    fn scope(&self) -> PyResult<String> {
+        super::spec::wire_label(&self.inner.scope)
     }
 
     /// Whether breach probabilities use the stochastic overlay.
@@ -247,8 +240,8 @@ impl PyCovenantForecast {
 
     /// Test direction: ``"at_most"`` or ``"at_least"``.
     #[getter]
-    fn comparator(&self) -> &'static str {
-        bound_kind_name(self.inner.comparator)
+    fn comparator(&self) -> PyResult<String> {
+        super::spec::wire_label(&self.inner.comparator)
     }
 
     /// Forecast test dates as ``datetime.date``.

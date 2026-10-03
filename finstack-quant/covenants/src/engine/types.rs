@@ -294,6 +294,64 @@ pub enum BoundKind {
     AtLeast,
 }
 
+impl ThresholdTest {
+    /// Build a threshold test from its wire label and bound.
+    ///
+    /// The labels are the serde variant names (`"maximum"`, `"minimum"`), so
+    /// hosts that spell a test as a `(label, value)` pair share this one parser.
+    ///
+    /// # Arguments
+    ///
+    /// * `test` - `"maximum"` (the metric must not exceed `value`) or
+    ///   `"minimum"` (the metric must reach `value`); matching is case-sensitive.
+    /// * `value` - Bound in the tested metric's own units (ratios in turns,
+    ///   amounts in the reporting currency). Finiteness is checked when the
+    ///   enclosing covenant is validated, not here.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`finstack_quant_core::Error::Validation`] when `test` is not one
+    /// of the two labels.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_covenants::ThresholdTest;
+    ///
+    /// let test = ThresholdTest::new("maximum", 0.75)?;
+    /// assert_eq!(test, ThresholdTest::Maximum(0.75));
+    /// assert_eq!((test.label(), test.value()), ("maximum", 0.75));
+    /// assert!(ThresholdTest::new("Maximum", 0.75).is_err());
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn new(test: &str, value: f64) -> finstack_quant_core::Result<Self> {
+        match test {
+            "maximum" => Ok(Self::Maximum(value)),
+            "minimum" => Ok(Self::Minimum(value)),
+            other => Err(finstack_quant_core::Error::Validation(format!(
+                "test must be \"maximum\" or \"minimum\", got {other:?}"
+            ))),
+        }
+    }
+
+    /// Wire label of the test direction: `"maximum"` or `"minimum"`.
+    #[must_use]
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Maximum(_) => "maximum",
+            Self::Minimum(_) => "minimum",
+        }
+    }
+
+    /// Bound the metric is compared against, in the metric's own units.
+    #[must_use]
+    pub fn value(&self) -> f64 {
+        match *self {
+            Self::Maximum(v) | Self::Minimum(v) => v,
+        }
+    }
+}
+
 impl CovenantType {
     fn validate(&self) -> finstack_quant_core::Result<()> {
         if self
@@ -516,6 +574,45 @@ pub struct CovenantSpec {
 }
 
 impl CovenantSpec {
+    /// Create a covenant spec without an explicit metric identifier.
+    ///
+    /// Each covenant type then reads its default metric. Net-debt/EBITDA also
+    /// selects `ebitda` as its denominator metric, exactly as
+    /// [`CovenantSpec::with_metric`] does.
+    ///
+    /// # Arguments
+    ///
+    /// * `covenant` - Contractual threshold, scope, cure, and consequence terms.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::dates::Tenor;
+    /// use finstack_quant_covenants::{Covenant, CovenantSpec, CovenantType};
+    ///
+    /// let covenant = Covenant::new(
+    ///     CovenantType::MaxNetDebtToEbitda { threshold: 4.0 },
+    ///     Tenor::quarterly(),
+    ///     "net_leverage",
+    /// );
+    /// let spec = CovenantSpec::new(covenant);
+    /// assert!(spec.metric_id.is_none());
+    /// assert_eq!(spec.denominator_metric_id.as_ref().map(|id| id.as_str()), Some("ebitda"));
+    /// ```
+    pub fn new(covenant: Covenant) -> Self {
+        let denominator_metric_id = matches!(
+            covenant.covenant_type,
+            CovenantType::MaxNetDebtToEbitda { .. }
+        )
+        .then(|| CovenantMetricId::from("ebitda"));
+        Self {
+            covenant,
+            metric_id: None,
+            denominator_metric_id,
+            threshold_schedule: None,
+        }
+    }
+
     /// Create a covenant spec with an explicit metric identifier.
     /// Net-debt/EBITDA also selects `ebitda` as its denominator metric.
     ///
@@ -525,16 +622,9 @@ impl CovenantSpec {
     /// * `metric_id` - Identifier of the precomputed covenant ratio in turns or
     ///   monetary amount in the same currency and period as the threshold.
     pub fn with_metric(covenant: Covenant, metric_id: impl Into<CovenantMetricId>) -> Self {
-        let denominator_metric_id = matches!(
-            covenant.covenant_type,
-            CovenantType::MaxNetDebtToEbitda { .. }
-        )
-        .then(|| CovenantMetricId::from("ebitda"));
         Self {
-            covenant,
             metric_id: Some(metric_id.into()),
-            denominator_metric_id,
-            threshold_schedule: None,
+            ..Self::new(covenant)
         }
     }
 
