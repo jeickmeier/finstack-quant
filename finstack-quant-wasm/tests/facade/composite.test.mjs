@@ -150,3 +150,50 @@ test('composite optional history, previous state, and warmup accept null like Py
   const observations = ['2025-01-01', '2025-01-02'].map((date) => ({ date, state: market }));
   assert.equal(composite.historyFromSpec(spec, observations, null).length, 2);
 });
+
+test('portfolio.primitiveExposures nets composite legs against direct positions', () => {
+  const initialized = facade.valuations.composite.initialize(spec, market, '2025-01-01');
+  const book = facade.portfolio.Portfolio.fromSpec({
+    id: 'PRIMITIVE',
+    as_of: '2025-01-01',
+    base_currency: 'USD',
+    entities: { FUND: { id: 'FUND' } },
+    positions: [
+      {
+        position_id: 'P-COMPOSITE',
+        entity_id: 'FUND',
+        instrument_id: 'A-B',
+        instrument_spec: initialized.instrument.instrument,
+        quantity: 2,
+        unit: 'units',
+      },
+      {
+        position_id: 'P-DIRECT',
+        entity_id: 'FUND',
+        instrument_id: 'A',
+        instrument_spec: equity('A', 100),
+        quantity: -2,
+        unit: 'units',
+      },
+    ],
+  });
+  const ctx = facade.core.MarketContext.fromJson(market);
+  try {
+    const report = facade.portfolio.primitiveExposures(book, ctx, []);
+    assert.equal(report.base_currency, 'USD');
+    assert.equal(report.paths.length, 3);
+    const byId = Object.fromEntries(report.aggregates.map((row) => [row.instrument_id, row]));
+    assert.deepEqual(Object.keys(byId), ['A', 'B']);
+    assert.equal(byId.A.net_quantity, 0);
+    assert.equal(byId.A.gross_quantity, 4);
+    assert.equal(Number(byId.A.gross_value.amount), 400);
+    assert.equal(byId.B.net_quantity, -2);
+    assert.throws(
+      () => facade.portfolio.primitiveExposures(book, ctx, ['ytm']),
+      (error) => error.name === 'FinstackError' && /non-additive/.test(error.message)
+    );
+  } finally {
+    ctx.free();
+    book.free();
+  }
+});

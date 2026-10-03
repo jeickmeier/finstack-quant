@@ -6,12 +6,11 @@
 //! ``RiskDecomposition``, ``WhatIfResult``, ``StressResult``, ``CreditVolReport``,
 //! or ``FactorAssignmentReport`` without serializing through JSON.
 //!
-//! Engine and builder types (``FactorModel``, ``FactorModelBuilder``,
-//! ``ParametricPositionDecomposer``, ``HistoricalPositionDecomposer``,
-//! ``WhatIfEngine``, ``FactorCovarianceForecast``) are intentionally left for
-//! a future slice — they hold borrowed handles or trait objects that do not
-//! map cleanly to a JSON-first PyO3 surface and are not required by the
-//! result-type contract this slice fulfils.
+//! ``FactorModel`` is a stateful handle built once from a ``FactorModelConfig``
+//! (Rust ``FactorModel::from_config``) and reused for assignment,
+//! sensitivities, risk decomposition, position what-if and factor stress. The
+//! Rust ``FactorModelBuilder`` and borrowed ``WhatIfEngine`` stay Rust-only:
+//! ``FactorModel.from_config`` and ``FactorModel.position_what_if`` cover them.
 
 mod assignment;
 mod budget_whatif;
@@ -19,6 +18,7 @@ pub(crate) mod config;
 mod contributions;
 mod credit_vol;
 mod functions;
+mod model;
 mod stress;
 
 use pyo3::prelude::*;
@@ -41,9 +41,10 @@ use functions::{
     historical_var_decomposition, parametric_es_decomposition, parametric_var_decomposition,
     position_component_var, PyParametricEsDecompositionView, PyPositionEsContributionView,
 };
+use model::PyFactorModel;
 use stress::{
-    build_stress_attribution, factor_stress, PyStressAttribution, PyStressPositionEntry,
-    PyStressResult, PyTailScenarioBreakdown,
+    build_stress_attribution, factor_stress, PyStressAttribution, PyStressPnl,
+    PyStressPositionEntry, PyStressResult, PyTailScenarioBreakdown,
 };
 
 /// Register factor_model typed result classes and typed-sibling functions on
@@ -52,6 +53,8 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFactorContributionDelta>()?;
     m.add_class::<PyWhatIfResult>()?;
     m.add_class::<PyStressResult>()?;
+    m.add_class::<PyStressPnl>()?;
+    m.add_class::<PyFactorModel>()?;
     m.add_class::<PyPositionAssignment>()?;
     m.add_class::<PyUnmatchedEntry>()?;
     m.add_class::<PyFactorAssignmentReport>()?;

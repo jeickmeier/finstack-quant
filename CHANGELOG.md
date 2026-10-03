@@ -18,6 +18,13 @@
 - Python: str arguments of `finstack_quant.cashflows.builder` Decimal parameters parse with Rust `decimal::parse_decimal`, rejecting text that is not exactly representable as a `Decimal` (was silently rounded).
 - Python: `ScalarTimeSeries`, `InflationIndex` and unitless `MarketContext.insert_price` convert a `decimal.Decimal` to `float` with Rust `decimal::decimal_to_f64` (`Decimal("0.1")` is accepted; was rejected unless binary-exact); non-finite values are rejected by Rust with its message. Rust `decimal::decimal_to_f64_exact` is removed.
 
+### Portfolio factor model and exposures (Python-binding audit PR 10)
+
+#### Added
+
+- Python and WASM: `FactorModel` handle on `finstack_quant.portfolio` / `portfolio.FactorModel` (Rust `FactorModel::from_config`), built once and reused for `assign_factors`, `compute_sensitivities`, `analyze`, `position_what_if`, `factor_stress` and the new P&L-only `factor_stress_pnl` (returns `StressPnl`).
+- Python and WASM: portfolio `primitive_exposures(portfolio, market, metrics)` / `portfolio.primitiveExposures` returns the composite look-through `PortfolioPrimitiveExposureReport` with net/gross aggregates per primitive instrument.
+
 ### Error kinds come from Rust (Python-binding audit PR 1)
 
 #### Changed (breaking)

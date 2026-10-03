@@ -11,6 +11,12 @@ import pytest
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
+from finstack_quant.portfolio import (
+    Portfolio,
+    PortfolioError,
+    PortfolioPrimitiveExposureReport,
+    primitive_exposures,
+)
 from finstack_quant.valuations.composite import (
     CompositeInstrument,
     CompositeLegSpec,
@@ -124,3 +130,54 @@ def test_composite_metric_requests_reject_noncanonical_keys(entry_point: str) ->
     }
     with pytest.raises(ValueError, match="noncanonical"):
         calls[entry_point]()
+
+
+def test_portfolio_primitive_exposures_net_composite_legs_against_direct_positions() -> None:
+    """PORT-009: portfolio look-through nets a composite leg against a direct position."""
+    market = MarketContext()
+    resolved = fixed_spec().initialize(market, dt.date(2025, 1, 1)).instrument
+    composite = json.loads(resolved.to_json())["instrument"]
+    direct = json.loads(equity_envelope("A", 100.0))["instrument"]
+    book = Portfolio.from_spec(
+        json.dumps({
+            "id": "PRIMITIVE",
+            "as_of": "2025-01-01",
+            "base_currency": "USD",
+            "entities": {"FUND": {"id": "FUND"}},
+            "positions": [
+                {
+                    "position_id": "P-COMPOSITE",
+                    "entity_id": "FUND",
+                    "instrument_id": "A-B",
+                    "instrument_spec": composite,
+                    "quantity": 2.0,
+                    "unit": "units",
+                },
+                {
+                    "position_id": "P-DIRECT",
+                    "entity_id": "FUND",
+                    "instrument_id": "A",
+                    "instrument_spec": direct,
+                    "quantity": -2.0,
+                    "unit": "units",
+                },
+            ],
+        })
+    )
+
+    report = primitive_exposures(book, market, [])
+
+    assert isinstance(report, PortfolioPrimitiveExposureReport)
+    assert (report.base_currency.code, report.path_count, report.aggregate_count) == ("USD", 3, 2)
+    frame = report.to_dataframe().set_index("instrument_id")
+    assert frame.loc["A", "net_quantity"] == 0.0
+    assert frame.loc["A", "gross_quantity"] == 4.0
+    assert frame.loc["A", "gross_value"] == pytest.approx(400.0)
+    assert frame.loc["B", "net_quantity"] == -2.0
+    paths = report.to_paths_dataframe()
+    assert sorted(paths["position_id"].tolist()) == ["P-COMPOSITE", "P-COMPOSITE", "P-DIRECT"]
+    restored = PortfolioPrimitiveExposureReport.from_json(report.to_json())
+    assert restored.to_json() == report.to_json()
+
+    with pytest.raises(PortfolioError, match="non-additive"):
+        primitive_exposures(book, market, ["ytm"])

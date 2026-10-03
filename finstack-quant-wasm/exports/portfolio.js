@@ -33,6 +33,7 @@ wasm.Portfolio.validateMaterialization = withCache(
 export const portfolio = {
   InstrumentArtifactCache: wasm.InstrumentArtifactCache,
   Portfolio: wasm.Portfolio,
+  FactorModel: wasm.FactorModel,
   parsePortfolioSpecJson: wasm.parsePortfolioSpecJson,
   brinsonFachler: wasm.brinsonFachler,
   carinoLink: wasm.carinoLink,
@@ -86,6 +87,9 @@ export const portfolio = {
   factorStress: wasm.factorStress,
   positionWhatIf: wasm.positionWhatIf,
   buildCreditVolReport: wasm.buildCreditVolReport,
+  // Raw export is prefixed: `primitiveExposures` is also the composite
+  // namespace name (valuations.composite), so the raw names must differ.
+  primitiveExposures: wasm.portfolioPrimitiveExposures,
   scenarioPnlBatch: wasm.scenarioPnlBatch,
   attributePortfolioPnl: wasm.attributePortfolioPnl,
   // Rust methods on result types; WASM results are plain objects, so each

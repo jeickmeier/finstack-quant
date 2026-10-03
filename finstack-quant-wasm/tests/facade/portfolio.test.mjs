@@ -27,6 +27,7 @@ const { portfolio, analytics, core, models } = facade;
 await init({ module_or_path: readFileSync(WASM_BG) });
 
 const EXPORTED_KEYS = [
+  'FactorModel',
   'InstrumentArtifactCache',
   'Portfolio',
   'PortfolioBuilder',
@@ -82,6 +83,7 @@ const EXPORTED_KEYS = [
   'portfolioValuationGetEntityValue',
   'portfolioValuationGetPositionValue',
   'positionWhatIf',
+  'primitiveExposures',
   'rebalanceFromSpec',
   'replayPortfolio',
   'scenarioPnl',

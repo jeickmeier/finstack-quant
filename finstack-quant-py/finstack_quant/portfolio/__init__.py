@@ -149,6 +149,8 @@ decompose_factor_risk = _portfolio.decompose_factor_risk
 FactorContributionDelta = _portfolio.FactorContributionDelta
 WhatIfResult = _portfolio.WhatIfResult
 StressResult = _portfolio.StressResult
+StressPnl = _portfolio.StressPnl
+FactorModel = _portfolio.FactorModel
 PositionAssignment = _portfolio.PositionAssignment
 UnmatchedEntry = _portfolio.UnmatchedEntry
 FactorAssignmentReport = _portfolio.FactorAssignmentReport
@@ -158,6 +160,8 @@ CreditVolReport = _portfolio.CreditVolReport
 factor_stress = _portfolio.factor_stress
 position_what_if = _portfolio.position_what_if
 build_credit_vol_report = _portfolio.build_credit_vol_report
+PortfolioPrimitiveExposureReport = _portfolio.PortfolioPrimitiveExposureReport
+primitive_exposures = _portfolio.primitive_exposures
 
 # Portfolio optimization specifications and results
 WeightingScheme = _portfolio.WeightingScheme
@@ -191,6 +195,7 @@ __all__ = [
     "FactorAssignmentReport",
     "FactorBrinsonResult",
     "FactorContributionDelta",
+    "FactorModel",
     "FactorPnlProfile",
     "FiAttributionResult",
     "FiCarinoLinkedResult",
@@ -218,6 +223,7 @@ __all__ = [
     "PortfolioMetrics",
     "PortfolioOptimizationResult",
     "PortfolioOptimizationSpec",
+    "PortfolioPrimitiveExposureReport",
     "PortfolioResult",
     "PortfolioValuation",
     "PositionAssignment",
@@ -229,6 +235,7 @@ __all__ = [
     "ScenarioPnl",
     "ScenarioPnlBatchItem",
     "SensitivityMatrix",
+    "StressPnl",
     "StressResult",
     "TradeDirection",
     "TradeSpec",
@@ -283,6 +290,7 @@ __all__ = [
     "optimize_portfolio",
     "parse_portfolio_spec_json",
     "position_what_if",
+    "primitive_exposures",
     "rebalance_from_spec",
     "replay_portfolio",
     "replay_portfolio_json",
