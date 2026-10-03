@@ -479,32 +479,50 @@ impl MarketSnapshot {
 
         // Install replacements before removing obsolete curves: dependent
         // credit indices must never see a temporary hole in the curve map.
-        for curve in snapshot.discount_curves.values() {
-            new_market.insert_mut(Arc::clone(curve));
+        if restore_flags.contains(MarketRestoreFlags::DISCOUNT) {
+            for curve in snapshot.discount_curves.values() {
+                new_market.insert_mut(Arc::clone(curve));
+            }
         }
-        for curve in snapshot.forward_curves.values() {
-            new_market.insert_mut(Arc::clone(curve));
+        if restore_flags.contains(MarketRestoreFlags::FORWARD) {
+            for curve in snapshot.forward_curves.values() {
+                new_market.insert_mut(Arc::clone(curve));
+            }
         }
-        for curve in snapshot.basis_spread_curves.values() {
-            new_market.insert_mut(Arc::clone(curve));
+        if restore_flags.contains(MarketRestoreFlags::FORWARD) {
+            for curve in snapshot.basis_spread_curves.values() {
+                new_market.insert_mut(Arc::clone(curve));
+            }
         }
-        for curve in snapshot.parametric_curves.values() {
-            new_market.insert_mut(Arc::clone(curve));
+        if restore_flags.contains(MarketRestoreFlags::FORWARD) {
+            for curve in snapshot.parametric_curves.values() {
+                new_market.insert_mut(Arc::clone(curve));
+            }
         }
-        for curve in snapshot.hazard_curves.values() {
-            new_market.insert_mut(Arc::clone(curve));
+        if restore_flags.contains(MarketRestoreFlags::HAZARD) {
+            for curve in snapshot.hazard_curves.values() {
+                new_market.insert_mut(Arc::clone(curve));
+            }
         }
-        for curve in snapshot.inflation_curves.values() {
-            new_market.insert_mut(Arc::clone(curve));
+        if restore_flags.contains(MarketRestoreFlags::INFLATION) {
+            for curve in snapshot.inflation_curves.values() {
+                new_market.insert_mut(Arc::clone(curve));
+            }
         }
-        for curve in snapshot.base_correlation_curves.values() {
-            new_market.insert_mut(Arc::clone(curve));
+        if restore_flags.contains(MarketRestoreFlags::CORRELATION) {
+            for curve in snapshot.base_correlation_curves.values() {
+                new_market.insert_mut(Arc::clone(curve));
+            }
         }
-        for curve in snapshot.vol_index_curves.values() {
-            new_market.insert_mut(Arc::clone(curve));
+        if restore_flags.contains(MarketRestoreFlags::VOL) {
+            for curve in snapshot.vol_index_curves.values() {
+                new_market.insert_mut(Arc::clone(curve));
+            }
         }
-        for curve in snapshot.price_curves.values() {
-            new_market.insert_mut(Arc::clone(curve));
+        if restore_flags.contains(MarketRestoreFlags::SCALARS) {
+            for curve in snapshot.price_curves.values() {
+                new_market.insert_mut(Arc::clone(curve));
+            }
         }
 
         // Every variant belongs to exactly one factor family. Retention also

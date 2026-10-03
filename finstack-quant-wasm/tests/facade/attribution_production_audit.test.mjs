@@ -25,16 +25,15 @@ test('Taylor and metrics attribution count risky discount moves only as credit',
     )
   );
   for (const method of ['metrics_based', { taylor: {} }]) {
-    const params = new attribution.AttributionJsonInputs(
-      JSON.stringify(fixture.instrument),
-      JSON.stringify(fixture.market_t0),
-      JSON.stringify(fixture.market_t1),
-      fixture.as_of_t0,
-      fixture.as_of_t1,
-      JSON.stringify(method),
-      undefined,
-      false
-    );
+    const params = {
+      instrument: fixture.instrument.instrument,
+      market_t0: fixture.market_t0,
+      market_t1: fixture.market_t1,
+      as_of_t0: fixture.as_of_t0,
+      as_of_t1: fixture.as_of_t1,
+      method,
+      full_cross_attribution: false,
+    };
     const result = attribution.attributePnl(params);
     assert.ok(Number(result.rates_curves_pnl.amount) === 0);
     assert.ok(Number(result.credit_curves_pnl.amount) < 0);
@@ -61,45 +60,30 @@ test('metrics attribution reports gross carry and a separate funding overlay', (
     tolerance_abs: 0.01,
     tolerance_pct: 0.001,
   };
-  const params = new attribution.AttributionJsonInputs(
-    JSON.stringify(bond),
-    JSON.stringify(market),
-    JSON.stringify(market),
-    '2025-06-17',
-    '2025-06-18',
-    '"metrics_based"',
-    JSON.stringify(config),
-    false
-  );
+  const params = {
+    instrument: bond.instrument,
+    market_t0: market,
+    market_t1: market,
+    as_of_t0: '2025-06-17',
+    as_of_t1: '2025-06-18',
+    method: 'metrics_based',
+    config,
+    full_cross_attribution: false,
+  };
   const result = attribution.attributePnl(params);
-  // A unit `AttributionMethod` variant is its bare wire label; the quoted
-  // JSON text above is equivalent.
-  assert.deepEqual(
-    attribution.attributePnl(
-      new attribution.AttributionJsonInputs(
-        JSON.stringify(bond),
-        JSON.stringify(market),
-        JSON.stringify(market),
-        '2025-06-17',
-        '2025-06-18',
-        'metrics_based',
-        JSON.stringify(config),
-        false
-      )
-    ),
-    result
-  );
+  // JSON text and the plain canonical spec execute identically.
+  assert.deepEqual(attribution.attributePnl(JSON.stringify(params)), result);
   assert.throws(
     () =>
-      new attribution.AttributionJsonInputs(
-        JSON.stringify(bond),
-        JSON.stringify(market),
-        JSON.stringify(market),
-        '2025-06-17',
-        '2025-06-18',
-        'nope'
-      ),
-    (error) => error.kind === 'validation' && /methodJson/.test(error.message)
+      attribution.attributePnl({
+        instrument: bond.instrument,
+        market_t0: market,
+        market_t1: market,
+        as_of_t0: '2025-06-17',
+        as_of_t1: '2025-06-18',
+        method: 'nope',
+      }),
+    (error) => error.kind === 'validation' && /unknown variant/.test(error.message)
   );
   const amount = (m) => Number(m.amount);
   const detail = result.carry_detail;
@@ -125,17 +109,20 @@ test('scalar volatility moves stay out of generic scalar attribution', () => {
   opening.prices['AAPL-VOL'] = { unitless: 0.25 };
   const closing = structuredClone(opening);
   closing.prices['AAPL-VOL'] = { unitless: 0.26 };
-  for (const method of ['parallel', { waterfall: attribution.defaultWaterfallOrder() }]) {
-    const params = new attribution.AttributionJsonInputs(
-      JSON.stringify(instrument),
-      JSON.stringify(opening),
-      JSON.stringify(closing),
-      input.as_of,
-      input.as_of,
-      JSON.stringify(method),
-      undefined,
-      false
-    );
+  for (const method of [
+    'parallel',
+    { waterfall: attribution.defaultWaterfallOrder() },
+    { taylor: {} },
+  ]) {
+    const params = {
+      instrument: instrument.instrument,
+      market_t0: opening,
+      market_t1: closing,
+      as_of_t0: input.as_of,
+      as_of_t1: input.as_of,
+      method,
+      full_cross_attribution: false,
+    };
     const result = attribution.attributePnl(params);
     assert.ok(Number(result.total_pnl.amount) > 0.01);
     assert.ok(Math.abs(Number(result.vol_pnl.amount) - Number(result.total_pnl.amount)) < 0.01);

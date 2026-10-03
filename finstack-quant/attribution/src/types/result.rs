@@ -661,7 +661,7 @@ impl PnlAttribution {
     /// # Errors
     ///
     /// Propagates the first error returned by `f`.
-    pub fn for_each_money_mut(
+    pub(crate) fn for_each_money_mut(
         &mut self,
         mut f: impl FnMut(&mut Money) -> Result<()>,
     ) -> Result<()> {
@@ -788,77 +788,19 @@ impl PnlAttribution {
         }
 
         let mut attributed_sum = self.carry;
-        attributed_sum = add_factor(
-            attributed_sum,
-            self.rates_curves_pnl,
-            "rates curves P&L",
-            &mut self.meta.notes,
-        )?;
-        attributed_sum = add_factor(
-            attributed_sum,
-            self.credit_curves_pnl,
-            "credit curves P&L",
-            &mut self.meta.notes,
-        )?;
-        attributed_sum = add_factor(
-            attributed_sum,
-            self.inflation_curves_pnl,
-            "inflation curves P&L",
-            &mut self.meta.notes,
-        )?;
-        attributed_sum = add_factor(
-            attributed_sum,
-            self.correlations_pnl,
-            "correlations P&L",
-            &mut self.meta.notes,
-        )?;
-        attributed_sum = add_factor(attributed_sum, self.fx_pnl, "FX P&L", &mut self.meta.notes)?;
-        attributed_sum = add_factor(
-            attributed_sum,
-            self.vol_pnl,
-            "vol P&L",
-            &mut self.meta.notes,
-        )?;
-        attributed_sum = add_factor(
-            attributed_sum,
-            self.cross_factor_pnl,
-            "cross-factor P&L",
-            &mut self.meta.notes,
-        )?;
-        attributed_sum = add_factor(
-            attributed_sum,
-            self.model_params_pnl,
-            "model params P&L",
-            &mut self.meta.notes,
-        )?;
-        attributed_sum = add_factor(
-            attributed_sum,
-            self.market_scalars_pnl,
-            "market scalars P&L",
-            &mut self.meta.notes,
-        )?;
-        attributed_sum = add_factor(
-            attributed_sum,
-            self.fx_translation_pnl,
-            "FX translation P&L",
-            &mut self.meta.notes,
-        )?;
-
-        // MI5: guard against a non-finite accumulator before calling
-        // `checked_sub` — `Money::new` panics on NaN/Inf inside `checked_sub`,
-        // so if attributed_sum has hit ±∞ from a runaway factor we flag the
-        // attribution invalid instead of unwinding the caller's stack.
-        if !attributed_sum.amount().is_finite() {
-            let note = format!(
-                "Non-finite attributed sum ({:?}) during residual computation; \
-                 attribution flagged invalid",
-                attributed_sum.amount()
-            );
-            self.meta.notes.push(note);
-            self.residual = Money::from((0_i64, self.total_pnl.currency()));
-            self.meta.residual_pct = 0.0;
-            self.result_invalid = true;
-            return Ok(());
+        for (amount, label) in [
+            (self.rates_curves_pnl, "rates curves P&L"),
+            (self.credit_curves_pnl, "credit curves P&L"),
+            (self.inflation_curves_pnl, "inflation curves P&L"),
+            (self.correlations_pnl, "correlations P&L"),
+            (self.fx_pnl, "FX P&L"),
+            (self.vol_pnl, "vol P&L"),
+            (self.cross_factor_pnl, "cross-factor P&L"),
+            (self.model_params_pnl, "model params P&L"),
+            (self.market_scalars_pnl, "market scalars P&L"),
+            (self.fx_translation_pnl, "FX translation P&L"),
+        ] {
+            attributed_sum = add_factor(attributed_sum, amount, label, &mut self.meta.notes)?;
         }
 
         self.residual = match self.total_pnl.checked_sub(attributed_sum) {

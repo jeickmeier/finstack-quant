@@ -322,21 +322,16 @@ test('namespace results match their published result types', () => {
       'utf8'
     )
   );
-  const params = new attribution.AttributionJsonInputs(
-    JSON.stringify(fixture.instrument),
-    JSON.stringify(fixture.market_t0),
-    JSON.stringify(fixture.market_t1),
-    fixture.as_of_t0,
-    fixture.as_of_t1,
-    JSON.stringify('metrics_based'),
-    null,
-    null
-  );
-  try {
-    declarations.push(['pnl_attribution', 'fq.PnlAttribution', attribution.attributePnl(params)]);
-  } finally {
-    params.free();
-  }
+  const params = {
+    instrument: fixture.instrument.instrument,
+    market_t0: fixture.market_t0,
+    market_t1: fixture.market_t1,
+    as_of_t0: fixture.as_of_t0,
+    as_of_t1: fixture.as_of_t1,
+    method: 'metrics_based',
+    config: null,
+  };
+  declarations.push(['pnl_attribution', 'fq.PnlAttribution', attribution.attributePnl(params)]);
 
   // covenants
   const specs = JSON.parse(covenants.lboStandardJson(5.0, 1.5, 1.2, 10_000_000.0));

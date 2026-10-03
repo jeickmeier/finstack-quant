@@ -85,16 +85,18 @@ fn test_default_metrics_attribute_long_bond_curve_twist() {
 
     let attribution = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: MarketContextState::try_from(&market_t0).expect("coherent market snapshot"),
-        market_t1: MarketContextState::try_from(&market_t1).expect("coherent market snapshot"),
-        as_of_t0: as_of,
-        as_of_t1: as_of,
-        method: AttributionMethod::MetricsBased,
-        model_params_t0: None,
-        config: None,
-        credit_factor_model: None,
-        credit_factor_detail_options: Default::default(),
-        full_cross_attribution: false,
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: MarketContextState::try_from(&market_t0).expect("coherent market snapshot"),
+            market_t1: MarketContextState::try_from(&market_t1).expect("coherent market snapshot"),
+            as_of_t0: as_of,
+            as_of_t1: as_of,
+            method: AttributionMethod::MetricsBased,
+            model_params_t0: None,
+            config: None,
+            credit_factor_model: None,
+            credit_factor_detail_options: Default::default(),
+            full_cross_attribution: false,
+        },
     }
     .execute()
     .expect("metrics-based attribution with its default metric request")

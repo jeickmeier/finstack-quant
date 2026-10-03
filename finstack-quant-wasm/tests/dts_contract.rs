@@ -1654,9 +1654,9 @@ fn attribution_dts_matches_json_pipeline_surface() {
 
     assert!(dts.contains("export interface AttributionNamespace"));
     assert!(declares_type(&dts, "PnlAttribution"));
-    assert!(dts.contains("attributePnl(params: AttributionJsonInputs): PnlAttribution;"));
-    assert!(dts.contains("attributePnlJson(params: AttributionJsonInputs): string;"));
-    assert!(dts.contains("AttributionJsonInputs: new ("));
+    assert!(dts.contains("attributePnl(spec: AttributionSpec | string): PnlAttribution;"));
+    assert!(dts.contains("attributePnlJson(spec: AttributionSpec | string): string;"));
+    assert!(!dts.contains("AttributionJsonInputs"));
     assert!(dts.contains("attributePnlEnvelope(specJson: JsonInput): AttributionResultEnvelope;"));
     assert!(declares_type(&dts, "AttributionResultEnvelope"));
     assert!(dts.contains("attributePnlEnvelopeJson(specJson: JsonInput): string;"));
@@ -1842,7 +1842,7 @@ fn rust_computation_twins_are_declared() {
         "valuationResultMetricSeries(result: ValuationResult | string, base: string): [string[], number][];",
         "calibrationEnvelopeContentHash(envelopeJson: CalibrationEnvelope | string): string;",
         "calibrationResultContentHash(resultJson: CalibrationResultEnvelope | string): string;",
-        "attributePnlMany(params: AttributionJsonInputs, instruments: JsonInput[]): PnlAttribution[];",
+        "attributePnlMany(inputs: AttributionInputs | string, instruments: JsonInput[] | string): PnlAttribution[];",
         "attributeReturnContribution(spec: JsonInput): ReturnContributionResult;",
         "pnlAttributionExplainText(pnl: PnlAttribution | string): string;",
         "financialModelContentHash(modelJson: JsonInput): string;",

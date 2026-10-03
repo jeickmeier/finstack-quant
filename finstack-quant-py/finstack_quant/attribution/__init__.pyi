@@ -33,7 +33,6 @@ __all__ = [
     "ReturnContributionResult",
     "attribute_pnl",
     "attribute_pnl_envelope",
-    "attribute_pnl_envelope_json",
     "attribute_pnl_many",
     "attribute_return_contribution",
     "default_attribution_metrics",
@@ -52,9 +51,8 @@ class AttributionResultEnvelope:
 
     Wraps Rust ``AttributionResultEnvelope`` (schema
     ``finstack_quant.attribution/1``). Returned by
-    :func:`attribute_pnl_envelope`; :meth:`to_json` is byte-identical to
-    :func:`attribute_pnl_envelope_json` and to the WASM
-    ``attributePnlEnvelopeJson``.
+    :func:`attribute_pnl_envelope`; :meth:`to_json` uses the same canonical
+    Rust wire serialization as WASM ``attributePnlEnvelopeJson``.
 
     Examples
     --------
@@ -74,8 +72,7 @@ class AttributionResultEnvelope:
         Parameters
         ----------
         json : str
-            JSON produced by :meth:`to_json` or
-            :func:`attribute_pnl_envelope_json`.
+            Canonical result-envelope JSON produced by :meth:`to_json`.
 
         Returns
         -------
@@ -101,7 +98,7 @@ class AttributionResultEnvelope:
 
     def to_json(self) -> str:
         """
-        Serialize to compact JSON (the ``attribute_pnl_envelope_json`` wire).
+        Serialize the result envelope to compact canonical Rust JSON.
 
         Returns
         -------
@@ -1470,7 +1467,7 @@ def attribute_pnl(
     This is the main entry point. Accepts the instrument, two market
     snapshots, valuation dates, and a method descriptor — typed objects or
     their canonical JSON — and returns the typed attribution result. Use
-    :func:`attribute_pnl_envelope_json` when you want the raw JSON envelope
+    :meth:`AttributionResultEnvelope.to_json` when you want the raw JSON envelope
     round-trip instead, :func:`attribute_pnl_many` for a book.
 
     Parameters
@@ -1676,8 +1673,8 @@ def attribute_pnl_envelope(spec_json: str) -> AttributionResultEnvelope:
     """
     Run attribution from a full JSON ``AttributionEnvelope``.
 
-    Typed twin of :func:`attribute_pnl_envelope_json` (WASM
-    ``attributePnlEnvelope``). Most users should prefer
+    Returns the typed result envelope; call its :meth:`to_json` for canonical
+    JSON. Corresponds to WASM ``attributePnlEnvelope``. Most users should prefer
     :func:`attribute_pnl`.
 
     Parameters
@@ -1705,47 +1702,6 @@ def attribute_pnl_envelope(spec_json: str) -> AttributionResultEnvelope:
     ValueError
         If ``spec_json`` is malformed or violates the exact attribution
         envelope schema, or attribution validation or pricing fails.
-    KeyError
-        If execution cannot find a required curve, market item, calendar, or FX
-        triangulation leg.
-    RuntimeError
-        If calibration or solver convergence fails, or attribution encounters
-        an internal operational failure.
-    """
-    ...
-
-def attribute_pnl_envelope_json(spec_json: str) -> str:
-    """
-    Run attribution from a full JSON ``AttributionEnvelope``.
-
-    JSON wire twin of :func:`attribute_pnl_envelope`.
-    Most users should prefer :func:`attribute_pnl`.
-
-    Parameters
-    ----------
-    spec_json : str
-        JSON-serialized ``AttributionEnvelope``.
-
-    Returns
-    -------
-    str
-        JSON-serialized ``AttributionResultEnvelope``.
-
-    Examples
-    --------
-    >>> from finstack_quant.attribution import attribute_pnl_envelope_json
-    >>> try:
-    ...     attribute_pnl_envelope_json("{}")
-    ... except ValueError as exc:
-    ...     "missing field" in str(exc)
-    True
-
-    Raises
-    ------
-    ValueError
-        If ``spec_json`` is malformed or violates the exact attribution
-        envelope schema, attribution validation or pricing fails, or the result
-        cannot be serialized.
     KeyError
         If execution cannot find a required curve, market item, calendar, or FX
         triangulation leg.

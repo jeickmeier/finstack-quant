@@ -203,6 +203,8 @@ import type {
   ValidationReport,
 } from './types/generated/valuations/index.js';
 import type {
+  AttributionInputs,
+  AttributionSpec,
   AttributionResultEnvelope,
   PnlAttribution,
 } from './types/generated/attribution/index.js';
@@ -442,7 +444,7 @@ export type {
   ValidationReport,
 };
 export type { Diagnostic } from './types/generated/valuations/index.js';
-export type { AttributionResultEnvelope, PnlAttribution };
+export type { AttributionInputs, AttributionSpec, AttributionResultEnvelope, PnlAttribution };
 export type {
   CheckCategory,
   CheckFinding,
@@ -32181,27 +32183,6 @@ export declare const valuations: ValuationsNamespace;
 // --- attribution -----------------------------------------------------------
 
 /**
- * Owned JSON fragments for P&L attribution via `attributePnl`: the fields of
- * Rust `AttributionJsonInputs`, which `attributePnl` passes to
- * `AttributionSpec::from_json_inputs`. JavaScript has no keyword arguments,
- * so the inputs are bundled in this class; Python passes the same fields as
- * keyword arguments of `attribute_pnl`.
- *
- * Optional `modelParamsT0Json` and `creditFactorModelJson` attach an opening
- * model-parameter snapshot and a credit-factor model after construction.
- */
-export interface AttributionJsonInputs extends WasmOwned {
-  /**
-   * Optional serialized opening `ModelParamsSnapshot` JSON.
-   */
-  modelParamsT0Json?: string | null;
-  /**
-   * Optional serialized `CreditFactorModel` JSON.
-   */
-  creditFactorModelJson?: string | null;
-}
-
-/**
  * Namespaced TypeScript entry points for attribution calculations and types.
  * @example
  * ```typescript
@@ -32216,56 +32197,31 @@ export interface AttributionNamespace {
    */
   schema: SchemaRegistryNamespace;
   /**
-   * Parameters constructor emitted by wasm-bindgen for attribution calls.
-   *
-   * `methodJson` is an `AttributionMethod` wire value: a unit variant name
-   * such as `"parallel"` or `"metrics_based"`, an object such as
-   * `{ waterfall: ["carry", "rates_curves"] }`, or the same value as JSON
-   * text. It is validated here; an unknown method throws with kind
-   * `validation`.
-   *
-   * `configJson` may include `{ "execution_policy": "parallel" }`; it opts into
-   * inner Rayon on native hosts and is accepted but ignored in WebAssembly,
-   * where attribution always runs serially with the same result. Set
-   * `modelParamsT0Json` / `creditFactorModelJson` on the constructed object
-   * to attach an opening model-parameter snapshot or credit-factor model.
-   */
-  AttributionJsonInputs: new (
-    instrumentJson: JsonInput,
-    marketT0Json: JsonInput,
-    marketT1Json: JsonInput,
-    asOfT0: string,
-    asOfT1: string,
-    methodJson: JsonInput,
-    configJson?: JsonInput | null,
-    fullCrossAttribution?: boolean | null
-  ) => AttributionJsonInputs;
-  /**
    * Run P&L attribution for a single instrument.
    *
-   * Accepts an `AttributionJsonInputs` object with the instrument JSON, two market
+   * Accepts an `AttributionSpec` object or its JSON text with an instrument payload, two market
    * snapshots, dates, and a method descriptor. Returns the `PnlAttribution`
    * result as a structured object with the canonical Rust serde field names;
-   * use `attributePnlJson` for the JSON wire string. `config_json` may include
+   * use `attributePnlJson` for the JSON wire string. `spec.config` may include
    * `"execution_policy": "parallel"`, which opts into inner Rayon on native
    * hosts; WebAssembly builds have no Rayon, so the field is accepted but
    * ignored here and attribution always runs serially (same result).
-   * @returns Structured `PnlAttribution` result object for the instrument.
-   * @param params - Fully specified AttributionJsonInputs object containing instrument, markets, dates, and method.
-   * @throws Error - Throws a `FinstackError` whose `kind` is the Rust classification (`not_found` for missing market data, `computation` for a caught panic or solver failure, otherwise `validation`). Rejects malformed instrument, market, method, or configuration JSON; invalid ISO attribution dates; instrument or market reconstruction, pricing, FX, rounding, metric, or method-specific attribution failures; a caught attribution panic; or failure to convert the result to a JavaScript value.
+   * @param spec - Canonical `AttributionSpec` object or JSON text with the instrument payload, market states, ISO calendar dates, method and optional config.
+   * @returns The native-currency or configured reporting-currency `PnlAttribution` object.
+   * @throws Error - Throws a classified `FinstackError` for malformed or unknown spec fields, invalid dates, unavailable market data, pricing, currency, configuration or method failures, or a contained Rust panic. Invalid host types throw `TypeError`.
    */
-  attributePnl(params: AttributionJsonInputs): PnlAttribution;
+  attributePnl(spec: AttributionSpec | string): PnlAttribution;
   /**
    * Run P&L attribution for a single instrument and return wire JSON.
    *
    * Wire twin of `attributePnl`: same inputs, validation, and panic
    * containment, returning the `PnlAttribution` as a JSON string instead of
    * a structured object.
-   * @returns JSON-serialized `PnlAttribution` wire document.
-   * @param params - Fully specified AttributionJsonInputs object containing instrument, markets, dates, and method.
-   * @throws Error - Rejects the same conditions as `attributePnl`, plus failure to serialize the result to JSON.
+   * @param spec - Canonical `AttributionSpec` object or JSON text with the instrument payload, market states, ISO calendar dates, method and optional config.
+   * @returns Compact canonical `PnlAttribution` JSON, preserving decimal amounts and map order.
+   * @throws Error - Throws the same classified errors as `attributePnl`, or a serialization error.
    */
-  attributePnlJson(params: AttributionJsonInputs): string;
+  attributePnlJson(spec: AttributionSpec | string): string;
   /**
    * Run attribution from a full `AttributionEnvelope` and return the result envelope.
    *
@@ -32332,12 +32288,15 @@ export interface AttributionNamespace {
   ): Money;
   /**
    * Run one attribution configuration against many instruments (mirrors Python `attribute_pnl_many`).
-   * @param params - AttributionJsonInputs carrying the shared markets, dates, method and configuration.
-   * @param instruments - Array of canonical instrument envelopes (objects or JSON), in output order.
+   * @param inputs - `AttributionInputs` object or JSON containing markets, dates, method and execution options; no placeholder instrument is required.
+   * @param instruments - Ordered array of canonical instrument envelopes, each an object or JSON string. The array itself may also be serialized JSON.
    * @returns One `PnlAttribution` object per instrument, in input order.
-   * @throws Error - Throws a `FinstackError` with the Rust classification for the first failing instrument (see `attributePnl`), or kind `validation` if an instrument envelope is malformed.
+   * @throws Error - Throws a classified `FinstackError` for malformed inputs or envelopes, or the first instrument's pricing, market-data, currency or validation error.
    */
-  attributePnlMany(params: AttributionJsonInputs, instruments: JsonInput[]): PnlAttribution[];
+  attributePnlMany(
+    inputs: AttributionInputs | string,
+    instruments: JsonInput[] | string
+  ): PnlAttribution[];
   /**
    * Compute return-contribution attribution from a specification (mirrors Python `attribute_return_contribution`).
    * @param spec - `ReturnContributionSpec` (object or JSON): positions with weights and returns, weighting scheme and optional benchmark.

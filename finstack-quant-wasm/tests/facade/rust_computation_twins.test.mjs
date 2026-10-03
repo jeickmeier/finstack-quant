@@ -700,22 +700,25 @@ test('pnlBridge and attributePnlMany run the Rust attribution entry points', () 
   );
   assert.equal(bridge.toString(), 'USD -61.80');
 
-  const params = new attribution.AttributionJsonInputs(
-    JSON.stringify(CONVERTIBLE.instrument),
-    JSON.stringify(CONVERTIBLE.market_t0),
-    JSON.stringify(CONVERTIBLE.market_t1),
-    CONVERTIBLE.as_of_t0,
-    CONVERTIBLE.as_of_t1,
-    '"parallel"',
-    undefined,
-    false
-  );
+  const params = {
+    instrument: CONVERTIBLE.instrument.instrument,
+    market_t0: CONVERTIBLE.market_t0,
+    market_t1: CONVERTIBLE.market_t1,
+    as_of_t0: CONVERTIBLE.as_of_t0,
+    as_of_t1: CONVERTIBLE.as_of_t1,
+    method: 'parallel',
+    full_cross_attribution: false,
+  };
   const single = attribution.attributePnl(params);
-  const many = attribution.attributePnlMany(params, [
+  const sharedInputs = { ...params };
+  delete sharedInputs.instrument;
+  const many = attribution.attributePnlMany(sharedInputs, [
     CONVERTIBLE.instrument,
-    CONVERTIBLE.instrument,
+    JSON.stringify(CONVERTIBLE.instrument),
   ]);
   assert.equal(many.length, 2);
+  assert.deepEqual(many[1].total_pnl, single.total_pnl);
+  assert.deepEqual(attribution.attributePnlMany(sharedInputs, []), []);
   assert.deepEqual(many[0].total_pnl, single.total_pnl);
 
   assert.match(attribution.pnlAttributionExplainText(single), /Total P&L/);

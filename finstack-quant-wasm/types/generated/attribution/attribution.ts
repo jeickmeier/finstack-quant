@@ -9425,7 +9425,7 @@ export interface AttributionSpec {
    */
   full_cross_attribution?: boolean;
   /**
-   * Instrument to attribute (as JSON envelope)
+   * Instrument payload to attribute, without its instrument envelope.
    */
   instrument: InstrumentJson;
   /**
@@ -20114,6 +20114,58 @@ export interface TaylorAttributionConfig {
    * Vol bump size for vega computation (absolute vol points, e.g. 0.01 = 1%).
    */
   vol_bump?: number;
+}
+/**
+ * Shared market snapshots, dates, method and options for a batch of instruments
+ */
+export interface AttributionInputs {
+  /**
+   * Valuation date at T₀
+   */
+  as_of_t0: DateWire;
+  /**
+   * Valuation date at T₁
+   */
+  as_of_t1: DateWire;
+  /**
+   * Optional configuration overrides (defaults to FinstackConfig::default())
+   */
+  config?: AttributionConfig | null;
+  /**
+   * Detail/payload options for `credit_factor_detail`. Inert when
+   * `credit_factor_model` is `None`.
+   */
+  credit_factor_detail_options?: CreditFactorDetailOptions;
+  /**
+   * Optional calibrated credit factor model. When present (and the
+   * instrument has a recognizable issuer + credit-curve exposure), the
+   * returned `PnlAttribution` carries a `credit_factor_detail` field with
+   * generic / per-level / adder P&L additively decomposing
+   * `credit_curves_pnl`. Parallel and waterfall populate the detail via
+   * the reprice cascade; metrics-based and Taylor back-solve it after
+   * the linear decomposition.
+   */
+  credit_factor_model?: CreditFactorModel | null;
+  /**
+   * Option to compute all 36 cross-factor pairs when enabled
+   */
+  full_cross_attribution?: boolean;
+  /**
+   * Market context at T₀
+   */
+  market_t0: MarketContextState;
+  /**
+   * Market context at T₁
+   */
+  market_t1: MarketContextState;
+  /**
+   * Attribution methodology
+   */
+  method: AttributionMethod;
+  /**
+   * Optional model parameters at T₀ (for attributing parameter changes)
+   */
+  model_params_t0?: ModelParamsSnapshot | null;
 }
 /**
  * Attribution metadata.

@@ -1277,9 +1277,8 @@ schema = { python = "finstack_quant.attribution.schema", status = "exists", note
 #     from hosts as serde payloads on PnlAttribution detail getters
 #   - spec/envelope/schema types (AttributionSpec, AttributionEnvelope,
 #     AttributionResult, AttributionSchema, AttributionConfig,
-#     AttributionJsonInputs, TaylorAttributionConfig) — hosts pass/receive
-#     them as JSON or binding fragments (WASM binds the JSON fragments as the
-#     AttributionJsonInputs class; AttributionResultEnvelope is a typed
+#     AttributionInputs, TaylorAttributionConfig) — hosts pass/receive
+#     them as canonical JSON or plain objects (AttributionResultEnvelope is a typed
 #     Python wrapper and a WASM plain object from attribute_pnl_envelope)
 #   - test-only market snapshot support
 #     (MarketSnapshot/MarketRestoreFlags)
@@ -1294,7 +1293,6 @@ public = [
     "ReturnContributionResult",
     "attribute_pnl",
     "attribute_pnl_envelope",
-    "attribute_pnl_envelope_json",
     "attribute_pnl_many",
     "attribute_return_contribution",
     "default_attribution_metrics",
@@ -2219,7 +2217,7 @@ types = { CdsConventionSpec = "CdsConventionSpec", InflationSwapConventions = "I
 js = "valuations.schema"
 
 [parity.js."attribution".wasm_only]
-AttributionJsonInputs = "the Rust AttributionJsonInputs fragments as a class (JS has no keyword arguments; Python passes the same fields as attribute_pnl kwargs)"
+attributePnlEnvelopeJson = "Canonical Rust JSON wire twin of attribute_pnl_envelope; Python serializes the typed AttributionResultEnvelope with to_json()"
 attributePnlJson = "JSON wire twin of attribute_pnl (Python returns the typed PnlAttribution)"
 attributeReturnContributionJson = "JSON wire twin of attribute_return_contribution (Rust attribute_return_contribution_json; Python returns the typed ReturnContributionResult)"
 pnlAttributionExplainText = "free-function twin of Python PnlAttribution.explain (member rename)"

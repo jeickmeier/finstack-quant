@@ -157,7 +157,7 @@
       "_shared.analyst_history.risk_panel",
       "_shared.instrument_fixtures.fixed_bond",
       "finstack_quant.analytics.Performance",
-      "finstack_quant.attribution.attribute_pnl_envelope_json",
+      "finstack_quant.attribution.attribute_pnl_envelope",
       "finstack_quant.core.dates.Schedule",
       "finstack_quant.core.market_data.DiscountCurve",
       "finstack_quant.core.market_data.MarketContext",

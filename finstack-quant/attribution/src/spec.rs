@@ -13,9 +13,8 @@ use finstack_quant_core::{
 };
 use finstack_quant_models::factor::credit::hierarchy::CreditFactorModel;
 use finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot;
-use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
+use finstack_quant_valuations::instruments::InstrumentJson;
 use finstack_quant_valuations::metrics::MetricId;
-use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
@@ -115,8 +114,21 @@ impl AttributionEnvelope {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct AttributionSpec {
-    /// Instrument to attribute (as JSON envelope)
+    /// Instrument payload to attribute, without its instrument envelope.
     pub instrument: InstrumentJson,
+    /// Shared markets, dates, method and execution options, flattened on the wire.
+    #[serde(flatten)]
+    pub inputs: AttributionInputs,
+}
+
+/// Shared inputs for single-instrument and order-preserving batch attribution.
+///
+/// Carries the same market, date and method fields as an attribution specification,
+/// without requiring a dummy instrument for a batch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct AttributionInputs {
     /// Market context at T₀
     pub market_t0: MarketContextState,
     /// Market context at T₁
@@ -221,98 +233,7 @@ pub struct AttributionConfig {
     pub execution_policy: Option<ExecutionPolicy>,
 }
 
-/// JSON fragments used by host bindings to construct an [`AttributionSpec`].
-///
-/// Every field is a serialized payload or an ISO date string. Optional
-/// fragments that are `None` are omitted from the spec (no model-parameter
-/// snapshot, no credit-factor model).
-#[derive(Debug, Clone, Copy)]
-pub struct AttributionJsonInputs<'a> {
-    /// Canonical v1 instrument envelope JSON.
-    pub instrument_json: &'a str,
-    /// Canonical market-context JSON at T₀.
-    pub market_t0_json: &'a str,
-    /// Canonical market-context JSON at T₁.
-    pub market_t1_json: &'a str,
-    /// ISO-8601 valuation date for `market_t0_json`.
-    pub as_of_t0: &'a str,
-    /// ISO-8601 valuation date for `market_t1_json`.
-    pub as_of_t1: &'a str,
-    /// Snake-case serialized [`AttributionMethod`].
-    pub method_json: &'a str,
-    /// Optional complete serialized [`AttributionConfig`].
-    pub config_json: Option<&'a str>,
-    /// Optional serialized T₀ [`finstack_quant_valuations::instruments::model_params::ModelParamsSnapshot`].
-    pub model_params_t0_json: Option<&'a str>,
-    /// Optional serialized [`CreditFactorModel`].
-    pub credit_factor_model_json: Option<&'a str>,
-    /// When true, parallel attribution evaluates every pairwise cross term.
-    pub full_cross_attribution: bool,
-}
-
-impl AttributionSpec {
-    /// Build an attribution spec from the JSON-friendly inputs used by bindings.
-    ///
-    /// `inputs.as_of_t0` and `inputs.as_of_t1` must use ISO-8601 calendar-date
-    /// syntax. When present, `inputs.config_json` supplies the complete
-    /// serialized attribution configuration; it is not merged with caller state.
-    ///
-    /// # Arguments
-    ///
-    /// * `inputs` - Instrument, market, date, method, and optional config,
-    ///   model-parameter, credit-factor-model, and full-cross fragments.
-    ///   Dates must be ISO-8601 calendar dates. JSON fragments must match
-    ///   the crate's serde schemas (`deny_unknown_fields`).
-    ///
-    /// # Errors
-    ///
-    /// Returns [`finstack_quant_core::Error::Validation`] when any JSON payload
-    /// has the wrong schema or either as-of date cannot be parsed.
-    pub fn from_json_inputs(inputs: AttributionJsonInputs<'_>) -> Result<Self> {
-        let instrument_envelope: InstrumentEnvelope =
-            parse_input_json("instrument envelope", inputs.instrument_json)?;
-        Ok(Self {
-            instrument: instrument_envelope.instrument,
-            market_t0: parse_input_json("market_t0", inputs.market_t0_json)?,
-            market_t1: parse_input_json("market_t1", inputs.market_t1_json)?,
-            as_of_t0: parse_iso_date("as_of_t0", inputs.as_of_t0)?,
-            as_of_t1: parse_iso_date("as_of_t1", inputs.as_of_t1)?,
-            method: parse_input_json("method", inputs.method_json)?,
-            model_params_t0: inputs
-                .model_params_t0_json
-                .map(|json| parse_input_json("model_params_t0", json))
-                .transpose()?,
-            config: inputs
-                .config_json
-                .map(|json| parse_input_json("config", json))
-                .transpose()?,
-            credit_factor_model: inputs
-                .credit_factor_model_json
-                .map(|json| parse_input_json("credit_factor_model", json))
-                .transpose()?
-                .map(Box::new),
-            credit_factor_detail_options: CreditFactorDetailOptions::default(),
-            full_cross_attribution: inputs.full_cross_attribution,
-        })
-    }
-}
-
-fn parse_input_json<T: DeserializeOwned>(label: &str, json: &str) -> Result<T> {
-    serde_json::from_str(json).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!("invalid attribution {label} JSON: {e}"))
-    })
-}
-
-fn parse_iso_date(label: &str, value: &str) -> Result<Date> {
-    let format = time::format_description::well_known::Iso8601::DEFAULT;
-    Date::parse(value, &format).map_err(|e| {
-        finstack_quant_core::Error::Validation(format!(
-            "invalid attribution {label} date '{value}': {e}"
-        ))
-    })
-}
-
-impl AttributionSpec {
+impl AttributionInputs {
     pub(crate) fn build_finstack_config(
         &self,
         instrument_currency: Option<Currency>,
@@ -338,43 +259,46 @@ impl AttributionSpec {
     }
 }
 
-/// Run one attribution specification against many instruments.
+/// Attribute many instruments using shared markets, dates and options.
 ///
-/// Every instrument is attributed with the same markets, dates, method and
-/// configuration carried by `template` (its own `instrument` field is
-/// ignored). Results come back in input order, one per instrument; the
-/// loop is serial and deterministic, and the first failing instrument aborts
-/// the batch with its error. Panics are contained per instrument exactly as
-/// in [`AttributionSpec::execute_contained`].
+/// Market contexts are reconstructed once. Results retain input order, and the
+/// first instrument failure aborts the batch. Empty batches return an empty list.
+/// Rust panics are converted to internal errors as on the single-run host path.
 ///
 /// # Arguments
 ///
-/// * `template` - Attribution run whose markets, valuation dates, method,
-///   config, model-parameter snapshot and credit-factor model are shared by
-///   every instrument.
-/// * `instruments` - Instrument payloads to attribute, in output order.
+/// * `inputs` - Shared native-currency attribution settings. Rounding currency
+///   and optional reporting-currency translation are resolved per instrument.
+/// * `instruments` - Instrument payloads, in the requested output order.
 ///
 /// # Errors
 ///
-/// Returns the first instrument's error — see [`AttributionSpec::execute`].
-///
-/// # Returns
-///
-/// One [`PnlAttribution`] per entry of `instruments`, in the same order.
+/// Returns market reconstruction, pricing, currency, configuration or method
+/// validation errors, or an internal error for a contained panic.
 pub fn attribute_pnl_many(
-    template: &AttributionSpec,
+    inputs: &AttributionInputs,
     instruments: Vec<InstrumentJson>,
 ) -> Result<Vec<PnlAttribution>> {
-    instruments
-        .into_iter()
-        .map(|instrument| {
-            let spec = AttributionSpec {
-                instrument,
-                ..template.clone()
-            };
-            spec.execute_contained().map(|result| result.attribution)
-        })
-        .collect()
+    if instruments.is_empty() {
+        return Ok(Vec::new());
+    }
+    crate::execution::contain_panic("execute", || {
+        crate::helpers::validate_attribution_period(inputs.as_of_t0, inputs.as_of_t1)?;
+        let market_t0 = finstack_quant_core::market_data::context::MarketContext::try_from(
+            inputs.market_t0.clone(),
+        )?;
+        let market_t1 = finstack_quant_core::market_data::context::MarketContext::try_from(
+            inputs.market_t1.clone(),
+        )?;
+        instruments
+            .iter()
+            .map(|instrument| {
+                inputs
+                    .execute_instrument(instrument, &market_t0, &market_t1)
+                    .map(|result| result.attribution)
+            })
+            .collect()
+    })
 }
 
 /// Default set of metrics for metrics-based attribution.
@@ -418,15 +342,6 @@ pub fn default_attribution_metrics() -> Vec<MetricId> {
 /// ```
 pub fn validate_attribution_json(json: &str) -> Result<String> {
     let envelope = AttributionEnvelope::from_json(json)?;
-    // Explicit schema-version gate. `AttributionSchema` deserialization already
-    // rejects unknown markers, but the gate is asserted here so the contract is
-    // visible at the validation boundary and stays correct if the enum ever
-    // grows a second variant.
-    if envelope.schema != AttributionSchema::CURRENT {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "unsupported attribution schema version; expected {ATTRIBUTION_SCHEMA:?}"
-        )));
-    }
     serde_json::to_string(&envelope).map_err(|e| {
         finstack_quant_core::Error::Internal(format!(
             "failed to re-serialize validated attribution envelope: {e}"
@@ -499,44 +414,46 @@ mod tests {
 
         let spec = AttributionSpec {
             instrument: InstrumentJson::Bond(bond),
-            market_t0: MarketContextState {
-                schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-                curves: vec![],
-                fx: None,
-                surfaces: vec![],
-                prices: std::collections::BTreeMap::new(),
-                series: vec![],
-                inflation_indices: vec![],
-                dividends: vec![],
-                credit_indices: vec![],
-                collateral: std::collections::BTreeMap::new(),
-                fx_delta_vol_surfaces: vec![],
-                vol_cubes: vec![],
-                hierarchy: None,
+            inputs: crate::AttributionInputs {
+                market_t0: MarketContextState {
+                    schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
+                    curves: vec![],
+                    fx: None,
+                    surfaces: vec![],
+                    prices: std::collections::BTreeMap::new(),
+                    series: vec![],
+                    inflation_indices: vec![],
+                    dividends: vec![],
+                    credit_indices: vec![],
+                    collateral: std::collections::BTreeMap::new(),
+                    fx_delta_vol_surfaces: vec![],
+                    vol_cubes: vec![],
+                    hierarchy: None,
+                },
+                market_t1: MarketContextState {
+                    schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
+                    curves: vec![],
+                    fx: None,
+                    surfaces: vec![],
+                    prices: std::collections::BTreeMap::new(),
+                    series: vec![],
+                    inflation_indices: vec![],
+                    dividends: vec![],
+                    credit_indices: vec![],
+                    collateral: std::collections::BTreeMap::new(),
+                    fx_delta_vol_surfaces: vec![],
+                    vol_cubes: vec![],
+                    hierarchy: None,
+                },
+                as_of_t0: create_date(2025, Month::January, 1).expect("Valid test date"),
+                as_of_t1: create_date(2025, Month::January, 2).expect("Valid test date"),
+                method: AttributionMethod::Parallel,
+                model_params_t0: None,
+                config: None,
+                credit_factor_model: None,
+                credit_factor_detail_options: CreditFactorDetailOptions::default(),
+                full_cross_attribution: false,
             },
-            market_t1: MarketContextState {
-                schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-                curves: vec![],
-                fx: None,
-                surfaces: vec![],
-                prices: std::collections::BTreeMap::new(),
-                series: vec![],
-                inflation_indices: vec![],
-                dividends: vec![],
-                credit_indices: vec![],
-                collateral: std::collections::BTreeMap::new(),
-                fx_delta_vol_surfaces: vec![],
-                vol_cubes: vec![],
-                hierarchy: None,
-            },
-            as_of_t0: create_date(2025, Month::January, 1).expect("Valid test date"),
-            as_of_t1: create_date(2025, Month::January, 2).expect("Valid test date"),
-            method: AttributionMethod::Parallel,
-            model_params_t0: None,
-            config: None,
-            credit_factor_model: None,
-            credit_factor_detail_options: CreditFactorDetailOptions::default(),
-            full_cross_attribution: false,
         };
 
         let envelope = AttributionEnvelope::new(spec);
@@ -545,9 +462,22 @@ mod tests {
         let parsed: AttributionEnvelope =
             serde_json::from_str(&json).expect("JSON deserialization should succeed in test");
 
+        let mut value = serde_json::to_value(&envelope).unwrap();
+        assert!(value["attribution"].get("inputs").is_none());
+        value["attribution"]["unknown_option"] = true.into();
+        assert!(serde_json::from_value::<AttributionEnvelope>(value).is_err());
+        let mut shared = serde_json::to_value(&envelope.attribution.inputs).unwrap();
+        shared["unknown_option"] = true.into();
+        assert!(serde_json::from_value::<AttributionInputs>(shared).is_err());
         assert_eq!(parsed.schema, AttributionSchema::Attribution);
-        assert_eq!(parsed.attribution.as_of_t0, envelope.attribution.as_of_t0);
-        assert_eq!(parsed.attribution.as_of_t1, envelope.attribution.as_of_t1);
+        assert_eq!(
+            parsed.attribution.inputs.as_of_t0,
+            envelope.attribution.inputs.as_of_t0
+        );
+        assert_eq!(
+            parsed.attribution.inputs.as_of_t1,
+            envelope.attribution.inputs.as_of_t1
+        );
     }
 
     #[test]
@@ -573,114 +503,6 @@ mod tests {
     }
 
     #[test]
-    fn test_attribution_spec_from_json_inputs() {
-        use finstack_quant_valuations::instruments::Bond;
-
-        let bond = Bond::fixed(
-            "TEST-BOND",
-            Money::from((1_000_000_i64, Currency::USD)),
-            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
-            create_date(2024, Month::January, 1).expect("Valid test date"),
-            create_date(2034, Month::January, 1).expect("Valid test date"),
-            finstack_quant_core::dates::StubKind::ShortFront,
-            "USD-OIS",
-        )
-        .expect("Bond::fixed should succeed with valid parameters");
-
-        let market_state = MarketContextState {
-            schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-            curves: vec![],
-            fx: None,
-            surfaces: vec![],
-            prices: std::collections::BTreeMap::new(),
-            series: vec![],
-            inflation_indices: vec![],
-            dividends: vec![],
-            credit_indices: vec![],
-            collateral: std::collections::BTreeMap::new(),
-            fx_delta_vol_surfaces: vec![],
-            vol_cubes: vec![],
-            hierarchy: None,
-        };
-        let config = AttributionConfig {
-            tolerance_abs: Some(0.01),
-            tolerance_pct: None,
-            metrics: None,
-            strict_validation: Some(true),
-            rounding_scale: Some(6),
-            rate_bump_bp: None,
-            target_currency: None,
-            execution_policy: None,
-        };
-
-        let instrument_json =
-            serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::Bond(bond)))
-                .expect("instrument JSON should serialize");
-        let market_json =
-            serde_json::to_string(&market_state).expect("market JSON should serialize");
-        let method_json = serde_json::to_string(&AttributionMethod::Parallel)
-            .expect("method JSON should serialize");
-        let config_json = serde_json::to_string(&config).expect("config JSON should serialize");
-        let spec = AttributionSpec::from_json_inputs(AttributionJsonInputs {
-            instrument_json: &instrument_json,
-            market_t0_json: &market_json,
-            market_t1_json: &market_json,
-            as_of_t0: "2025-01-01",
-            as_of_t1: "2025-01-02",
-            method_json: &method_json,
-            config_json: Some(&config_json),
-            model_params_t0_json: None,
-            credit_factor_model_json: None,
-            full_cross_attribution: false,
-        })
-        .expect("binding-friendly spec constructor should succeed");
-
-        assert!(matches!(spec.method, AttributionMethod::Parallel));
-        assert_eq!(
-            spec.as_of_t0,
-            create_date(2025, Month::January, 1).expect("Valid test date")
-        );
-        assert_eq!(
-            spec.as_of_t1,
-            create_date(2025, Month::January, 2).expect("Valid test date")
-        );
-        assert!(spec
-            .config
-            .as_ref()
-            .and_then(|cfg| cfg.strict_validation)
-            .expect("strict_validation should be preserved"));
-        assert!(!spec.full_cross_attribution);
-        assert!(spec.credit_factor_model.is_none());
-        assert!(spec.model_params_t0.is_none());
-    }
-
-    #[test]
-    fn attribution_json_inputs_reject_bare_instruments() {
-        use finstack_quant_valuations::instruments::Bond;
-
-        let bond = Bond::example().expect("bond example should build");
-        // schema-rejection-test: standalone attribution requires an envelope.
-        let raw = serde_json::to_string(&InstrumentJson::Bond(bond))
-            .expect("instrument JSON should serialize");
-
-        let error = AttributionSpec::from_json_inputs(AttributionJsonInputs {
-            instrument_json: &raw,
-            market_t0_json: "{}",
-            market_t1_json: "{}",
-            as_of_t0: "2025-01-01",
-            as_of_t1: "2025-01-02",
-            method_json: "\"parallel\"",
-            config_json: None,
-            model_params_t0_json: None,
-            credit_factor_model_json: None,
-            full_cross_attribution: false,
-        })
-        .expect_err("bare instrument JSON must be rejected before market parsing");
-
-        assert!(error.to_string().contains("instrument envelope"));
-    }
-
-    #[test]
     fn test_attribution_envelope_json_envelope_trait() {
         use finstack_quant_valuations::instruments::Bond;
 
@@ -697,44 +519,46 @@ mod tests {
 
         let spec = AttributionSpec {
             instrument: InstrumentJson::Bond(bond),
-            market_t0: MarketContextState {
-                schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-                curves: vec![],
-                fx: None,
-                surfaces: vec![],
-                prices: std::collections::BTreeMap::new(),
-                series: vec![],
-                inflation_indices: vec![],
-                dividends: vec![],
-                credit_indices: vec![],
-                collateral: std::collections::BTreeMap::new(),
-                fx_delta_vol_surfaces: vec![],
-                vol_cubes: vec![],
-                hierarchy: None,
+            inputs: crate::AttributionInputs {
+                market_t0: MarketContextState {
+                    schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
+                    curves: vec![],
+                    fx: None,
+                    surfaces: vec![],
+                    prices: std::collections::BTreeMap::new(),
+                    series: vec![],
+                    inflation_indices: vec![],
+                    dividends: vec![],
+                    credit_indices: vec![],
+                    collateral: std::collections::BTreeMap::new(),
+                    fx_delta_vol_surfaces: vec![],
+                    vol_cubes: vec![],
+                    hierarchy: None,
+                },
+                market_t1: MarketContextState {
+                    schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
+                    curves: vec![],
+                    fx: None,
+                    surfaces: vec![],
+                    prices: std::collections::BTreeMap::new(),
+                    series: vec![],
+                    inflation_indices: vec![],
+                    dividends: vec![],
+                    credit_indices: vec![],
+                    collateral: std::collections::BTreeMap::new(),
+                    fx_delta_vol_surfaces: vec![],
+                    vol_cubes: vec![],
+                    hierarchy: None,
+                },
+                as_of_t0: create_date(2025, Month::January, 1).expect("Valid test date"),
+                as_of_t1: create_date(2025, Month::January, 2).expect("Valid test date"),
+                method: AttributionMethod::Parallel,
+                model_params_t0: None,
+                config: None,
+                credit_factor_model: None,
+                credit_factor_detail_options: CreditFactorDetailOptions::default(),
+                full_cross_attribution: false,
             },
-            market_t1: MarketContextState {
-                schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-                curves: vec![],
-                fx: None,
-                surfaces: vec![],
-                prices: std::collections::BTreeMap::new(),
-                series: vec![],
-                inflation_indices: vec![],
-                dividends: vec![],
-                credit_indices: vec![],
-                collateral: std::collections::BTreeMap::new(),
-                fx_delta_vol_surfaces: vec![],
-                vol_cubes: vec![],
-                hierarchy: None,
-            },
-            as_of_t0: create_date(2025, Month::January, 1).expect("Valid test date"),
-            as_of_t1: create_date(2025, Month::January, 2).expect("Valid test date"),
-            method: AttributionMethod::Parallel,
-            model_params_t0: None,
-            config: None,
-            credit_factor_model: None,
-            credit_factor_detail_options: CreditFactorDetailOptions::default(),
-            full_cross_attribution: false,
         };
 
         let envelope = AttributionEnvelope::new(spec);
@@ -746,7 +570,10 @@ mod tests {
         let parsed =
             serde_json::from_str::<AttributionEnvelope>(&json).expect("from_json should succeed");
         assert_eq!(parsed.schema, AttributionSchema::Attribution);
-        assert_eq!(parsed.attribution.as_of_t0, envelope.attribution.as_of_t0);
+        assert_eq!(
+            parsed.attribution.inputs.as_of_t0,
+            envelope.attribution.inputs.as_of_t0
+        );
 
         let reader = std::io::Cursor::new(json.as_bytes());
         let parsed_from_reader = serde_json::from_reader::<_, AttributionEnvelope>(reader)
@@ -775,16 +602,18 @@ mod tests {
         .expect("coherent market snapshot");
         let spec = AttributionSpec {
             instrument: InstrumentJson::Bond(bond),
-            market_t0: market.clone(),
-            market_t1: market,
-            as_of_t0: create_date(2025, Month::January, 1).expect("Valid test date"),
-            as_of_t1: create_date(2025, Month::January, 2).expect("Valid test date"),
-            method: AttributionMethod::Parallel,
-            model_params_t0: None,
-            config: None,
-            credit_factor_model: None,
-            credit_factor_detail_options: CreditFactorDetailOptions::default(),
-            full_cross_attribution: false,
+            inputs: crate::AttributionInputs {
+                market_t0: market.clone(),
+                market_t1: market,
+                as_of_t0: create_date(2025, Month::January, 1).expect("Valid test date"),
+                as_of_t1: create_date(2025, Month::January, 2).expect("Valid test date"),
+                method: AttributionMethod::Parallel,
+                model_params_t0: None,
+                config: None,
+                credit_factor_model: None,
+                credit_factor_detail_options: CreditFactorDetailOptions::default(),
+                full_cross_attribution: false,
+            },
         };
         let envelope = AttributionEnvelope::new(spec);
         let pretty =

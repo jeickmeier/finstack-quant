@@ -41,7 +41,6 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
     ("finstack_quant.attribution", "attribute_pnl", "wrapper"),
     ("finstack_quant.attribution", "attribute_return_contribution", "wrapper"),
     ("finstack_quant.attribution", "attribute_pnl_envelope", "wrapper"),
-    ("finstack_quant.attribution", "attribute_pnl_envelope_json", "json"),
     # calibration
     ("finstack_quant.calibration", "dry_run", "wrapper"),
     ("finstack_quant.calibration", "dry_run_json", "json"),

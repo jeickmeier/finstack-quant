@@ -254,16 +254,18 @@ fn taylor_credit_detail_reconciles_to_credit_curves_pnl() {
     let model = make_model();
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: make_market_state(disc_t0, haz_t0, prices_t0),
-        market_t1: make_market_state(disc_t1, haz_t1, prices_t1),
-        as_of_t0,
-        as_of_t1,
-        method: AttributionMethod::Taylor(TaylorAttributionConfig::default()),
-        model_params_t0: None,
-        credit_factor_model: Some(Box::new(model)),
-        credit_factor_detail_options: CreditFactorDetailOptions::default(),
-        config: None,
-        full_cross_attribution: false,
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: make_market_state(disc_t0, haz_t0, prices_t0),
+            market_t1: make_market_state(disc_t1, haz_t1, prices_t1),
+            as_of_t0,
+            as_of_t1,
+            method: AttributionMethod::Taylor(TaylorAttributionConfig::default()),
+            model_params_t0: None,
+            credit_factor_model: Some(Box::new(model)),
+            credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            config: None,
+            full_cross_attribution: false,
+        },
     };
 
     let result = AttributionEnvelope::new(spec)
@@ -432,16 +434,18 @@ fn twisted_hazard_curve_does_not_omit_or_explode_credit_detail() {
     let model = make_model();
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: make_market_state(disc_t0, haz_t0, prices()),
-        market_t1: make_market_state(disc_t1, haz_t1, prices()),
-        as_of_t0,
-        as_of_t1,
-        method: AttributionMethod::Taylor(TaylorAttributionConfig::default()),
-        model_params_t0: None,
-        credit_factor_model: Some(Box::new(model)),
-        credit_factor_detail_options: CreditFactorDetailOptions::default(),
-        config: None,
-        full_cross_attribution: false,
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: make_market_state(disc_t0, haz_t0, prices()),
+            market_t1: make_market_state(disc_t1, haz_t1, prices()),
+            as_of_t0,
+            as_of_t1,
+            method: AttributionMethod::Taylor(TaylorAttributionConfig::default()),
+            model_params_t0: None,
+            credit_factor_model: Some(Box::new(model)),
+            credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            config: None,
+            full_cross_attribution: false,
+        },
     };
 
     let result = AttributionEnvelope::new(spec)

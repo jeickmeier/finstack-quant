@@ -107,7 +107,14 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1245544
+            "bytes": 1245567
+          },
+          {
+            "path": "schemas/attribution/1/attribution_inputs.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
+            "type_name": "AttributionInputs",
+            "kind": "input",
+            "bytes": 234594
           },
           {
             "path": "schemas/attribution/1/attribution_result.schema.json",
@@ -3592,7 +3599,15 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1245544
+            "bytes": 1245567
+          },
+          {
+            "domain": "attribution",
+            "path": "schemas/attribution/1/attribution_inputs.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
+            "type_name": "AttributionInputs",
+            "kind": "input",
+            "bytes": 234594
           },
           {
             "domain": "attribution",

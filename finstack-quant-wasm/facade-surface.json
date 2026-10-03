@@ -105,7 +105,6 @@
   "attribution": {
     "kind": "namespace",
     "keys": [
-      "AttributionJsonInputs",
       "attributePnl",
       "attributePnlEnvelope",
       "attributePnlEnvelopeJson",
@@ -126,12 +125,6 @@
       "validateAttributionJson",
       "validateReturnContributionJson"
     ]
-  },
-  "attribution.AttributionJsonInputs": {
-    "kind": "class",
-    "statics": [],
-    "methods": ["free"],
-    "getters": ["creditFactorModelJson", "modelParamsT0Json"]
   },
   "attribution.attributePnl": {
     "kind": "function"
