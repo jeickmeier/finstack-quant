@@ -637,6 +637,212 @@ impl PyAssetPool {
         money_to_py(self.inner.excess_spread_account)
     }
 
+    /// Current balance of the whole pool (mirrors Rust ``AssetPool::total_balance``).
+    ///
+    /// Sums the loan-level assets, the representative lines or the instrument
+    /// collateral, whichever represents the pool; defaulted assets are
+    /// included.
+    ///
+    /// Returns
+    /// -------
+    /// Money
+    ///     Pool balance in the pool currency.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the pool carries both asset rows and representative lines, or
+    ///     balances in more than one currency.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
+    /// >>> StructuredCredit.example().pool.total_balance().amount
+    /// 100000000.0
+    #[pyo3(text_signature = "($self)")]
+    fn total_balance(&self) -> PyResult<PyMoney> {
+        self.inner
+            .total_balance()
+            .map(money_to_py)
+            .map_err(crate::errors::core_to_py)
+    }
+
+    /// Balance of the performing (non-defaulted) collateral (mirrors Rust
+    /// ``AssetPool::performing_balance``).
+    ///
+    /// Returns
+    /// -------
+    /// Money
+    ///     Performing balance in the pool currency; equals ``total_balance()``
+    ///     when the pool has no loan-level assets.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the pool representation or currencies are inconsistent.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
+    /// >>> StructuredCredit.example().pool.performing_balance().amount
+    /// 100000000.0
+    #[pyo3(text_signature = "($self)")]
+    fn performing_balance(&self) -> PyResult<PyMoney> {
+        self.inner
+            .performing_balance()
+            .map(money_to_py)
+            .map_err(crate::errors::core_to_py)
+    }
+
+    /// Weighted-average coupon of the performing fixed-rate collateral
+    /// (mirrors Rust ``AssetPool::wac``).
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Balance-weighted coupon as an annual decimal (``0.07`` = 7%);
+    ///     ``0.0`` when no performing fixed-rate collateral exists.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
+    /// >>> StructuredCredit.example().pool.wac()
+    /// 0.07
+    #[pyo3(text_signature = "($self)")]
+    fn wac(&self) -> f64 {
+        self.inner.wac()
+    }
+
+    /// Weighted-average spread of the performing collateral that carries an
+    /// explicit spread (mirrors Rust ``AssetPool::weighted_avg_spread_bp``).
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Balance-weighted spread in basis points; ``0.0`` when no
+    ///     performing asset carries a spread.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
+    /// >>> StructuredCredit.example().pool.weighted_avg_spread_bp()
+    /// 0.0
+    #[pyo3(text_signature = "($self)")]
+    fn weighted_avg_spread_bp(&self) -> f64 {
+        self.inner.weighted_avg_spread_bp()
+    }
+
+    /// Balance-weighted average remaining maturity (mirrors Rust
+    /// ``AssetPool::weighted_avg_maturity``).
+    ///
+    /// Parameters
+    /// ----------
+    /// as_of : datetime.date | str
+    ///     Date the remaining maturities are measured from, either a
+    ///     date-like object or an ISO 8601 string.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Weighted average maturity in years (ACT/365F from ``as_of``);
+    ///     ``0.0`` for an empty pool.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``as_of`` is not a date or the pool balances are inconsistent.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
+    /// >>> round(StructuredCredit.example().pool.weighted_avg_maturity("2024-01-01"), 1)
+    /// 10.0
+    #[pyo3(text_signature = "($self, as_of)")]
+    fn weighted_avg_maturity(&self, as_of: &Bound<'_, PyAny>) -> PyResult<f64> {
+        let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+        self.inner
+            .weighted_avg_maturity(as_of)
+            .map_err(crate::errors::core_to_py)
+    }
+
+    /// Moody's diversity score of the pool (mirrors Rust
+    /// ``AssetPool::diversity_score``).
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     Diversity score from the obligor and industry concentrations;
+    ///     ``0.0`` when the pool balance cannot be computed.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
+    /// >>> StructuredCredit.example().pool.diversity_score() >= 0.0
+    /// True
+    #[pyo3(text_signature = "($self)")]
+    fn diversity_score(&self) -> f64 {
+        self.inner.diversity_score()
+    }
+
+    /// Loan-level assets of one obligor (mirrors Rust
+    /// ``AssetPool::assets_by_obligor``).
+    ///
+    /// Parameters
+    /// ----------
+    /// obligor_id : str
+    ///     Obligor identifier matched exactly against each asset's
+    ///     ``obligor_id``.
+    ///
+    /// Returns
+    /// -------
+    /// list[PoolAsset]
+    ///     Copies of the matching assets in pool order; empty when none match.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
+    /// >>> StructuredCredit.example().pool.assets_by_obligor("NOBODY")
+    /// []
+    #[pyo3(text_signature = "($self, obligor_id)")]
+    fn assets_by_obligor(&self, obligor_id: &str) -> Vec<PyPoolAsset> {
+        self.inner
+            .assets_by_obligor(obligor_id)
+            .into_iter()
+            .map(|asset| PyPoolAsset {
+                inner: asset.clone(),
+            })
+            .collect()
+    }
+
+    /// Loan-level assets in one industry (mirrors Rust
+    /// ``AssetPool::assets_by_industry``).
+    ///
+    /// Parameters
+    /// ----------
+    /// industry : str
+    ///     Industry label matched exactly against each asset's ``industry``.
+    ///
+    /// Returns
+    /// -------
+    /// list[PoolAsset]
+    ///     Copies of the matching assets in pool order; empty when none match.
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
+    /// >>> StructuredCredit.example().pool.assets_by_industry("Utilities")
+    /// []
+    #[pyo3(text_signature = "($self, industry)")]
+    fn assets_by_industry(&self, industry: &str) -> Vec<PyPoolAsset> {
+        self.inner
+            .assets_by_industry(industry)
+            .into_iter()
+            .map(|asset| PyPoolAsset {
+                inner: asset.clone(),
+            })
+            .collect()
+    }
+
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
         format!(

@@ -58,6 +58,7 @@ EXAMPLE_CLASSES = [
     "CdsTranche",
     "ConvertibleBond",
     "EquityOption",
+    "StructuredCredit",
 ]
 
 
@@ -238,6 +239,27 @@ def build_cases() -> dict[str, Any]:
         "stochastic_npv": stochastic_result.npv.amount,
         "stochastic_paths": stochastic_result.num_paths,
         "coverage_tests": deal.create_waterfall().coverage_tests(),
+        "price": deal.price(sc_market, close, metrics=["wal"]).value.amount,
+        "wal": deal.metric(sc_market, close, "wal"),
+        "effective": {
+            "loss_allocation": deal.effective_loss_allocation,
+            "loss_recognition": deal.effective_loss_recognition,
+            "principal_covers_senior_interest": deal.effective_principal_covers_senior_interest,
+            "is_stochastic": [deal.is_stochastic, stochastic.is_stochastic],
+        },
+        "disable_stochastic": stochastic.disable_stochastic().to_json(),
+        "pool": deal.pool.to_json(),
+        "pool_analytics": {
+            "total_balance": _money(deal.pool.total_balance()),
+            "performing_balance": _money(deal.pool.performing_balance()),
+            "wac": deal.pool.wac(),
+            "weighted_avg_spread_bp": deal.pool.weighted_avg_spread_bp(),
+            "weighted_avg_maturity": deal.pool.weighted_avg_maturity(close),
+            "diversity_score": deal.pool.diversity_score(),
+            "assets_by_obligor": [asset.to_dict() for asset in deal.pool.assets_by_obligor("NOBODY")],
+            "assets_by_industry": [asset.to_dict() for asset in deal.pool.assets_by_industry("NOBODY")],
+            "pool_stats": ins.calculate_pool_stats(deal.pool, close).to_dict(),
+        },
     }
 
     # -- Merton Monte Carlo ------------------------------------------------
@@ -259,6 +281,10 @@ def build_cases() -> dict[str, Any]:
         "expected_loss": merton_result.expected_loss,
         "num_paths": merton_result.num_paths,
         "default_rate": merton_result.path_statistics.default_rate,
+        "calibrated_config": config
+        .calibration(ins.MertonMcCalibrationSpec({"z_spread": 0.03}, "asset_vol", low_paths=500))
+        .cashflow_dfs([(0.0, 1.0), (1.0, 0.96), (5.0, 0.8)])
+        .to_dict(),
     }
 
     # -- data-type constructors ---------------------------------------------

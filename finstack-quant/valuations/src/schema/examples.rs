@@ -216,6 +216,15 @@ pub(super) fn equity_metrics() -> Result<Vec<Value>> {
     })
 }
 
+/// Statistics of the canonical example CLO pool at its closing date.
+pub(super) fn pool_stats() -> Result<Vec<Value>> {
+    let deal = structured_credit::StructuredCredit::example()?;
+    example(&structured_credit::calculate_pool_stats(
+        &deal.pool,
+        deal.closing_date,
+    )?)
+}
+
 /// One quarterly interest payment on a senior floating-rate tranche.
 fn tranche_cashflows_value(tranche_id: &str) -> Value {
     let usd = |amount: &str| json!({"amount": amount, "currency": "USD"});

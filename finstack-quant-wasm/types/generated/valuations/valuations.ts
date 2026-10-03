@@ -19751,6 +19751,52 @@ export interface OasResult {
   [k: string]: unknown;
 }
 /**
+ * Collateral-pool statistics: WAC, spread, maturity, diversity and concentration.
+ */
+export interface PoolStats {
+  /**
+   * Balance of assets currently carried as defaulted, in percent points
+   * of the current total pool balance (defaulted assets included in the
+   * denominator; `10.0` = 10%).
+   */
+  defaulted_balance_pct: number;
+  /**
+   * Diversity score (Moody's methodology)
+   */
+  diversity_score: number;
+  /**
+   * Number of industries
+   */
+  num_industries: number;
+  /**
+   * Number of obligors
+   */
+  num_obligors: number;
+  /**
+   * Undrawn commitment across revolving and delayed-draw collateral
+   * (`commitment − balance`, performing assets only).
+   */
+  undrawn_commitment?: number;
+  /**
+   * Weighted-average coupon (annual decimal) of the performing fixed-rate
+   * collateral; see [`AssetPool::wac`].
+   */
+  wac: number;
+  /**
+   * Weighted average maturity (WAM) in years.
+   *
+   * For weighted average life use
+   * [`AssetPool::wal_from_cashflows`].
+   */
+  weighted_avg_maturity: number;
+  /**
+   * Weighted-average spread in basis points of the performing collateral
+   * that carries an explicit `spread_bp`; see
+   * [`AssetPool::weighted_avg_spread_bp`].
+   */
+  weighted_avg_spread_bp: number;
+}
+/**
  * Market conventions of one interest-rate index.
  */
 export interface RateIndexConventions {

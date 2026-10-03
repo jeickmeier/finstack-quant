@@ -5125,6 +5125,14 @@
       "amortizationEventCumulativeLoss",
       "amortizationEventDate",
       "amortizationEventExcessSpread",
+      "assetPoolAssetsByIndustry",
+      "assetPoolAssetsByObligor",
+      "assetPoolDiversityScore",
+      "assetPoolPerformingBalance",
+      "assetPoolTotalBalance",
+      "assetPoolWac",
+      "assetPoolWeightedAvgMaturity",
+      "assetPoolWeightedAvgSpreadBp",
       "assetPoolWithAccounts",
       "assetPoolWithAssets",
       "assetPoolWithInstruments",
@@ -5134,6 +5142,7 @@
       "barrierCrossingBrownianBridge",
       "barrierCrossingDiscrete",
       "bondFromCashflowsJson",
+      "calculatePoolStats",
       "cdsIndexParamsCdxNaHy",
       "cdsIndexParamsCdxNaIg",
       "cdsIndexParamsItraxxEurope",
@@ -5659,12 +5668,16 @@
   },
   "valuations.instruments.StructuredCredit": {
     "kind": "class",
-    "statics": ["builder", "fromJson", "newAbs", "newClo", "newCmbs", "newRmbs"],
+    "statics": ["builder", "example", "fromJson", "newAbs", "newClo", "newCmbs", "newRmbs"],
     "methods": [
       "createWaterfall",
+      "disableStochastic",
       "enableStochastic",
       "equityMetrics",
       "free",
+      "marketDependencies",
+      "metric",
+      "price",
       "priceStochastic",
       "runSimulationWithDiagnostics",
       "toDict",
@@ -5686,14 +5699,20 @@
       "creditModel",
       "dealMetadata",
       "dealType",
+      "defaultModel",
       "defaultSpec",
       "delinquency",
       "discountCurveId",
+      "effectiveLossAllocation",
+      "effectiveLossRecognition",
+      "effectivePrincipalCoversSeniorInterest",
+      "expiry",
       "fees",
       "firstPaymentDate",
       "frequency",
       "hedgeSwaps",
       "id",
+      "isStochastic",
       "liquidationPricePct",
       "lossAllocation",
       "lossRecognition",
@@ -6113,12 +6132,15 @@
     "statics": ["fromJson"],
     "methods": [
       "barrierCrossing",
+      "calibration",
+      "cashflowDfs",
       "dynamicRecovery",
       "endogenousHazard",
       "free",
       "pikSchedule",
       "recoveryRate",
       "stepsPerYear",
+      "toDict",
       "toJson",
       "toggleModel"
     ],
@@ -6179,6 +6201,33 @@
     "kind": "function"
   },
   "valuations.instruments.assetPoolWithAccounts": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolTotalBalance": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolPerformingBalance": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolWac": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolWeightedAvgSpreadBp": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolWeightedAvgMaturity": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolDiversityScore": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolAssetsByObligor": {
+    "kind": "function"
+  },
+  "valuations.instruments.assetPoolAssetsByIndustry": {
+    "kind": "function"
+  },
+  "valuations.instruments.calculatePoolStats": {
     "kind": "function"
   },
   "valuations.instruments.prepaymentPenaltyLockout": {

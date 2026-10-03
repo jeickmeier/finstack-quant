@@ -3405,6 +3405,13 @@
             "bytes": 1413
           },
           {
+            "path": "schemas/results/1/pool_stats.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
+            "type_name": "PoolStats",
+            "kind": "output",
+            "bytes": 2449
+          },
+          {
             "path": "schemas/results/1/scenario_table.schema.json",
             "$id": "https://finstack_quant.dev/schemas/results/1/scenario_table.schema.json",
             "type_name": "ScenarioTable",
@@ -5507,6 +5514,14 @@
             "type_name": "OasResult",
             "kind": "output",
             "bytes": 1413
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/results/1/pool_stats.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
+            "type_name": "PoolStats",
+            "kind": "output",
+            "bytes": 2449
           },
           {
             "domain": "valuations",

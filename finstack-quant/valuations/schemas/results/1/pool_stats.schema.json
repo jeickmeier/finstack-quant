@@ -1,0 +1,74 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/results/1/pool_stats.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Collateral-pool statistics: WAC, spread, maturity, diversity and concentration.",
+  "examples": [
+    {
+      "defaulted_balance_pct": 0.0,
+      "diversity_score": 0.0,
+      "num_industries": 0,
+      "num_obligors": 0,
+      "undrawn_commitment": 0.0,
+      "wac": 0.07,
+      "weighted_avg_maturity": 10.0082191781,
+      "weighted_avg_spread_bp": 0.0
+    }
+  ],
+  "properties": {
+    "defaulted_balance_pct": {
+      "description": "Balance of assets currently carried as defaulted, in percent points\nof the current total pool balance (defaulted assets included in the\ndenominator; `10.0` = 10%).",
+      "format": "double",
+      "type": "number"
+    },
+    "diversity_score": {
+      "description": "Diversity score (Moody's methodology)",
+      "format": "double",
+      "type": "number"
+    },
+    "num_industries": {
+      "description": "Number of industries",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "num_obligors": {
+      "description": "Number of obligors",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "undrawn_commitment": {
+      "default": 0.0,
+      "description": "Undrawn commitment across revolving and delayed-draw collateral\n(`commitment − balance`, performing assets only).",
+      "format": "double",
+      "type": "number"
+    },
+    "wac": {
+      "description": "Weighted-average coupon (annual decimal) of the performing fixed-rate\ncollateral; see [`AssetPool::wac`].",
+      "format": "double",
+      "type": "number"
+    },
+    "weighted_avg_maturity": {
+      "description": "Weighted average maturity (WAM) in years.\n\nFor weighted average life use\n[`AssetPool::wal_from_cashflows`].",
+      "format": "double",
+      "type": "number"
+    },
+    "weighted_avg_spread_bp": {
+      "description": "Weighted-average spread in basis points of the performing collateral\nthat carries an explicit `spread_bp`; see\n[`AssetPool::weighted_avg_spread_bp`].",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "wac",
+    "weighted_avg_spread_bp",
+    "weighted_avg_maturity",
+    "diversity_score",
+    "num_obligors",
+    "num_industries",
+    "defaulted_balance_pct"
+  ],
+  "title": "PoolStats",
+  "type": "object"
+}

@@ -59,6 +59,7 @@ InterestRateSwap = _valuations.instruments.InterestRateSwap
 InterestRateSwapBuilder = _valuations.instruments.InterestRateSwapBuilder
 LiquidationSpec = _valuations.instruments.LiquidationSpec
 MarketHistory = _valuations.instruments.MarketHistory
+MertonMcCalibrationSpec = _valuations.instruments.MertonMcCalibrationSpec
 MertonMcConfig = _valuations.instruments.MertonMcConfig
 MertonMcResult = _valuations.instruments.MertonMcResult
 MetricPricingOverrides = _valuations.instruments.MetricPricingOverrides
@@ -67,6 +68,7 @@ PathStatistics = _valuations.instruments.PathStatistics
 PikMode = _valuations.instruments.PikMode
 PikSchedule = _valuations.instruments.PikSchedule
 PoolAsset = _valuations.instruments.PoolAsset
+PoolStats = _valuations.instruments.PoolStats
 PremiumLegSpec = _valuations.instruments.PremiumLegSpec
 PrepaymentPenalty = _valuations.instruments.PrepaymentPenalty
 ProtectionLegSpec = _valuations.instruments.ProtectionLegSpec
@@ -91,6 +93,7 @@ TrancheMetrics = _valuations.instruments.TrancheMetrics
 TrancheStructure = _valuations.instruments.TrancheStructure
 Waterfall = _valuations.instruments.Waterfall
 bond_from_cashflows_json = _valuations.instruments.bond_from_cashflows_json
+calculate_pool_stats = _valuations.instruments.calculate_pool_stats
 instrument_cashflows_json = _valuations.instruments.instrument_cashflows_json
 list_models = _valuations.instruments.list_models
 list_models_grouped = _valuations.instruments.list_models_grouped
@@ -153,6 +156,7 @@ __all__: list[str] = [
     "InterestRateSwapBuilder",
     "LiquidationSpec",
     "MarketHistory",
+    "MertonMcCalibrationSpec",
     "MertonMcConfig",
     "MertonMcResult",
     "MetricPricingOverrides",
@@ -161,6 +165,7 @@ __all__: list[str] = [
     "PikMode",
     "PikSchedule",
     "PoolAsset",
+    "PoolStats",
     "PremiumLegSpec",
     "PrepaymentPenalty",
     "ProtectionLegSpec",
@@ -185,6 +190,7 @@ __all__: list[str] = [
     "TrancheStructure",
     "Waterfall",
     "bond_from_cashflows_json",
+    "calculate_pool_stats",
     "instrument_cashflows_json",
     "list_models",
     "list_models_grouped",

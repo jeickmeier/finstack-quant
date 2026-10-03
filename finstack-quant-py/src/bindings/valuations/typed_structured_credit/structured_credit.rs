@@ -22,7 +22,9 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
 use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
 use super::super::instruments::{
-    enum_from_str, parse_typed_instrument_json, serialize_typed_instrument_json,
+    enum_from_str, instrument_default_model, instrument_expiry, instrument_market_dependencies,
+    metric_typed_envelope, parse_typed_instrument_json, price_typed_envelope,
+    serialize_typed_instrument_json,
 };
 use super::hedge_swap::hedge_swaps_from_py;
 use super::{
@@ -30,6 +32,7 @@ use super::{
     PySimulationDiagnostics, PyStochasticPricingResult, PyTrancheCashflows, PyTrancheStructure,
     PyWaterfall,
 };
+use crate::bindings::valuations::PyValuationResult;
 
 type StructuredCreditBuilderInner =
     finstack_quant_valuations::instruments::fixed_income::structured_credit::StructuredCreditBuilder;
@@ -919,6 +922,220 @@ impl PyStructuredCredit {
     #[pyo3(text_signature = "($self)")]
     fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
+    }
+
+    /// Canonical example deal: a USD 100M CLO with one 7% fixed-rate
+    /// collateral bond and one 6% senior note, closing 2024-01-01, legal
+    /// final 2034-01-01, discounted on ``USD-OIS`` with the ``nyse`` calendar
+    /// (mirrors Rust ``StructuredCredit::example``).
+    ///
+    /// Returns
+    /// -------
+    /// StructuredCredit
+    ///     The example deal.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If construction fails (does not occur for a released build).
+    ///
+    /// Examples
+    /// --------
+    /// >>> from finstack_quant.valuations.instruments import StructuredCredit
+    /// >>> StructuredCredit.example().id
+    /// 'CLO-EXAMPLE'
+    #[staticmethod]
+    #[pyo3(text_signature = "()")]
+    fn example() -> PyResult<Self> {
+        StructuredCredit::example()
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    /// Price this deal and return a typed ``ValuationResult``.
+    ///
+    /// Delegates to the same canonical Rust pricer entry point as
+    /// ``price_instrument(self, market, as_of, model)``.
+    ///
+    /// Parameters
+    /// ----------
+    /// market : MarketContext | str
+    ///     Market context object or JSON string supplying the discount and
+    ///     forward curves.
+    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
+    ///     Valuation date.
+    /// model : str, default "default"
+    ///     Model key (``"default"`` is the deal's ``default_model``, the
+    ///     deterministic ``"discounting"`` waterfall).
+    /// metrics : list[str], optional
+    ///     Metric identifiers to compute (e.g. ``["wal", "clo_warf"]``);
+    ///     omitted means valuation only.
+    /// metric_pricing_overrides : MetricPricingOverrides | dict | str | None
+    ///     Metric-time overrides merged into
+    ///     ``instrument.spec.metric_pricing_overrides`` before pricing.
+    /// market_history : MarketHistory | dict | str | None
+    ///     Historical scenarios required by ``hvar`` and ``expected_shortfall``.
+    ///
+    /// Returns
+    /// -------
+    /// ValuationResult
+    ///     Typed valuation envelope carrying value, currency and metrics.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If an input cannot be interpreted or the deal fails validation.
+    /// KeyError
+    ///     If a required curve or metric is missing.
+    /// RuntimeError
+    ///     If pricing or a metric computation fails.
+    #[pyo3(signature = (market, as_of, model="default", metrics=None, metric_pricing_overrides=None, market_history=None))]
+    #[pyo3(
+        text_signature = "($self, market, as_of, model='default', metrics=None, metric_pricing_overrides=None, market_history=None)"
+    )]
+    // PyO3 binding: the argument list mirrors the Python keyword-argument API.
+    #[allow(clippy::too_many_arguments)]
+    fn price(
+        &self,
+        py: Python<'_>,
+        market: &Bound<'_, PyAny>,
+        as_of: &Bound<'_, PyAny>,
+        model: &str,
+        metrics: Option<Vec<String>>,
+        metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
+        market_history: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<PyValuationResult> {
+        price_typed_envelope(
+            py,
+            self.envelope_json()?,
+            market,
+            as_of,
+            model,
+            metrics,
+            metric_pricing_overrides,
+            market_history,
+        )
+    }
+
+    /// Compute one scalar metric (e.g. ``"wal"`` or ``"clo_warf"``).
+    ///
+    /// Mirrors Rust ``pricer::metric_value``: the deal is priced under
+    /// ``model`` and the single metric ``metric_id`` is returned.
+    ///
+    /// Parameters
+    /// ----------
+    /// market : MarketContext | str
+    ///     Market context object or JSON string.
+    /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
+    ///     Valuation date.
+    /// metric_id : str
+    ///     Registered metric identifier.
+    /// model : str, default "default"
+    ///     Model key.
+    ///
+    /// Returns
+    /// -------
+    /// float
+    ///     The metric value in the metric's documented unit.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``metric_id`` is unknown or an input cannot be interpreted.
+    /// KeyError
+    ///     If a required curve is missing.
+    /// RuntimeError
+    ///     If the metric computation fails.
+    #[pyo3(signature = (market, as_of, metric_id, model="default"))]
+    #[pyo3(text_signature = "($self, market, as_of, metric_id, model='default')")]
+    fn metric(
+        &self,
+        py: Python<'_>,
+        market: &Bound<'_, PyAny>,
+        as_of: &Bound<'_, PyAny>,
+        metric_id: &str,
+        model: &str,
+    ) -> PyResult<f64> {
+        metric_typed_envelope(py, self.envelope_json()?, market, as_of, metric_id, model)
+    }
+
+    /// Market-data dependencies (discount and forward curves, fixing
+    /// series) as a dict.
+    ///
+    /// Returns
+    /// -------
+    /// dict
+    ///     Serde form of the Rust ``MarketDependencies``.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the deal cannot enumerate its dependencies (for example a pool
+    ///     that cannot be normalised).
+    #[pyo3(text_signature = "($self)")]
+    fn market_dependencies<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        instrument_market_dependencies(py, &self.inner)
+    }
+
+    /// Default pricing model key from the ``Instrument`` trait
+    /// (``"discounting"``: the deterministic waterfall).
+    #[getter]
+    fn default_model(&self) -> String {
+        instrument_default_model(&self.inner)
+    }
+
+    /// Expiry date exposed by the ``Instrument`` trait, or ``None``.
+    #[getter]
+    fn expiry<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        instrument_expiry(py, &self.inner)
+    }
+
+    /// ``True`` when a stochastic prepayment, default or correlation spec is set
+    /// (mirrors Rust ``StructuredCredit::is_stochastic``).
+    #[getter]
+    fn is_stochastic(&self) -> bool {
+        self.inner.is_stochastic()
+    }
+
+    /// Return a copy with every stochastic specification cleared (mirrors
+    /// Rust ``StructuredCredit::disable_stochastic``); the inverse of
+    /// ``enable_stochastic``.
+    ///
+    /// Returns
+    /// -------
+    /// StructuredCredit
+    ///     A new deal without the stochastic prepayment, default and
+    ///     correlation specs (``stochastic_recovery_spec`` is kept).
+    #[pyo3(text_signature = "($self)")]
+    fn disable_stochastic(&self) -> Self {
+        let mut deal = self.inner.clone();
+        deal.disable_stochastic();
+        Self { inner: deal }
+    }
+
+    /// Loss-allocation policy in force for pricing: ``loss_allocation`` when
+    /// set, otherwise the deal-type convention (``"write_down"`` /
+    /// ``"par_preserving"``).
+    #[getter]
+    fn effective_loss_allocation(&self) -> PyResult<String> {
+        enum_to_py_string(&self.inner.effective_loss_allocation())
+    }
+
+    /// Loss-recognition timing in force: ``loss_recognition`` when set,
+    /// otherwise the deal-type convention (``"at_liquidation"`` for RMBS and
+    /// CMBS, ``"at_default"`` otherwise).
+    #[getter]
+    fn effective_loss_recognition(&self) -> PyResult<String> {
+        enum_to_py_string(&self.inner.effective_loss_recognition())
+    }
+
+    /// Whether the template waterfall pays senior fees and senior note
+    /// interest from principal when interest proceeds fall short:
+    /// ``principal_covers_senior_interest`` when set, otherwise ``True`` for
+    /// CLO/CBO and ``False`` for every other deal type.
+    #[getter]
+    fn effective_principal_covers_senior_interest(&self) -> bool {
+        self.inner.effective_principal_covers_senior_interest()
     }
 
     /// Return ``repr(self)``.

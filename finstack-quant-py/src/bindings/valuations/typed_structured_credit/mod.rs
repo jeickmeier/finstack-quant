@@ -2,7 +2,8 @@
 //! `AssetPool`, `Tranche`, `TrancheStructure`, the `StructuredCredit`
 //! instrument and its typed companions (`CallAssumption`, `CoverageRules`,
 //! `HedgeSwap`, `Waterfall`) and results (`TrancheCashflows`,
-//! `EquityMetrics`, `SimulationDiagnostics`, `StochasticPricingResult`).
+//! `EquityMetrics`, `PoolStats`, `SimulationDiagnostics`,
+//! `StochasticPricingResult`).
 //!
 //! Mirrors the `PyBond` pattern in `instruments.rs` for `StructuredCredit`
 //! (the `Instrument`) and the `PyFixedLegSpec` pattern in `typed_legs.rs` for
@@ -88,6 +89,7 @@ mod diagnostics;
 mod equity_metrics;
 mod hedge_swap;
 mod pool_asset;
+mod pool_stats;
 mod rep_line;
 mod specs;
 mod stochastic_result;
@@ -137,6 +139,8 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySimulationDiagnostics>()?;
     m.add_class::<PyTrancheCashflows>()?;
     m.add_class::<PyEquityMetrics>()?;
+    m.add_class::<pool_stats::PyPoolStats>()?;
+    m.add_function(wrap_pyfunction!(pool_stats::calculate_pool_stats, m)?)?;
     m.add_class::<PyBalloonSpec>()?;
     m.add_class::<PyPrepaymentPenalty>()?;
     m.add_class::<PySpecialServicingSpec>()?;
@@ -164,10 +168,12 @@ pub(crate) const EXPORTS: &[&str] = &[
     "HedgeSwap",
     "LiquidationSpec",
     "PoolAsset",
+    "PoolStats",
     "PrepaymentPenalty",
     "SimulationDiagnostics",
     "SpecialServicingSpec",
     "StochasticPricingResult",
     "TrancheCashflows",
     "Waterfall",
+    "calculate_pool_stats",
 ];

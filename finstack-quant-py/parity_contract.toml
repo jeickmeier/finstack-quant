@@ -954,7 +954,15 @@ public = [
 # field (the three *_pricing_overrides bags stay Rust-only), CallAssumption,
 # CoverageRules, HedgeSwap, Waterfall (create_waterfall introspection),
 # TrancheCashflows (tranche_cashflows) and EquityMetrics (equity_metrics);
-# SimulationDiagnostics carries the per-period record. TrancheAccrualPeriod,
+# SimulationDiagnostics carries the per-period record. StructuredCredit also
+# carries the typed-instrument surface (example, price, metric,
+# market_dependencies, default_model, expiry), is_stochastic /
+# disable_stochastic and the effective_* policy getters; AssetPool carries the
+# collateral analytics (total/performing balance, wac, weighted_avg_spread_bp,
+# weighted_avg_maturity, diversity_score, assets_by_obligor/industry) and
+# calculate_pool_stats returns PoolStats. Rust-only: value_tranche*,
+# calculate_smm/calculate_default_rate, current_loss_percentage,
+# AssetPool::add_bond/wal_from_cashflows. TrancheAccrualPeriod,
 # CoverageTestSpec, CoverageTrigger, DelinquencyModel, CardPortfolioSpec and the
 # CMBS PoolAsset sub-specs stay dict/JSON sub-fields. WASM stays JSON-first;
 # its TrancheMetrics shape carries the *_to_call twins.
@@ -1006,6 +1014,7 @@ public = [
     "InterestRateSwapBuilder",
     "LiquidationSpec",
     "MarketHistory",
+    "MertonMcCalibrationSpec",
     "MertonMcConfig",
     "MertonMcResult",
     "MetricPricingOverrides",
@@ -1014,6 +1023,7 @@ public = [
     "PikMode",
     "PikSchedule",
     "PoolAsset",
+    "PoolStats",
     "PremiumLegSpec",
     "PrepaymentPenalty",
     "ProtectionLegSpec",
@@ -1038,6 +1048,7 @@ public = [
     "TrancheStructure",
     "Waterfall",
     "bond_from_cashflows_json",
+    "calculate_pool_stats",
     "instrument_cashflows_json",
     "list_models",
     "list_models_grouped",
@@ -2150,7 +2161,7 @@ js = "valuations.creditDerivatives"
 [parity.modules."finstack_quant.valuations.instruments"]
 js = "valuations.instruments"
 renames = { FxForward = { js = "valuations.fx.FxForward", reason = "WASM groups the FX instrument classes under valuations.fx" }, FxForwardBuilder = { js = "valuations.fx.FxForwardBuilder", reason = "WASM groups the FX instrument classes under valuations.fx" }, FxOption = { js = "valuations.fx.FxOption", reason = "WASM groups the FX instrument classes under valuations.fx" }, FxOptionBuilder = { js = "valuations.fx.FxOptionBuilder", reason = "WASM groups the FX instrument classes under valuations.fx" } }
-types = { AdvanceRate = "AdvanceRate", AmortizationEvent = "AmortizationEvent", AssetPool = "AssetPool", BalloonSpec = "BalloonSpec", BarrierCrossing = "BarrierCrossing", BorrowingBaseRules = "BorrowingBaseRules", CallAssumption = "CallAssumption", CallPutSchedule = "CallPutSchedule", CdsIndexConstituent = "CdsIndexConstituent", CdsIndexParams = "CdsIndexParams", CdsTrancheParams = "CdsTrancheParams", ConcentrationLimit = "ConcentrationLimit", ConversionSpec = "ConversionSpec", CoverageRules = "CoverageRules", EligibilityRule = "EligibilityRule", EnhancedMonteCarloResult = "EnhancedMonteCarloResult", EquityMetrics = "EquityMetrics", FacilityProjection = "FacilityProjection", FixedLegSpec = "FixedLegSpec", FloatLegSpec = "FloatLegSpec", HedgeSwap = "HedgeSwap", LiquidationSpec = "LiquidationSpec", MarketHistory = "MarketHistory", MertonMcResult = "MertonMcResult", MetricPricingOverrides = "MetricPricingOverrides", OasResult = "OasResult", PathStatistics = "PathStatistics", PikMode = "PikMode", PikSchedule = "PikSchedule", PoolAsset = "PoolAsset", PremiumLegSpec = "PremiumLegSpec", PrepaymentPenalty = "PrepaymentPenalty", ProtectionLegSpec = "ProtectionLegSpec", RepLine = "RepLine", ScenarioTable = "ScenarioTable", SimulationDiagnostics = "SimulationDiagnostics", SpecialServicingSpec = "SpecialServicingSpec", StochasticPricingResult = "StochasticPricingResult", TermOutSpec = "TermOutSpec", Tranche = "Tranche", TrancheCashflows = "TrancheCashflows", TrancheMetrics = "TrancheMetrics", TrancheStructure = "TrancheStructure", Waterfall = "Waterfall" }
+types = { AdvanceRate = "AdvanceRate", AmortizationEvent = "AmortizationEvent", AssetPool = "AssetPool", BalloonSpec = "BalloonSpec", BarrierCrossing = "BarrierCrossing", BorrowingBaseRules = "BorrowingBaseRules", CallAssumption = "CallAssumption", CallPutSchedule = "CallPutSchedule", CdsIndexConstituent = "CdsIndexConstituent", CdsIndexParams = "CdsIndexParams", CdsTrancheParams = "CdsTrancheParams", ConcentrationLimit = "ConcentrationLimit", ConversionSpec = "ConversionSpec", CoverageRules = "CoverageRules", EligibilityRule = "EligibilityRule", EnhancedMonteCarloResult = "EnhancedMonteCarloResult", EquityMetrics = "EquityMetrics", FacilityProjection = "FacilityProjection", FixedLegSpec = "FixedLegSpec", FloatLegSpec = "FloatLegSpec", HedgeSwap = "HedgeSwap", LiquidationSpec = "LiquidationSpec", MarketHistory = "MarketHistory", MertonMcCalibrationSpec = "MertonMcCalibrationSpec", MertonMcResult = "MertonMcResult", MetricPricingOverrides = "MetricPricingOverrides", OasResult = "OasResult", PathStatistics = "PathStatistics", PikMode = "PikMode", PikSchedule = "PikSchedule", PoolAsset = "PoolAsset", PoolStats = "PoolStats", PremiumLegSpec = "PremiumLegSpec", PrepaymentPenalty = "PrepaymentPenalty", ProtectionLegSpec = "ProtectionLegSpec", RepLine = "RepLine", ScenarioTable = "ScenarioTable", SimulationDiagnostics = "SimulationDiagnostics", SpecialServicingSpec = "SpecialServicingSpec", StochasticPricingResult = "StochasticPricingResult", TermOutSpec = "TermOutSpec", Tranche = "Tranche", TrancheCashflows = "TrancheCashflows", TrancheMetrics = "TrancheMetrics", TrancheStructure = "TrancheStructure", Waterfall = "Waterfall" }
 
 [parity.modules."finstack_quant.valuations.market"]
 js = "valuations.market"
@@ -2574,6 +2585,14 @@ QuantoOption = "typed WASM class; Python has no typed twin yet and prices it thr
 amortizationEventCumulativeLoss = "free-function twin of Python AmortizationEvent.cumulative_loss (member rename)"
 amortizationEventDate = "free-function twin of Python AmortizationEvent.date (member rename)"
 amortizationEventExcessSpread = "free-function twin of Python AmortizationEvent.excess_spread (member rename)"
+assetPoolAssetsByIndustry = "free-function twin of Python AssetPool.assets_by_industry (member rename)"
+assetPoolAssetsByObligor = "free-function twin of Python AssetPool.assets_by_obligor (member rename)"
+assetPoolDiversityScore = "free-function twin of Python AssetPool.diversity_score (member rename)"
+assetPoolPerformingBalance = "free-function twin of Python AssetPool.performing_balance (member rename)"
+assetPoolTotalBalance = "free-function twin of Python AssetPool.total_balance (member rename)"
+assetPoolWac = "free-function twin of Python AssetPool.wac (member rename)"
+assetPoolWeightedAvgMaturity = "free-function twin of Python AssetPool.weighted_avg_maturity (member rename)"
+assetPoolWeightedAvgSpreadBp = "free-function twin of Python AssetPool.weighted_avg_spread_bp (member rename)"
 assetPoolWithAccounts = "free-function twin of Python AssetPool.with_accounts (member rename)"
 assetPoolWithAssets = "free-function twin of Python AssetPool.with_assets (member rename)"
 assetPoolWithInstruments = "free-function twin of Python AssetPool.with_instruments (member rename)"
@@ -2666,7 +2685,7 @@ renames = { fixed_rate_bond = { js = "valuations.instruments.poolAssetFixedRateB
 renames = { from_balances = { js = "valuations.instruments.trancheStructureFromBalances", reason = "WASM `TrancheStructure` values are plain objects; the Rust constructor or method is a free function" } }
 
 [parity.members."finstack_quant.valuations.instruments.AssetPool"]
-renames = { with_rep_lines = { js = "valuations.instruments.assetPoolWithRepLines", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_assets = { js = "valuations.instruments.assetPoolWithAssets", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_instruments = { js = "valuations.instruments.assetPoolWithInstruments", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_reserve = { js = "valuations.instruments.assetPoolWithReserve", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_reinvestment_period = { js = "valuations.instruments.assetPoolWithReinvestmentPeriod", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_accounts = { js = "valuations.instruments.assetPoolWithAccounts", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" } }
+renames = { assets_by_industry = { js = "valuations.instruments.assetPoolAssetsByIndustry", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, assets_by_obligor = { js = "valuations.instruments.assetPoolAssetsByObligor", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, diversity_score = { js = "valuations.instruments.assetPoolDiversityScore", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, performing_balance = { js = "valuations.instruments.assetPoolPerformingBalance", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, total_balance = { js = "valuations.instruments.assetPoolTotalBalance", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, wac = { js = "valuations.instruments.assetPoolWac", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, weighted_avg_maturity = { js = "valuations.instruments.assetPoolWeightedAvgMaturity", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, weighted_avg_spread_bp = { js = "valuations.instruments.assetPoolWeightedAvgSpreadBp", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_rep_lines = { js = "valuations.instruments.assetPoolWithRepLines", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_assets = { js = "valuations.instruments.assetPoolWithAssets", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_instruments = { js = "valuations.instruments.assetPoolWithInstruments", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_reserve = { js = "valuations.instruments.assetPoolWithReserve", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_reinvestment_period = { js = "valuations.instruments.assetPoolWithReinvestmentPeriod", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_accounts = { js = "valuations.instruments.assetPoolWithAccounts", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" } }
 
 [parity.members."finstack_quant.valuations.instruments.PikSchedule"]
 renames = { uniform = { js = "valuations.instruments.pikScheduleUniform", reason = "WASM `PikSchedule` values are plain objects; the Rust constructor or method is a free function" }, stepped = { js = "valuations.instruments.pikScheduleStepped", reason = "WASM `PikSchedule` values are plain objects; the Rust constructor or method is a free function" }, mode_at = { js = "valuations.instruments.pikScheduleModeAt", reason = "WASM `PikSchedule` values are plain objects; the Rust constructor or method is a free function" } }
