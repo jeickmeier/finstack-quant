@@ -3433,9 +3433,7 @@
       "YieldPca",
       "dieboldLiFitFactors",
       "dieboldLiForecast",
-      "nelsonSiegelYields",
-      "yieldPcaFit",
-      "yieldPcaScenario"
+      "nelsonSiegelYields"
     ]
   },
   "models.rates.dtsm.YieldPanel": {
@@ -3481,12 +3479,6 @@
     "kind": "function"
   },
   "models.rates.dtsm.dieboldLiForecast": {
-    "kind": "function"
-  },
-  "models.rates.dtsm.yieldPcaFit": {
-    "kind": "function"
-  },
-  "models.rates.dtsm.yieldPcaScenario": {
     "kind": "function"
   },
   "models.rates.hullWhite": {

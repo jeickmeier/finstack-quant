@@ -853,7 +853,7 @@ class recovery_waterfall:
     Examples
     --------
     >>> from finstack_quant.models.credit import recovery_waterfall
-    >>> claim = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0)
+    >>> claim = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)
     >>> result = recovery_waterfall.allocate_recovery(40.0, [claim])
     >>> (result.total_distributed, result.undistributed_estate, result.apr_satisfied)
     (40.0, 0.0, True)
@@ -867,7 +867,7 @@ class recovery_waterfall:
         Examples
         --------
         >>> from finstack_quant.models.credit import recovery_waterfall
-        >>> claim = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, accrued=5.0)
+        >>> claim = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 5.0, 0.0, 0.0)
         >>> (claim.id, claim.total_claim)
         ('SEN', 105.0)
         """
@@ -878,10 +878,10 @@ class recovery_waterfall:
             seniority: str,
             priority: int,
             principal: float,
-            accrued: float = 0.0,
-            penalties: float = 0.0,
+            accrued: float,
+            penalties: float,
+            collateral_haircut: float,
             collateral_value: float | None = None,
-            collateral_haircut: float = 0.0,
         ) -> None:
             """
             Create a claim for absolute-priority recovery allocation.
@@ -897,16 +897,21 @@ class recovery_waterfall:
                 before higher values.
             principal : float
                 Outstanding principal claim in the estate's monetary units.
-            accrued : float, default 0.0
-                Unpaid accrued interest added to the claim amount.
-            penalties : float, default 0.0
-                Contractual penalty or default-interest claim added to the total.
+            accrued : float
+                Unpaid accrued interest added to the claim amount; pass
+                ``0.0`` when none has accrued.
+            penalties : float
+                Contractual penalty or default-interest claim added to the
+                total; pass ``0.0`` when none applies.
+            collateral_haircut : float
+                Decimal fraction of ``collateral_value`` deducted before
+                estate allocation; must lie in ``[0, 1]``. Required so a
+                secured claim never receives full collateral credit by
+                omission; pass ``0.0`` for an unsecured claim.
             collateral_value : float or None, default None
                 Gross market value of collateral pledged to this claim, or
-                ``None`` for an unsecured claim.
-            collateral_haircut : float, default 0.0
-                Decimal fraction of ``collateral_value`` deducted before
-                estate allocation; must lie in ``[0, 1]``.
+                ``None`` for an unsecured claim (matching the Rust wire form,
+                where the field may be omitted).
 
             Notes
             -----
@@ -1080,7 +1085,7 @@ class recovery_waterfall:
 
             Examples
             --------
-            >>> value = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0)
+            >>> value = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)
             >>> recovery_waterfall.RecoveryClaim.from_json(value.to_json()) == value
             True
             """
@@ -1125,7 +1130,7 @@ class recovery_waterfall:
         Examples
         --------
         >>> from finstack_quant.models.credit import recovery_waterfall
-        >>> claim = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0)
+        >>> claim = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)
         >>> allocation = recovery_waterfall.allocate_recovery(40.0, [claim]).allocations[0]
         >>> (allocation.id, allocation.total_recovery, allocation.recovery_rate)
         ('SEN', 40.0, 0.4)
@@ -1299,7 +1304,7 @@ class recovery_waterfall:
             Examples
             --------
             >>> value = recovery_waterfall.allocate_recovery(
-            ...     40.0, [recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0)]
+            ...     40.0, [recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)]
             ... ).allocations[0]
             >>> recovery_waterfall.RecoveryAllocation.from_json(value.to_json()) == value
             True
@@ -1360,7 +1365,7 @@ class recovery_waterfall:
         Examples
         --------
         >>> from finstack_quant.models.credit import recovery_waterfall
-        >>> claim = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0)
+        >>> claim = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)
         >>> result = recovery_waterfall.allocate_recovery(40.0, [claim])
         >>> (result.total_distributed, result.undistributed_estate, result.apr_satisfied)
         (40.0, 0.0, True)
@@ -1498,7 +1503,7 @@ class recovery_waterfall:
         Examples
         --------
         >>> from finstack_quant.models.credit import recovery_waterfall
-        >>> claims = [recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0)]
+        >>> claims = [recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)]
         >>> recovery_waterfall.allocate_recovery(40.0, claims).allocations[0].recovery_rate
         0.4
 

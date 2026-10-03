@@ -19,11 +19,13 @@ def test_recovery_waterfall_delegates_collateral_and_priority_allocation() -> No
             "first_lien",
             1,
             100.0,
+            0.0,
+            0.0,
+            0.25,
             collateral_value=60.0,
-            collateral_haircut=0.25,
         ),
-        RecoveryClaim("peer", "first_lien", 1, 100.0),
-        RecoveryClaim("junior", "subordinated", 2, 50.0),
+        RecoveryClaim("peer", "first_lien", 1, 100.0, 0.0, 0.0, 0.0),
+        RecoveryClaim("junior", "subordinated", 2, 50.0, 0.0, 0.0, 0.0),
     ]
 
     result = allocate_recovery(100.0, claims)
@@ -44,7 +46,7 @@ def test_recovery_waterfall_delegates_collateral_and_priority_allocation() -> No
 
 
 def test_recovery_waterfall_maps_rust_validation_errors() -> None:
-    claim = RecoveryClaim("bad", "first_lien", 1, -1.0)
+    claim = RecoveryClaim("bad", "first_lien", 1, -1.0, 0.0, 0.0, 0.0)
 
     with pytest.raises(ValueError, match="principal"):
         allocate_recovery(10.0, [claim])
@@ -52,8 +54,8 @@ def test_recovery_waterfall_maps_rust_validation_errors() -> None:
 
 def test_recovery_waterfall_accepts_decimal_collateral_rounding() -> None:
     claims = [
-        RecoveryClaim("first", "first_lien", 1, 0.1, collateral_value=0.1),
-        RecoveryClaim("second", "first_lien", 1, 0.2, collateral_value=0.2),
+        RecoveryClaim("first", "first_lien", 1, 0.1, 0.0, 0.0, 0.0, collateral_value=0.1),
+        RecoveryClaim("second", "first_lien", 1, 0.2, 0.0, 0.0, 0.0, collateral_value=0.2),
     ]
 
     result = allocate_recovery(0.3, claims)
@@ -66,7 +68,7 @@ def test_recovery_waterfall_accepts_decimal_collateral_rounding() -> None:
 def test_recovery_claim_and_allocation_round_trip() -> None:
     import pickle
 
-    claim = RecoveryClaim("SEN", "secured", 1, 100.0, collateral_value=60.0, collateral_haircut=0.25)
+    claim = RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.25, collateral_value=60.0)
     assert RecoveryClaim.from_json(claim.to_json()) == claim
     assert pickle.loads(pickle.dumps(claim))  # noqa: S301 - trusted in-process round trip == claim
     assert repr(claim) == 'RecoveryClaim(id="SEN", seniority="secured", priority=1, total_claim=100)'
@@ -81,8 +83,8 @@ def test_recovery_claim_and_allocation_round_trip() -> None:
 
 def test_recovery_waterfall_rejects_duplicate_trimmed_ids() -> None:
     claims = [
-        RecoveryClaim("duplicate", "first_lien", 1, 1.0),
-        RecoveryClaim(" duplicate ", "subordinated", 2, 1.0),
+        RecoveryClaim("duplicate", "first_lien", 1, 1.0, 0.0, 0.0, 0.0),
+        RecoveryClaim(" duplicate ", "subordinated", 2, 1.0, 0.0, 0.0, 0.0),
     ]
 
     with pytest.raises(
@@ -90,3 +92,18 @@ def test_recovery_waterfall_rejects_duplicate_trimmed_ids() -> None:
         match="duplicate recovery claim id after trimming: 'duplicate'",
     ):
         allocate_recovery(2.0, claims)
+
+
+def test_recovery_claim_requires_accrued_penalties_and_haircut() -> None:
+    """MODA-006: no binding-invented zeros; the Rust wire form requires all three."""
+    with pytest.raises(TypeError):
+        RecoveryClaim("SEN", "secured", 1, 100.0, collateral_value=50.0)  # type: ignore[call-arg]
+    with pytest.raises(TypeError):
+        RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0)  # type: ignore[call-arg]
+    with pytest.raises(ValueError, match="collateral_haircut"):
+        RecoveryClaim.from_json(
+            '{"id":"A","seniority":"s","priority":1,"principal":100.0,"accrued":0.0,"penalties":0.0}'
+        )
+    claim = RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.3, collateral_value=50.0)
+    other = RecoveryClaim("JUN", "unsecured", 2, 100.0, 0.0, 0.0, 0.0)
+    assert allocate_recovery(60.0, [claim, other]).allocations[0].collateral_recovery == pytest.approx(35.0)

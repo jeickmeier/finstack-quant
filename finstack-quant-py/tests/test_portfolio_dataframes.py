@@ -895,7 +895,7 @@ def test_credit_vol_report_to_level_dataframe() -> None:
     assert isinstance(df, pd.DataFrame)
     assert list(df.columns) == ["level_name", "total"]
     assert len(df) == len(report.by_level) == 2
-    assert list(df["level_name"]) == ["Rating", "Region"]
+    assert list(df["level_name"]) == ["rating", "region"]
 
 
 def test_credit_vol_report_to_position_dataframe() -> None:

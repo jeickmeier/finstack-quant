@@ -10049,8 +10049,8 @@ declare class CreditFactorModel {
    */
   readonly nFactors: number;
   /**
-   * Display labels of the hierarchy levels, broadest first.
-   * @returns Labels such as `"Rating"`, `"Region"`, `"Sector"` or a custom dimension key.
+   * Names of the hierarchy levels, broadest first.
+   * @returns Dimension keys such as `"rating"`, `"region"`, `"sector"` or a custom dimension key — the same keys as the issuer tags and the serialized model.
    */
   levelNames(): string[];
   /**
@@ -27956,29 +27956,6 @@ export interface DtsmNamespace {
     horizon: number,
     lambda?: number
   ): generated.models.YieldForecast;
-  /**
-   * Fit a yield-curve PCA and return the leading components.
-   * @param yieldChanges - Yield changes as nested rows: one `number[]` per date, one decimal change per tenor.
-   * @param nComponents - Optional number of leading components to keep; omitted uses the Rust default (3).
-   * @returns The `YieldPcaView` object (`loadings`, `scores`, `eigenvalues`, `explained_variance_ratio`, `cumulative_variance`, `mean_change`, `tenors`).
-   * @throws Error - Throws a `validation` error if the rows are ragged or too few or `nComponents` exceeds the number of tenors.
-   */
-  yieldPcaFit(yieldChanges: NumericArray[], nComponents?: number): generated.models.YieldPcaView;
-  /**
-   * Yield-change scenario from a shock to one principal component.
-   * @param yieldChanges - Yield changes as nested rows: one `number[]` per date, one decimal change per tenor.
-   * @param componentIndex - Zero-based index of the shocked component.
-   * @param sigmaShock - Shock size in standard deviations of that component's score.
-   * @param nComponents - Optional number of leading components retained; omitted uses the Rust default (3).
-   * @returns The yield change per tenor, as decimals.
-   * @throws Error - Throws a `validation` error if the rows are ragged or too few or `componentIndex` is not below `nComponents`.
-   */
-  yieldPcaScenario(
-    yieldChanges: NumericArray[],
-    componentIndex: number,
-    sigmaShock: number,
-    nComponents?: number
-  ): Float64Array;
 }
 
 /**

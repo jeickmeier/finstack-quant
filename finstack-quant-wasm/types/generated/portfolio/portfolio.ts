@@ -2458,7 +2458,9 @@ export interface LevelVolContribution {
     [k: string]: number;
   };
   /**
-   * Human-readable hierarchy level name.
+   * Hierarchy level name: the level's dimension key (`"rating"`,
+   * `"region"`, `"sector"` or a custom dimension's own key), matching
+   * `CreditFactorModel::level_names` and the issuer-tag keys.
    */
   level_name: string;
   /**

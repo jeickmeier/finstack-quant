@@ -862,7 +862,10 @@ class SabrSmile:
         -------
         pandas.DataFrame
             Columns ``strike``, ``vol`` (decimal Black vol, or absolute normal
-            vol when ``beta == 0``) and ``log_moneyness`` (``ln(K / F)``).
+            vol when ``beta == 0``) and ``log_moneyness``
+            (``ln((K + s) / (F + s))`` with the SABR shift ``s``, ``0`` when
+            unshifted, computed in Rust; ``NaN`` when a shifted rate is not
+            positive).
 
         Raises
         ------

@@ -303,8 +303,8 @@
     6,
     9,
     [
-      "Rating",
-      "Region"
+      "rating",
+      "region"
     ],
     [
       "ISSUER-A",

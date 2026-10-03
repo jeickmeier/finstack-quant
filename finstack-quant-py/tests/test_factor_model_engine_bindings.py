@@ -131,7 +131,7 @@ def test_build_credit_vol_report_from_typed_inputs() -> None:
     assert report.total == pytest.approx(1.0)
     assert report.generic == pytest.approx(0.10)
     assert report.idiosyncratic_total == pytest.approx(0.40)
-    assert [level.level_name for level in report.by_level] == ["Rating", "Region"]
+    assert [level.level_name for level in report.by_level] == ["rating", "region"]
     assert report.by_level[0].total == pytest.approx(0.20)
     assert report.by_level[0].by_bucket["IG"] == pytest.approx(0.20)
     assert report.by_level[1].total == pytest.approx(0.30)

@@ -350,7 +350,9 @@ class CreditFactorModel:
         Returns
         -------
         list[str]
-            Dimension names (e.g. ``["Rating", "Region", "Sector"]``).
+            Dimension keys, broadest first (e.g. ``["rating", "region",
+            "sector"]`` or a custom dimension's own key) — the same keys as
+            the issuer tags and ``to_json``.
 
         Notes
         -----
@@ -484,30 +486,35 @@ class CreditCalibrator:
         spreads: pd.DataFrame,
         tags: Mapping[str, Mapping[str, str]] | pd.DataFrame,
         generic: pd.Series | list[float],
-        as_of: datetime.date | str | None = None,
+        generic_spec: Mapping[str, str] | str,
         spread_durations: Mapping[str, float] | pd.Series | None = None,
         config: Mapping[str, Any] | str | None = None,
     ) -> CreditFactorModel:
         """
         Calibrate straight from pandas objects.
 
-        Builds the ``CreditCalibrationInputs`` from the frames (pure
-        conversion) and runs :meth:`calibrate` under ``config``.
+        Converts the frames to the Rust panel types; Rust
+        ``CreditCalibrationInputs::from_panel`` anchors the run at the last
+        index date (the only anchor calibration accepts) with the last row as
+        the anchor spreads, then :meth:`calibrate` runs under ``config``.
 
         Parameters
         ----------
         spreads : pd.DataFrame
             Decimal spreads (``0.01`` = 100 bp) with a date index (sorted,
-            regular grid) and one column per issuer; ``NaN`` marks a gap.
+            regular grid) and one column per issuer; ``NaN`` marks a gap. The
+            last index date becomes the model's ``as_of``.
         tags : Mapping[str, Mapping[str, str]] | pd.DataFrame
             ``{issuer: {dimension_key: tag}}`` or a DataFrame indexed by
             issuer with one column per hierarchy dimension (``"rating"``,
             ``"region"``, ...).
         generic : pd.Series | list[float]
-            Generic (PC) factor series aligned with ``spreads.index``; a
-            Series' ``name`` becomes the factor name.
-        as_of : datetime.date | str | None
-            Anchor date; defaults to the last index date.
+            Generic (PC) factor values aligned with ``spreads.index``, in
+            decimal units. A Series' ``name`` is not used.
+        generic_spec : Mapping[str, str] | str
+            ``GenericFactorSpec`` dict or JSON string
+            ``{"name": ..., "series_id": ...}`` identifying the generic series;
+            persisted verbatim into the model artifact.
         spread_durations : Mapping[str, float] | pd.Series | None
             ``{issuer: years}``; required when ``bucket_weighting="dts"``.
         config : Mapping[str, Any] | str | None
@@ -522,8 +529,9 @@ class CreditCalibrator:
         Raises
         ------
         ValueError
-            If the frames are misaligned, ``as_of`` is not an index date, or
-            calibration rejects the inputs.
+            If the panel is empty, ``generic_spec`` is not a valid
+            ``GenericFactorSpec``, the frames are misaligned, or calibration
+            rejects the inputs.
 
         Examples
         --------
@@ -534,6 +542,7 @@ class CreditCalibrator:
         ...     spreads,
         ...     {"A": {}},
         ...     [0.010, 0.0101],
+        ...     {"name": "CDX IG 5Y", "series_id": "cdx.ig.5y"},
         ...     config={"covariance_strategy": "diagonal", "bucket_weighting": "equal"},
         ... )
         >>> model.n_issuers

@@ -108,7 +108,8 @@ def test_monte_carlo_pricers_resolve_defaults_in_rust() -> None:
             monte_carlo.EuropeanPricer(num_paths)
 
 
-def test_pca_convenience_functions_default_to_three_components() -> None:
+def test_pca_has_no_host_only_free_twins_or_invented_component_count() -> None:
+    """MODA-008/009: PCA is reached through the bound ``YieldPca`` methods only."""
     changes = [
         [0.001, 0.0012, 0.0011, 0.0009],
         [-0.0005, -0.0004, -0.0006, -0.0002],
@@ -116,5 +117,12 @@ def test_pca_convenience_functions_default_to_three_components() -> None:
         [-0.001, -0.0007, -0.0003, -0.0004],
         [0.0002, 0.0004, 0.0007, 0.0003],
     ]
-    assert len(dtsm.yield_pca_fit(changes).eigenvalues) == 3
-    assert dtsm.yield_pca_scenario(changes, 0, 1.0) == dtsm.yield_pca_scenario(changes, 0, 1.0, 3)
+    assert not hasattr(dtsm, "yield_pca_fit")
+    assert not hasattr(dtsm, "yield_pca_scenario")
+    pca = dtsm.YieldPca.fit_yield_changes(changes)
+    assert pca.num_components == 4
+    with pytest.raises(TypeError):
+        pca.truncated()  # type: ignore[call-arg]
+    assert pca.truncated(4).num_components == 4
+    two_tenor = [row[:2] for row in changes]
+    assert dtsm.YieldPca.fit_yield_changes(two_tenor).truncated(2).num_components == 2

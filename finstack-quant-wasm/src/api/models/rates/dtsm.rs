@@ -6,7 +6,7 @@
 //! boundary as plain objects in their canonical serde form.
 
 use crate::utils::input::{
-    js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_opt_string_seq, js_opt_uint, js_uint,
+    js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_opt_string_seq, js_uint,
 };
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::Error;
@@ -532,56 +532,4 @@ pub fn diebold_li_forecast(
     )
     .map_err(to_js_err)?;
     to_js_value(&forecast)
-}
-
-/// Fit a yield-curve PCA and return the leading components.
-/// @param yield_changes - Yield changes as nested rows: one `number[]` per date, one decimal change per tenor.
-/// @param n_components - Optional number of leading components to keep; omitted uses the Rust default (3).
-/// @returns The `YieldPcaView` object (`loadings`, `scores`, `eigenvalues`, `explained_variance_ratio`, `cumulative_variance`, `mean_change`, `tenors`).
-///
-/// # Errors
-///
-/// Throws a `validation` error if the rows are ragged or too few or
-/// `nComponents` exceeds the number of tenors.
-#[wasm_bindgen(js_name = yieldPcaFit)]
-pub fn yield_pca_fit(
-    yield_changes: JsValue,
-    n_components: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let n_components =
-        js_opt_uint(n_components.as_ref(), "nComponents")?.unwrap_or(dtsm::DEFAULT_PCA_COMPONENTS);
-    let view = YieldPca::fit_yield_changes(js_f64_matrix(&yield_changes, "yieldChanges")?)
-        .and_then(|pca| pca.truncated(n_components))
-        .map_err(to_js_err)?;
-    to_js_value(&view)
-}
-
-/// Yield-change scenario from a shock to one principal component.
-/// @param yield_changes - Yield changes as nested rows: one `number[]` per date, one decimal change per tenor.
-/// @param component_index - Zero-based index of the shocked component.
-/// @param sigma_shock - Shock size in standard deviations of that component's score.
-/// @param n_components - Optional number of leading components retained; omitted uses the Rust default (3).
-/// @returns The yield change per tenor, as decimals.
-///
-/// # Errors
-///
-/// Throws a `validation` error if the rows are ragged or too few or
-/// `componentIndex` is not below `nComponents`.
-#[wasm_bindgen(js_name = yieldPcaScenario)]
-pub fn yield_pca_scenario(
-    yield_changes: JsValue,
-    component_index: JsValue,
-    sigma_shock: JsValue,
-    n_components: Option<JsValue>,
-) -> Result<Box<[f64]>, JsValue> {
-    let n_components =
-        js_opt_uint(n_components.as_ref(), "nComponents")?.unwrap_or(dtsm::DEFAULT_PCA_COMPONENTS);
-    YieldPca::scenario_from_yield_changes(
-        js_f64_matrix(&yield_changes, "yieldChanges")?,
-        js_uint(&component_index, "componentIndex")?,
-        js_f64(&sigma_shock, "sigmaShock")?,
-        n_components,
-    )
-    .map(Vec::into_boxed_slice)
-    .map_err(to_js_err)
 }

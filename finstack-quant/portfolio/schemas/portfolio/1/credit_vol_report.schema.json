@@ -12,7 +12,7 @@
           "type": "object"
         },
         "level_name": {
-          "description": "Human-readable hierarchy level name.",
+          "description": "Hierarchy level name: the level's dimension key (`\"rating\"`,\n`\"region\"`, `\"sector\"` or a custom dimension's own key), matching\n`CreditFactorModel::level_names` and the issuer-tag keys.",
           "type": "string"
         },
         "total": {

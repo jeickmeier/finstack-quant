@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::types::PositionId;
-use finstack_quant_models::factor::credit::hierarchy::{CreditFactorModel, HierarchyDimension};
+use finstack_quant_models::factor::credit::hierarchy::{dimension_key, CreditFactorModel};
 use finstack_quant_models::factor::matching::CREDIT_GENERIC_FACTOR_ID;
 use finstack_quant_models::factor::risk::RiskDecomposition;
 use finstack_quant_models::factor::RiskMeasure;
@@ -30,7 +30,9 @@ pub struct CreditVolReport {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 pub struct LevelVolContribution {
-    /// Human-readable hierarchy level name.
+    /// Hierarchy level name: the level's dimension key (`"rating"`,
+    /// `"region"`, `"sector"` or a custom dimension's own key), matching
+    /// `CreditFactorModel::level_names` and the issuer-tag keys.
     pub level_name: String,
     /// Total contribution across the level's buckets.
     pub total: f64,
@@ -70,13 +72,7 @@ pub fn build_credit_vol_report(
         .levels
         .iter()
         .map(|level| LevelVolContribution {
-            level_name: match level {
-                HierarchyDimension::Rating => "Rating".to_owned(),
-                HierarchyDimension::Region => "Region".to_owned(),
-                HierarchyDimension::Sector => "Sector".to_owned(),
-                HierarchyDimension::Custom(name) => name.clone(),
-                _ => "Unknown".to_owned(),
-            },
+            level_name: dimension_key(level).to_owned(),
             total: 0.0,
             by_bucket: BTreeMap::new(),
         })
@@ -172,7 +168,7 @@ mod tests {
             measure: RiskMeasure::Variance,
             generic: 0.1,
             by_level: vec![LevelVolContribution {
-                level_name: "Rating".to_owned(),
+                level_name: "rating".to_owned(),
                 total: 0.2,
                 by_bucket: BTreeMap::from([("IG".to_owned(), 0.2)]),
             }],

@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/credit_vol_report.schema.json",
-      "bytes": 6261,
+      "bytes": 6417,
       "kind": "output",
       "path": "schemas/portfolio/1/credit_vol_report.schema.json",
       "summary": "Aggregated credit risk grouped by hierarchy level.",

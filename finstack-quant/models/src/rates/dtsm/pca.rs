@@ -55,11 +55,6 @@ fn validate_components(
     Ok(())
 }
 
-/// Number of leading principal components kept by the host convenience
-/// functions (`yield_pca_fit`, `yield_pca_scenario`) when the caller does not
-/// choose one: level, slope and curvature.
-pub const DEFAULT_PCA_COMPONENTS: usize = 3;
-
 /// Serializable view of the leading components of a [`YieldPca`] fit.
 ///
 /// Produced by [`YieldPca::truncated`]; this is the wire form the language
@@ -487,40 +482,6 @@ impl YieldPca {
         Ok(result)
     }
 
-    /// Fit PCA from row-major yield changes and shock one component.
-    ///
-    /// Returns `sigma_shock * sqrt(eigenvalue_k) * loading_k` for the selected
-    /// component, preserving the same component-bound checks as the standard
-    /// scenario path.
-    ///
-    /// # Errors
-    /// - `n_components` is zero or exceeds the fitted component count
-    /// - `component_index >= n_components`
-    /// - Any invariant enforced by [`Self::fit_yield_changes`] fails
-    pub fn scenario_from_yield_changes(
-        yield_changes: Vec<Vec<f64>>,
-        component_index: usize,
-        sigma_shock: f64,
-        n_components: usize,
-    ) -> finstack_quant_core::Result<Vec<f64>> {
-        let pca = Self::fit_yield_changes(yield_changes)?;
-        if n_components == 0 || n_components > pca.num_components() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "n_components must be in [1, {}], got {n_components}",
-                pca.num_components()
-            )));
-        }
-        if component_index >= n_components {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "component_index {component_index} must be < n_components {n_components}"
-            )));
-        }
-
-        let mut shocks = vec![0.0_f64; n_components];
-        shocks[component_index] = sigma_shock;
-        pca.scenario(&shocks)
-    }
-
     /// Reconstruct yield changes from a truncated set of K components.
     ///
     /// # Errors
@@ -704,21 +665,6 @@ mod tests {
             .iter()
             .zip(from_changes.eigenvalues())
         {
-            assert!((a - b).abs() < 1e-14);
-        }
-    }
-
-    #[test]
-    fn scenario_from_yield_changes_matches_manual_shock() {
-        let tenors = standard_tenors();
-        let panel = make_synthetic_panel(52, &tenors, &[0.01, 0.005, 0.002]);
-        let rows = matrix_rows(&panel.yield_changes());
-
-        let pca = YieldPca::fit_yield_changes(rows.clone()).unwrap();
-        let expected = pca.scenario(&[2.0, 0.0, 0.0]).unwrap();
-        let actual = YieldPca::scenario_from_yield_changes(rows, 0, 2.0, 3).unwrap();
-
-        for (a, b) in expected.iter().zip(actual.iter()) {
             assert!((a - b).abs() < 1e-14);
         }
     }

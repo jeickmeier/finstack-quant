@@ -42,8 +42,6 @@ __all__ = [
     "diebold_li_fit_factors",
     "diebold_li_forecast",
     "nelson_siegel_yields",
-    "yield_pca_fit",
-    "yield_pca_scenario",
 ]
 
 class YieldPanel:
@@ -1536,8 +1534,9 @@ class YieldPcaView:
 
     Examples
     --------
-    >>> from finstack_quant.models.rates.dtsm import yield_pca_fit
-    >>> view = yield_pca_fit([[0.001, 0.002, 0.003], [0.002, 0.001, 0.002], [-0.001, 0.0, 0.001]], 2)
+    >>> from finstack_quant.models.rates.dtsm import YieldPca
+    >>> changes = [[0.001, 0.002, 0.003], [0.002, 0.001, 0.002], [-0.001, 0.0, 0.001]]
+    >>> view = YieldPca.fit_yield_changes(changes).truncated(2)
     >>> (view.num_components, len(view.explained_variance_ratio), view.tenors)
     (2, 2, [1.0, 2.0, 3.0])
     """
@@ -1687,8 +1686,9 @@ class YieldPcaView:
 
         Examples
         --------
-        >>> from finstack_quant.models.rates.dtsm import yield_pca_fit
-        >>> yield_pca_fit([[0.001, 0.002], [0.002, 0.001], [-0.001, 0.0]], 1).to_dataframe().shape
+        >>> from finstack_quant.models.rates.dtsm import YieldPca
+        >>> view = YieldPca.fit_yield_changes([[0.001, 0.002], [0.002, 0.001], [-0.001, 0.0]]).truncated(1)
+        >>> view.to_dataframe().shape
         (2, 1)
         """
         ...
@@ -1710,8 +1710,9 @@ class YieldPcaView:
 
         Examples
         --------
-        >>> from finstack_quant.models.rates.dtsm import yield_pca_fit
-        >>> yield_pca_fit([[0.001, 0.002], [0.002, 0.001], [-0.001, 0.0]], 1).to_scores_dataframe().shape
+        >>> from finstack_quant.models.rates.dtsm import YieldPca
+        >>> view = YieldPca.fit_yield_changes([[0.001, 0.002], [0.002, 0.001], [-0.001, 0.0]]).truncated(1)
+        >>> view.to_scores_dataframe().shape
         (3, 1)
         """
         ...
@@ -1731,8 +1732,8 @@ class YieldPcaView:
 
         Examples
         --------
-        >>> from finstack_quant.models.rates.dtsm import YieldPcaView, yield_pca_fit
-        >>> view = yield_pca_fit([[0.001, 0.002], [0.002, 0.001], [-0.001, 0.0]], 1)
+        >>> from finstack_quant.models.rates.dtsm import YieldPca, YieldPcaView
+        >>> view = YieldPca.fit_yield_changes([[0.001, 0.002], [0.002, 0.001], [-0.001, 0.0]]).truncated(1)
         >>> YieldPcaView.from_json(view.to_json()) == view
         True
         """
@@ -1760,8 +1761,8 @@ class YieldPcaView:
 
         Examples
         --------
-        >>> from finstack_quant.models.rates.dtsm import YieldPcaView, yield_pca_fit
-        >>> view = yield_pca_fit([[0.001, 0.002], [0.002, 0.001], [-0.001, 0.0]], 1)
+        >>> from finstack_quant.models.rates.dtsm import YieldPca, YieldPcaView
+        >>> view = YieldPca.fit_yield_changes([[0.001, 0.002], [0.002, 0.001], [-0.001, 0.0]]).truncated(1)
         >>> YieldPcaView.from_json(view.to_json()).num_components
         1
         """
@@ -1928,88 +1929,6 @@ def nelson_siegel_yields(
     --------
     >>> from finstack_quant.models.rates.dtsm import nelson_siegel_yields
     >>> len(nelson_siegel_yields(0.7308, (0.03, -0.01, 0.005), [1.0, 5.0, 10.0]))
-    3
-
-    """
-    ...
-
-def yield_pca_fit(
-    yield_changes: Sequence[Sequence[float]],
-    n_components: int = 3,
-) -> YieldPcaView:
-    """
-    PCA decomposition of a yield-change panel.
-
-    Thin twin of ``YieldPca.fit_yield_changes(yield_changes).truncated(n_components)``.
-
-    Parameters
-    ----------
-    yield_changes : Sequence[Sequence[float]]
-        Panel of yield changes ``yield_changes[date_idx][tenor_idx]`` in decimal
-        units (e.g. ``0.001`` for a 10 bp move).
-    n_components : int, default 3
-        Number of principal components to retain (``1..=min(T-1, N)``).
-
-    Returns
-    -------
-    YieldPcaView
-        Eigenvalues, ``explained_variance_ratio``, ``cumulative_variance``,
-        loadings per tenor and scores, with ``to_dataframe()``. The ``tenors``
-        are placeholders ``1..N`` because yield changes do not identify the
-        maturities.
-
-    Raises
-    ------
-    ValueError
-        If the panel is empty, ragged, non-finite, or ``n_components`` is invalid.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.rates.dtsm import yield_pca_fit
-    >>> changes = [[0.001, 0.002, 0.003], [0.002, 0.001, 0.002], [-0.001, 0.0, 0.001]]
-    >>> len(yield_pca_fit(changes, 2).eigenvalues)
-    2
-
-    """
-    ...
-
-def yield_pca_scenario(
-    yield_changes: Sequence[Sequence[float]],
-    component_index: int,
-    sigma_shock: float,
-    n_components: int = 3,
-) -> list[float]:
-    """
-    Apply a single-component N-sigma PCA shock to the mean yield curve.
-
-    Parameters
-    ----------
-    yield_changes : Sequence[Sequence[float]]
-        Historical yield-change panel used to fit PCA (same shape as
-        :func:`yield_pca_fit`).
-    component_index : int
-        Zero-based principal component index to shock.
-    sigma_shock : float
-        Shock size in standard deviations (e.g. ``2.0`` for a +2σ move).
-    n_components : int, default 3
-        Number of components used in the PCA fit.
-
-    Returns
-    -------
-    list[float]
-        Scenario yield shift per tenor (decimal units), length equal to the
-        number of columns in ``yield_changes``.
-
-    Raises
-    ------
-    ValueError
-        If PCA fitting fails or ``component_index`` is out of range.
-
-    Examples
-    --------
-    >>> from finstack_quant.models.rates.dtsm import yield_pca_scenario
-    >>> changes = [[0.001, 0.002, 0.003], [0.002, 0.001, 0.002], [-0.001, 0.0, 0.001]]
-    >>> len(yield_pca_scenario(changes, 0, 1.0, 2))
     3
 
     """

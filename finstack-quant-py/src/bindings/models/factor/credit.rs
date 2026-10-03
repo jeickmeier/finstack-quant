@@ -17,7 +17,7 @@ use finstack_quant_models::factor::credit::calibration::{
     IssuerTagPanel,
 };
 use finstack_quant_models::factor::credit::hierarchy::{
-    CreditFactorModel, GenericFactorSpec, IssuerTags,
+    dimension_key, CreditFactorModel, GenericFactorSpec, IssuerTags,
 };
 use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
 
@@ -255,7 +255,9 @@ impl PyCreditFactorModel {
     /// Hierarchy level names as a list of strings.
     ///
     /// Returns:
-    ///     List of dimension names (e.g. ``["Rating", "Region", "Sector"]``).
+    ///     List of dimension keys, broadest first (e.g.
+    ///     ``["rating", "region", "sector"]`` or a custom dimension's own
+    ///     key) — the same keys as the issuer tags and ``to_json``.
     fn level_names(&self) -> Vec<String> {
         self.inner.level_names()
     }
@@ -354,13 +356,14 @@ fn extract_calibration_config(
     }
 }
 
-/// Build a `CreditCalibrationInputs` from pandas objects.
+/// Convert pandas objects into the Rust panel types and hand them to
+/// [`CreditCalibrationInputs::from_panel`], which owns the anchor derivation.
 fn inputs_from_dataframe(
     py: Python<'_>,
     spreads: &Bound<'_, PyAny>,
     tags: &Bound<'_, PyAny>,
     generic: &Bound<'_, PyAny>,
-    as_of: Option<&Bound<'_, PyAny>>,
+    generic_spec: &Bound<'_, PyAny>,
     spread_durations: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<CreditCalibrationInputs> {
     let index = spreads.getattr("index")?;
@@ -368,9 +371,6 @@ fn inputs_from_dataframe(
         .try_iter()?
         .map(|d| extract_date(&d?))
         .collect::<PyResult<Vec<_>>>()?;
-    if dates.is_empty() {
-        return Err(value_error("spreads DataFrame has no rows"));
-    }
     let columns = spreads.getattr("columns")?;
     let issuers = columns
         .try_iter()?
@@ -391,30 +391,7 @@ fn inputs_from_dataframe(
                 Ok(if f.is_nan() { None } else { Some(f) })
             })
             .collect::<PyResult<_>>()?;
-        if values.len() != dates.len() {
-            return Err(value_error(format!(
-                "spreads column {issuer:?} has {} values for {} dates",
-                values.len(),
-                dates.len()
-            )));
-        }
         panel.insert(IssuerId::new(issuer.clone()), values);
-    }
-
-    let as_of = match as_of {
-        Some(obj) if !obj.is_none() => extract_date(obj)?,
-        _ => dates[dates.len() - 1],
-    };
-    let as_of_index = dates.iter().position(|d| *d == as_of).ok_or_else(|| {
-        value_error(format!(
-            "as_of {as_of} is not one of the spreads DataFrame index dates"
-        ))
-    })?;
-    let mut as_of_spreads: BTreeMap<IssuerId, f64> = BTreeMap::new();
-    for (issuer, values) in &panel {
-        if let Some(v) = values[as_of_index] {
-            as_of_spreads.insert(issuer.clone(), v);
-        }
     }
 
     let tag_map: BTreeMap<IssuerId, IssuerTags> = {
@@ -429,49 +406,28 @@ fn inputs_from_dataframe(
         serde_json::from_value(value).map_err(|e| serde_json_to_py(e, "invalid issuer tags"))?
     };
 
-    let (name, values): (String, Vec<f64>) = if generic.hasattr("tolist")? {
-        let name = generic
-            .getattr("name")
-            .ok()
-            .filter(|n| !n.is_none())
-            .map(|n| n.str().and_then(|s| s.extract::<String>()))
-            .transpose()?
-            .unwrap_or_else(|| "generic".to_owned());
-        (name, generic.call_method0("tolist")?.extract()?)
+    let values: Vec<f64> = if generic.hasattr("tolist")? {
+        generic.call_method0("tolist")?.extract()?
     } else {
-        ("generic".to_owned(), generic.extract()?)
+        generic.extract()?
     };
-    if values.len() != dates.len() {
-        return Err(value_error(format!(
-            "generic series has {} values for {} dates",
-            values.len(),
-            dates.len()
-        )));
-    }
+    let spec: GenericFactorSpec = py_to_serde_any(py, generic_spec, "GenericFactorSpec")?;
 
     let spread_durations: BTreeMap<IssuerId, f64> = match spread_durations {
         Some(obj) if !obj.is_none() => py_to_serde_any(py, obj, "spread_durations")?,
         _ => BTreeMap::new(),
     };
 
-    Ok(CreditCalibrationInputs {
-        history_panel: HistoryPanel {
+    CreditCalibrationInputs::from_panel(
+        HistoryPanel {
             dates,
             spreads: panel,
         },
-        issuer_tags: IssuerTagPanel { tags: tag_map },
-        generic_factor: GenericFactorSeries {
-            spec: GenericFactorSpec {
-                name: name.clone(),
-                series_id: name,
-            },
-            values,
-        },
-        as_of,
-        as_of_spreads,
-        idiosyncratic_overrides: BTreeMap::new(),
+        IssuerTagPanel { tags: tag_map },
+        GenericFactorSeries { spec, values },
         spread_durations,
-    })
+    )
+    .map_err(core_to_py)
 }
 
 #[pymethods]
@@ -529,21 +485,24 @@ impl PyCreditCalibrator {
 
     /// Calibrate straight from pandas objects.
     ///
-    /// Builds the ``CreditCalibrationInputs`` from the frames (pure
-    /// conversion) and runs ``calibrate`` under ``config``.
+    /// Converts the frames to the Rust panel types; Rust
+    /// ``CreditCalibrationInputs::from_panel`` then anchors the run at the last
+    /// index date (the only anchor calibration accepts) with the last row as the
+    /// anchor spreads, and ``calibrate`` runs under ``config``.
     ///
     /// Args:
     ///     spreads: ``pandas.DataFrame`` of decimal spreads (``0.01`` = 100 bp)
     ///         with a date index (sorted, regular grid) and one column per
-    ///         issuer; ``NaN`` marks a gap.
+    ///         issuer; ``NaN`` marks a gap. The last index date is ``as_of``.
     ///     tags: Issuer tags — a mapping ``{issuer: {dimension_key: tag}}`` or
     ///         a ``pandas.DataFrame`` indexed by issuer with one column per
     ///         hierarchy dimension (``"rating"``, ``"region"``, ...).
-    ///     generic: Generic (PC) factor series aligned with ``spreads.index`` —
-    ///         a ``pandas.Series`` (its ``name`` becomes the factor name) or a
-    ///         list of decimal values.
-    ///     as_of: Anchor date (date-like or ISO string); defaults to the last
-    ///         index date.
+    ///     generic: Generic (PC) factor values aligned with ``spreads.index`` —
+    ///         a ``pandas.Series`` or a list of decimal values. Its ``name`` is
+    ///         not used.
+    ///     generic_spec: ``GenericFactorSpec`` dict / JSON string
+    ///         ``{"name": ..., "series_id": ...}`` naming the generic series;
+    ///         persisted into the model artifact.
     ///     spread_durations: Optional ``{issuer: years}`` mapping or
     ///         ``pandas.Series``; required when ``bucket_weighting="dts"``.
     ///     config: ``CreditCalibrationConfig`` dict / JSON string / ``None``
@@ -553,21 +512,23 @@ impl PyCreditCalibrator {
     ///     Calibrated ``CreditFactorModel``.
     ///
     /// Raises:
-    ///     ValueError: If the frames are misaligned, ``as_of`` is not an index
-    ///         date, or calibration rejects the inputs.
+    ///     ValueError: If the panel is empty, ``generic_spec`` is not a valid
+    ///         ``GenericFactorSpec``, the frames are misaligned, or calibration
+    ///         rejects the inputs.
     #[staticmethod]
-    #[pyo3(signature = (spreads, tags, generic, as_of = None, spread_durations = None, config = None))]
+    #[pyo3(signature = (spreads, tags, generic, generic_spec, spread_durations = None, config = None))]
     fn from_dataframe(
         py: Python<'_>,
         spreads: &Bound<'_, PyAny>,
         tags: &Bound<'_, PyAny>,
         generic: &Bound<'_, PyAny>,
-        as_of: Option<&Bound<'_, PyAny>>,
+        generic_spec: &Bound<'_, PyAny>,
         spread_durations: Option<&Bound<'_, PyAny>>,
         config: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyCreditFactorModel> {
         let config = extract_calibration_config(py, config)?;
-        let inputs = inputs_from_dataframe(py, spreads, tags, generic, as_of, spread_durations)?;
+        let inputs =
+            inputs_from_dataframe(py, spreads, tags, generic, generic_spec, spread_durations)?;
         let calibrator =
             finstack_quant_models::factor::credit::calibration::CreditCalibrator::new(config);
         let model = py
@@ -719,7 +680,7 @@ impl PyLevelsAtDate {
         let date = self.inner.date.to_string();
         let mut rows: Vec<serde_json::Value> = Vec::new();
         for level in &self.inner.by_level {
-            let dimension = level.dimension.label();
+            let dimension = dimension_key(&level.dimension);
             for (bucket, value) in &level.values {
                 rows.push(serde_json::json!({
                     "date": date,
@@ -899,7 +860,7 @@ impl PyPeriodDecomposition {
         let to_date = self.inner.to.to_string();
         let mut rows: Vec<serde_json::Value> = Vec::new();
         for level in &self.inner.by_level {
-            let dimension = level.dimension.label();
+            let dimension = dimension_key(&level.dimension);
             for (bucket, delta) in &level.deltas {
                 rows.push(serde_json::json!({
                     "from_date": from_date,

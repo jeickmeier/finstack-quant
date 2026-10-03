@@ -31,7 +31,7 @@ impl PyLevelVolContribution {
 
 #[pymethods]
 impl PyLevelVolContribution {
-    /// Human-readable hierarchy level name, e.g. ``"Rating"``.
+    /// Hierarchy level name: the level's dimension key, e.g. ``"rating"``.
     #[getter]
     fn level_name(&self) -> String {
         self.inner.level_name.clone()

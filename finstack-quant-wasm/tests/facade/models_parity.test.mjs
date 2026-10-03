@@ -581,8 +581,8 @@ const CASES = {
       pca.componentsForThreshold(0.9),
       list(pca.scenario([1.0])),
       list(pca.applyScenario([0.03, 0.032, 0.036, 0.04], [1.0, -0.5])),
-      dtsm.yieldPcaFit(CHANGES, 2).eigenvalues,
-      list(dtsm.yieldPcaScenario(CHANGES, 0, 1.0, 2)),
+      dtsm.YieldPca.fitYieldChanges(CHANGES).truncated(2).eigenvalues,
+      list(dtsm.YieldPca.fitYieldChanges(CHANGES).scenario([1.0, 0.0])),
       list(dtsm.YieldPca.fitYieldChanges(CHANGES).cumulativeVariance),
     ];
   },

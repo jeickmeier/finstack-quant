@@ -912,14 +912,14 @@
       "generic": 0.1,
       "by_level": [
         {
-          "level_name": "Rating",
+          "level_name": "rating",
           "total": 0.2,
           "by_bucket": {
             "IG": 0.2
           }
         },
         {
-          "level_name": "Region",
+          "level_name": "region",
           "total": 0.3,
           "by_bucket": {
             "IG.EU": 0.3

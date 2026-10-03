@@ -181,6 +181,44 @@ impl SabrSmile {
             .collect()
     }
 
+    /// Log-moneyness of `strike` on this smile's (possibly shifted) axis.
+    ///
+    /// Returns `ln((K + s) / (F + s))`, where `s` is the SABR displacement
+    /// shift (`0` for unshifted SABR), so the value lives on the same axis as
+    /// the vols from [`Self::implied_vol`]. Returns `NaN` when either shifted
+    /// rate is not strictly positive (e.g. unshifted normal SABR with a
+    /// negative forward), where the log-ratio is undefined.
+    ///
+    /// # Arguments
+    ///
+    /// * `strike` - Option strike in the same units as the smile's forward
+    ///   (unshifted; the model's shift is applied here).
+    ///
+    /// # Returns
+    ///
+    /// Natural-log moneyness as a decimal, or `NaN` outside the log domain.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use finstack_quant_models::volatility::sabr::{SabrModel, SabrParameters, SabrSmile};
+    ///
+    /// let params = SabrParameters::new_with_shift(0.01, 0.5, 0.3, -0.2, 0.02)?;
+    /// let smile = SabrSmile::new(SabrModel::new(params), -0.001, 1.0);
+    /// let m = smile.log_moneyness(-0.005);
+    /// assert!((m - (0.015_f64 / 0.019).ln()).abs() < 1e-15);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[must_use]
+    pub fn log_moneyness(&self, strike: f64) -> f64 {
+        let (forward, strike) = self.model.effective_rates(self.forward, strike);
+        if forward > 0.0 && strike > 0.0 {
+            (strike / forward).ln()
+        } else {
+            f64::NAN
+        }
+    }
+
     /// Generate strike from absolute forward delta using the ATM volatility.
     ///
     /// Uses Bachelier delta for beta=0 and Black delta on displaced coordinates
@@ -566,6 +604,38 @@ mod smile_tests {
 
     use super::*;
     use crate::volatility::sabr::{SabrModel, SabrParameters};
+
+    /// MODB-006: log-moneyness is on the shifted axis, for negative and
+    /// positive forwards alike.
+    #[test]
+    fn log_moneyness_uses_the_displacement_shift() {
+        let shifted = SabrParameters::new_with_shift(0.01, 0.5, 0.3, -0.2, 0.02).expect("params");
+        let negative = SabrSmile::new(SabrModel::new(shifted.clone()), -0.001, 1.0);
+        let got: Vec<f64> = [-0.005, 0.0, 0.005]
+            .iter()
+            .map(|&k| negative.log_moneyness(k))
+            .collect();
+        for (g, e) in got.iter().zip([
+            -0.236_388_778_064_230_4,
+            0.051_293_294_387_550_48,
+            0.274_436_845_701_760_36,
+        ]) {
+            assert!((g - e).abs() < 1e-14, "{g} vs {e}");
+        }
+        let positive = SabrSmile::new(SabrModel::new(shifted), 0.01, 1.0);
+        assert!((positive.log_moneyness(0.005) - (0.025_f64 / 0.03).ln()).abs() < 1e-15);
+        assert!((positive.log_moneyness(0.02) - (0.04_f64 / 0.03).ln()).abs() < 1e-15);
+
+        let unshifted = SabrParameters::new(0.2, 0.5, 0.3, -0.1).expect("params");
+        let smile = SabrSmile::new(SabrModel::new(unshifted), 100.0, 1.0);
+        assert!((smile.log_moneyness(110.0) - 1.1_f64.ln()).abs() < 1e-15);
+        let normal = SabrSmile::new(
+            SabrModel::new(SabrParameters::new(0.01, 0.0, 0.3, -0.1).expect("params")),
+            -0.001,
+            1.0,
+        );
+        assert!(normal.log_moneyness(0.001).is_nan());
+    }
 
     #[test]
     fn uneven_strike_grid_preserves_flat_arbitrage_free_smile() {
