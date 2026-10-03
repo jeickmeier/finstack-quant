@@ -334,8 +334,23 @@ pub struct PortfolioOptimizationResultWire {
     /// Whether the solution can be consumed.
     pub is_feasible: bool,
     /// Objective value at the solution.
+    ///
+    /// `NaN` when the solve is not feasible; non-finite values travel as the
+    /// string sentinels `"nan"`, `"inf"` and `"-inf"` so the result round-trips.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub objective_value: f64,
     /// Gross turnover.
+    ///
+    /// `NaN` when the solve is not feasible; encoded like `objective_value`.
+    #[serde(with = "finstack_quant_core::wire::non_finite_f64")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "finstack_quant_core::wire::NonFiniteF64Wire")
+    )]
     pub turnover: f64,
     /// Optimal weights keyed by position.
     pub optimal_weights: IndexMap<PositionId, f64>,
@@ -557,5 +572,32 @@ mod tests {
     #[test]
     fn wire_binding_constraints_derive_from_slacks() {
         assert_eq!(wire().binding_constraints(), vec![("budget", 0.0)]);
+    }
+
+    #[test]
+    fn infeasible_wire_round_trips_nan_objective_and_turnover() {
+        // An infeasible solve reports NaN for both fields; serde_json used to
+        // write them as `null` and then refuse to read its own output.
+        let mut infeasible = wire();
+        infeasible.status = OptimizationStatus::Infeasible {
+            conflicting_constraints: vec![],
+        };
+        infeasible.status_label = "infeasible".to_string();
+        infeasible.is_feasible = false;
+        infeasible.objective_value = f64::NAN;
+        infeasible.turnover = f64::NAN;
+
+        let json = serde_json::to_string(&infeasible).expect("serialize");
+        assert!(json.contains(r#""objective_value":"nan""#), "{json}");
+        assert!(json.contains(r#""turnover":"nan""#), "{json}");
+        let decoded: PortfolioOptimizationResultWire =
+            serde_json::from_str(&json).expect("deserialize");
+        assert!(decoded.objective_value.is_nan());
+        assert!(decoded.turnover.is_nan());
+
+        // Finite values keep the plain JSON number form.
+        let feasible = serde_json::to_value(wire()).expect("serialize");
+        assert_eq!(feasible["objective_value"], serde_json::json!(1.0));
+        assert_eq!(feasible["turnover"], serde_json::json!(0.0));
     }
 }

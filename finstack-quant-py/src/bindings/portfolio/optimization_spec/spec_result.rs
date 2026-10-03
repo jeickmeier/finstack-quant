@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList, PyType};
 
@@ -54,7 +52,8 @@ impl PyCandidatePosition {
     ///     Typed instrument wrapper or canonical instrument-envelope JSON.
     /// unit : str | dict | None
     ///     Position unit (``"units"`` default, ``"face_value"``,
-    ///     ``"percentage"``, ``"notional"`` or ``{"notional": "USD"}``).
+    ///     ``"percentage"``, or the mapping ``{"notional": "USD"}`` /
+    ///     ``{"notional": None}``; the bare string ``"notional"`` is rejected).
     /// max_weight : float
     ///     Maximum weight the candidate may receive (default ``1.0``).
     /// min_weight : float
@@ -84,19 +83,7 @@ impl PyCandidatePosition {
         let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
             serde_json::from_str(&envelope_json).map_err(crate::errors::display_to_py)?;
         let boxed = envelope.into_boxed().map_err(crate::errors::core_to_py)?;
-        let unit: finstack_quant_portfolio::position::PositionUnit =
-            match unit {
-                None => finstack_quant_portfolio::position::PositionUnit::Units,
-                Some(obj) => match obj.extract::<String>() {
-                    Ok(ref s) if s == "notional" => {
-                        finstack_quant_portfolio::position::PositionUnit::Notional(None)
-                    }
-                    Ok(s) => serde_json::from_value(serde_json::Value::String(s.clone())).map_err(
-                        |_| crate::errors::value_error(format!("unknown position unit {s:?}")),
-                    )?,
-                    Err(_) => crate::bindings::module_utils::py_to_serde(py, obj, "position unit")?,
-                },
-            };
+        let unit = crate::bindings::portfolio::types::extract_position_unit(py, unit)?;
         let mut inner = CandidatePosition::new(id, entity_id, std::sync::Arc::from(boxed), unit)
             .with_max_weight(max_weight)
             .with_min_weight(min_weight);
@@ -616,7 +603,7 @@ impl PyPortfolioOptimizationResult {
     /// dict[str, float]
     ///     Weights are **fractions** of the portfolio, not percentages.
     #[getter]
-    fn current_weights(&self) -> HashMap<String, f64> {
+    fn current_weights(&self) -> IndexMap<String, f64> {
         self.inner
             .current_weights
             .iter()
@@ -632,7 +619,7 @@ impl PyPortfolioOptimizationResult {
     ///     Fractions, not percentages. Only covers positions in the trade
     ///     universe; positions outside it implicitly keep their current weight.
     #[getter]
-    fn optimal_weights(&self) -> HashMap<String, f64> {
+    fn optimal_weights(&self) -> IndexMap<String, f64> {
         self.inner
             .optimal_weights
             .iter()
@@ -642,7 +629,7 @@ impl PyPortfolioOptimizationResult {
 
     /// Weight changes ``optimal - current`` by position id, as fractions.
     #[getter]
-    fn weight_deltas(&self) -> HashMap<String, f64> {
+    fn weight_deltas(&self) -> IndexMap<String, f64> {
         self.inner
             .weight_deltas
             .iter()
@@ -660,7 +647,7 @@ impl PyPortfolioOptimizationResult {
     ///     current quantity under every weighting scheme, including zero-PV
     ///     holdings.
     #[getter]
-    fn implied_quantities(&self) -> HashMap<String, f64> {
+    fn implied_quantities(&self) -> IndexMap<String, f64> {
         self.inner
             .implied_quantities
             .iter()
@@ -670,7 +657,7 @@ impl PyPortfolioOptimizationResult {
 
     /// Evaluated portfolio-level metric values at the solution, keyed by metric id.
     #[getter]
-    fn metric_values(&self) -> HashMap<String, f64> {
+    fn metric_values(&self) -> IndexMap<String, f64> {
         self.inner
             .metric_values
             .iter()
@@ -686,7 +673,7 @@ impl PyPortfolioOptimizationResult {
     ///     Positive means slack remains; approximately zero means the
     ///     constraint is binding.
     #[getter]
-    fn constraint_slacks(&self) -> HashMap<String, f64> {
+    fn constraint_slacks(&self) -> IndexMap<String, f64> {
         self.inner
             .constraint_slacks
             .iter()

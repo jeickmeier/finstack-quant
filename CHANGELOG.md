@@ -137,6 +137,19 @@
 
 - Python: `SabrSmile.to_dataframe` `log_moneyness` is shift-aware, `ln((K+s)/(F+s))`, from the new Rust `SabrSmile::log_moneyness` (was `ln(K/F)` computed in the binding).
 
+### Portfolio optimization and results (Python-binding audit PR 9)
+
+#### Changed (breaking)
+
+- Rust: `PortfolioResult::new(valuation, metrics, config, timestamp)` builds the `meta` stamp itself (rounding from `config`, `fx_policy_applied` from the valuation's `fx_collapse_policy`, optional injected timestamp) instead of taking a caller-built `ResultsMeta`. Python `PortfolioResult(valuation, metrics, config=None, timestamp=None)` calls it; by default `meta` carries no wall-clock timestamp, so identical inputs serialize identically, and `meta["fx_policy_applied"]` is the valuation's policy (was `None`).
+- Rust, Python and WASM: an infeasible `PortfolioOptimizationResult` writes `objective_value` / `turnover` as the non-finite sentinel `"nan"` (was `null`), so `from_json(to_json())` and `pickle` round-trip it; the JSON schema types both fields as a number or a sentinel string.
+- Python: the bare position unit string `"notional"` is rejected by `PortfolioBuilder.position` and `CandidatePosition`, as `Portfolio.from_spec` already did; use `{"notional": "USD"}` or `{"notional": None}`. Unit strings parse through the new Rust `PositionUnit::from_str`, and both constructors raise the same `PortfolioError`.
+
+#### Fixed
+
+- Python: the six `PortfolioOptimizationResult` dict getters (`current_weights`, `optimal_weights`, `weight_deltas`, `implied_quantities`, `metric_values`, `constraint_slacks`) keep the wire key order (was random per process).
+- Python: functions taking attribution results (`campisi_reconciliation_check`, `campisi_carino_link`, `grid_carino_link`, `carino_link`, `excess_returns` and their `_json` twins) accept the typed result wrappers directly, standalone or in lists; `FiAttributionResult.reconciliation_check(tolerance)` binds the Rust method.
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

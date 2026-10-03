@@ -288,30 +288,19 @@ fn unit_label(unit: &PositionUnit) -> PyResult<String> {
 }
 
 /// Parse a position unit from ``None`` (units), a serde name string
-/// (``"units"``, ``"face_value"``, ``"percentage"``) or a JSON-shaped dict
-/// (``{"notional": "USD"}`` / ``{"notional": None}``).
-fn extract_position_unit(
+/// (``"units"``, ``"face_value"``, ``"percentage"``, parsed by Rust
+/// ``PositionUnit::from_str``) or a JSON-shaped dict (``{"notional": "USD"}``
+/// / ``{"notional": None}``).
+pub(crate) fn extract_position_unit(
     py: Python<'_>,
     unit: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PositionUnit> {
     match unit {
         None => Ok(PositionUnit::Units),
-        Some(obj) => {
-            if let Ok(s) = obj.extract::<String>() {
-                if s == "notional" {
-                    return Ok(PositionUnit::Notional(None));
-                }
-                return serde_json::from_value(serde_json::Value::String(s.clone())).map_err(
-                    |_| {
-                        value_error(format!(
-                            "unknown position unit {s:?}; expected one of units, notional, \
-                         face_value, percentage or {{\"notional\": <currency>}}"
-                        ))
-                    },
-                );
-            }
-            py_to_serde(py, obj, "position unit")
-        }
+        Some(obj) => match obj.extract::<String>() {
+            Ok(s) => s.parse().map_err(crate::errors::portfolio_to_py),
+            Err(_) => py_to_serde(py, obj, "position unit"),
+        },
     }
 }
 
@@ -402,8 +391,9 @@ impl PyPortfolioBuilder {
     ///     position to the auto-created standalone entity.
     /// unit : str | dict | None
     ///     Position unit: ``"units"`` (default), ``"face_value"``,
-    ///     ``"percentage"``, ``"notional"`` or ``{"notional": "USD"}`` for a
-    ///     currency-tagged lot multiplier.
+    ///     ``"percentage"``, or the mapping ``{"notional": "USD"}`` /
+    ///     ``{"notional": None}`` for a (currency-tagged) lot multiplier. The
+    ///     bare string ``"notional"`` is rejected, as in the JSON spec.
     /// attributes : dict[str, str | float] | None
     ///     Position attributes (rating, sector, scores) used by grouping and
     ///     optimization filters.
@@ -882,24 +872,50 @@ impl PyPortfolioResult {
 impl PyPortfolioResult {
     /// Assemble a result envelope from a valuation and its aggregated metrics.
     ///
+    /// The ``meta`` stamp is built in Rust: the numeric mode, rounding context
+    /// and library version come from ``config``, and ``fx_policy_applied``
+    /// records the valuation's ``fx_collapse_policy``.
+    ///
     /// Parameters
     /// ----------
     /// valuation : PortfolioValuation
     ///     Output of ``value_portfolio``.
     /// metrics : PortfolioMetrics
     ///     Output of ``aggregate_metrics`` for the same valuation.
+    /// config : FinstackConfig, optional
+    ///     Configuration whose rounding context is stamped into ``meta``.
+    ///     ``None`` uses the default ``FinstackConfig``.
+    /// timestamp : datetime.datetime, optional
+    ///     Timezone-aware audit timestamp for ``meta["timestamp"]``. ``None``
+    ///     (the default) leaves it out, so identical inputs serialize
+    ///     identically.
     ///
-    /// The ``meta`` stamp (numeric mode, rounding context, library version)
-    /// is taken from the default ``FinstackConfig``.
+    /// Raises
+    /// ------
+    /// TypeError
+    ///     If ``timestamp`` is not a timezone-aware ``datetime``.
     #[new]
-    #[pyo3(text_signature = "(valuation, metrics)")]
-    fn new(valuation: &PyPortfolioValuation, metrics: &PyPortfolioMetrics) -> Self {
-        let config = finstack_quant_core::config::FinstackConfig::default();
-        let meta = finstack_quant_core::config::results_meta_now(&config);
+    #[pyo3(signature = (valuation, metrics, config=None, timestamp=None))]
+    #[pyo3(text_signature = "(valuation, metrics, config=None, timestamp=None)")]
+    fn new(
+        valuation: &PyPortfolioValuation,
+        metrics: &PyPortfolioMetrics,
+        config: Option<PyRef<'_, crate::bindings::core::config::PyFinstackConfig>>,
+        timestamp: Option<time::OffsetDateTime>,
+    ) -> Self {
+        let default_config;
+        let config = match &config {
+            Some(cfg) => &cfg.inner,
+            None => {
+                default_config = finstack_quant_core::config::FinstackConfig::default();
+                &default_config
+            }
+        };
         Self::from_inner(finstack_quant_portfolio::results::PortfolioResult::new(
             valuation.inner.clone(),
             metrics.inner.clone(),
-            meta,
+            config,
+            timestamp,
         ))
     }
 

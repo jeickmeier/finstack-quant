@@ -19,6 +19,7 @@ import numpy.typing as npt
 import pandas as pd
 
 from finstack_quant.attribution import PnlAttribution
+from finstack_quant.core.config import FinstackConfig
 from finstack_quant.core.currency import Currency
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
@@ -642,8 +643,9 @@ class PortfolioBuilder:
             position to the auto-created standalone entity.
         unit : str or dict, optional
             Position unit: ``"units"`` (default), ``"face_value"``,
-            ``"percentage"``, ``"notional"`` or ``{"notional": "USD"}`` for a
-            currency-tagged lot multiplier.
+            ``"percentage"``, or the mapping ``{"notional": "USD"}`` /
+            ``{"notional": None}`` for a (currency-tagged) lot multiplier.
+            The bare string ``"notional"`` is rejected, as in the JSON spec.
         attributes : dict[str, str | float], optional
             Position attributes used by grouping and optimization filters.
 
@@ -2738,9 +2740,20 @@ class PortfolioResult:
     0.0
     """
 
-    def __init__(self, valuation: PortfolioValuation, metrics: PortfolioMetrics) -> None:
+    def __init__(
+        self,
+        valuation: PortfolioValuation,
+        metrics: PortfolioMetrics,
+        config: FinstackConfig | None = None,
+        timestamp: datetime.datetime | None = None,
+    ) -> None:
         """
         Assemble a result envelope from a valuation and its aggregated metrics.
+
+        The ``meta`` stamp is built in Rust: the numeric mode, rounding context
+        and library version come from ``config``, and
+        ``meta["fx_policy_applied"]`` records the valuation's
+        ``fx_collapse_policy`` (e.g. ``"cashflow_date"``).
 
         Parameters
         ----------
@@ -2748,11 +2761,17 @@ class PortfolioResult:
             Output of :func:`value_portfolio`.
         metrics : PortfolioMetrics
             Output of :func:`aggregate_metrics` for the same valuation.
+        config : FinstackConfig, optional
+            Configuration whose rounding context is stamped into ``meta``.
+            ``None`` uses the default ``FinstackConfig``.
+        timestamp : datetime.datetime, optional
+            Timezone-aware audit timestamp for ``meta["timestamp"]``. ``None``
+            (the default) omits it, so identical inputs serialize identically.
 
-        Notes
-        -----
-        The ``meta`` stamp is taken from the default ``FinstackConfig``. This
-        constructor does not raise.
+        Raises
+        ------
+        TypeError
+            If ``timestamp`` is not a timezone-aware ``datetime.datetime``.
 
         Examples
         --------
@@ -2767,8 +2786,15 @@ class PortfolioResult:
         ...     })
         ... )
         >>> metrics = PortfolioMetrics.from_json('{"aggregated": {}, "by_position": {}}')
-        >>> PortfolioResult(valuation, metrics).total_value
-        0.0
+        >>> result = PortfolioResult(valuation, metrics)
+        >>> (result.total_value, result.meta["fx_policy_applied"], "timestamp" in result.meta)
+        (0.0, 'cashflow_date', False)
+        >>> result.to_json() == PortfolioResult(valuation, metrics).to_json()
+        True
+        >>> import datetime
+        >>> stamp = datetime.datetime(2025, 1, 1, 12, tzinfo=datetime.timezone.utc)
+        >>> PortfolioResult(valuation, metrics, timestamp=stamp).meta["timestamp"]
+        '+002025-01-01T12:00:00.000000000Z'
         """
         ...
 
@@ -5175,9 +5201,10 @@ def carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFrame) -
     Parameters
     ----------
     periods_json : str | dict | list | pandas.DataFrame
-        Chronological JSON array of ``BrinsonPeriodResult`` objects (for
-        example ``json.loads(brinson_fachler_json(...))`` per period) with
-        identical sector ordering in every period.
+        Chronological list of typed ``BrinsonPeriodResult`` objects (as
+        returned by :func:`brinson_fachler`) or their JSON form (for example
+        ``json.loads(brinson_fachler_json(...))`` per period) with identical
+        sector ordering in every period.
 
     Returns
     -------
@@ -5542,6 +5569,54 @@ class FiAttributionResult:
         ------
         ValueError
             If the result cannot be serialized into a pandas object.
+        """
+        ...
+
+    def reconciliation_check(self, tolerance: float) -> FiReconciliationReport:
+        """
+        Reconcile the five Campisi effect totals against the active return.
+
+        Binds the Rust method
+        ``finstack_quant_portfolio::FiAttributionResult::reconciliation_check``;
+        :func:`campisi_reconciliation_check` is the free-function form that
+        also accepts the JSON wire shape.
+
+        Parameters
+        ----------
+        tolerance : float
+            Absolute tolerance in return units (``1e-10`` is appropriate for
+            return-space values).
+
+        Returns
+        -------
+        FiReconciliationReport
+            Typed report with ``total_residual``, ``is_reconciled`` and
+            ``tolerance``.
+
+        Notes
+        -----
+        This method does not raise.
+
+        Examples
+        --------
+        >>> import json
+        >>> from finstack_quant.portfolio import campisi_attribution
+        >>> snap = [
+        ...     {
+        ...         "sector": "GOVT",
+        ...         "weight": 1.0,
+        ...         "total_return": 0.02,
+        ...         "yield_annual": 0.04,
+        ...         "modified_duration": 5.0,
+        ...         "spread_duration": 0.0,
+        ...         "spread": 0.0,
+        ...         "delta_treasury_yield": -0.001,
+        ...         "delta_spread": 0.0,
+        ...     }
+        ... ]
+        >>> result = campisi_attribution(json.dumps(snap), json.dumps(snap), '{"period_years":0.25}')
+        >>> result.reconciliation_check(1e-10).is_reconciled
+        True
         """
         ...
 
@@ -6170,8 +6245,9 @@ def campisi_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.Data
     Parameters
     ----------
     periods_json : str | dict | list | pandas.DataFrame
-        JSON array of ``FiAttributionResult`` objects in chronological order,
-        each the parsed output of :func:`campisi_attribution_json` (or
+        Chronological list of typed ``FiAttributionResult`` objects (as
+        returned by :func:`campisi_attribution`) or their JSON form, each the
+        parsed output of :func:`campisi_attribution_json` (or
         ``FiAttributionResult.to_json()``). Every period
         must carry the same sector ordering. Unknown fields are rejected.
 
@@ -6431,7 +6507,7 @@ def campisi_carino_link_from_snapshots_json(
     ...
 
 def campisi_reconciliation_check(
-    result_json: str | dict[str, Any] | list[Any] | pd.DataFrame, tolerance: float
+    result_json: FiAttributionResult | str | dict[str, Any] | list[Any] | pd.DataFrame, tolerance: float
 ) -> FiReconciliationReport:
     """
     Reconcile the five Campisi effect totals against the active return.
@@ -6448,8 +6524,9 @@ def campisi_reconciliation_check(
 
     Parameters
     ----------
-    result_json : str | dict | list | pandas.DataFrame
-        JSON ``FiAttributionResult``, as returned by
+    result_json : FiAttributionResult | str | dict | list | pandas.DataFrame
+        Typed ``FiAttributionResult`` (as returned by
+        :func:`campisi_attribution`) or its JSON form, as returned by
         :func:`campisi_attribution_json` (or
         ``FiAttributionResult.to_json()``). Unknown fields are rejected.
     tolerance : float
@@ -6509,7 +6586,7 @@ def campisi_reconciliation_check(
     ...
 
 def campisi_reconciliation_check_json(
-    result_json: str | dict[str, Any] | list[Any] | pd.DataFrame, tolerance: float
+    result_json: FiAttributionResult | str | dict[str, Any] | list[Any] | pd.DataFrame, tolerance: float
 ) -> str:
     """
     Reconcile the five Campisi effect totals and return wire JSON.
@@ -7086,7 +7163,7 @@ def cell_returns_from_curves_json(
 
 def excess_returns(
     positions_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    table_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    table_json: DurationCellTable | str | dict[str, Any] | list[Any] | pd.DataFrame,
 ) -> ExcessReturnResult:
     """
     Compute duration-matched credit excess returns against a base-return table.
@@ -7103,8 +7180,8 @@ def excess_returns(
         JSON array of ``ExcessReturnPosition`` objects (``id``, ``weight``,
         ``duration``, ``total_return``); weights must sum to ``1.0`` within
         ``1e-6``.
-    table_json : str | dict | list | pandas.DataFrame
-        JSON ``DurationCellTable``, as returned by
+    table_json : DurationCellTable | str | dict | list | pandas.DataFrame
+        Typed ``DurationCellTable`` or its JSON form, as returned by
         :func:`cell_returns_from_reference_json`,
         :func:`cell_returns_from_curves_json`, or
         ``DurationCellTable.to_json()``.
@@ -7148,7 +7225,7 @@ def excess_returns(
 
 def excess_returns_json(
     positions_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
-    table_json: str | dict[str, Any] | list[Any] | pd.DataFrame,
+    table_json: DurationCellTable | str | dict[str, Any] | list[Any] | pd.DataFrame,
 ) -> str:
     """
     Compute duration-matched credit excess returns and return wire JSON.
@@ -7762,8 +7839,9 @@ def grid_carino_link(periods_json: str | dict[str, Any] | list[Any] | pd.DataFra
     Parameters
     ----------
     periods_json : str | dict | list | pandas.DataFrame
-        JSON array of ``GridAttributionResult`` objects, in chronological
-        order, each the wire output of :func:`grid_attribution_json` (or
+        Chronological list of typed ``GridAttributionResult`` objects (as
+        returned by :func:`grid_attribution`) or their JSON form, each the
+        wire output of :func:`grid_attribution_json` (or
         ``GridAttributionResult.to_json()``).
 
     Returns
@@ -11646,7 +11724,9 @@ class CandidatePosition:
             Typed instrument wrapper or canonical instrument-envelope JSON.
         unit : str | dict | None
             Position unit: ``"units"`` (default), ``"face_value"``,
-            ``"percentage"``, ``"notional"`` or ``{"notional": "USD"}``.
+            ``"percentage"``, or the mapping ``{"notional": "USD"}`` /
+            ``{"notional": None}``. The bare string ``"notional"`` is
+            rejected, as in the JSON spec.
         max_weight : float
             Maximum weight (fraction) the candidate may receive.
         min_weight : float

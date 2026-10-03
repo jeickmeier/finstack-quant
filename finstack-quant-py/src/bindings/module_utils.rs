@@ -112,6 +112,28 @@ pub(crate) fn attach_submodule(
     Ok(())
 }
 
+/// Build the `json.dumps` ``default`` hook that encodes typed wrappers.
+///
+/// Typed wrappers serialize through their canonical form, standalone or
+/// nested inside lists and dicts: ``to_dict`` when they carry one, otherwise
+/// the ``to_json`` every result and spec wrapper exposes. Objects with
+/// neither keep the standard ``TypeError: Object of type ... is not JSON
+/// serializable``.
+fn typed_wrapper_json_hook<'py>(
+    py: Python<'py>,
+    json_mod: &Bound<'py, PyModule>,
+) -> PyResult<Bound<'py, PyAny>> {
+    let globals = pyo3::types::PyDict::new(py);
+    globals.set_item("json", json_mod)?;
+    py.eval(
+        c"lambda o: o.to_dict() if hasattr(o, 'to_dict') \
+           else json.loads(o.to_json()) if hasattr(o, 'to_json') \
+           else json.JSONEncoder().default(o)",
+        Some(&globals),
+        None,
+    )
+}
+
 /// Convert a Python object (e.g. dict or string) to a `serde_json::Value`.
 ///
 /// A Python `str` is first parsed as JSON; when that fails it is treated as
@@ -129,8 +151,10 @@ pub(crate) fn py_to_json_value<'py>(
     }
 
     let json_mod = py.import("json")?;
+    let kwargs = pyo3::types::PyDict::new(py);
+    kwargs.set_item("default", typed_wrapper_json_hook(py, &json_mod)?)?;
     let json: String = json_mod
-        .call_method1("dumps", (obj,))
+        .call_method("dumps", (obj,), Some(&kwargs))
         .and_then(|value| value.extract())
         .map_err(|e| crate::errors::value_error(format!("invalid {label}: {e}")))?;
     serde_json::from_str(&json)
@@ -162,18 +186,8 @@ pub(crate) fn py_to_serde<'py, T: serde::de::DeserializeOwned + Send>(
     label: &str,
 ) -> PyResult<T> {
     let json_mod = py.import("json")?;
-    // Typed wrappers serialize through their canonical form, standalone or
-    // nested inside lists and dicts: ``to_dict`` when they carry one,
-    // otherwise the ``to_json`` every result and spec wrapper exposes.
-    let globals = pyo3::types::PyDict::new(py);
-    globals.set_item("json", &json_mod)?;
-    let to_serde = py.eval(
-        c"lambda o: o.to_dict() if hasattr(o, 'to_dict') else json.loads(o.to_json())",
-        Some(&globals),
-        None,
-    )?;
     let kwargs = pyo3::types::PyDict::new(py);
-    kwargs.set_item("default", to_serde)?;
+    kwargs.set_item("default", typed_wrapper_json_hook(py, &json_mod)?)?;
     let json_str: String = json_mod
         .call_method("dumps", (obj,), Some(&kwargs))?
         .extract()?;

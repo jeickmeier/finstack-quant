@@ -218,7 +218,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
-      "bytes": 9217,
+      "bytes": 10752,
       "kind": "output",
       "path": "schemas/portfolio/1/portfolio_optimization_result.schema.json",
       "summary": "Optimizer weights and diagnostics.",
