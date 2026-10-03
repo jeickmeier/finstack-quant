@@ -5,9 +5,7 @@
 //! [`transform_panel`] is the typed Rust entry point and preserves
 //! operation order in [`PanelTransformResult`].
 
-use crate::{
-    transform_cross_sectional_with_op, transform_timeseries_with_op, CrossSectionalOp, TimeSeriesOp,
-};
+use crate::{transform_cross_sectional, transform_timeseries, CrossSectionalOp, TimeSeriesOp};
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -69,7 +67,7 @@ pub fn transform_panel(spec: &PanelTransformSpec) -> Result<PanelTransformResult
                         "panel transform order is required for time-series operations".to_string(),
                     )
                 })?;
-                transform_timeseries_with_op(source, entity, order, *op, params.as_ref())?
+                transform_timeseries(source, entity, order, *op, params.as_ref())?
             }
             PanelOperation::CrossSectional { op, params, .. } => {
                 let time_key = spec.time_key.as_ref().ok_or_else(|| {
@@ -78,7 +76,7 @@ pub fn transform_panel(spec: &PanelTransformSpec) -> Result<PanelTransformResult
                             .to_string(),
                     )
                 })?;
-                transform_cross_sectional_with_op(source, time_key, *op, params.as_ref())?
+                transform_cross_sectional(source, time_key, *op, params.as_ref())?
             }
         };
         columns.push(PanelTransformColumn {

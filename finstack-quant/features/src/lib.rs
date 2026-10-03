@@ -11,10 +11,10 @@
 //!
 //! - **Time-series** — Backward-looking transforms per entity (returns, rolling
 //!   stats, EWMA, drawdown, Hampel filter, …). Entry point:
-//!   [`transform_timeseries`] / [`transform_timeseries_with_op`].
+//!   [`transform_timeseries`].
 //! - **Cross-sectional** — Transforms across entities within each time
 //!   partition (rank, z-score, normalize, winsorize, …). Entry point:
-//!   [`transform_cross_sectional`] / [`transform_cross_sectional_with_op`].
+//!   [`transform_cross_sectional`].
 //! - **Panel** — JSON-specified or typed-spec pipeline of named time-series and
 //!   cross-sectional operations. Entry point: [`transform_panel_json`] /
 //!   [`transform_panel`].
@@ -25,12 +25,12 @@
 //! # Quick Start
 //!
 //! ```rust
-//! use finstack_quant_features::{transform_timeseries_with_op, TimeSeriesOp};
+//! use finstack_quant_features::{transform_timeseries, TimeSeriesOp};
 //!
 //! let values = vec![Some(100.0), Some(102.0), Some(101.0), Some(105.0)];
 //! let entity = vec!["A".to_string(), "A".to_string(), "A".to_string(), "A".to_string()];
 //! let order = vec!["1".to_string(), "2".to_string(), "3".to_string(), "4".to_string()];
-//! let result = transform_timeseries_with_op(
+//! let result = transform_timeseries(
 //!     &values, &entity, &order,
 //!     TimeSeriesOp::Returns, None,
 //! )?;
@@ -64,9 +64,10 @@
 //!   sign-preserving allocations fail. `neutralize_and_zscore` requires an intercept.
 //! - `drawdown` takes a level series; `rolling_sharpe` is a period feature,
 //!   not the `analytics` Sharpe. `transform_panel_json` is sequential.
-//! - String/JSON entry points are retained for Python and WASM bindings; Rust
-//!   callers should use the typed-op variants (`TimeSeriesOp`,
-//!   `CrossSectionalOp`, `PairwiseOp`, `PanelTransformSpec`).
+//! - Rust transforms accept typed operation selectors (`TimeSeriesOp`,
+//!   `CrossSectionalOp`, `PairwiseOp`); bindings convert host strings or enum
+//!   values directly to these selectors. Panel pipelines accept a typed
+//!   `PanelTransformSpec` or its JSON wire form.
 
 #![forbid(unsafe_code)]
 #![warn(clippy::float_cmp)]
@@ -98,21 +99,18 @@ pub mod schema;
 mod timeseries;
 mod types;
 
-pub use cross_sectional::{
-    transform_cross_sectional, transform_cross_sectional_with_op, CrossSectionalOp,
-};
+pub use cross_sectional::{transform_cross_sectional, CrossSectionalOp};
 pub use keys::{datetime_order_key, naive_datetime_order_key};
 pub use multi::{
     neutralize, neutralize_and_zscore, rank_to_weights, risk_scaled_weights,
-    rolling_regression_residual, transform_cross_sectional_grouped,
-    transform_cross_sectional_grouped_with_op, transform_timeseries_pairwise,
-    transform_timeseries_pairwise_with_op, PairwiseOp,
+    rolling_regression_residual, transform_cross_sectional_grouped, transform_timeseries_pairwise,
+    PairwiseOp,
 };
 pub use panel::{
     transform_panel, transform_panel_json, PanelOperation, PanelTransformColumn,
     PanelTransformResult, PanelTransformSpec,
 };
-pub use timeseries::{transform_timeseries, transform_timeseries_with_op, TimeSeriesOp};
+pub use timeseries::{transform_timeseries, TimeSeriesOp};
 
 /// Compiles the crate `README.md` Rust samples as doctests.
 ///

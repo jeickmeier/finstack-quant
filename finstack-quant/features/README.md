@@ -29,16 +29,14 @@ type of its own.
 | Function | Role |
 |----------|------|
 | `transform_timeseries` | Backward-looking transform per entity, ordered by a sortable key |
-| `transform_timeseries_with_op` | Rust typed-op variant of `transform_timeseries` |
 | `transform_cross_sectional` | Transform a value column across entities within each time partition |
-| `transform_cross_sectional_with_op` | Rust typed-op variant of `transform_cross_sectional` |
 | `transform_panel_json` | Apply a JSON-specified pipeline of named time-series and cross-sectional operations |
 | `transform_panel` | Rust typed-spec variant of `transform_panel_json` with ordered result columns |
 
 These entry points return `finstack_quant_core::Result`. Outputs preserve input
 order and length; element `i` of the output corresponds to element `i` of
-`values`. The string/JSON entry points are retained for Python and WASM
-bindings. Rust callers can use `TimeSeriesOp`, `CrossSectionalOp`, `PairwiseOp`,
+`values`. Rust transforms accept typed operation selectors. Python and WASM
+bindings convert host operation names to those selectors. Rust callers use `TimeSeriesOp`, `CrossSectionalOp`, `PairwiseOp`,
 `PanelTransformSpec`, `PanelOperation`, `PanelTransformResult`, and
 `PanelTransformColumn` to avoid string dispatch. Each op enum implements
 `FromStr` for the canonical snake_case names accepted by the string entry
@@ -138,14 +136,12 @@ call fails. A constant signal produces zero weights. Missing signals stay missin
 | Function | Role |
 |----------|------|
 | `transform_cross_sectional_grouped` | Apply a cross-sectional op within `(time_key, group)` sub-partitions |
-| `transform_cross_sectional_grouped_with_op` | Typed-op variant of `transform_cross_sectional_grouped` |
 | `neutralize` | Equal-weighted cross-sectional OLS residualization (`fit_intercept`, default `true`); fails if a date is singular or underdetermined |
 | `transform_timeseries_pairwise` | Rolling covariance, correlation, and beta between two columns (`rolling_cov`, `rolling_corr`, `rolling_beta`) |
-| `transform_timeseries_pairwise_with_op` | Typed-op variant of `transform_timeseries_pairwise` |
 | `rolling_regression_residual` | Per-entity rolling OLS residuals; rank-deficient windows emit `None` (unlike `neutralize`) |
 | `risk_scaled_weights` | Inverse-vol scale, demean, then gross-normalize so each cross-section is dollar-neutral |
 | `rank_to_weights` | Convert ranks into gross-normalized long/short weights |
-| `neutralize_and_zscore` | Residualize with an intercept, then cross-sectional z-score; `fit_intercept=false` fails |
+| `neutralize_and_zscore` | Residualize with an intercept, then cross-sectional z-score; intercept fixed to true |
 
 Python additionally exposes `finstack_quant.features.dataframe`, a pure-Python
 pandas convenience layer. These helpers accept a DataFrame plus key selectors and
@@ -168,7 +164,7 @@ panel values normalize NaN and infinities to missing, just like direct calls.
 ### Time-series returns and rolling std
 
 ```rust
-use finstack_quant_features::{transform_timeseries_with_op, TimeSeriesOp};
+use finstack_quant_features::{transform_timeseries, TimeSeriesOp};
 use serde_json::json;
 
 fn example() -> finstack_quant_core::Result<()> {
@@ -181,14 +177,14 @@ let order = vec![
     "2026-01-01".into(),
 ];
 
-let returns = transform_timeseries_with_op(
+let returns = transform_timeseries(
     &values,
     &entity,
     &order,
     TimeSeriesOp::Returns,
     Some(&json!({"periods": 1})),
 )?;
-let rolling_std = transform_timeseries_with_op(
+let rolling_std = transform_timeseries(
     &values,
     &entity,
     &order,
@@ -204,7 +200,7 @@ Ok(())
 ### Cross-sectional rank and winsorize
 
 ```rust
-use finstack_quant_features::{transform_cross_sectional_with_op, CrossSectionalOp};
+use finstack_quant_features::{transform_cross_sectional, CrossSectionalOp};
 use serde_json::json;
 
 fn example() -> finstack_quant_core::Result<()> {
@@ -216,8 +212,8 @@ let time_key = vec![
     "2026-01-02".into(),
 ];
 
-let _ranks = transform_cross_sectional_with_op(&values, &time_key, CrossSectionalOp::Rank, None)?;
-let _winsorized = transform_cross_sectional_with_op(
+let _ranks = transform_cross_sectional(&values, &time_key, CrossSectionalOp::Rank, None)?;
+let _winsorized = transform_cross_sectional(
     &values,
     &time_key,
     CrossSectionalOp::Winsorize,
@@ -317,8 +313,10 @@ The spec uses `serde(deny_unknown_fields)`; unrecognized keys are rejected.
   `rankToWeights`, `riskScaledWeights`, `rollingRegressionResidual`. JavaScript
   callers pass `number | null` arrays for values and plain objects for params.
 
-The typed-op Rust variants (`*_with_op`) and `transform_panel` have no
-host twin; both bindings go through the string/JSON entry points.
+Rust transforms use typed operation selectors. Both bindings convert host
+operation names to those selectors and call the same canonical functions.
+`transform_panel` / `transformPanel` expose the typed panel pipeline;
+`transform_panel_json` / `transformPanelJson` provide its JSON wire form.
 
 ## Related
 

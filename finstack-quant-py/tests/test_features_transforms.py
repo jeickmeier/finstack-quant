@@ -297,3 +297,36 @@ def test_transform_panel_dict_and_json_share_rust_validation() -> None:
         ]
         is None
     )
+
+
+def test_operation_enum_families_match_their_string_inputs() -> None:
+    from finstack_quant.features import CrossSectionalOp, PairwiseOp, TimeSeriesOp
+
+    cases = [
+        (
+            transform_timeseries,
+            ([1.0, 3.0], ["A"] * 2, ["1", "2"]),
+            TimeSeriesOp("diff"),
+            CrossSectionalOp("rank"),
+            None,
+        ),
+        (transform_cross_sectional, ([1.0, 3.0], ["d"] * 2), CrossSectionalOp("rank"), TimeSeriesOp("diff"), None),
+        (
+            transform_cross_sectional_grouped,
+            ([1.0, 3.0], ["d"] * 2, ["g"] * 2),
+            CrossSectionalOp("rank"),
+            PairwiseOp("rolling_corr"),
+            None,
+        ),
+        (
+            transform_timeseries_pairwise,
+            ([1.0, 3.0], [2.0, 6.0], ["A"] * 2, ["1", "2"]),
+            PairwiseOp("rolling_corr"),
+            TimeSeriesOp("diff"),
+            {"window": 2},
+        ),
+    ]
+    for transform, args, operation, wrong_family, params in cases:
+        assert transform(*args, operation, params) == transform(*args, operation.name, params)
+        with pytest.raises(TypeError, match="corresponding operation enum"):
+            transform(*args, wrong_family, params)

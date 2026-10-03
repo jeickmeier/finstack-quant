@@ -740,7 +740,7 @@ def transform_timeseries(
     values: list[float | None],
     entity: KeyColumn,
     order: KeyColumn,
-    op: str | TimeSeriesOp | CrossSectionalOp | PairwiseOp,
+    op: str | TimeSeriesOp,
     params: TransformParams | None = None,
 ) -> list[float | None]:
     """
@@ -768,8 +768,8 @@ def transform_timeseries(
         UTC at fixed nanosecond precision; naive datetimes retain wall time.
         Mixing aware and naive datetimes raises ``ValueError``. Opaque strings
         require a consistent timezone and precision for chronological order.
-    op : str
-        Operation name. Supported values are ``"returns"``,
+    op : str or TimeSeriesOp
+        Operation name or matching TimeSeriesOp value. Supported names are ``"returns"``,
         ``"log_returns"``, ``"diff"``, ``"lag"``,
         ``"rolling_mean"``, ``"rolling_sum"``, ``"rolling_std"``,
         ``"rolling_min"``, ``"rolling_max"``, ``"rolling_zscore"``,
@@ -797,6 +797,9 @@ def transform_timeseries(
 
     Raises
     ------
+    TypeError
+        If ``op`` is neither a string nor a TimeSeriesOp value, including
+        an enum from another operation family.
     ValueError
         If lengths differ, ``op`` is unsupported, or params are
         malformed. Integer params must be positive. EWMA operations require
@@ -831,7 +834,7 @@ def transform_timeseries(
 def transform_cross_sectional(
     values: list[float | None],
     time_key: KeyColumn,
-    op: str | TimeSeriesOp | CrossSectionalOp | PairwiseOp,
+    op: str | CrossSectionalOp,
     params: TransformParams | None = None,
 ) -> list[float | None]:
     """
@@ -850,8 +853,8 @@ def transform_cross_sectional(
         ``values``. Aware datetime keys normalize to UTC with fixed precision,
         so different offsets for the same instant share a partition. Mixing
         aware and naive datetimes raises ``ValueError``; strings stay opaque.
-    op : str
-        Operation name. Supported values are ``"zscore"``, ``"rank"``,
+    op : str or CrossSectionalOp
+        Operation name or matching CrossSectionalOp value. Supported names are ``"zscore"``, ``"rank"``,
         ``"percentile_rank"``, ``"quantile_bucket"``, ``"demean"``,
         ``"robust_zscore"``, ``"minmax_scale"``, ``"clip"``,
         ``"clip_by_sigma"``,
@@ -876,6 +879,9 @@ def transform_cross_sectional(
 
     Raises
     ------
+    TypeError
+        If ``op`` is neither a string nor a CrossSectionalOp value, including
+        an enum from another operation family.
     ValueError
         If lengths differ, ``op`` is unsupported, params are
         malformed, explicit clip bounds are inverted, ``sigma`` is
@@ -907,7 +913,7 @@ def transform_cross_sectional_grouped(
     values: list[float | None],
     time_key: KeyColumn,
     groups: KeyColumn,
-    op: str | TimeSeriesOp | CrossSectionalOp | PairwiseOp,
+    op: str | CrossSectionalOp,
     params: TransformParams | None = None,
 ) -> list[float | None]:
     """
@@ -929,7 +935,7 @@ def transform_cross_sectional_grouped(
     groups : list[str]
         Secondary partition key combined with ``time_key``; length must
         match ``values``.
-    op : str
+    op : str or CrossSectionalOp
         Cross-sectional operation name. Accepts the same operations as
         :func:`transform_cross_sectional`.
     params : TransformParams or None
@@ -943,6 +949,9 @@ def transform_cross_sectional_grouped(
 
     Raises
     ------
+    TypeError
+        If ``op`` is neither a string nor a CrossSectionalOp value, including
+        an enum from another operation family.
     ValueError
         If lengths differ, ``op`` is unsupported, or params are
         malformed.
@@ -1018,7 +1027,7 @@ def transform_timeseries_pairwise(
     other: list[float | None],
     entity: KeyColumn,
     order: KeyColumn,
-    op: str | TimeSeriesOp | CrossSectionalOp | PairwiseOp,
+    op: str | PairwiseOp,
     params: TransformParams | None = None,
 ) -> list[float | None]:
     """
@@ -1045,8 +1054,8 @@ def transform_timeseries_pairwise(
         UTC at fixed nanosecond precision; naive datetimes retain wall time.
         Mixing aware and naive datetimes raises ``ValueError``. Opaque strings
         require a consistent timezone and precision for chronological order.
-    op : str
-        Operation name. Supported values are ``"rolling_cov"``,
+    op : str or PairwiseOp
+        Operation name or matching PairwiseOp value. Supported names are ``"rolling_cov"``,
         ``"rolling_corr"``, and ``"rolling_beta"``.
     params : TransformParams or None
         Optional parameters. ``window`` (default ``1``) and
@@ -1060,6 +1069,9 @@ def transform_timeseries_pairwise(
 
     Raises
     ------
+    TypeError
+        If ``op`` is neither a string nor a PairwiseOp value, including
+        an enum from another operation family.
     ValueError
         If lengths differ, ``op`` is unsupported, or params are
         malformed.
@@ -1244,14 +1256,13 @@ def neutralize_and_zscore(
     values: list[float | None],
     time_key: KeyColumn,
     exposures: list[list[float | None]],
-    params: TransformParams | None = None,
 ) -> list[float | None]:
     """
     Neutralize a signal against exposures, then cross-sectional z-score.
 
     Runs :func:`neutralize` to residualize ``values`` on the exposure columns
-    within each ``time_key`` partition, then applies a ``"zscore"`` transform to
-    the residuals.
+    with an intercept within each ``time_key`` partition, then applies a
+    ``"zscore"`` transform to the residuals.
 
     Parameters
     ----------
@@ -1265,10 +1276,6 @@ def neutralize_and_zscore(
     exposures : list[list[float | None]]
         Exposure columns, each aligned to ``values`` (same length and
         row order).
-    params : TransformParams or None
-        Optional parameters forwarded to :func:`neutralize`;
-        ``fit_intercept`` defaults to ``True`` and must remain true to preserve
-        exposure neutrality after demeaning.
 
     Returns
     -------
@@ -1280,8 +1287,8 @@ def neutralize_and_zscore(
     ------
     ValueError
         If lengths differ, an exposure column has the wrong length,
-        params are malformed, ``fit_intercept=False``, or a ``time_key`` partition is singular
-        or underdetermined (the error names that ``time_key``).
+        or a ``time_key`` partition is singular or underdetermined (the error
+        names that ``time_key``).
 
     Examples
     --------
