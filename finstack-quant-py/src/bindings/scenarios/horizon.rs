@@ -7,7 +7,7 @@ use crate::errors::{core_to_py, display_to_py, scenarios_to_py};
 use pyo3::prelude::*;
 
 use super::engine::PyApplicationReport;
-use super::extract::{extract_config, extract_scenario_spec};
+use super::extract::extract_config;
 
 /// Compute horizon total return under a scenario.
 ///
@@ -101,7 +101,7 @@ pub(crate) fn compute_horizon_return<'py>(
     // Owned copy so the compute can run without the GIL.
     let market_ctx = extract_market(py, market)?;
     let date = crate::bindings::date_utils::extract_date(as_of)?;
-    let scenario = extract_scenario_spec(scenario)?;
+    let scenario = crate::bindings::extract::extract_scenario_spec(py, scenario)?;
     let attribution_method = method
         .map(finstack_quant_scenarios::horizon::attribution_method_from_str)
         .transpose()
@@ -238,24 +238,16 @@ impl PyHorizonResult {
     /// ``"model_parameters"``.
     fn factor_contribution(&self, factor: &str) -> PyResult<f64> {
         use finstack_quant_attribution::AttributionFactor;
-        let f: AttributionFactor = serde_json::from_value(serde_json::Value::String(
-            factor.to_string(),
-        ))
-        .map_err(|_| {
-            crate::errors::value_error(format!(
-                "Unknown factor '{factor}'. Expected one of: carry, rates_curves, \
-                         credit_curves, inflation_curves, correlations, fx, volatility, \
-                         market_scalars, model_parameters"
-            ))
-        })?;
+        let f: AttributionFactor =
+            finstack_quant_core::wire::serde_parse(factor).map_err(crate::errors::core_to_py)?;
         Ok(self.inner.factor_contribution(&f))
     }
 
     /// Serialize the canonical horizon result with Rust-computed decimal total
-    /// return, annualized return, and factor contributions. Undefined derived
+    /// return, annualized return, and factor contributions in ``summary``. Undefined derived
     /// values are JSON ``null``.
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner.to_json()).map_err(display_to_py)
+        serde_json::to_string(&self.inner.report()).map_err(display_to_py)
     }
 
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).

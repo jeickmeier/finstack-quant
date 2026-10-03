@@ -1,7 +1,7 @@
 //! wasm-bindgen-test suite for `api::scenarios`.
 //!
 //! Covers list_builtin_templates, list_template_components,
-//! apply_scenario, and apply_scenario_to_market which return JsValue.
+//! apply_scenario with optional model inputs, returning JsValue.
 
 #![cfg(target_arch = "wasm32")]
 
@@ -26,18 +26,14 @@ fn empty_model_json() -> String {
 }
 
 fn built_scenario_json(resolution_mode: Option<String>) -> String {
-    let operations =
-        serde_wasm_bindgen::to_value(&Vec::<finstack_quant_scenarios::OperationSpec>::new())
-            .unwrap();
-    let value = build_scenario_spec(
-        JsValue::from("test"),
-        operations,
-        None,
-        None,
-        None,
-        resolution_mode.map(JsValue::from),
-        None,
-    )
+    let value = parse_scenario_spec(JsValue::from(
+        serde_json::json!({
+            "id": "test",
+            "operations": [],
+            "resolution_mode": resolution_mode.unwrap_or_else(|| "most_specific_wins".into()),
+        })
+        .to_string(),
+    ))
     .unwrap();
     let spec: finstack_quant_scenarios::ScenarioSpec =
         serde_wasm_bindgen::from_value(value).unwrap();
@@ -59,15 +55,15 @@ fn list_template_components_for_gfc() {
 }
 
 #[wasm_bindgen_test]
-fn apply_scenario_empty_spec() {
+fn apply_scenario_with_model_empty_spec() {
     let scenario = built_scenario_json(None);
     let market = empty_market_json();
     let model = empty_model_json();
     let result = apply_scenario(
         JsValue::from(&scenario),
         JsValue::from(&market),
-        JsValue::from(&model),
         JsValue::from("2024-01-15"),
+        Some(JsValue::from(&model)),
         None,
         None,
     )
@@ -78,7 +74,7 @@ fn apply_scenario_empty_spec() {
         "market should be a nested object"
     );
     assert!(obj["model"].is_object(), "model should be a nested object");
-    assert_eq!(obj["operations_applied"].as_u64().unwrap(), 0);
+    assert_eq!(obj["report"]["operations_applied"].as_u64().unwrap(), 0);
 }
 
 #[wasm_bindgen_test]
@@ -87,8 +83,8 @@ fn apply_scenario_rejects_a_model_without_periods() {
     let err = apply_scenario(
         JsValue::from(&built_scenario_json(None)),
         JsValue::from(&empty_market_json()),
-        JsValue::from(&serde_json::to_string(&model).unwrap()),
         JsValue::from("2024-01-15"),
+        Some(JsValue::from(&serde_json::to_string(&model).unwrap())),
         None,
         None,
     )
@@ -101,13 +97,14 @@ fn apply_scenario_rejects_a_model_without_periods() {
 }
 
 #[wasm_bindgen_test]
-fn apply_scenario_to_market_empty_spec() {
+fn apply_scenario_without_model_empty_spec() {
     let scenario = built_scenario_json(None);
     let market = empty_market_json();
-    let result = apply_scenario_to_market(
+    let result = apply_scenario(
         JsValue::from(&scenario),
         JsValue::from(&market),
         JsValue::from("2024-06-01"),
+        None,
         None,
         None,
     )
@@ -118,11 +115,11 @@ fn apply_scenario_to_market_empty_spec() {
         "market should be a nested object"
     );
     assert!(obj["model"].is_null(), "no model was supplied");
-    assert_eq!(obj["operations_applied"].as_u64().unwrap(), 0);
+    assert_eq!(obj["report"]["operations_applied"].as_u64().unwrap(), 0);
 }
 
 #[wasm_bindgen_test]
-fn build_scenario_spec_preserves_cumulative_resolution_mode() {
+fn parse_scenario_spec_preserves_cumulative_resolution_mode() {
     let scenario = built_scenario_json(Some("cumulative".to_string()));
     let value: serde_json::Value = serde_json::from_str(&scenario).unwrap();
     assert_eq!(value["resolution_mode"], "cumulative");
@@ -130,28 +127,21 @@ fn build_scenario_spec_preserves_cumulative_resolution_mode() {
 
 #[wasm_bindgen_test]
 fn compose_scenarios_rejects_mixed_hazard_bump_modes_as_javascript_error() {
-    let operations =
-        serde_wasm_bindgen::to_value(&Vec::<finstack_quant_scenarios::OperationSpec>::new())
-            .expect("operations");
-    let first_order = build_scenario_spec(
-        JsValue::from("first-order"),
-        operations.clone(),
-        None,
-        None,
-        Some(JsValue::from(0)),
-        None,
-        Some(JsValue::from("first_order_shift".to_string())),
-    )
+    let first_order = parse_scenario_spec(JsValue::from(
+        serde_json::json!({
+            "id": "first-order", "operations": [], "priority": 0,
+            "hazard_bump_mode": "first_order_shift",
+        })
+        .to_string(),
+    ))
     .expect("first-order scenario");
-    let solve_to_par = build_scenario_spec(
-        JsValue::from("solve-to-par"),
-        operations,
-        None,
-        None,
-        Some(JsValue::from(1)),
-        None,
-        Some(JsValue::from("solve_to_par".to_string())),
-    )
+    let solve_to_par = parse_scenario_spec(JsValue::from(
+        serde_json::json!({
+            "id": "solve-to-par", "operations": [], "priority": 1,
+            "hazard_bump_mode": "solve_to_par",
+        })
+        .to_string(),
+    ))
     .expect("solve-to-par scenario");
     let first_order: finstack_quant_scenarios::ScenarioSpec =
         serde_wasm_bindgen::from_value(first_order).expect("typed first-order scenario");
@@ -199,10 +189,11 @@ fn instrument_copies_are_returned_and_missing_inventory_is_rejected() {
         ..Default::default()
     };
     let scenario = serde_json::to_string(&scenario).unwrap();
-    assert!(apply_scenario_to_market(
+    assert!(apply_scenario(
         JsValue::from(&scenario),
         JsValue::from(&empty_market_json()),
         JsValue::from("2025-01-15"),
+        None,
         None,
         None
     )
@@ -212,16 +203,17 @@ fn instrument_copies_are_returned_and_missing_inventory_is_rejected() {
             apply_scenario(
                 JsValue::from(&scenario),
                 JsValue::from(&empty_market_json()),
-                JsValue::from(&empty_model_json()),
                 JsValue::from("2025-01-15"),
+                Some(JsValue::from(&empty_model_json())),
                 Some(JsValue::from(inventory.clone())),
                 None,
             )
         } else {
-            apply_scenario_to_market(
+            apply_scenario(
                 JsValue::from(&scenario),
                 JsValue::from(&empty_market_json()),
                 JsValue::from("2025-01-15"),
+                None,
                 Some(JsValue::from(inventory.clone())),
                 None,
             )

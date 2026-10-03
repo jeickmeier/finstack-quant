@@ -123,11 +123,10 @@ pub struct TemplateRegistry {
 impl TemplateRegistry {
     /// Create an empty template registry with no built-in templates registered.
     ///
-    /// Use [`Self::with_embedded_builtins`] to load the crate-owned historical
+    /// Use [`Self::embedded_builtins`] to load the crate-owned historical
     /// stress templates through the fallible validation path.
     #[must_use]
-    #[allow(clippy::new_without_default)] // Loading built-ins is fallible, so callers must choose explicitly.
-    pub fn new() -> Self {
+    fn new() -> Self {
         Self {
             entries: IndexMap::new(),
         }
@@ -144,7 +143,7 @@ impl TemplateRegistry {
     ///
     /// Returns an error if the embedded JSON documents cannot be parsed or fail
     /// validation.
-    pub fn with_embedded_builtins() -> Result<Self> {
+    fn with_embedded_builtins() -> Result<Self> {
         let mut registry = Self::new();
         register_builtins(&mut registry)?;
         Ok(registry)
@@ -155,8 +154,7 @@ impl TemplateRegistry {
     /// The embedded JSON documents are parsed and validated once, on first
     /// access, and the resulting registry is shared for the lifetime of the
     /// process. Hosts that only read templates (list, build, decompose) should
-    /// use this instead of re-parsing via
-    /// [`with_embedded_builtins`](Self::with_embedded_builtins) on every call.
+    /// share this registry across calls.
     ///
     /// # Errors
     ///

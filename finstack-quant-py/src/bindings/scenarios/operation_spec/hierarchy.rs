@@ -1,8 +1,7 @@
 //! `HierarchyTarget` wrapper for hierarchy-targeted scenario operations.
 
-use finstack_quant_core::market_data::hierarchy::{HierarchyTarget, TagFilter, TagPredicate};
+use finstack_quant_core::market_data::hierarchy::{HierarchyTarget, TagFilter};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
 
 /// Path into the market-data hierarchy, with an optional tag filter, that a
 /// hierarchy-targeted operation resolves against the execution context's
@@ -13,15 +12,14 @@ use pyo3::types::PyDict;
 /// path : list[str]
 ///     Hierarchy path from the root, e.g. ``["Credit", "US", "IG"]``. Every
 ///     curve in that subtree is targeted.
-/// tag_filter : dict[str, str] | None, default None
-///     Optional ``{key: value}`` equality predicates (AND semantics) that a
-///     node must satisfy for its subtree to be included. Use ``from_json``
-///     for ``in`` / ``exists`` predicates.
+/// tag_filter : dict[str, Any] | None, default None
+///     Canonical ``{"predicates": [...]}`` filter with equals, in or exists
+///     predicates combined with AND semantics; omit to match the whole subtree.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.scenarios import HierarchyTarget
-/// >>> target = HierarchyTarget(["Credit", "US"], {"sector": "financials"})
+/// >>> target = HierarchyTarget(["Credit", "US"], {"predicates": [{"equals": {"key": "sector", "value": "financials"}}]})
 /// >>> target.path
 /// ['Credit', 'US']
 /// >>> HierarchyTarget.from_json(target.to_json()) == target
@@ -42,22 +40,20 @@ pub struct PyHierarchyTarget {
 impl PyHierarchyTarget {
     #[new]
     #[pyo3(signature = (path, tag_filter=None))]
-    fn new(path: Vec<String>, tag_filter: Option<&Bound<'_, PyDict>>) -> PyResult<Self> {
-        let tag_filter = match tag_filter {
-            None => None,
-            Some(dict) => {
-                let predicates = dict
-                    .iter()
-                    .map(|(k, v)| {
-                        Ok(TagPredicate::Equals {
-                            key: k.extract::<String>()?,
-                            value: v.extract::<String>()?,
-                        })
-                    })
-                    .collect::<PyResult<Vec<_>>>()?;
-                Some(TagFilter { predicates })
-            }
-        };
+    fn new(
+        py: Python<'_>,
+        path: Vec<String>,
+        tag_filter: Option<&Bound<'_, PyAny>>,
+    ) -> PyResult<Self> {
+        let tag_filter = tag_filter
+            .map(|value| {
+                let json: String = py
+                    .import("json")?
+                    .call_method1("dumps", (value,))?
+                    .extract()?;
+                serde_json::from_str::<TagFilter>(&json).map_err(crate::errors::display_to_py)
+            })
+            .transpose()?;
         Ok(Self {
             inner: HierarchyTarget { path, tag_filter },
         })
@@ -69,20 +65,14 @@ impl PyHierarchyTarget {
         self.inner.path.clone()
     }
 
-    /// Tag filter as ``{key: value}`` for equality predicates; ``None`` when
-    /// no filter is set. Non-equality predicates are visible via ``to_json``.
+    /// Complete canonical tag filter, including equals, in and exists predicates.
     #[getter]
-    fn tag_filter(&self) -> Option<Vec<(String, String)>> {
-        self.inner.tag_filter.as_ref().map(|filter| {
-            filter
-                .predicates
-                .iter()
-                .filter_map(|predicate| match predicate {
-                    TagPredicate::Equals { key, value } => Some((key.clone(), value.clone())),
-                    _ => None,
-                })
-                .collect()
-        })
+    fn tag_filter<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        self.inner
+            .tag_filter
+            .as_ref()
+            .map(|filter| crate::bindings::pandas_utils::serde_to_py(py, filter))
+            .transpose()
     }
 
     /// Serialize to canonical JSON (``{"path": [...], "tag_filter": {...}}``).
@@ -91,7 +81,7 @@ impl PyHierarchyTarget {
     }
 
     /// Deserialize from canonical JSON, including ``in`` / ``exists`` tag
-    /// predicates that the constructor does not express.
+    /// predicates accepted by the constructor.
     ///
     /// Raises
     /// ------

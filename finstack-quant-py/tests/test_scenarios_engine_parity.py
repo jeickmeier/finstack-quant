@@ -31,8 +31,8 @@ from finstack_quant.scenarios import (
     TenorMatchMode,
     TimeRollMode,
     apply_scenario,
-    apply_scenario_to_market,
     compute_horizon_return,
+    parallel_bp_many,
     validate_scenario_spec,
 )
 from finstack_quant.valuations.instruments import Bond
@@ -81,12 +81,12 @@ def _up_25() -> ScenarioSpec:
 # ---------------------------------------------------------------------------
 
 
-def test_apply_scenario_to_market_accepts_spec_or_json_and_date_like_as_of() -> None:
+def test_apply_scenario_accepts_spec_or_json_and_date_like_as_of() -> None:
     spec = _up_25()
-    typed = apply_scenario_to_market(spec, _market(), AS_OF)
-    from_json = apply_scenario_to_market(spec.to_json(), _market(), date(2025, 1, 15))
-    from_datetime = apply_scenario_to_market(spec, _market(), datetime(2025, 1, 15, 9, 30))
-    from_timestamp = apply_scenario_to_market(spec, _market(), pd.Timestamp("2025-01-15"))
+    typed = apply_scenario(spec, _market(), AS_OF)
+    from_json = apply_scenario(spec.to_json(), _market(), date(2025, 1, 15))
+    from_datetime = apply_scenario(spec, _market(), datetime(2025, 1, 15, 9, 30))
+    from_timestamp = apply_scenario(spec, _market(), pd.Timestamp("2025-01-15"))
 
     for result in (typed, from_json, from_datetime, from_timestamp):
         assert isinstance(result, ApplicationResult)
@@ -98,21 +98,21 @@ def test_apply_scenario_to_market_accepts_spec_or_json_and_date_like_as_of() -> 
 
 def test_apply_scenario_accepts_config_object_string_or_none() -> None:
     spec = _up_25()
-    default = apply_scenario_to_market(spec, _market(), AS_OF)
-    typed = apply_scenario_to_market(spec, _market(), AS_OF, config=FinstackConfig())
-    from_json = apply_scenario_to_market(spec, _market(), AS_OF, config=FinstackConfig().to_json())
+    default = apply_scenario(spec, _market(), AS_OF)
+    typed = apply_scenario(spec, _market(), AS_OF, config=FinstackConfig())
+    from_json = apply_scenario(spec, _market(), AS_OF, config=FinstackConfig().to_json())
     assert default.report.meta is not None
     assert typed.report.meta == default.report.meta
     assert from_json.report.meta == default.report.meta
     with pytest.raises(ValueError, match="config"):
-        apply_scenario_to_market(spec, _market(), AS_OF, config=42)
+        apply_scenario(spec, _market(), AS_OF, config=42)
 
 
 def test_apply_scenario_rejects_non_spec_scenario_argument() -> None:
-    with pytest.raises(ValueError, match="ScenarioSpec"):
-        apply_scenario_to_market(123, _market(), AS_OF)
+    with pytest.raises(TypeError, match="ScenarioSpec"):
+        apply_scenario(123, _market(), AS_OF)
     with pytest.raises(ValueError, match="Failed to parse ScenarioSpec JSON"):
-        apply_scenario_to_market("{not json", _market(), AS_OF)
+        apply_scenario("{not json", _market(), AS_OF)
 
 
 # ---------------------------------------------------------------------------
@@ -123,7 +123,7 @@ def test_apply_scenario_rejects_non_spec_scenario_argument() -> None:
 def test_missing_curve_raises_key_error() -> None:
     spec = ScenarioSpec("missing", [OperationSpec.curve_parallel_bp("discount", "NOPE", 1.0)])
     with pytest.raises(KeyError):
-        apply_scenario_to_market(spec, _market(), AS_OF)
+        apply_scenario(spec, _market(), AS_OF)
 
 
 def test_validation_failure_raises_value_error_with_same_message_everywhere() -> None:
@@ -133,7 +133,7 @@ def test_validation_failure_raises_value_error_with_same_message_everywhere() ->
     with pytest.raises(ValueError, match=r"Scenario ID cannot be empty") as from_from_json:
         ScenarioSpec.from_json(bad_json)
     with pytest.raises(ValueError, match=r"Scenario ID cannot be empty") as from_apply:
-        apply_scenario_to_market(bad_json, _market(), AS_OF)
+        apply_scenario(bad_json, _market(), AS_OF)
     assert str(from_validate.value) == str(from_from_json.value) == str(from_apply.value)
     assert "Scenario ID cannot be empty" in str(from_validate.value)
 
@@ -142,18 +142,18 @@ def test_instrument_mutating_scenario_without_instruments_raises_value_error() -
     spec = ScenarioSpec("px", [OperationSpec.instrument_price_pct_by_type(["bond"], -5.0)])
     assert spec.mutates_instruments()
     assert spec.requires_instruments()
-    # Same Rust engine message as WASM applyScenarioToMarket.
+    # Same Rust engine message as WASM applyScenario.
     with pytest.raises(ValueError, match="no instruments were supplied"):
-        apply_scenario_to_market(spec, _market(), AS_OF)
+        apply_scenario(spec, _market(), AS_OF)
     blank = json.dumps({"id": "", "operations": [json.loads(spec.to_json())["operations"][0]]})
     with pytest.raises(ValueError, match="Scenario ID cannot be empty"):
-        apply_scenario_to_market(blank, _market(), AS_OF)
+        apply_scenario(blank, _market(), AS_OF)
 
 
 def test_bare_instrument_payloads_use_the_shared_envelope_loader() -> None:
     bare = json.dumps(json.loads(_deposit_json())["instrument"])
     with pytest.raises(ValueError, match="invalid instrument envelope JSON"):
-        apply_scenario_to_market(_up_25(), _market(), AS_OF, instruments=[bare])
+        apply_scenario(_up_25(), _market(), AS_OF, instruments=[bare])
     with pytest.raises(ValueError, match="invalid instrument envelope JSON"):
         compute_horizon_return(bare, _market(), AS_OF, _up_25())
 
@@ -162,7 +162,7 @@ def test_time_roll_without_instruments_still_rolls_market() -> None:
     spec = ScenarioSpec("roll", [OperationSpec.time_roll_forward("1M", roll_mode="calendar_days")])
     assert spec.requires_instruments()
     assert not spec.mutates_instruments()
-    result = apply_scenario_to_market(spec, _market(), AS_OF)
+    result = apply_scenario(spec, _market(), AS_OF)
     assert result.report.time_roll is not None
     assert result.report.time_roll["days"] == 31
     assert result.report.changes["as_of_changed"] is True
@@ -171,7 +171,7 @@ def test_time_roll_without_instruments_still_rolls_market() -> None:
 
 def test_instruments_are_accepted_as_json_envelopes_for_carry() -> None:
     spec = ScenarioSpec("roll", [OperationSpec.time_roll_forward("1M", roll_mode="calendar_days")])
-    result = apply_scenario_to_market(spec, _market(), AS_OF, instruments=[_deposit_json()])
+    result = apply_scenario(spec, _market(), AS_OF, instruments=[_deposit_json()])
     carry = result.report.carry_to_dataframe()
     assert list(carry.columns) == ["instrument_id", "amount", "currency"]
     assert list(carry["instrument_id"]) == ["DEP-0"]
@@ -185,7 +185,7 @@ def test_instruments_are_accepted_as_json_envelopes_for_carry() -> None:
 
 def test_report_exposes_structured_warnings_and_counters() -> None:
     spec = ScenarioSpec("eq", [OperationSpec.equity_price_pct(["MISSING"], -10.0)])
-    result = apply_scenario_to_market(spec, _market(), AS_OF)
+    result = apply_scenario(spec, _market(), AS_OF)
     report = result.report
     assert isinstance(report, ApplicationReport)
     assert report.warning_count == len(report.warnings) == 1
@@ -208,14 +208,14 @@ def test_report_exposes_structured_warnings_and_counters() -> None:
 
 
 def test_changes_to_dataframe_lists_resolved_targets() -> None:
-    result = apply_scenario_to_market(_up_25(), _market(), AS_OF)
+    result = apply_scenario(_up_25(), _market(), AS_OF)
     changes = result.report.changes_to_dataframe()
     assert list(changes.columns) == ["kind", "id", "curve_kind"]
     assert changes.to_dict("records") == [{"kind": "curve", "id": "USD-OIS", "curve_kind": "discount"}]
 
 
 def test_application_result_json_roundtrip_and_pickle() -> None:
-    result = apply_scenario_to_market(_up_25(), _market(), AS_OF)
+    result = apply_scenario(_up_25(), _market(), AS_OF)
     restored = ApplicationResult.from_json(result.to_json())
     assert restored.report.to_json() == result.report.to_json()
     assert restored.market.to_json() == result.market.to_json()
@@ -241,9 +241,9 @@ def test_compute_horizon_return_typed_inputs_and_result_surface() -> None:
     assert isinstance(result, HorizonResult)
     assert result.to_json() == from_json.to_json()
     payload = json.loads(result.to_json())
-    assert payload["total_return"] == result.total_return
-    assert payload["annualized_return"] == result.annualized_return
-    assert set(payload["factor_contributions"]) == {
+    assert payload["summary"]["total_return"] == result.total_return
+    assert payload["summary"]["annualized_return"] == result.annualized_return
+    assert set(payload["summary"]["factor_contributions"]) == {
         "carry",
         "rates_curves",
         "credit_curves",
@@ -254,7 +254,7 @@ def test_compute_horizon_return_typed_inputs_and_result_surface() -> None:
         "market_scalars",
         "model_parameters",
     }
-    for factor, contribution in payload["factor_contributions"].items():
+    for factor, contribution in payload["summary"]["factor_contributions"].items():
         assert contribution == result.factor_contribution(factor)
     assert result.currency == "USD"
     assert result.horizon_days == 31
@@ -276,9 +276,9 @@ def test_horizon_json_uses_null_for_undefined_derived_returns() -> None:
     result = compute_horizon_return(_deposit_json(), _market(), "2025-08-15", ScenarioSpec("matured", []))
     payload = json.loads(result.to_json())
     assert result.initial_value == 0
-    assert payload["total_return"] is None
-    assert payload["annualized_return"] is None
-    assert all(value is None for value in payload["factor_contributions"].values())
+    assert payload["summary"]["total_return"] is None
+    assert payload["summary"]["annualized_return"] is None
+    assert all(value is None for value in payload["summary"]["factor_contributions"].values())
     assert HorizonResult.from_json(result.to_json()).to_json() == result.to_json()
 
 
@@ -296,9 +296,11 @@ def test_horizon_methods_support_standard_fixed_income_instruments(method: str, 
     assert result.currency == "USD"
     assert math.isfinite(result.total_return)
     payload = json.loads(result.to_json())
-    assert payload["total_return"] == result.total_return
-    assert payload["annualized_return"] is None
-    assert all(value is not None and math.isfinite(value) for value in payload["factor_contributions"].values())
+    assert payload["summary"]["total_return"] == result.total_return
+    assert payload["summary"]["annualized_return"] is None
+    assert all(
+        value is not None and math.isfinite(value) for value in payload["summary"]["factor_contributions"].values()
+    )
 
 
 @pytest.mark.parametrize("method", ["parallel", "waterfall", "metrics_based", "taylor"])
@@ -337,7 +339,7 @@ def test_floating_horizons_preserve_opening_and_crossed_fixings(method: str, iss
     market_before = market.to_json()
     scenario = ScenarioSpec("crossed-reset", [OperationSpec.time_roll_forward("4D", False, "calendar_days")])
     opening = instrument.price(market, origin).value
-    rolled = apply_scenario_to_market(scenario, market, origin, instruments=[instrument])
+    rolled = apply_scenario(scenario, market, origin, instruments=[instrument])
     assert rolled.instruments is not None
     closing = Bond.from_json(rolled.instruments[0]).price(rolled.market, rolled.report.time_roll["new_date"]).value
 
@@ -367,7 +369,7 @@ def test_compute_horizon_return_config_and_method_handling() -> None:
     explicit = compute_horizon_return(_deposit_json(), _market(), AS_OF, spec, method="parallel")
     omitted = compute_horizon_return(_deposit_json(), _market(), AS_OF, spec, method=None)
     assert explicit.to_json() == default.to_json() == omitted.to_json()
-    with pytest.raises(ValueError, match="Unknown attribution method"):
+    with pytest.raises(ValueError, match="bogus"):
         compute_horizon_return(_deposit_json(), _market(), AS_OF, spec, method="bogus")
     with pytest.raises(KeyError, match="not-a-calendar"):
         compute_horizon_return(_deposit_json(), _market(), AS_OF, spec, calendar_id="not-a-calendar")
@@ -402,8 +404,8 @@ def test_horizon_annualization_preserves_losses_beyond_initial_capital() -> None
     # Serialized derived fields came from the original result; Rust recomputes
     # them from the changed endpoint and P&L values when serializing again.
     loss_json = json.loads(loss.to_json())
-    assert loss_json["total_return"] == pytest.approx(-2.2)
-    assert loss_json["annualized_return"] is None
+    assert loss_json["summary"]["total_return"] == pytest.approx(-2.2)
+    assert loss_json["summary"]["annualized_return"] is None
 
     payload["terminal_value"]["amount"] = "0"
     payload["attribution"]["total_pnl"]["amount"] = "-100"
@@ -435,9 +437,9 @@ def test_enum_wrappers_construct_from_labels_and_hash() -> None:
     assert TimeRollMode("approximate") == TimeRollMode.approximate()
     assert Compounding("semi_annual") == Compounding.semi_annual()
     assert {CurveKind("discount"): 1}[CurveKind.discount()] == 1
-    with pytest.raises(ValueError, match="CurveKind"):
+    with pytest.raises(ValueError, match="zero"):
         CurveKind("zero")
-    with pytest.raises(ValueError, match="TimeRollMode"):
+    with pytest.raises(ValueError, match="whenever"):
         OperationSpec.time_roll_forward("1M", roll_mode="whenever")
 
 
@@ -459,13 +461,16 @@ def test_operation_spec_equality_repr_and_validation() -> None:
     assert not OperationSpec.time_roll_forward("1M").mutates_instruments()
 
 
-def test_curve_parallel_bp_expands_curve_id_lists() -> None:
-    ops = OperationSpec.curve_parallel_bp("discount", ["USD-OIS", "EUR-OIS"], 25.0)
+def test_parallel_bp_many_expands_curve_ids() -> None:
+    ops = parallel_bp_many("discount", ["USD-OIS", "EUR-OIS"], 25.0)
     assert isinstance(ops, list)
     assert len(ops) == 2
     assert [json.loads(o.to_json())["curve_id"] for o in ops] == ["USD-OIS", "EUR-OIS"]
-    with pytest.raises(ValueError, match="curve_id"):
+    with pytest.raises(TypeError, match="curve_id"):
         OperationSpec.curve_parallel_bp("discount", 5, 25.0)
+    with pytest.raises(TypeError, match="curve_id"):
+        OperationSpec.curve_parallel_bp("discount", ["USD-OIS"], 25.0)
+    assert parallel_bp_many(CurveKind.discount(), [], 25.0) == []
 
 
 def test_attr_operations_accept_mapping_or_pairs() -> None:
@@ -476,9 +481,17 @@ def test_attr_operations_accept_mapping_or_pairs() -> None:
 
 
 def test_hierarchy_target_pyclass_roundtrip() -> None:
-    target = HierarchyTarget(["Credit", "US"], {"sector": "financials"})
+    tag_filter = {
+        "predicates": [
+            {"equals": {"key": "sector", "value": "financials"}},
+            {"in": {"key": "rating", "values": ["A", "BBB"]}},
+            {"exists": {"key": "region"}},
+        ]
+    }
+    target = HierarchyTarget(["Credit", "US"], tag_filter)
     assert target.path == ["Credit", "US"]
-    assert target.tag_filter == [("sector", "financials")]
+    assert target.tag_filter == tag_filter
+    assert HierarchyTarget(target.path, target.tag_filter) == target
     assert HierarchyTarget.from_json(target.to_json()) == target
     typed = OperationSpec.hierarchy_curve_parallel_bp("par_cds", target, 50.0)
     from_json = OperationSpec.hierarchy_curve_parallel_bp(CurveKind.par_cds(), target.to_json(), 50.0)
@@ -510,17 +523,17 @@ def test_shocked_instrument_copies_survive_result_round_trips(with_model: bool) 
         result = apply_scenario(
             scenario,
             _market(),
+            AS_OF,
             json.dumps({
                 "schema_version": 1,
                 "id": "m",
                 "periods": [{"id": "2025Q1", "start": "2025-01-01", "end": "2025-04-01", "is_actual": False}],
                 "nodes": {},
             }),
-            AS_OF,
             instruments=[original],
         )
     else:
-        result = apply_scenario_to_market(scenario, _market(), AS_OF, instruments=[original])
+        result = apply_scenario(scenario, _market(), AS_OF, instruments=[original])
     assert original.to_json() == before
     for restored in [result, ApplicationResult.from_json(result.to_json()), pickle.loads(pickle.dumps(result))]:  # noqa: S301 - own serialized result
         assert restored.instruments is not None
@@ -528,7 +541,7 @@ def test_shocked_instrument_copies_survive_result_round_trips(with_model: bool) 
         payload = json.loads(restored.instruments[0])
         shock = payload["instrument"]["spec"]["scenario_pricing_overrides"]["scenario_price_shock_decimal"]
         assert 100.0 * (1.0 + shock) == pytest.approx(16.0)
-        next_result = apply_scenario_to_market(
+        next_result = apply_scenario(
             ScenarioSpec("half", [OperationSpec.instrument_price_pct_by_type(["bond"], -50.0)]),
             _market(),
             AS_OF,
@@ -544,7 +557,7 @@ def test_shocked_instrument_copies_survive_result_round_trips(with_model: bool) 
 
 def test_empty_inventory_is_distinct_from_absent_inventory() -> None:
     spec = ScenarioSpec("empty", [])
-    assert apply_scenario_to_market(spec, _market(), AS_OF).instruments is None
-    result = apply_scenario_to_market(spec, _market(), AS_OF, instruments=[])
+    assert apply_scenario(spec, _market(), AS_OF).instruments is None
+    result = apply_scenario(spec, _market(), AS_OF, instruments=[])
     assert result.instruments == []
     assert ApplicationResult.from_json(result.to_json()).instruments == []

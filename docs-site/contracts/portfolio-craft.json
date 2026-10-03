@@ -368,7 +368,7 @@
       "finstack_quant.scenarios.OperationSpec",
       "finstack_quant.scenarios.ScenarioSpec",
       "finstack_quant.scenarios.TenorMatchMode",
-      "finstack_quant.scenarios.apply_scenario_to_market",
+      "finstack_quant.scenarios.apply_scenario",
       "finstack_quant.scenarios.build_from_template",
       "finstack_quant.scenarios.compose_scenarios",
       "finstack_quant.scenarios.compute_horizon_return",
@@ -383,7 +383,7 @@
     ],
     "expected_exceptions": [],
     "support_notes": [
-      "Fixed-hazard curve-space shocks use apply_scenario_to_market then value_portfolio(metrics=[]). Quote-space risk under changed discounting requires recalibration; preserving old hazard replay does not make that risk calculation consistent. validate_scenario_spec returns None on success."
+      "Fixed-hazard curve-space shocks use apply_scenario then value_portfolio(metrics=[]). Quote-space risk under changed discounting requires recalibration; preserving old hazard replay does not make that risk calculation consistent. validate_scenario_spec returns None on success."
     ]
   },
   {
@@ -946,7 +946,7 @@
       "finstack_quant.scenarios.CurveKind",
       "finstack_quant.scenarios.OperationSpec",
       "finstack_quant.scenarios.ScenarioSpec",
-      "finstack_quant.scenarios.apply_scenario_to_market",
+      "finstack_quant.scenarios.apply_scenario",
       "finstack_quant.valuations.instruments.price_instrument"
     ],
     "models": [],

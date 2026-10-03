@@ -36684,31 +36684,10 @@ export interface ScenariosNamespace {
    */
   buildTemplateComponent(templateId: string, componentId: string): ScenarioSpec;
   /**
-   * Build a scenario spec from fields.
-   * @returns Validated structured scenario specification from the supplied fields.
-   * @param id - Scenario identifier stored on the constructed spec.
-   * @param operations - Structured scenario operation specifications in execution order.
-   * @param name - Optional human-readable scenario name.
-   * @param description - Optional human-readable description of the scenario purpose.
-   * @param priority - Optional execution priority; lower values run earlier during composition. Omit for the Rust serde default (`0`), matching the Python `priority=0` keyword default.
-   * @param resolutionMode - Optional hierarchy conflict policy: `"most_specific_wins"` (default) or `"cumulative"`.
-   * @param hazardBumpMode - Optional ParCDS delivery: `"solve_to_par"` (default) rebootstraps par quotes; `"first_order_shift"` applies delta hazard = delta spread / (1 - recovery) and reports an approximation warning.
-   * @throws Error - Rejects malformed or schema-incompatible `operations`, an unsupported `resolution_mode` or `hazard_bump_mode`, a blank scenario ID, multiple time-roll operations, invalid operation identifiers or numeric fields, variant-specific operation violations, or failure to serialize the scenario.
-   */
-  buildScenarioSpec(
-    id: string,
-    operations: OperationSpec[],
-    name?: string,
-    description?: string,
-    priority?: number,
-    resolutionMode?: 'most_specific_wins' | 'cumulative',
-    hazardBumpMode?: 'solve_to_par' | 'first_order_shift'
-  ): ScenarioSpec;
-  /**
-   * Apply a scenario to a market context and financial model.
+   * Apply a scenario to copied market data and an optional financial model.
    *
    * Returns a JavaScript object with `market` and `model` (the mutated
-   * contexts as objects, not JSON strings), `operations_applied`,
+   * contexts as objects, not JSON strings), and a canonical `report` containing `operations_applied`,
    * `user_operations`, `expanded_operations`, `changes` (a
    * `ScenarioChangeManifest`), `warnings`, `meta` (a `ResultsMeta` audit stamp
    * carrying the numeric mode, rounding context, and FX policy; omitted when
@@ -36722,7 +36701,7 @@ export interface ScenariosNamespace {
    * @returns Mutated market and optional model after applying the scenario.
    * @param scenarioJson - JSON-serialized ScenarioSpec to validate and apply.
    * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param modelJson - JSON-serialized FinancialModelSpec that scenario operations may mutate.
+   * @param modelJson - Optional FinancialModelSpec JSON; omit for market-only scenarios.
    * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
    * @param instrumentsJson - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
    * @param configJson - Optional FinstackConfig JSON; its rounding policy is stamped into `meta`. Omit for the library default.
@@ -36731,28 +36710,8 @@ export interface ScenariosNamespace {
   applyScenario(
     scenarioJson: JsonInput,
     marketJson: JsonInput,
-    modelJson: JsonInput,
     asOf: string,
-    instrumentsJson?: JsonInput,
-    configJson?: JsonInput
-  ): ApplicationEnvelope;
-  /**
-   * Apply a scenario to a market context only (no model mutations).
-   *
-   * Returns the same envelope shape as `applyScenario` minus `model`;
-   * the same inventory, configuration and calendar rules apply.
-   * @returns Mutated market after applying the scenario.
-   * @param scenarioJson - JSON-serialized ScenarioSpec to validate and apply.
-   * @param marketJson - Canonical market-context JSON supplying curves, quotes, and FX data.
-   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
-   * @param instrumentsJson - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
-   * @param configJson - Optional FinstackConfig JSON; its rounding policy is stamped into `meta`. Omit for the library default.
-   * @throws Error - Rejects a malformed or invalid scenario (checked before the market is parsed), malformed market, instrument, or configuration JSON, instrument-scoped operations without `instruments_json`, an invalid ISO `as_of` date, an invalid scenario operation, missing market objects or hierarchy context, failure to encode the mutated market, or failure to serialize the application envelope to JavaScript.
-   */
-  applyScenarioToMarket(
-    scenarioJson: JsonInput,
-    marketJson: JsonInput,
-    asOf: string,
+    modelJson?: JsonInput,
     instrumentsJson?: JsonInput,
     configJson?: JsonInput
   ): ApplicationEnvelope;
@@ -36820,25 +36779,40 @@ export interface ScenariosNamespace {
     pct: number
   ): OperationSpec;
   /**
+   * Expand a parallel shift into one operation per curve identifier.
+   * @param curveKind - Canonical discount, forward, par_cds, inflation or commodity family label.
+   * @param curveIds - Ordered array of curve identifiers; empty input returns an empty array.
+   * @param bp - Additive basis points; percent of forward for commodity curves.
+   * @param discountCurveId - Optional ParCDS discount curve copied onto every operation.
+   * @returns An array of operations preserving identifier order.
+   * @throws Error - Throws TypeError for malformed identifiers or non-numeric bp, and a validation error for an unknown curve family.
+   */
+  parallelBpMany(
+    curveKind: CurveKind,
+    curveIds: string[],
+    bp: number,
+    discountCurveId?: string
+  ): OperationSpec[];
+  /**
    * Build a parallel basis-point curve shift for one curve or several.
    *
    * Free-function twin of Python `OperationSpec.curve_parallel_bp`. A single
    * identifier builds Rust `OperationSpec::CurveParallelBp`; an array expands
    * through Rust `ScenarioSpec::parallel_bp_many` to one operation per
    * identifier, in the given order.
-   * @param curveKind - Curve family label: `"discount"`, `"forward"`, `"par_cds"`, `"inflation"` or `"commodity"`.
-   * @param curveId - One curve identifier, or an array of identifiers to shift by the same amount.
-   * @param bp - Additive shift in basis points (1 bp = 1e-4); for `"commodity"` curves, percent of the forward.
-   * @param discountCurveId - Optional discount curve used when re-bootstrapping shocked ParCDS quotes.
-   * @returns One `curve_parallel_bp` operation object for a string `curveId`, an array of them for an array.
-   * @throws Error - Throws a `TypeError` when `curveId` is neither a string nor an array of strings or `bp` is not a number, and a `validation` error for an unknown `curveKind` label.
+   * @param curveKind - Canonical discount, forward, par_cds, inflation or commodity family label.
+   * @param curveId - Identifier of the single curve receiving the shift.
+   * @param bp - Additive basis points; percent of forward for commodity curves.
+   * @param discountCurveId - Optional discount curve used to re-bootstrap ParCDS quotes.
+   * @returns One curve_parallel_bp operation object.
+   * @throws Error - Throws TypeError for non-string identifiers or non-numeric bp, and a validation error for an unknown curve family.
    */
   operationSpecCurveParallelBp(
     curveKind: CurveKind,
-    curveId: string | string[],
+    curveId: string,
     bp: number,
     discountCurveId?: string
-  ): OperationSpec | OperationSpec[];
+  ): OperationSpec;
   /**
    * Build node-level basis-point shifts on a curve.
    *

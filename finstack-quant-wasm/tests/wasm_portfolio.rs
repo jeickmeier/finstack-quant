@@ -14,7 +14,7 @@
 
 use finstack_quant_wasm::api::portfolio::sensitivity::decompose_factor_risk;
 use finstack_quant_wasm::api::portfolio::*;
-use finstack_quant_wasm::api::scenarios::build_scenario_spec;
+use finstack_quant_wasm::api::scenarios::parse_scenario_spec;
 use finstack_quant_wasm::utils::materialization_to_js_error;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
@@ -592,19 +592,8 @@ fn campisi_reconciliation_check_honours_tolerance_and_denies_unknown_fields() {
 }
 
 fn empty_scenario_json() -> String {
-    let operations =
-        serde_wasm_bindgen::to_value(&Vec::<finstack_quant_scenarios::OperationSpec>::new())
-            .expect("operations");
-    let value = build_scenario_spec(
-        JsValue::from("stress"),
-        operations,
-        None,
-        None,
-        None,
-        None,
-        None,
-    )
-    .expect("scenario");
+    let value =
+        parse_scenario_spec(JsValue::from(r#"{"id":"stress","operations":[]}"#)).expect("scenario");
     let spec: finstack_quant_scenarios::ScenarioSpec =
         serde_wasm_bindgen::from_value(value).expect("typed scenario");
     serde_json::to_string(&spec).expect("scenario json")

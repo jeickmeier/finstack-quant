@@ -2020,7 +2020,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1124830
+            "bytes": 1126944
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -4509,7 +4509,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1124830
+            "bytes": 1126944
           },
           {
             "domain": "scenarios",

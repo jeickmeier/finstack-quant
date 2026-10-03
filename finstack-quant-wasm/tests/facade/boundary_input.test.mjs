@@ -204,15 +204,15 @@ test('u64 seeds accept exact BigInt or safe integers and reject wrapping', () =>
   assert.throws(() => model.simulatePaths(2, 2, 1, 7n, 'no'), invalidType('antithetic'));
 });
 
-test('optional integers reject fractions (buildScenarioSpec priority)', () => {
-  assert.equal(scenarios.buildScenarioSpec('x', [], undefined, undefined, 3).priority, 3);
+test('scenario priority uses the canonical integer contract', () => {
+  assert.equal(scenarios.parseScenarioSpec({ id: 'x', operations: [], priority: 3 }).priority, 3);
   assert.throws(
-    () => scenarios.buildScenarioSpec('x', [], undefined, undefined, 1.5),
-    invalidType('priority')
+    () => scenarios.parseScenarioSpec({ id: 'x', operations: [], priority: 1.5 }),
+    (error) => error.kind === 'validation'
   );
   assert.throws(
-    () => scenarios.buildScenarioSpec('x', [], undefined, undefined, 2 ** 31),
-    invalidType('priority')
+    () => scenarios.parseScenarioSpec({ id: 'x', operations: [], priority: 2 ** 31 }),
+    (error) => error.kind === 'validation'
   );
 });
 

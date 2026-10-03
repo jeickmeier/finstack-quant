@@ -3958,9 +3958,7 @@
     "kind": "namespace",
     "keys": [
       "applyScenario",
-      "applyScenarioToMarket",
       "buildFromTemplate",
-      "buildScenarioSpec",
       "buildTemplateComponent",
       "composeScenarios",
       "computeHorizonReturn",
@@ -3996,6 +3994,7 @@
       "operationSpecVolIndexParallelPts",
       "operationSpecVolSurfaceBucketPct",
       "operationSpecVolSurfaceParallelPct",
+      "parallelBpMany",
       "parseScenarioSpec",
       "rateBindingSpecValidate",
       "scenarioSpecMutatesInstruments",
@@ -4029,13 +4028,7 @@
   "scenarios.buildTemplateComponent": {
     "kind": "function"
   },
-  "scenarios.buildScenarioSpec": {
-    "kind": "function"
-  },
   "scenarios.applyScenario": {
-    "kind": "function"
-  },
-  "scenarios.applyScenarioToMarket": {
     "kind": "function"
   },
   "scenarios.computeHorizonReturn": {
@@ -4048,6 +4041,9 @@
     "kind": "function"
   },
   "scenarios.operationSpecInstrumentPricePctByAttr": {
+    "kind": "function"
+  },
+  "scenarios.parallelBpMany": {
     "kind": "function"
   },
   "scenarios.operationSpecCurveParallelBp": {

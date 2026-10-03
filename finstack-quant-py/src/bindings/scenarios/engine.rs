@@ -9,17 +9,16 @@ use crate::bindings::pandas_utils::{
 use crate::bindings::statements::types::PyFinancialModelSpec;
 use crate::errors::{display_to_py, scenarios_to_py};
 use finstack_quant_scenarios::engine::{ApplicationEnvelope, ApplicationReport};
-use finstack_quant_scenarios::ScenarioSpec;
 use finstack_quant_valuations::instruments::Instrument;
 use pyo3::prelude::*;
 use pyo3::types::PyAny;
 
-use super::extract::{extract_config, extract_instruments, extract_scenario_spec};
+use super::extract::{extract_config, extract_instruments};
 
 /// Report describing what a scenario application changed.
 ///
 /// Returned as the ``report`` attribute of an ``ApplicationResult`` from
-/// ``apply_scenario`` / ``apply_scenario_to_market`` and as
+/// ``apply_scenario`` and as
 /// ``HorizonResult.scenario_report``.
 ///
 /// ``warnings`` is a list of structured dicts, each carrying a ``kind``
@@ -317,7 +316,7 @@ impl PyApplicationResult {
     /// Serialize to a compact JSON string.
     ///
     /// Emits the canonical ``ApplicationEnvelope`` shape, with ``market`` and
-    /// ``model`` as nested objects.
+    /// ``model`` and the canonical ``report`` as nested objects.
     fn to_json(&self) -> PyResult<String> {
         let envelope = ApplicationEnvelope::from_contexts(
             self.report.clone(),
@@ -375,32 +374,7 @@ impl PyApplicationResult {
     }
 }
 
-/// Everything the engine needs beyond the market itself.
-struct ApplyInputs<'a> {
-    spec: &'a ScenarioSpec,
-    model: Option<&'a mut finstack_quant_statements::FinancialModelSpec>,
-    instruments: Option<&'a mut Vec<Box<dyn Instrument>>>,
-    as_of: time::Date,
-    config: finstack_quant_core::config::FinstackConfig,
-}
-
-fn apply_with_context(
-    market: &mut finstack_quant_core::market_data::context::MarketContext,
-    inputs: ApplyInputs<'_>,
-) -> finstack_quant_scenarios::Result<ApplicationReport> {
-    let engine = finstack_quant_scenarios::ScenarioEngine::with_config(inputs.config);
-    let mut ctx = finstack_quant_scenarios::ExecutionContext {
-        market,
-        model: inputs.model,
-        instruments: inputs.instruments,
-        rate_bindings: None,
-        calendar: None,
-        as_of: inputs.as_of,
-    };
-    engine.apply(inputs.spec, &mut ctx)
-}
-
-/// Apply a scenario to a market context and financial model.
+/// Apply a scenario to copied market data and an optional financial model.
 ///
 /// Parameters
 /// ----------
@@ -409,8 +383,8 @@ fn apply_with_context(
 /// market : MarketContext | str
 ///     A ``MarketContext`` object or a JSON string. Never mutated; the result
 ///     carries a modified copy.
-/// model : FinancialModelSpec | str
-///     A ``FinancialModelSpec`` object or a JSON string.
+/// model : FinancialModelSpec | str | None, default None
+///     A ``FinancialModelSpec`` object or JSON string; omit for market-only execution.
 /// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
 ///     Valuation date (ISO 8601 accepted).
 /// instruments : list[Instrument | str] | None, default None
@@ -429,6 +403,8 @@ fn apply_with_context(
 ///
 /// Raises
 /// ------
+/// TypeError
+///     If scenario is neither a ScenarioSpec nor canonical JSON.
 /// ValueError
 ///     If any input fails to parse or validate, or the scenario contains
 ///     instrument-scoped operations and ``instruments`` is ``None`` (the Rust
@@ -439,123 +415,42 @@ fn apply_with_context(
 /// RuntimeError
 ///     If the engine fails internally.
 #[pyfunction]
-#[pyo3(signature = (scenario, market, model, as_of, instruments=None, config=None))]
+#[pyo3(signature = (scenario, market, as_of, model=None, instruments=None, config=None))]
 fn apply_scenario(
     py: Python<'_>,
     scenario: &Bound<'_, PyAny>,
     market: &Bound<'_, PyAny>,
-    model: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
+    model: Option<&Bound<'_, PyAny>>,
     instruments: Option<Vec<Bound<'_, PyAny>>>,
     config: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyApplicationResult> {
-    let spec = extract_scenario_spec(scenario)?;
+    let spec = crate::bindings::extract::extract_scenario_spec(py, scenario)?;
     let mut market = extract_market(py, market)?;
-    let mut model = extract_model_ref(model)?.into_owned();
+    let mut model = model
+        .map(|value| extract_model_ref(value).map(|model| model.into_owned()))
+        .transpose()?;
     let date = crate::bindings::date_utils::extract_date(as_of)?;
     let mut instruments = extract_instruments(instruments)?;
     let config = extract_config(config)?;
 
     // Release the GIL for scenario application: shifts + re-pricing can run for seconds.
-    let (report, market, model) = py.detach(|| {
-        let report = apply_with_context(
-            &mut market,
-            ApplyInputs {
-                spec: &spec,
-                model: Some(&mut model),
-                instruments: instruments.as_mut(),
-                as_of: date,
-                config,
-            },
-        );
-        (report, market, model)
+    let report = py.detach(|| {
+        let mut ctx = finstack_quant_scenarios::ExecutionContext {
+            market: &mut market,
+            model: model.as_mut(),
+            instruments: instruments.as_mut(),
+            rate_bindings: None,
+            calendar: None,
+            as_of: date,
+        };
+        finstack_quant_scenarios::ScenarioEngine::with_config(config).apply(&spec, &mut ctx)
     });
     let report = report.map_err(scenarios_to_py)?;
 
     Ok(PyApplicationResult {
         market,
-        model: Some(model),
-        report,
-        instruments,
-    })
-}
-
-/// Apply a scenario to a market context only (no model).
-///
-/// Parameters
-/// ----------
-/// scenario : ScenarioSpec | str
-///     Typed scenario or JSON-serialized ``ScenarioSpec``.
-/// market : MarketContext | str
-///     A ``MarketContext`` object or a JSON string. Never mutated.
-/// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-///     Valuation date (ISO 8601 accepted).
-/// instruments : list[Instrument | str] | None, default None
-///     Typed instruments or canonical envelope JSON strings; required for
-///     instrument-scoped operations, used for carry under
-///     ``time_roll_forward``. Shocked copies are returned in ``ApplicationResult.instruments``.
-/// config : FinstackConfig | str | None, default None
-///     Library configuration; ``None`` uses the default.
-///
-/// Returns
-/// -------
-/// ApplicationResult
-///     Typed result whose ``model`` attribute is ``None``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If any input fails to parse or validate, or the scenario contains
-///     instrument-scoped operations and ``instruments`` is ``None`` (the Rust
-///     engine rejects it after validating the scenario).
-/// KeyError
-///     If the scenario references market data, tenors or instruments that do
-///     not exist.
-/// RuntimeError
-///     If the engine fails internally.
-///
-/// Examples
-/// --------
-/// >>> from finstack_quant.scenarios import CurveKind, OperationSpec, ScenarioSpec, apply_scenario_to_market
-/// >>> from finstack_quant.core.market_data import MarketContext
-/// >>> spec = ScenarioSpec("up25", [OperationSpec.curve_parallel_bp("discount", "USD-OIS", 25.0)])
-/// >>> result = apply_scenario_to_market(spec, MarketContext(), "2025-01-15")
-/// >>> result.report.user_operations
-/// 1
-#[pyfunction]
-#[pyo3(signature = (scenario, market, as_of, instruments=None, config=None))]
-fn apply_scenario_to_market(
-    py: Python<'_>,
-    scenario: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-    instruments: Option<Vec<Bound<'_, PyAny>>>,
-    config: Option<&Bound<'_, PyAny>>,
-) -> PyResult<PyApplicationResult> {
-    let spec = extract_scenario_spec(scenario)?;
-    let mut market = extract_market(py, market)?;
-    let date = crate::bindings::date_utils::extract_date(as_of)?;
-    let mut instruments = extract_instruments(instruments)?;
-    let config = extract_config(config)?;
-
-    let (report, market) = py.detach(|| {
-        let report = apply_with_context(
-            &mut market,
-            ApplyInputs {
-                spec: &spec,
-                model: None,
-                instruments: instruments.as_mut(),
-                as_of: date,
-                config,
-            },
-        );
-        (report, market)
-    });
-    let report = report.map_err(scenarios_to_py)?;
-
-    Ok(PyApplicationResult {
-        market,
-        model: None,
+        model,
         report,
         instruments,
     })
@@ -566,6 +461,5 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyApplicationReport>()?;
     m.add_class::<PyApplicationResult>()?;
     m.add_function(pyo3::wrap_pyfunction!(apply_scenario, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(apply_scenario_to_market, m)?)?;
     Ok(())
 }

@@ -465,12 +465,15 @@ test('namespace results match their published result types', () => {
   declarations.push([
     'application',
     'fq.ApplicationEnvelope',
-    scenarios.applyScenarioToMarket(spec, OIS_MARKET, AS_OF, [DEPOSIT]),
+    scenarios.applyScenario(spec, OIS_MARKET, AS_OF, undefined, [DEPOSIT]),
   ]);
-  const hold = scenarios.buildScenarioSpec('hold_1m_up25', [
-    { kind: 'time_roll_forward', period: '1M', apply_shocks: true, roll_mode: 'calendar_days' },
-    up25,
-  ]);
+  const hold = scenarios.parseScenarioSpec({
+    id: 'hold_1m_up25',
+    operations: [
+      { kind: 'time_roll_forward', period: '1M', apply_shocks: true, roll_mode: 'calendar_days' },
+      up25,
+    ],
+  });
   declarations.push([
     'horizon',
     'fq.HorizonReport',

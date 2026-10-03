@@ -30,70 +30,39 @@ pub(super) fn parse_instrument_types(names: Vec<String>) -> PyResult<Vec<Instrum
     names.iter().map(|s| parse_instrument_type(s)).collect()
 }
 
-/// Parse a serde string-enum from its snake-case wire label.
-pub(super) fn label_to_enum<T: serde::de::DeserializeOwned>(
-    type_name: &str,
-    label: &str,
-    accepted: &str,
-) -> PyResult<T> {
-    serde_json::from_value(serde_json::Value::String(label.to_string())).map_err(|_| {
-        crate::errors::value_error(format!(
-            "Unknown {type_name} label {label:?}; expected one of: {accepted}"
-        ))
-    })
-}
-
-/// Render a serde string-enum as its snake-case wire label.
-pub(super) fn enum_to_label<T: serde::Serialize>(value: &T) -> PyResult<String> {
-    match serde_json::to_value(value).map_err(crate::errors::display_to_py)? {
-        serde_json::Value::String(label) => Ok(label),
-        _ => Err(crate::errors::value_error(
-            "scenario enum did not serialize to a string",
-        )),
-    }
-}
-
 macro_rules! typed_or_label {
-    ($fn_name:ident, $wrapper:ty, $inner:ty, $type_name:literal, $accepted:literal) => {
+    ($fn_name:ident, $wrapper:ty, $inner:ty, $type_name:literal) => {
         /// Accept the typed wrapper or its snake-case wire label.
-        pub(super) fn $fn_name(obj: &Bound<'_, PyAny>) -> PyResult<$inner> {
+        pub(crate) fn $fn_name(obj: &Bound<'_, PyAny>) -> PyResult<$inner> {
             if let Ok(typed) = obj.cast::<$wrapper>() {
                 return Ok(typed.borrow().inner);
             }
             let label: String = obj.extract().map_err(|_| {
                 crate::errors::value_error(format!(
-                    "{} must be a {} or one of: {}; got {}",
+                    "{} must be a {} or canonical string; got {}",
                     $type_name,
                     $type_name,
-                    $accepted,
                     obj.get_type()
                 ))
             })?;
-            label_to_enum::<$inner>($type_name, &label, $accepted)
+            finstack_quant_core::wire::serde_parse::<$inner>(&label)
+                .map_err(crate::errors::core_to_py)
         }
     };
 }
 
-typed_or_label!(
-    extract_curve_kind,
-    PyCurveKind,
-    CurveKind,
-    "CurveKind",
-    "discount, forward, par_cds, inflation, commodity"
-);
+typed_or_label!(extract_curve_kind, PyCurveKind, CurveKind, "CurveKind");
 typed_or_label!(
     extract_tenor_match_mode,
     PyTenorMatchMode,
     TenorMatchMode,
-    "TenorMatchMode",
-    "exact, interpolate"
+    "TenorMatchMode"
 );
 typed_or_label!(
     extract_time_roll_mode,
     PyTimeRollMode,
     TimeRollMode,
-    "TimeRollMode",
-    "business_days, calendar_days, approximate"
+    "TimeRollMode"
 );
 /// Accept the typed `Compounding` wrapper or its canonical label.
 pub(super) fn extract_compounding(obj: &Bound<'_, PyAny>) -> PyResult<Compounding> {
