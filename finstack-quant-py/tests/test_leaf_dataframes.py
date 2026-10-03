@@ -139,6 +139,16 @@ def test_multi_factor_result_to_dataframe_accepts_factor_names() -> None:
     assert list(df["factor"]) == ["value", "momentum"]
 
 
+def test_multi_factor_constant_response_frame_preserves_nan() -> None:
+    dates = [dt_date(2024, 1, 1) + timedelta(days=i) for i in range(8)]
+    perf = Performance.from_returns_arrays(dates, [[0.01] * 8], ["FUND"])
+    result = perf.multi_factor_greeks(0, [[-0.02, -0.01, 0.0, 0.01, 0.02, 0.03, 0.015, -0.005]])
+    frame = result.to_dataframe(["market"])
+    for column in ("r_squared", "adjusted_r_squared"):
+        assert math.isnan(frame[column].iloc[0])
+        assert frame[column].dtype == "float64"
+
+
 def test_multi_factor_result_to_dataframe_rejects_mismatched_names() -> None:
     result = _multi_factor_result()
     with pytest.raises(ValueError, match="factor_names"):

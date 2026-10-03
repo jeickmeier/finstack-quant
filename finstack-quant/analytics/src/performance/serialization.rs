@@ -36,8 +36,9 @@ impl TryFrom<PerformanceState> for Performance {
                 )
             })?
             .clone();
-        let return_dates = state.price_dates.get(1..).unwrap_or(&[]).to_vec();
-        if state.start_idx > state.end_idx || state.end_idx > return_dates.len() {
+        if state.start_idx > state.end_idx
+            || state.end_idx > state.price_dates.len().saturating_sub(1)
+        {
             return Err(invalid_return_series(
                 "<panel>",
                 state.start_idx,
@@ -47,7 +48,6 @@ impl TryFrom<PerformanceState> for Performance {
         }
         let mut perf = Self::assemble(
             state.price_dates,
-            return_dates,
             state.returns,
             state.return_spans,
             state.ticker_names,

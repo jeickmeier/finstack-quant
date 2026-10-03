@@ -9218,53 +9218,25 @@ export type NumericArray = number[] | Float64Array;
 export type NumericMatrix = NumericArray[];
 
 /**
- * Dated rolling result returned by per-ticker rolling analytics: the serde
- * form of Rust `DatedSeries`, with `values` as a typed array.
- *
- * Hand-declared because the JavaScript form differs from the generated wire
- * type (`number[]`, with non-finite sentinels): `values` is a `Float64Array`
- * holding `NaN` for an undefined window.
- *
- * Identical keys to Python `DatedSeries.to_json()`.
+ * Dated rolling result derived from the Rust schema, with its numeric column
+ * exposed as a typed array. Undefined windows contain `NaN`.
+ * Dates and metric labels retain the generated Rust wire contract.
  */
-export interface DatedSeries {
-  /**
-   * Rolling metric values, one per completed window.
-   */
+export type DatedSeries = WithFields<generated.analytics.DatedSeries, {
+  /** Rolling metric values, one per completed window. */
   values: Float64Array;
-  /**
-   * ISO-8601 window-end dates aligned 1:1 with `values`, in chronological order.
-   */
-  dates: string[];
-  /**
-   * Rust `RollingMetric` name of the series: `"volatility"` (`rollingVolatility`),
-   * `"sortino"` (`rollingSortino`), `"sharpe"` (`rollingSharpe`) or `"return"`
-   * (`rollingReturns`).
-   */
-  value_column: 'volatility' | 'sortino' | 'sharpe' | 'return';
-}
+}>;
 
 /**
- * Rolling greeks aligned with rolling-window end dates: the serde form of Rust
- * `RollingGreeks`, with `alphas` and `betas` as typed arrays.
- *
- * Hand-declared because the JavaScript form differs from the generated wire
- * type (`number[]`): the numeric columns are `Float64Array`s.
+ * Rolling greeks derived from the Rust schema, with numeric columns exposed as
+ * typed arrays aligned with the generated window-end dates.
  */
-export interface RollingGreeks {
-  /**
-   * ISO-8601 end dates of each rolling window, in chronological order.
-   */
-  dates: string[];
-  /**
-   * Annualized Jensen alpha at each window end, as decimal fractions.
-   */
+export type RollingGreeks = WithFields<generated.analytics.RollingGreeks, {
+  /** Annualized Jensen alpha at each window end, as decimal fractions. */
   alphas: Float64Array;
-  /**
-   * OLS beta at each window end.
-   */
+  /** OLS beta at each window end. */
   betas: Float64Array;
-}
+}>;
 
 /**
  * Stateful performance analytics engine over a panel of ticker series.
@@ -9313,46 +9285,6 @@ declare class Performance {
    * @throws Error - Rejects malformed dates or matrices and invalid benchmark or frequency inputs.
    */
   static fromReturns(
-    dates: string[],
-    returns: NumericMatrix,
-    tickerNames: string[],
-    benchmarkTicker?: string | null,
-    frequency?: string
-  ): Performance;
-  /**
-   * Construct from a ticker-major, column-oriented price matrix.
-   *
-   * Same call as `new Performance(...)`, under the name of Python
-   * `Performance.from_arrays` (Rust `Performance::new`).
-   * @param dates - ISO-8601 observation dates in ascending order, with one entry per value in each inner price series.
-   * @param prices - Ticker-major, column-oriented matrix where `prices[tickerIdx][dateIdx]` is the price for `tickerIdx` at `dates[dateIdx]`.
-   * @param tickerNames - Ticker labels aligned with the outer elements of `prices`.
-   * @param benchmarkTicker - Optional ticker label to use as the benchmark return series.
-   * @param frequency - Optional observation frequency token; defaults to daily.
-   * @returns A `Performance` handle over the returns derived from the price panel.
-   * @throws Error - Rejects malformed dates or matrices, invalid prices, unsupported frequencies, and an unknown benchmark ticker.
-   */
-  static fromArrays(
-    dates: string[],
-    prices: NumericMatrix,
-    tickerNames: string[],
-    benchmarkTicker?: string | null,
-    frequency?: string
-  ): Performance;
-  /**
-   * Construct from a ticker-major, column-oriented return matrix.
-   *
-   * Same call as `Performance.fromReturns(...)`, under the name of Python
-   * `Performance.from_returns_arrays` (Rust `Performance::from_returns`).
-   * @param dates - ISO-8601 observation dates in ascending order, with one entry per value in each inner return series.
-   * @param returns - Ticker-major, column-oriented simple decimal return matrix where `returns[tickerIdx][dateIdx]` is the return for `tickerIdx` at `dates[dateIdx]`.
-   * @param tickerNames - Ticker labels aligned with the outer elements of `returns`.
-   * @param benchmarkTicker - Optional ticker label to use as the benchmark return series.
-   * @param frequency - Optional observation frequency token; defaults to daily.
-   * @returns A `Performance` handle over the supplied return panel.
-   * @throws Error - Rejects malformed dates or matrices and invalid benchmark or frequency inputs.
-   */
-  static fromReturnsArrays(
     dates: string[],
     returns: NumericMatrix,
     tickerNames: string[],

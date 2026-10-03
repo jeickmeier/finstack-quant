@@ -70,12 +70,6 @@ pub struct Performance {
         schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
     )]
     price_dates: Vec<Date>,
-    #[serde(skip_serializing)]
-    #[cfg_attr(
-        feature = "json-schema",
-        schemars(with = "Vec<finstack_quant_core::wire::DateWire>")
-    )]
-    dates: Vec<Date>,
     returns: Vec<Vec<f64>>,
     return_spans: Vec<TickerSpan>,
     ticker_names: Vec<String>,
@@ -325,7 +319,7 @@ fn build_synthetic_price_dates(dates: &[Date], frequency: PeriodKind) -> crate::
 
 impl Performance {
     fn global_active_span(&self) -> TickerSpan {
-        TickerSpan::new(self.start_idx, self.end_idx.min(self.dates.len()))
+        TickerSpan::new(self.start_idx, self.end_idx.min(self.dates().len()))
     }
 
     fn active_span_for_ticker(&self, ticker_idx: usize) -> TickerSpan {
@@ -391,7 +385,8 @@ impl Performance {
 
     fn active_pair_dates(&self, ticker_idx: usize) -> &[Date] {
         let span = self.active_pair_span(ticker_idx);
-        &self.dates[span.start.min(self.dates.len())..span.end.min(self.dates.len())]
+        let dates = self.dates();
+        &dates[span.start.min(dates.len())..span.end.min(dates.len())]
     }
 
     fn active_holding_period_for_ticker(&self, ticker_idx: usize) -> Option<(Date, Date)> {
@@ -514,14 +509,8 @@ impl Performance {
             returns_matrix.push(returns);
             return_spans.push(span);
         }
-        let return_dates = if dates.len() > 1 {
-            dates[1..].to_vec()
-        } else {
-            dates.clone()
-        };
         Self::assemble(
             dates,
-            return_dates,
             returns_matrix,
             return_spans,
             ticker_names,
@@ -596,7 +585,6 @@ impl Performance {
 
         Self::assemble(
             build_synthetic_price_dates(&dates, frequency)?,
-            dates,
             all_returns,
             return_spans,
             ticker_names,
@@ -611,25 +599,17 @@ impl Performance {
     /// and [`Self::from_returns`] (which receives a return matrix directly).
     fn assemble(
         price_dates: Vec<Date>,
-        return_dates: Vec<Date>,
         returns: Vec<Vec<f64>>,
         return_spans: Vec<TickerSpan>,
         ticker_names: Vec<String>,
         benchmark_ticker: Option<&str>,
         frequency: PeriodKind,
     ) -> crate::Result<Self> {
-        if return_dates.is_empty() || returns.is_empty() {
+        if price_dates.len() < 2 || returns.is_empty() {
             return Err(invalid_return_series("<panel>", 0, "returns or dates is empty").into());
         }
         validate_strictly_ascending_dates(&price_dates)?;
-        if price_dates.len() != return_dates.len() + 1 || price_dates[1..] != return_dates {
-            return Err(invalid_return_series(
-                "<panel>",
-                0,
-                "price dates must include the initial valuation date followed by the return dates",
-            )
-            .into());
-        }
+        let end_idx = price_dates.len() - 1;
         if ticker_names.len() != returns.len() {
             return Err(invalid_return_series(
                 "<panel>",
@@ -676,7 +656,7 @@ impl Performance {
 
         let mut all_drawdowns: Vec<Vec<f64>> = Vec::with_capacity(returns.len());
         for ((col, span), ticker) in returns.iter().zip(&return_spans).zip(&ticker_names) {
-            if span.start >= span.end || span.end > return_dates.len() || span.len() != col.len() {
+            if span.start >= span.end || span.end > end_idx || span.len() != col.len() {
                 return Err(invalid_return_series(
                     ticker,
                     span.start,
@@ -698,11 +678,8 @@ impl Performance {
             all_drawdowns.push(dd);
         }
 
-        let end_idx = return_dates.len();
-
         Ok(Self {
             price_dates,
-            dates: return_dates,
             returns,
             return_spans,
             ticker_names,
@@ -744,9 +721,9 @@ impl Performance {
     /// * `start` - First date to include (inclusive).
     /// * `end`   - Last date to include (inclusive).
     pub fn reset_date_range(&mut self, start: Date, end: Date) {
-        self.start_idx = self.dates.partition_point(|&d| d < start);
+        self.start_idx = self.dates().partition_point(|&d| d < start);
         self.end_idx = self
-            .dates
+            .dates()
             .partition_point(|&d| d <= end)
             .max(self.start_idx);
         self.refresh_active_drawdown_cache();
@@ -784,7 +761,7 @@ impl Performance {
     }
 
     fn full_range_len(&self) -> usize {
-        self.dates.len()
+        self.dates().len()
     }
 
     fn using_full_range(&self) -> bool {
@@ -926,8 +903,9 @@ impl Performance {
     /// Date slice corresponding to the currently active analysis window.
     pub fn active_dates(&self) -> &[Date] {
         let range = self.active_range();
-        let end = range.end.min(self.dates.len());
-        &self.dates[range.start.min(end)..end]
+        let dates = self.dates();
+        let end = range.end.min(dates.len());
+        &dates[range.start.min(end)..end]
     }
 
     /// Date slice corresponding to a ticker's currently active return series.
@@ -950,7 +928,8 @@ impl Performance {
 
     fn active_dates_for_ticker_unchecked(&self, ticker_idx: usize) -> &[Date] {
         let span = self.active_span_for_ticker(ticker_idx);
-        &self.dates[span.start.min(self.dates.len())..span.end.min(self.dates.len())]
+        let dates = self.dates();
+        &dates[span.start.min(dates.len())..span.end.min(dates.len())]
     }
 
     fn active_drawdown_values(&self, ticker_idx: usize) -> &[f64] {
@@ -991,7 +970,7 @@ impl Performance {
     /// covering the full constructed range. To get just the dates inside
     /// the currently selected analysis window, use [`Self::active_dates`].
     pub fn dates(&self) -> &[Date] {
-        &self.dates
+        &self.price_dates[1..]
     }
     /// Ticker names in column order.
     ///

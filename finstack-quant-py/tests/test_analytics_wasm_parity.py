@@ -3,7 +3,7 @@
 ``tests/data/analytics_wasm_parity.json`` holds the Python outputs for a fixed
 price panel and a fixed return panel. This module pins Python to that file and
 ``finstack-quant-wasm/tests/facade/analytics_parity.test.mjs`` pins the WASM
-members ``Performance.fromArrays``, ``fromReturnsArrays``, ``toJson`` and
+constructor ``new Performance(...)`` and members ``fromReturns``, ``toJson`` and
 ``fromJson`` to the same file.
 """
 

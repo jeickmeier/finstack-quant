@@ -453,7 +453,7 @@ fn aligned_panel_rejects_malformed_shapes_and_only_pads_inactive_dates() {
         Date::from_calendar_date(2025, Month::January, 2).expect("first date"),
         4,
     );
-    let perf = Performance::from_returns(
+    let mut perf = Performance::from_returns(
         dates.clone(),
         vec![
             vec![0.01, 0.02, 0.03, 0.04],
@@ -483,6 +483,25 @@ fn aligned_panel_rejects_malformed_shapes_and_only_pads_inactive_dates() {
     assert_eq!(columns[1][1], 0.02);
     assert_eq!(columns[1][2], 0.03);
     assert!(columns[1][3].is_nan());
+
+    for (start, end) in [(0, 0), (1, 2), (3, 3), (3, 0)] {
+        perf.reset_date_range(dates[start], dates[end]);
+        let (aligned_dates, columns) = perf.aligned_panel(perf.returns()).expect("windowed series");
+        assert_eq!(aligned_dates, perf.active_dates());
+        assert_eq!(perf.dates(), dates);
+        for (ticker_idx, column) in columns.iter().enumerate() {
+            let ticker_dates = perf
+                .active_dates_for_ticker(ticker_idx)
+                .expect("ticker dates");
+            let returns = perf.returns_for_ticker(ticker_idx).expect("ticker returns");
+            for (&date, &value) in aligned_dates.iter().zip(column) {
+                match ticker_dates.binary_search(&date) {
+                    Ok(idx) => assert_eq!(value, returns[idx]),
+                    Err(_) => assert!(value.is_nan()),
+                }
+            }
+        }
+    }
 }
 
 #[test]

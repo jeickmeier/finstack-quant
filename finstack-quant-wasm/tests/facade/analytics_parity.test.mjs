@@ -36,41 +36,29 @@ const close = (actual, expected, rel, label) =>
     `${label}: ${actual} vs ${expected}`
   );
 const pricePanel = () =>
-  Performance.fromArrays(
-    PRICES.dates,
-    PRICES.values,
-    NAMES,
-    PRICES.benchmark_ticker,
-    PRICES.frequency
-  );
+  new Performance(PRICES.dates, PRICES.values, NAMES, PRICES.benchmark_ticker, PRICES.frequency);
 
-test('Performance.fromArrays is the price constructor under its Python name', () => {
+test('Performance constructor matches the shared Python price golden', () => {
   const panel = pricePanel();
-  const viaConstructor = new Performance(
-    PRICES.dates,
-    PRICES.values,
-    NAMES,
-    PRICES.benchmark_ticker,
-    PRICES.frequency
-  );
   const sharpe = Array.from(panel.sharpe());
-  assert.deepEqual(sharpe, Array.from(viaConstructor.sharpe()));
   sharpe.forEach((value, index) => close(value, PRICES.sharpe[index], 1e-12, `sharpe[${index}]`));
+  assert.equal('fromArrays' in Performance, false);
   assert.throws(
-    () => Performance.fromArrays(PRICES.dates, PRICES.values, NAMES, 'missing'),
+    () => new Performance(PRICES.dates, PRICES.values, NAMES, 'missing'),
     (error) => error.name === 'FinstackError'
   );
+  panel.free();
 });
 
-test('Performance.fromReturnsArrays is fromReturns under its Python name', () => {
+test('Performance.fromReturns matches the shared Python return golden', () => {
   const returns = GOLDEN.returns;
-  const panel = Performance.fromReturnsArrays(returns.dates, returns.values, NAMES);
-  const viaFromReturns = Performance.fromReturns(returns.dates, returns.values, NAMES);
+  const panel = Performance.fromReturns(returns.dates, returns.values, NAMES);
   const volatility = Array.from(panel.volatility());
-  assert.deepEqual(volatility, Array.from(viaFromReturns.volatility()));
   volatility.forEach((value, index) =>
     close(value, returns.volatility[index], 1e-12, `volatility[${index}]`)
   );
+  assert.equal('fromReturnsArrays' in Performance, false);
+  panel.free();
 });
 
 test('Performance.toJson writes the Python to_json document', () => {

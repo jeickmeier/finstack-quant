@@ -64,14 +64,10 @@ impl Performance {
                 .into());
             }
             let mut padded = vec![f64::NAN; dates.len()];
-            let mut global_idx = 0usize;
-            for (&date, &value) in ticker_dates.iter().zip(series.iter()) {
-                while global_idx < dates.len() && dates[global_idx] < date {
-                    global_idx += 1;
-                }
-                if global_idx < dates.len() && dates[global_idx] == date {
-                    padded[global_idx] = value;
-                }
+            if !series.is_empty() {
+                let span = self.active_span_for_ticker(ticker_idx);
+                let offset = span.start - self.start_idx;
+                padded[offset..offset + series.len()].copy_from_slice(&series);
             }
             columns.push(padded);
         }

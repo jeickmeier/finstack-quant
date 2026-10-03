@@ -341,13 +341,13 @@ class PeriodStats:
         -------
         pd.DataFrame
             One row, columns in :meth:`to_series` order; stack tickers with
-            ``pd.concat``. Non-finite ratios (``inf`` on a loss-free sample)
-            arrive as ``None`` and make that column ``object`` dtype.
+            ``pd.concat``. Non-finite ratios remain native ``NaN`` / ``inf``
+            in ``float64`` columns; streak counts remain integers.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as a pandas object.
         """
         ...
 
@@ -516,10 +516,8 @@ class BetaResult:
         right shape: ``pd.concat([r.to_dataframe() for r in results])`` stacks
         every ticker's beta into one comparison table without reshaping.
 
-        A degenerate regression (fewer than three observations) yields
-        non-finite estimates, which arrive as ``None`` and make the affected
-        column ``object`` dtype; coerce with ``pd.to_numeric`` before
-        aggregating.
+        Undefined estimates from a degenerate regression remain ``NaN``
+        in numeric ``float64`` columns.
 
         Returns
         -------
@@ -529,7 +527,7 @@ class BetaResult:
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as a pandas object.
         """
         ...
 
@@ -695,9 +693,8 @@ class GreeksResult:
         right shape: ``pd.concat([r.to_dataframe() for r in results])`` stacks
         every ticker's greeks into one comparison table without reshaping.
 
-        Non-finite estimates from a degenerate fit arrive as ``None`` and make
-        the affected column ``object`` dtype; coerce with ``pd.to_numeric``
-        before aggregating.
+        Undefined estimates from a degenerate fit remain ``NaN`` in numeric
+        ``float64`` columns.
 
         Returns
         -------
@@ -707,7 +704,7 @@ class GreeksResult:
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as a pandas object.
         """
         ...
 
@@ -863,7 +860,7 @@ class RollingGreeks:
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as a pandas object.
         """
         ...
 
@@ -1252,7 +1249,7 @@ class DrawdownEpisode:
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as a pandas object.
         """
         ...
 
@@ -1428,7 +1425,7 @@ class LookbackReturns:
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as a pandas object.
         """
         ...
 
@@ -1586,7 +1583,7 @@ class DatedSeries:
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as a pandas object.
         """
         ...
 
@@ -3370,7 +3367,7 @@ class Performance:
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as a pandas object.
         """
         ...
 
@@ -3537,7 +3534,8 @@ class Performance:
         Returns
         -------
         pd.DataFrame
-            Drawdown episodes, one row per episode, deepest first.
+            Drawdown episodes, one row per episode, deepest first. Empty
+            frames retain ``int64`` duration and ``bool`` truncation columns.
 
         Raises
         ------
@@ -3594,13 +3592,13 @@ class Performance:
         -------
         pd.DataFrame
             Indexed by ticker with columns ``beta``, ``std_err``,
-            ``ci_lower``, ``ci_upper`` (95% bounds). Non-finite estimates from
-            a degenerate regression arrive as ``None``.
+            ``ci_lower``, ``ci_upper`` (95% bounds). Undefined estimates remain
+            ``NaN`` in numeric ``float64`` columns.
 
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as a pandas object.
 
         Examples
         --------
@@ -3635,7 +3633,7 @@ class Performance:
         Raises
         ------
         ValueError
-            If the result cannot be serialized into a pandas object.
+            If the result cannot be represented as a pandas object.
         """
         ...
 

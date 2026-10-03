@@ -60,6 +60,62 @@ def _returns_panel(prices: pd.DataFrame) -> pd.DataFrame:
     return prices.pct_change().fillna(0.0)
 
 
+def test_beta_confidence_interval_uses_actual_degrees_of_freedom() -> None:
+    benchmark = [-0.02 + i * 0.001 for i in range(42)]
+    fund = [1.4 * value + (0.002 if i % 2 == 0 else -0.0015) for i, value in enumerate(benchmark)]
+    perf = Performance.from_returns_arrays(_daily_dates(42), [fund, benchmark], ["FUND", "BENCH"], "BENCH")
+    result = perf.beta()[0]
+    assert (result.ci_upper - result.beta) / result.std_err == pytest.approx(2.0210753903062733, abs=1e-9)
+
+
+def test_native_frames_preserve_infinite_period_statistics() -> None:
+    perf = Performance.from_returns_arrays(_daily_dates(4), [[0.01, 0.02, 0.03, 0.04]], ["FUND"])
+    stats = perf.period_stats(0, aggregation_frequency="daily")
+    frame = stats.to_dataframe()
+    for name in ("payoff_ratio", "profit_factor", "cpc_ratio"):
+        assert math.isinf(frame[name].iloc[0])
+        assert frame[name].dtype == "float64"
+    assert frame["consecutive_wins"].dtype == "int64"
+    assert frame["consecutive_losses"].dtype == "int64"
+
+
+def test_degenerate_regression_frames_keep_numeric_nan_columns() -> None:
+    perf = Performance.from_returns_arrays(
+        _daily_dates(4), [[0.01, -0.02, 0.03, 0.04], [0.01] * 4], ["FUND", "BENCH"], "BENCH"
+    )
+    for leaf, panel in (
+        (perf.beta()[0].to_dataframe(), perf.to_beta_dataframe()),
+        (perf.greeks()[0].to_dataframe(), perf.to_greeks_dataframe()),
+    ):
+        assert leaf.isna().all().all()
+        assert panel.isna().all().all()
+        assert all(dtype == "float64" for dtype in leaf.dtypes)
+        assert all(dtype == "float64" for dtype in panel.dtypes)
+        assert list(panel.index) == ["FUND", "BENCH"]
+        assert panel.index.name == "ticker"
+
+
+def test_empty_drawdown_frame_retains_populated_dtypes_and_leaf_shape() -> None:
+    perf = Performance.from_arrays(_daily_dates(4), [[100.0, 90.0, 100.0, 110.0]], ["FUND"])
+    empty = perf.to_drawdown_details_dataframe(0, n=0)
+    populated = perf.to_drawdown_details_dataframe(0)
+    assert empty.empty
+    assert empty.dtypes.to_dict() == populated.dtypes.to_dict()
+    assert empty["duration_days"].dtype == "int64"
+    assert empty["truncated_at_start"].dtype == "bool"
+    pd.testing.assert_frame_equal(populated, perf.drawdown_details(0)[0].to_dataframe())
+
+
+def test_lookback_leaf_and_panel_frames_have_identical_labels() -> None:
+    perf = Performance.from_returns_arrays(
+        _daily_dates(4), [[0.01, 0.02, 0.03, 0.04], [-0.01, 0.03, 0.02, 0.01]], ["A", "B"]
+    )
+    ref_date = _daily_dates(4)[-1]
+    pd.testing.assert_frame_equal(
+        perf.lookback_returns(ref_date).to_dataframe(), perf.to_lookback_returns_dataframe(ref_date)
+    )
+
+
 @pytest.fixture
 def perf_prices() -> Performance:
     return Performance(_prices_panel(), benchmark_ticker="BENCH", frequency="daily")

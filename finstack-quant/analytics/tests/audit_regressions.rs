@@ -534,3 +534,21 @@ fn drawdown_ratios_propagate_invalid_cash_before_zero_risk_sentinels() {
     assert_eq!(flat.calmar().unwrap()[0], 0.0);
     assert_eq!(flat.martin_ratio().unwrap()[0], 0.0);
 }
+
+#[test]
+fn burke_uses_the_worst_episode_depths_without_date_metadata() {
+    // Three independently recovered episodes, with depths 10%, 20%, 30%.
+    let perf = panel(
+        vec![-0.1, 1.0 / 9.0, -0.2, 0.25, -0.3, 3.0 / 7.0],
+        PeriodKind::Daily,
+    );
+    let excess_cagr = perf.cagr(CagrDayCount::default(), None).unwrap()[0] - 0.01;
+    for (n, rms) in [
+        (1, 0.3),
+        (2, ((0.09 + 0.04) / 2.0_f64).sqrt()),
+        (3, ((0.09 + 0.04 + 0.01) / 3.0_f64).sqrt()),
+        (5, ((0.09 + 0.04 + 0.01) / 3.0_f64).sqrt()),
+    ] {
+        close(perf.burke_ratio(0.01, n).unwrap()[0], excess_cagr / rms);
+    }
+}

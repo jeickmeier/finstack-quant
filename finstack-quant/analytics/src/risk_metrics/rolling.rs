@@ -191,11 +191,7 @@ pub(crate) fn rolling_sharpe(
     let mut date_idx = window - 1;
     rolling_mean_m2_kernel(returns, n, window, |mean, m2| {
         let ann_mean = mean * ann_factor;
-        let var = if window == 1 {
-            0.0
-        } else {
-            (m2 / (w - 1.0)).max(0.0)
-        };
+        let var = (m2 / (w - 1.0)).max(0.0);
         let ann_vol = var.sqrt() * ann_factor.sqrt();
         out.values
             .push(sharpe(ann_mean, ann_vol, risk_free_rate, ann_factor));
@@ -238,11 +234,7 @@ pub(crate) fn rolling_volatility(
     let mut out = DatedSeries::with_capacity(RollingMetric::Volatility, n - window + 1);
     let mut date_idx = window - 1;
     rolling_mean_m2_kernel(returns, n, window, |_, m2| {
-        let var = if window == 1 {
-            0.0
-        } else {
-            (m2 / (w - 1.0)).max(0.0)
-        };
+        let var = (m2 / (w - 1.0)).max(0.0);
         out.values.push(var.sqrt() * ann_factor.sqrt());
         out.dates.push(dates[date_idx]);
         date_idx += 1;
@@ -319,13 +311,6 @@ fn rolling_mean_m2_kernel<F>(returns: &[f64], n: usize, window: usize, mut emit:
 where
     F: FnMut(f64, f64),
 {
-    if window == 1 {
-        for &value in &returns[..n] {
-            emit(value, 0.0);
-        }
-        return;
-    }
-
     let window_n = window as f64;
     let (mut mean, mut m2) = recompute_mean_m2(&returns[..window]);
     let mut m2_scale = m2;

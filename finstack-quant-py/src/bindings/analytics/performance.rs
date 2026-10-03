@@ -4,8 +4,8 @@ use super::types::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::date_utils::{date_to_py, extract_date, py_to_date};
 use crate::bindings::pandas_utils::{
-    dates_to_datetime_index, dict_to_dataframe, int_values_to_series,
-    serde_rows_to_dataframe_with_schema, table_to_dataframe, values_to_series, ColumnSchema,
+    dates_to_datetime_index, dict_to_dataframe, int_values_to_series, table_to_dataframe,
+    values_to_series,
 };
 use crate::errors::analytics_to_py as core_to_py;
 use crate::errors::display_to_py;
@@ -23,11 +23,6 @@ type PyPeriodicReturnPanel<'py> = Vec<Vec<(Bound<'py, PyAny>, f64)>>;
 /// buffer so no per-element `PyFloat` boxing occurs.
 fn vec_to_pyarray<'py>(py: Python<'py>, values: Vec<f64>) -> Bound<'py, PyArray1<f64>> {
     PyArray1::from_vec(py, values)
-}
-
-/// Wrap a borrowed `&[f64]` as a NumPy `float64` array (one copy).
-fn slice_to_pyarray<'py>(py: Python<'py>, values: &[f64]) -> Bound<'py, PyArray1<f64>> {
-    PyArray1::from_slice(py, values)
 }
 
 /// Resolve optional fiscal-year-start month/day through the Rust rule
@@ -98,24 +93,6 @@ fn extract_f64_vec(obj: &Bound<'_, PyAny>, label: &str) -> PyResult<Vec<f64>> {
         "{label} must be a sequence of floats, a NumPy array, or a pandas Series"
     )))
 }
-
-/// Column schema of `Performance.to_beta_dataframe`.
-const BETA_COLUMNS: &[ColumnSchema<'static>] = &[
-    ("ticker", "str"),
-    ("beta", "float64"),
-    ("std_err", "float64"),
-    ("ci_lower", "float64"),
-    ("ci_upper", "float64"),
-];
-
-/// Column schema of `Performance.to_greeks_dataframe`.
-const GREEKS_COLUMNS: &[ColumnSchema<'static>] = &[
-    ("ticker", "str"),
-    ("alpha", "float64"),
-    ("beta", "float64"),
-    ("r_squared", "float64"),
-    ("adjusted_r_squared", "float64"),
-];
 
 fn ensure_pandas_dataframe(value: &Bound<'_, PyAny>, error_message: &str) -> PyResult<()> {
     let pd = value.py().import("pandas")?;
@@ -1500,44 +1477,7 @@ impl PyPerformance {
             .inner
             .drawdown_details(ticker_idx, n)
             .map_err(core_to_py)?;
-        let data = PyDict::new(py);
-        let pd = py.import("pandas")?;
-        let starts: Vec<time::Date> = episodes.iter().map(|e| e.start).collect();
-        let valleys: Vec<time::Date> = episodes.iter().map(|e| e.valley).collect();
-        let ends: PyResult<Vec<_>> = episodes
-            .iter()
-            .map(|e| match e.end {
-                Some(d) => date_to_py(py, d).map(|v| v.into_any()),
-                None => Ok(py.None().into_bound(py)),
-            })
-            .collect();
-
-        data.set_item("start", dates_to_datetime_index(py, &starts)?)?;
-        data.set_item("valley", dates_to_datetime_index(py, &valleys)?)?;
-        data.set_item("end", pd.call_method1("to_datetime", (ends?,))?)?;
-        data.set_item(
-            "duration_days",
-            episodes.iter().map(|e| e.duration_days).collect::<Vec<_>>(),
-        )?;
-        data.set_item(
-            "max_drawdown",
-            episodes.iter().map(|e| e.max_drawdown).collect::<Vec<_>>(),
-        )?;
-        data.set_item(
-            "near_recovery_threshold",
-            episodes
-                .iter()
-                .map(|e| e.near_recovery_threshold)
-                .collect::<Vec<_>>(),
-        )?;
-        data.set_item(
-            "truncated_at_start",
-            episodes
-                .iter()
-                .map(|e| e.truncated_at_start)
-                .collect::<Vec<_>>(),
-        )?;
-        dict_to_dataframe(py, &data, None)
+        drawdowns_to_dataframe(py, &episodes)
     }
 
     /// Period-to-date lookback returns as a pandas ``DataFrame``.
@@ -1556,40 +1496,23 @@ impl PyPerformance {
         let d = py_to_date(&ref_date)?;
         let lb = self.lookback_returns_inner(d, fiscal_year_start_month, fiscal_year_start_day)?;
 
-        let data = PyDict::new(py);
-        data.set_item("mtd", slice_to_pyarray(py, &lb.mtd))?;
-        data.set_item("qtd", slice_to_pyarray(py, &lb.qtd))?;
-        data.set_item("ytd", slice_to_pyarray(py, &lb.ytd))?;
-        data.set_item("fytd", slice_to_pyarray(py, &lb.fytd))?;
-
-        let idx = ticker_index(py, self.inner.ticker_names())?;
-        dict_to_dataframe(py, &data, Some(idx))
+        PyLookbackReturns { inner: lb }.to_dataframe(py)
     }
 
     /// Beta regression statistics for every ticker vs the benchmark as a
     /// pandas ``DataFrame`` indexed by ticker.
     ///
     /// Columns: ``beta``, ``std_err``, ``ci_lower``, ``ci_upper`` (95%
-    /// confidence bounds). Non-finite estimates from a degenerate regression
-    /// arrive as ``None``.
+    /// confidence bounds). Undefined estimates remain ``NaN`` in numeric
+    /// ``float64`` columns.
     fn to_beta_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .beta()
-            .iter()
-            .zip(self.inner.ticker_names())
-            .map(|(b, name)| {
-                serde_json::json!({
-                    "ticker": name,
-                    "beta": b.beta,
-                    "std_err": b.std_err,
-                    "ci_lower": b.ci_lower,
-                    "ci_upper": b.ci_upper,
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, BETA_COLUMNS)?
-            .call_method1("set_index", ("ticker",))
+        let frame = beta_to_dataframe(
+            py,
+            &self.inner.beta(),
+            Some(ticker_index(py, self.inner.ticker_names())?),
+        )?;
+        frame.getattr("index")?.setattr("name", "ticker")?;
+        Ok(frame)
     }
 
     /// Single-index greeks (annualized Jensen alpha, beta, R², adjusted R²)
@@ -1606,23 +1529,13 @@ impl PyPerformance {
         py: Python<'py>,
         risk_free_rate: f64,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .greeks(risk_free_rate)
-            .iter()
-            .zip(self.inner.ticker_names())
-            .map(|(g, name)| {
-                serde_json::json!({
-                    "ticker": name,
-                    "alpha": g.alpha,
-                    "beta": g.beta,
-                    "r_squared": g.r_squared,
-                    "adjusted_r_squared": g.adjusted_r_squared,
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(py, &rows, GREEKS_COLUMNS)?
-            .call_method1("set_index", ("ticker",))
+        let frame = greeks_to_dataframe(
+            py,
+            &self.inner.greeks(risk_free_rate),
+            Some(ticker_index(py, self.inner.ticker_names())?),
+        )?;
+        frame.getattr("index")?.setattr("name", "ticker")?;
+        Ok(frame)
     }
 
     /// Excess returns over a risk-free rate as a pandas ``DataFrame`` with a

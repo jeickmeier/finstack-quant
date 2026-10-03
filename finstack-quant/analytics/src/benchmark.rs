@@ -11,6 +11,7 @@
 use crate::dates::Date;
 use crate::math::stats::{OnlineCovariance, OnlineStats};
 use crate::regression::normalized_svd_least_squares;
+use finstack_quant_core::math::special_functions::student_t_inv_cdf;
 use finstack_quant_core::math::{neumaier_sum, NeumaierAccumulator};
 use finstack_quant_core::wire::NonFiniteFields;
 use nalgebra::DMatrix;
@@ -288,59 +289,6 @@ impl NonFiniteFields for BetaResult {
     const NON_FINITE_FIELDS: &'static [&'static str] = &["beta", "std_err", "ci_lower", "ci_upper"];
 }
 
-// Two-sided 95% critical value: Student's t with `n−2` degrees of freedom.
-// Use exact tabulated values for small samples, then conservative step-down
-// anchors at df = 40, 60, and 120 before the asymptotic normal limit.
-fn beta_ci_critical_value(sample_size: usize) -> f64 {
-    match sample_size.saturating_sub(2) {
-        0 => f64::NAN,
-        1 => 12.706_204_736_432_095,
-        2 => 4.302_652_729_696_142,
-        3 => 3.182_446_305_284_263,
-        4 => 2.776_445_105_197_798_7,
-        5 => 2.570_581_835_636_305,
-        6 => 2.446_911_851_144_969_2,
-        7 => 2.364_624_251_592_784_4,
-        8 => 2.306_004_135_204_166,
-        9 => 2.262_157_162_854_099_3,
-        10 => 2.228_138_851_964_938_5,
-        11 => 2.200_985_160_082_949,
-        12 => 2.178_812_829_663_417_7,
-        13 => 2.160_368_656_461_013,
-        14 => 2.144_786_687_916_927_7,
-        15 => 2.131_449_545_559_323,
-        16 => 2.119_905_299_221_011_2,
-        17 => 2.109_815_577_833_180_6,
-        18 => 2.100_922_040_240_96,
-        19 => 2.093_024_054_408_263,
-        20 => 2.085_963_447_265_837,
-        21 => 2.079_613_844_727_662,
-        22 => 2.073_873_067_904_015,
-        23 => 2.068_657_610_419_041,
-        24 => 2.063_898_561_628_021,
-        25 => 2.059_538_552_753_294,
-        26 => 2.055_529_438_642_872,
-        27 => 2.051_830_516_480_283_3,
-        28 => 2.048_407_141_795_244,
-        29 => 2.045_229_642_132_703,
-        30 => 2.042_272_456_301_238,
-        31 => 2.039_513_446_396_408_5,
-        32 => 2.036_933_343_460_101_6,
-        33 => 2.034_515_297_449_338_3,
-        34 => 2.032_244_509_317_719,
-        35 => 2.030_107_928_250_343,
-        36 => 2.028_094_000_980_451,
-        37 => 2.026_192_463_029_109_3,
-        // Anchor at df = 38 (not 40) so the whole bucket is conservative:
-        // t is decreasing in df, so the bucket's smallest df needs the
-        // largest critical value.
-        38..=59 => 2.024_394_164_575_136,
-        60..=119 => 2.000_297_821_058_262,
-        120..=239 => 1.979_930_405_052_777,
-        _ => 1.959_963_984_540_054,
-    }
-}
-
 /// OLS beta of portfolio vs benchmark, with standard error and 95% CI.
 ///
 /// Estimates the slope of the single-factor linear regression
@@ -354,22 +302,8 @@ fn beta_ci_critical_value(sample_size: usize) -> f64 {
 ///
 /// The **95% two-sided** interval uses `β ± t_{n−2, 0.975} × SE(β)`, where
 /// `t_{n−2, 0.975}` is the **Student's t** critical value for `n − 2` degrees
-/// of freedom. Exact tabulated values are used for `n − 2 ≤ 37`; for larger
-/// samples the implementation steps down through conservative anchors before
-/// reaching the asymptotic normal limit:
-///
-/// | `n − 2`     | Critical value                                |
-/// |-------------|-----------------------------------------------|
-/// | `1..=37`    | exact Student's t at that df                  |
-/// | `38..=59`   | `2.024` (t at df = 38, used as a step-down)   |
-/// | `60..=119`  | `2.000` (t at df = 60)                        |
-/// | `120..=239` | `1.980` (t at df = 120)                       |
-/// | `≥ 240`     | `1.96`  (asymptotic normal)                   |
-///
-/// Each bucket is anchored at its *smallest* df (the largest t value in the
-/// bucket), so intervals are conservative — never narrower than the exact t
-/// critical — for `38 ≤ n − 2 < 240`. The `≥ 240` regime uses the asymptotic
-/// normal value, which is up to ~0.5% narrower than the exact t at df = 240.
+/// of freedom, evaluated by the core Student's t inverse CDF at the actual
+/// sample degrees of freedom.
 ///
 /// Requires at least 3 paired observations because the result includes a
 /// residual standard error and confidence interval.
@@ -441,7 +375,9 @@ pub fn beta(portfolio: &[f64], benchmark: &[f64]) -> BetaResult {
         f64::NAN
     };
 
-    let critical_value = beta_ci_critical_value(n);
+    // n >= 3 guarantees valid positive degrees of freedom. Preserve the
+    // undefined-statistic sentinel if the core quantile cannot be evaluated.
+    let critical_value = student_t_inv_cdf(0.975, (n - 2) as f64).unwrap_or(f64::NAN);
     BetaResult {
         beta,
         std_err: se,
@@ -1011,8 +947,9 @@ where
         return 0.0;
     }
 
-    let mut port_logs = Vec::with_capacity(n);
-    let mut bench_logs = Vec::with_capacity(n);
+    let mut port_logs = NeumaierAccumulator::new();
+    let mut bench_logs = NeumaierAccumulator::new();
+    let mut selected = 0usize;
     for i in 0..n {
         if include(benchmark[i]) {
             let port_growth = 1.0 + returns[i];
@@ -1024,18 +961,19 @@ where
             {
                 return f64::NAN;
             }
-            port_logs.push(port_growth.ln());
-            bench_logs.push(bench_growth.ln());
+            port_logs.add(port_growth.ln());
+            bench_logs.add(bench_growth.ln());
+            selected += 1;
         }
     }
 
-    if port_logs.is_empty() {
+    if selected == 0 {
         return 0.0;
     }
 
-    let count = port_logs.len() as f64;
-    let port_geom = (neumaier_sum(port_logs) * ann_factor / count).exp() - 1.0;
-    let bench_geom = (neumaier_sum(bench_logs) * ann_factor / count).exp() - 1.0;
+    let count = selected as f64;
+    let port_geom = (port_logs.total() * ann_factor / count).exp() - 1.0;
+    let bench_geom = (bench_logs.total() * ann_factor / count).exp() - 1.0;
     if bench_geom.abs() < 1e-18 {
         return 0.0;
     }
@@ -1453,15 +1391,35 @@ mod tests {
             .map(|(i, &b)| 1.4 * b + if i % 2 == 0 { 0.002 } else { -0.0015 })
             .collect();
         let result = beta(&y, &x);
-        // n = 42 → df = 40; bucket is anchored at its smallest df (38) so the
-        // interval is conservative for every df in 38..=59.
-        let expected_t_critical_df38 = 2.024_394_164_575_136_f64;
+        // n = 42 → df = 40: use the actual degrees of freedom, not a bucket.
+        let expected_t_critical_df40 = 2.021_075_390_306_273_3_f64;
         let actual_half_width = result.ci_upper - result.beta;
 
         assert!(
-            (actual_half_width - expected_t_critical_df38 * result.std_err).abs() < 1e-12,
+            (actual_half_width - expected_t_critical_df40 * result.std_err).abs() < 1e-12,
             "beta CI should continue using Student-t beyond df=37"
         );
+    }
+
+    #[test]
+    fn beta_intervals_cover_the_student_t_probability_at_bucket_boundaries() {
+        use finstack_quant_core::math::special_functions::student_t_cdf;
+
+        for df in [38, 59, 60, 119, 120, 239, 240, 1_000] {
+            let x: Vec<f64> = (0..df + 2).map(|i| i as f64 * 0.001).collect();
+            let y: Vec<f64> = x
+                .iter()
+                .enumerate()
+                .map(|(i, &b)| 1.4 * b + if i % 2 == 0 { 0.002 } else { -0.0015 })
+                .collect();
+            let result = beta(&y, &x);
+            let critical = (result.ci_upper - result.beta) / result.std_err;
+            let probability = student_t_cdf(critical, df as f64).expect("valid degrees of freedom");
+            assert!(
+                (probability - 0.975).abs() < 1e-9,
+                "df={df}: upper confidence bound has CDF {probability}"
+            );
+        }
     }
 
     #[test]

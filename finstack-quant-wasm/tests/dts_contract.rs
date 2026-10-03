@@ -252,7 +252,7 @@ fn analytics_dts_matches_runtime_hotspots() {
     assert!(contains_ignoring_ws(&dts, "values: Float64Array;"));
     assert!(contains_ignoring_ws(
         &dts,
-        "value_column: 'volatility' | 'sortino' | 'sharpe' | 'return';",
+        "export type DatedSeries = WithFields<generated.analytics.DatedSeries,",
     ));
     assert!(!dts.contains("return?: Float64Array;"));
     assert!(contains_ignoring_ws(
@@ -1785,7 +1785,11 @@ fn result_types_use_rust_names_from_the_generated_contract() {
     }
     assert!(dts.contains("import type * as generated from './types/generated/index.js';"));
     // The documented host-only survivors keep their JavaScript shapes.
-    assert!(interface_block(&dts, "RollingGreeks").contains("alphas: Float64Array;"));
+    assert!(contains_ignoring_ws(
+        &dts,
+        "export type RollingGreeks = WithFields<generated.analytics.RollingGreeks,",
+    ));
+    assert!(dts.contains("alphas: Float64Array;"));
     assert!(contains_ignoring_ws(
         &dts,
         "export type FxInstrumentSpec = Record<string, unknown>;"

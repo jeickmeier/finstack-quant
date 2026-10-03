@@ -16,6 +16,8 @@ CONSTANT_CASE) name. Everything else is recorded explicitly:
 * ``wasm_only`` -- WASM keys with no Python twin, with a reason.
 
 The same partition applies to the members of every class bound in both hosts.
+A member rename to ``constructor`` requires a constructor signature in that
+class's TypeScript declaration; constructors are not ordinary runtime statics.
 
 One exclusion reason, ``literal``, is for members only: the member just
 constructs or rebuilds a plain data value (an enum-variant constructor, a
@@ -321,6 +323,30 @@ def test_data_class_methods_are_accounted_for(qualified: str) -> None:
     assert problems == []
 
 
+def _has_declared_constructor(dts: str, class_name: str) -> bool:
+    """Accept a constructor rename only for the named, declared class."""
+    declaration = re.search(
+        rf"^(?:export )?(?:declare )?class {re.escape(class_name)}\b[^{{]*{{(.*?)^}}",
+        dts,
+        re.M | re.S,
+    )
+    return bool(declaration and re.search(r"^\s+constructor\s*\(", declaration.group(1), re.M))
+
+
+@pytest.mark.parametrize(
+    ("declaration", "expected"),
+    [
+        ("declare class Performance {\n  constructor(dates: string[]);\n}\n", True),
+        ("export declare class Performance {\n  constructor();\n}\n", True),
+        ("declare class Other {\n  constructor();\n}\n", False),
+        ("declare class Performance {\n  static fromReturns(): Performance;\n}\n", False),
+        ("declare class Performance {\n  /** constructor() example */\n}\n", False),
+    ],
+)
+def test_constructor_renames_require_the_target_class(declaration: str, expected: bool) -> None:
+    assert _has_declared_constructor(declaration, "Performance") is expected
+
+
 @pytest.mark.parametrize("qualified", sorted(SHARED))
 def test_shared_class_members_are_partitioned(qualified: str) -> None:
     cls, target = SHARED[qualified]
@@ -347,7 +373,10 @@ def test_shared_class_members_are_partitioned(qualified: str) -> None:
         if not reason:
             problems.append(f"{target}.{name}: wasm_only needs a reason")
     for rename in entry.get("renames", {}).values():
-        if rename["js"] not in js_members:
+        if rename["js"] == "constructor":
+            if not _has_declared_constructor(DTS, target.rsplit(".", 1)[-1]):
+                problems.append(f"{target}: constructor rename target is not declared")
+        elif rename["js"] not in js_members:
             problems.append(f"{target}: member rename target {rename['js']!r} does not exist")
     assert problems == []
 

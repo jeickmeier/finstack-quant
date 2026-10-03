@@ -249,7 +249,12 @@ pub(crate) fn mean_episode_drawdown(drawdown: &[f64], n: usize) -> f64 {
 /// Extract the worst `n` episode depths from a drawdown series, sorted
 /// ascending (most severe first). Shared by [`mean_episode_drawdown`] and
 /// [`drawdown_details`]-derived callers.
-fn worst_episode_depths(drawdown: &[f64], n: usize) -> Vec<f64> {
+///
+/// # Arguments
+///
+/// * `drawdown` - Peak-relative drawdown fractions in observation order.
+/// * `n` - Maximum number of deepest episodes to retain; zero returns no depths.
+pub(crate) fn worst_episode_depths(drawdown: &[f64], n: usize) -> Vec<f64> {
     if drawdown.is_empty() {
         return vec![];
     }

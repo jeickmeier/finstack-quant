@@ -12,7 +12,7 @@
   },
   "analytics.Performance": {
     "kind": "class",
-    "statics": ["fromArrays", "fromJson", "fromReturns", "fromReturnsArrays"],
+    "statics": ["fromJson", "fromReturns"],
     "methods": [
       "activeDates",
       "activeDatesForTicker",

@@ -555,12 +555,7 @@ impl Performance {
     pub fn burke_ratio(&self, risk_free_rate: f64, n: usize) -> crate::Result<Vec<f64>> {
         let cagrs = self.cagr(CagrDayCount::default(), None)?;
         Ok(self.map_tickers(|i| {
-            let episodes = crate::drawdown::drawdown_details(
-                self.active_drawdown_values(i),
-                self.active_dates_for_ticker_unchecked(i),
-                n,
-            );
-            let dd_vals: Vec<f64> = episodes.iter().map(|e| e.max_drawdown).collect();
+            let dd_vals = crate::drawdown::worst_episode_depths(self.active_drawdown_values(i), n);
             crate::drawdown::burke_ratio(cagrs[i], &dd_vals, risk_free_rate)
         }))
     }

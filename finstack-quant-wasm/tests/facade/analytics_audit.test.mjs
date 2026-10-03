@@ -231,3 +231,18 @@ test('drawdown dates, cash basis, Kelly and undefined factor statistics agree wi
     assert.ok(Number.isNaN(fit.adjusted_r_squared));
   }
 });
+
+test('beta confidence intervals use the actual sample degrees of freedom', () => {
+  const benchmark = Array.from({ length: 42 }, (_, i) => -0.02 + i * 0.001);
+  const fund = benchmark.map((value, i) => 1.4 * value + (i % 2 === 0 ? 0.002 : -0.0015));
+  const perf = analytics.Performance.fromReturns(
+    dates(42),
+    [fund, benchmark],
+    ['FUND', 'BENCH'],
+    'BENCH'
+  );
+  const result = perf.beta()[0];
+  const critical = (result.ci_upper - result.beta) / result.std_err;
+  assert.ok(Math.abs(critical - 2.0210753903062733) < 1e-9, `df=40: critical value ${critical}`);
+  perf.free();
+});
