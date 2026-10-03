@@ -608,8 +608,6 @@ impl CalibrationReport {
                 ),
             )
             .with_metadata("type", type_str)
-            .with_metadata("tolerance", format!("{:.2e}", tolerance))
-            .with_metadata("success_tolerance", format!("{:.2e}", tolerance))
             .with_success_tolerance(tolerance);
         }
 
@@ -652,12 +650,8 @@ impl CalibrationReport {
             )
         };
 
-        let tolerance_str = format!("{:.2e}", tolerance);
-
         Self::new(residuals, iterations, success, convergence_reason)
             .with_metadata("type", type_str)
-            .with_metadata("tolerance", tolerance_str.clone())
-            .with_metadata("success_tolerance", tolerance_str)
             .with_success_tolerance(tolerance)
     }
 }
@@ -826,14 +820,7 @@ mod tests {
 
         assert_eq!(report.success, deserialized.success);
         assert_eq!(report.convergence_reason, deserialized.convergence_reason);
-        assert_eq!(
-            report.metadata.get("tolerance"),
-            deserialized.metadata.get("tolerance")
-        );
-        assert_eq!(
-            report.metadata.get("success_tolerance"),
-            deserialized.metadata.get("success_tolerance")
-        );
+        assert_eq!(report.success_tolerance, deserialized.success_tolerance);
     }
 
     #[test]
@@ -1126,17 +1113,16 @@ mod tests {
     }
 
     #[test]
-    fn test_for_type_with_tolerance_metadata_includes_tolerance() {
+    fn test_for_type_with_tolerance_preserves_typed_tolerance() {
         let residuals = BTreeMap::new();
         let tolerance = 1e-8;
 
         let report =
             CalibrationReport::for_type_with_tolerance("yield_curve", residuals, 0, tolerance);
 
-        assert!(
-            report.metadata.contains_key("tolerance"),
-            "Metadata should include tolerance"
-        );
+        assert_eq!(report.success_tolerance, Some(tolerance));
+        assert!(!report.metadata.contains_key("tolerance"));
+        assert!(!report.metadata.contains_key("success_tolerance"));
         assert!(
             report.metadata.contains_key("type"),
             "Metadata should include type"
@@ -1144,11 +1130,6 @@ mod tests {
         assert_eq!(
             report.metadata.get("type"),
             Some(&"yield_curve".to_string())
-        );
-        assert_eq!(
-            report.metadata.get("success_tolerance"),
-            report.metadata.get("tolerance"),
-            "success_tolerance should mirror tolerance metadata"
         );
     }
 }

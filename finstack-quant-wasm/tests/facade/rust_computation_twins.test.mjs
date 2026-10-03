@@ -671,7 +671,7 @@ test('calibration content hashes match the Python/Rust hashes', () => {
   );
   assert.equal(
     calibration.calibrationEnvelopeContentHash(envelope),
-    'sha256:17433701c1eb8fbea59159c679c47bce1bd6bff4d691d2e569bf9b50c424355d'
+    'sha256:0959605bc2b4005f3b8d809eb78c431fe4c6abac03443161fc3a64f35f08843a'
   );
   // The solved residuals differ from the native build in the last bits
   // (wasm32 libm), so the result hash is pinned against its own JSON text:

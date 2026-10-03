@@ -180,7 +180,7 @@ pub(crate) fn rebonato_factors(slice: &CoTerminalSlice<'_>) -> Option<RebonatoFa
 ///
 /// # Arguments
 ///
-/// * `slice` - Remaining co-terminal forward basket and unscaled factor loadings.
+/// * `factors` - Prepared co-terminal swap rate and unscaled volatility factors.
 /// * `market_swaption_vol` - Positive finite annual Black-lognormal volatility,
 ///   expressed as a decimal, at the unshifted ATM swap rate.
 /// * `expiry` - Positive finite ACT/365F time from valuation to exercise, in years.
@@ -190,7 +190,7 @@ pub(crate) fn rebonato_factors(slice: &CoTerminalSlice<'_>) -> Option<RebonatoFa
 /// Returns `None` for invalid expiry or volatility, a degenerate swap, or an
 /// ATM premium that cannot be converted to a positive finite loading scale.
 pub(crate) fn calibrate_base_vol(
-    slice: &CoTerminalSlice<'_>,
+    factors: &RebonatoFactors,
     market_swaption_vol: f64,
     expiry: f64,
 ) -> Option<f64> {
@@ -201,7 +201,6 @@ pub(crate) fn calibrate_base_vol(
     {
         return None;
     }
-    let factors = rebonato_factors(slice)?;
     let shape_factor = factors.shape_factor;
     if shape_factor <= 1e-12 || factors.swap_rate <= 1e-12 {
         return None;
@@ -303,7 +302,7 @@ pub fn calibrate_bermudan_lmm_base_vol(
         expiry,
         factors.swap_rate,
     );
-    calibrate_base_vol(&slice, market_vol, expiry).ok_or_else(|| {
+    calibrate_base_vol(&factors, market_vol, expiry).ok_or_else(|| {
         finstack_quant_core::Error::Validation(format!(
             "LMM calibration for '{}' is degenerate at expiry {expiry} and swap rate {}",
             swaption.id, factors.swap_rate
@@ -786,7 +785,12 @@ mod tests {
             first_alive: 0,
         };
         let market_vol = 0.22;
-        let base_vol = super::calibrate_base_vol(&slice, market_vol, 2.0).expect("calibration");
+        let base_vol = super::calibrate_base_vol(
+            &rebonato_factors(&slice).expect("valid factors"),
+            market_vol,
+            2.0,
+        )
+        .expect("calibration");
         let implied_swaption_vol = implied_swaption_vol(&slice, base_vol, 2.0);
         assert!(
             (implied_swaption_vol - market_vol).abs() < 1e-12,
@@ -818,7 +822,9 @@ mod tests {
             loading_shapes: &shapes,
             first_alive: 2,
         };
-        let base_vol = super::calibrate_base_vol(&slice, 0.20, 2.0).expect("calibration");
+        let base_vol =
+            super::calibrate_base_vol(&rebonato_factors(&slice).expect("valid factors"), 0.20, 2.0)
+                .expect("calibration");
         assert!(base_vol.is_finite() && base_vol > 0.0);
         let implied_swaption_vol = implied_swaption_vol(&slice, base_vol, 2.0);
         assert!((implied_swaption_vol - 0.20).abs() < 1e-12);
@@ -840,16 +846,30 @@ mod tests {
             first_alive: 1, // no live forwards
         };
         assert!(rebonato_factors(&slice).is_none());
-        assert!(super::calibrate_base_vol(&slice, 0.2, 1.0).is_none());
         // Non-positive market vol rejected.
         let live_slice = CoTerminalSlice {
             first_alive: 0,
             ..slice
         };
-        assert!(super::calibrate_base_vol(&live_slice, 0.0, 1.0).is_none());
-        assert!(super::calibrate_base_vol(&live_slice, -0.1, 1.0).is_none());
+        assert!(super::calibrate_base_vol(
+            &rebonato_factors(&live_slice).expect("valid factors"),
+            0.0,
+            1.0
+        )
+        .is_none());
+        assert!(super::calibrate_base_vol(
+            &rebonato_factors(&live_slice).expect("valid factors"),
+            -0.1,
+            1.0
+        )
+        .is_none());
         for expiry in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-            assert!(super::calibrate_base_vol(&live_slice, 0.2, expiry).is_none());
+            assert!(super::calibrate_base_vol(
+                &rebonato_factors(&live_slice).expect("valid factors"),
+                0.2,
+                expiry
+            )
+            .is_none());
         }
     }
 
@@ -870,7 +890,12 @@ mod tests {
         };
         let market_vol = 0.30;
         let expiry = 10.0;
-        let base_vol = super::calibrate_base_vol(&slice, market_vol, expiry).expect("calibration");
+        let base_vol = super::calibrate_base_vol(
+            &rebonato_factors(&slice).expect("valid factors"),
+            market_vol,
+            expiry,
+        )
+        .expect("calibration");
         let factors = rebonato_factors(&slice).expect("factors");
 
         // Instantaneous absolute-volatility matching is insufficient at

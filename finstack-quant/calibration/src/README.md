@@ -150,8 +150,8 @@ set it to `false`.
 2. **Plan-level** — `CalibrationPlan.settings` (`CalibrationConfig`).
 3. **Global defaults** — `CalibrationConfig::default()`.
 
-Step-level `method` always wins over the plan-level `calibration_method`, which
-serves mainly as runtime state passed from targets to solvers.
+Curve calibration methods are configured per step through `params.method`.
+Global settings contain numerical and validation policy.
 
 `CalibrationMethod` is `Bootstrap` (default) or
 `GlobalSolve { use_analytical_jacobian: bool }`.

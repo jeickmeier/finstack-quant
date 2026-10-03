@@ -207,7 +207,6 @@ pub fn calibration_step_inflation(
 /// @param id - Step identifier; also the default quote-set name and the default identifier of the produced object.
 /// @param base_date - ISO-8601 surface base date.
 /// @param underlying_ticker - Underlying identifier the quotes reference.
-/// @param model - Surface model label; defaults to `"sabr"`.
 /// @param quote_set - Name of the quote set in `plan.quote_sets`; defaults to `id`.
 /// @param vol_surface_id - Identifier of the produced surface; defaults to `id`.
 /// @param params - Optional object (or JSON) of further wire fields: `discount_curve_id`, `beta`, `target_expiries`, `target_strikes`, `spot_override`, `dividend_yield_override`, `expiry_extrapolation`. An entry named like another argument is replaced by that argument.
@@ -223,7 +222,6 @@ pub fn calibration_step_vol_surface(
     id: JsValue,
     base_date: JsValue,
     underlying_ticker: JsValue,
-    model: Option<JsValue>,
     quote_set: Option<JsValue>,
     vol_surface_id: Option<JsValue>,
     params: Option<JsValue>,
@@ -231,7 +229,6 @@ pub fn calibration_step_vol_surface(
     let fields = Fields::from_overrides(params.as_ref())?
         .date("base_date", &base_date, "baseDate")?
         .string("underlying_ticker", &underlying_ticker, "underlyingTicker")?
-        .opt_string("model", model.as_ref(), "model")?
         .opt_string("vol_surface_id", vol_surface_id.as_ref(), "volSurfaceId")?;
     step("vol_surface", &id, quote_set.as_ref(), fields)
 }

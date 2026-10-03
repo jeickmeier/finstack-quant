@@ -20,12 +20,6 @@ pub(crate) const TOLERANCE_DUP_KNOTS: f64 = 1e-10;
 /// redundant objective function evaluations.
 pub(crate) const TOLERANCE_GRID_DEDUP: f64 = 0.001;
 
-/// Minimum spacing between scan grid points to avoid numerical instability.
-///
-/// Expressed in year-fraction units. Spacing below this threshold can lead
-/// to poorly conditioned matrices in global optimization.
-pub(crate) const MIN_GRID_SPACING: f64 = 1e-8;
-
 /// Hard minimum for discount factors during solving (to prevent log(0) or negative DFs).
 ///
 /// Prevents the solver from exploring regions where interest rates become physically

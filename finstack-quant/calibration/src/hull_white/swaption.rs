@@ -190,6 +190,7 @@ pub fn calibrate_hull_white_to_swaptions_with_fn(
         &config,
         fit_tolerance,
         Some(&multi_start),
+        false,
     )?;
 
     let mut quote_residuals = BTreeMap::new();
@@ -197,6 +198,15 @@ pub fn calibrate_hull_white_to_swaptions_with_fn(
         let annuity = pre.annuity;
         let forward = pre.fwd_swap_rate;
         let price = pre.model_price(params, df, quote.expiry)?;
+        if !price.is_finite() || price < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Hull-White swaption calibration: calibrated (κ={:.6e}, σ={:.6e}) reprices \
+                 quote {}Yx{}Y to an invalid model price ({price:?}); a swaption \
+                 price must be finite and non-negative. The optimizer terminated on a \
+                 numerically degenerate solution — review the discount inputs and quote set.",
+                params.kappa, params.sigma, quote.expiry, quote.tenor
+            )));
+        }
         let implied = if quote.is_normal_vol {
             price / annuity * (2.0 * std::f64::consts::PI / quote.expiry).sqrt()
         } else {
@@ -248,40 +258,9 @@ pub fn calibrate_hull_white_to_swaptions_with_fn(
         "Hull-White swaption calibration",
     )?;
 
-    validate_model_price_sanity(df, quotes, &target.prepared, &params)?;
-
     // Final validation of (κ, σ) > 0 through the calibration parameter gate.
     let params = HullWhiteCalibrationParams::new(params.kappa, params.sigma)?;
     Ok((params, report))
-}
-
-/// Post-calibration sanity gate: reprice every calibration quote at the
-/// final `(κ, σ)` and reject non-finite or negative model prices.
-///
-/// HW1F is arbitrage-free by construction, so butterfly/calendar arbitrage
-/// checks on the model-implied surface are unnecessary; the failure modes
-/// this guards against are numerical — a degenerate Jamshidian `r*` solve or
-/// pathological discount inputs producing a price a swaption cannot have.
-/// Fit quality is judged from the final implied-quote report residuals.
-fn validate_model_price_sanity(
-    df: &(dyn Fn(f64) -> f64 + Sync),
-    quotes: &[SwaptionQuote],
-    prepared: &[PreparedSwaption],
-    params: &HullWhiteCalibrationParams,
-) -> finstack_quant_core::Result<()> {
-    for (q, pre) in quotes.iter().zip(prepared) {
-        let model_price = pre.model_price(*params, df, q.expiry)?;
-        if !model_price.is_finite() || model_price < 0.0 {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Hull-White swaption calibration: calibrated (κ={:.6e}, σ={:.6e}) reprices \
-                 quote {}Yx{}Y to an invalid model price ({model_price:?}); a swaption \
-                 price must be finite and non-negative. The optimizer terminated on a \
-                 numerically degenerate solution — review the discount inputs and quote set.",
-                params.kappa, params.sigma, q.expiry, q.tenor
-            )));
-        }
-    }
-    Ok(())
 }
 
 /// ATM vega for a swaption expressed in the same volatility units as the

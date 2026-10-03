@@ -134,7 +134,7 @@ pub(crate) fn parse_envelope(py: Python<'_>, json: &str) -> PyResult<Calibration
     validate_api::parse_envelope(json).map_err(|error| envelope_error_to_py(py, error))
 }
 
-/// Extract a typed envelope from `CalibrationEnvelope | CalibrationPlan | dict | str`.
+/// Extract a typed envelope from `CalibrationEnvelope | dict | str`.
 ///
 /// A `str` goes to the Rust strict loader unchanged, so malformed JSON yields
 /// the same `contract/parse-error` diagnostic as the WASM twin; only other
@@ -145,9 +145,6 @@ pub(crate) fn extract_envelope(
 ) -> PyResult<CalibrationEnvelope> {
     if let Ok(envelope) = obj.cast::<PyCalibrationEnvelope>() {
         return Ok(envelope.borrow().inner.clone());
-    }
-    if let Ok(plan) = obj.cast::<PyCalibrationPlan>() {
-        return plan.borrow().to_envelope(py, Vec::new(), Vec::new());
     }
     if let Ok(json) = obj.extract::<std::borrow::Cow<'_, str>>() {
         return parse_envelope(py, &json);
@@ -160,9 +157,8 @@ pub(crate) fn extract_envelope(
 ///
 /// Parameters
 /// ----------
-/// envelope : CalibrationEnvelope | CalibrationPlan | dict | str
-///     Typed envelope, plan (its attached quotes become ``market_data``),
-///     dict, or JSON string using schema marker ``finstack_quant.calibration/1``.
+/// envelope : CalibrationEnvelope | dict | str
+///     Typed envelope, dict, or JSON string using schema marker ``finstack_quant.calibration/1``.
 ///
 /// Returns
 /// -------
@@ -188,7 +184,7 @@ fn validate_calibration_json(py: Python<'_>, envelope: &Bound<'_, PyAny>) -> PyR
 ///
 /// Parameters
 /// ----------
-/// envelope : CalibrationEnvelope | CalibrationPlan | dict | str
+/// envelope : CalibrationEnvelope | dict | str
 ///     Typed envelope, plan, dict, or JSON string.
 ///
 /// Returns
@@ -216,7 +212,7 @@ fn validate_calibration(
 ///
 /// Parameters
 /// ----------
-/// envelope : CalibrationEnvelope | CalibrationPlan | dict | str
+/// envelope : CalibrationEnvelope | dict | str
 ///     Typed envelope, plan, dict, or JSON string.
 ///
 /// Returns
@@ -244,7 +240,7 @@ fn dry_run(py: Python<'_>, envelope: &Bound<'_, PyAny>) -> PyResult<PyCalibratio
 ///
 /// Parameters
 /// ----------
-/// envelope : CalibrationEnvelope | CalibrationPlan | dict | str
+/// envelope : CalibrationEnvelope | dict | str
 ///     Typed envelope, plan, dict, or JSON string.
 ///
 /// Returns
@@ -266,9 +262,8 @@ fn dry_run_json(py: Python<'_>, envelope: &Bound<'_, PyAny>) -> PyResult<String>
 ///
 /// Parameters
 /// ----------
-/// envelope : CalibrationEnvelope | CalibrationPlan | dict | str
-///     Typed envelope, plan (quotes attached to its steps become the
-///     ``market_data``), dict, or JSON string.
+/// envelope : CalibrationEnvelope | dict | str
+///     Typed envelope, dict, or JSON string containing the plan and market data.
 ///
 /// Returns
 /// -------

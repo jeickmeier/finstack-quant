@@ -256,7 +256,6 @@
             }
           ],
           "calibration_config": {
-            "calibration_method": "bootstrap",
             "compute_diagnostics": false,
             "discount_curve": {
               "allow_non_monotonic_final": null,
@@ -744,7 +743,6 @@
             }
           ],
           "calibration_config": {
-            "calibration_method": "bootstrap",
             "compute_diagnostics": false,
             "discount_curve": {
               "allow_non_monotonic_final": null,

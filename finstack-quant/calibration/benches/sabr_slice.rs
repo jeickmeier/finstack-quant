@@ -1,7 +1,7 @@
 //! Criterion benchmark for SABR slice calibration.
 
 use criterion::{criterion_group, criterion_main, Criterion};
-use finstack_quant_calibration::api::schema::{StepParams, VolSurfaceModel, VolSurfaceParams};
+use finstack_quant_calibration::api::schema::{StepParams, VolSurfaceParams};
 use finstack_quant_calibration::quotes::ids::QuoteId;
 use finstack_quant_calibration::quotes::market_quote::MarketQuote;
 use finstack_quant_calibration::quotes::vol::VolQuote;
@@ -57,7 +57,6 @@ fn bench_sabr_slice(c: &mut Criterion) {
         vol_surface_id: "SPY-VOL".to_string(),
         base_date,
         underlying_ticker: "SPY".to_string(),
-        model: VolSurfaceModel::Sabr,
         discount_curve_id: Some("USD-OIS".into()),
         beta: 0.5,
         target_expiries: vec![target_expiry],

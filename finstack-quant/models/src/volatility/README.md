@@ -16,7 +16,7 @@ Consumed by [`models::closed_form`](../closed_form/) and
 [`models::trees`](../trees/) (both use `black::d1_d2`), by
 `calibration::hull_white` (`normal::bachelier_price_with_annuity`), by
 `calibration::targets::vol` (`SabrCalibrator::calibrate`, the
-SABR slice fitter behind `VolSurfaceModel::Sabr`), and by the rates/FX/vol
+SABR slice fitter used by calibration's volatility surface step), and by the rates/FX/vol
 instrument pricers — `rates/{swaption, cap_floor, cms_option, cms_swap}`,
 the asset-owned futures-option instruments, `fx/fx_digital_option`,
 `exotics/range_accrual` — which reach for `normal::{bachelier_price_with_annuity,

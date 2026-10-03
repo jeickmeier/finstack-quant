@@ -469,11 +469,6 @@
           "type": "object"
         }
       ]
-    },
-    "VolSurfaceModel": {
-      "const": "sabr",
-      "description": "Parameters for volatility surface calibration step.",
-      "type": "string"
     }
   },
   "$id": "https://finstack_quant.dev/schemas/calibration/1/step_params.schema.json",
@@ -825,10 +820,6 @@
           "const": "vol_surface",
           "type": "string"
         },
-        "model": {
-          "$ref": "#/$defs/VolSurfaceModel",
-          "description": "Volatility model used for calibration."
-        },
         "spot_override": {
           "default": null,
           "description": "Optional spot price override.",
@@ -869,8 +860,7 @@
         "kind",
         "vol_surface_id",
         "base_date",
-        "underlying_ticker",
-        "model"
+        "underlying_ticker"
       ],
       "type": "object"
     },

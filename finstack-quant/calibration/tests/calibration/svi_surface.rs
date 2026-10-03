@@ -28,7 +28,7 @@
 use finstack_quant_calibration::api::engine;
 use finstack_quant_calibration::api::schema::{
     CalibrationEnvelope, CalibrationPlan, CalibrationStep, StepParams, SurfaceExtrapolationPolicy,
-    SviSurfaceParams, VolSurfaceModel, VolSurfaceParams,
+    SviSurfaceParams, VolSurfaceParams,
 };
 use finstack_quant_calibration::quotes::ids::QuoteId;
 use finstack_quant_calibration::quotes::market_quote::MarketQuote;
@@ -310,7 +310,6 @@ fn calibrated_surfaces_preserve_total_variance_between_published_expiries() {
             vol_surface_id: "FLAT-VOL".into(),
             base_date,
             underlying_ticker: UNDERLYING.into(),
-            model: VolSurfaceModel::Sabr,
             discount_curve_id: Some(DISCOUNT_ID.into()),
             beta: 1.0,
             target_expiries: expiries.clone(),

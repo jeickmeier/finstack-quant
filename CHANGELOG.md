@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Calibration: simpler execution and canonical contracts
+
+#### Changed (breaking)
+
+- Removed the ineffective global `CalibrationConfig.calibration_method` and SABR-only `VolSurfaceParams.model` / vol-surface constructor selector. Curve fitting selects its method per step.
+- `ValidationConfig` partial JSON now uses the same Rust defaults as typed host constructors and still rejects unknown fields.
+- Reports and execution errors use exact typed `success_tolerance`; duplicated rounded tolerance metadata is removed.
+
+#### Fixed
+
+- Configuration overlays preserve nonserialized explanation settings. Distressed CDS calibration honors the caller's explicit maximum hazard rate.
+- Hazard replay caches hash complete canonical source and discount curves, including FX policy and replay conventions.
+
+#### Simplified
+
+- Targets return their produced curves or scalar directly, and the runtime installs each product once. Concrete instrument builders, canonical model functions, cache interfaces and decoded recipe bindings replace redundant type erasure, bypasses and repeated computations.
+
 ### Instrument envelope is a value (Python-binding audit FUP-003)
 
 #### Changed (breaking)
@@ -71,9 +88,9 @@
 #### Changed
 
 - **Breaking:** Python `hull_white.SwaptionQuote(expiry, tenor, volatility, is_normal_vol)` and `hull_white.CapFloorQuote(maturity, strike, volatility, is_cap, is_normal_vol)` require the flags; the `True` defaults (normal vol, cap) are removed, matching Rust and WASM.
-- Python `RateQuote.futures(convexity_adjustment=None)`, `VolQuote.option_vol(option_type=None)`, `CalibrationStep.hazard(seniority=None)`, `CalibrationStep.vol_surface(model=None)` and `CalibrationStep.parametric(model=None)` take the default from the Rust authoring consts (`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`, `VolQuote::DEFAULT_OPTION_TYPE`, `CalibrationStep::DEFAULT_*`) instead of repeating the value; omitted arguments give the same wire values as before, and `None` is now accepted.
-- **Breaking:** quotes attached to a Python `CalibrationStep` / `CalibrationPlan` are part of the Rust value instead of binding-only fields (audit CFCC-014). A step wraps the new Rust `AttachedStep` (step fields plus a `quotes` array, omitted when empty) and a plan is held as a Rust `CalibrationEnvelope` without prior market, so `CalibrationStep.to_json/from_json`, `CalibrationPlan.to_json/from_json`, `plan.steps` (new Rust `CalibrationEnvelope::attached_steps`) and `CalibrationEnvelope.plan` keep the attached quotes and the round-tripped plan calibrates identically. `CalibrationPlan.to_json()` now writes `{"schema", "plan", "market_data"}` and `from_json` requires that shape (a bare `{"id", "quote_sets", "steps", ...}` plan object is rejected). Rust `CalibrationEnvelope::from_attached_steps` takes `Vec<AttachedStep>` instead of `(CalibrationStep, Vec<MarketDatum>)` tuples.
-- `CalibrationEnvelope(plan, market_data=...)` merges the extra market data onto the plan's attached quotes with the new Rust `CalibrationEnvelope::with_market_data`: an identical repeat (same kind, id and payload) is collected once instead of failing with `duplicate_market_datum_id`, and a repeat with a different payload raises `CalibrationEnvelopeError` (`kind == "conflicting_market_datum"`). The `ConflictingMarketDatum` message is now "market datum id '...' has conflicting payloads".
+- Python `RateQuote.futures(convexity_adjustment=None)`, `VolQuote.option_vol(option_type=None)`, `CalibrationStep.hazard(seniority=None)`, `CalibrationStep.parametric(model=None)` take the default from the Rust authoring consts (`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`, `VolQuote::DEFAULT_OPTION_TYPE`, `CalibrationStep::DEFAULT_*`) instead of repeating the value; omitted arguments give the same wire values as before, and `None` is now accepted.
+- **Breaking:** calibration steps and plans are plain Rust values across Python, WASM, JSON and pickle. Quote IDs are supplied in `CalibrationPlan.quote_sets`, and quote payloads belong only to `CalibrationEnvelope.market_data`. Execution and validation require an envelope, dictionary or canonical envelope JSON; attached quotes, `AttachedStep`, attachment assemblers and implicit plan execution are removed.
+- `CalibrationEnvelope(plan, market_data=...)` stores the explicit flat market-data inputs. Validation rejects duplicate kind-and-ID entries. Rust `CalibrationEnvelope::with_market_data` remains the explicit merge operation, collecting identical payloads and rejecting conflicting payloads.
 
 #### Added
 

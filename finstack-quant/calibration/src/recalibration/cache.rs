@@ -42,19 +42,15 @@ impl<K: Eq + Hash, V> KeyedOnceCache<K, V> {
     ///
     /// # Arguments
     ///
-    /// * `cache` - Optional batch-local cache; `None` bypasses memoisation.
     /// * `key` - Memo key identifying the recalibration request.
     /// * `compute` - Fallible constructor invoked at most once per key.
     pub(crate) fn get_or_compute(
-        cache: Option<&Self>,
+        &self,
         key: K,
         compute: impl FnOnce() -> finstack_quant_core::Result<V>,
     ) -> finstack_quant_core::Result<Arc<V>> {
-        let Some(cache) = cache else {
-            return compute().map(Arc::new);
-        };
         let entry = {
-            let mut entries = match cache.entries.lock() {
+            let mut entries = match self.entries.lock() {
                 Ok(entries) => entries,
                 Err(poisoned) => poisoned.into_inner(),
             };

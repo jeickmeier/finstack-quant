@@ -11,7 +11,7 @@ use finstack_quant_calibration::api::schema::{
     BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationStep,
     DiscountCurveParams, ForwardCurveParams, HazardCurveParams, HullWhiteStepParams,
     InflationCurveParams, StepParams, SurfaceExtrapolationPolicy, SviSurfaceParams,
-    SwaptionVolParams, VolSurfaceModel, VolSurfaceParams,
+    SwaptionVolParams, VolSurfaceParams,
 };
 use finstack_quant_calibration::quotes::cds::CdsQuote;
 use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
@@ -170,7 +170,6 @@ fn step_params_v2_roundtrip_for_all_variants() {
         vol_surface_id: "SPX-VOL".to_string(),
         base_date,
         underlying_ticker: "SPX".to_string(),
-        model: VolSurfaceModel::Sabr,
         discount_curve_id: Some("USD-OIS".into()),
         beta: 0.5,
         target_expiries: vec![0.5, 1.0],

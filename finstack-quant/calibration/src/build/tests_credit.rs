@@ -10,11 +10,10 @@ use crate::quotes::ids::Pillar;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DateExt, Tenor};
 use finstack_quant_core::HashMap;
-use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::{
     CdsConvention, CdsValuationConvention,
 };
-use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTranche;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
 use rust_decimal::Decimal;
 
@@ -47,7 +46,8 @@ fn test_build_cds_par_spread() {
 
     assert_eq!(instrument.id(), "CDS-TEST-1");
 
-    if let Some(cds) = instrument.as_any().downcast_ref::<CreditDefaultSwap>() {
+    {
+        let cds = instrument;
         assert_eq!(cds.notional.currency(), Currency::USD);
         assert_eq!(cds.premium_leg.coupon_bp, Decimal::from(120));
         assert_eq!(cds.protection_leg.recovery_rate, 0.40);
@@ -56,8 +56,6 @@ fn test_build_cds_par_spread() {
         // Verify discount/credit curve ids come from BuildCtx role mappings
         assert_eq!(cds.premium_leg.discount_curve_id.as_str(), "USD-OIS");
         assert_eq!(cds.protection_leg.credit_curve_id.as_str(), "XYZ-CORP-SNR");
-    } else {
-        panic!("Expected CreditDefaultSwap");
     }
 }
 
@@ -87,7 +85,8 @@ fn test_build_cds_upfront() {
 
     let instrument = build_cds_instrument(&quote, &ctx).expect("build cds upfront");
 
-    if let Some(cds) = instrument.as_any().downcast_ref::<CreditDefaultSwap>() {
+    {
+        let cds = instrument;
         assert_eq!(cds.premium_leg.coupon_bp, Decimal::from(100)); // Running
         assert!(cds.upfront.is_some());
         assert_eq!(cds.convention, CdsConvention::IsdaNa);
@@ -97,8 +96,6 @@ fn test_build_cds_upfront() {
         }
         assert_eq!(cds.premium_leg.discount_curve_id.as_str(), "USD-OIS");
         assert_eq!(cds.protection_leg.credit_curve_id.as_str(), "XYZ-CREDIT");
-    } else {
-        panic!("Expected CreditDefaultSwap");
     }
 }
 
@@ -137,10 +134,7 @@ fn credit_coupon_anchors_follow_trade_date_across_all_quarterly_rolls() {
                 recovery_rate: 0.40,
             };
             let cds_instrument = build_cds_instrument(&cds_quote, &ctx).unwrap();
-            let cds = cds_instrument
-                .as_any()
-                .downcast_ref::<CreditDefaultSwap>()
-                .unwrap();
+            let cds = cds_instrument;
             assert_eq!(cds.premium_leg.start, expected_start, "CDS trade {trade}");
             assert!(cds.protection_start() <= trade, "CDS trade {trade}");
             assert!(cds.upfront.unwrap().0 > trade, "CDS trade {trade}");
@@ -162,10 +156,7 @@ fn credit_coupon_anchors_follow_trade_date_across_all_quarterly_rolls() {
                 &CdsTrancheBuildOverrides::default(),
             )
             .unwrap();
-            let tranche = tranche_instrument
-                .as_any()
-                .downcast_ref::<CdsTranche>()
-                .unwrap();
+            let tranche = tranche_instrument;
             assert_eq!(
                 tranche.start_date,
                 Some(expected_start),
@@ -210,10 +201,7 @@ fn cds_coupon_anchor_cash_settlement_and_protection_step_in_remain_distinct() {
     ] {
         let ctx = ctx.clone().with_cds_valuation_convention(Some(convention));
         let instrument = build_cds_instrument(&quote, &ctx).unwrap();
-        let cds = instrument
-            .as_any()
-            .downcast_ref::<CreditDefaultSwap>()
-            .unwrap();
+        let cds = instrument;
         assert_eq!(
             cds.premium_leg.start,
             Date::from_calendar_date(2025, December, 20).unwrap()

@@ -127,10 +127,17 @@ fn resolve_hazard_conventions(
     Ok(spec)
 }
 
+#[derive(Clone)]
+pub(crate) struct ReplayQuote {
+    pub(crate) quote: CdsQuote,
+    pub(crate) pillar_date: finstack_quant_core::dates::Date,
+    pub(crate) pillar_time: f64,
+}
+
 pub(crate) fn validate_hazard_recipe_bindings(
     params: &HazardCurveParams,
     recipe: &HazardCalibrationRecipe,
-) -> Result<()> {
+) -> Result<(Vec<ReplayQuote>, Vec<ReplayQuote>)> {
     let mut quotes = Vec::new();
     for (input_kind, inputs) in [
         ("calibration", recipe.calibration_inputs.as_slice()),
@@ -156,6 +163,8 @@ pub(crate) fn validate_hazard_recipe_bindings(
     let build_ctx = BuildCtx::new(params.base_date, params.notional, curve_ids)
         .with_cds_valuation_convention(params.cds_valuation_convention);
 
+    let mut calibration = Vec::new();
+    let mut spread_risk = Vec::new();
     for (input_kind, input, quote) in quotes {
         let prepared = crate::build::prepared::prepare_cds_quote(
             quote.clone(),
@@ -181,8 +190,18 @@ pub(crate) fn validate_hazard_recipe_bindings(
                     input.pillar_time
                 )));
         }
+        let replay = ReplayQuote {
+            quote,
+            pillar_date: input.pillar_date,
+            pillar_time: input.pillar_time,
+        };
+        if input_kind == "calibration" {
+            calibration.push(replay);
+        } else {
+            spread_risk.push(replay);
+        }
     }
-    Ok(())
+    Ok((calibration, spread_risk))
 }
 
 /// Build the log-spaced hazard bracketing scan grid for a spread-implied
@@ -312,7 +331,7 @@ impl HazardCurveTarget {
         quotes: &[MarketQuote],
         context: &MarketContext,
         global_config: &CalibrationConfig,
-    ) -> Result<(MarketContext, CalibrationReport)> {
+    ) -> Result<(HazardCurve, CalibrationReport)> {
         let cds_quotes: Vec<crate::quotes::cds::CdsQuote> = quotes.extract_quotes();
 
         if cds_quotes.is_empty() {
@@ -321,8 +340,7 @@ impl HazardCurveTarget {
             ));
         }
 
-        let mut config = global_config.clone();
-        config.calibration_method = params.method.clone();
+        let config = global_config.clone();
         let target =
             HazardCurveTarget::new(params.clone(), context.clone(), config.clone(), &cds_quotes)?;
 
@@ -362,9 +380,18 @@ impl HazardCurveTarget {
                 &config,
                 success_tolerance,
             )?,
-            CalibrationMethod::GlobalSolve { .. } => {
-                GlobalFitOptimizer::optimize(&target, &prepared_quotes, &config, success_tolerance)?
-            }
+            CalibrationMethod::GlobalSolve { .. } => GlobalFitOptimizer::optimize(
+                &target,
+                &prepared_quotes,
+                &config,
+                success_tolerance,
+                matches!(
+                    params.method,
+                    CalibrationMethod::GlobalSolve {
+                        use_analytical_jacobian: true
+                    }
+                ),
+            )?,
         };
 
         let report = report
@@ -477,8 +504,7 @@ impl HazardCurveTarget {
         }
         let curve = builder.build()?;
 
-        let new_context = context.clone().insert(curve);
-        Ok((new_context, report))
+        Ok((curve, report))
     }
 
     fn quote_hazard_guess(&self, quote: &CalibrationQuote) -> Option<f64> {

@@ -221,6 +221,7 @@ pub fn calibrate_hull_white_to_cap_floors_with_fn(
         &config_lm,
         config.fit_tolerance,
         Some(&multi_start),
+        false,
     )?;
 
     reject_at_bound_params(

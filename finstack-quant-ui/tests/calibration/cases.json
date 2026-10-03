@@ -70,7 +70,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -400,8 +399,6 @@
               "curve_id": "USD-OIS",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -545,7 +542,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -1044,8 +1040,6 @@
               "curve_id": "USD-OIS",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -1104,8 +1098,6 @@
               "residual_evals": "11",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "tolerance_definition": "max_abs_residual",
               "type": "global_fit",
               "validation_tolerance": "1.00e-8"
@@ -1245,7 +1237,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -1720,7 +1711,6 @@
                   }
                 ],
                 "calibration_config": {
-                  "calibration_method": "bootstrap",
                   "compute_diagnostics": false,
                   "discount_curve": {
                     "allow_non_monotonic_final": null,
@@ -1997,8 +1987,6 @@
               "entity": "Issuer-A",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -2047,8 +2035,6 @@
               "curve_id": "USD-OIS",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -2187,7 +2173,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -2662,7 +2647,6 @@
                   }
                 ],
                 "calibration_config": {
-                  "calibration_method": "bootstrap",
                   "compute_diagnostics": false,
                   "discount_curve": {
                     "allow_non_monotonic_final": null,
@@ -2939,8 +2923,6 @@
               "entity": "CDX.NA.IG.46",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -2989,8 +2971,6 @@
               "curve_id": "USD-OIS",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -3154,7 +3134,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -3742,7 +3721,6 @@
                   }
                 ],
                 "calibration_config": {
-                  "calibration_method": "bootstrap",
                   "compute_diagnostics": false,
                   "discount_curve": {
                     "allow_non_monotonic_final": null,
@@ -4044,8 +4022,6 @@
               "entity": "CDX.NA.IG.46",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -4091,8 +4067,6 @@
               "residual_units": "discounted_upfront_fraction",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-3",
-              "tolerance": "1.00e-3",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -4140,8 +4114,6 @@
               "curve_id": "USD-OIS",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -4189,7 +4161,7 @@
   },
   {
     "source": "finstack-quant/calibration/examples/market_bootstrap/06_cdx_index_vol.json",
-    "sha256": "3d9376c81eea51eb3a2d61511d2233a446e72ea35379173c9cf53e16e4dc3955",
+    "sha256": "a53cdaaa1e68d3bd8f312aa91e19679012fe1e718c662877ddc2e4328d083d70",
     "input": {
       "$schema": "../../schemas/calibration/1/calibration.schema.json",
       "schema": "finstack_quant.calibration/1",
@@ -4264,7 +4236,6 @@
             "vol_surface_id": "CDX-NA-IG-46-CDSO-VOL",
             "base_date": "2026-05-08",
             "underlying_ticker": "CDX-NA-IG-46",
-            "model": "sabr",
             "discount_curve_id": "USD-OIS",
             "beta": 1,
             "target_expiries": [
@@ -4309,7 +4280,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -4883,7 +4853,6 @@
                   }
                 ],
                 "calibration_config": {
-                  "calibration_method": "bootstrap",
                   "compute_diagnostics": false,
                   "discount_curve": {
                     "allow_non_monotonic_final": null,
@@ -5185,8 +5154,6 @@
               "entity": "CDX.NA.IG.46",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -5242,8 +5209,6 @@
               "sabr_winning_starts": "T=0.109589:alpha=0.36030000,nu=0.40000000,rho=0.60000000;T=0.361644:alpha=0.37000000,nu=0.90000000,rho=0.00000000;T=0.610959:alpha=0.38000000,nu=0.90000000,rho=0.60000000",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-3",
-              "tolerance": "1.00e-3",
               "type": "vol_surface"
             },
             "solver_config": {
@@ -5301,8 +5266,6 @@
               "curve_id": "USD-OIS",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -5496,7 +5459,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -6414,8 +6376,6 @@
               "curve_id": "USD-OIS",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -6474,8 +6434,6 @@
               "residual_evals": "11",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "tolerance_definition": "max_abs_residual",
               "type": "global_fit",
               "validation_tolerance": "1.00e-8"
@@ -6553,8 +6511,6 @@
               "sabr_winning_starts": "T=1.000000,tenor=2.000000:alpha=0.00716161,nu=0.40000000,rho=0.00000000;T=1.000000,tenor=5.000000:alpha=0.00670000,nu=0.40000000,rho=-0.60000000;T=1.000000,tenor=10.000000:alpha=0.00620000,nu=0.15000000,rho=0.60000000;T=2.002740,tenor=2.000000:alpha=0.00740000,nu=0.40000000,rho=-0.60000000;T=2.002740,tenor=5.000000:alpha=0.00690000,nu=0.15000000,rho=0.60000000;T=2.002740,tenor=10.000000:alpha=0.00640000,nu=0.90000000,rho=-0.60000000;T=5.002740,tenor=2.000000:alpha=0.00800000,nu=0.90000000,rho=-0.60000000;T=5.002740,tenor=5.000000:alpha=0.00740000,nu=0.40000000,rho=0.00000000;T=5.002740,tenor=10.000000:alpha=0.00670000,nu=0.40000000,rho=0.00000000",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.50e-3",
-              "tolerance": "1.50e-3",
               "type": "swaption_vol"
             },
             "solver_config": {
@@ -6601,7 +6557,7 @@
   },
   {
     "source": "finstack-quant/calibration/examples/market_bootstrap/08_equity_vol_surface.json",
-    "sha256": "918b84641728b153b779097708144de04d623654a170c8861d4fb5c8acb9eeb5",
+    "sha256": "7164cac1bb60dfd30bdbedd2a28e25b8753b846d6716ab90f51e16a403f41af0",
     "input": {
       "$schema": "../../schemas/calibration/1/calibration.schema.json",
       "schema": "finstack_quant.calibration/1",
@@ -6654,7 +6610,6 @@
             "vol_surface_id": "AAPL-EQUITY-VOL",
             "base_date": "2026-05-08",
             "underlying_ticker": "AAPL",
-            "model": "sabr",
             "discount_curve_id": "USD-OIS",
             "beta": 0.5,
             "target_expiries": [0.25205479, 0.50410959, 1],
@@ -6697,7 +6652,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -7263,8 +7217,6 @@
               "sabr_winning_starts": "T=0.252055:alpha=3.29160147,nu=0.40000000,rho=-0.60000000;T=0.504110:alpha=3.14325364,nu=0.90000000,rho=0.00000000;T=1.000000:alpha=2.97542361,nu=0.90000000,rho=0.00000000",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-3",
-              "tolerance": "1.00e-3",
               "type": "vol_surface"
             },
             "solver_config": {
@@ -7322,8 +7274,6 @@
               "curve_id": "USD-OIS",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -7413,7 +7363,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -7615,7 +7564,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -7831,7 +7779,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -8195,7 +8142,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -8804,7 +8750,6 @@
                   }
                 ],
                 "calibration_config": {
-                  "calibration_method": "bootstrap",
                   "compute_diagnostics": false,
                   "discount_curve": {
                     "allow_non_monotonic_final": null,
@@ -9120,8 +9065,6 @@
               "entity": "CDX.NA.IG.46",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -9168,8 +9111,6 @@
               "residual_units": "discounted_upfront_fraction",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-3",
-              "tolerance": "1.00e-3",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -9217,8 +9158,6 @@
               "curve_id": "USD-OIS",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {
@@ -9336,7 +9275,6 @@
             "min_rate": -0.02,
             "max_rate": 0.5
           },
-          "calibration_method": "bootstrap",
           "compute_diagnostics": true,
           "discount_curve": {
             "scan_grid_points": 48,
@@ -9666,8 +9604,6 @@
               "curve_id": "USD-OIS",
               "solver_max_iterations": "100",
               "solver_tolerance": "1.00e-12",
-              "success_tolerance": "1.00e-8",
-              "tolerance": "1.00e-8",
               "type": "generic_bootstrap"
             },
             "solver_config": {

@@ -6,7 +6,7 @@ use crate::quotes::ids::{Pillar, QuoteId};
 use crate::quotes::xccy::XccyQuote;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
-use finstack_quant_valuations::instruments::rates::xccy_swap::XccySwap;
+use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::market::conventions::ids::XccyConventionId;
 
 fn xccy_build_ctx(as_of: Date) -> BuildCtx {
@@ -35,10 +35,7 @@ fn test_build_xccy_basis_swap() {
     let instrument = build_xccy_instrument(&quote, &ctx).expect("build xccy swap");
     assert_eq!(instrument.id(), "EURUSD-XCCY-5Y");
 
-    let swap = instrument
-        .as_any()
-        .downcast_ref::<XccySwap>()
-        .expect("Expected XccySwap");
+    let swap = instrument;
     assert_eq!(swap.leg1.notional.currency(), Currency::EUR);
     assert_eq!(swap.leg2.notional.currency(), Currency::USD);
     assert_eq!(swap.reporting_currency, Currency::USD);
@@ -101,10 +98,7 @@ fn unregistered_forward_override_keeps_contractual_overnight_compounding() {
     };
 
     let instrument = build_xccy_instrument(&quote, &ctx).expect("build xccy swap");
-    let swap = instrument
-        .as_any()
-        .downcast_ref::<XccySwap>()
-        .expect("Expected XccySwap");
+    let swap = instrument;
     assert_eq!(
         swap.leg2.leg.forward_curve_id.as_str(),
         "USD-SOFR-OIS-ALIAS"
@@ -169,10 +163,7 @@ mod mtm_reset_builder_tests {
         };
 
         let instrument = build_xccy_instrument(&quote, &ctx).expect("build succeeds");
-        let swap = instrument
-            .as_any()
-            .downcast_ref::<XccySwap>()
-            .expect("instrument is an XccySwap");
+        let swap = instrument;
 
         assert_eq!(
             swap.notional_exchange,
