@@ -4,9 +4,9 @@
 //! full-repricing factor sensitivities from Python, with DataFrame export.
 
 use crate::bindings::extract::extract_market;
+use crate::bindings::models::factor::risk::PyRiskDecomposition;
 use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::bindings::portfolio::factor_model::PyRiskDecomposition;
 use crate::errors::{core_to_py, display_to_py};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};

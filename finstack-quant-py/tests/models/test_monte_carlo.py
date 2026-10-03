@@ -143,11 +143,6 @@ def test_simulate_gbm_paths_is_typed_deterministic_and_shaped() -> None:
     assert all(path[0] == pytest.approx(100.0) for path in first.paths)
 
 
-def test_simulate_gbm_paths_rejects_capture_with_antithetic() -> None:
-    with pytest.raises(ValueError, match="antithetic"):
-        simulate_gbm_paths(100.0, 0.05, 0.0, 0.2, 1.0, 4, 3, 42, antithetic=True)
-
-
 def test_heston_feller_uses_inclusive_predicate_without_validation() -> None:
     assert heston_satisfies_feller(2.0, 0.04, 0.3)
     assert heston_satisfies_feller(1.0, 0.045, 0.3)

@@ -94,6 +94,7 @@ impl std::str::FromStr for WorkoutCollateralType {
 /// A single piece of collateral in the recovery waterfall.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "CollateralPieceWire")]
 pub struct CollateralPiece {
     /// Collateral asset class.
     pub collateral_type: WorkoutCollateralType,
@@ -103,8 +104,31 @@ pub struct CollateralPiece {
     pub haircut: f64,
 }
 
+#[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct CollateralPieceWire {
+    /// Collateral asset class.
+    collateral_type: WorkoutCollateralType,
+    /// Book value (pre-haircut) of the collateral.
+    book_value: f64,
+    /// Liquidation haircut in \[0, 1\]. Applied as: liquidation_value = book_value * (1 - haircut).
+    haircut: f64,
+}
+impl TryFrom<CollateralPieceWire> for CollateralPiece {
+    type Error = finstack_quant_core::Error;
+    fn try_from(wire: CollateralPieceWire) -> Result<Self> {
+        Self::new(wire.collateral_type, wire.book_value, wire.haircut)
+    }
+}
+
 impl CollateralPiece {
     /// Create a new collateral piece.
+    ///
+    /// # Arguments
+    /// * `collateral_type` - Asset class used to identify this recovery-waterfall entry.
+    /// * `book_value` - Finite, non-negative collateral value in the same monetary units as EAD.
+    /// * `haircut` - Finite liquidation discount as a decimal fraction in `[0, 1]`.
     ///
     /// # Errors
     ///
@@ -140,6 +164,7 @@ impl CollateralPiece {
 /// These reduce the net recovery available to creditors.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "WorkoutCostsWire")]
 pub struct WorkoutCosts {
     /// Direct costs as fraction of EAD (legal fees, administrative). Typical: 3-8%.
     pub direct_cost_rate: f64,
@@ -147,8 +172,28 @@ pub struct WorkoutCosts {
     pub indirect_cost_rate: f64,
 }
 
+#[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct WorkoutCostsWire {
+    /// Direct costs as fraction of EAD (legal fees, administrative). Typical: 3-8%.
+    direct_cost_rate: f64,
+    /// Indirect costs as fraction of EAD (opportunity cost, management distraction). Typical: 2-5%.
+    indirect_cost_rate: f64,
+}
+impl TryFrom<WorkoutCostsWire> for WorkoutCosts {
+    type Error = finstack_quant_core::Error;
+    fn try_from(wire: WorkoutCostsWire) -> Result<Self> {
+        Self::new(wire.direct_cost_rate, wire.indirect_cost_rate)
+    }
+}
+
 impl WorkoutCosts {
     /// Create workout costs specification.
+    ///
+    /// # Arguments
+    /// * `direct_cost_rate` - Finite, non-negative legal and administration costs as a fraction of EAD.
+    /// * `indirect_cost_rate` - Finite, non-negative indirect resolution costs as a fraction of EAD.
     ///
     /// # Errors
     ///
@@ -211,6 +256,7 @@ impl WorkoutCosts {
 /// with the same factor as recoveries (Basel workout-LGD methodology).
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(try_from = "WorkoutLgdWire")]
 pub struct WorkoutLgd {
     /// Ordered collateral waterfall (highest priority first).
     collateral: Vec<CollateralPiece>,
@@ -238,7 +284,55 @@ pub struct WorkoutLgdResult {
     pub recovery_rate: f64,
 }
 
+#[derive(serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+struct WorkoutLgdWire {
+    /// Ordered collateral waterfall (highest priority first).
+    collateral: Vec<CollateralPiece>,
+    /// Expected workout duration in years. Typical: 1-5 years.
+    workout_years: f64,
+    /// Discount rate for time-value-of-money during workout.
+    discount_rate: f64,
+    /// Direct and indirect resolution costs.
+    costs: WorkoutCosts,
+}
+impl TryFrom<WorkoutLgdWire> for WorkoutLgd {
+    type Error = finstack_quant_core::Error;
+    fn try_from(wire: WorkoutLgdWire) -> Result<Self> {
+        Self::from_parts(
+            wire.collateral,
+            wire.workout_years,
+            wire.discount_rate,
+            wire.costs,
+        )
+    }
+}
+
 impl WorkoutLgd {
+    fn from_parts(
+        collateral: Vec<CollateralPiece>,
+        workout_years: f64,
+        discount_rate: f64,
+        costs: WorkoutCosts,
+    ) -> Result<Self> {
+        validate_finite(workout_years)?;
+        validate_finite(discount_rate)?;
+        if workout_years < 0.0 || discount_rate < 0.0 {
+            return Err(InputError::NegativeValue.into());
+        }
+        for piece in &collateral {
+            CollateralPiece::new(piece.collateral_type, piece.book_value, piece.haircut)?;
+        }
+        WorkoutCosts::new(costs.direct_cost_rate, costs.indirect_cost_rate)?;
+        Ok(Self {
+            collateral,
+            workout_years,
+            discount_rate,
+            costs,
+        })
+    }
+
     /// Start building a WorkoutLgd.
     #[must_use]
     pub fn builder() -> WorkoutLgdBuilder {
@@ -387,7 +481,7 @@ impl WorkoutLgdBuilder {
     ///
     /// # Errors
     ///
-    /// Returns an error if workout_years or discount_rate is non-finite or negative.
+    /// Returns an error if workout duration, discount rate, costs or collateral are non-finite or outside their accepted ranges.
     pub fn build(self) -> Result<WorkoutLgd> {
         let defaults = crate::credit::registry::embedded_registry()?.workout_lgd_defaults(
             crate::credit::registry::embedded_registry()?.default_workout_lgd_id(),
@@ -395,24 +489,15 @@ impl WorkoutLgdBuilder {
         let workout_years = self.workout_years.unwrap_or(defaults.workout_years);
         let discount_rate = self.discount_rate.unwrap_or(defaults.discount_rate);
 
-        validate_finite(workout_years)?;
-        validate_finite(discount_rate)?;
-        if workout_years < 0.0 {
-            return Err(InputError::NegativeValue.into());
-        }
-        if discount_rate < 0.0 {
-            return Err(InputError::NegativeValue.into());
-        }
-
-        Ok(WorkoutLgd {
-            collateral: self.collateral,
+        WorkoutLgd::from_parts(
+            self.collateral,
             workout_years,
             discount_rate,
-            costs: match self.costs {
+            match self.costs {
                 Some(costs) => costs,
                 None => WorkoutCosts::new(defaults.direct_cost_rate, defaults.indirect_cost_rate)?,
             },
-        })
+        )
     }
 }
 
@@ -420,6 +505,45 @@ impl WorkoutLgdBuilder {
 mod tests {
     use super::*;
     use std::str::FromStr;
+
+    #[test]
+    fn replay_and_builder_reject_invalid_workout_inputs() {
+        let model = WorkoutLgd::builder().build().expect("valid model");
+        let mut wire = serde_json::to_value(&model).expect("serialize");
+        for field in ["workout_years", "discount_rate"] {
+            let mut invalid = wire.clone();
+            invalid[field] = serde_json::json!(-1.0);
+            assert!(serde_json::from_value::<WorkoutLgd>(invalid).is_err());
+        }
+        wire["costs"]["direct_cost_rate"] = serde_json::json!(-1.0);
+        assert!(serde_json::from_value::<WorkoutLgd>(wire).is_err());
+        assert!(serde_json::from_str::<CollateralPiece>(
+            r#"{"collateral_type":"cash","book_value":100.0,"haircut":1.1}"#
+        )
+        .is_err());
+        assert!(serde_json::from_str::<WorkoutCosts>(
+            r#"{"direct_cost_rate":-1.0,"indirect_cost_rate":0.0}"#
+        )
+        .is_err());
+        let bad_costs = WorkoutCosts {
+            direct_cost_rate: -1.0,
+            indirect_cost_rate: 0.0,
+        };
+        assert!(WorkoutLgd::builder().costs(bad_costs).build().is_err());
+        let bad_piece = CollateralPiece {
+            collateral_type: WorkoutCollateralType::Cash,
+            book_value: -1.0,
+            haircut: 0.0,
+        };
+        assert!(WorkoutLgd::builder().collateral(bad_piece).build().is_err());
+        let replay: WorkoutLgd =
+            serde_json::from_str(&serde_json::to_string(&model).expect("serialize"))
+                .expect("valid replay");
+        assert_eq!(
+            replay.lgd(100.0).expect("ead"),
+            model.lgd(100.0).expect("ead")
+        );
+    }
 
     #[test]
     fn collateral_piece_liquidation_value() {

@@ -715,6 +715,17 @@ impl PathDependentPricer {
     }
 
     /// Price a path-dependent option with a custom time grid.
+    ///
+    /// # Arguments
+    /// * `process` - GBM dynamics, including any cumulative carry schedule.
+    /// * `initial_spot` - Finite, positive initial asset price in payoff price units.
+    /// * `time_grid` - Simulation times from zero; include every contractual observation time.
+    /// * `payoff` - Path payoff evaluated at the grid's observation indices.
+    /// * `currency` - Currency of the discounted estimate.
+    /// * `discount_factor` - Present-value factor from payoff payment to valuation.
+    ///
+    /// # Errors
+    /// Returns validation or simulation errors, including incompatible capture and variance reduction.
     #[allow(clippy::too_many_arguments)]
     pub fn price_with_grid<P>(
         &self,
@@ -728,62 +739,15 @@ impl PathDependentPricer {
     where
         P: Payoff,
     {
-        self.config.validate()?;
-        if self.config.use_sobol {
-            return self
-                .price_with_sobol(
-                    process,
-                    initial_spot,
-                    time_grid,
-                    payoff,
-                    currency,
-                    discount_factor,
-                )
-                .map(|result| result.estimate);
-        }
-
-        // Antithetic pairing is handled inline by the engine
-        // (see McEngine::simulate_antithetic_pair); path-capture + antithetic
-        // is rejected at validate_runtime.
-        let engine_config = McEngineConfig {
-            num_paths: self.config.num_paths,
+        self.run_grid(
+            process,
+            initial_spot,
             time_grid,
-            target_ci_half_width: None,
-            use_parallel: self.config.use_parallel,
-            chunk_size: Some(self.config.chunk_size),
-            path_capture: self.config.path_capture.clone(),
-            antithetic: self.config.antithetic,
-        };
-
-        let engine = McEngine::new(engine_config);
-        let disc = ExactGbm::new();
-        let initial_state = vec![initial_spot];
-        let rng = PhiloxRng::new(self.config.seed);
-
-        if engine.config().path_capture.enabled {
-            let process_params = process.metadata();
-            let result = engine.price_with_capture(
-                &rng,
-                process,
-                &disc,
-                &initial_state,
-                payoff,
-                currency,
-                discount_factor,
-                process_params,
-            )?;
-            Ok(result.estimate)
-        } else {
-            engine.price(
-                &rng,
-                process,
-                &disc,
-                &initial_state,
-                payoff,
-                currency,
-                discount_factor,
-            )
-        }
+            payoff,
+            currency,
+            discount_factor,
+        )
+        .map(|result| result.estimate)
     }
 
     /// Price with full Monte Carlo result (including captured paths if enabled).
@@ -840,7 +804,6 @@ impl PathDependentPricer {
     where
         P: Payoff,
     {
-        self.config.validate()?;
         // Path capture is incompatible with antithetic pairing (the engine
         // rejects the combination); fail loudly instead of silently pricing
         // with a different estimator than the caller configured.
@@ -852,6 +815,26 @@ impl PathDependentPricer {
                     .to_string(),
             ));
         }
+        self.run_grid(
+            process,
+            initial_spot,
+            time_grid,
+            payoff,
+            currency,
+            discount_factor,
+        )
+    }
+
+    fn run_grid<P: Payoff>(
+        &self,
+        process: &GbmProcess,
+        initial_spot: f64,
+        time_grid: TimeGrid,
+        payoff: &P,
+        currency: Currency,
+        discount_factor: f64,
+    ) -> Result<MonteCarloResult> {
+        self.config.validate()?;
         if self.config.use_sobol {
             return self.price_with_sobol(
                 process,
@@ -870,7 +853,7 @@ impl PathDependentPricer {
             use_parallel: self.config.use_parallel,
             chunk_size: Some(self.config.chunk_size),
             path_capture: self.config.path_capture.clone(),
-            antithetic: false,
+            antithetic: self.config.antithetic,
         };
         let engine = McEngine::new(engine_config);
 
@@ -1386,6 +1369,71 @@ mod tests {
             assert!((call_value.mean.amount() - 19.0).abs() < 1e-10);
             assert!((put_value.mean.amount() - 19.0).abs() < 1e-10);
         }
+    }
+
+    #[test]
+    fn grid_entry_points_preserve_estimates_and_capture_contracts() {
+        let gbm = GbmProcess::with_params(0.05, 0.0, 0.2).expect("valid GBM");
+        let call = EuropeanCall::new(100.0, 1.0, 4);
+        for sobol in [false, true] {
+            let config = PathDependentPricerConfig::new(32)
+                .with_seed(17)
+                .with_parallel(false)
+                .with_antithetic(false)
+                .with_sobol(sobol);
+            let pricer = PathDependentPricer::new(config);
+            let estimate = pricer
+                .price_with_grid(
+                    &gbm,
+                    100.0,
+                    TimeGrid::uniform(1.0, 4).expect("grid"),
+                    &call,
+                    Currency::USD,
+                    0.95,
+                )
+                .expect("estimate");
+            let result = pricer
+                .price_with_paths_and_grid(
+                    &gbm,
+                    100.0,
+                    TimeGrid::uniform(1.0, 4).expect("grid"),
+                    &call,
+                    Currency::USD,
+                    0.95,
+                )
+                .expect("result");
+            assert_eq!(
+                serde_json::to_value(estimate).expect("serialize"),
+                serde_json::to_value(result.estimate).expect("serialize")
+            );
+            assert_eq!(result.run.expect("metadata").seed, Some(17));
+        }
+        let pricer = PathDependentPricer::new(
+            PathDependentPricerConfig::new(32)
+                .with_parallel(false)
+                .with_antithetic(true),
+        );
+        let estimate = pricer
+            .price_with_grid(
+                &gbm,
+                100.0,
+                TimeGrid::uniform(1.0, 4).expect("grid"),
+                &call,
+                Currency::USD,
+                0.95,
+            )
+            .expect("antithetic estimate");
+        assert_eq!(estimate.num_simulated_paths, 64);
+        assert!(pricer
+            .price_with_paths_and_grid(
+                &gbm,
+                100.0,
+                TimeGrid::uniform(1.0, 4).expect("grid"),
+                &call,
+                Currency::USD,
+                0.95
+            )
+            .is_err());
     }
 
     #[test]

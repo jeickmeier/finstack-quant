@@ -1933,7 +1933,6 @@ export interface CollateralPiece {
    * Liquidation haircut in \[0, 1\]. Applied as: liquidation_value = book_value * (1 - haircut).
    */
   haircut: number;
-  [k: string]: unknown;
 }
 /**
  * COS method configuration.
@@ -4896,37 +4895,6 @@ export interface RoughHestonParams {
   [k: string]: unknown;
 }
 /**
- * Market data for SABR calibration.
- */
-export interface SabrMarketData {
-  /**
-   * Fixed beta parameter
-   */
-  beta: number;
-  /**
-   * Forward price
-   */
-  forward: number;
-  /**
-   * Market implied volatilities
-   */
-  market_vols: number[];
-  /**
-   * Optional shift for handling negative rates in lognormal SABR (beta ≈ 1.0)
-   * Default: 0.02 (200 basis points) if None and rates are negative
-   */
-  shift?: number | null;
-  /**
-   * Strike prices
-   */
-  strikes: number[];
-  /**
-   * Time to expiry
-   */
-  time_to_expiry: number;
-  [k: string]: unknown;
-}
-/**
  * SABR model parameters
  */
 export interface SabrParameters {
@@ -5337,7 +5305,6 @@ export interface WorkoutCosts {
    * Indirect costs as fraction of EAD (opportunity cost, management distraction). Typical: 2-5%.
    */
   indirect_cost_rate: number;
-  [k: string]: unknown;
 }
 /**
  * Workout-based LGD model using a collateral-first recovery waterfall.
@@ -5359,7 +5326,6 @@ export interface WorkoutLgd {
    * Expected workout duration in years. Typical: 1-5 years.
    */
   workout_years: number;
-  [k: string]: unknown;
 }
 /**
  * Outcome of evaluating a `WorkoutLgd` model at one exposure at default.

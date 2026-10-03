@@ -5,29 +5,15 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use finstack_quant_core::market_data::term_structures::HazardCurve;
-use finstack_quant_models::credit::pool::StochasticDefaultSpec;
 use finstack_quant_valuations::instruments::json_loader::{instrument_registry, registry_tags};
 use finstack_quant_valuations::instruments::json_loader::{InstrumentEnvelope, InstrumentJson};
 use serde::Deserialize;
-use time::macros::date;
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CoverageManifest {
     schema_version: u32,
-    #[serde(default)]
-    non_persistable: Vec<NonPersistablePolicy>,
     instrument: Vec<CoverageEntry>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct NonPersistablePolicy {
-    tag: String,
-    case: String,
-    expected_error_contains: Vec<String>,
-    rationale: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -485,65 +471,6 @@ fn persisted_tags_match_runtime_instrument_types() {
             "runtime InstrumentType and persisted instrument tag diverged"
         );
     }
-}
-
-#[test]
-fn declared_non_persistable_cases_are_exercised() {
-    let manifest = load_manifest();
-    let registry: BTreeSet<&str> = registry_tags().iter().copied().collect();
-    let mut exercised = BTreeSet::new();
-
-    for policy in &manifest.non_persistable {
-        assert!(
-            registry.contains(policy.tag.as_str()),
-            "non-persistable policy references unknown tag {}",
-            policy.tag
-        );
-        assert!(
-            !policy.rationale.trim().is_empty(),
-            "{}:{} requires a substantive rationale",
-            policy.tag,
-            policy.case
-        );
-        assert!(
-            exercised.insert((policy.tag.as_str(), policy.case.as_str())),
-            "duplicate non-persistable policy {}:{}",
-            policy.tag,
-            policy.case
-        );
-
-        let error = match (policy.tag.as_str(), policy.case.as_str()) {
-            ("structured_credit", "stochastic_default_hazard_curve_based") => {
-                let curve = HazardCurve::builder("REGISTRY-COVERAGE-HAZARD")
-                    .base_date(date!(2026 - 01 - 01))
-                    .knots([(1.0, 0.01), (5.0, 0.02)])
-                    .recovery_rate(0.40)
-                    .build()
-                    .expect("valid hazard curve for persistence-policy coverage");
-                let spec = StochasticDefaultSpec::from_hazard_curve(curve, 0.5);
-                serde_json::to_string(&spec)
-                    .expect_err("HazardCurveBased must reject typed persistence")
-                    .to_string()
-            }
-            (tag, case) => {
-                panic!("declared non-persistable policy is not exercised: {tag}:{case}")
-            }
-        };
-
-        for expected in &policy.expected_error_contains {
-            assert!(
-                error.contains(expected),
-                "{}:{} typed serialization error {error:?} omitted required rationale token {expected:?}",
-                policy.tag,
-                policy.case
-            );
-        }
-    }
-
-    assert!(
-        !exercised.is_empty(),
-        "the manifest must exercise at least one explicit non-persistable case"
-    );
 }
 
 #[test]

@@ -1,11 +1,5 @@
 schema_version = 1
 
-[[non_persistable]]
-tag = "structured_credit"
-case = "stochastic_default_hazard_curve_based"
-expected_error_contains = ["HazardCurveBased", "cannot be persisted", "build_from_hazard_curve", "prior_market"]
-rationale = "HazardCurveBased stores a derived calibrated curve artifact; persist prior market calibration inputs and reconstruct it at runtime."
-
 [[instrument]]
 tag = "bond"
 fixture = "json_examples/bond.json"

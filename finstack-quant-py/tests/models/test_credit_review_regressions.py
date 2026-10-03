@@ -56,3 +56,39 @@ def test_lsmc_constructor_rejects_oversized_workload(num_paths: int, num_steps: 
 def test_compact_gbm_rejects_oversized_output_before_grid_allocation() -> None:
     with pytest.raises(ValueError, match="exceed"):
         simulate_gbm_paths(100.0, 0.05, 0.0, 0.20, 1.0, 64_000_000, 1)
+
+
+def test_workout_replay_validates_costs_and_collateral() -> None:
+    import json
+
+    from finstack_quant.models.credit.lgd import CollateralPiece, WorkoutCosts, WorkoutLgd
+
+    with pytest.raises(ValueError, match="WorkoutCosts JSON"):
+        WorkoutCosts.from_json('{"direct_cost_rate":-1.0,"indirect_cost_rate":0.0}')
+    with pytest.raises(ValueError, match="CollateralPiece JSON"):
+        CollateralPiece.from_json('{"collateral_type":"cash","book_value":100.0,"haircut":1.1}')
+    model = WorkoutLgd.builder().build()
+    wire = json.loads(model.to_json())
+    wire["costs"]["direct_cost_rate"] = -1.0
+    with pytest.raises(ValueError, match="WorkoutLgd JSON"):
+        WorkoutLgd.from_json(json.dumps(wire))
+
+
+def test_migration_rejects_reshaped_nested_matrix() -> None:
+    from finstack_quant.models.credit.migration import RatingScale, TransitionMatrix
+
+    scale = RatingScale.custom(["A", "D"])
+    with pytest.raises(ValueError, match="rows"):
+        TransitionMatrix(scale, [[0.9, 0.1, 0.0, 1.0]], 1.0)
+    assert TransitionMatrix(scale, [0.9, 0.1, 0.0, 1.0], 1.0).to_matrix() == [
+        [0.9, 0.1],
+        [0.0, 1.0],
+    ]
+
+
+@pytest.mark.parametrize("volatilities", [[0.2], [0.2, -0.1], [0.2, float("nan")]])
+def test_uncorrelated_factors_validate_volatilities(volatilities: list[float]) -> None:
+    from finstack_quant.models.correlation import LatentMultiFactor
+
+    with pytest.raises(ValueError, match=r"(?i)volatil"):
+        LatentMultiFactor.uncorrelated(2, volatilities)

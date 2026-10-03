@@ -11,7 +11,7 @@ use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::errors::{core_to_py, portfolio_to_py};
 
-use super::json_bridge::{deserialize_json, serialize_json};
+use crate::bindings::json_bridge::{deserialize_json, serialize_json};
 
 const AGGREGATE_COLUMNS: &[ColumnSchema<'static>] = &[
     ("instrument_id", "str"),

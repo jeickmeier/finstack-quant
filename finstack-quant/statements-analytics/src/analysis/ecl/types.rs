@@ -12,7 +12,7 @@
 
 use finstack_quant_core::math::interp::interp_knots_flat;
 use finstack_quant_core::{Error, InputError, Result};
-use finstack_quant_models::credit::lgd::ead_revolver;
+use finstack_quant_models::credit::lgd::{CreditConversionFactor, EadCalculator};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -186,7 +186,7 @@ pub struct Exposure {
     /// Undrawn commitment at the reporting date, in the same currency as
     /// [`Self::ead`]. Constant across the horizon (no undrawn schedule).
     /// Default `0.0` (fully drawn term loan). EAD is
-    /// `drawn + undrawn × ccf` via core `ead_revolver`.
+    /// `drawn + undrawn × ccf` via core `EadCalculator`.
     #[serde(default)]
     pub undrawn: f64,
 
@@ -350,7 +350,7 @@ impl Exposure {
     /// Drawn amount is interpolated over [`Exposure::ead_schedule`] with
     /// flat extrapolation when a schedule is present; otherwise the
     /// constant [`Exposure::ead`] is used. The priced EAD is
-    /// `ead_revolver(drawn, undrawn, ccf)` from core: term loans with
+    /// `EadCalculator::new` from models: term loans with
     /// `undrawn = 0` keep EAD equal to drawn.
     ///
     /// # Arguments
@@ -362,14 +362,14 @@ impl Exposure {
     /// # Errors
     ///
     /// Returns an error when `drawn`, [`Self::undrawn`], or [`Self::ccf`]
-    /// violate the core `ead_revolver` invariants (non-finite or negative
+    /// violate the core `EadCalculator` invariants (non-finite or negative
     /// amounts, CCF outside `[0, 1]`).
     pub(crate) fn ead_at(&self, t: f64) -> Result<f64> {
         let drawn = match &self.ead_schedule {
             Some(schedule) if !schedule.is_empty() => interp_knots_flat(schedule, t),
             _ => self.ead,
         };
-        ead_revolver(drawn, self.undrawn, self.ccf)
+        Ok(EadCalculator::new(drawn, self.undrawn, CreditConversionFactor::new(self.ccf)?)?.ead())
     }
 }
 

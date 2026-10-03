@@ -9,8 +9,8 @@ use finstack_quant_valuations::metrics::MetricId;
 
 use crate::errors::portfolio_to_py;
 
-use super::super::json_bridge::{deserialize_json, serialize_json};
 use super::enums::PyInequality;
+use crate::bindings::json_bridge::{deserialize_json, serialize_json};
 
 fn parse_metric_id(id: &str) -> PyResult<MetricId> {
     // `FromStr::from_str` never fails for `MetricId` — unknown names silently

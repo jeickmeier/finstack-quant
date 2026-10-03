@@ -24,7 +24,7 @@ def test_scale_and_matrix_validation_errors() -> None:
         migration.RatingScale.custom(["AAA"])
 
     scale = migration.RatingScale.custom(["AAA", "D"])
-    with pytest.raises(Exception, match=r"Dimension|dimension|expected"):
+    with pytest.raises(ValueError, match="data must contain 2 x 2 values"):
         migration.TransitionMatrix(scale, [1.0, 0.0, 0.0], 1.0)
 
 

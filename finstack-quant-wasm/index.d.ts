@@ -11551,10 +11551,10 @@ export interface LatentMultiFactorConstructor {
   ): LatentMultiFactor;
   /**
    * Model with independent factors (identity correlation).
-   * @param numFactors - Number of systematic factors; a positive safe integer.
-   * @param volatilities - Annualized factor volatilities, one per factor; a length mismatch falls back to unit volatilities.
+   * @param numFactors - Number of systematic factors; a non-negative safe integer, with zero resolving to one.
+   * @param volatilities - Annualized factor volatilities, one per factor; must be finite, non-negative and match the factor count.
    * @returns The uncorrelated multi-factor model.
-   * @throws Error - Throws a `TypeError` if `numFactors` is not a safe non-negative integer or `volatilities` is not an array of numbers.
+   * @throws Error - Throws a `TypeError` if `numFactors` is not a safe non-negative integer or `volatilities` is not an array of numbers. Throws a validation error for a length mismatch, negative or non-finite volatility.
    */
   uncorrelated(numFactors: number, volatilities: NumericArray): LatentMultiFactor;
 }
@@ -12454,7 +12454,6 @@ export interface MonteCarloNamespace {
    * @param numSteps - Number of time-grid steps; a positive safe integer.
    * @param numPaths - Number of captured paths; a positive safe integer.
    * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the Rust `GbmPathConfig` default.
-   * @param antithetic - Optional; when `true`, paths are generated in antithetic pairs. Omitted uses the Rust default (`false`).
    * @returns The `GbmPathSummary` object (`num_paths`, `num_simulated_paths`, `times`, `paths`).
    * @throws Error - Throws a `TypeError` if a count is not a safe integer, and a `validation` error if an input is non-finite or out of range.
    */
@@ -12466,8 +12465,7 @@ export interface MonteCarloNamespace {
     expiry: number,
     numSteps: number,
     numPaths: number,
-    seed?: number | bigint,
-    antithetic?: boolean
+    seed?: number | bigint
   ): generated.models.GbmPathSummary;
 }
 
@@ -28670,30 +28668,7 @@ export interface ModelCreditNamespace {
    * @returns The floor, `0.0003`.
    */
   baselIrbPdFloor(): number;
-  /**
-   * Quantile of a Beta recovery distribution given its mean and standard deviation.
-   * @param mean - Mean recovery rate as a fraction strictly between 0 and 1.
-   * @param std - Recovery standard deviation as a fraction.
-   * @param q - Probability level from 0 through 1.
-   * @returns The recovery rate at probability level `q`.
-   * @throws Error - Throws a `validation` error if the moments or `q` are out of range.
-   */
-  betaRecoveryQuantile(mean: number, std: number, q: number): number;
-  /**
-   * Draw Beta-distributed recovery rates from a mean and standard deviation.
-   * @param mean - Mean recovery rate as a fraction strictly between 0 and 1.
-   * @param std - Recovery standard deviation as a fraction.
-   * @param nSamples - Number of draws; a safe non-negative integer.
-   * @param seed - Seed for reproducible draws, as a safe integer or `bigint`.
-   * @returns The sampled recovery rates.
-   * @throws Error - Throws a `validation` error if the moments do not define a Beta distribution.
-   */
-  betaRecoverySample(
-    mean: number,
-    std: number,
-    nSamples: number,
-    seed: number | bigint
-  ): Float64Array;
+
   /**
    * Long-run central-tendency PD from a history of annual default rates.
    * @param annualDefaultRates - Annual default rates as decimals in `[0, 1]`, as a `number[]` or `Float64Array`; non-empty.
@@ -28701,46 +28676,7 @@ export interface ModelCreditNamespace {
    * @throws Error - Throws a `validation` error if the series is empty or a rate is non-finite or outside `[0, 1]`.
    */
   centralTendency(annualDefaultRates: NumericArray): number;
-  /**
-   * Regulatory downturn LGD: `max(baseLgd + addOn, floor)`.
-   * @param baseLgd - Through-the-cycle LGD as a fraction from 0 through 1.
-   * @param addOn - Additive LGD add-on as a fraction; non-negative.
-   * @param floor - Minimum downturn LGD as a fraction from 0 through 1.
-   * @returns The downturn LGD as a fraction in `[0, 1]`.
-   * @throws Error - Throws a `validation` error on out-of-range inputs.
-   */
-  downturnLgdRegulatoryFloor(baseLgd: number, addOn: number, floor: number): number;
-  /**
-   * Stressed-factor downturn LGD for a base LGD.
-   * @param baseLgd - Through-the-cycle LGD as a fraction from 0 through 1.
-   * @param assetCorrelation - Asset correlation with the systematic factor, from 0 to 1.
-   * @param lgdSensitivity - Sensitivity of LGD to the systematic factor; non-negative.
-   * @param stressQuantile - Stress quantile of the systematic factor, strictly between 0 and 1.
-   * @returns The downturn LGD as a fraction in `[0, 1]`.
-   * @throws Error - Throws a `validation` error on out-of-range inputs.
-   */
-  downturnLgdStressed(
-    baseLgd: number,
-    assetCorrelation: number,
-    lgdSensitivity: number,
-    stressQuantile: number
-  ): number;
-  /**
-   * Exposure at default of a revolver: `drawn + ccf * undrawn`.
-   * @param drawn - Drawn balance in monetary units; non-negative.
-   * @param undrawn - Undrawn commitment in monetary units; non-negative.
-   * @param ccf - Credit conversion factor applied to the undrawn amount, from 0 through 1.
-   * @returns The EAD in monetary units.
-   * @throws Error - Throws a `validation` error on negative, non-finite or out-of-range inputs.
-   */
-  eadRevolver(drawn: number, undrawn: number, ccf: number): number;
-  /**
-   * Exposure at default of a fully drawn term loan.
-   * @param principal - Outstanding principal in monetary units; non-negative.
-   * @returns The EAD, equal to the principal.
-   * @throws Error - Throws a `validation` error if `principal` is negative or non-finite.
-   */
-  eadTermLoan(principal: number): number;
+
   /**
    * Moody's WARF rating factor for one credit rating.
    * @param rating - Rating label such as `"Baa3"`, `"BBB-"` or `"B2"`; agency notches are normalized by the Rust parser.

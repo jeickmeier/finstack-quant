@@ -920,8 +920,6 @@ impl McEngine {
         D: Discretization<P> + Clone,
         F: Payoff,
     {
-        use std::sync::Mutex;
-
         use rayon::prelude::*;
 
         // Hoist per-run, path-independent scheme constants once before fanning
@@ -938,12 +936,10 @@ impl McEngine {
             .unwrap_or_else(|| adaptive_chunk_size(self.config.num_paths));
 
         let chunks = parallel_path_chunks(self.config.num_paths, effective_chunk_size);
-        let captured_sink: Option<Mutex<Vec<SimulatedPath>>> =
-            capture.then(|| Mutex::new(Vec::new()));
         let correlation = build_correlation_factor(process, disc)?;
         let correlation_ref = correlation.as_ref();
 
-        let chunk_results: Vec<Result<OnlineStats>> = chunks
+        let chunk_results: Vec<Result<(OnlineStats, Vec<SimulatedPath>)>> = chunks
             .par_iter()
             .map(|range| {
                 let mut stats = OnlineStats::new();
@@ -1056,27 +1052,16 @@ impl McEngine {
                     stats.update(discounted_value);
                 }
 
-                if let Some(sink) = captured_sink.as_ref() {
-                    if !chunk_paths.is_empty() {
-                        // Poisoned mutex means a prior thread panicked — propagate
-                        // rather than continue with corrupt captured paths.
-                        #[allow(clippy::expect_used)]
-                        sink.lock()
-                            .expect("Mutex should not be poisoned")
-                            .extend(chunk_paths);
-                    }
-                }
-
-                Ok(stats)
+                Ok((stats, chunk_paths))
             })
             .collect();
 
-        let chunk_stats: Vec<OnlineStats> =
-            chunk_results.into_iter().collect::<Result<Vec<_>>>()?;
-
         let mut combined = OnlineStats::new();
-        for chunk_stat in chunk_stats {
+        let mut captured_paths = Vec::new();
+        for chunk_result in chunk_results {
+            let (chunk_stat, chunk_paths) = chunk_result?;
             combined.merge(&chunk_stat);
+            captured_paths.extend(chunk_paths);
         }
 
         let num_paths = combined.count();
@@ -1093,11 +1078,6 @@ impl McEngine {
         )
         .with_std_dev(combined.std_dev())
         .with_num_simulated_paths(num_simulated_paths);
-
-        #[allow(clippy::expect_used)] // Mutex poisoning indicates prior panic in worker thread.
-        let captured_paths = captured_sink
-            .map(|sink| sink.into_inner().expect("Mutex should not be poisoned"))
-            .unwrap_or_default();
 
         Ok((estimate, captured_paths))
     }

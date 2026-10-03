@@ -2762,13 +2762,7 @@
       "analyzeLme",
       "applyBaselIrbPdFloor",
       "baselIrbPdFloor",
-      "betaRecoveryQuantile",
-      "betaRecoverySample",
       "centralTendency",
-      "downturnLgdRegulatoryFloor",
-      "downturnLgdStressed",
-      "eadRevolver",
-      "eadTermLoan",
       "moodysWarfFactor",
       "ohlsonOScore",
       "pitToTtc",
@@ -2931,25 +2925,7 @@
   "models.credit.seniorityRecoveryStats": {
     "kind": "function"
   },
-  "models.credit.betaRecoverySample": {
-    "kind": "function"
-  },
-  "models.credit.betaRecoveryQuantile": {
-    "kind": "function"
-  },
   "models.credit.workoutLgd": {
-    "kind": "function"
-  },
-  "models.credit.downturnLgdStressed": {
-    "kind": "function"
-  },
-  "models.credit.downturnLgdRegulatoryFloor": {
-    "kind": "function"
-  },
-  "models.credit.eadTermLoan": {
-    "kind": "function"
-  },
-  "models.credit.eadRevolver": {
     "kind": "function"
   },
   "models.credit.MasterScale": {

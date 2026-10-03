@@ -12,10 +12,10 @@ use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_rows_to_dataframe_with_schema, ColumnSchema,
 };
 
-use super::super::json_bridge::{deserialize_json, serialize_json};
 use super::enums::{PyMissingMetricPolicy, PyWeightingScheme};
 use super::expressions::{PyConstraint, PyObjective, PyPositionFilter};
 use super::status_trade::{PyOptimizationStatus, PyTradeSpec};
+use crate::bindings::json_bridge::{deserialize_json, serialize_json};
 
 /// Candidate instrument that could be added to the portfolio by the
 /// optimizer (starts at weight zero; bounded by ``min_weight`` /

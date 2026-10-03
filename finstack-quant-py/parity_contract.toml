@@ -660,8 +660,7 @@ python_package = "finstack_quant.models.volatility"
 # helpers (Heston pricing is `models.heston_price` / `models.monte_carlo`),
 # `source` (`VolSource`,
 # `materialize_cube_grid`, `measure_vol_surface_shift`,
-# `get_surface_vol_extrapolated`), `sabr_derivatives`
-# (`SabrCalibrationDerivatives`, `SabrMarketData`), the `black` helpers
+# `get_surface_vol_extrapolated`), the `black` helpers
 # (`d1` / `d2` / `d1_d2` / `*_black76`), `vega_weight`, `SabrVolType` (and so
 # `SabrModel::vol_type` / `SabrSmile::vol_type` / `implied_volatility_with_type`:
 # the hosts' `implied_vol` returns the beta-dependent vol, documented on each
@@ -1178,12 +1177,6 @@ public = [
     "WorkoutLgd",
     "WorkoutLgdBuilder",
     "WorkoutLgdResult",
-    "beta_recovery_quantile",
-    "beta_recovery_sample",
-    "downturn_lgd_regulatory_floor",
-    "downturn_lgd_stressed",
-    "ead_revolver",
-    "ead_term_loan",
     "seniority_recovery_stats",
     "workout_lgd",
 ]

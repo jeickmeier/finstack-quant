@@ -1,4 +1,4 @@
-//! Fast extraction helpers for dense portfolio risk matrices.
+//! Fast extraction helpers for dense model and portfolio matrices.
 //!
 //! Python lists retain the existing `Vec<Vec<f64>>` conversion path and its
 //! canonical Rust validation. C-contiguous `float64` NumPy arrays are copied
@@ -87,6 +87,14 @@ pub(crate) fn extract_square_matrix(
         return Ok(numpy_row_major(&array));
     }
 
+    if let Ok(flat) = matrix.extract::<Vec<f64>>() {
+        if n.checked_mul(n) != Some(flat.len()) {
+            return Err(crate::errors::value_error(format!(
+                "{label} must contain {n} x {n} values"
+            )));
+        }
+        return Ok(flat);
+    }
     let nested = matrix.extract::<Vec<Vec<f64>>>()?;
     let label = label.to_owned();
     py.detach(move || core_flatten_square_matrix(nested, n, &label))

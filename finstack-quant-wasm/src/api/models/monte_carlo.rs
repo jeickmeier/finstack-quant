@@ -274,7 +274,6 @@ pub fn heston_satisfies_feller(
 /// @param num_steps - Number of time-grid steps; a positive safe integer.
 /// @param num_paths - Number of captured paths; a positive safe integer.
 /// @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the Rust `GbmPathConfig` default.
-/// @param antithetic - Optional; when `true`, paths are generated in antithetic pairs. Omitted uses the Rust default (`false`).
 /// @returns The `GbmPathSummary` object (`num_paths`, `num_simulated_paths`, `times`, `paths`).
 ///
 /// # Errors
@@ -292,7 +291,6 @@ pub fn simulate_gbm_paths(
     num_steps: JsValue,
     num_paths: JsValue,
     seed: Option<JsValue>,
-    antithetic: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let mut config = finstack_quant_models::monte_carlo::GbmPathConfig::new(
         js_f64(&spot, "spot")?,
@@ -305,9 +303,6 @@ pub fn simulate_gbm_paths(
     );
     if let Some(seed) = js_opt_u64(seed.as_ref(), "seed")? {
         config = config.with_seed(seed);
-    }
-    if let Some(antithetic) = js_opt_bool(antithetic.as_ref(), "antithetic")? {
-        config = config.with_antithetic(antithetic);
     }
     let summary =
         finstack_quant_models::monte_carlo::simulate_gbm_paths(&config).map_err(to_js_err)?;

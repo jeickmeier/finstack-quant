@@ -158,11 +158,7 @@ impl StochasticPricer {
     ) -> Result<PreparedRun> {
         // Fail fast on invalid default specs and keep the built model so the
         // per-path hot loops can assume a validated, already-built spec.
-        let default_model = self
-            .config
-            .tree_config
-            .default_spec
-            .build_with_seasoning_offset(self.config.tree_config.seasoning_months)?;
+        let default_model = self.config.tree_config.default_spec.build()?;
         // Prepare the loop-invariant deal simulation once. A `None` here
         // (exhausted pool) yields no tranche results, which the collector
         // reports as a missing-tranche validation error; raise it here with

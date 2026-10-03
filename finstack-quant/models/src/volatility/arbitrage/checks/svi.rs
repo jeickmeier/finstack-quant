@@ -113,14 +113,7 @@ impl SviArbitrageCheck {
                     continue;
                 }
 
-                let km = k - params.m;
-                let r = (km * km + params.sigma * params.sigma).sqrt();
-                let w_prime = params.b * (params.rho + km / r);
-                let w_double_prime = params.b * params.sigma * params.sigma / (r * r * r);
-
-                let term1 = 1.0 - k * w_prime / (2.0 * w);
-                let g = term1 * term1 - w_prime * w_prime / 4.0 * (1.0 / w + 0.25)
-                    + w_double_prime / 2.0;
+                let g = params.durrleman_g(k);
 
                 if g < -1e-10 {
                     violations.push(ArbitrageViolation {

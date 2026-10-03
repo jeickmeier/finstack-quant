@@ -222,9 +222,7 @@ impl MertonMcConfig {
     /// outside `[0, 1]`.
     pub fn new(merton: MertonModel, recovery_rate: f64) -> finstack_quant_core::Result<Self> {
         validate_recovery_rate(recovery_rate)?;
-        let defaults = &finstack_quant_models::monte_carlo::registry::embedded_defaults()?
-            .rust
-            .merton_pik_bond;
+        let defaults = &crate::pricer::defaults::embedded_defaults()?.merton_pik_bond;
         let barrier_crossing = match merton.barrier_type() {
             MertonBarrierType::FirstPassage { .. } => BarrierCrossing::BrownianBridge,
             MertonBarrierType::Terminal => BarrierCrossing::Discrete,
@@ -358,7 +356,7 @@ impl MertonMcRun {
     /// Resolve sampling settings from an instrument's model configuration.
     ///
     /// `mc_paths` and `mc_antithetic` fall back to the embedded registry's
-    /// `rust.merton_pik_bond` defaults. The seed is
+    /// valuations `merton_pik_bond` defaults. The seed is
     /// `derive_seed(instrument_id, mc_seed_scenario)`, with `"base"` when no
     /// label is set.
     ///
@@ -377,9 +375,7 @@ impl MertonMcRun {
         instrument_id: &finstack_quant_core::types::InstrumentId,
         model_config: &crate::instruments::pricing_overrides::ModelConfig,
     ) -> finstack_quant_core::Result<Self> {
-        let defaults = &finstack_quant_models::monte_carlo::registry::embedded_defaults()?
-            .rust
-            .merton_pik_bond;
+        let defaults = &crate::pricer::defaults::embedded_defaults()?.merton_pik_bond;
         Ok(Self {
             num_paths: crate::instruments::common_impl::helpers::resolve_mc_paths(
                 model_config.mc_paths,

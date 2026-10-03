@@ -77,12 +77,6 @@ def test_maturity_only_lsmc_counts_pairs_and_uses_pair_mean_standard_error() -> 
     assert results[0].stderr < results[1].stderr
 
 
-def test_captured_gbm_rejects_antithetic_request() -> None:
-    """Path capture must fail explicitly rather than silently drop pairing."""
-    with pytest.raises(ValueError, match="antithetic"):
-        simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 12, 16, seed=17, antithetic=True)
-
-
 def test_structured_note_redemption_profiles_through_supported_json_route() -> None:
     """Known fixings isolate the three redemption contracts from MC noise."""
     example = (

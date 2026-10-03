@@ -39,9 +39,7 @@ pub struct RateExoticMcConfig {
 
 impl Default for RateExoticMcConfig {
     fn default() -> Self {
-        let defaults = &finstack_quant_models::monte_carlo::registry::embedded_defaults_or_panic()
-            .rust
-            .rate_exotics;
+        let defaults = &crate::pricer::defaults::embedded_defaults_or_panic().rate_exotics;
         Self {
             num_paths: defaults.num_paths,
             seed: defaults.seed,
@@ -55,15 +53,13 @@ impl Default for RateExoticMcConfig {
 
 impl RateExoticMcConfig {
     /// Defaults for the LMM/BGM Bermudan swaption engine, read from the
-    /// `rust.lmm_bermudan` block of the embedded pricer-defaults registry.
+    /// `lmm_bermudan` block of the embedded pricer-defaults registry.
     ///
     /// The LMM engine simulates more paths and uses a cubic regression basis
     /// by default; `min_steps_between_events` is the minimum number of
     /// simulation sub-steps between consecutive exercise dates.
     pub fn lmm_bermudan() -> Self {
-        let defaults = &finstack_quant_models::monte_carlo::registry::embedded_defaults_or_panic()
-            .rust
-            .lmm_bermudan;
+        let defaults = &crate::pricer::defaults::embedded_defaults_or_panic().lmm_bermudan;
         Self {
             num_paths: defaults.num_paths,
             seed: defaults.seed,

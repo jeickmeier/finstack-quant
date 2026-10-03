@@ -1609,7 +1609,7 @@ mod tests {
 
     #[test]
     fn test_polynomial_basis() {
-        let basis = PolynomialBasis::new(2);
+        let basis = PolynomialBasis::new(2).expect("valid regression basis");
         let mut out = vec![0.0; 3];
 
         basis.evaluate(100.0, &mut out);
@@ -1621,7 +1621,7 @@ mod tests {
 
     #[test]
     fn test_laguerre_basis() {
-        let basis = LaguerreBasis::new(2, 100.0);
+        let basis = LaguerreBasis::new(2, 100.0).expect("valid regression basis");
         let mut out = vec![0.0; 3];
 
         basis.evaluate(100.0, &mut out);
@@ -1633,8 +1633,8 @@ mod tests {
 
     #[test]
     fn test_laguerre_basis_non_standard_strikes() {
-        let basis_low = LaguerreBasis::new(2, 1.0);
-        let basis_high = LaguerreBasis::new(2, 1000.0);
+        let basis_low = LaguerreBasis::new(2, 1.0).expect("valid regression basis");
+        let basis_high = LaguerreBasis::new(2, 1000.0).expect("valid regression basis");
         let mut out_low = vec![0.0; 3];
         let mut out_high = vec![0.0; 3];
 
@@ -1691,7 +1691,7 @@ mod tests {
 
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.3).unwrap());
         let put = AmericanPut { strike: 100.0 };
-        let basis = PolynomialBasis::new(2);
+        let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
         let result = pricer
             .price(&gbm, 100.0, 1.0, 100, &put, &basis, Currency::USD, 0.05)
@@ -1714,7 +1714,7 @@ mod tests {
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.3).unwrap());
         let put = AmericanPut { strike: 100.0 };
 
-        let basis = PolynomialBasis::new(5);
+        let basis = PolynomialBasis::new(5).expect("valid regression basis");
 
         let result = pricer.price(&gbm, 80.0, 1.0, 100, &put, &basis, Currency::USD, 0.05);
 
@@ -1738,7 +1738,7 @@ mod tests {
 
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 1.0).unwrap());
         let put = AmericanPut { strike: 100.0 };
-        let basis = PolynomialBasis::new(3);
+        let basis = PolynomialBasis::new(3).expect("valid regression basis");
 
         let result = pricer.price(&gbm, 100.0, 1.0, 100, &put, &basis, Currency::USD, 0.05);
 
@@ -1762,7 +1762,7 @@ mod tests {
 
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.05).unwrap());
         let put = AmericanPut { strike: 50.0 };
-        let basis = PolynomialBasis::new(2);
+        let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
         let result = pricer.price(&gbm, 150.0, 0.5, 100, &put, &basis, Currency::USD, 0.05);
 
@@ -1780,7 +1780,7 @@ mod tests {
         let config = LsmcConfig::new(2, vec![1], 2).unwrap();
         let pricer = LsmcPricer::new(config);
         let exercise = AmericanCall { strike: 100.0 };
-        let basis = PolynomialBasis::new(2);
+        let basis = PolynomialBasis::new(2).expect("valid regression basis");
         let paths = PathMatrix::from_rows(&[vec![100.0, 110.0, 130.0]]);
 
         let present_values = pricer
@@ -1826,7 +1826,7 @@ mod tests {
         let pricer = LsmcPricer::new(config);
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.3).unwrap());
         let put = AmericanPut::new(100.0).unwrap();
-        let basis = PolynomialBasis::new(2);
+        let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
         let unbiased = pricer
             .price_unbiased(
@@ -1853,7 +1853,7 @@ mod tests {
         let pricer = LsmcPricer::new(cfg);
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.2).unwrap());
         let put = AmericanPut::new(100.0).unwrap();
-        let basis = PolynomialBasis::new(2);
+        let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
         let result = pricer.price_unbiased(
             &gbm,
@@ -1876,7 +1876,7 @@ mod tests {
             .with_antithetic(false);
         let pricer = LsmcPricer::new(config);
         let exercise = AmericanPut::new(100.0).unwrap();
-        let basis = PolynomialBasis::new(1);
+        let basis = PolynomialBasis::new(1).expect("valid regression basis");
         let zero_continuation = PathMatrix::from_rows(&vec![vec![90.0, 100.0]; 2]);
         let high_continuation = PathMatrix::from_rows(&vec![vec![90.0, 50.0]; 2]);
 
@@ -1913,8 +1913,8 @@ mod tests {
         let pricer = LsmcPricer::new(cfg);
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.2).unwrap());
         let put = AmericanPut::new(100.0).unwrap();
-        let basis_train = PolynomialBasis::new(2);
-        let basis_price = PolynomialBasis::new(3);
+        let basis_train = PolynomialBasis::new(2).expect("valid regression basis");
+        let basis_price = PolynomialBasis::new(3).expect("valid regression basis");
 
         let policy = pricer
             .fit_exercise_policy(&gbm, 100.0, 1.0, 20, &put, &basis_train, 0.05)
@@ -1942,7 +1942,7 @@ mod tests {
         let config = LsmcConfig::new(16, vec![1], 2).unwrap();
         let pricer = LsmcPricer::new(config);
         let exercise = AmericanCall { strike: 100.0 };
-        let basis = PolynomialBasis::new(1);
+        let basis = PolynomialBasis::new(1).expect("valid regression basis");
         let paths = PathMatrix::from_rows(&vec![vec![100.0, 100.0 + 1.0e-8, 100.0]; 16]);
 
         let present_values = pricer

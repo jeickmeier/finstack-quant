@@ -202,55 +202,6 @@ fn seniority_recovery_stats(
     .map_err(core_to_py)
 }
 
-/// Draw ``n_samples`` recovery rates from ``BetaRecovery(mean, std)``.
-///
-/// Thin twin of ``BetaRecovery(mean, std).sample_seeded(n_samples, seed)``.
-///
-/// Parameters
-/// ----------
-/// mean : float
-///     Mean recovery rate in (0, 1).
-/// std : float
-///     Standard deviation; must satisfy ``std**2 < mean * (1 - mean)``.
-/// n_samples : int
-///     Number of draws to produce.
-/// seed : int
-///     RNG seed. The same seed yields the same sequence.
-///
-/// Raises ``ValueError`` when the moments are invalid.
-#[pyfunction]
-#[pyo3(text_signature = "(mean, std, n_samples, seed)")]
-fn beta_recovery_sample(
-    py: Python<'_>,
-    mean: f64,
-    std: f64,
-    n_samples: usize,
-    seed: u64,
-) -> PyResult<Vec<f64>> {
-    py.detach(|| lgd::beta_recovery_sample(mean, std, n_samples, seed))
-        .map_err(core_to_py)
-}
-
-/// Recovery rate at quantile ``q`` of ``BetaRecovery(mean, std)``.
-///
-/// Thin twin of ``BetaRecovery(mean, std).quantile(q)``.
-///
-/// Parameters
-/// ----------
-/// mean : float
-///     Mean recovery rate in (0, 1).
-/// std : float
-///     Standard deviation; must satisfy ``std**2 < mean * (1 - mean)``.
-/// q : float
-///     Probability in (0, 1).
-///
-/// Raises ``ValueError`` when the moments or ``q`` are invalid.
-#[pyfunction]
-#[pyo3(text_signature = "(mean, std, q)")]
-fn beta_recovery_quantile(mean: f64, std: f64, q: f64) -> PyResult<f64> {
-    lgd::beta_recovery_quantile(mean, std, q).map_err(core_to_py)
-}
-
 /// One collateral piece in a workout waterfall.
 #[pyclass(
     module = "finstack_quant.models.credit.lgd",
@@ -1059,100 +1010,6 @@ impl PyEadCalculator {
     }
 }
 
-/// Apply a stressed downturn adjustment to a base LGD.
-///
-/// Thin twin of ``DownturnLgd.stressed(...).adjust(base_lgd)``:
-///
-/// ```text
-/// LGD_downturn = LGD_base + lgd_sensitivity * sqrt(rho) * Phi^-1(q)
-///              * sqrt(LGD_base * (1 - LGD_base))
-/// ```
-///
-/// (a mean-plus-multiple-of-Bernoulli-stdev approximation, not the
-/// Frye-Jacobs 2012 model). The result is clamped to [0, 1].
-///
-/// Parameters
-/// ----------
-/// base_lgd : float
-///     Through-the-cycle LGD in [0, 1].
-/// asset_correlation : float
-///     Asset correlation rho in (0, 1). Basel: 0.12-0.24.
-/// lgd_sensitivity : float
-///     LGD sensitivity to the systematic factor (>= 0). Typical: 0.3-0.5.
-/// stress_quantile : float
-///     Downturn quantile in (0, 1), e.g. 0.999.
-///
-/// Raises ``ValueError`` on out-of-range inputs.
-#[pyfunction]
-#[pyo3(text_signature = "(base_lgd, asset_correlation, lgd_sensitivity, stress_quantile)")]
-fn downturn_lgd_stressed(
-    base_lgd: f64,
-    asset_correlation: f64,
-    lgd_sensitivity: f64,
-    stress_quantile: f64,
-) -> PyResult<f64> {
-    lgd::downturn_lgd_stressed(
-        base_lgd,
-        asset_correlation,
-        lgd_sensitivity,
-        stress_quantile,
-    )
-    .map_err(core_to_py)
-}
-
-/// Apply a regulatory floor downturn adjustment to a base LGD.
-///
-/// Thin twin of ``DownturnLgd.regulatory_floor(add_on, floor).adjust(base_lgd)``:
-/// ``LGD_downturn = max(LGD_base + add_on, floor)`` clamped to [0, 1].
-///
-/// Parameters
-/// ----------
-/// base_lgd : float
-///     Through-the-cycle LGD in [0, 1].
-/// add_on : float
-///     Flat add-on (>= 0). Typical: 0.05-0.10.
-/// floor : float
-///     Absolute floor in [0, 1]. Typical: 0.10 secured / 0.25 unsecured.
-///
-/// Raises ``ValueError`` on out-of-range inputs.
-#[pyfunction]
-#[pyo3(text_signature = "(base_lgd, add_on, floor)")]
-fn downturn_lgd_regulatory_floor(base_lgd: f64, add_on: f64, floor: f64) -> PyResult<f64> {
-    lgd::downturn_lgd_regulatory_floor(base_lgd, add_on, floor).map_err(core_to_py)
-}
-
-/// Exposure at default for a fully drawn term loan (``principal`` itself).
-///
-/// Parameters
-/// ----------
-/// principal : float
-///     Drawn principal (>= 0).
-///
-/// Raises ``ValueError`` when ``principal`` is negative or non-finite.
-#[pyfunction]
-#[pyo3(text_signature = "(principal)")]
-fn ead_term_loan(principal: f64) -> PyResult<f64> {
-    lgd::ead_term_loan(principal).map_err(core_to_py)
-}
-
-/// Exposure at default for a revolving facility: ``drawn + undrawn * ccf``.
-///
-/// Parameters
-/// ----------
-/// drawn : float
-///     Currently drawn amount (>= 0).
-/// undrawn : float
-///     Undrawn commitment (>= 0).
-/// ccf : float
-///     Credit conversion factor in [0, 1]. Basel IRB: 0.75.
-///
-/// Raises ``ValueError`` on negative amounts or a CCF outside [0, 1].
-#[pyfunction]
-#[pyo3(text_signature = "(drawn, undrawn, ccf)")]
-fn ead_revolver(drawn: f64, undrawn: f64, ccf: f64) -> PyResult<f64> {
-    lgd::ead_revolver(drawn, undrawn, ccf).map_err(core_to_py)
-}
-
 /// Build the `finstack_quant.models.credit.lgd` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     let m = crate::bindings::module_utils::new_submodule(parent, "lgd")?;
@@ -1173,13 +1030,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyWorkoutLgdBuilder>()?;
     m.add_class::<PyWorkoutLgdResult>()?;
     m.add_function(wrap_pyfunction!(seniority_recovery_stats, &m)?)?;
-    m.add_function(wrap_pyfunction!(beta_recovery_sample, &m)?)?;
-    m.add_function(wrap_pyfunction!(beta_recovery_quantile, &m)?)?;
     m.add_function(wrap_pyfunction!(workout_lgd, &m)?)?;
-    m.add_function(wrap_pyfunction!(downturn_lgd_stressed, &m)?)?;
-    m.add_function(wrap_pyfunction!(downturn_lgd_regulatory_floor, &m)?)?;
-    m.add_function(wrap_pyfunction!(ead_term_loan, &m)?)?;
-    m.add_function(wrap_pyfunction!(ead_revolver, &m)?)?;
 
     let all = PyList::new(
         py,
@@ -1192,12 +1043,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "WorkoutLgd",
             "WorkoutLgdBuilder",
             "WorkoutLgdResult",
-            "beta_recovery_quantile",
-            "beta_recovery_sample",
-            "downturn_lgd_regulatory_floor",
-            "downturn_lgd_stressed",
-            "ead_revolver",
-            "ead_term_loan",
             "seniority_recovery_stats",
             "workout_lgd",
         ],

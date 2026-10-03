@@ -7,6 +7,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyList;
 
 pub(crate) mod credit;
+pub(crate) mod risk;
 mod schema;
 
 /// Register the `models.factor` Python domain.
@@ -23,7 +24,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "Credit factor hierarchy artifacts, calibration, and decomposition.",
     )?;
     credit::register(py, &credit)?;
-    crate::bindings::portfolio::factor_model::register_credit_forecast(&credit)?;
+    risk::register_credit_forecast(&credit)?;
 
     let credit_all = PyList::new(
         py,
@@ -52,7 +53,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "__doc__",
         "Product-independent factor and position risk decomposition kernels.",
     )?;
-    crate::bindings::portfolio::factor_model::register_risk(&risk)?;
+    risk::register(&risk)?;
     let risk_all = PyList::new(
         py,
         [

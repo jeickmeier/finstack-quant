@@ -245,7 +245,7 @@ from finstack_quant.models.credit import lgd
 workout = lgd.workout_lgd(1_000_000,[("receivables",500_000,0.2),("equipment",400_000,0.4)],0.03,0.02,2.0,0.08)
 liquidation = 500_000*(1-0.2)+400_000*(1-0.4)
 manual_recovery = (min(liquidation,1_000_000)-0.05*1_000_000)/(1.08**2)
-stressed_lgd = lgd.downturn_lgd_stressed(workout.lgd,0.15,0.4,0.999)
+stressed_lgd = lgd.DownturnLgd.stressed(0.15,0.4,0.999).adjust(workout.lgd)
 print(f"Liquidation={liquidation:,.2f}; delayed net recovery={workout.net_recovery:,.2f}; workout LGD={workout.lgd:.4%}; stressed approximation={stressed_lgd:.4%}")
 print("The downturn helper is a mean-plus-stress approximation; it is not an empirical recovery calibration or a Frye-Jacobs model.")
 ```

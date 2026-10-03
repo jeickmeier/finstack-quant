@@ -23,13 +23,7 @@ export const credit = {
   DownturnLgd: wasm.DownturnLgd,
   EadCalculator: wasm.EadCalculator,
   seniorityRecoveryStats: wasm.seniorityRecoveryStats,
-  betaRecoverySample: wasm.betaRecoverySample,
-  betaRecoveryQuantile: wasm.betaRecoveryQuantile,
   workoutLgd: wasm.workoutLgd,
-  downturnLgdStressed: wasm.downturnLgdStressed,
-  downturnLgdRegulatoryFloor: wasm.downturnLgdRegulatoryFloor,
-  eadTermLoan: wasm.eadTermLoan,
-  eadRevolver: wasm.eadRevolver,
   // PD calibration
   MasterScale: wasm.MasterScale,
   baselIrbPdFloor: wasm.baselIrbPdFloor,

@@ -150,14 +150,6 @@ mod gbm_path_summary_tests {
         assert!(first.paths.iter().all(|path| path.len() == 5));
         assert!(first.paths.iter().all(|path| path[0] == 100.0));
     }
-
-    #[test]
-    fn gbm_path_capture_rejects_antithetic_pairing() {
-        let config = GbmPathConfig::new(100.0, 0.05, 0.0, 0.2, 1.0, 4, 3).with_antithetic(true);
-        let error =
-            simulate_gbm_paths(&config).expect_err("path capture and antithetic must be rejected");
-        assert!(error.to_string().contains("antithetic"));
-    }
 }
 
 /// Compiles the crate `README.md` Rust samples as doctests.

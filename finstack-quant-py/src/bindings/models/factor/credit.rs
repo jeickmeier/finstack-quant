@@ -7,7 +7,7 @@
 
 use std::collections::BTreeMap;
 
-use numpy::{PyArray2, PyArrayMethods, PyReadonlyArray2, PyUntypedArrayMethods};
+use numpy::{PyArray2, PyArrayMethods};
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyTuple};
 
@@ -22,14 +22,14 @@ use finstack_quant_models::factor::credit::hierarchy::{
 use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
 
 use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::models::factor::risk::config::extract_vol_horizon;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, labeled_values_to_series, serde_rows_to_dataframe_with_schema, serde_to_py,
     ColumnSchema,
 };
 use crate::bindings::pickle_support::reduce_via_json;
-use crate::bindings::portfolio::factor_model::config::extract_vol_horizon;
-use crate::errors::{core_to_py, decomposition_error_to_py, serde_json_to_py, value_error};
+use crate::errors::{core_to_py, decomposition_error_to_py, serde_json_to_py};
 
 /// Column schema of `PyLevelsAtDate::to_dataframe`, kept so a level-free
 /// snapshot still exports the documented columns.
@@ -1065,33 +1065,6 @@ impl PyFactorCovarianceMatrix {
     }
 }
 
-/// Flatten `data` (flat list, nested list, or 2-D NumPy array) into a
-/// row-major buffer of `n * n` entries.
-fn extract_covariance_data(data: &Bound<'_, PyAny>, n: usize) -> PyResult<Vec<f64>> {
-    if let Ok(array) = data.extract::<PyReadonlyArray2<'_, f64>>() {
-        let shape = array.shape();
-        if shape[0] != n || shape[1] != n {
-            return Err(value_error(format!(
-                "data must be a {n} x {n} matrix, got shape ({}, {})",
-                shape[0], shape[1]
-            )));
-        }
-        return Ok(array.as_array().iter().copied().collect());
-    }
-    if let Ok(flat) = data.extract::<Vec<f64>>() {
-        return Ok(flat);
-    }
-    let nested = data.extract::<Vec<Vec<f64>>>().map_err(|_| {
-        value_error("data must be a flat list, a nested list, or a 2-D float64 NumPy array")
-    })?;
-    if nested.len() != n || nested.iter().any(|row| row.len() != n) {
-        return Err(value_error(format!(
-            "data must be a {n} x {n} nested list matching factor_ids"
-        )));
-    }
-    Ok(nested.into_iter().flatten().collect())
-}
-
 #[pymethods]
 impl PyFactorCovarianceMatrix {
     /// Build and validate a covariance matrix.
@@ -1109,7 +1082,8 @@ impl PyFactorCovarianceMatrix {
     #[pyo3(signature = (factor_ids, data))]
     fn new(factor_ids: Vec<String>, data: &Bound<'_, PyAny>) -> PyResult<Self> {
         let n = factor_ids.len();
-        let flat = extract_covariance_data(data, n)?;
+        let flat =
+            crate::bindings::matrix_input::extract_square_matrix(data.py(), data, n, "data")?;
         let ids: Vec<FactorId> = factor_ids.into_iter().map(FactorId::new).collect();
         let inner = FactorCovarianceMatrix::new(ids, flat).map_err(core_to_py)?;
         Ok(Self { inner })

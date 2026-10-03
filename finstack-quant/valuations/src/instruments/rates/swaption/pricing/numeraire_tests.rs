@@ -530,7 +530,7 @@ fn hw1f_reference_bermudan(
         }
         // Match the engine's ITM-count gate for the regression branch
         // (`regression_x.len() > basis.num_basis() + 10`).
-        let basis = PolynomialBasis::new(3);
+        let basis = PolynomialBasis::new(3).expect("valid regression basis");
         if xs.len() > basis.num_basis() + 10 {
             let k = basis.num_basis();
             let mut design = vec![0.0; xs.len() * k];
@@ -597,7 +597,7 @@ fn lsmc_european_uses_pathwise_money_market_numeraire() {
     let strike = 0.03; // ITM payer
     let notional = 1_000_000.0;
     let schedule = lsmc_swap_schedule();
-    let basis = PolynomialBasis::new(3);
+    let basis = PolynomialBasis::new(3).expect("valid regression basis");
     let num_paths = 60_000;
     let seed = 7;
 
@@ -697,7 +697,7 @@ fn lsmc_bermudan_matches_pathwise_numeraire_reference() {
     let strike = 0.03;
     let notional = 1_000_000.0;
     let schedule = lsmc_swap_schedule();
-    let basis = PolynomialBasis::new(3);
+    let basis = PolynomialBasis::new(3).expect("valid regression basis");
     let num_paths = 60_000;
     let seed = 7;
     let exercise_times = [1.0, 2.0, 3.0, 4.0];
