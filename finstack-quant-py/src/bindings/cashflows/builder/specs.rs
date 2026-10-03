@@ -12,7 +12,6 @@ use finstack_quant_core::money::Money;
 use pyo3::prelude::*;
 use pyo3::types::PyModule;
 use rust_decimal::Decimal;
-use serde_json::Value;
 
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::currency::PyCurrency;
@@ -25,7 +24,7 @@ use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
 use crate::bindings::core::money::{decimal_from_py, decimal_to_py, is_python_decimal, PyMoney};
 use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::pandas_utils::serde_to_py;
-use crate::bindings::repr_support::repr_from_serde;
+use crate::bindings::repr_support::{enum_repr_from_serde as enum_repr, repr_from_serde};
 use crate::errors::core_to_py;
 
 /// `(date, amount)` rows as returned to Python: Python date objects paired with `Money`.
@@ -88,66 +87,6 @@ fn decimal_opt_to_py<'py>(
     value: Option<Decimal>,
 ) -> PyResult<Option<Bound<'py, PyAny>>> {
     value.map(|v| decimal_to_py(py, v)).transpose()
-}
-
-/// Render one serde JSON value Python-style (used by enum reprs).
-fn render_value(value: &Value) -> String {
-    match value {
-        Value::Null => "None".to_string(),
-        Value::Bool(b) => if *b { "True" } else { "False" }.to_string(),
-        Value::Number(n) => n.to_string(),
-        Value::String(s) => format!("{s:?}"),
-        Value::Array(items) => format!(
-            "[{}]",
-            items
-                .iter()
-                .map(render_value)
-                .collect::<Vec<_>>()
-                .join(", ")
-        ),
-        Value::Object(fields) => {
-            if let (Some(amount), Some(currency)) = (fields.get("amount"), fields.get("currency")) {
-                if fields.len() == 2 {
-                    return format!("{} {}", render_value(amount), render_value(currency));
-                }
-            }
-            format!(
-                "{{{}}}",
-                fields
-                    .iter()
-                    .map(|(k, v)| format!("{k}={}", render_value(v)))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
-        }
-    }
-}
-
-/// Python-style repr for an externally-tagged serde enum:
-/// unit variants render as ``Type.UPPER_SNAKE``, data variants as
-/// ``Type.variant(field=value, ...)``.
-fn enum_repr<T: serde::Serialize>(type_name: &str, value: &T) -> String {
-    match serde_json::to_value(value) {
-        Ok(Value::String(variant)) => format!("{type_name}.{}", variant.to_ascii_uppercase()),
-        Ok(Value::Object(map)) if map.len() == 1 => {
-            let (variant, payload) = map
-                .iter()
-                .next()
-                .map_or(("", &Value::Null), |(k, v)| (k.as_str(), v));
-            match payload {
-                Value::Object(fields) => format!(
-                    "{type_name}.{variant}({})",
-                    fields
-                        .iter()
-                        .map(|(k, v)| format!("{k}={}", render_value(v)))
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                ),
-                other => format!("{type_name}.{variant}({})", render_value(other)),
-            }
-        }
-        _ => format!("{type_name}(...)"),
-    }
 }
 
 /// Generate `to_json` / `from_json` / `__reduce__` for a serde-backed wrapper.

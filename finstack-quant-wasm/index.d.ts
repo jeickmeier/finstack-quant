@@ -310,11 +310,17 @@ export type {
 /**
  * Payload of a `MarketDatum` tagged `kind: "fx_spot"` (Rust `FxSpotDatum`); twin of Python `calibration.FxSpotDatum`.
  */
-export type FxSpotDatum = Omit<Extract<generated.calibration.MarketDatum, { kind: 'fx_spot' }>, 'kind'>;
+export type FxSpotDatum = Omit<
+  Extract<generated.calibration.MarketDatum, { kind: 'fx_spot' }>,
+  'kind'
+>;
 /**
  * Payload of a `MarketDatum` tagged `kind: "price"` (Rust `PriceDatum`); twin of Python `calibration.PriceDatum`.
  */
-export type PriceDatum = Omit<Extract<generated.calibration.MarketDatum, { kind: 'price' }>, 'kind'>;
+export type PriceDatum = Omit<
+  Extract<generated.calibration.MarketDatum, { kind: 'price' }>,
+  'kind'
+>;
 /**
  * Payload of a `MarketDatum` tagged `kind: "dividend_schedule"` (Rust `DividendScheduleDatum`); twin of Python `calibration.DividendScheduleDatum`.
  */
@@ -9218,21 +9224,27 @@ export type NumericMatrix = NumericArray[];
  * exposed as a typed array. Undefined windows contain `NaN`.
  * Dates and metric labels retain the generated Rust wire contract.
  */
-export type DatedSeries = WithFields<generated.analytics.DatedSeries, {
-  /** Rolling metric values, one per completed window. */
-  values: Float64Array;
-}>;
+export type DatedSeries = WithFields<
+  generated.analytics.DatedSeries,
+  {
+    /** Rolling metric values, one per completed window. */
+    values: Float64Array;
+  }
+>;
 
 /**
  * Rolling greeks derived from the Rust schema, with numeric columns exposed as
  * typed arrays aligned with the generated window-end dates.
  */
-export type RollingGreeks = WithFields<generated.analytics.RollingGreeks, {
-  /** Annualized Jensen alpha at each window end, as decimal fractions. */
-  alphas: Float64Array;
-  /** OLS beta at each window end. */
-  betas: Float64Array;
-}>;
+export type RollingGreeks = WithFields<
+  generated.analytics.RollingGreeks,
+  {
+    /** Annualized Jensen alpha at each window end, as decimal fractions. */
+    alphas: Float64Array;
+    /** OLS beta at each window end. */
+    betas: Float64Array;
+  }
+>;
 
 /**
  * Stateful performance analytics engine over a panel of ticker series.
@@ -13182,7 +13194,13 @@ export interface FrtbSensitivities extends WasmOwned {
    * @param amount - Base-currency P&L per 1 percentage point of spread move (`100 * CS01`).
    * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
    */
-  addCsrNonsecDelta(issuer: string, bucket: number, tenor: string, basis: string, amount: number): void;
+  addCsrNonsecDelta(
+    issuer: string,
+    bucket: number,
+    tenor: string,
+    basis: string,
+    amount: number
+  ): void;
   /**
    * Add a CSR non-securitisation vega sensitivity.
    * @param issuer - Issuer or reference-entity identifier.
@@ -13210,7 +13228,13 @@ export interface FrtbSensitivities extends WasmOwned {
    * @param amount - Base-currency P&L per 1 percentage point of spread move (`100 * CS01`).
    * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
    */
-  addCsrSecCtpDelta(tranche: string, bucket: number, tenor: string, basis: string, amount: number): void;
+  addCsrSecCtpDelta(
+    tranche: string,
+    bucket: number,
+    tenor: string,
+    basis: string,
+    amount: number
+  ): void;
   /**
    * Add a CSR securitisation (correlation trading portfolio) vega sensitivity.
    * @param tranche - Tranche or index identifier.
@@ -13238,7 +13262,13 @@ export interface FrtbSensitivities extends WasmOwned {
    * @param amount - Base-currency P&L per 1 percentage point of spread move (`100 * CS01`).
    * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
    */
-  addCsrSecNonctpDelta(tranche: string, bucket: number, tenor: string, basis: string, amount: number): void;
+  addCsrSecNonctpDelta(
+    tranche: string,
+    bucket: number,
+    tenor: string,
+    basis: string,
+    amount: number
+  ): void;
   /**
    * Add a CSR securitisation (non-CTP) vega sensitivity.
    * @param tranche - Tranche identifier.
@@ -13290,7 +13320,13 @@ export interface FrtbSensitivities extends WasmOwned {
    * @param amount - Base-currency P&L per 1 percentage point move in the commodity price.
    * @throws Error - Throws a `TypeError` for an argument of the wrong type, including a bucket that is not an integer in `0..=255`.
    */
-  addCommodityDelta(name: string, bucket: number, tenor: string, basis: string, amount: number): void;
+  addCommodityDelta(
+    name: string,
+    bucket: number,
+    tenor: string,
+    basis: string,
+    amount: number
+  ): void;
   /**
    * Add a commodity vega sensitivity.
    * @param name - Commodity identifier.
@@ -13317,7 +13353,12 @@ export interface FrtbSensitivities extends WasmOwned {
    * @param currency - ISO-4217 currency of the curve; omitted uses the base currency.
    * @throws Error - Throws if a supplied currency is not a known ISO-4217 code.
    */
-  addGirrVega(optionMaturity: string, underlyingTenor: string, amount: number, currency?: string | null): void;
+  addGirrVega(
+    optionMaturity: string,
+    underlyingTenor: string,
+    amount: number,
+    currency?: string | null
+  ): void;
   /**
    * Add an equity vega sensitivity.
    * @param underlier - Equity underlier or index identifier.
@@ -14418,7 +14459,14 @@ export interface CashFlowSchedule extends WasmOwned {
    * @returns `PeriodAggregation`: `{ periodId: { currency: Money } }` of PV per period and currency.
    * @throws If a curve is missing from `market` (kind `not_found`), or an argument is malformed or a discount factor cannot be computed (kind `invalid_type` or `validation`).
    */
-  pvByPeriod(periods: readonly generated.statements.Period[], market: MarketContext, discCurveId: string, base: string, dayCount?: generated.core.DayCount | null, creditCurveId?: string | null): generated.cashflows.PeriodAggregation;
+  pvByPeriod(
+    periods: readonly generated.statements.Period[],
+    market: MarketContext,
+    discCurveId: string,
+    base: string,
+    dayCount?: generated.core.DayCount | null,
+    creditCurveId?: string | null
+  ): generated.cashflows.PeriodAggregation;
   /**
    * Calendar-year non-principal / principal / PV ladder.
    *
@@ -14467,7 +14515,12 @@ export interface CashFlowScheduleConstructor {
    * @returns The assembled `CashFlowSchedule`.
    * @throws If an argument does not match its wire type (kind `validation`).
    */
-  fromParts(flows: readonly generated.cashflows.CashFlow[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount, meta: generated.cashflows.CashFlowMeta): CashFlowSchedule;
+  fromParts(
+    flows: readonly generated.cashflows.CashFlow[],
+    notional: generated.cashflows.Notional,
+    dayCount: generated.core.DayCount,
+    meta: generated.cashflows.CashFlowMeta
+  ): CashFlowSchedule;
   /**
    * Assemble a schedule from externally supplied flows, validating every row
    * (Rust `CashFlowSchedule::from_flows`).
@@ -14485,7 +14538,12 @@ export interface CashFlowScheduleConstructor {
    * @returns The assembled `CashFlowSchedule`.
    * @throws If an argument does not match its wire type or a flow fails validation (kind `validation`).
    */
-  fromFlows(flows: readonly generated.cashflows.CashFlow[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount, meta?: generated.cashflows.CashFlowMeta | null): CashFlowSchedule;
+  fromFlows(
+    flows: readonly generated.cashflows.CashFlow[],
+    notional: generated.cashflows.Notional,
+    dayCount: generated.core.DayCount,
+    meta?: generated.cashflows.CashFlowMeta | null
+  ): CashFlowSchedule;
   /**
    * Parse a schedule from its canonical JSON.
    *
@@ -14541,7 +14599,13 @@ export interface CashFlowBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
    */
-  addPrincipalEvent(date: string, paymentDate: string, delta: MoneyValue, kind: generated.cashflows.CFKind, cash?: MoneyValue | null): CashFlowBuilder;
+  addPrincipalEvent(
+    date: string,
+    paymentDate: string,
+    delta: MoneyValue,
+    kind: generated.cashflows.CFKind,
+    cash?: MoneyValue | null
+  ): CashFlowBuilder;
   /**
    * Add a fixed-rate coupon leg over the whole life.
    *
@@ -14583,7 +14647,11 @@ export interface CashFlowBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
    */
-  addFixedWindow(start: string, end: string, spec: generated.cashflows.FixedCouponSpec): CashFlowBuilder;
+  addFixedWindow(
+    start: string,
+    end: string,
+    spec: generated.cashflows.FixedCouponSpec
+  ): CashFlowBuilder;
   /**
    * Add a floating coupon leg that applies only inside a date window.
    *
@@ -14593,7 +14661,11 @@ export interface CashFlowBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
    */
-  addFloatingWindow(start: string, end: string, spec: generated.cashflows.FloatingCouponSpec): CashFlowBuilder;
+  addFloatingWindow(
+    start: string,
+    end: string,
+    spec: generated.cashflows.FloatingCouponSpec
+  ): CashFlowBuilder;
   /**
    * Set the cash/PIK split of coupons paid inside a date window.
    *
@@ -14603,7 +14675,11 @@ export interface CashFlowBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
    */
-  addPaymentWindow(start: string, end: string, split: generated.cashflows.CouponType): CashFlowBuilder;
+  addPaymentWindow(
+    start: string,
+    end: string,
+    split: generated.cashflows.CouponType
+  ): CashFlowBuilder;
   /**
    * Set a sequence of cash/PIK splits, each applying until its end date.
    *
@@ -14611,7 +14687,9 @@ export interface CashFlowBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws If `steps` is not an array of `[isoDate, CouponType]` pairs (kind `validation`).
    */
-  paymentSplitProgram(steps: readonly (readonly [string, generated.cashflows.CouponType])[]): CashFlowBuilder;
+  paymentSplitProgram(
+    steps: readonly (readonly [string, generated.cashflows.CouponType])[]
+  ): CashFlowBuilder;
   /**
    * Pay a fixed coupon until a switch date, then a floating coupon.
    *
@@ -14621,7 +14699,11 @@ export interface CashFlowBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
    */
-  fixedToFloat(switchDate: string, fixed: generated.cashflows.FixedCouponSpec, floating: generated.cashflows.FloatingCouponSpec): CashFlowBuilder;
+  fixedToFloat(
+    switchDate: string,
+    fixed: generated.cashflows.FixedCouponSpec,
+    floating: generated.cashflows.FloatingCouponSpec
+  ): CashFlowBuilder;
   /**
    * Add a floating leg whose margin steps on listed dates.
    *
@@ -14630,7 +14712,10 @@ export interface CashFlowBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws If an argument does not match its wire type (kind `validation`).
    */
-  floatMarginSteps(steps: readonly (readonly [string, string])[], baseSpec: generated.cashflows.FloatingCouponSpec): CashFlowBuilder;
+  floatMarginSteps(
+    steps: readonly (readonly [string, string])[],
+    baseSpec: generated.cashflows.FloatingCouponSpec
+  ): CashFlowBuilder;
   /**
    * Build the schedule, projecting floating coupons from market curves when a market is given.
    *
@@ -14651,7 +14736,7 @@ export interface CashFlowBuilder extends WasmOwned {
  * await init();
  * const builder = cashflows.CashFlowSchedule.builder()
  *   .principal({ amount: "1000000", currency: "USD" }, "2025-01-15", "2027-01-15")
- *   .amortization(cashflows.amortizationSpecLinearTo({ amount: "500000", currency: "USD" }))
+ *   .amortization({ linear_to: { final_notional: { amount: "500000", currency: "USD" } } })
  *   .fixedCf({ rate: "0.05", coupon_type: "cash", ...cashflows.scheduleParamsSemiannual30360() });
  * const schedule = builder.build();
  * console.log(schedule.outstandingByDate());
@@ -14664,7 +14749,6 @@ export interface CashFlowBuilderConstructor {
    * JavaScript prototype of `CashFlowBuilder`; instances come from `CashFlowSchedule.builder()`, not `new`.
    */
   readonly prototype: CashFlowBuilder;
-
 }
 
 /**
@@ -14714,7 +14798,10 @@ export interface AccrualIndexConstructor {
    * @returns An `AccrualIndex` handle; release it with free().
    * @throws If the schedule fails validation or mixes coupon currencies, `config` is not an `AccrualConfig`, or the outstanding path or a day-count calculation fails (kind `validation`).
    */
-  build(schedule: CashFlowSchedule, config?: generated.cashflows.AccrualConfig | null): AccrualIndex;
+  build(
+    schedule: CashFlowSchedule,
+    config?: generated.cashflows.AccrualConfig | null
+  ): AccrualIndex;
 }
 
 /**
@@ -14890,7 +14977,10 @@ export interface CashflowsNamespace {
    * @returns `{ year, non_principal, principal, pv }` rows in ascending year order.
    * @throws If the schedule is malformed or fails validation, `pvs` does not have one entry per flow, or a value is non-finite (kind `validation`).
    */
-  scheduleCalendarYearLadder(scheduleJson: JsonInput, pvs: number[] | Float64Array): CalendarYearLadderRow[];
+  scheduleCalendarYearLadder(
+    scheduleJson: JsonInput,
+    pvs: number[] | Float64Array
+  ): CalendarYearLadderRow[];
 
   /**
    * `CashFlowSchedule` handle: canonical cashflow schedule: classified dated flows with their notional,
@@ -14918,7 +15008,10 @@ export interface CashflowsNamespace {
    * @returns The built `CashFlowSchedule` handle; release it with free().
    * @throws If `spec` does not match the build-spec schema (kind `invalid_type` or `validation`), a referenced curve or fixing is missing (kind `not_found`), or schedule construction fails (kind `validation`).
    */
-  buildCashflowSchedule(spec: generated.cashflows.CashflowScheduleBuildSpec | string, market?: MarketContext | null): CashFlowSchedule;
+  buildCashflowSchedule(
+    spec: generated.cashflows.CashflowScheduleBuildSpec | string,
+    market?: MarketContext | null
+  ): CashFlowSchedule;
 
   /**
    * Settlement cash flows of a schedule as dated amounts.
@@ -14943,7 +15036,12 @@ export interface CashflowsNamespace {
    * @returns The `CashFlowSchedule` handle, flows in canonical order.
    * @throws If an argument does not match its wire type (kind `validation`).
    */
-  scheduleFromDatedFlows(flows: readonly DatedFlowJson[], kind: generated.cashflows.CFKind, dayCount: generated.core.DayCount, opts?: generated.cashflows.ScheduleBuildOpts | null): CashFlowSchedule;
+  scheduleFromDatedFlows(
+    flows: readonly DatedFlowJson[],
+    kind: generated.cashflows.CFKind,
+    dayCount: generated.core.DayCount,
+    opts?: generated.cashflows.ScheduleBuildOpts | null
+  ): CashFlowSchedule;
 
   /**
    * Build a schedule from flows that already carry their cashflow kind.
@@ -14954,7 +15052,11 @@ export interface CashflowsNamespace {
    * @returns The `CashFlowSchedule` handle, flows in canonical order.
    * @throws If an argument does not match its wire type (kind `validation`).
    */
-  scheduleFromClassifiedFlows(flows: readonly generated.cashflows.CashFlow[], dayCount: generated.core.DayCount, opts?: generated.cashflows.ScheduleBuildOpts | null): CashFlowSchedule;
+  scheduleFromClassifiedFlows(
+    flows: readonly generated.cashflows.CashFlow[],
+    dayCount: generated.core.DayCount,
+    opts?: generated.cashflows.ScheduleBuildOpts | null
+  ): CashFlowSchedule;
 
   /**
    * Merge several schedules into one under a new notional and day count.
@@ -14968,7 +15070,11 @@ export interface CashflowsNamespace {
    * @returns The merged `CashFlowSchedule` handle.
    * @throws If `schedules` is not an array (kind `invalid_type`) or an argument does not match its wire type (kind `validation`).
    */
-  mergeCashflowSchedules(schedules: readonly (CashFlowSchedule | JsonInput)[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount): CashFlowSchedule;
+  mergeCashflowSchedules(
+    schedules: readonly (CashFlowSchedule | JsonInput)[],
+    notional: generated.cashflows.Notional,
+    dayCount: generated.core.DayCount
+  ): CashFlowSchedule;
 
   /**
    * Coupon record date for a coupon paid on a date.
@@ -14982,7 +15088,10 @@ export interface CashflowsNamespace {
    * @returns ISO-8601 record date.
    * @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved (kind `validation`), or `paymentDate` is not an ISO-8601 string (kind `invalid_type` or `validation`).
    */
-  exCouponRuleExDate(rule: generated.cashflows.ExCouponRule, paymentDate: string): generated.core.DateWire;
+  exCouponRuleExDate(
+    rule: generated.cashflows.ExCouponRule,
+    paymentDate: string
+  ): generated.core.DateWire;
 
   /**
    * Whether a settlement date falls in the ex-coupon window of a coupon.
@@ -14997,7 +15106,11 @@ export interface CashflowsNamespace {
    * @returns `true` strictly after the record date and before the payment date; settlement on the record date keeps the coupon and returns `false`.
    * @throws If `rule` is not an `ExCouponRule`, `days_before_coupon` exceeds 366, the calendar id cannot be resolved, the record date is out of range (kind `validation`), or a date is not an ISO-8601 string (kind `invalid_type` or `validation`).
    */
-  exCouponRuleIsExCoupon(rule: generated.cashflows.ExCouponRule, paymentDate: string, settlementDate: string): boolean;
+  exCouponRuleIsExCoupon(
+    rule: generated.cashflows.ExCouponRule,
+    paymentDate: string,
+    settlementDate: string
+  ): boolean;
 
   /**
    * Accrued interest of a schedule as of a date.
@@ -15011,7 +15124,11 @@ export interface CashflowsNamespace {
    * @returns `Money` wire object in the schedule currency; negative inside an ex-coupon window.
    * @throws If the schedule fails validation or mixes coupon currencies, `config` is not an `AccrualConfig`, or a day-count calculation fails (kind `validation`).
    */
-  accruedInterestAmount(schedule: CashFlowSchedule, asOf: string, config?: generated.cashflows.AccrualConfig | null): MoneyValue;
+  accruedInterestAmount(
+    schedule: CashFlowSchedule,
+    asOf: string,
+    config?: generated.cashflows.AccrualConfig | null
+  ): MoneyValue;
 
   /**
    * Sum dated amounts into reporting periods, keeping currencies separate.
@@ -15021,7 +15138,10 @@ export interface CashflowsNamespace {
    * @returns `PeriodAggregation`: `{ periodId: { currency: Money } }`, with only periods that received a flow.
    * @throws If an argument does not match its wire type, the periods are unsorted, overlapping or repeat an id, or a period total is non-finite or out of range (kind `validation`).
    */
-  aggregateByPeriod(flows: readonly DatedFlowJson[], periods: readonly generated.statements.Period[]): generated.cashflows.PeriodAggregation;
+  aggregateByPeriod(
+    flows: readonly DatedFlowJson[],
+    periods: readonly generated.statements.Period[]
+  ): generated.cashflows.PeriodAggregation;
 
   /**
    * Sum dated amounts that must all be in one currency.
@@ -15031,7 +15151,10 @@ export interface CashflowsNamespace {
    * @returns `Money` wire object: the compensated sum in `target`.
    * @throws If a flow is in another currency or the sum cannot be represented (kind `validation`), or an argument does not match its wire type.
    */
-  aggregateCashflowsChecked(flows: readonly DatedFlowJson[], target: generated.core.Currency): MoneyValue;
+  aggregateCashflowsChecked(
+    flows: readonly DatedFlowJson[],
+    target: generated.core.Currency
+  ): MoneyValue;
 
   /**
    * Group dated cashflows into a calendar-year non-principal / principal / PV ladder.
@@ -15045,7 +15168,12 @@ export interface CashflowsNamespace {
    * @returns `{ year, non_principal, principal, pv }` rows in ascending year order.
    * @throws If the arrays differ in length, a kind label is unknown, or an amount or PV is non-finite (kind `validation`), or an array has the wrong element type (kind `invalid_type`).
    */
-  calendarYearLadder(dates: readonly string[], kinds: readonly string[], amounts: number[] | Float64Array, pvs: number[] | Float64Array): CalendarYearLadderRow[];
+  calendarYearLadder(
+    dates: readonly string[],
+    kinds: readonly string[],
+    amounts: number[] | Float64Array,
+    pvs: number[] | Float64Array
+  ): CalendarYearLadderRow[];
 
   /**
    * Amount aggregated for one period and currency.
@@ -15059,7 +15187,11 @@ export interface CashflowsNamespace {
    * @returns `Money` wire object, or `undefined` when the period has no flows in that currency.
    * @throws If `aggregation` is not a `PeriodAggregation` or `currency` is not an ISO-4217 code (kind `validation`), or `period` is not a string (kind `invalid_type`).
    */
-  periodAggregationGetAmount(aggregation: generated.cashflows.PeriodAggregation, period: string, currency: generated.core.Currency): MoneyValue | undefined;
+  periodAggregationGetAmount(
+    aggregation: generated.cashflows.PeriodAggregation,
+    period: string,
+    currency: generated.core.Currency
+  ): MoneyValue | undefined;
 
   /**
    * Materialize the reset observations crossed by a realized-forward market roll.
@@ -15075,7 +15207,12 @@ export interface CashflowsNamespace {
    * @returns A new `MarketContext` handle with the crossed fixings materialized; release it with free().
    * @throws If the window runs backward, a fixing-series identifier is malformed, a crossed projection is unavailable or non-finite, or two schedules project the same index and date differently (kind `validation`).
    */
-  materializeFixings(market: MarketContext, schedules: readonly (CashFlowSchedule | JsonInput)[], oldDate: string, newDate: string): MarketContext;
+  materializeFixings(
+    market: MarketContext,
+    schedules: readonly (CashFlowSchedule | JsonInput)[],
+    oldDate: string,
+    newDate: string
+  ): MarketContext;
 
   /**
    * Parse a cashflow kind label into its `CFKind` wire string.
@@ -15133,126 +15270,12 @@ export interface CashflowsNamespace {
   cashFlowGetBalanceDate(flow: generated.cashflows.CashFlow): generated.core.DateWire;
 
   /**
-   * Copy of a cashflow with an explicit economic principal date.
-   *
-   * @param flow - `CashFlow` wire object.
-   * @param date - ISO-8601 date on which the outstanding balance changes, independent of the cash payment date.
-   * @returns The updated `CashFlow`.
-   * @throws If `flow` is not a `CashFlow` or `date` is not an ISO date (kind `validation`).
-   */
-  cashFlowWithPrincipalDate(flow: generated.cashflows.CashFlow, date: string): generated.cashflows.CashFlow;
-
-  /**
-   * Copy of a cashflow carrying its accrual-period metadata.
-   *
-   * @param flow - `CashFlow` wire object.
-   * @param accrual - `CashFlowAccrual` wire object: accrual start and end dates, day count and optional projected index rate.
-   * @returns The updated `CashFlow`.
-   * @throws If either argument does not match its wire type (kind `validation`).
-   */
-  cashFlowWithAccrual(flow: generated.cashflows.CashFlow, accrual: generated.cashflows.CashFlowAccrual): generated.cashflows.CashFlow;
-
-  /**
-   * Copy of a cashflow with an explicit outstanding-balance change.
-   *
-   * @param flow - `CashFlow` wire object.
-   * @param delta - `Money` wire object: change in outstanding principal (positive increases the balance), which may differ from the cash amount.
-   * @returns The updated `CashFlow`.
-   * @throws If either argument does not match its wire type (kind `validation`).
-   */
-  cashFlowWithPrincipalDelta(flow: generated.cashflows.CashFlow, delta: MoneyValue): generated.cashflows.CashFlow;
-
-  /**
    * Check a cashflow's invariants.
    *
    * @param flow - `CashFlow` wire object.
    * @throws If `flow` is not a `CashFlow`, its amount, accrual factor or rate is non-finite, its accrual factor is negative, its reset date is after its payment date, or its principal delta is in another currency (kind `validation`).
    */
   cashFlowValidate(flow: generated.cashflows.CashFlow): void;
-
-  /**
-   * Straight-line amortization from the initial notional down to a final balance.
-   *
-   * @param finalNotional - `Money` wire object: outstanding balance left at maturity, in the notional currency.
-   * @returns `AmortizationSpec` wire value `{ linear_to: { final_notional } }`.
-   * @throws If `finalNotional` is not a `Money` wire object (kind `validation`).
-   */
-  amortizationSpecLinearTo(finalNotional: MoneyValue): generated.cashflows.AmortizationSpec;
-
-  /**
-   * Amortization to an explicit remaining balance on each listed date.
-   *
-   * @param schedule - `[isoDate, Money]` pairs: the outstanding balance after each date, in the notional currency.
-   * @returns `AmortizationSpec` wire value `{ step_remaining: { schedule } }`.
-   * @throws If `schedule` is not an array of `[isoDate, Money]` pairs (kind `validation`).
-   */
-  amortizationSpecStepRemaining(schedule: readonly (readonly [string, MoneyValue])[]): generated.cashflows.AmortizationSpec;
-
-  /**
-   * Amortization of a fixed share of the original notional each period.
-   *
-   * @param pct - Share of the original notional repaid per period as a decimal (`0.05` = 5%).
-   * @returns `AmortizationSpec` wire value `{ percent_of_original_per_period: { pct } }`.
-   * @throws If `pct` is not a number (kind `invalid_type`).
-   */
-  amortizationSpecPercentOfOriginalPerPeriod(pct: number): generated.cashflows.AmortizationSpec;
-
-  /**
-   * Amortization of a fixed share of the remaining balance each period.
-   *
-   * @param pct - Share of the then-outstanding balance repaid per period as a decimal (`0.05` = 5%).
-   * @returns `AmortizationSpec` wire value `{ percent_of_remaining_per_period: { pct } }`.
-   * @throws If `pct` is not a number (kind `invalid_type`).
-   */
-  amortizationSpecPercentOfRemainingPerPeriod(pct: number): generated.cashflows.AmortizationSpec;
-
-  /**
-   * Straight-line amortization to zero between two dates.
-   *
-   * @param start - ISO-8601 date on which amortization begins; the balance is flat before it.
-   * @param end - ISO-8601 date on which the balance reaches zero.
-   * @returns `AmortizationSpec` wire value `{ linear_between: { start, end } }`.
-   * @throws If either date is not an ISO-8601 string (kind `invalid_type` or `validation`).
-   */
-  amortizationSpecLinearBetween(start: string, end: string): generated.cashflows.AmortizationSpec;
-
-  /**
-   * Amortization by explicit principal payments on listed dates.
-   *
-   * @param items - `[isoDate, Money]` pairs: the principal repaid on each date, in the notional currency.
-   * @returns `AmortizationSpec` wire value `{ custom_principal: { items } }`.
-   * @throws If `items` is not an array of `[isoDate, Money]` pairs (kind `validation`).
-   */
-  amortizationSpecCustomPrincipal(items: readonly (readonly [string, MoneyValue])[]): generated.cashflows.AmortizationSpec;
-
-  /**
-   * Coupon paid partly in cash and partly in kind.
-   *
-   * @param cashFraction - Share of each coupon paid in cash, as an exact decimal string (`"0.6"`).
-   * @param pikFraction - Share of each coupon capitalized into principal, as an exact decimal string (`"0.4"`); the two shares must sum to one when the schedule is built.
-   * @returns `CouponType` wire value `{ split: { cash_fraction, pik_fraction } }`.
-   * @throws If a fraction is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
-   */
-  couponTypeSplit(cashFraction: string, pikFraction: string): generated.cashflows.CouponType;
-
-  /**
-   * Fee base equal to the undrawn part of a commitment.
-   *
-   * @param commitment - `Money` wire object: total facility commitment; the fee accrues on commitment minus drawn balance.
-   * @returns `FeeBase` wire value `{ undrawn: { commitment } }`.
-   * @throws If `commitment` is not a `Money` wire object (kind `validation`).
-   */
-  feeBaseUndrawn(commitment: MoneyValue): generated.cashflows.FeeBase;
-
-  /**
-   * One-off fee of a fixed amount on a date.
-   *
-   * @param date - ISO-8601 payment date of the fee.
-   * @param amount - `Money` wire object: fee amount in its own currency.
-   * @returns `FeeSpec` wire value `{ fixed: { date, amount } }`.
-   * @throws If `date` is not an ISO-8601 string or `amount` is not a `Money` wire object (kind `invalid_type` or `validation`).
-   */
-  feeSpecFixed(date: string, amount: MoneyValue): generated.cashflows.FeeSpec;
 
   /**
    * Recurring fee quoted in basis points of a drawn or undrawn balance.
@@ -15267,34 +15290,6 @@ export interface CashflowsNamespace {
    * @throws If `fields` is missing a required field, has an unknown field or a field of the wrong shape (kind `validation`).
    */
   feeSpecPeriodicBp(fields: Record<string, unknown>): generated.cashflows.FeeSpec;
-
-  /**
-   * Fallback that uses a fixed index rate when a projection is unavailable.
-   *
-   * @param rate - Index rate used in place of the missing projection, as an exact decimal string (`"0.03"` = 3%), before spread and gearing.
-   * @returns `FloatingRateFallback` wire value `{ fixed_rate: rate }`.
-   * @throws If `rate` is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
-   */
-  floatingRateFallbackFixedRate(rate: string): generated.cashflows.FloatingRateFallback;
-
-  /**
-   * Overnight compounding in arrears with a lookback.
-   *
-   * @param lookbackDays - Business days each daily observation is shifted back (non-negative integer; `0` for none).
-   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days } }`.
-   * @throws If `lookbackDays` is not a non-negative integer (kind `invalid_type`).
-   */
-  floatingLegCompoundingCompoundedInArrears(lookbackDays: number): generated.cashflows.FloatingLegCompounding;
-
-  /**
-   * Overnight compounding with an observation-period shift.
-   *
-   * @param shiftDays - Business days the whole observation period (rates and weights) is shifted back (non-negative integer).
-   * @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days } }`.
-   * @throws If `shiftDays` is not a non-negative integer (kind `invalid_type`).
-   */
-  floatingLegCompoundingCompoundedWithObservationShift(shiftDays: number): generated.cashflows.FloatingLegCompounding;
-
 
   /**
    * USD SOFR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::sofr`).
@@ -15351,15 +15346,6 @@ export interface CashflowsNamespace {
    * @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days: 5 } }`.
    */
   floatingLegCompoundingSoniaObservationShift(): generated.cashflows.FloatingLegCompounding;
-
-  /**
-   * Compounded RFR with an end-of-period rate cut-off (Rust `FloatingLegCompounding::rate_cutoff`).
-   *
-   * @param cutoffDays - Business days before period end over which the overnight rate is frozen (non-negative integer).
-   * @returns `FloatingLegCompounding` wire value `{ compounded_with_rate_cutoff: { cutoff_days } }`.
-   * @throws If `cutoffDays` is not a non-negative integer (kind `invalid_type`).
-   */
-  floatingLegCompoundingRateCutoff(cutoffDays: number): generated.cashflows.FloatingLegCompounding;
 
   /**
    * Whether a compounding convention builds the period rate from daily overnight
@@ -15479,7 +15465,10 @@ export interface CashflowsNamespace {
    * @returns `DefaultModelSpec` wire object using the cumulative-loss curve.
    * @throws If an argument is not a number or array of numbers (kind `invalid_type`).
    */
-  defaultModelSpecCumulativeLoss(cumulativeNetLossPct: number[] | Float64Array, severity: number): generated.cashflows.DefaultModelSpec;
+  defaultModelSpecCumulativeLoss(
+    cumulativeNetLossPct: number[] | Float64Array,
+    severity: number
+  ): generated.cashflows.DefaultModelSpec;
 
   /**
    * Rating-agency default timing over a lifetime cumulative default rate.
@@ -15489,7 +15478,10 @@ export interface CashflowsNamespace {
    * @returns `DefaultModelSpec` wire object using the timing curve.
    * @throws If an argument is not a number or array of numbers (kind `invalid_type`).
    */
-  defaultModelSpecTiming(cumulativeDefaultRate: number, annualPct: number[] | Float64Array): generated.cashflows.DefaultModelSpec;
+  defaultModelSpecTiming(
+    cumulativeDefaultRate: number,
+    annualPct: number[] | Float64Array
+  ): generated.cashflows.DefaultModelSpec;
 
   /**
    * Check a default model's curve parameters.
@@ -15523,7 +15515,11 @@ export interface CashflowsNamespace {
    * @returns Monthly default rate as a decimal in `[0, 1]`; zero once the surviving balance is exhausted.
    * @throws If `spec` is not a `DefaultModelSpec`, its curve parameters are invalid, or `survivingBalanceFraction` is negative or non-finite (kind `validation`); if `seasoningMonths` is not a non-negative integer or `survivingBalanceFraction` is not a number (kind `invalid_type`).
    */
-  defaultModelSpecMdrWithSurvival(spec: generated.cashflows.DefaultModelSpec, seasoningMonths: number, survivingBalanceFraction: number): number;
+  defaultModelSpecMdrWithSurvival(
+    spec: generated.cashflows.DefaultModelSpec,
+    seasoningMonths: number,
+    survivingBalanceFraction: number
+  ): number;
 
   /**
    * Cumulative defaults through a seasoning month as a fraction of the original
@@ -15534,7 +15530,10 @@ export interface CashflowsNamespace {
    * @returns The fraction for cumulative-loss and timing curves (may exceed 1.0 with replenishment or par build); `undefined` for rate-based curves.
    * @throws If `spec` is not a `DefaultModelSpec` or its curve parameters are invalid (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
    */
-  defaultModelSpecCumulativeDefaultFraction(spec: generated.cashflows.DefaultModelSpec, seasoningMonths: number): number | undefined;
+  defaultModelSpecCumulativeDefaultFraction(
+    spec: generated.cashflows.DefaultModelSpec,
+    seasoningMonths: number
+  ): number | undefined;
 
   /**
    * Constant annual prepayment rate.
@@ -15570,7 +15569,10 @@ export interface CashflowsNamespace {
    * @returns `PrepaymentModelSpec` wire object using the lockout curve.
    * @throws If `lockoutMonths` is not a non-negative integer or `postLockoutCpr` is not a number (kind `invalid_type`).
    */
-  prepaymentModelSpecCmbsWithLockout(lockoutMonths: number, postLockoutCpr: number): generated.cashflows.PrepaymentModelSpec;
+  prepaymentModelSpecCmbsWithLockout(
+    lockoutMonths: number,
+    postLockoutCpr: number
+  ): generated.cashflows.PrepaymentModelSpec;
 
   /**
    * ABS speed curve (auto-loan and consumer ABS convention).
@@ -15591,7 +15593,9 @@ export interface CashflowsNamespace {
    * @returns `PrepaymentModelSpec` wire object using the vector curve.
    * @throws If `monthlyCpr` is not an array of numbers (kind `invalid_type`).
    */
-  prepaymentModelSpecVector(monthlyCpr: number[] | Float64Array): generated.cashflows.PrepaymentModelSpec;
+  prepaymentModelSpecVector(
+    monthlyCpr: number[] | Float64Array
+  ): generated.cashflows.PrepaymentModelSpec;
 
   /**
    * Check a prepayment model's curve parameters.
@@ -15609,17 +15613,10 @@ export interface CashflowsNamespace {
    * @returns Monthly prepayment rate as a decimal; a constant CPR converts as `1 - (1 - CPR)^(1/12)`.
    * @throws If `spec` is not a `PrepaymentModelSpec` or its curve parameters are invalid (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
    */
-  prepaymentModelSpecSmm(spec: generated.cashflows.PrepaymentModelSpec, seasoningMonths: number): number;
-
-  /**
-   * Copy of a recovery model with a loss-severity vector by month of default.
-   *
-   * @param spec - `RecoveryModelSpec` wire object.
-   * @param severityVector - Loss severity (`1 − recovery`) per seasoning month of the default as decimals in `[0, 1]`, month 1 first; the last value is held. Must be non-empty.
-   * @returns The `RecoveryModelSpec` with the vector attached; `rate` stays as the flat fallback but no longer drives recoveries.
-   * @throws If `spec` is not a `RecoveryModelSpec` (kind `validation`) or `severityVector` is not an array of numbers (kind `invalid_type`).
-   */
-  recoveryModelSpecWithSeverityVector(spec: generated.cashflows.RecoveryModelSpec, severityVector: number[] | Float64Array): generated.cashflows.RecoveryModelSpec;
+  prepaymentModelSpecSmm(
+    spec: generated.cashflows.PrepaymentModelSpec,
+    seasoningMonths: number
+  ): number;
 
   /**
    * Recovery rate of a recovery model for a default in a seasoning month.
@@ -15629,7 +15626,10 @@ export interface CashflowsNamespace {
    * @returns Recovery as a decimal fraction of defaulted par: `1 − severity` for the month when a severity vector is set, otherwise the flat `rate`.
    * @throws If `spec` is not a `RecoveryModelSpec` (kind `validation`) or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
    */
-  recoveryModelSpecRecoveryRate(spec: generated.cashflows.RecoveryModelSpec, seasoningMonths: number): number;
+  recoveryModelSpecRecoveryRate(
+    spec: generated.cashflows.RecoveryModelSpec,
+    seasoningMonths: number
+  ): number;
 
   /**
    * Check a recovery model's rate and severity vector.
@@ -15797,7 +15797,11 @@ export interface CovenantEngine extends WasmOwned {
    * @returns Covenant reports keyed by stable covenant instance key, in engine order.
    * @throws If `scope` is not one of the listed strings, the engine is invalid, a metric value is not a number (kind `validation`), or a required metric is missing (kind `not_found`).
    */
-  evaluateAndTrack(metrics: Record<string, number> | string, asOf: string, scope: generated.covenants.CovenantScope): Record<string, CovenantReport>;
+  evaluateAndTrack(
+    metrics: Record<string, number> | string,
+    asOf: string,
+    scope: generated.covenants.CovenantScope
+  ): Record<string, CovenantReport>;
   /**
    * Evaluate the engine on each dated row of metric values.
    *
@@ -15807,7 +15811,9 @@ export interface CovenantEngine extends WasmOwned {
    * @returns `DatedCovenantReports` rows (`{ as_of, reports }`), one per input row in input order. (Python returns the same reports as a long DataFrame.)
    * @throws If `metrics` is not an array of `DatedMetrics`, the engine is invalid (kind `validation`), or a required metric is missing on a date (kind `not_found`).
    */
-  evaluateSeries(metrics: readonly generated.covenants.DatedMetrics[]): generated.covenants.DatedCovenantReports[];
+  evaluateSeries(
+    metrics: readonly generated.covenants.DatedMetrics[]
+  ): generated.covenants.DatedCovenantReports[];
   /**
    * Covenant specifications, in the order they were added.
    * @returns `CovenantSpec` wire objects.
@@ -15992,7 +15998,12 @@ export interface CovenantsNamespace {
    * @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
    * @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
    */
-  lboStandard(initialLeverage: number, interestCoverage: number, fixedChargeCoverage: number, maxCapex: number): generated.covenants.CovenantSpec[];
+  lboStandard(
+    initialLeverage: number,
+    interestCoverage: number,
+    fixedChargeCoverage: number,
+    maxCapex: number
+  ): generated.covenants.CovenantSpec[];
 
   /**
    * Covenant-lite package: incurrence-style total and senior leverage tests.
@@ -16017,7 +16028,11 @@ export interface CovenantsNamespace {
    * @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
    * @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
    */
-  realEstate(minDscr: number, minDebtYield: number, maxLtv: number): generated.covenants.CovenantSpec[];
+  realEstate(
+    minDscr: number,
+    minDebtYield: number,
+    maxLtv: number
+  ): generated.covenants.CovenantSpec[];
 
   /**
    * Project-finance covenant package: DSCR, distribution lock-up, liquidity and net leverage tests.
@@ -16031,7 +16046,12 @@ export interface CovenantsNamespace {
    * @returns `CovenantSpec` wire objects, ready for `CovenantEngine.fromSpecs`.
    * @throws If a threshold is not a number (kind `invalid_type`), or is NaN, infinite or negative (kind `validation`).
    */
-  projectFinance(minDscr: number, distributionLockupDscr: number, minLiquidity: number, maxNetLeverage: number): generated.covenants.CovenantSpec[];
+  projectFinance(
+    minDscr: number,
+    distributionLockupDscr: number,
+    minLiquidity: number,
+    maxNetLeverage: number
+  ): generated.covenants.CovenantSpec[];
 
   /**
    * Forecast one numeric covenant over dated metric projections.
@@ -16049,7 +16069,11 @@ export interface CovenantsNamespace {
    * @returns `CovenantForecast` wire object: per-date projected values, thresholds, headroom and breach probabilities, with the first breach date and minimum headroom.
    * @throws If `metrics` is empty or repeats a date, the covenant is not numeric, the configuration is invalid or an observation is non-finite (kind `validation`), or the covenant's metric is missing on a date (kind `not_found`).
    */
-  forecastCovenant(spec: generated.covenants.CovenantSpec, metrics: readonly generated.covenants.DatedMetrics[], config?: generated.covenants.CovenantForecastConfig | null): generated.covenants.CovenantForecast;
+  forecastCovenant(
+    spec: generated.covenants.CovenantSpec,
+    metrics: readonly generated.covenants.DatedMetrics[],
+    config?: generated.covenants.CovenantForecastConfig | null
+  ): generated.covenants.CovenantForecast;
 
   /**
    * Forecast every breach of an engine's covenants over dated metric projections.
@@ -16066,7 +16090,11 @@ export interface CovenantsNamespace {
    * @returns `FutureBreach` wire objects sorted by breach date, then covenant id.
    * @throws If `metrics` is empty or repeats a date, the engine or configuration is invalid or an observation is non-finite (kind `validation`), or a required metric is missing on a date (kind `not_found`).
    */
-  forecastBreaches(engine: CovenantEngine, metrics: readonly generated.covenants.DatedMetrics[], config?: generated.covenants.CovenantForecastConfig | null): generated.covenants.FutureBreach[];
+  forecastBreaches(
+    engine: CovenantEngine,
+    metrics: readonly generated.covenants.DatedMetrics[],
+    config?: generated.covenants.CovenantForecastConfig | null
+  ): generated.covenants.FutureBreach[];
 
   /**
    * Copy of a forecast configuration with a different covenant scope.
@@ -16076,7 +16104,10 @@ export interface CovenantsNamespace {
    * @returns The updated `CovenantForecastConfig`.
    * @throws If `config` is not a `CovenantForecastConfig` or `scope` is not one of the listed strings (kind `validation`).
    */
-  covenantForecastConfigWithScope(config: generated.covenants.CovenantForecastConfig, scope: generated.covenants.CovenantScope): generated.covenants.CovenantForecastConfig;
+  covenantForecastConfigWithScope(
+    config: generated.covenants.CovenantForecastConfig,
+    scope: generated.covenants.CovenantScope
+  ): generated.covenants.CovenantForecastConfig;
 
   /**
    * Maximum total debt / EBITDA covenant.
@@ -16195,7 +16226,11 @@ export interface CovenantsNamespace {
    * @returns `CovenantType` wire value `{ custom: { metric, test } }`.
    * @throws If `metric` or `test` is not a string or `value` is not a number (kind `invalid_type`), or `test` is not one of the listed strings or `value` is non-finite (kind `validation`).
    */
-  covenantTypeCustom(metric: string, test: 'maximum' | 'minimum', value: number): generated.covenants.CovenantType;
+  covenantTypeCustom(
+    metric: string,
+    test: 'maximum' | 'minimum',
+    value: number
+  ): generated.covenants.CovenantType;
 
   /**
    * Basket covenant: a capped amount for a named category.
@@ -16248,7 +16283,9 @@ export interface CovenantsNamespace {
    * @returns `CovenantConsequence` wire value `{ require_collateral: { description } }`.
    * @throws If `description` is not a string (kind `invalid_type`).
    */
-  covenantConsequenceRequireCollateral(description: string): generated.covenants.CovenantConsequence;
+  covenantConsequenceRequireCollateral(
+    description: string
+  ): generated.covenants.CovenantConsequence;
 
   /**
    * Breach consequence: the maturity is accelerated to a new date.
@@ -16257,7 +16294,9 @@ export interface CovenantsNamespace {
    * @returns `CovenantConsequence` wire value `{ accelerate_maturity: { new_maturity } }`.
    * @throws If `newMaturity` is not an ISO-8601 string (kind `invalid_type` or `validation`).
    */
-  covenantConsequenceAccelerateMaturity(newMaturity: string): generated.covenants.CovenantConsequence;
+  covenantConsequenceAccelerateMaturity(
+    newMaturity: string
+  ): generated.covenants.CovenantConsequence;
 
   /**
    * Create a covenant with the Rust defaults.
@@ -16272,7 +16311,11 @@ export interface CovenantsNamespace {
    * @returns `Covenant` wire object.
    * @throws If an argument does not match its wire type (kind `invalid_type` or `validation`).
    */
-  covenantNew(covenantType: generated.covenants.CovenantType, testFrequency: generated.covenants.Tenor, label: string): generated.covenants.Covenant;
+  covenantNew(
+    covenantType: generated.covenants.CovenantType,
+    testFrequency: generated.covenants.Tenor,
+    label: string
+  ): generated.covenants.Covenant;
 
   /**
    * Copy of a covenant with a cure period.
@@ -16282,7 +16325,10 @@ export interface CovenantsNamespace {
    * @returns The updated `Covenant`.
    * @throws If `covenant` is not a `Covenant` (kind `validation`) or `days` is not an integer (kind `invalid_type`).
    */
-  covenantWithCurePeriod(covenant: generated.covenants.Covenant, days?: number | null): generated.covenants.Covenant;
+  covenantWithCurePeriod(
+    covenant: generated.covenants.Covenant,
+    days?: number | null
+  ): generated.covenants.Covenant;
 
   /**
    * Copy of a covenant with one more breach consequence.
@@ -16292,7 +16338,10 @@ export interface CovenantsNamespace {
    * @returns The updated `Covenant`.
    * @throws If either argument does not match its wire type (kind `validation`).
    */
-  covenantWithConsequence(covenant: generated.covenants.Covenant, consequence: generated.covenants.CovenantConsequence): generated.covenants.Covenant;
+  covenantWithConsequence(
+    covenant: generated.covenants.Covenant,
+    consequence: generated.covenants.CovenantConsequence
+  ): generated.covenants.Covenant;
 
   /**
    * Copy of a covenant with a different scope.
@@ -16302,7 +16351,10 @@ export interface CovenantsNamespace {
    * @returns The updated `Covenant`.
    * @throws If `covenant` is not a `Covenant` or `scope` is not one of the listed strings (kind `validation`).
    */
-  covenantWithScope(covenant: generated.covenants.Covenant, scope: generated.covenants.CovenantScope): generated.covenants.Covenant;
+  covenantWithScope(
+    covenant: generated.covenants.Covenant,
+    scope: generated.covenants.CovenantScope
+  ): generated.covenants.Covenant;
 
   /**
    * Copy of a covenant that is tested only while a springing condition holds.
@@ -16312,7 +16364,10 @@ export interface CovenantsNamespace {
    * @returns The updated `Covenant`.
    * @throws If either argument does not match its wire type (kind `validation`).
    */
-  covenantWithSpringingCondition(covenant: generated.covenants.Covenant, condition: generated.covenants.SpringingCondition): generated.covenants.Covenant;
+  covenantWithSpringingCondition(
+    covenant: generated.covenants.Covenant,
+    condition: generated.covenants.SpringingCondition
+  ): generated.covenants.Covenant;
 
   /**
    * Covenant specification that reads the covenant type's default metric.
@@ -16339,7 +16394,10 @@ export interface CovenantsNamespace {
    * @returns `CovenantSpec` wire object.
    * @throws If `covenant` is not a `Covenant` (kind `validation`) or `metricId` is not a string (kind `invalid_type`).
    */
-  covenantSpecWithMetric(covenant: generated.covenants.Covenant, metricId: string): generated.covenants.CovenantSpec;
+  covenantSpecWithMetric(
+    covenant: generated.covenants.Covenant,
+    metricId: string
+  ): generated.covenants.CovenantSpec;
 
   /**
    * Copy of a specification with an explicit earnings denominator metric.
@@ -16349,7 +16407,10 @@ export interface CovenantsNamespace {
    * @returns The updated `CovenantSpec`.
    * @throws If `spec` is not a `CovenantSpec` (kind `validation`) or `metricId` is not a string (kind `invalid_type`).
    */
-  covenantSpecWithDenominatorMetric(spec: generated.covenants.CovenantSpec, metricId: string): generated.covenants.CovenantSpec;
+  covenantSpecWithDenominatorMetric(
+    spec: generated.covenants.CovenantSpec,
+    metricId: string
+  ): generated.covenants.CovenantSpec;
 
   /**
    * Copy of a specification with step-down (or step-up) thresholds.
@@ -16359,7 +16420,10 @@ export interface CovenantsNamespace {
    * @returns The updated `CovenantSpec`.
    * @throws If `spec` is not a `CovenantSpec`, or `schedule` has a non-finite threshold or repeats a date (kind `validation`).
    */
-  covenantSpecWithThresholdSchedule(spec: generated.covenants.CovenantSpec, schedule: generated.covenants.ThresholdSchedule): generated.covenants.CovenantSpec;
+  covenantSpecWithThresholdSchedule(
+    spec: generated.covenants.CovenantSpec,
+    schedule: generated.covenants.ThresholdSchedule
+  ): generated.covenants.CovenantSpec;
 
   /**
    * Threshold in force on a test date.
@@ -16369,7 +16433,10 @@ export interface CovenantsNamespace {
    * @returns The threshold of the latest entry effective on or before `testDate`, or `undefined` when the schedule starts later.
    * @throws If `schedule` has a non-finite threshold or repeats a date (kind `validation`), or `testDate` is not an ISO-8601 string (kind `invalid_type` or `validation`).
    */
-  thresholdScheduleThresholdFor(schedule: generated.covenants.ThresholdSchedule, testDate: string): number | undefined;
+  thresholdScheduleThresholdFor(
+    schedule: generated.covenants.ThresholdSchedule,
+    testDate: string
+  ): number | undefined;
 }
 
 /**
@@ -16486,7 +16553,10 @@ export interface Bond extends WasmOwned {
    * Settlement convention (settlement lag, ex-coupon period) in serde form.
    * @returns `{"settlement_days": ..., "ex_coupon_days": ..., "ex_coupon_calendar_id": ...}` or `null`.
    */
-  readonly settlementConvention: Pick<generated.valuations.Bond, 'settlement_days' | 'ex_coupon_days' | 'ex_coupon_calendar_id'> | null;
+  readonly settlementConvention: Pick<
+    generated.valuations.Bond,
+    'settlement_days' | 'ex_coupon_days' | 'ex_coupon_calendar_id'
+  > | null;
   /**
    * Settlement lag in business days.
    * @returns The lag, or `null` when no settlement convention is set.
@@ -16511,17 +16581,23 @@ export interface Bond extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.Bond['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.Bond['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.Bond['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.Bond['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.Bond['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.Bond['scenario_pricing_overrides']
+  >;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -16589,7 +16665,11 @@ export interface Bond extends WasmOwned {
    * @returns `MertonMcResult` with clean and dirty price in percent of par, loss statistics and path statistics.
    * @throws Error - Throws with kind `validation` if `asOf` is malformed or the bond or configuration is invalid, kind `invalid_type` if `discountRate` is not a number, and kind `computation` if the simulation fails.
    */
-  priceMertonMc(config: MertonMcConfig, discountRate: number, asOf: string): generated.valuations.MertonMcResult;
+  priceMertonMc(
+    config: MertonMcConfig,
+    discountRate: number,
+    asOf: string
+  ): generated.valuations.MertonMcResult;
 }
 
 /**
@@ -16756,7 +16836,13 @@ export interface BondConstructor {
    * @returns The validated zero-coupon bond.
    * @throws Error - Throws with kind `validation` if a date is malformed or bond validation fails (e.g. maturity not after issue_date).
    */
-  zeroCoupon(id: string, notional: Money, issueDate: string, maturity: string, discountCurveId: string): Bond;
+  zeroCoupon(
+    id: string,
+    notional: Money,
+    issueDate: string,
+    maturity: string,
+    discountCurveId: string
+  ): Bond;
   /**
    * Canonical example bond (mirrors Rust `Bond::example`): a 10-year US Treasury, USD 1,000,000 at 4.25%.
    * @returns The example bond.
@@ -16851,7 +16937,9 @@ export interface TermLoan extends WasmOwned {
    * Business day convention (serde string).
    * @returns `"modified_following"` unless overridden.
    */
-  readonly businessDayConvention: NonNullable<generated.valuations.TermLoan['business_day_convention']>;
+  readonly businessDayConvention: NonNullable<
+    generated.valuations.TermLoan['business_day_convention']
+  >;
   /**
    * Holiday calendar identifier.
    * @returns Calendar id, or `null`.
@@ -16921,17 +17009,23 @@ export interface TermLoan extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.TermLoan['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.TermLoan['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.TermLoan['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.TermLoan['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.TermLoan['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.TermLoan['scenario_pricing_overrides']
+  >;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -17183,7 +17277,9 @@ export interface AssetBackedFacility extends WasmOwned {
    * Events that end revolving early, as `AmortizationEvent` serde plain objects.
    * @returns Each `{"kind": "date", "date": ...}`, `{"kind": "cumulative_loss", "max_cumulative_loss": ...}` or `{"kind": "excess_spread", "min_excess_spread_3m": ...}`.
    */
-  readonly amortizationEvents: NonNullable<generated.valuations.AssetBackedFacility['amortization_events']>;
+  readonly amortizationEvents: NonNullable<
+    generated.valuations.AssetBackedFacility['amortization_events']
+  >;
   /**
    * Term-out window as its serde plain object (`{"months": ...}`), or `null`.
    * @returns Months after the revolving end at which the collateral is liquidated.
@@ -17193,7 +17289,9 @@ export interface AssetBackedFacility extends WasmOwned {
    * Collateral liquidation price at the term-out end in percent of par, or `null` for par.
    * @returns Percent of par.
    */
-  readonly liquidationPricePct: NonNullable<generated.valuations.AssetBackedFacility['liquidation_price_pct']> | null;
+  readonly liquidationPricePct: NonNullable<
+    generated.valuations.AssetBackedFacility['liquidation_price_pct']
+  > | null;
   /**
    * Transaction fees paid ahead of the facility's interest as the `DealFees` serde plain object.
    * @returns `null` when the facility carries no fees.
@@ -17208,7 +17306,9 @@ export interface AssetBackedFacility extends WasmOwned {
    * Whether the line is re-advanced up to the borrowing base each revolving period.
    * @returns `true` when re-advances apply.
    */
-  readonly readvanceToBorrowingBase: NonNullable<generated.valuations.AssetBackedFacility['readvance_to_borrowing_base']>;
+  readonly readvanceToBorrowingBase: NonNullable<
+    generated.valuations.AssetBackedFacility['readvance_to_borrowing_base']
+  >;
   /**
    * Discount curve identifier.
    * @returns The curve id.
@@ -17238,17 +17338,23 @@ export interface AssetBackedFacility extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.AssetBackedFacility['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.AssetBackedFacility['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.AssetBackedFacility['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.AssetBackedFacility['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.AssetBackedFacility['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.AssetBackedFacility['scenario_pricing_overrides']
+  >;
   /**
    * Scenario-selection attributes.
    * @returns The attribute map.
@@ -17500,7 +17606,9 @@ export interface RevolvingCredit extends WasmOwned {
    * Business-day convention applied to payment dates (serde string, e.g. `"modified_following"`).
    * @returns `"modified_following"` unless overridden.
    */
-  readonly businessDayConvention: NonNullable<generated.valuations.RevolvingCredit['business_day_convention']>;
+  readonly businessDayConvention: NonNullable<
+    generated.valuations.RevolvingCredit['business_day_convention']
+  >;
   /**
    * Holiday calendar identifier used for payment, fixing and settlement rolls, or `null` for weekends only.
    * @returns The calendar identifier, or `null`.
@@ -17520,17 +17628,23 @@ export interface RevolvingCredit extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.RevolvingCredit['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.RevolvingCredit['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.RevolvingCredit['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.RevolvingCredit['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.RevolvingCredit['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.RevolvingCredit['scenario_pricing_overrides']
+  >;
   /**
    * Scenario-selection attributes.
    * @returns The attribute map.
@@ -17788,28 +17902,39 @@ export interface BondBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  settlementConvention(value: Pick<generated.valuations.Bond, 'settlement_days' | 'ex_coupon_days' | 'ex_coupon_calendar_id'>): BondBuilder;
+  settlementConvention(
+    value: Pick<
+      generated.valuations.Bond,
+      'settlement_days' | 'ex_coupon_days' | 'ex_coupon_calendar_id'
+    >
+  ): BondBuilder;
   /**
    * Set the instrument-owned pricing inputs.
    * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.Bond['instrument_pricing_overrides']>): BondBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.Bond['instrument_pricing_overrides']>
+  ): BondBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.Bond['metric_pricing_overrides']>): BondBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.Bond['metric_pricing_overrides']>
+  ): BondBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.Bond['scenario_pricing_overrides']>): BondBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.Bond['scenario_pricing_overrides']>
+  ): BondBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -17913,7 +18038,9 @@ export interface TermLoanBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  businessDayConvention(value: NonNullable<generated.valuations.TermLoan['business_day_convention']>): TermLoanBuilder;
+  businessDayConvention(
+    value: NonNullable<generated.valuations.TermLoan['business_day_convention']>
+  ): TermLoanBuilder;
   /**
    * Set the holiday calendar identifier (e.g. `"usny"`).
    * @param value - Holiday calendar identifier (e.g. `"usny"`).
@@ -18004,21 +18131,27 @@ export interface TermLoanBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.TermLoan['instrument_pricing_overrides']>): TermLoanBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.TermLoan['instrument_pricing_overrides']>
+  ): TermLoanBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.TermLoan['metric_pricing_overrides']>): TermLoanBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.TermLoan['metric_pricing_overrides']>
+  ): TermLoanBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.TermLoan['scenario_pricing_overrides']>): TermLoanBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.TermLoan['scenario_pricing_overrides']>
+  ): TermLoanBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -18129,21 +18262,27 @@ export interface RevolvingCreditBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  commitmentSteps(value: NonNullable<generated.valuations.RevolvingCredit['commitment_steps']>): RevolvingCreditBuilder;
+  commitmentSteps(
+    value: NonNullable<generated.valuations.RevolvingCredit['commitment_steps']>
+  ): RevolvingCreditBuilder;
   /**
    * Set the dated fixed fees (amendment, waiver, extension, consent).
    * @param value - Rows of `{"date": "YYYY-MM-DD", "amount": `Money` plain object}` (a array of plain objects or a JSON string), each paid on its date. Dates must lie after the commitment date and on or before maturity.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scheduledFees(value: NonNullable<generated.valuations.RevolvingCredit['scheduled_fees']>): RevolvingCreditBuilder;
+  scheduledFees(
+    value: NonNullable<generated.valuations.RevolvingCredit['scheduled_fees']>
+  ): RevolvingCreditBuilder;
   /**
    * Set the effective-interest-rate reporting switch.
    * @param value - `{"include_fees": boolean}` as a plain object or JSON string; `null` (the default) includes fees in the effective yield.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  oidEir(value: NonNullable<generated.valuations.RevolvingCredit['oid_eir']>): RevolvingCreditBuilder;
+  oidEir(
+    value: NonNullable<generated.valuations.RevolvingCredit['oid_eir']>
+  ): RevolvingCreditBuilder;
   /**
    * Set the letter-of-credit sub-facility.
    * @param value - `LetterOfCreditSpec` as a plain object or JSON string with `sublimit` and `outstanding` (`Money` plain objects), `events` (rows of `{"date", "amount", "is_issue"}`), `fee_bp` (`null` accrues the floating margin), `fronting_fee_bp` and `leq` (the fraction of the LC face drawn at default). `null` removes the sublimit.
@@ -18157,14 +18296,18 @@ export interface RevolvingCreditBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  marginSteps(value: NonNullable<generated.valuations.RevolvingCredit['margin_steps']>): RevolvingCreditBuilder;
+  marginSteps(
+    value: NonNullable<generated.valuations.RevolvingCredit['margin_steps']>
+  ): RevolvingCreditBuilder;
   /**
    * Set the draw/repay specification from its serde shape.
    * @param value - `DrawRepaySpec` as a plain object or JSON string: `{"deterministic": [{"date": ..., "amount": Money, "is_draw": boolean}, ...]}` or `{"stochastic": {"utilization_process": {...}, "use_sobol_qmc": ..., "mc_config": ...}}`. The estimator count, antithetic flag and seed label come from `instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`, `mc_seed_scenario`).
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  drawRepaySpec(value: generated.valuations.RevolvingCredit['draw_repay_spec']): RevolvingCreditBuilder;
+  drawRepaySpec(
+    value: generated.valuations.RevolvingCredit['draw_repay_spec']
+  ): RevolvingCreditBuilder;
   /**
    * Set the discount curve identifier.
    * @param value - Discount curve id in the market context.
@@ -18206,7 +18349,9 @@ export interface RevolvingCreditBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  businessDayConvention(value: NonNullable<generated.valuations.RevolvingCredit['business_day_convention']>): RevolvingCreditBuilder;
+  businessDayConvention(
+    value: NonNullable<generated.valuations.RevolvingCredit['business_day_convention']>
+  ): RevolvingCreditBuilder;
   /**
    * Set the holiday calendar used for payment, fixing and settlement rolls.
    * @param value - Calendar identifier such as `"usny"`; `null` (the default) adjusts for weekends only. An unknown identifier fails at `build()`.
@@ -18234,21 +18379,27 @@ export interface RevolvingCreditBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.RevolvingCredit['instrument_pricing_overrides']>): RevolvingCreditBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.RevolvingCredit['instrument_pricing_overrides']>
+  ): RevolvingCreditBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.RevolvingCredit['metric_pricing_overrides']>): RevolvingCreditBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.RevolvingCredit['metric_pricing_overrides']>
+  ): RevolvingCreditBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.RevolvingCredit['scenario_pricing_overrides']>): RevolvingCreditBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.RevolvingCredit['scenario_pricing_overrides']>
+  ): RevolvingCreditBuilder;
   /**
    * Set scenario-selection attributes.
    * @param value - Attribute map; `null` clears it.
@@ -18303,14 +18454,18 @@ export interface AssetBackedFacilityBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  collateral(value: generated.valuations.AssetBackedFacility['collateral']): AssetBackedFacilityBuilder;
+  collateral(
+    value: generated.valuations.AssetBackedFacility['collateral']
+  ): AssetBackedFacilityBuilder;
   /**
    * Set the advance rates, eligibility and concentration limits.
    * @param value - `BorrowingBaseRules` serde object: `advance_rates` (each with an `asset_class` wire name or `"*"`, a decimal `rate` and an optional `eligibility`) and `concentration_limits` (each with `scope` `"obligor"` / `"industry"` / `"asset_class"` and a percent `max_pct`).
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  borrowingBaseRules(value: generated.valuations.AssetBackedFacility['borrowing_base_rules']): AssetBackedFacilityBuilder;
+  borrowingBaseRules(
+    value: generated.valuations.AssetBackedFacility['borrowing_base_rules']
+  ): AssetBackedFacilityBuilder;
   /**
    * Set the total commitment.
    * @param value - Total commitment, as a `Money` handle.
@@ -18387,28 +18542,36 @@ export interface AssetBackedFacilityBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  amortizationEvents(value: NonNullable<generated.valuations.AssetBackedFacility['amortization_events']>): AssetBackedFacilityBuilder;
+  amortizationEvents(
+    value: NonNullable<generated.valuations.AssetBackedFacility['amortization_events']>
+  ): AssetBackedFacilityBuilder;
   /**
    * Set the term-out window after revolving.
    * @param value - `TermOutSpec` plain object, e.g. `{"months": 24}`: the amortization term after the revolving period ends.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  termOut(value: NonNullable<generated.valuations.AssetBackedFacility['term_out']>): AssetBackedFacilityBuilder;
+  termOut(
+    value: NonNullable<generated.valuations.AssetBackedFacility['term_out']>
+  ): AssetBackedFacilityBuilder;
   /**
    * Set the transaction fees paid through the waterfall ahead of the facility's interest.
    * @param value - `DealFees` serde object (`trustee_fee` Money per annum, `senior_mgmt_fee_bp`, `subordinated_mgmt_fee_bp`, `servicing_fee_bp`, optional `master_servicer_fee_bp` / `workout_fee_pct` / `liquidation_fee_pct` / `special_servicer_fee_bp` / `incentive_fee`).
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  fees(value: NonNullable<generated.valuations.AssetBackedFacility['fees']>): AssetBackedFacilityBuilder;
+  fees(
+    value: NonNullable<generated.valuations.AssetBackedFacility['fees']>
+  ): AssetBackedFacilityBuilder;
   /**
    * Set the scheduled draws after closing.
    * @param value - `DrawEvent` serde objects `{"date": "2025-01-01", "amount": {"amount": "10000000", "currency": "USD"}}`, ascending by date; each is applied on the first payment date at or after its date.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  draws(value: NonNullable<generated.valuations.AssetBackedFacility['draws']>): AssetBackedFacilityBuilder;
+  draws(
+    value: NonNullable<generated.valuations.AssetBackedFacility['draws']>
+  ): AssetBackedFacilityBuilder;
   /**
    * Set whether the line is re-advanced up to the borrowing base each revolving period.
    * @param value - `true` draws `min(commitment, borrowing base) − balance` every revolving period.
@@ -18443,49 +18606,63 @@ export interface AssetBackedFacilityBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  prepaymentSpec(value: NonNullable<generated.valuations.AssetBackedFacility['prepayment_spec']>): AssetBackedFacilityBuilder;
+  prepaymentSpec(
+    value: NonNullable<generated.valuations.AssetBackedFacility['prepayment_spec']>
+  ): AssetBackedFacilityBuilder;
   /**
    * Set the deterministic default model of the collateral.
    * @param value - Typed spec or its serde form.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  defaultSpec(value: NonNullable<generated.valuations.AssetBackedFacility['default_spec']>): AssetBackedFacilityBuilder;
+  defaultSpec(
+    value: NonNullable<generated.valuations.AssetBackedFacility['default_spec']>
+  ): AssetBackedFacilityBuilder;
   /**
    * Set the recovery model of the collateral.
    * @param value - Typed spec or its serde form.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  recoverySpec(value: NonNullable<generated.valuations.AssetBackedFacility['recovery_spec']>): AssetBackedFacilityBuilder;
+  recoverySpec(
+    value: NonNullable<generated.valuations.AssetBackedFacility['recovery_spec']>
+  ): AssetBackedFacilityBuilder;
   /**
    * Set the instrument-owned pricing inputs.
    * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.AssetBackedFacility['instrument_pricing_overrides']>): AssetBackedFacilityBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.AssetBackedFacility['instrument_pricing_overrides']>
+  ): AssetBackedFacilityBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.AssetBackedFacility['metric_pricing_overrides']>): AssetBackedFacilityBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.AssetBackedFacility['metric_pricing_overrides']>
+  ): AssetBackedFacilityBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.AssetBackedFacility['scenario_pricing_overrides']>): AssetBackedFacilityBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.AssetBackedFacility['scenario_pricing_overrides']>
+  ): AssetBackedFacilityBuilder;
   /**
    * Set scenario-selection attributes.
    * @param value - Attribute map; `null` clears it.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  attributes(value: NonNullable<generated.valuations.AssetBackedFacility['attributes']>): AssetBackedFacilityBuilder;
+  attributes(
+    value: NonNullable<generated.valuations.AssetBackedFacility['attributes']>
+  ): AssetBackedFacilityBuilder;
 }
 
 /**
@@ -18603,21 +18780,27 @@ export interface FxForwardBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.FxForward['instrument_pricing_overrides']>): FxForwardBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.FxForward['instrument_pricing_overrides']>
+  ): FxForwardBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.FxForward['metric_pricing_overrides']>): FxForwardBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.FxForward['metric_pricing_overrides']>
+  ): FxForwardBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.FxForward['scenario_pricing_overrides']>): FxForwardBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.FxForward['scenario_pricing_overrides']>
+  ): FxForwardBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -18742,21 +18925,27 @@ export interface FxOptionBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.FxOption['instrument_pricing_overrides']>): FxOptionBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.FxOption['instrument_pricing_overrides']>
+  ): FxOptionBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.FxOption['metric_pricing_overrides']>): FxOptionBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.FxOption['metric_pricing_overrides']>
+  ): FxOptionBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.FxOption['scenario_pricing_overrides']>): FxOptionBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.FxOption['scenario_pricing_overrides']>
+  ): FxOptionBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -18852,17 +19041,23 @@ export interface InterestRateSwap extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.InterestRateSwap['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.InterestRateSwap['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.InterestRateSwap['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.InterestRateSwap['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.InterestRateSwap['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.InterestRateSwap['scenario_pricing_overrides']
+  >;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -19044,28 +19239,36 @@ export interface InterestRateSwapBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  marginSpec(value: NonNullable<generated.valuations.InterestRateSwap['margin_spec']>): InterestRateSwapBuilder;
+  marginSpec(
+    value: NonNullable<generated.valuations.InterestRateSwap['margin_spec']>
+  ): InterestRateSwapBuilder;
   /**
    * Set the instrument-owned pricing inputs.
    * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.InterestRateSwap['instrument_pricing_overrides']>): InterestRateSwapBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.InterestRateSwap['instrument_pricing_overrides']>
+  ): InterestRateSwapBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.InterestRateSwap['metric_pricing_overrides']>): InterestRateSwapBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.InterestRateSwap['metric_pricing_overrides']>
+  ): InterestRateSwapBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.InterestRateSwap['scenario_pricing_overrides']>): InterestRateSwapBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.InterestRateSwap['scenario_pricing_overrides']>
+  ): InterestRateSwapBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -19199,17 +19402,23 @@ export interface Swaption extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.Swaption['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.Swaption['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.Swaption['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.Swaption['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.Swaption['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.Swaption['scenario_pricing_overrides']
+  >;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -19372,7 +19581,9 @@ export interface SwaptionBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  cashSettlementMethod(value: generated.valuations.Swaption['cash_settlement_method']): SwaptionBuilder;
+  cashSettlementMethod(
+    value: generated.valuations.Swaption['cash_settlement_method']
+  ): SwaptionBuilder;
   /**
    * Set the volatility model used for pricing.
    * @param value - Volatility model used for pricing (serde string).
@@ -19414,21 +19625,27 @@ export interface SwaptionBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.Swaption['instrument_pricing_overrides']>): SwaptionBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.Swaption['instrument_pricing_overrides']>
+  ): SwaptionBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.Swaption['metric_pricing_overrides']>): SwaptionBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.Swaption['metric_pricing_overrides']>
+  ): SwaptionBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.Swaption['scenario_pricing_overrides']>): SwaptionBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.Swaption['scenario_pricing_overrides']>
+  ): SwaptionBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -19524,7 +19741,9 @@ export interface CapFloor extends WasmOwned {
    * Business day convention (serde string).
    * @returns `"modified_following"` unless overridden.
    */
-  readonly businessDayConvention: NonNullable<generated.valuations.CapFloor['business_day_convention']>;
+  readonly businessDayConvention: NonNullable<
+    generated.valuations.CapFloor['business_day_convention']
+  >;
   /**
    * Holiday calendar identifier.
    * @returns Calendar id, or `null`.
@@ -19584,17 +19803,23 @@ export interface CapFloor extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.CapFloor['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.CapFloor['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.CapFloor['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.CapFloor['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.CapFloor['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.CapFloor['scenario_pricing_overrides']
+  >;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -19784,7 +20009,9 @@ export interface CapFloorBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  businessDayConvention(value: NonNullable<generated.valuations.CapFloor['business_day_convention']>): CapFloorBuilder;
+  businessDayConvention(
+    value: NonNullable<generated.valuations.CapFloor['business_day_convention']>
+  ): CapFloorBuilder;
   /**
    * Set the holiday calendar identifier for schedule and roll conventions.
    * @param value - Holiday calendar identifier for schedule and roll conventions.
@@ -19798,7 +20025,9 @@ export interface CapFloorBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  exerciseStyle(value: NonNullable<generated.valuations.CapFloor['exercise_style']>): CapFloorBuilder;
+  exerciseStyle(
+    value: NonNullable<generated.valuations.CapFloor['exercise_style']>
+  ): CapFloorBuilder;
   /**
    * Set the settlement type.
    * @param value - Settlement type (serde string). Default `"cash"`.
@@ -19847,28 +20076,36 @@ export interface CapFloorBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  overnightCoupon(value: NonNullable<generated.valuations.CapFloor['overnight_coupon']>): CapFloorBuilder;
+  overnightCoupon(
+    value: NonNullable<generated.valuations.CapFloor['overnight_coupon']>
+  ): CapFloorBuilder;
   /**
    * Set the instrument-owned pricing inputs.
    * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.CapFloor['instrument_pricing_overrides']>): CapFloorBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.CapFloor['instrument_pricing_overrides']>
+  ): CapFloorBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.CapFloor['metric_pricing_overrides']>): CapFloorBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.CapFloor['metric_pricing_overrides']>
+  ): CapFloorBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.CapFloor['scenario_pricing_overrides']>): CapFloorBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.CapFloor['scenario_pricing_overrides']>
+  ): CapFloorBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -19932,17 +20169,23 @@ export interface CreditDefaultSwap extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.CreditDefaultSwap['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.CreditDefaultSwap['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.CreditDefaultSwap['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.CreditDefaultSwap['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.CreditDefaultSwap['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.CreditDefaultSwap['scenario_pricing_overrides']
+  >;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -19985,7 +20228,9 @@ export interface CreditDefaultSwap extends WasmOwned {
    * Valuation presentation convention (serde name).
    * @returns `"bloomberg_cdsw_clean"` (default), `"bloomberg_cdsw_clean_full_premium"`, `"isda_dirty"` or `"quant_lib_isda_parity"`.
    */
-  readonly valuationConvention: NonNullable<generated.valuations.CreditDefaultSwap['valuation_convention']>;
+  readonly valuationConvention: NonNullable<
+    generated.valuations.CreditDefaultSwap['valuation_convention']
+  >;
   /**
    * Points-upfront payment as `(payment_date, amount)`; positive means the protection buyer pays.
    * @returns The upfront pair, or `null` when the trade has no upfront.
@@ -20158,28 +20403,36 @@ export interface CreditDefaultSwapBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  premiumLeg(value: generated.valuations.CreditDefaultSwap['premium_leg']): CreditDefaultSwapBuilder;
+  premiumLeg(
+    value: generated.valuations.CreditDefaultSwap['premium_leg']
+  ): CreditDefaultSwapBuilder;
   /**
    * Set the protection leg specification.
    * @param value - Protection leg specification.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  protectionLeg(value: generated.valuations.CreditDefaultSwap['protection_leg']): CreditDefaultSwapBuilder;
+  protectionLeg(
+    value: generated.valuations.CreditDefaultSwap['protection_leg']
+  ): CreditDefaultSwapBuilder;
   /**
    * Set the valuation presentation convention.
    * @param value - `"bloomberg_cdsw_clean"` (default) reports Bloomberg CDSW clean principal; `"isda_dirty"` the academic ISDA dirty PV; `"quant_lib_isda_parity"` reproduces QuantLib `IsdaCdsEngine`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  valuationConvention(value: NonNullable<generated.valuations.CreditDefaultSwap['valuation_convention']>): CreditDefaultSwapBuilder;
+  valuationConvention(
+    value: NonNullable<generated.valuations.CreditDefaultSwap['valuation_convention']>
+  ): CreditDefaultSwapBuilder;
   /**
    * Set the ISDA documentation clause for restructuring credit events.
    * @param value - One of the four 2014 ISDA restructuring elections, a regional ISDA corporate default, or `"custom"`. If never set, the effective clause is derived from the CDS convention (see `CreditDefaultSwap.doc_clause_effective`).
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  docClause(value: NonNullable<generated.valuations.CreditDefaultSwap['doc_clause']>): CreditDefaultSwapBuilder;
+  docClause(
+    value: NonNullable<generated.valuations.CreditDefaultSwap['doc_clause']>
+  ): CreditDefaultSwapBuilder;
   /**
    * Set the protection effective date for a forward-starting CDS.
    * @param value - Date on which credit protection begins; must satisfy `premium.start <= value <= premium.end` as an ISO-8601 string.
@@ -20193,35 +20446,45 @@ export interface CreditDefaultSwapBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  marginSpec(value: NonNullable<generated.valuations.CreditDefaultSwap['margin_spec']>): CreditDefaultSwapBuilder;
+  marginSpec(
+    value: NonNullable<generated.valuations.CreditDefaultSwap['margin_spec']>
+  ): CreditDefaultSwapBuilder;
   /**
    * Set the instrument-owned pricing inputs.
    * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.CreditDefaultSwap['instrument_pricing_overrides']>): CreditDefaultSwapBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.CreditDefaultSwap['instrument_pricing_overrides']>
+  ): CreditDefaultSwapBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.CreditDefaultSwap['metric_pricing_overrides']>): CreditDefaultSwapBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.CreditDefaultSwap['metric_pricing_overrides']>
+  ): CreditDefaultSwapBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.CreditDefaultSwap['scenario_pricing_overrides']>): CreditDefaultSwapBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.CreditDefaultSwap['scenario_pricing_overrides']>
+  ): CreditDefaultSwapBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  attributes(value: NonNullable<generated.valuations.CreditDefaultSwap['attributes']>): CreditDefaultSwapBuilder;
+  attributes(
+    value: NonNullable<generated.valuations.CreditDefaultSwap['attributes']>
+  ): CreditDefaultSwapBuilder;
   /**
    * Set the upfront payment exchanged at inception.
    * @param paymentDate - Upfront payment date as an ISO-8601 string.
@@ -20278,17 +20541,23 @@ export interface CdsIndex extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.CdsIndex['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.CdsIndex['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.CdsIndex['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.CdsIndex['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.CdsIndex['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.CdsIndex['scenario_pricing_overrides']
+  >;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -20629,21 +20898,27 @@ export interface CdsIndexBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.CdsIndex['instrument_pricing_overrides']>): CdsIndexBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.CdsIndex['instrument_pricing_overrides']>
+  ): CdsIndexBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.CdsIndex['metric_pricing_overrides']>): CdsIndexBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.CdsIndex['metric_pricing_overrides']>
+  ): CdsIndexBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.CdsIndex['scenario_pricing_overrides']>): CdsIndexBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.CdsIndex['scenario_pricing_overrides']>
+  ): CdsIndexBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -20707,17 +20982,23 @@ export interface CdsTranche extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.CdsTranche['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.CdsTranche['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.CdsTranche['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.CdsTranche['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.CdsTranche['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.CdsTranche['scenario_pricing_overrides']
+  >;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -20780,7 +21061,9 @@ export interface CdsTranche extends WasmOwned {
    * Business day convention (serde name).
    * @returns `"modified_following"` unless set otherwise.
    */
-  readonly businessDayConvention: NonNullable<generated.valuations.CdsTranche['business_day_convention']>;
+  readonly businessDayConvention: NonNullable<
+    generated.valuations.CdsTranche['business_day_convention']
+  >;
   /**
    * Holiday calendar identifier.
    * @returns The calendar id, or `null`.
@@ -21036,7 +21319,9 @@ export interface CdsTrancheBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  businessDayConvention(value: NonNullable<generated.valuations.CdsTranche['business_day_convention']>): CdsTrancheBuilder;
+  businessDayConvention(
+    value: NonNullable<generated.valuations.CdsTranche['business_day_convention']>
+  ): CdsTrancheBuilder;
   /**
    * Set the holiday calendar identifier.
    * @param value - Holiday calendar identifier.
@@ -21099,21 +21384,27 @@ export interface CdsTrancheBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.CdsTranche['instrument_pricing_overrides']>): CdsTrancheBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.CdsTranche['instrument_pricing_overrides']>
+  ): CdsTrancheBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.CdsTranche['metric_pricing_overrides']>): CdsTrancheBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.CdsTranche['metric_pricing_overrides']>
+  ): CdsTrancheBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.CdsTranche['scenario_pricing_overrides']>): CdsTrancheBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.CdsTranche['scenario_pricing_overrides']>
+  ): CdsTrancheBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -21232,7 +21523,9 @@ export interface CdsOption extends WasmOwned {
    * Accrual-start convention of the synthetic underlying CDS.
    * @returns `"spot"` or `"forward"`.
    */
-  readonly protectionStartConvention: NonNullable<generated.valuations.CdsOption['protection_start_convention']>;
+  readonly protectionStartConvention: NonNullable<
+    generated.valuations.CdsOption['protection_start_convention']
+  >;
   /**
    * Whether the option knocks out on default before expiry.
    * @returns `true` for knock-out options.
@@ -21262,7 +21555,9 @@ export interface CdsOption extends WasmOwned {
    * ISDA convention of the underlying CDS (serde name).
    * @returns `"isda_na"`, `"isda_eu"`, `"isda_as"` or `"custom"`.
    */
-  readonly underlyingConvention: NonNullable<generated.valuations.CdsOption['underlying_convention']>;
+  readonly underlyingConvention: NonNullable<
+    generated.valuations.CdsOption['underlying_convention']
+  >;
   /**
    * Whether the underlying is a CDS index.
    * @returns `true` for an index option, `false` for a single name.
@@ -21516,7 +21811,9 @@ export interface CdsOptionBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  underlyingConvention(value: NonNullable<generated.valuations.CdsOption['underlying_convention']>): CdsOptionBuilder;
+  underlyingConvention(
+    value: NonNullable<generated.valuations.CdsOption['underlying_convention']>
+  ): CdsOptionBuilder;
   /**
    * Set whether the underlying is a CDS index.
    * @param value - `true` for an index option (no knock-out, index factor applies), `false` for a single name.
@@ -21621,17 +21918,23 @@ export interface ConvertibleBond extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.ConvertibleBond['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.ConvertibleBond['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.ConvertibleBond['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.ConvertibleBond['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.ConvertibleBond['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.ConvertibleBond['scenario_pricing_overrides']
+  >;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -21701,12 +22004,16 @@ export interface ConvertibleBond extends WasmOwned {
    * Soft-call trigger (`threshold_pct`, `observation_days`, `required_days_above`).
    * @returns The trigger plain object, or `null`.
    */
-  readonly softCallTrigger: NonNullable<generated.valuations.ConvertibleBond['soft_call_trigger']> | null;
+  readonly softCallTrigger: NonNullable<
+    generated.valuations.ConvertibleBond['soft_call_trigger']
+  > | null;
   /**
    * Settlement lag in business days.
    * @returns The lag, or `null` for same-day.
    */
-  readonly settlementDays: NonNullable<generated.valuations.ConvertibleBond['settlement_days']> | null;
+  readonly settlementDays: NonNullable<
+    generated.valuations.ConvertibleBond['settlement_days']
+  > | null;
   /**
    * Assumed recovery rate on default as a fraction.
    * @returns The recovery, or `null`.
@@ -21932,14 +22239,18 @@ export interface ConvertibleBondBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  callPut(value: NonNullable<generated.valuations.ConvertibleBond['call_put']>): ConvertibleBondBuilder;
+  callPut(
+    value: NonNullable<generated.valuations.ConvertibleBond['call_put']>
+  ): ConvertibleBondBuilder;
   /**
    * Set the soft-call trigger condition.
    * @param value - `PriceTrigger` as a plain object or JSON object string with `threshold_pct` (percent of conversion price, e.g. `130.0`), `observation_days` and `required_days_above`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  softCallTrigger(value: NonNullable<generated.valuations.ConvertibleBond['soft_call_trigger']>): ConvertibleBondBuilder;
+  softCallTrigger(
+    value: NonNullable<generated.valuations.ConvertibleBond['soft_call_trigger']>
+  ): ConvertibleBondBuilder;
   /**
    * Set the settlement lag.
    * @param value - Business days from trade date to settlement (e.g. `2` for US corporate convertibles); same-day when never set.
@@ -21960,28 +22271,36 @@ export interface ConvertibleBondBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  cashflowSpec(value: generated.valuations.ConvertibleBond['cashflow_spec']): ConvertibleBondBuilder;
+  cashflowSpec(
+    value: generated.valuations.ConvertibleBond['cashflow_spec']
+  ): ConvertibleBondBuilder;
   /**
    * Set the instrument-owned pricing inputs.
    * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.ConvertibleBond['instrument_pricing_overrides']>): ConvertibleBondBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.ConvertibleBond['instrument_pricing_overrides']>
+  ): ConvertibleBondBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.ConvertibleBond['metric_pricing_overrides']>): ConvertibleBondBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.ConvertibleBond['metric_pricing_overrides']>
+  ): ConvertibleBondBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.ConvertibleBond['scenario_pricing_overrides']>): ConvertibleBondBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.ConvertibleBond['scenario_pricing_overrides']>
+  ): ConvertibleBondBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -22037,17 +22356,23 @@ export interface EquityOption extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.EquityOption['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.EquityOption['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.EquityOption['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.EquityOption['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.EquityOption['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.EquityOption['scenario_pricing_overrides']
+  >;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -22358,7 +22683,9 @@ export interface EquityOptionBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  exerciseStyle(value: NonNullable<generated.valuations.EquityOption['exercise_style']>): EquityOptionBuilder;
+  exerciseStyle(
+    value: NonNullable<generated.valuations.EquityOption['exercise_style']>
+  ): EquityOptionBuilder;
   /**
    * Set the option expiry date.
    * @param value - Option expiry date as an ISO-8601 string.
@@ -22379,7 +22706,9 @@ export interface EquityOptionBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  settlement(value: NonNullable<generated.valuations.EquityOption['settlement']>): EquityOptionBuilder;
+  settlement(
+    value: NonNullable<generated.valuations.EquityOption['settlement']>
+  ): EquityOptionBuilder;
   /**
    * Set the number of underlying units the option is written on.
    * @param value - Number of underlying units; PV and Greeks scale linearly with it.
@@ -22435,21 +22764,27 @@ export interface EquityOptionBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.EquityOption['instrument_pricing_overrides']>): EquityOptionBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.EquityOption['instrument_pricing_overrides']>
+  ): EquityOptionBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.EquityOption['metric_pricing_overrides']>): EquityOptionBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.EquityOption['metric_pricing_overrides']>
+  ): EquityOptionBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.EquityOption['scenario_pricing_overrides']>): EquityOptionBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.EquityOption['scenario_pricing_overrides']>
+  ): EquityOptionBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -22531,12 +22866,16 @@ export interface StructuredCredit extends WasmOwned {
    * Loss-allocation policy in force for pricing: `lossAllocation` when set, otherwise the deal-type convention.
    * @returns `"write_down"` or `"par_preserving"`.
    */
-  readonly effectiveLossAllocation: NonNullable<generated.valuations.StructuredCredit['loss_allocation']>;
+  readonly effectiveLossAllocation: NonNullable<
+    generated.valuations.StructuredCredit['loss_allocation']
+  >;
   /**
    * Loss-recognition timing in force: `lossRecognition` when set, otherwise the deal-type convention.
    * @returns `"at_liquidation"` for RMBS and CMBS by default, `"at_default"` otherwise.
    */
-  readonly effectiveLossRecognition: NonNullable<generated.valuations.StructuredCredit['loss_recognition']>;
+  readonly effectiveLossRecognition: NonNullable<
+    generated.valuations.StructuredCredit['loss_recognition']
+  >;
   /**
    * Whether the template waterfall pays senior fees and senior note interest from principal when interest proceeds fall short: `principalCoversSeniorInterest` when set, otherwise `true` for CLO/CBO and `false` for every other deal type.
    * @returns The flag in force.
@@ -22650,7 +22989,9 @@ export interface StructuredCredit extends WasmOwned {
    * Payment business-day convention string.
    * @returns `null` for the default convention.
    */
-  readonly businessDayConvention: NonNullable<generated.valuations.StructuredCredit['business_day_convention']> | null;
+  readonly businessDayConvention: NonNullable<
+    generated.valuations.StructuredCredit['business_day_convention']
+  > | null;
   /**
    * Credit model as its `CreditModelConfig` serde plain object.
    * @returns Prepayment, default, recovery, stochastic, delinquency and card specs.
@@ -22680,32 +23021,44 @@ export interface StructuredCredit extends WasmOwned {
    * Deal-level coverage tests as `CoverageTestSpec` serde plain objects.
    * @returns One plain object per test (empty when none run).
    */
-  readonly coverageTriggers: NonNullable<generated.valuations.StructuredCredit['coverage_triggers']>;
+  readonly coverageTriggers: NonNullable<
+    generated.valuations.StructuredCredit['coverage_triggers']
+  >;
   /**
    * Clean-up call pool-factor threshold (decimal).
    * @returns `null` when no clean-up call is set.
    */
-  readonly cleanupCallDecimal: NonNullable<generated.valuations.StructuredCredit['cleanup_call_decimal']> | null;
+  readonly cleanupCallDecimal: NonNullable<
+    generated.valuations.StructuredCredit['cleanup_call_decimal']
+  > | null;
   /**
    * Assumed optional redemption.
    * @returns `null` without a call assumption.
    */
-  readonly callAssumption: NonNullable<generated.valuations.StructuredCredit['call_assumption']> | null;
+  readonly callAssumption: NonNullable<
+    generated.valuations.StructuredCredit['call_assumption']
+  > | null;
   /**
    * Collateral liquidation price in percent of par.
    * @returns `null` for par.
    */
-  readonly liquidationPricePct: NonNullable<generated.valuations.StructuredCredit['liquidation_price_pct']> | null;
+  readonly liquidationPricePct: NonNullable<
+    generated.valuations.StructuredCredit['liquidation_price_pct']
+  > | null;
   /**
    * Explicit loss-allocation policy (`"write_down"` / `"par_preserving"`).
    * @returns `null` for the deal-type default.
    */
-  readonly lossAllocation: NonNullable<generated.valuations.StructuredCredit['loss_allocation']> | null;
+  readonly lossAllocation: NonNullable<
+    generated.valuations.StructuredCredit['loss_allocation']
+  > | null;
   /**
    * Explicit loss-recognition timing (`"at_default"` / `"at_liquidation"`).
    * @returns `null` for the deal-type default (at liquidation for RMBS/CMBS, at default otherwise).
    */
-  readonly lossRecognition: NonNullable<generated.valuations.StructuredCredit['loss_recognition']> | null;
+  readonly lossRecognition: NonNullable<
+    generated.valuations.StructuredCredit['loss_recognition']
+  > | null;
   /**
    * Scheduled lender draws on notes as `TrancheDraw` serde plain objects (`tranche_id`, `date`, `amount`).
    * @returns Empty for a fully funded structure.
@@ -22715,22 +23068,30 @@ export interface StructuredCredit extends WasmOwned {
    * Per-period re-advance rule as its `TrancheReadvance` serde plain object (`tranche_id`, `commitment`).
    * @returns `null` for no re-advances.
    */
-  readonly trancheReadvance: NonNullable<generated.valuations.StructuredCredit['tranche_readvance']> | null;
+  readonly trancheReadvance: NonNullable<
+    generated.valuations.StructuredCredit['tranche_readvance']
+  > | null;
   /**
    * Explicit principal-covers-senior-interest flag.
    * @returns `null` for the deal-type default.
    */
-  readonly principalCoversSeniorInterest: NonNullable<generated.valuations.StructuredCredit['principal_covers_senior_interest']> | null;
+  readonly principalCoversSeniorInterest: NonNullable<
+    generated.valuations.StructuredCredit['principal_covers_senior_interest']
+  > | null;
   /**
    * Collateral valuation rules for the coverage tests.
    * @returns `null` when performing collateral is carried at par.
    */
-  readonly coverageRules: NonNullable<generated.valuations.StructuredCredit['coverage_rules']> | null;
+  readonly coverageRules: NonNullable<
+    generated.valuations.StructuredCredit['coverage_rules']
+  > | null;
   /**
    * Declarative waterfall rules as their serde plain object.
    * @returns `null` when no rules are layered on the base waterfall.
    */
-  readonly waterfallRules: NonNullable<generated.valuations.StructuredCredit['waterfall_rules']> | null;
+  readonly waterfallRules: NonNullable<
+    generated.valuations.StructuredCredit['waterfall_rules']
+  > | null;
   /**
    * Custom priority of payments.
    * @returns `null` when the deal-type template applies.
@@ -22740,17 +23101,23 @@ export interface StructuredCredit extends WasmOwned {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.StructuredCredit['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.StructuredCredit['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.StructuredCredit['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.StructuredCredit['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.StructuredCredit['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.StructuredCredit['scenario_pricing_overrides']
+  >;
   /**
    * Free-form attributes (tags and metadata).
    * @returns The attribute bag.
@@ -22775,22 +23142,30 @@ export interface StructuredCredit extends WasmOwned {
    * Stochastic prepayment specification as its serde plain object.
    * @returns `null` until set or enabled.
    */
-  readonly stochasticPrepaySpec: NonNullable<generated.valuations.StructuredCredit['stochastic_prepay_spec']> | null;
+  readonly stochasticPrepaySpec: NonNullable<
+    generated.valuations.StructuredCredit['stochastic_prepay_spec']
+  > | null;
   /**
    * Stochastic default specification as its serde plain object.
    * @returns `null` until set or enabled.
    */
-  readonly stochasticDefaultSpec: NonNullable<generated.valuations.StructuredCredit['stochastic_default_spec']> | null;
+  readonly stochasticDefaultSpec: NonNullable<
+    generated.valuations.StructuredCredit['stochastic_default_spec']
+  > | null;
   /**
    * Stochastic recovery specification as its `RecoverySpec` serde plain object.
    * @returns `{"type": "constant", "rate": ...}` or `{"type": "market_correlated", "mean_recovery": ..., "recovery_volatility": ..., "factor_correlation": ...}`; `null` for constant recoveries at the deterministic rate.
    */
-  readonly stochasticRecoverySpec: NonNullable<generated.valuations.StructuredCredit['stochastic_recovery_spec']> | null;
+  readonly stochasticRecoverySpec: NonNullable<
+    generated.valuations.StructuredCredit['stochastic_recovery_spec']
+  > | null;
   /**
    * Default correlation structure as its serde plain object.
    * @returns `null` until set or enabled.
    */
-  readonly correlationStructure: NonNullable<generated.valuations.StructuredCredit['correlation_structure']> | null;
+  readonly correlationStructure: NonNullable<
+    generated.valuations.StructuredCredit['correlation_structure']
+  > | null;
   /**
    * Delinquency model as its `DelinquencyModel` serde plain object.
    * @returns `null` when no roll-rate model is set.
@@ -22842,7 +23217,11 @@ export interface StructuredCredit extends WasmOwned {
    * @returns `TrancheCashflows` plain object with total, interest, principal, PIK, deferred and writedown flows.
    * @throws Error - Throws with kind `not_found` if `trancheId` is not a class of the deal or a curve is missing, kind `validation` if an input is malformed, and kind `computation` if the simulation fails.
    */
-  trancheCashflows(trancheId: string, marketJson: JsonInput, asOf: string): generated.valuations.TrancheCashflows;
+  trancheCashflows(
+    trancheId: string,
+    marketJson: JsonInput,
+    asOf: string
+  ): generated.valuations.TrancheCashflows;
   /**
    * Equity-tranche return metrics (mirrors Rust `calculate_equity_metrics`).
    * @param marketJson - Canonical market-context JSON (string or plain object) supplying the discount and forward curves.
@@ -22882,7 +23261,10 @@ export interface StructuredCredit extends WasmOwned {
    * @returns `SimulationDiagnostics` plain object with per-period pool, account and coverage-test records.
    * @throws Error - Throws with kind `not_found` if a curve is missing, kind `validation` if an input is malformed, and kind `computation` if the simulation fails.
    */
-  runSimulationWithDiagnostics(marketJson: JsonInput, asOf: string): generated.valuations.SimulationDiagnostics;
+  runSimulationWithDiagnostics(
+    marketJson: JsonInput,
+    asOf: string
+  ): generated.valuations.SimulationDiagnostics;
 }
 
 /**
@@ -23131,7 +23513,9 @@ export interface StructuredCreditBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  businessDayConvention(value: NonNullable<generated.valuations.StructuredCredit['business_day_convention']>): StructuredCreditBuilder;
+  businessDayConvention(
+    value: NonNullable<generated.valuations.StructuredCredit['business_day_convention']>
+  ): StructuredCreditBuilder;
   /**
    * Set the discount curve identifier for valuation.
    * @param value - Discount curve identifier.
@@ -23145,14 +23529,18 @@ export interface StructuredCreditBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  marketConditions(value: generated.valuations.StructuredCredit['market_conditions']): StructuredCreditBuilder;
+  marketConditions(
+    value: generated.valuations.StructuredCredit['market_conditions']
+  ): StructuredCreditBuilder;
   /**
    * Set declarative waterfall rules from a JSON object.
    * @param value - JSON-encoded `WaterfallRules` object (available-funds caps, step-down, shifting interest, controlled accumulation), layered onto the base waterfall.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  waterfallRules(value: NonNullable<generated.valuations.StructuredCredit['waterfall_rules']>): StructuredCreditBuilder;
+  waterfallRules(
+    value: NonNullable<generated.valuations.StructuredCredit['waterfall_rules']>
+  ): StructuredCreditBuilder;
   /**
    * Set senior transaction fees from a JSON object.
    * @param value - JSON-encoded `DealFees` object (trustee, senior management, servicing, and optional master/special servicer fees), paid ahead of every note. Optional `workout_fee_pct` (percent of the P&I collected on specially serviced loans) and `liquidation_fee_pct` (percent of liquidation proceeds) are taken inside the collateral flows. Skipped (`null`) by default.
@@ -23173,56 +23561,72 @@ export interface StructuredCreditBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  prepaymentSpec(value: NonNullable<generated.valuations.StructuredCredit['prepayment_spec']>): StructuredCreditBuilder;
+  prepaymentSpec(
+    value: NonNullable<generated.valuations.StructuredCredit['prepayment_spec']>
+  ): StructuredCreditBuilder;
   /**
    * Set the deterministic default model.
    * @param value - Typed spec (`DefaultModelSpec.constant_cdr` / `sda` / `vector` / `cumulative_loss` / `timing`) or its serde form.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  defaultSpec(value: NonNullable<generated.valuations.StructuredCredit['default_spec']>): StructuredCreditBuilder;
+  defaultSpec(
+    value: NonNullable<generated.valuations.StructuredCredit['default_spec']>
+  ): StructuredCreditBuilder;
   /**
    * Set the recovery model.
    * @param value - Typed spec (rate, lag, optional severity vector) or its serde form.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  recoverySpec(value: NonNullable<generated.valuations.StructuredCredit['recovery_spec']>): StructuredCreditBuilder;
+  recoverySpec(
+    value: NonNullable<generated.valuations.StructuredCredit['recovery_spec']>
+  ): StructuredCreditBuilder;
   /**
    * Set the stochastic prepayment specification used by `StructuredCredit.price_stochastic`.
    * @param value - `StochasticPrepaySpec` serde object (Richard-Roll or factor parameters).
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  stochasticPrepaySpec(value: NonNullable<generated.valuations.StructuredCredit['stochastic_prepay_spec']>): StructuredCreditBuilder;
+  stochasticPrepaySpec(
+    value: NonNullable<generated.valuations.StructuredCredit['stochastic_prepay_spec']>
+  ): StructuredCreditBuilder;
   /**
    * Set the stochastic default specification used by `StructuredCredit.price_stochastic`.
    * @param value - `StochasticDefaultSpec` serde object.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  stochasticDefaultSpec(value: NonNullable<generated.valuations.StructuredCredit['stochastic_default_spec']>): StructuredCreditBuilder;
+  stochasticDefaultSpec(
+    value: NonNullable<generated.valuations.StructuredCredit['stochastic_default_spec']>
+  ): StructuredCreditBuilder;
   /**
    * Set the stochastic recovery specification used by `StructuredCredit.price_stochastic`.
    * @param value - `RecoverySpec` serde object: `{"type": "constant", "rate": 0.4}` or `{"type": "market_correlated", "mean_recovery": 0.4, "recovery_volatility": 0.25, "factor_correlation": 0.4}` (recovery falls with the systematic factor, so heavy-default paths recover less).
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  stochasticRecoverySpec(value: NonNullable<generated.valuations.StructuredCredit['stochastic_recovery_spec']>): StructuredCreditBuilder;
+  stochasticRecoverySpec(
+    value: NonNullable<generated.valuations.StructuredCredit['stochastic_recovery_spec']>
+  ): StructuredCreditBuilder;
   /**
    * Set the default correlation structure used by `StructuredCredit.price_stochastic`.
    * @param value - `CorrelationStructure` serde object (factor loadings).
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  correlationStructure(value: NonNullable<generated.valuations.StructuredCredit['correlation_structure']>): StructuredCreditBuilder;
+  correlationStructure(
+    value: NonNullable<generated.valuations.StructuredCredit['correlation_structure']>
+  ): StructuredCreditBuilder;
   /**
    * Set the delinquency roll-rate, advancing and modification model (ABS/RMBS asset and rep-line pools).
    * @param value - `DelinquencyModel` serde object: `roll_rates` (per bucket, the last rolls to charge-off), `cure_rates`, `advancing` (`{"policy": "none"}` or `{"policy": "principal_and_interest", "recoverability_cap_pct": ..., "reimburse_from_collections": false}`) and optional `modification`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  delinquency(value: NonNullable<generated.valuations.StructuredCredit['delinquency']>): StructuredCreditBuilder;
+  delinquency(
+    value: NonNullable<generated.valuations.StructuredCredit['delinquency']>
+  ): StructuredCreditBuilder;
   /**
    * Set the card master-trust portfolio model.
    * @param value - `CardPortfolioSpec` serde object: `monthly_payment_rate`, `portfolio_yield` and `charge_off_rate` (annual decimals), plus the optional `seller_interest` (`Money` serde object in the pool currency) and `fixed_allocation_decimal` (decimal in `(0, 1]`) that fix the investor allocation of trust collections once the revolving period ends.
@@ -23236,35 +23640,45 @@ export interface StructuredCreditBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  coverageTriggers(value: NonNullable<generated.valuations.StructuredCredit['coverage_triggers']>): StructuredCreditBuilder;
+  coverageTriggers(
+    value: NonNullable<generated.valuations.StructuredCredit['coverage_triggers']>
+  ): StructuredCreditBuilder;
   /**
    * Set the collateral valuation rules for the coverage tests.
    * @param value - Typed `CoverageRules` or its serde form.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  coverageRules(value: NonNullable<generated.valuations.StructuredCredit['coverage_rules']>): StructuredCreditBuilder;
+  coverageRules(
+    value: NonNullable<generated.valuations.StructuredCredit['coverage_rules']>
+  ): StructuredCreditBuilder;
   /**
    * Set the assumed optional redemption for price-to-call analytics.
    * @param value - Typed `CallAssumption` or its serde form (`date`, `price_pct`, `scope`).
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  callAssumption(value: NonNullable<generated.valuations.StructuredCredit['call_assumption']>): StructuredCreditBuilder;
+  callAssumption(
+    value: NonNullable<generated.valuations.StructuredCredit['call_assumption']>
+  ): StructuredCreditBuilder;
   /**
    * Set a custom priority of payments in place of the deal-type template.
    * @param value - Typed `Waterfall` or its serde form (`tiers`, `currency`, optional `coverage_rules`).
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  waterfall(value: NonNullable<generated.valuations.StructuredCredit['waterfall']>): StructuredCreditBuilder;
+  waterfall(
+    value: NonNullable<generated.valuations.StructuredCredit['waterfall']>
+  ): StructuredCreditBuilder;
   /**
    * Set the interest-rate hedges settled through the waterfall.
    * @param value - Typed `HedgeSwap` objects, their serde plain objects, or a JSON array string.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  hedgeSwaps(value: NonNullable<generated.valuations.StructuredCredit['hedge_swaps']>): StructuredCreditBuilder;
+  hedgeSwaps(
+    value: NonNullable<generated.valuations.StructuredCredit['hedge_swaps']>
+  ): StructuredCreditBuilder;
   /**
    * Set the clean-up call pool-factor threshold.
    * @param value - Pool factor (decimal in `(0, 1)`, typically `0.10`) below which the deal is redeemed when the liquidation proceeds cover the notes.
@@ -23285,28 +23699,36 @@ export interface StructuredCreditBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  lossAllocation(value: NonNullable<generated.valuations.StructuredCredit['loss_allocation']>): StructuredCreditBuilder;
+  lossAllocation(
+    value: NonNullable<generated.valuations.StructuredCredit['loss_allocation']>
+  ): StructuredCreditBuilder;
   /**
    * Set when collateral losses are booked.
    * @param value - `"at_default"` books the expected net loss on the default date (CLO/ABS convention); `"at_liquidation"` books the realized loss when the claim settles after the recovery lag (RMBS/CMBS convention), which delays write-downs and every cumulative-loss trigger. The deal type's default applies when never set.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  lossRecognition(value: NonNullable<generated.valuations.StructuredCredit['loss_recognition']>): StructuredCreditBuilder;
+  lossRecognition(
+    value: NonNullable<generated.valuations.StructuredCredit['loss_recognition']>
+  ): StructuredCreditBuilder;
   /**
    * Set the scheduled lender draws on notes after closing.
    * @param value - `TrancheDraw` serde objects `{"tranche_id": "A", "date": "2025-01-01", "amount": {"amount": "5000000", "currency": "USD"}}`, ascending by date; each is applied on the first payment date at or after its date, lifting the note's balance and adding the cash to principal proceeds.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  trancheDraws(value: NonNullable<generated.valuations.StructuredCredit['tranche_draws']>): StructuredCreditBuilder;
+  trancheDraws(
+    value: NonNullable<generated.valuations.StructuredCredit['tranche_draws']>
+  ): StructuredCreditBuilder;
   /**
    * Set the per-period re-advance of one note up to its commitment and the borrowing base while the deal revolves.
    * @param value - `TrancheReadvance` serde object `{"tranche_id": "A", "commitment": {"amount": "70000000", "currency": "USD"}}`; requires `coverage_rules.borrowing_base`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  trancheReadvance(value: NonNullable<generated.valuations.StructuredCredit['tranche_readvance']>): StructuredCreditBuilder;
+  trancheReadvance(
+    value: NonNullable<generated.valuations.StructuredCredit['tranche_readvance']>
+  ): StructuredCreditBuilder;
   /**
    * Set whether principal proceeds cover senior fees and senior interest shortfalls before any note is redeemed.
    * @param value - `true` for the CLO principal-waterfall convention, `false` for strictly separate accounts. The deal type's default applies when never set.
@@ -23320,28 +23742,36 @@ export interface StructuredCreditBuilder extends WasmOwned {
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  dealMetadata(value: NonNullable<generated.valuations.StructuredCredit['deal_metadata']>): StructuredCreditBuilder;
+  dealMetadata(
+    value: NonNullable<generated.valuations.StructuredCredit['deal_metadata']>
+  ): StructuredCreditBuilder;
   /**
    * Set the instrument-owned pricing inputs.
    * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  instrumentPricingOverrides(value: NonNullable<generated.valuations.StructuredCredit['instrument_pricing_overrides']>): StructuredCreditBuilder;
+  instrumentPricingOverrides(
+    value: NonNullable<generated.valuations.StructuredCredit['instrument_pricing_overrides']>
+  ): StructuredCreditBuilder;
   /**
    * Set the metric-time pricing configuration stored on the instrument.
    * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  metricPricingOverrides(value: NonNullable<generated.valuations.StructuredCredit['metric_pricing_overrides']>): StructuredCreditBuilder;
+  metricPricingOverrides(
+    value: NonNullable<generated.valuations.StructuredCredit['metric_pricing_overrides']>
+  ): StructuredCreditBuilder;
   /**
    * Set the scenario-only pricing adjustments.
    * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
-  scenarioPricingOverrides(value: NonNullable<generated.valuations.StructuredCredit['scenario_pricing_overrides']>): StructuredCreditBuilder;
+  scenarioPricingOverrides(
+    value: NonNullable<generated.valuations.StructuredCredit['scenario_pricing_overrides']>
+  ): StructuredCreditBuilder;
   /**
    * Set free-form attributes (tags and metadata) on the deal.
    * @param value - Attribute bag; a plain object populates `meta` (an optional `"tags"` list populates `tags`).
@@ -24339,7 +24769,9 @@ export interface ValuationInstrumentsNamespace {
    * @returns The `PikSchedule` plain object.
    * @throws Error - Throws with kind `validation` if `steps` is not an array of `[number, PikMode]` pairs.
    */
-  pikScheduleStepped(steps: [number, generated.valuations.PikMode][] | string): generated.valuations.PikSchedule;
+  pikScheduleStepped(
+    steps: [number, generated.valuations.PikMode][] | string
+  ): generated.valuations.PikSchedule;
   /**
    * The PIK mode in force at a time (mirrors Rust `PikSchedule::mode_at`).
    * @param schedule - `PikSchedule` plain object or JSON string.
@@ -24347,7 +24779,10 @@ export interface ValuationInstrumentsNamespace {
    * @returns The `PikMode` applying at `t`.
    * @throws Error - Throws with kind `validation` if `schedule` does not match the `PikSchedule` schema, and kind `invalid_type` if `t` is not a number.
    */
-  pikScheduleModeAt(schedule: generated.valuations.PikSchedule | string, t: number): generated.valuations.PikMode;
+  pikScheduleModeAt(
+    schedule: generated.valuations.PikSchedule | string,
+    t: number
+  ): generated.valuations.PikMode;
   /**
    * Create a fluent `TrancheBuilder` (mirrors Rust `Tranche::builder`).
    * @returns An empty tranche builder.
@@ -24362,7 +24797,9 @@ export interface ValuationInstrumentsNamespace {
    * @returns The validated `TrancheStructure` plain object.
    * @throws Error - Throws with kind `validation` if a tranche does not match the `Tranche` schema or the structure is invalid (empty, mixed currencies, duplicate ids).
    */
-  trancheStructureFromBalances(tranches: generated.valuations.Tranche[] | string): generated.valuations.TrancheStructure;
+  trancheStructureFromBalances(
+    tranches: generated.valuations.Tranche[] | string
+  ): generated.valuations.TrancheStructure;
   /**
    * Create a fixed-rate bond pool asset (mirrors Rust `PoolAsset::fixed_rate_bond`).
    * @param id - Asset identifier, unique within the pool.
@@ -24406,7 +24843,10 @@ export interface ValuationInstrumentsNamespace {
    * @returns A new `AssetPool` plain object carrying `rep_lines`.
    * @throws Error - Throws with kind `validation` if `pool` or `repLines` does not match its schema.
    */
-  assetPoolWithRepLines(pool: generated.valuations.AssetPool | string, repLines: generated.valuations.RepLine[] | string): generated.valuations.AssetPool;
+  assetPoolWithRepLines(
+    pool: generated.valuations.AssetPool | string,
+    repLines: generated.valuations.RepLine[] | string
+  ): generated.valuations.AssetPool;
   /**
    * Return a copy of a pool with its loan-level assets replaced.
    * @param pool - `AssetPool` plain object or JSON string.
@@ -24414,7 +24854,10 @@ export interface ValuationInstrumentsNamespace {
    * @returns A new `AssetPool` plain object carrying `assets`.
    * @throws Error - Throws with kind `validation` if `pool` or `value` does not match its schema.
    */
-  assetPoolWithAssets(pool: generated.valuations.AssetPool | string, value: generated.valuations.PoolAsset[] | string): generated.valuations.AssetPool;
+  assetPoolWithAssets(
+    pool: generated.valuations.AssetPool | string,
+    value: generated.valuations.PoolAsset[] | string
+  ): generated.valuations.AssetPool;
   /**
    * Return a copy of a pool collateralized by typed instruments.
    * @param pool - `AssetPool` plain object or JSON string.
@@ -24422,7 +24865,10 @@ export interface ValuationInstrumentsNamespace {
    * @returns A new `AssetPool` plain object carrying `instruments`.
    * @throws Error - Throws with kind `validation` if `pool` or `collateral` does not match its schema.
    */
-  assetPoolWithInstruments(pool: generated.valuations.AssetPool | string, collateral: generated.valuations.InstrumentCollateral | string): generated.valuations.AssetPool;
+  assetPoolWithInstruments(
+    pool: generated.valuations.AssetPool | string,
+    collateral: generated.valuations.InstrumentCollateral | string
+  ): generated.valuations.AssetPool;
   /**
    * Return a copy of a pool with its reserve account configured.
    * @param pool - `AssetPool` plain object or JSON string.
@@ -24438,7 +24884,8 @@ export interface ValuationInstrumentsNamespace {
     reserveAccount: MoneyValue,
     reserveAccountRate: number,
     reserveTarget?: MoneyValue | null,
-    reserveInterestDestination?: generated.valuations.AssetPool['reserve_interest_destination'] | null
+    reserveInterestDestination?:
+      generated.valuations.AssetPool['reserve_interest_destination'] | null
   ): generated.valuations.AssetPool;
   /**
    * Return a copy of a pool with a reinvestment period.
@@ -24447,7 +24894,10 @@ export interface ValuationInstrumentsNamespace {
    * @returns A new `AssetPool` plain object carrying `reinvestment_period`.
    * @throws Error - Throws with kind `validation` if `pool` or `value` does not match its schema.
    */
-  assetPoolWithReinvestmentPeriod(pool: generated.valuations.AssetPool | string, value: generated.valuations.ReinvestmentPeriod | string): generated.valuations.AssetPool;
+  assetPoolWithReinvestmentPeriod(
+    pool: generated.valuations.AssetPool | string,
+    value: generated.valuations.ReinvestmentPeriod | string
+  ): generated.valuations.AssetPool;
   /**
    * Return a copy of a pool with seasoned account balances.
    * @param pool - `AssetPool` plain object or JSON string.
@@ -24522,7 +24972,10 @@ export interface ValuationInstrumentsNamespace {
    * @returns `PoolAsset` plain objects in pool order; empty when none match.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, and kind `invalid_type` if `obligorId` is not a string.
    */
-  assetPoolAssetsByObligor(pool: generated.valuations.AssetPool | string, obligorId: string): generated.valuations.PoolAsset[];
+  assetPoolAssetsByObligor(
+    pool: generated.valuations.AssetPool | string,
+    obligorId: string
+  ): generated.valuations.PoolAsset[];
   /**
    * Loan-level assets in one industry (mirrors Rust `AssetPool::assets_by_industry`).
    * @param pool - `AssetPool` plain object or JSON string.
@@ -24530,7 +24983,10 @@ export interface ValuationInstrumentsNamespace {
    * @returns `PoolAsset` plain objects in pool order; empty when none match.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, and kind `invalid_type` if `industry` is not a string.
    */
-  assetPoolAssetsByIndustry(pool: generated.valuations.AssetPool | string, industry: string): generated.valuations.PoolAsset[];
+  assetPoolAssetsByIndustry(
+    pool: generated.valuations.AssetPool | string,
+    industry: string
+  ): generated.valuations.PoolAsset[];
   /**
    * Collateral-pool statistics at a date (mirrors Rust `calculate_pool_stats`).
    * @param pool - `AssetPool` plain object or JSON string.
@@ -24538,7 +24994,10 @@ export interface ValuationInstrumentsNamespace {
    * @returns `PoolStats` plain object: weighted-average coupon, spread (bp) and maturity (years), diversity score, obligor and industry counts, defaulted balance in percent points and undrawn commitment.
    * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema, `asOf` is malformed, or the pool balances are inconsistent.
    */
-  calculatePoolStats(pool: generated.valuations.AssetPool | string, asOf: string): generated.valuations.PoolStats;
+  calculatePoolStats(
+    pool: generated.valuations.AssetPool | string,
+    asOf: string
+  ): generated.valuations.PoolStats;
   /**
    * `PrepaymentPenalty::Lockout`: voluntary prepayment is not allowed.
    * @param through - Optional last date of the lockout as an ISO-8601 string; omit for a lockout to maturity.
@@ -24553,14 +25012,19 @@ export interface ValuationInstrumentsNamespace {
    * @returns The `PrepaymentPenalty` plain object.
    * @throws Error - Throws with kind `validation` if `pct` is negative or not finite or `through` is malformed, and kind `invalid_type` for a wrong argument type.
    */
-  prepaymentPenaltyFixed(pct: number, through?: string | null): generated.valuations.PrepaymentPenalty;
+  prepaymentPenaltyFixed(
+    pct: number,
+    through?: string | null
+  ): generated.valuations.PrepaymentPenalty;
   /**
    * `PrepaymentPenalty::StepDown`: a declining schedule of percentages.
    * @param schedule - `[throughDate, pct]` pairs in increasing date order: `pct` percent of the prepaid balance applies through each ISO-8601 date.
    * @returns The `PrepaymentPenalty` plain object.
    * @throws Error - Throws with kind `validation` if `schedule` is not an array of `[string, number]` pairs, a date is malformed, or the schedule is empty, unordered or has a negative percentage.
    */
-  prepaymentPenaltyStepDown(schedule: [string, number][] | string): generated.valuations.PrepaymentPenalty;
+  prepaymentPenaltyStepDown(
+    schedule: [string, number][] | string
+  ): generated.valuations.PrepaymentPenalty;
   /**
    * `PrepaymentPenalty::YieldMaintenance`: the lender is made whole on lost interest.
    * @param reinvestmentRate - Optional flat reinvestment rate as a decimal; omit to discount on `discountCurveId`.
@@ -24597,7 +25061,9 @@ export interface ValuationInstrumentsNamespace {
    * @returns `CoverageTestSpec` plain objects in the order the waterfall runs them.
    * @throws Error - Throws with kind `validation` if `waterfall` does not match the `Waterfall` schema.
    */
-  waterfallCoverageTests(waterfall: generated.valuations.Waterfall | string): generated.valuations.CoverageTestSpec[];
+  waterfallCoverageTests(
+    waterfall: generated.valuations.Waterfall | string
+  ): generated.valuations.CoverageTestSpec[];
   /**
    * The grid cells of a structured-credit scenario table.
    * @param table - `ScenarioTable` plain object or JSON string, as returned by `structuredCreditTrancheScenarioTable`.
@@ -24618,7 +25084,9 @@ export interface ValuationInstrumentsNamespace {
    * @returns The `AmortizationEvent` plain object.
    * @throws Error - Throws with kind `validation` if the limit is outside `(0, 1]`, and kind `invalid_type` if it is not a number.
    */
-  amortizationEventCumulativeLoss(maxCumulativeLoss: number): generated.valuations.AmortizationEvent;
+  amortizationEventCumulativeLoss(
+    maxCumulativeLoss: number
+  ): generated.valuations.AmortizationEvent;
   /**
    * `AmortizationEvent::ExcessSpread`: revolving stops when excess spread falls below a floor.
    * @param minExcessSpread3m - Minimum three-month average annualized excess spread as a decimal (`0.01` = 1%).
@@ -24634,7 +25102,11 @@ export interface ValuationInstrumentsNamespace {
    * @returns The `CdsIndexParams` plain object for `CdsIndex.fromPreset`.
    * @throws Error - Throws with kind `invalid_type` if `series` or `version` is not a whole number in `0..=65535` or `couponBp` is not a number.
    */
-  cdsIndexParamsCdxNaIg(series: number, version: number, couponBp: number): generated.valuations.CdsIndexParams;
+  cdsIndexParamsCdxNaIg(
+    series: number,
+    version: number,
+    couponBp: number
+  ): generated.valuations.CdsIndexParams;
   /**
    * CDX North America High Yield preset (mirrors Rust `CdsIndexParams::cdx_na_hy`).
    * @param series - Published series number of the index.
@@ -24643,7 +25115,11 @@ export interface ValuationInstrumentsNamespace {
    * @returns The `CdsIndexParams` plain object for `CdsIndex.fromPreset`.
    * @throws Error - Throws with kind `invalid_type` if `series` or `version` is not a whole number in `0..=65535` or `couponBp` is not a number.
    */
-  cdsIndexParamsCdxNaHy(series: number, version: number, couponBp: number): generated.valuations.CdsIndexParams;
+  cdsIndexParamsCdxNaHy(
+    series: number,
+    version: number,
+    couponBp: number
+  ): generated.valuations.CdsIndexParams;
   /**
    * iTraxx Europe preset (mirrors Rust `CdsIndexParams::itraxx_europe`).
    * @param series - Published series number of the index.
@@ -24652,7 +25128,11 @@ export interface ValuationInstrumentsNamespace {
    * @returns The `CdsIndexParams` plain object for `CdsIndex.fromPreset`.
    * @throws Error - Throws with kind `invalid_type` if `series` or `version` is not a whole number in `0..=65535` or `couponBp` is not a number.
    */
-  cdsIndexParamsItraxxEurope(series: number, version: number, couponBp: number): generated.valuations.CdsIndexParams;
+  cdsIndexParamsItraxxEurope(
+    series: number,
+    version: number,
+    couponBp: number
+  ): generated.valuations.CdsIndexParams;
   /**
    * Equity tranche, 0% to 3% (mirrors Rust `CdsTrancheParams::equity_tranche`).
    * @param indexName - Index family name, e.g. `"CDX.NA.IG"`.
@@ -24816,17 +25296,23 @@ export interface FxForwardInstrument extends FxInstrument {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.FxForward['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.FxForward['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.FxForward['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.FxForward['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.FxForward['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.FxForward['scenario_pricing_overrides']
+  >;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -24951,17 +25437,23 @@ export interface FxVanillaOptionInstrument extends FxOptionInstrument {
    * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly instrumentPricingOverrides: NonNullable<generated.valuations.FxOption['instrument_pricing_overrides']>;
+  readonly instrumentPricingOverrides: NonNullable<
+    generated.valuations.FxOption['instrument_pricing_overrides']
+  >;
   /**
    * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
    * @returns The overrides plain object; unset fields are `null` or omitted.
    */
-  readonly metricPricingOverrides: NonNullable<generated.valuations.FxOption['metric_pricing_overrides']>;
+  readonly metricPricingOverrides: NonNullable<
+    generated.valuations.FxOption['metric_pricing_overrides']
+  >;
   /**
    * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
    * @returns The overrides plain object; `{}` when none is set.
    */
-  readonly scenarioPricingOverrides: NonNullable<generated.valuations.FxOption['scenario_pricing_overrides']>;
+  readonly scenarioPricingOverrides: NonNullable<
+    generated.valuations.FxOption['scenario_pricing_overrides']
+  >;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -28574,7 +29066,10 @@ export interface CompositeNamespace {
    * @returns The `WeightingMethod` plain object.
    * @throws Error - Throws with kind `invalid_type` if `anchorLegId` is not a string or `anchorQuantity` is not a number.
    */
-  weightingMethodDv01Neutral(anchorLegId: string, anchorQuantity: number): generated.valuations.WeightingMethod;
+  weightingMethodDv01Neutral(
+    anchorLegId: string,
+    anchorQuantity: number
+  ): generated.valuations.WeightingMethod;
   /**
    * Delta-neutral weighting (mirrors Rust `WeightingMethod::delta_neutral`).
    * @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
@@ -28582,7 +29077,10 @@ export interface CompositeNamespace {
    * @returns The `WeightingMethod` plain object.
    * @throws Error - Throws with kind `invalid_type` if `anchorLegId` is not a string or `anchorQuantity` is not a number.
    */
-  weightingMethodDeltaNeutral(anchorLegId: string, anchorQuantity: number): generated.valuations.WeightingMethod;
+  weightingMethodDeltaNeutral(
+    anchorLegId: string,
+    anchorQuantity: number
+  ): generated.valuations.WeightingMethod;
   /**
    * Duration-weighted sizing (mirrors Rust `WeightingMethod::duration_weighted`).
    * @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
@@ -28590,7 +29088,10 @@ export interface CompositeNamespace {
    * @returns The `WeightingMethod` plain object.
    * @throws Error - Throws with kind `invalid_type` if `anchorLegId` is not a string or `anchorQuantity` is not a number.
    */
-  weightingMethodDurationWeighted(anchorLegId: string, anchorQuantity: number): generated.valuations.WeightingMethod;
+  weightingMethodDurationWeighted(
+    anchorLegId: string,
+    anchorQuantity: number
+  ): generated.valuations.WeightingMethod;
   /**
    * Inverse-volatility weighting (mirrors Rust `WeightingMethod::volatility_weighted`).
    * @param anchorLegId - Leg whose quantity is fixed at `anchorQuantity`.
@@ -28646,7 +29147,9 @@ export interface CompositeNamespace {
    * @returns The leg's `finstack_quant.instrument/1` envelope as a plain object.
    * @throws Error - Throws with kind `validation` if `leg` does not match the `CompositeLegSpec` schema.
    */
-  compositeLegSpecInstrumentDict(leg: generated.valuations.CompositeLegSpec | string): Record<string, unknown>;
+  compositeLegSpecInstrumentDict(
+    leg: generated.valuations.CompositeLegSpec | string
+  ): Record<string, unknown>;
   /**
    * One row of a composite history as canonical JSON.
    *
@@ -29451,7 +29954,13 @@ export interface VolatilityNamespace {
    * @returns Black volatility as an annualized decimal; `0` when `price` equals intrinsic value.
    * @throws Error - Throws a `FinstackError` (kind `validation`) if `forward`, `strike` or `t` is not positive and finite, `price` is negative or non-finite, `price` is below intrinsic value or at/above the upper bound (forward for a call, strike for a put), or the solver does not converge.
    */
-  impliedVolBlack(price: number, forward: number, strike: number, t: number, isCall: boolean): number;
+  impliedVolBlack(
+    price: number,
+    forward: number,
+    strike: number,
+    t: number,
+    isCall: boolean
+  ): number;
   /**
    * Convert an ATM volatility quote between normal, lognormal and shifted-lognormal conventions.
    * @returns Volatility in the target convention (decimal Black vol, or absolute normal vol).
@@ -31340,7 +31849,11 @@ export interface CalibrationNamespace {
    * @param forwards - Forward price for each surface expiry, in expiry order (same units as the strikes).
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed, `forwards` does not have one finite positive entry per expiry, or any check fails.
    */
-  validateSurfaceWithForwards(surface: VolSurface, config: generated.calibration.ValidationConfig, forwards: number[] | Float64Array): void;
+  validateSurfaceWithForwards(
+    surface: VolSurface,
+    config: generated.calibration.ValidationConfig,
+    forwards: number[] | Float64Array
+  ): void;
   /**
    * Check that total variance does not decrease with expiry at each strike.
    *
@@ -31359,7 +31872,11 @@ export interface CalibrationNamespace {
    * @param forwards - Forward price for each surface expiry, in expiry order.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed, `forwards` does not match the expiries, or total variance decreases at fixed forward moneyness.
    */
-  validateCalendarSpreadWithForwards(surface: VolSurface, config: generated.calibration.ValidationConfig, forwards: number[] | Float64Array): void;
+  validateCalendarSpreadWithForwards(
+    surface: VolSurface,
+    config: generated.calibration.ValidationConfig,
+    forwards: number[] | Float64Array
+  ): void;
   /**
    * Check that total variance is convex in strike at each expiry (butterfly spread).
    *
@@ -31368,7 +31885,10 @@ export interface CalibrationNamespace {
    * @param config - `ValidationConfig` object (`butterfly_upper_ratio`, `butterfly_lower_ratio`; `lenient_arbitrage: true` logs violations instead of throwing); `check_arbitrage: false` skips the check.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed or a butterfly violation exceeds the tolerance.
    */
-  validateButterflySpread(surface: VolSurface, config: generated.calibration.ValidationConfig): void;
+  validateButterflySpread(
+    surface: VolSurface,
+    config: generated.calibration.ValidationConfig
+  ): void;
   /**
    * Check that undiscounted Black call prices are convex in strike at each expiry.
    *
@@ -31380,7 +31900,11 @@ export interface CalibrationNamespace {
    * @param forwards - Forward price for each surface expiry, in expiry order.
    * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) for a wrong argument type and a `FinstackError` (`kind: "validation"`) if `config` is malformed, `forwards` does not match the expiries, or call prices are not convex in strike.
    */
-  validateButterflyCallConvexity(surface: VolSurface, config: generated.calibration.ValidationConfig, forwards: number[] | Float64Array): void;
+  validateButterflyCallConvexity(
+    surface: VolSurface,
+    config: generated.calibration.ValidationConfig,
+    forwards: number[] | Float64Array
+  ): void;
   /**
    * Check that every surface volatility is positive and at most `config.max_volatility`.
    *
@@ -33816,7 +34340,10 @@ export interface StatementsAnalyticsNamespace {
    * @returns `TableEnvelope` with `period` and `metric` columns, one value column per scenario and the `_frac` change columns.
    * @throws Error - Throws with kind `validation` if the results input is malformed, the result set or metric list is empty, or table construction fails.
    */
-  scenarioComparisonTable(scenarioResultsJson: ScenarioResults | string, metrics: string[]): TableEnvelope;
+  scenarioComparisonTable(
+    scenarioResultsJson: ScenarioResults | string,
+    metrics: string[]
+  ): TableEnvelope;
   /**
    * Sensitivity parameter whose perturbations are percentage moves of a base value (twin of Python `ParameterSpec.with_percentages`).
    * @param nodeId - Node identifier to vary.
@@ -35478,7 +36005,10 @@ export interface PortfolioNamespace {
    * @returns `{ components, total, by_entity }` entries in aggregation order.
    * @throws Error - Throws with kind `validation` if the metrics input is malformed or `base` is not a canonically encoded metric key.
    */
-  portfolioMetricsSeries(metricsJson: PortfolioMetrics | string, base: string): PortfolioMetricSeriesEntry[];
+  portfolioMetricsSeries(
+    metricsJson: PortfolioMetrics | string,
+    base: string
+  ): PortfolioMetricSeriesEntry[];
   /**
    * Value a portfolio from its spec and market context.
    * @returns Returns a plain structured JavaScript object; `JSON.stringify` it for a JSON string (integer-like map keys enumerate in numeric order, so it is not byte-identical to the Rust wire JSON).
@@ -35550,7 +36080,10 @@ export interface PortfolioNamespace {
    * @returns `[isoDate, netAmount]` pairs sorted by date; dates with no flows in `currency` are omitted.
    * @throws Error - Throws with kind `validation` if the input is not JSON, `currency` is not a known ISO code, or `by_date` is not an object.
    */
-  netInCurrencyByDate(cashflowsJson: PortfolioCashflows | string, currency: string): [string, number][];
+  netInCurrencyByDate(
+    cashflowsJson: PortfolioCashflows | string,
+    currency: string
+  ): [string, number][];
   /**
    * Collapse a multi-currency cashflow ladder into the base currency per date and kind (twin of Python `PortfolioCashflows.collapse_to_base_by_date_kind_json`), converting at the CIP forward from the `asOf` spot.
    * @param cashflowsJson - `PortfolioCashflows` from `aggregateFullCashflows` (object or JSON).
@@ -35649,7 +36182,10 @@ export interface PortfolioNamespace {
    * @returns The rebalanced, validated `Portfolio` handle.
    * @throws Error - Throws with kind `validation` if either input is malformed, the solution is infeasible, or the result names a position that is neither in the spec portfolio nor a trade-universe candidate (a result paired with the wrong spec), and propagates portfolio validation failures.
    */
-  rebalanceFromSpec(specJson: JsonInput, resultJson: PortfolioOptimizationResult | string): Portfolio;
+  rebalanceFromSpec(
+    specJson: JsonInput,
+    resultJson: PortfolioOptimizationResult | string
+  ): Portfolio;
   /**
    * Replay a portfolio through dated market snapshots.
    *
@@ -35996,7 +36532,10 @@ export interface PortfolioNamespace {
    * @returns The total, or `undefined` when the metric was not aggregated.
    * @throws Error - Throws a `TypeError` (kind `invalid_type`) if `metrics` is not a JSON string or plain object or `metricId` is not a string, and a `FinstackError` (kind `validation`) if `metrics` does not match the `PortfolioMetrics` schema.
    */
-  portfolioMetricsGetTotal(metrics: PortfolioMetrics | string, metricId: string): number | undefined;
+  portfolioMetricsGetTotal(
+    metrics: PortfolioMetrics | string,
+    metricId: string
+  ): number | undefined;
   /**
    * Trades of an optimization result that open a new position.
    *

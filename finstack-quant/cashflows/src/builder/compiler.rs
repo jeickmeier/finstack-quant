@@ -14,17 +14,14 @@
 //! - Materialize per‑window coupon specs (fixed or floating) and selected
 //!   payment split (Cash | PIK | Split) with precise coverage semantics.
 //! - Compile fee specifications into periodic and fixed fee schedules.
-//! - Collect a stable, de‑duplicated set of relevant dates (issue, maturity,
-//!   coupon/payment/fee dates, and custom amortization dates). The orchestrator
-//!   then adds the lagged `redemption_date` so maturity handling runs on the
-//!   same date as the final coupon.
+//! - Retain ordered accrual and payment periods with their stub metadata.
+//!   The orchestrator collects these boundaries, principal events and the
+//!   lagged redemption date into the complete build-date grid.
 //!
 //! Determinism and validation follow the project invariants: windows must be
 //! within `[issue, maturity]`, coverage must be unique (no overlapping coupon
 //! pieces without containment), and every produced schedule must contain at
 //! least two dates.
-
-use crate::builder::{AmortizationSpec, Notional};
 
 use finstack_quant_core::dates::{Date, DayCount, HolidayCalendar, Tenor};
 use finstack_quant_core::money::Money;
@@ -33,21 +30,14 @@ use rust_decimal::Decimal;
 
 use super::calendar::resolve_calendar_strict;
 use super::date_generation::{
-    build_schedule_period, effective_frequency, effective_stub, generate_periods_with_adjustment,
-    index_period_schedule, validate_accrual_grid,
+    build_schedule_period, compile_periods, effective_frequency, effective_stub,
+    generate_periods_with_adjustment, validate_accrual_grid, CompiledPeriod,
 };
-use super::periods::SchedulePeriod;
 use super::rate_helpers::ResolvedFloatingRateSpec;
 use super::specs::{
     CouponType, FeeAccrualBasis, FeeBase, FeeSpec, FixedCouponSpec, FloatingCouponSpec,
     FloatingRateSpec, ScheduleParams,
 };
-
-type PeriodMap = finstack_quant_core::HashMap<Date, SchedulePeriod>;
-type DateSet = finstack_quant_core::HashSet<Date>;
-
-/// Result type for schedule building with metadata.
-type ScheduleWithMeta = (Vec<Date>, PeriodMap, DateSet);
 
 #[derive(Debug, Clone, Copy)]
 pub(super) enum WindowBound {
@@ -126,11 +116,11 @@ impl DateWindow {
 }
 
 /// Build periods and compiler metadata using the private date generator.
-fn build_periods_with_meta(
+fn build_compiled_periods(
     window: DateWindow,
     params: &ScheduleParams,
     allow_front_accrual: bool,
-) -> finstack_quant_core::Result<ScheduleWithMeta> {
+) -> finstack_quant_core::Result<Vec<CompiledPeriod>> {
     validate_accrual_grid(
         window.start,
         window.end,
@@ -169,13 +159,15 @@ fn build_periods_with_meta(
             )?;
         }
     }
-    index_period_schedule(periods, params.frequency, params.roll_rule)
+    compile_periods(periods, params.frequency, params.roll_rule)
 }
 
 /// Adjusted accrual end of the instrument maturity period, if present.
 /// Rate-group and coupon-window boundaries are not termination dates.
-fn terminal_accrual_end(prev: &PeriodMap, maturity: Date) -> Option<Date> {
-    prev.values()
+fn terminal_accrual_end(periods: &[CompiledPeriod], maturity: Date) -> Option<Date> {
+    periods
+        .iter()
+        .map(|entry| &entry.period)
         .find(|period| period.unadjusted_end == maturity)
         .map(|period| period.accrual_end)
 }
@@ -185,9 +177,7 @@ fn terminal_accrual_end(prev: &PeriodMap, maturity: Date) -> Option<Date> {
 pub(crate) struct FixedSchedule {
     pub(crate) spec: FixedCouponSpec,
     pub(crate) calendar: &'static dyn HolidayCalendar,
-    pub(crate) dates: Vec<Date>,
-    pub(crate) prev: PeriodMap,
-    pub(crate) first_last: DateSet,
+    pub(crate) periods: Vec<CompiledPeriod>,
     /// Terminal accrual end.
     pub(crate) terminal_accrual_end: Option<Date>,
 }
@@ -199,8 +189,7 @@ pub(crate) struct FloatSchedule {
     pub(crate) calendar: &'static dyn HolidayCalendar,
     pub(crate) fixing_calendar: &'static dyn HolidayCalendar,
     pub(crate) runtime_spec: ResolvedFloatingRateSpec,
-    pub(crate) dates: Vec<Date>,
-    pub(crate) prev: PeriodMap,
+    pub(crate) periods: Vec<CompiledPeriod>,
     /// Terminal accrual end.
     pub(crate) terminal_accrual_end: Option<Date>,
 }
@@ -215,8 +204,7 @@ pub(super) struct PeriodicFee {
     pub(super) frequency: Tenor,
     pub(super) stub: finstack_quant_core::dates::StubKind,
     pub(super) calendar: &'static dyn HolidayCalendar,
-    pub(super) dates: Vec<Date>,
-    pub(super) prev: PeriodMap,
+    pub(super) periods: Vec<CompiledPeriod>,
     pub(super) accrual_basis: FeeAccrualBasis,
     /// Terminal accrual end.
     pub(super) terminal_accrual_end: Option<Date>,
@@ -269,16 +257,16 @@ pub(super) fn build_fee_schedules(
                     adjust_accrual_dates: false,
                     roll_rule: crate::builder::specs::RollRule::None,
                 };
-                let (dates, prev, _) =
-                    build_periods_with_meta(DateWindow::new(issue, maturity), &schedule, true)?;
-                if dates.is_empty() {
+                let periods =
+                    build_compiled_periods(DateWindow::new(issue, maturity), &schedule, true)?;
+                if periods.is_empty() {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "periodic fee ({bp} bp, {frequency} on '{calendar_id}') produced an empty \
                          schedule over [{issue}, {maturity}]"
                     )));
                 }
                 let calendar = resolve_calendar_strict(calendar_id)?;
-                let terminal = terminal_accrual_end(&prev, maturity);
+                let terminal = terminal_accrual_end(&periods, maturity);
                 periodic_fees.push(PeriodicFee {
                     calendar_id: calendar_id.clone(),
                     base: base.clone(),
@@ -287,8 +275,7 @@ pub(super) fn build_fee_schedules(
                     frequency: *frequency,
                     calendar,
                     stub: *stub,
-                    dates,
-                    prev,
+                    periods,
                     accrual_basis: accrual_basis.clone(),
                     terminal_accrual_end: terminal,
                 });
@@ -331,70 +318,6 @@ pub(super) struct CompiledSchedules {
     pub(super) float_schedules: Vec<FloatSchedule>,
 }
 
-/// Collect all relevant dates for cashflow schedule building.
-pub(super) fn collect_dates(
-    issue: Date,
-    maturity: Date,
-    fixed_schedules: &[FixedSchedule],
-    float_schedules: &[FloatSchedule],
-    periodic_fee_date_slices: &[&[Date]],
-    fixed_fees: &[(Date, Money)],
-    notional: &Notional,
-) -> Vec<Date> {
-    let estimated_periods: usize = fixed_schedules
-        .iter()
-        .map(|s| s.dates.len())
-        .chain(float_schedules.iter().map(|s| s.dates.len()))
-        .sum();
-    let estimated_capacity = 2 + estimated_periods * 3 + fixed_fees.len() + 16;
-
-    let mut dates: Vec<Date> = Vec::with_capacity(estimated_capacity);
-    dates.push(issue);
-    dates.push(maturity);
-
-    for schedule in fixed_schedules {
-        for period in schedule.prev.values() {
-            dates.push(period.accrual_start);
-            dates.push(period.accrual_end);
-            dates.push(period.payment_date);
-        }
-    }
-
-    for schedule in float_schedules {
-        for period in schedule.prev.values() {
-            dates.push(period.accrual_start);
-            dates.push(period.accrual_end);
-            dates.push(period.payment_date);
-        }
-    }
-
-    for dates_slice in periodic_fee_date_slices {
-        dates.extend_from_slice(dates_slice);
-    }
-
-    for (d, _) in fixed_fees {
-        dates.push(*d);
-    }
-
-    match &notional.amort {
-        AmortizationSpec::CustomPrincipal { items } => {
-            for (d, _) in items {
-                dates.push(*d);
-            }
-        }
-        AmortizationSpec::StepRemaining { schedule } => {
-            for (d, _) in schedule {
-                dates.push(*d);
-            }
-        }
-        _ => {}
-    }
-
-    dates.sort_unstable();
-    dates.dedup();
-    dates
-}
-
 struct StepUpCompileInput<'a> {
     maturity: Date,
     split: CouponType,
@@ -402,65 +325,13 @@ struct StepUpCompileInput<'a> {
     step_schedule: &'a [(Date, Decimal)],
     schedule: &'a ScheduleParams,
     calendar: &'static dyn HolidayCalendar,
-    dates: &'a [Date],
-    prev: &'a finstack_quant_core::HashMap<Date, SchedulePeriod>,
-    first_last: &'a finstack_quant_core::HashSet<Date>,
+    periods: &'a [CompiledPeriod],
 }
 
 fn compile_step_up_schedules(input: StepUpCompileInput<'_>) -> Vec<FixedSchedule> {
     struct RateGroup {
         rate: Decimal,
-        dates: Vec<Date>,
-        prev: PeriodMap,
-        first_last: DateSet,
-    }
-
-    impl RateGroup {
-        fn new(
-            rate: Decimal,
-            payment_date: Date,
-            period: SchedulePeriod,
-            is_first_or_last: bool,
-        ) -> Self {
-            let mut prev = PeriodMap::default();
-            prev.insert(payment_date, period);
-
-            let mut first_last = DateSet::default();
-            if is_first_or_last {
-                first_last.insert(payment_date);
-            }
-
-            Self {
-                rate,
-                dates: vec![payment_date],
-                prev,
-                first_last,
-            }
-        }
-
-        fn push(&mut self, payment_date: Date, period: SchedulePeriod, is_first_or_last: bool) {
-            self.dates.push(payment_date);
-            self.prev.insert(payment_date, period);
-            if is_first_or_last {
-                self.first_last.insert(payment_date);
-            }
-        }
-
-        fn into_fixed_schedule(self, input: &StepUpCompileInput<'_>) -> FixedSchedule {
-            let terminal = terminal_accrual_end(&self.prev, input.maturity);
-            FixedSchedule {
-                spec: FixedCouponSpec {
-                    coupon_type: input.split,
-                    rate: self.rate,
-                    schedule: input.schedule.clone(),
-                },
-                calendar: input.calendar,
-                dates: self.dates,
-                prev: self.prev,
-                first_last: self.first_last,
-                terminal_accrual_end: terminal,
-            }
-        }
+        periods: Vec<CompiledPeriod>,
     }
 
     let rate_for = |period_start: Date| -> Decimal {
@@ -476,34 +347,35 @@ fn compile_step_up_schedules(input: StepUpCompileInput<'_>) -> Vec<FixedSchedule
     };
 
     let mut rate_groups: Vec<RateGroup> = Vec::new();
-    for &payment_date in input.dates {
-        let Some(period) = input.prev.get(&payment_date) else {
-            continue;
-        };
-        let period_rate = rate_for(period.unadjusted_start);
-        let extend_last = rate_groups
-            .last()
-            .map(|group| group.rate == period_rate)
-            .unwrap_or(false);
-        let is_first_or_last = input.first_last.contains(&payment_date);
-
-        if extend_last {
-            if let Some(last) = rate_groups.last_mut() {
-                last.push(payment_date, *period, is_first_or_last);
-            }
+    for &entry in input.periods {
+        let period_rate = rate_for(entry.period.unadjusted_start);
+        if let Some(group) = rate_groups
+            .last_mut()
+            .filter(|group| group.rate == period_rate)
+        {
+            group.periods.push(entry);
         } else {
-            rate_groups.push(RateGroup::new(
-                period_rate,
-                payment_date,
-                *period,
-                is_first_or_last,
-            ));
+            rate_groups.push(RateGroup {
+                rate: period_rate,
+                periods: vec![entry],
+            });
         }
     }
-
     rate_groups
         .into_iter()
-        .map(|group| group.into_fixed_schedule(&input))
+        .map(|group| {
+            let terminal = terminal_accrual_end(&group.periods, input.maturity);
+            FixedSchedule {
+                spec: FixedCouponSpec {
+                    coupon_type: input.split,
+                    rate: group.rate,
+                    schedule: input.schedule.clone(),
+                },
+                calendar: input.calendar,
+                periods: group.periods,
+                terminal_accrual_end: terminal,
+            }
+        })
         .collect()
 }
 
@@ -658,9 +530,8 @@ pub(super) fn compute_coupon_schedules(
         schedule.frequency = effective_frequency(schedule.frequency, schedule.roll_rule);
         schedule.stub = effective_stub(schedule.stub, schedule.roll_rule);
 
-        let (dates, prev, first_or_last) =
-            build_periods_with_meta(DateWindow::new(s, e), &schedule, s == issue)?;
-        if dates.is_empty() {
+        let periods = build_compiled_periods(DateWindow::new(s, e), &schedule, s == issue)?;
+        if periods.is_empty() {
             return Err(InputError::TooFewPoints.into());
         }
         let calendar = resolve_calendar_strict(&schedule.calendar_id)?;
@@ -672,13 +543,11 @@ pub(super) fn compute_coupon_schedules(
                     rate: *rate,
                     schedule: schedule.clone(),
                 };
-                let terminal = terminal_accrual_end(&prev, maturity);
+                let terminal = terminal_accrual_end(&periods, maturity);
                 fixed_schedules.push(FixedSchedule {
                     spec,
                     calendar,
-                    dates,
-                    prev,
-                    first_last: first_or_last,
+                    periods,
                     terminal_accrual_end: terminal,
                 });
             }
@@ -698,9 +567,7 @@ pub(super) fn compute_coupon_schedules(
                     step_schedule,
                     schedule: &schedule,
                     calendar,
-                    dates: &dates,
-                    prev: &prev,
-                    first_last: &first_or_last,
+                    periods: &periods,
                 }));
             }
             CouponSpec::Float { rate_spec } => {
@@ -717,14 +584,13 @@ pub(super) fn compute_coupon_schedules(
                     .as_deref()
                     .unwrap_or(&spec.schedule.calendar_id);
                 let fixing_calendar = resolve_calendar_strict(fixing_calendar_id)?;
-                let terminal = terminal_accrual_end(&prev, maturity);
+                let terminal = terminal_accrual_end(&periods, maturity);
                 float_schedules.push(FloatSchedule {
                     spec,
                     calendar,
                     fixing_calendar,
                     runtime_spec,
-                    dates,
-                    prev,
+                    periods,
                     terminal_accrual_end: terminal,
                 });
             }

@@ -371,7 +371,6 @@ struct CouponBucket {
     /// explicitly set af. We use Option rather than 0.0 as a sentinel so a
     /// legitimate zero-length period is distinguishable from unset.
     accrual_factor: Option<f64>,
-    rate: Option<f64>,
 }
 
 /// A single coupon period derived from the schedule.
@@ -425,30 +424,12 @@ fn build_coupon_periods(
     schedule: &CashFlowSchedule,
     cfg: &AccrualConfig,
 ) -> finstack_quant_core::Result<Vec<CouponPeriod>> {
-    let mut coupon_idx: Vec<usize> = schedule
+    let mut buckets: Vec<CouponBucket> = Vec::new();
+    for cf in schedule
         .flows
         .iter()
-        .enumerate()
-        .filter(|(_, cf)| is_coupon_kind(cf.kind, cfg.include_pik))
-        .map(|(i, _)| i)
-        .collect();
-    if !coupon_idx
-        .windows(2)
-        .all(|w| schedule.flows[w[0]].date <= schedule.flows[w[1]].date)
+        .filter(|cf| is_coupon_kind(cf.kind, cfg.include_pik))
     {
-        coupon_idx.sort_by_key(|&i| schedule.flows[i].date);
-    }
-    debug_assert!(
-        coupon_idx
-            .windows(2)
-            .all(|w| schedule.flows[w[0]].date <= schedule.flows[w[1]].date),
-        "coupon flows must preserve schedule date order"
-    );
-
-    let mut buckets: Vec<CouponBucket> = Vec::with_capacity(coupon_idx.len());
-
-    for &i in &coupon_idx {
-        let cf = &schedule.flows[i];
         let accrual = cf.accrual.as_ref();
         let true_period = accrual.map(|accrual| (accrual.start, accrual.end));
         let calendar_id = accrual.and_then(|accrual| accrual.calendar_id.clone());
@@ -496,9 +477,6 @@ fn build_coupon_periods(
             if bucket.accrual_factor.is_none() {
                 bucket.accrual_factor = cf_af;
             }
-            if bucket.rate.is_none() {
-                bucket.rate = cf.rate;
-            }
             continue;
         }
 
@@ -521,7 +499,6 @@ fn build_coupon_periods(
                 0.0
             },
             accrual_factor: cf_af,
-            rate: cf.rate,
         });
     }
 
@@ -926,18 +903,14 @@ mod tests {
     }
 
     #[test]
-    fn build_coupon_periods_sorts_only_when_schedule_coupons_are_unsorted() {
+    fn accrual_index_rejects_unsorted_schedule() {
         let mut schedule = make_test_schedule(
             &[(make_date(2026, 1, 1), 0.5), (make_date(2025, 7, 1), 0.5)],
             DayCount::Thirty360,
         );
         schedule.meta.issue_date = Some(make_date(2025, 1, 1));
-
-        let periods = build_coupon_periods(&schedule, &AccrualConfig::default()).expect("periods");
-
-        assert_eq!(periods.len(), 2);
-        assert_eq!(periods[0].end, make_date(2025, 7, 1));
-        assert_eq!(periods[1].end, make_date(2026, 1, 1));
+        AccrualIndex::build(&schedule, &AccrualConfig::default())
+            .expect_err("public accrual entry validates schedule order");
     }
 
     #[test]
@@ -1468,7 +1441,6 @@ mod tests {
                 cash_amount: f64::NAN,
                 pik_amount: 0.0,
                 accrual_factor: Some(0.5),
-                rate: None,
             },
         }];
 

@@ -158,14 +158,13 @@ fn day_count_rank(day_count: DayCount) -> u8 {
 }
 
 pub(crate) fn finalize_flows(
-    mut flows: Vec<CashFlow>,
+    flows: Vec<CashFlow>,
     fixed: &[FixedSchedule],
     floating: &[FloatSchedule],
     issue_date: Option<Date>,
     maturity_date: Option<Date>,
     mut projected_fixings: Vec<crate::fixings::ProjectedFixing>,
 ) -> (Vec<CashFlow>, CashFlowMeta, DayCount) {
-    sort_flows(&mut flows);
     crate::fixings::normalize_projected_fixings(&mut projected_fixings);
 
     let mut cals: Vec<String> = fixed
@@ -346,7 +345,7 @@ impl CashFlowSchedule {
             day_count,
             meta,
         };
-        sort_schedule_with_metadata(&mut schedule);
+        sort_flows(&mut schedule.flows);
         schedule
     }
 
@@ -700,7 +699,7 @@ impl CashFlowSchedule {
     }
 
     /// Internal future-flow filtering step for composed schedule normalization.
-    pub(crate) fn filter_future(mut self, as_of: Date) -> finstack_quant_core::Result<Self> {
+    pub(crate) fn normalize_public(mut self, as_of: Date) -> finstack_quant_core::Result<Self> {
         if let Some(anchor) = self
             .meta
             .issue_date
@@ -760,22 +759,9 @@ impl CashFlowSchedule {
         // The remaining rows already resolve the contractual amortization.
         // An inception recipe cannot be reapplied to the rebased opening balance.
         self.notional.amort = super::AmortizationSpec::None;
-        retain_schedule_flows(&mut self, |cf| cf.date >= as_of);
+        self.flows.retain(|cf| cf.date >= as_of);
         sort_flows(&mut self.flows);
         Ok(self)
-    }
-
-    /// One-shot public-schedule normalization pipeline.
-    ///
-    /// Applies, in order:
-    /// 1. Future-flow filtering (`date >= as_of`)
-    /// 2. Restore canonical flow order
-    /// 3. Preserve PIK classification, accrual amounts, and the representation
-    ///    attached by the raw schedule source. Settlement views exclude PIK.
-    pub(crate) fn normalize_public(self, as_of: Date) -> finstack_quant_core::Result<Self> {
-        let mut normalized = self.filter_future(as_of)?;
-        sort_schedule_with_metadata(&mut normalized);
-        Ok(normalized)
     }
 
     /// Get an iterator over interest-like coupon cashflows.
@@ -1046,15 +1032,6 @@ where
     })
 }
 
-fn retain_schedule_flows(schedule: &mut CashFlowSchedule, mut keep: impl FnMut(&CashFlow) -> bool) {
-    schedule.flows.retain(|flow| keep(flow));
-}
-
-/// Sort a schedule using the canonical self-contained flow order.
-pub(crate) fn sort_schedule_with_metadata(schedule: &mut CashFlowSchedule) {
-    sort_flows(&mut schedule.flows);
-}
-
 fn merge_representation(
     current: Option<CashflowRepresentation>,
     next: CashflowRepresentation,
@@ -1277,8 +1254,8 @@ impl CashFlowSchedule {
     ///   from the valuation date in `date_ctx` to each payment date.
     /// * `credit` - Optional survival curve and decimal recovery rate in
     ///   `[0, 1]`; absent hazard inputs select plain discounting.
-    /// * `date_ctx` - Valuation date, day-count convention, and day-count
-    ///   context used to convert cashflow dates into discount times.
+    /// * `date_ctx` - Base date for relative discounting and conditional survival;
+    ///   the day-count convention and context apply to survival curves without a date origin.
     ///
     /// # Returns
     ///
@@ -1331,13 +1308,12 @@ impl CashFlowSchedule {
             recovery_rate,
         }) = credit
         {
-            crate::aggregation::pv_by_period_credit_adjusted_detailed_with_timing(
+            crate::aggregation::pv_by_period_credit_adjusted(
                 &self.flows,
                 periods,
                 disc,
                 Some(hazard_curve),
                 recovery_rate,
-                crate::aggregation::RecoveryTiming::default(),
                 date_ctx,
             )
         } else {
@@ -1345,9 +1321,7 @@ impl CashFlowSchedule {
                 &self.flows,
                 periods,
                 disc,
-                date_ctx.base,
-                date_ctx.day_count,
-                date_ctx.day_count_context,
+                date_ctx,
                 None,
             )
         }
@@ -1458,15 +1432,19 @@ impl CashFlowSchedule {
                 }
             }
         }
-        let dates: Vec<Date> = self.flows.iter().map(|flow| flow.date).collect();
-        let labels: Vec<String> = self
-            .flows
-            .iter()
-            .map(|flow| flow.kind.to_string())
-            .collect();
-        let label_refs: Vec<&str> = labels.iter().map(String::as_str).collect();
-        let amounts: Vec<f64> = self.flows.iter().map(|flow| flow.amount.amount()).collect();
-        crate::aggregation::calendar_year_ladder(&dates, &label_refs, &amounts, pvs)
+        if self.flows.len() != pvs.len() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "calendar_year_ladder requires equal lengths, got flows={}, pvs={}",
+                self.flows.len(),
+                pvs.len()
+            )));
+        }
+        crate::aggregation::calendar_year_ladder_rows(
+            self.flows
+                .iter()
+                .zip(pvs)
+                .map(|(flow, &pv)| (flow.date, Ok(flow.kind), flow.amount.amount(), pv)),
+        )
     }
 }
 
@@ -2045,7 +2023,7 @@ mod tests {
             DayCount::Act365F,
             CashFlowMeta::default(),
         )
-        .filter_future(d2)
+        .normalize_public(d2)
         .expect("valid balance replay");
 
         assert_eq!(schedule.flows.len(), 1);

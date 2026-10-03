@@ -16,7 +16,7 @@ pub(crate) use coupons::{
     emit_fixed_coupons_on, emit_float_coupons_on, FloatEmissionOutput, ResolvedFloatMarket,
 };
 
-pub(super) use amortization::{emit_amortization_on, AmortizationParams};
+pub(super) use amortization::emit_amortization_on;
 
 pub(super) use fees::emit_fees_on;
 

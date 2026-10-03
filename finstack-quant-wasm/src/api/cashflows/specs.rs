@@ -8,145 +8,16 @@
 //! their first argument.
 
 use crate::utils::input::{js_f64, js_f64_seq, js_uint};
-use crate::utils::wire::{js_date, js_decimal, js_wire};
+use crate::utils::wire::{js_decimal, js_wire};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_cashflows::builder::{
-    AmortizationSpec, CouponType, DefaultModelSpec, FeeBase, FeeSpec, FloatingLegCompounding,
-    FloatingRateFallback, FloatingRateSpec, Notional, PrepaymentModelSpec, RecoveryModelSpec,
-    ScheduleParams,
+    DefaultModelSpec, FeeSpec, FloatingLegCompounding, FloatingRateSpec, Notional,
+    PrepaymentModelSpec, RecoveryModelSpec, ScheduleParams,
 };
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::Date;
-use finstack_quant_core::money::Money;
 use wasm_bindgen::prelude::*;
 
-/// `[date, Money]` pairs in the wire form `AmortizationSpec` uses.
-#[derive(serde::Deserialize)]
-#[serde(transparent)]
-struct DatedMoneyValues(
-    #[serde(with = "finstack_quant_core::wire::dated_money_values")] Vec<(Date, Money)>,
-);
-
-// --- AmortizationSpec --------------------------------------------------------
-
-/// Straight-line amortization from the initial notional down to a final balance.
-///
-/// @param final_notional - `Money` wire object: outstanding balance left at maturity, in the notional currency.
-/// @returns `AmortizationSpec` wire value `{ linear_to: { final_notional } }`.
-/// @throws If `finalNotional` is not a `Money` wire object (kind `validation`).
-#[wasm_bindgen(js_name = amortizationSpecLinearTo)]
-pub fn amortization_spec_linear_to(final_notional: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&AmortizationSpec::LinearTo {
-        final_notional: js_wire(&final_notional, "finalNotional")?,
-    })
-}
-
-/// Amortization to an explicit remaining balance on each listed date.
-///
-/// @param schedule - `[isoDate, Money]` pairs: the outstanding balance after each date, in the notional currency.
-/// @returns `AmortizationSpec` wire value `{ step_remaining: { schedule } }`.
-/// @throws If `schedule` is not an array of `[isoDate, Money]` pairs (kind `validation`).
-#[wasm_bindgen(js_name = amortizationSpecStepRemaining)]
-pub fn amortization_spec_step_remaining(schedule: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&AmortizationSpec::StepRemaining {
-        schedule: js_wire::<DatedMoneyValues>(&schedule, "schedule")?.0,
-    })
-}
-
-/// Amortization of a fixed share of the original notional each period.
-///
-/// @param pct - Share of the original notional repaid per period as a decimal (`0.05` = 5%).
-/// @returns `AmortizationSpec` wire value `{ percent_of_original_per_period: { pct } }`.
-/// @throws If `pct` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = amortizationSpecPercentOfOriginalPerPeriod)]
-pub fn amortization_spec_percent_of_original_per_period(pct: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&AmortizationSpec::PercentOfOriginalPerPeriod {
-        pct: js_f64(&pct, "pct")?,
-    })
-}
-
-/// Amortization of a fixed share of the remaining balance each period.
-///
-/// @param pct - Share of the then-outstanding balance repaid per period as a decimal (`0.05` = 5%).
-/// @returns `AmortizationSpec` wire value `{ percent_of_remaining_per_period: { pct } }`.
-/// @throws If `pct` is not a number (kind `invalid_type`).
-#[wasm_bindgen(js_name = amortizationSpecPercentOfRemainingPerPeriod)]
-pub fn amortization_spec_percent_of_remaining_per_period(pct: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&AmortizationSpec::PercentOfRemainingPerPeriod {
-        pct: js_f64(&pct, "pct")?,
-    })
-}
-
-/// Straight-line amortization to zero between two dates.
-///
-/// @param start - ISO-8601 date on which amortization begins; the balance is flat before it.
-/// @param end - ISO-8601 date on which the balance reaches zero.
-/// @returns `AmortizationSpec` wire value `{ linear_between: { start, end } }`.
-/// @throws If either date is not an ISO-8601 string (kind `invalid_type` or `validation`).
-#[wasm_bindgen(js_name = amortizationSpecLinearBetween)]
-pub fn amortization_spec_linear_between(start: JsValue, end: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&AmortizationSpec::LinearBetween {
-        start: js_date(&start, "start")?,
-        end: js_date(&end, "end")?,
-    })
-}
-
-/// Amortization by explicit principal payments on listed dates.
-///
-/// @param items - `[isoDate, Money]` pairs: the principal repaid on each date, in the notional currency.
-/// @returns `AmortizationSpec` wire value `{ custom_principal: { items } }`.
-/// @throws If `items` is not an array of `[isoDate, Money]` pairs (kind `validation`).
-#[wasm_bindgen(js_name = amortizationSpecCustomPrincipal)]
-pub fn amortization_spec_custom_principal(items: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&AmortizationSpec::CustomPrincipal {
-        items: js_wire::<DatedMoneyValues>(&items, "items")?.0,
-    })
-}
-
 // --- CouponType / FeeBase / FeeSpec -----------------------------------------
-
-/// Coupon paid partly in cash and partly in kind.
-///
-/// @param cash_fraction - Share of each coupon paid in cash, as an exact decimal string (`"0.6"`).
-/// @param pik_fraction - Share of each coupon capitalized into principal, as an exact decimal string (`"0.4"`); the two shares must sum to one when the schedule is built.
-/// @returns `CouponType` wire value `{ split: { cash_fraction, pik_fraction } }`.
-/// @throws If a fraction is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
-#[wasm_bindgen(js_name = couponTypeSplit)]
-pub fn coupon_type_split(
-    cash_fraction: JsValue,
-    pik_fraction: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(&CouponType::Split {
-        cash_fraction: js_decimal(&cash_fraction, "cashFraction")?.0,
-        pik_fraction: js_decimal(&pik_fraction, "pikFraction")?.0,
-    })
-}
-
-/// Fee base equal to the undrawn part of a commitment.
-///
-/// @param commitment - `Money` wire object: total facility commitment; the fee accrues on commitment minus drawn balance.
-/// @returns `FeeBase` wire value `{ undrawn: { commitment } }`.
-/// @throws If `commitment` is not a `Money` wire object (kind `validation`).
-#[wasm_bindgen(js_name = feeBaseUndrawn)]
-pub fn fee_base_undrawn(commitment: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&FeeBase::Undrawn {
-        commitment: js_wire(&commitment, "commitment")?,
-    })
-}
-
-/// One-off fee of a fixed amount on a date.
-///
-/// @param date - ISO-8601 payment date of the fee.
-/// @param amount - `Money` wire object: fee amount in its own currency.
-/// @returns `FeeSpec` wire value `{ fixed: { date, amount } }`.
-/// @throws If `date` is not an ISO-8601 string or `amount` is not a `Money` wire object (kind `invalid_type` or `validation`).
-#[wasm_bindgen(js_name = feeSpecFixed)]
-pub fn fee_spec_fixed(date: JsValue, amount: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&FeeSpec::Fixed {
-        date: js_date(&date, "date")?,
-        amount: js_wire(&amount, "amount")?,
-    })
-}
 
 /// Recurring fee quoted in basis points of a drawn or undrawn balance.
 ///
@@ -171,46 +42,6 @@ pub fn fee_spec_periodic_bp(fields: JsValue) -> Result<JsValue, JsValue> {
 }
 
 // --- Floating-rate conventions ----------------------------------------------
-
-/// Fallback that uses a fixed index rate when a projection is unavailable.
-///
-/// @param rate - Index rate used in place of the missing projection, as an exact decimal string (`"0.03"` = 3%), before spread and gearing.
-/// @returns `FloatingRateFallback` wire value `{ fixed_rate: rate }`.
-/// @throws If `rate` is not a string (kind `invalid_type`) or not a decimal number (kind `validation`).
-#[wasm_bindgen(js_name = floatingRateFallbackFixedRate)]
-pub fn floating_rate_fallback_fixed_rate(rate: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingRateFallback::FixedRate(
-        js_decimal(&rate, "rate")?.0,
-    ))
-}
-
-/// Overnight compounding in arrears with a lookback.
-///
-/// @param lookback_days - Business days each daily observation is shifted back (non-negative integer; `0` for none).
-/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days } }`.
-/// @throws If `lookbackDays` is not a non-negative integer (kind `invalid_type`).
-#[wasm_bindgen(js_name = floatingLegCompoundingCompoundedInArrears)]
-pub fn floating_leg_compounding_compounded_in_arrears(
-    lookback_days: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingLegCompounding::CompoundedInArrears {
-        lookback_days: js_uint(&lookback_days, "lookbackDays")?,
-    })
-}
-
-/// Overnight compounding with an observation-period shift.
-///
-/// @param shift_days - Business days the whole observation period (rates and weights) is shifted back (non-negative integer).
-/// @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days } }`.
-/// @throws If `shiftDays` is not a non-negative integer (kind `invalid_type`).
-#[wasm_bindgen(js_name = floatingLegCompoundingCompoundedWithObservationShift)]
-pub fn floating_leg_compounding_compounded_with_observation_shift(
-    shift_days: JsValue,
-) -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingLegCompounding::CompoundedWithObservationShift {
-        shift_days: js_uint(&shift_days, "shiftDays")?,
-    })
-}
 
 /// USD SOFR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::sofr`).
 ///
@@ -274,19 +105,6 @@ pub fn floating_leg_compounding_sofr_observation_shift() -> Result<JsValue, JsVa
 #[wasm_bindgen(js_name = floatingLegCompoundingSoniaObservationShift)]
 pub fn floating_leg_compounding_sonia_observation_shift() -> Result<JsValue, JsValue> {
     to_js_value(&FloatingLegCompounding::sonia_observation_shift())
-}
-
-/// Compounded RFR with an end-of-period rate cut-off (Rust `FloatingLegCompounding::rate_cutoff`).
-///
-/// @param cutoff_days - Business days before period end over which the overnight rate is frozen (non-negative integer).
-/// @returns `FloatingLegCompounding` wire value `{ compounded_with_rate_cutoff: { cutoff_days } }`.
-/// @throws If `cutoffDays` is not a non-negative integer (kind `invalid_type`).
-#[wasm_bindgen(js_name = floatingLegCompoundingRateCutoff)]
-pub fn floating_leg_compounding_rate_cutoff(cutoff_days: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingLegCompounding::rate_cutoff(js_uint(
-        &cutoff_days,
-        "cutoffDays",
-    )?))
 }
 
 /// Whether a compounding convention builds the period rate from daily overnight
@@ -638,21 +456,6 @@ pub fn prepayment_model_spec_smm(spec: JsValue, seasoning_months: JsValue) -> Re
 }
 
 // --- RecoveryModelSpec -----------------------------------------------------------
-
-/// Copy of a recovery model with a loss-severity vector by month of default.
-///
-/// @param spec - `RecoveryModelSpec` wire object.
-/// @param severity_vector - Loss severity (`1 − recovery`) per seasoning month of the default as decimals in `[0, 1]`, month 1 first; the last value is held. Must be non-empty.
-/// @returns The `RecoveryModelSpec` with the vector attached; `rate` stays as the flat fallback but no longer drives recoveries.
-/// @throws If `spec` is not a `RecoveryModelSpec` (kind `validation`) or `severityVector` is not an array of numbers (kind `invalid_type`).
-#[wasm_bindgen(js_name = recoveryModelSpecWithSeverityVector)]
-pub fn recovery_model_spec_with_severity_vector(
-    spec: JsValue,
-    severity_vector: JsValue,
-) -> Result<JsValue, JsValue> {
-    let spec = js_wire::<RecoveryModelSpec>(&spec, "spec")?;
-    to_js_value(&spec.with_severity_vector(js_f64_seq(&severity_vector, "severityVector")?))
-}
 
 /// Recovery rate of a recovery model for a default in a seasoning month.
 ///

@@ -200,16 +200,14 @@ fn require_supplied_historical_fixings(
 
 /// Resolve a floating-rate fallback outcome shared by the curve-missing and
 /// projection-failure call sites: propagate `error` when the policy demands
-/// it, otherwise log and return the fallback (spread-only or fixed-rate) all-in
-/// rate. `error` is built by the caller (a `NotFound` for a missing curve, or
+/// it, otherwise log and return the fallback index rate. `error` is built by the caller (a `NotFound` for a missing curve, or
 /// the original projection error).
 fn resolve_floating_rate_fallback(
     error: finstack_quant_core::Error,
     reset_date: Date,
     spread_bp: f64,
     fallback: &ResolvedFloatingRateFallback,
-    params: &crate::builder::rate_helpers::FloatingRateParams,
-) -> finstack_quant_core::Result<(f64, Option<f64>)> {
+) -> finstack_quant_core::Result<f64> {
     match fallback {
         ResolvedFloatingRateFallback::Error => Err(error),
         ResolvedFloatingRateFallback::SpreadOnly => {
@@ -219,10 +217,7 @@ fn resolve_floating_rate_fallback(
                 error = %error,
                 "Floating rate unavailable, using fallback (spread-only) rate"
             );
-            fallback
-                .fallback_rate(params)
-                .map(|rate| (rate, fallback.fallback_index_rate()))
-                .ok_or(finstack_quant_core::Error::Input(InputError::Invalid))
+            Ok(0.0)
         }
         ResolvedFloatingRateFallback::FixedRate(index_rate) => {
             info!(
@@ -231,22 +226,14 @@ fn resolve_floating_rate_fallback(
                 error = %error,
                 "Floating rate unavailable, using fixed index rate"
             );
-            fallback
-                .fallback_rate(params)
-                .map(|rate| (rate, fallback.fallback_index_rate()))
-                .ok_or(finstack_quant_core::Error::Input(InputError::Invalid))
+            if !index_rate.is_finite() {
+                return Err(finstack_quant_core::Error::Validation(
+                    "floating-rate fallback did not provide a finite index rate".into(),
+                ));
+            }
+            Ok(*index_rate)
         }
     }
-}
-
-fn fallback_index_rate(
-    outcome: finstack_quant_core::Result<(f64, Option<f64>)>,
-) -> finstack_quant_core::Result<f64> {
-    outcome?.1.ok_or_else(|| {
-        finstack_quant_core::Error::Validation(
-            "floating-rate fallback did not provide a finite index rate".to_string(),
-        )
-    })
 }
 
 /// Emit fixed coupon cashflows on a specific date.
@@ -275,17 +262,14 @@ pub(crate) fn emit_fixed_coupons_on(
     for schedule in fixed_schedules {
         let spec = &schedule.spec;
         let calendar = schedule.calendar;
-        let first = schedule.dates.partition_point(|date| {
-            schedule
-                .prev
-                .get(date)
-                .is_none_or(|period| period.accrual_end < d)
-        });
-        for period in schedule.dates[first..]
+        let first = schedule
+            .periods
+            .partition_point(|entry| entry.period.accrual_end < d);
+        for entry in schedule.periods[first..]
             .iter()
-            .filter_map(|date| schedule.prev.get(date))
-            .take_while(|period| period.accrual_end == d)
+            .take_while(|entry| entry.period.accrual_end == d)
         {
+            let period = &entry.period;
             let d = period.payment_date;
             for (accrual_start, accrual_end, base_out) in super::balances::balance_segments(
                 outstanding_history,
@@ -293,7 +277,7 @@ pub(crate) fn emit_fixed_coupons_on(
                 period.accrual_end,
                 outstanding_fallback,
             ) {
-                let is_stub = schedule.first_last.contains(&d);
+                let is_stub = entry.is_stub;
                 let is_termination_date = schedule.terminal_accrual_end == Some(accrual_end);
 
                 // ACT/ACT ICMA: regular periods use the unadjusted span; stubs use the adjacent regular coupon.
@@ -634,17 +618,14 @@ pub(crate) fn emit_float_coupons_on(
         .zip(market.fixings)
     {
         let spec = &schedule.spec;
-        let first = schedule.dates.partition_point(|date| {
-            schedule
-                .prev
-                .get(date)
-                .is_none_or(|period| period.accrual_end < d)
-        });
-        for period in schedule.dates[first..]
+        let first = schedule
+            .periods
+            .partition_point(|entry| entry.period.accrual_end < d);
+        for entry in schedule.periods[first..]
             .iter()
-            .filter_map(|date| schedule.prev.get(date))
-            .take_while(|period| period.accrual_end == d)
+            .take_while(|entry| entry.period.accrual_end == d)
         {
+            let period = &entry.period;
             let segments = super::balances::balance_segments(
                 outstanding_history,
                 period.accrual_start,
@@ -782,13 +763,12 @@ pub(crate) fn emit_float_coupons_on(
                         resolved_fixing.as_ref(),
                         spec.rate_spec.forward_curve_id.as_str(),
                     )?;
-                    let index_rate = fallback_index_rate(resolve_floating_rate_fallback(
+                    let index_rate = resolve_floating_rate_fallback(
                         error,
                         reset_date,
                         params.spread_bp,
                         &runtime_spec.fallback,
-                        params,
-                    ))?;
+                    )?;
                     let constrained_index = calculate_floating_rate(
                         index_rate,
                         &crate::builder::rate_helpers::FloatingRateParams {

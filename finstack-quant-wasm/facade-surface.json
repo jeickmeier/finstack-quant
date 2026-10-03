@@ -422,25 +422,15 @@
       "accruedInterestAmount",
       "aggregateByPeriod",
       "aggregateCashflowsChecked",
-      "amortizationSpecCustomPrincipal",
-      "amortizationSpecLinearBetween",
-      "amortizationSpecLinearTo",
-      "amortizationSpecPercentOfOriginalPerPeriod",
-      "amortizationSpecPercentOfRemainingPerPeriod",
-      "amortizationSpecStepRemaining",
       "buildCashflowSchedule",
       "buildCashflowScheduleJson",
       "calendarYearLadder",
       "cashFlowGetBalanceDate",
       "cashFlowValidate",
-      "cashFlowWithAccrual",
-      "cashFlowWithPrincipalDate",
-      "cashFlowWithPrincipalDelta",
       "cdrToMdr",
       "cfKindIsInterestLike",
       "cfKindIsPrincipalLike",
       "cfKindParse",
-      "couponTypeSplit",
       "cprToSmm",
       "datedFlows",
       "datedFlowsJson",
@@ -456,22 +446,16 @@
       "defaultModelSpecVector",
       "exCouponRuleExDate",
       "exCouponRuleIsExCoupon",
-      "feeBaseUndrawn",
-      "feeSpecFixed",
       "feeSpecPeriodicBp",
-      "floatingLegCompoundingCompoundedInArrears",
-      "floatingLegCompoundingCompoundedWithObservationShift",
       "floatingLegCompoundingEstr",
       "floatingLegCompoundingFedfunds",
       "floatingLegCompoundingIsOvernight",
-      "floatingLegCompoundingRateCutoff",
       "floatingLegCompoundingSaron",
       "floatingLegCompoundingSofr",
       "floatingLegCompoundingSofrObservationShift",
       "floatingLegCompoundingSonia",
       "floatingLegCompoundingSoniaObservationShift",
       "floatingLegCompoundingTona",
-      "floatingRateFallbackFixedRate",
       "floatingRateSpecEuribor3m",
       "floatingRateSpecSofr",
       "floatingRateSpecSonia",
@@ -494,7 +478,6 @@
       "prepaymentModelSpecVector",
       "recoveryModelSpecRecoveryRate",
       "recoveryModelSpecValidate",
-      "recoveryModelSpecWithSeverityVector",
       "scheduleCalendarYearLadder",
       "scheduleFromClassifiedFlows",
       "scheduleFromDatedFlows",
@@ -583,24 +566,6 @@
   "cashflows.aggregateCashflowsChecked": {
     "kind": "function"
   },
-  "cashflows.amortizationSpecCustomPrincipal": {
-    "kind": "function"
-  },
-  "cashflows.amortizationSpecLinearBetween": {
-    "kind": "function"
-  },
-  "cashflows.amortizationSpecLinearTo": {
-    "kind": "function"
-  },
-  "cashflows.amortizationSpecPercentOfOriginalPerPeriod": {
-    "kind": "function"
-  },
-  "cashflows.amortizationSpecPercentOfRemainingPerPeriod": {
-    "kind": "function"
-  },
-  "cashflows.amortizationSpecStepRemaining": {
-    "kind": "function"
-  },
   "cashflows.buildCashflowSchedule": {
     "kind": "function"
   },
@@ -616,15 +581,6 @@
   "cashflows.cashFlowValidate": {
     "kind": "function"
   },
-  "cashflows.cashFlowWithAccrual": {
-    "kind": "function"
-  },
-  "cashflows.cashFlowWithPrincipalDate": {
-    "kind": "function"
-  },
-  "cashflows.cashFlowWithPrincipalDelta": {
-    "kind": "function"
-  },
   "cashflows.cdrToMdr": {
     "kind": "function"
   },
@@ -635,9 +591,6 @@
     "kind": "function"
   },
   "cashflows.cfKindParse": {
-    "kind": "function"
-  },
-  "cashflows.couponTypeSplit": {
     "kind": "function"
   },
   "cashflows.cprToSmm": {
@@ -685,19 +638,7 @@
   "cashflows.exCouponRuleIsExCoupon": {
     "kind": "function"
   },
-  "cashflows.feeBaseUndrawn": {
-    "kind": "function"
-  },
-  "cashflows.feeSpecFixed": {
-    "kind": "function"
-  },
   "cashflows.feeSpecPeriodicBp": {
-    "kind": "function"
-  },
-  "cashflows.floatingLegCompoundingCompoundedInArrears": {
-    "kind": "function"
-  },
-  "cashflows.floatingLegCompoundingCompoundedWithObservationShift": {
     "kind": "function"
   },
   "cashflows.floatingLegCompoundingEstr": {
@@ -707,9 +648,6 @@
     "kind": "function"
   },
   "cashflows.floatingLegCompoundingIsOvernight": {
-    "kind": "function"
-  },
-  "cashflows.floatingLegCompoundingRateCutoff": {
     "kind": "function"
   },
   "cashflows.floatingLegCompoundingSaron": {
@@ -728,9 +666,6 @@
     "kind": "function"
   },
   "cashflows.floatingLegCompoundingTona": {
-    "kind": "function"
-  },
-  "cashflows.floatingRateFallbackFixedRate": {
     "kind": "function"
   },
   "cashflows.floatingRateSpecEuribor3m": {
@@ -797,9 +732,6 @@
     "kind": "function"
   },
   "cashflows.recoveryModelSpecValidate": {
-    "kind": "function"
-  },
-  "cashflows.recoveryModelSpecWithSeverityVector": {
     "kind": "function"
   },
   "cashflows.scheduleCalendarYearLadder": {

@@ -142,10 +142,9 @@ After the economic principal reduction has passed, an unpaid settlement is
 valued as a cash receivable, consistently before and after schedule normalization.
 Already-paid economic replay rows carry no recovery. A final PIK coupon paid
 before capitalization carries no funded-principal recovery before payment.
-The integrated / default-midpoint variant, selected by `RecoveryTiming`, is
-reached only through the `pub(crate)` period-PV kernel that valuations pricers
-call; `RecoveryTiming` and `DateContext` are public types for that kernel's
-signature but have no host binding.
+`DateContext` supplies the valuation base date and the fallback day-count
+convention and context for survival curves without their own date origin.
+Discount curves use their own date basis for relative discounting.
 
 ## Conventions
 

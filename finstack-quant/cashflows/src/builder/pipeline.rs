@@ -13,10 +13,12 @@ use rust_decimal::Decimal;
 use crate::builder::compiler::{FixedSchedule, FloatSchedule, PeriodicFee};
 use crate::builder::emission::{
     emit_amortization_on, emit_fees_on, emit_fixed_coupons_on, emit_float_coupons_on,
-    AmortizationParams, FloatEmissionOutput, ResolvedFloatMarket,
+    FloatEmissionOutput, ResolvedFloatMarket,
 };
-use crate::builder::orchestrator::{AmortizationSetup, BuildState, PrincipalEvent};
-use crate::builder::{Notional, PrincipalExchange};
+use crate::builder::orchestrator::{
+    apply_principal_event, AmortizationSetup, BuildState, PreparedAmortization, PrincipalEvent,
+};
+use crate::builder::PrincipalExchange;
 use crate::primitives::{CFKind, CashFlow};
 
 #[derive(Clone, Copy)]
@@ -31,7 +33,6 @@ pub(super) struct BuildContext<'a> {
     pub(super) redemption_effective_date: Date,
     /// Whether to emit the maturity balloon as `CFKind::Notional`.
     pub(super) principal_exchange: PrincipalExchange,
-    pub(super) notional: &'a Notional,
     pub(super) fixed_schedules: &'a [FixedSchedule],
     pub(super) float_schedules: &'a [FloatSchedule],
     pub(super) periodic_fees: &'a [PeriodicFee],
@@ -99,26 +100,13 @@ impl<'a> DateProcessor<'a> {
         d: Date,
         state: &mut BuildState,
     ) -> finstack_quant_core::Result<()> {
-        let amort_params = AmortizationParams {
-            ccy: self.ctx.ccy,
-            amort_dates: &self.amort_setup.amort_dates,
-            linear_delta: self.amort_setup.linear_delta,
-            percent_per: self.amort_setup.percent_per,
-            percent_remaining: self.amort_setup.percent_remaining,
-            linear_between: self.amort_setup.linear_between.and_then(|(start, end, _)| {
-                state
-                    .linear_between_installment
-                    .map(|installment| (start, end, installment))
-            }),
-            step_remaining_map: &self.amort_setup.step_remaining_map,
-            custom_principal_map: &self.amort_setup.custom_principal_map,
-        };
         let first_flow = state.flows.len();
         emit_amortization_on(
             d,
-            self.ctx.notional,
+            self.ctx.ccy,
             &mut state.outstanding,
-            &amort_params,
+            self.amort_setup,
+            state.linear_between_installment,
             self.amort_setup.final_amortization_date == Some(d),
             &mut state.flows,
         )?;
@@ -144,13 +132,11 @@ impl<'a> DateProcessor<'a> {
 
     /// Fix equal installments from the balance after all start-date movements.
     fn initialize_linear_between(&self, d: Date, state: &mut BuildState) {
-        if let Some((_, _, count)) = self
-            .amort_setup
-            .linear_between
-            .filter(|(start, _, _)| *start == d)
-        {
-            state.linear_between_installment =
-                Some(state.outstanding / Decimal::from(count as u64));
+        if let PreparedAmortization::LinearBetween { start, count, .. } = &self.amort_setup.rule {
+            if *start == d {
+                state.linear_between_installment =
+                    Some(state.outstanding / Decimal::from(*count as u64));
+            }
         }
     }
 
@@ -178,39 +164,7 @@ impl<'a> DateProcessor<'a> {
             .iter()
             .take_while(|ev| ev.date == d)
         {
-            if ev.delta.amount() != 0.0 || ev.cash.amount() != 0.0 {
-                // Draws are negative (lender outflow); amortization is positive (lender inflow).
-                let flow_amount = match ev.kind {
-                    CFKind::Amortization => ev.cash.amount(),
-                    _ => -ev.cash.amount(),
-                };
-                state.flows.push(
-                    CashFlow::new(
-                        ev.payment_date,
-                        None,
-                        Money::new(flow_amount, ev.cash.currency())?,
-                        ev.kind,
-                        0.0,
-                        None,
-                    )
-                    .with_principal_delta(ev.delta)
-                    .with_principal_date(ev.date),
-                );
-                state.outstanding = state
-                    .outstanding
-                    .checked_add(f64_to_decimal(ev.delta.amount())?)
-                    .ok_or_else(|| {
-                        finstack_quant_core::Error::Validation(
-                            "outstanding principal exceeds the supported decimal range".into(),
-                        )
-                    })?;
-                if state.outstanding < Decimal::ZERO {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "principal event on {} would make outstanding balance negative ({})",
-                        d, state.outstanding
-                    )));
-                }
-            }
+            apply_principal_event(ev, &mut state.outstanding, &mut state.flows)?;
         }
         Ok(())
     }

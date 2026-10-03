@@ -393,9 +393,9 @@ impl PyCashFlowBuilder {
 
     /// Python-style summary of what has been configured so far.
     fn __repr__(&self) -> String {
-        let principal = self.inner.principal_notional().map_or_else(
+        let principal = self.inner.get_initial_principal().map_or_else(
             || "None".to_string(),
-            |n| format!("{} {}", n.initial.amount(), n.initial.currency()),
+            |n| format!("{} {}", n.amount(), n.currency()),
         );
         let horizon = match (self.inner.issue_date(), self.inner.maturity_date()) {
             (Some(issue), Some(maturity)) => format!("'{issue}'..'{maturity}'"),

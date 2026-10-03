@@ -67,28 +67,6 @@ pub(crate) enum ResolvedFloatingRateFallback {
     FixedRate(f64),
 }
 
-impl ResolvedFloatingRateFallback {
-    /// Return the fallback all-in rate when the policy permits it.
-    #[must_use]
-    pub fn fallback_rate(&self, params: &FloatingRateParams) -> Option<f64> {
-        match self {
-            Self::Error => None,
-            Self::SpreadOnly => Some(calculate_floating_rate(0.0, params)),
-            Self::FixedRate(index_rate) => Some(calculate_floating_rate(*index_rate, params)),
-        }
-    }
-
-    /// Return the index component represented by this fallback policy.
-    #[must_use]
-    pub fn fallback_index_rate(&self) -> Option<f64> {
-        match self {
-            Self::Error => None,
-            Self::SpreadOnly => Some(0.0),
-            Self::FixedRate(index_rate) => Some(*index_rate),
-        }
-    }
-}
-
 /// Validated runtime floating-rate configuration used by coupon emission.
 #[derive(Debug, Clone)]
 pub(crate) struct ResolvedFloatingRateSpec {

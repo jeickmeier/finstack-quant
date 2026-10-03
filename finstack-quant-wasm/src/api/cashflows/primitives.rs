@@ -5,12 +5,9 @@
 //! free functions taking that value.
 
 use crate::utils::input::js_string;
-use crate::utils::wire::{js_date, js_wire};
+use crate::utils::wire::js_wire;
 use crate::utils::{date_to_iso, to_js_err, to_js_value};
-use finstack_quant_cashflows::primitives::{
-    is_cash_settlement_kind, CFKind, CashFlow, CashFlowAccrual,
-};
-use finstack_quant_core::money::Money;
+use finstack_quant_cashflows::primitives::{is_cash_settlement_kind, CFKind, CashFlow};
 use wasm_bindgen::prelude::*;
 
 /// Parse a cashflow kind label into its `CFKind` wire string.
@@ -76,42 +73,6 @@ pub fn cash_flow_get_balance_date(flow: JsValue) -> Result<String, JsValue> {
     Ok(date_to_iso(
         js_wire::<CashFlow>(&flow, "flow")?.get_balance_date(),
     ))
-}
-
-/// Copy of a cashflow with an explicit economic principal date.
-///
-/// @param flow - `CashFlow` wire object.
-/// @param date - ISO-8601 date on which the outstanding balance changes, independent of the cash payment date.
-/// @returns The updated `CashFlow`.
-/// @throws If `flow` is not a `CashFlow` or `date` is not an ISO date (kind `validation`).
-#[wasm_bindgen(js_name = cashFlowWithPrincipalDate)]
-pub fn cash_flow_with_principal_date(flow: JsValue, date: JsValue) -> Result<JsValue, JsValue> {
-    let flow = js_wire::<CashFlow>(&flow, "flow")?;
-    to_js_value(&flow.with_principal_date(js_date(&date, "date")?))
-}
-
-/// Copy of a cashflow carrying its accrual-period metadata.
-///
-/// @param flow - `CashFlow` wire object.
-/// @param accrual - `CashFlowAccrual` wire object: accrual start and end dates, day count and optional projected index rate.
-/// @returns The updated `CashFlow`.
-/// @throws If either argument does not match its wire type (kind `validation`).
-#[wasm_bindgen(js_name = cashFlowWithAccrual)]
-pub fn cash_flow_with_accrual(flow: JsValue, accrual: JsValue) -> Result<JsValue, JsValue> {
-    let flow = js_wire::<CashFlow>(&flow, "flow")?;
-    to_js_value(&flow.with_accrual(js_wire::<CashFlowAccrual>(&accrual, "accrual")?))
-}
-
-/// Copy of a cashflow with an explicit outstanding-balance change.
-///
-/// @param flow - `CashFlow` wire object.
-/// @param delta - `Money` wire object: change in outstanding principal (positive increases the balance), which may differ from the cash amount.
-/// @returns The updated `CashFlow`.
-/// @throws If either argument does not match its wire type (kind `validation`).
-#[wasm_bindgen(js_name = cashFlowWithPrincipalDelta)]
-pub fn cash_flow_with_principal_delta(flow: JsValue, delta: JsValue) -> Result<JsValue, JsValue> {
-    let flow = js_wire::<CashFlow>(&flow, "flow")?;
-    to_js_value(&flow.with_principal_delta(js_wire::<Money>(&delta, "delta")?))
 }
 
 /// Check a cashflow's invariants.

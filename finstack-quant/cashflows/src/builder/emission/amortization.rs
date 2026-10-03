@@ -1,27 +1,12 @@
 //! Amortization cashflow emission.
 
-use crate::builder::{AmortizationSpec, Notional};
+use crate::builder::orchestrator::{AmortizationSetup, PreparedAmortization};
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::decimal::{decimal_to_f64, f64_to_decimal};
 use finstack_quant_core::money::Money;
 use rust_decimal::Decimal;
-
-/// Precomputed maps and deltas used by [`emit_amortization_on`].
-#[derive(Debug, Clone)]
-pub(in crate::builder) struct AmortizationParams<'a> {
-    pub(in crate::builder) ccy: Currency,
-    pub(in crate::builder) amort_dates: &'a finstack_quant_core::HashSet<Date>,
-    pub(in crate::builder) linear_delta: Option<Decimal>,
-    pub(in crate::builder) percent_per: Option<Decimal>,
-    pub(in crate::builder) percent_remaining: Option<Decimal>,
-    pub(in crate::builder) linear_between: Option<(Date, Date, Decimal)>,
-    pub(in crate::builder) step_remaining_map:
-        &'a Option<finstack_quant_core::HashMap<Date, Money>>,
-    pub(in crate::builder) custom_principal_map:
-        &'a Option<finstack_quant_core::HashMap<Date, Money>>,
-}
 
 fn emit_principal_repayment(
     d: Date,
@@ -56,96 +41,69 @@ fn emit_principal_repayment(
 /// Residual outstanding at maturity is redeemed later as [`CFKind::Notional`].
 pub(in crate::builder) fn emit_amortization_on(
     d: Date,
-    notional: &Notional,
+    ccy: Currency,
     outstanding: &mut Decimal,
-    params: &AmortizationParams,
+    setup: &AmortizationSetup,
+    linear_between_installment: Option<Decimal>,
     is_maturity: bool,
     new_flows: &mut Vec<CashFlow>,
 ) -> finstack_quant_core::Result<()> {
-    match &notional.amort {
-        AmortizationSpec::None => {}
-        AmortizationSpec::LinearTo { final_notional } => {
-            if let Some(delta) = params
-                .linear_delta
-                .filter(|_| params.amort_dates.contains(&d))
-            {
-                let final_notional = f64_to_decimal(final_notional.amount())?;
-                let pay = if is_maturity {
-                    (*outstanding - final_notional).max(Decimal::ZERO)
-                } else {
-                    delta.min(*outstanding)
-                };
-                emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
+    let on_boundary = setup.amort_dates.contains(&d);
+    let pay = match &setup.rule {
+        PreparedAmortization::LinearTo {
+            installment,
+            final_notional,
+        } if on_boundary => {
+            if is_maturity {
+                (*outstanding - *final_notional).max(Decimal::ZERO)
+            } else {
+                *installment
             }
         }
-        AmortizationSpec::StepRemaining { .. } => {
-            if let Some(rem_after) = params
-                .step_remaining_map
-                .as_ref()
-                .and_then(|map| map.get(&d))
-            {
-                let target = f64_to_decimal(rem_after.amount())?;
+        PreparedAmortization::StepRemaining(map) => {
+            if let Some(target) = map.get(&d) {
+                let target = f64_to_decimal(target.amount())?;
                 if target > *outstanding {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "StepRemaining target {target} exceeds outstanding principal {outstanding} on {d}"
                     )));
                 }
-                let pay = *outstanding - target;
-                emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
+                *outstanding - target
+            } else {
+                Decimal::ZERO
             }
         }
-        AmortizationSpec::PercentOfOriginalPerPeriod { .. } => {
-            if let Some(per) = params
-                .percent_per
-                .filter(|_| params.amort_dates.contains(&d))
-            {
-                emit_principal_repayment(
-                    d,
-                    params.ccy,
-                    outstanding,
-                    per.min(*outstanding),
-                    new_flows,
-                )?;
-            }
+        PreparedAmortization::OriginalPercent { installment } if on_boundary => *installment,
+        PreparedAmortization::RemainingPercent { fraction } if on_boundary => {
+            *outstanding * *fraction
         }
-        AmortizationSpec::PercentOfRemainingPerPeriod { .. } => {
-            if let Some(pct) = params
-                .percent_remaining
-                .filter(|_| params.amort_dates.contains(&d))
-            {
-                let pay = *outstanding * pct;
-                emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
-            }
-        }
-        AmortizationSpec::LinearBetween { .. } => {
-            if let Some((_, last, installment)) = params
-                .linear_between
-                .filter(|(start, last, _)| d > *start && d <= *last)
-                .filter(|_| params.amort_dates.contains(&d))
-            {
-                let pay = if d == last {
+        PreparedAmortization::LinearBetween { start, end, .. }
+            if on_boundary && d > *start && d <= *end =>
+        {
+            if let Some(installment) = linear_between_installment {
+                if d == *end {
                     *outstanding
                 } else {
-                    installment.min(*outstanding)
-                };
-                emit_principal_repayment(d, params.ccy, outstanding, pay, new_flows)?;
-            }
-        }
-        AmortizationSpec::CustomPrincipal { .. } => {
-            if let Some(amt) = params
-                .custom_principal_map
-                .as_ref()
-                .and_then(|map| map.get(&d))
-            {
-                let amount = f64_to_decimal(amt.amount())?;
-                if amount > *outstanding {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "CustomPrincipal repayment {amount} exceeds outstanding principal {outstanding} on {d}"
-                    )));
+                    installment
                 }
-                emit_principal_repayment(d, params.ccy, outstanding, amount, new_flows)?;
+            } else {
+                Decimal::ZERO
             }
         }
-    }
-    Ok(())
+        PreparedAmortization::CustomPrincipal(map) => {
+            let amount = map
+                .get(&d)
+                .map(|money| f64_to_decimal(money.amount()))
+                .transpose()?
+                .unwrap_or_default();
+            if amount > *outstanding {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "CustomPrincipal repayment {amount} exceeds outstanding principal {outstanding} on {d}"
+                )));
+            }
+            amount
+        }
+        _ => Decimal::ZERO,
+    };
+    emit_principal_repayment(d, ccy, outstanding, pay, new_flows)
 }

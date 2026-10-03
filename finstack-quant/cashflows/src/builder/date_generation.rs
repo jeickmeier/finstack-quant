@@ -6,7 +6,7 @@
 //! ## Responsibilities
 //!
 //! - Generate skeletal periods for the canonical `build_periods` API
-//! - Create helper maps for compiler previous-date lookups
+//! - Classify compiler periods using contractual stub metadata
 //! - Apply business day adjustments using calendars
 
 use super::calendar::resolve_calendar_strict;
@@ -236,60 +236,44 @@ pub(crate) fn build_schedule_period(
     })
 }
 
-/// Payment-date indexed schedule: `(payment_dates, period_by_payment_date, stub_payment_dates)`.
-pub(crate) type IndexedPeriods = (
-    Vec<Date>,
-    finstack_quant_core::HashMap<Date, SchedulePeriod>,
-    finstack_quant_core::HashSet<Date>,
-);
+/// One contractual period and its original-grid stub classification.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct CompiledPeriod {
+    pub(crate) period: SchedulePeriod,
+    pub(crate) is_stub: bool,
+}
 
-/// Convert a generated schedule into the compiler's payment-date index form.
+/// Classify periods without duplicating their accrual and payment dates.
 ///
 /// # Arguments
 ///
-/// * `periods` - Generated contractual accrual periods and their adjusted payment dates.
-/// * `frequency` - Effective coupon tenor for classifying plain-grid regular coupons.
-/// * `roll_rule` - Explicit quarterly grid used to distinguish its regular coupons from stubs.
+/// * `periods` - Ordered contractual accrual periods and their adjusted payment dates.
+/// * `frequency` - Effective coupon tenor used to classify plain-grid regular coupons.
+/// * `roll_rule` - Explicit quarterly grid distinguishing regular coupons from stubs.
 ///
 /// # Errors
 ///
-/// Returns `Error::Validation` when two distinct accrual periods adjust to the
-/// same payment date (e.g. a daily-tenor schedule rolling a weekend with
-/// `Following`, or a one-day stub adjacent to a holiday). A last-writer-wins
-/// map would silently drop one of the periods' coupons.
-pub(crate) fn index_period_schedule(
+/// Rejects distinct periods that adjust to the same payment date.
+pub(crate) fn compile_periods(
     periods: Vec<SchedulePeriod>,
     frequency: Tenor,
     roll_rule: RollRule,
-) -> finstack_quant_core::Result<IndexedPeriods> {
-    let dates = periods.iter().map(|period| period.payment_date).collect();
-    // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)).
-    let first_or_last = periods
-        .iter()
-        .filter(|period| {
+) -> finstack_quant_core::Result<Vec<CompiledPeriod>> {
+    validate_unique_payment_dates(&periods)?;
+    Ok(periods
+        .into_iter()
+        .map(|period| {
+            // Regularity uses unadjusted dates (ISDA 2006 §4.16(c)).
             let start = period.unadjusted_start;
             let end = period.unadjusted_end;
-            match roll_rule {
+            let is_stub = match roll_rule {
                 RollRule::Imm => !is_imm_date(start) || next_imm(start).ok() != Some(end),
                 RollRule::CdsImm => !is_cds_date(start) || next_cds_date(start).ok() != Some(end),
                 RollRule::None => !is_regular_period(start, end, frequency),
-            }
+            };
+            CompiledPeriod { period, is_stub }
         })
-        .map(|period| period.payment_date)
-        .collect();
-    let mut period_map: finstack_quant_core::HashMap<Date, SchedulePeriod> =
-        finstack_quant_core::HashMap::default();
-    period_map.reserve(periods.len());
-    for period in &periods {
-        if let Some(previous) = period_map.insert(period.payment_date, *period) {
-            return Err(duplicate_payment_date_error(
-                period.payment_date,
-                previous,
-                *period,
-            ));
-        }
-    }
-    Ok((dates, period_map, first_or_last))
+        .collect())
 }
 
 pub(crate) fn validate_unique_payment_dates(
@@ -418,30 +402,14 @@ pub(crate) fn generate_periods_with_adjustment(
         }
     }
 
-    let payment_dates: Option<Vec<Date>> = if adjust_accrual_dates {
-        let mut resolved = Vec::with_capacity(dates.len() - 1);
-        for window in adjusted.windows(2) {
-            let adjusted_end = window[1];
-            resolved.push(if payment_lag_days == 0 {
-                adjusted_end
-            } else {
-                adjusted_end.add_business_days(payment_lag_days, cal)?
-            });
-        }
-        Some(resolved)
-    } else {
-        None
-    };
-    let mut resolved_payments = payment_dates.into_iter().flatten();
-
     let mut periods = Vec::with_capacity(dates.len() - 1);
     for (raw, adj) in dates.windows(2).zip(adjusted.windows(2)) {
         let (raw_start, raw_end) = (raw[0], raw[1]);
         let adjusted_end = adj[1];
-        let payment_date = match resolved_payments.next() {
-            Some(date) => date,
-            None if payment_lag_days == 0 => adjusted_end,
-            None => adjusted_end.add_business_days(payment_lag_days, cal)?,
+        let payment_date = if payment_lag_days == 0 {
+            adjusted_end
+        } else {
+            adjusted_end.add_business_days(payment_lag_days, cal)?
         };
 
         let (accrual_start, accrual_end) = if adjust_accrual_dates {
@@ -595,10 +563,10 @@ mod tests {
         .expect("schedule should build");
 
         assert_eq!(periods.len(), 2);
-        let (_, _, stubs) = index_period_schedule(periods, Tenor::semi_annual(), RollRule::None)
-            .expect("period index");
+        let compiled =
+            compile_periods(periods, Tenor::semi_annual(), RollRule::None).expect("period index");
         assert!(
-            stubs.is_empty(),
+            compiled.iter().all(|entry| !entry.is_stub),
             "regular periods must not be tagged as stubs"
         );
     }
@@ -621,11 +589,11 @@ mod tests {
         .expect("schedule builds");
 
         assert_eq!(periods.len(), 2);
-        let (_, _, stubs) = index_period_schedule(periods, Tenor::semi_annual(), RollRule::None)
-            .expect("period index");
+        let compiled =
+            compile_periods(periods, Tenor::semi_annual(), RollRule::None).expect("period index");
         assert!(
-            stubs.is_empty(),
-            "adjusted regular periods must not be tagged as stubs: {stubs:?}"
+            compiled.iter().all(|entry| !entry.is_stub),
+            "adjusted regular periods must not be tagged as stubs: {compiled:?}"
         );
     }
 
@@ -644,13 +612,19 @@ mod tests {
         .expect("schedule should build");
 
         let first = periods[0];
-        let (_, _, stubs) = index_period_schedule(periods, Tenor::semi_annual(), RollRule::None)
-            .expect("period index");
+        let compiled =
+            compile_periods(periods, Tenor::semi_annual(), RollRule::None).expect("period index");
         assert!(
-            stubs.contains(&first.payment_date),
+            compiled
+                .iter()
+                .any(|entry| entry.is_stub && entry.period.payment_date == first.payment_date),
             "short-front stub must be tagged"
         );
-        assert_eq!(stubs.len(), 1, "only the genuine stub period is tagged");
+        assert_eq!(
+            compiled.iter().filter(|entry| entry.is_stub).count(),
+            1,
+            "only the genuine stub period is tagged"
+        );
     }
 
     #[test]
@@ -684,7 +658,7 @@ mod tests {
         )
         .expect("raw schedule should build");
 
-        let res = super::index_period_schedule(periods, Tenor::daily(), RollRule::None);
+        let res = super::compile_periods(periods, Tenor::daily(), RollRule::None);
         let err = res.expect_err("duplicate adjusted payment dates must error");
         assert!(
             err.to_string().contains("same payment date"),

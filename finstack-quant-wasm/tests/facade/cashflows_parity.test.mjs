@@ -100,9 +100,9 @@ const cases = {
       cashflows.CashFlowSchedule.builder()
         .principal(usd('1000000'), ISSUE, MATURITY)
         .principalExchange('initial_and_final')
-        .amortization(cashflows.amortizationSpecLinearTo(usd('400000')))
+        .amortization({ linear_to: { final_notional: usd('400000') } })
         .fixedCf(fixedSpec)
-        .fee(cashflows.feeSpecFixed('2025-07-15', usd('2500')))
+        .fee({ fixed: { date: '2025-07-15', amount: usd('2500') } })
         .addPrincipalEvent('2025-10-15', '2025-10-17', usd('-100000'), 'amortization')
         .build()
     ),
@@ -126,7 +126,7 @@ const cases = {
         .addFixedWindow('2026-01-15', MATURITY, { ...fixedSpec, rate: '0.08' })
         .paymentSplitProgram([
           ['2026-01-15', 'pik'],
-          [MATURITY, cashflows.couponTypeSplit('0.5', '0.5')],
+          [MATURITY, { split: { cash_fraction: '0.5', pik_fraction: '0.5' } }],
         ])
         .build()
     ),
@@ -351,7 +351,12 @@ const cases = {
       accrual_factor: 0.5,
       rate: 0.06,
     };
-    const accrual = { start: '2025-01-15', end: '2025-07-15', day_count: '30_360' };
+    const accrual = {
+      start: '2025-01-15',
+      end: '2025-07-15',
+      day_count: '30_360',
+      end_is_termination_date: false,
+    };
     return {
       parse: ['fixed', 'prepayment', 'collateral_substitution_out'].map((name) =>
         cashflows.cfKindParse(name)
@@ -367,40 +372,44 @@ const cases = {
       ),
       balance_date: [
         cashflows.cashFlowGetBalanceDate(flow),
-        cashflows.cashFlowGetBalanceDate(cashflows.cashFlowWithPrincipalDate(flow, '2025-07-11')),
+        cashflows.cashFlowGetBalanceDate({ ...flow, principal_date: '2025-07-11' }),
       ],
-      with_accrual: cashflows.cashFlowWithAccrual(flow, accrual),
-      with_principal_delta: cashflows.cashFlowWithPrincipalDelta(flow, usd('-1000')),
+      with_accrual: { ...flow, accrual },
+      with_principal_delta: { ...flow, principal_delta: usd('-1000') },
     };
   },
   // --- specs ---------------------------------------------------------------------
   'specs.amortization': () => [
-    cashflows.amortizationSpecLinearTo(usd('250000')),
-    cashflows.amortizationSpecStepRemaining([
-      ['2026-01-15', usd('750000')],
-      ['2027-01-15', usd('0')],
-    ]),
-    cashflows.amortizationSpecPercentOfOriginalPerPeriod(0.05),
-    cashflows.amortizationSpecPercentOfRemainingPerPeriod(0.1),
-    cashflows.amortizationSpecLinearBetween('2025-07-15', '2027-01-15'),
-    cashflows.amortizationSpecCustomPrincipal([['2026-01-15', usd('250000')]]),
+    { linear_to: { final_notional: usd('250000') } },
+    {
+      step_remaining: {
+        schedule: [
+          ['2026-01-15', usd('750000')],
+          ['2027-01-15', usd('0')],
+        ],
+      },
+    },
+    { percent_of_original_per_period: { pct: 0.05 } },
+    { percent_of_remaining_per_period: { pct: 0.1 } },
+    { linear_between: { start: '2025-07-15', end: '2027-01-15' } },
+    { custom_principal: { items: [['2026-01-15', usd('250000')]] } },
   ],
   'specs.coupon_fee_floating': () => [
-    cashflows.couponTypeSplit('0.6', '0.4'),
-    cashflows.feeBaseUndrawn(usd('5000000')),
-    cashflows.feeSpecFixed('2025-03-01', usd('25000')),
+    { split: { cash_fraction: '0.6', pik_fraction: '0.4' } },
+    { undrawn: { commitment: usd('5000000') } },
+    { fixed: { date: '2025-03-01', amount: usd('25000') } },
     cashflows.feeSpecPeriodicBp({
-      base: cashflows.feeBaseUndrawn(usd('5000000')),
+      base: { undrawn: { commitment: usd('5000000') } },
       bp: '37.5',
       frequency: { count: 3, unit: 'months' },
       day_count: 'act_360',
       business_day_convention: 'modified_following',
       calendar_id: 'usny',
     }),
-    cashflows.floatingRateFallbackFixedRate('0.03'),
-    cashflows.floatingLegCompoundingCompoundedInArrears(5),
-    cashflows.floatingLegCompoundingCompoundedWithObservationShift(2),
-    cashflows.floatingLegCompoundingRateCutoff(3),
+    { fixed_rate: '0.03' },
+    { compounded_in_arrears: { lookback_days: 5 } },
+    { compounded_with_observation_shift: { shift_days: 2 } },
+    { compounded_with_rate_cutoff: { cutoff_days: 3 } },
     cashflows.floatingRateSpecSofr('150'),
     cashflows.floatingRateSpecSonia('25.5'),
     cashflows.floatingRateSpecEuribor3m('-10'),
@@ -443,7 +452,7 @@ const cases = {
   },
   'specs.recovery_model': () => {
     const flat = { rate: 0.4, recovery_lag: 6 };
-    const vector = cashflows.recoveryModelSpecWithSeverityVector(flat, [0.7, 0.6, 0.55]);
+    const vector = { ...flat, severity_vector: [0.7, 0.6, 0.55] };
     return {
       vector,
       recovery_rate: [flat, vector].map((model) =>
@@ -628,7 +637,7 @@ test('spec functions validate through Rust and reject wrong host types', () => {
     () =>
       cashflows.notionalValidate({
         initial: usd('100'),
-        amort: cashflows.amortizationSpecLinearTo(usd('200')),
+        amort: { linear_to: { final_notional: usd('200') } },
       }),
     kind('validation', /cannot exceed initial notional/)
   );
@@ -681,14 +690,6 @@ test('spec functions validate through Rust and reject wrong host types', () => {
   assert.throws(
     () => cashflows.cfKindIsInterestLike('coupon-ish'),
     kind('validation', /kind: unknown variant `coupon-ish`/)
-  );
-  assert.throws(
-    () => cashflows.couponTypeSplit(0.5, '0.5'),
-    kind('invalid_type', /^cashFraction: /)
-  );
-  assert.throws(
-    () => cashflows.couponTypeSplit('half', '0.5'),
-    kind('validation', /cashFraction: invalid value/)
   );
   assert.throws(
     () => cashflows.defaultModelSpecMdr(cashflows.defaultModelSpecCdr2pct(), 1.5),
@@ -770,9 +771,6 @@ test('CFCC-010: compounding presets and default-model survival helpers come from
   });
   assert.deepEqual(cashflows.floatingLegCompoundingSoniaObservationShift(), {
     compounded_with_observation_shift: { shift_days: 5 },
-  });
-  assert.deepEqual(cashflows.floatingLegCompoundingRateCutoff(2), {
-    compounded_with_rate_cutoff: { cutoff_days: 2 },
   });
   assert.equal(cashflows.floatingLegCompoundingIsOvernight('simple'), false);
   assert.equal(cashflows.floatingLegCompoundingIsOvernight('simple_average'), true);

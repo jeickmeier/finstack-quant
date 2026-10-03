@@ -64,16 +64,14 @@ pub(in crate::builder) fn emit_fees_on(
     new_flows: &mut Vec<CashFlow>,
 ) -> finstack_quant_core::Result<()> {
     for pf in periodic_fees {
-        let first = pf.dates.partition_point(|date| {
-            pf.prev
-                .get(date)
-                .is_none_or(|period| period.accrual_end < d)
-        });
-        for period in pf.dates[first..]
+        let first = pf
+            .periods
+            .partition_point(|entry| entry.period.accrual_end < d);
+        for entry in pf.periods[first..]
             .iter()
-            .filter_map(|date| pf.prev.get(date))
-            .take_while(|period| period.accrual_end == d)
+            .take_while(|entry| entry.period.accrual_end == d)
         {
+            let period = &entry.period;
             let mut segments = super::balances::balance_segments(
                 outstanding_history,
                 period.accrual_start,
@@ -184,19 +182,15 @@ mod tests {
         accrual_basis: FeeAccrualBasis,
         base: FeeBase,
     ) -> PeriodicFee {
-        let mut prev = finstack_quant_core::HashMap::default();
-        prev.insert(
+        let period = SchedulePeriod {
+            accrual_start,
+            accrual_end,
             payment_date,
-            SchedulePeriod {
-                accrual_start,
-                accrual_end,
-                payment_date,
-                reset_date: None,
-                accrual_year_fraction: 0.0,
-                unadjusted_start: accrual_start,
-                unadjusted_end: accrual_end,
-            },
-        );
+            reset_date: None,
+            accrual_year_fraction: 0.0,
+            unadjusted_start: accrual_start,
+            unadjusted_end: accrual_end,
+        };
         PeriodicFee {
             calendar_id: "weekends_only".to_owned(),
             base,
@@ -206,8 +200,10 @@ mod tests {
             stub: finstack_quant_core::dates::StubKind::ShortBack,
             calendar: crate::builder::calendar::resolve_calendar_strict("weekends_only")
                 .expect("weekends_only calendar should resolve"),
-            dates: vec![payment_date],
-            prev,
+            periods: vec![crate::builder::date_generation::CompiledPeriod {
+                period,
+                is_stub: false,
+            }],
             accrual_basis,
             terminal_accrual_end: Some(accrual_end),
         }

@@ -382,8 +382,6 @@ pub struct PyAccrualIndex {
     pub(crate) inner: AccrualIndex,
     /// Currency of the indexed schedule (for repr and Money results).
     currency: finstack_quant_core::currency::Currency,
-    /// Number of coupon periods indexed (for repr).
-    periods: usize,
 }
 
 #[pymethods]
@@ -423,14 +421,9 @@ impl PyAccrualIndex {
     ) -> PyResult<Self> {
         let schedule = schedule.inner.clone();
         let currency = schedule.get_notional().currency();
-        let periods = schedule.coupons().count();
         let cfg = config.map_or_else(AccrualConfig::default, |c| c.inner.clone());
         py.detach(move || AccrualIndex::build(&schedule, &cfg))
-            .map(|inner| Self {
-                inner,
-                currency,
-                periods,
-            })
+            .map(|inner| Self { inner, currency })
             .map_err(core_to_py)
     }
 
@@ -467,10 +460,7 @@ impl PyAccrualIndex {
 
     /// Python-style summary.
     fn __repr__(&self) -> String {
-        format!(
-            "AccrualIndex(periods={}, currency='{}')",
-            self.periods, self.currency
-        )
+        format!("AccrualIndex(currency='{}')", self.currency)
     }
 }
 

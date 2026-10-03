@@ -4,7 +4,7 @@ use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 
 use crate::builder::orchestrator::{CashFlowBuilder, PrincipalEvent};
-use crate::builder::{AmortizationSpec, Notional, PrincipalExchange};
+use crate::builder::{AmortizationSpec, PrincipalExchange};
 use crate::primitives::CFKind;
 
 impl CashFlowBuilder {
@@ -25,10 +25,7 @@ impl CashFlowBuilder {
     /// Mutable builder reference for fluent chaining.
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn principal(&mut self, initial: Money, issue_date: Date, maturity: Date) -> &mut Self {
-        self.notional = Some(Notional {
-            initial,
-            amort: self.amortization.clone().unwrap_or(AmortizationSpec::None),
-        });
+        self.initial_principal = Some(initial);
         self.issue = Some(issue_date);
         self.maturity = Some(maturity);
         self
@@ -89,12 +86,13 @@ impl CashFlowBuilder {
     /// Configures amortization for the instrument notional.
     ///
     /// This may be called before or after [`principal`](Self::principal).
+    ///
+    /// # Arguments
+    ///
+    /// * `spec` - Contractual repayment rule, with monetary targets in the principal currency.
     #[must_use = "builder methods should be chained or terminated with .build(...)"]
     pub fn amortization(&mut self, spec: AmortizationSpec) -> &mut Self {
-        self.amortization = Some(spec.clone());
-        if let Some(n) = &mut self.notional {
-            n.amort = spec;
-        }
+        self.amortization = spec;
         self
     }
 

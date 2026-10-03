@@ -22,16 +22,37 @@ pub(crate) fn repr_from_serde<T: serde::Serialize>(type_name: &str, value: &T) -
     let Ok(Value::Object(map)) = serde_json::to_value(value) else {
         return format!("{type_name}(...)");
     };
-    let total = map.len();
+    format!("{type_name}({})", render_fields(&map))
+}
+
+/// Render externally tagged enums using the same bounded field renderer.
+pub(crate) fn enum_repr_from_serde<T: serde::Serialize>(type_name: &str, value: &T) -> String {
+    match serde_json::to_value(value) {
+        Ok(Value::String(variant)) => format!("{type_name}.{}", variant.to_ascii_uppercase()),
+        Ok(Value::Object(map)) if map.len() == 1 => {
+            let Some((variant, payload)) = map.iter().next() else {
+                return format!("{type_name}(...)");
+            };
+            let fields = match payload {
+                Value::Object(fields) => render_fields(fields),
+                other => render(other),
+            };
+            format!("{type_name}.{variant}({fields})")
+        }
+        _ => format!("{type_name}(...)"),
+    }
+}
+
+fn render_fields(map: &serde_json::Map<String, Value>) -> String {
     let mut parts: Vec<String> = map
         .iter()
         .take(MAX_FIELDS)
         .map(|(k, v)| format!("{k}={}", render(v)))
         .collect();
-    if total > MAX_FIELDS {
+    if map.len() > MAX_FIELDS {
         parts.push("...".to_string());
     }
-    format!("{type_name}({})", parts.join(", "))
+    parts.join(", ")
 }
 
 /// Render one field value, summarising anything unbounded.
