@@ -3438,6 +3438,13 @@
             "type_name": "ValuationResult",
             "kind": "output",
             "bytes": 60306
+          },
+          {
+            "path": "schemas/results/1/var_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/var_result.schema.json",
+            "type_name": "VarResult",
+            "kind": "output",
+            "bytes": 3032
           }
         ]
       },
@@ -5547,6 +5554,14 @@
             "type_name": "ValuationResult",
             "kind": "output",
             "bytes": 60306
+          },
+          {
+            "domain": "valuations",
+            "path": "schemas/results/1/var_result.schema.json",
+            "$id": "https://finstack_quant.dev/schemas/results/1/var_result.schema.json",
+            "type_name": "VarResult",
+            "kind": "output",
+            "bytes": 3032
           }
         ]
       },

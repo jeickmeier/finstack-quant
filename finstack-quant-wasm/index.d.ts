@@ -21230,6 +21230,450 @@ export interface CdsTrancheBuilderConstructor {
 }
 
 /**
+ * Typed handle on the Rust `CdsOption` instrument: a European option on a single-name or index CDS, struck on a forward spread or a clean index price.
+ *
+ * A call is the right to buy protection (payer), a put the right to sell it (receiver); `delta`, `gamma`, `vega`, `theta` and `implied_vol` are metric ids of `price` / `metric`. Every public Rust field is a read-only property.
+ */
+export interface CdsOption extends WasmOwned {
+  /**
+   * Instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
+   */
+  readonly id: string;
+  /**
+   * Serialize to the canonical `finstack_quant.instrument/1` envelope.
+   *
+   * The output is compact JSON, byte-identical to the Python `to_json()` of the same instrument; pass it to `valuations.instruments.priceInstrument` or `fromJson`.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toJson(): string;
+  /**
+   * Canonical model key used when `model="default"` is passed to `price`.
+   * @returns Registered model key of the Bloomberg CDSO quadrature pricer.
+   */
+  readonly defaultModel: string;
+  /**
+   * Instrument attributes (tags and metadata) used for scenario selection.
+   * @returns The attribute bag; empty when none were set.
+   */
+  readonly attributes: generated.valuations.CdsOption['attributes'];
+  /**
+   * Option strike in its serde form.
+   * @returns `{ spread: "<decimal rate>" }` or `{ clean_price_pct: "<price points>" }`.
+   */
+  readonly strike: generated.valuations.CdsOption['strike'];
+  /**
+   * Option type of this `CdsOption`.
+   * @returns `"call"` (right to buy protection) or `"put"` (right to sell protection).
+   */
+  readonly optionType: generated.valuations.CdsOption['option_type'];
+  /**
+   * Exercise style; only European prices.
+   * @returns `"european"`, `"american"` or `"bermudan"`.
+   */
+  readonly exerciseStyle: generated.valuations.CdsOption['exercise_style'];
+  /**
+   * Legal option expiry date.
+   * @returns ISO-8601 expiry date.
+   */
+  readonly expiry: string;
+  /**
+   * Maturity of the underlying CDS.
+   * @returns ISO-8601 maturity date.
+   */
+  readonly underlyingMaturity: string;
+  /**
+   * Option notional.
+   * @returns Currency-tagged notional of the underlying CDS.
+   */
+  readonly notional: Money;
+  /**
+   * Settlement type of the exercise proceeds.
+   * @returns `"cash"` or `"physical"`.
+   */
+  readonly settlement: generated.valuations.CdsOption['settlement'];
+  /**
+   * Explicit option premium payment date.
+   * @returns The date, or `null` for the convention settlement lag.
+   */
+  readonly premiumSettlementDate: string | null;
+  /**
+   * Explicit exercise proceeds payment date.
+   * @returns The date, or `null` for legal expiry.
+   */
+  readonly exerciseSettlementDate: string | null;
+  /**
+   * Explicit accrual-effective date of the underlying CDS.
+   * @returns The date, or `null` when `protectionStartConvention` selects it.
+   */
+  readonly underlyingStartDate: string | null;
+  /**
+   * Accrual-start convention of the synthetic underlying CDS.
+   * @returns `"spot"` or `"forward"`.
+   */
+  readonly protectionStartConvention: NonNullable<generated.valuations.CdsOption['protection_start_convention']>;
+  /**
+   * Whether the option knocks out on default before expiry.
+   * @returns `true` for knock-out options.
+   */
+  readonly knockout: boolean;
+  /**
+   * Recovery rate assumption.
+   * @returns Recovery as a decimal (`0.4` = 40%).
+   */
+  readonly recoveryRate: number;
+  /**
+   * Discount curve identifier.
+   * @returns Discount curve id in the market context.
+   */
+  readonly discountCurveId: string;
+  /**
+   * Hazard (credit) curve identifier.
+   * @returns Hazard curve id in the market context.
+   */
+  readonly creditCurveId: string;
+  /**
+   * Volatility surface identifier.
+   * @returns Vol surface id in the market context.
+   */
+  readonly volSurfaceId: string;
+  /**
+   * ISDA convention of the underlying CDS (serde name).
+   * @returns `"isda_na"`, `"isda_eu"`, `"isda_as"` or `"custom"`.
+   */
+  readonly underlyingConvention: NonNullable<generated.valuations.CdsOption['underlying_convention']>;
+  /**
+   * Whether the underlying is a CDS index.
+   * @returns `true` for an index option, `false` for a single name.
+   */
+  readonly underlyingIsIndex: boolean;
+  /**
+   * Current index factor `f`.
+   * @returns Surviving fraction of original index notional, in `(0, 1]`.
+   */
+  readonly indexFactor: number;
+  /**
+   * Original index factor `f0` of a clean-price strike.
+   * @returns The factor, or `null` for spread strikes.
+   */
+  readonly strikeIndexFactor: number | null;
+  /**
+   * Settled cumulative index loss since option inception.
+   * @returns Decimal fraction of original index notional.
+   */
+  readonly realizedLoss: number;
+  /**
+   * Running coupon of the underlying CDS in basis points.
+   * @returns The coupon, or `null` when the strike spread is the coupon.
+   */
+  readonly couponBp: number | null;
+  /**
+   * The bare instrument spec as a plain object (no envelope).
+   *
+   * Mirrors Python `to_dict()`: the serde form of the Rust struct, i.e. the `instrument.spec` payload of `toJson()`.
+   * @returns Plain-object instrument spec.
+   * @throws Error - Throws if the instrument cannot be serialized.
+   */
+  toDict(): generated.valuations.CdsOption;
+  /**
+   * Market data this instrument needs to price (mirrors Rust `Instrument::market_dependencies`).
+   * @returns `MarketDependencies` plain object listing discount, forward and credit curves, spot ids, volatility surfaces, FX pairs and fixing series.
+   * @throws Error - Throws with kind `validation` if the instrument cannot enumerate its dependencies.
+   */
+  marketDependencies(): generated.valuations.MarketDependencies;
+  /**
+   * Price the instrument against a market snapshot.
+   *
+   * Same pipeline and arguments as `valuations.instruments.priceInstrument`.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @param metrics - Optional canonical metric IDs such as `"dv01"` or `"cs01"`. Omit, `null`, or `undefined` for a valuation-only result.
+   * @param metricPricingOverrides - Optional `MetricPricingOverrides` (JSON string or plain object) merged into the envelope before validation.
+   * @param marketHistory - Optional `MarketHistory` (JSON string or plain object) required by historical risk metrics such as historical VaR.
+   * @returns Structured `ValuationResult` for the selected model.
+   * @throws Error - Throws with kind `validation` if a payload, `asOf`, `model`, or a metric identifier is invalid; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if pricing or a metric fails.
+   */
+  price(
+    marketJson: JsonInput,
+    asOf: string,
+    model?: string | null,
+    metrics?: string[] | null,
+    metricPricingOverrides?: JsonInput | null,
+    marketHistory?: JsonInput | null
+  ): ValuationResult;
+  /**
+   * Compute one metric of the instrument against a market snapshot.
+   *
+   * The same Rust metric path as `price(..., [metricId])`, returning just the value.
+   * @param marketJson - Canonical market-context JSON (string or plain object) supplying curves, quotes, and FX data.
+   * @param asOf - ISO-8601 valuation date used to resolve date-dependent market data.
+   * @param metricId - Fully qualified metric identifier, e.g. `"dv01"` or `"par_rate"`.
+   * @param model - Optional pricing-model identifier; omit to use the instrument's default model.
+   * @returns The metric value in the metric's documented unit.
+   * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
+   */
+  metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+}
+
+/**
+ * Constructor surface for the typed `CdsOption` WebAssembly instrument.
+ * @example
+ * ```typescript
+ * import init, { valuations } from "finstack-quant-wasm";
+ * await init();
+ * const option = valuations.instruments.CdsOption.example();
+ * console.log(option.id, option.optionType, option.strike);
+ * option.free();
+ * ```
+ */
+export interface CdsOptionConstructor {
+  /**
+   * JavaScript prototype of `CdsOption`; instances come from the static factories, not `new`.
+   */
+  readonly prototype: CdsOption;
+  /**
+   * Deserialize the instrument from its canonical v1 envelope.
+   *
+   * Bare payloads are rejected; the loader's validation runs on the result.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
+   */
+  fromJson(json: JsonInput): CdsOption;
+  /**
+   * Create a fluent builder (mirrors the Rust `builder()`).
+   *
+   * Each setter stores one field and returns the builder; `build()` validates and consumes it.
+   * @returns An empty builder.
+   */
+  builder(): CdsOptionBuilder;
+  /**
+   * Canonical 100bp-strike call on a 5-year USD 10,000,000 corporate CDS (mirrors Rust `CdsOption::example`): expiry 2025-06-20, CDS maturity 2030-06-20, cash settlement, 40% recovery, curves `USD-OIS` / `CORP-HAZARD`, vol surface `CDSOPT-VOL`.
+   * @returns The example option.
+   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
+   */
+  example(): CdsOption;
+}
+
+/**
+ * Fluent builder for `CdsOption`; one setter per Rust `FinancialBuilder` setter.
+ *
+ * Required: `id`, `strike`, `optionType`, `exerciseStyle`, `expiry`, `underlyingMaturity`, `notional`, `settlement`, `recoveryRate`, `discountCurveId`, `creditCurveId`, `volSurfaceId` and `underlyingIsIndex`. Every setter returns the builder, so calls chain; `build()` validates and consumes it.
+ */
+export interface CdsOptionBuilder extends WasmOwned {
+  /**
+   * Validate the staged fields and build the instrument.
+   *
+   * Runs the Rust `build()` validation and consumes the builder; create a new builder for the next instrument.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed, a required field is missing (the message names the field), or validation fails.
+   */
+  build(): CdsOption;
+  /**
+   * Set the instrument identifier.
+   * @param value - Unique identifier for the option.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  id(value: string): CdsOptionBuilder;
+  /**
+   * Strike for this `CdsOptionBuilder`.
+   * @param value - `{ spread: "0.0325" }` (decimal forward spread) or `{ clean_price_pct: "107.0" }` (clean price points), as a plain object or JSON string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  strike(value: generated.valuations.CdsOption['strike'] | string): CdsOptionBuilder;
+  /**
+   * Set the option type.
+   * @param value - `"call"` buys protection at expiry, `"put"` sells it.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  optionType(value: 'call' | 'put'): CdsOptionBuilder;
+  /**
+   * Set the exercise style.
+   * @param value - `"european"`, `"american"` or `"bermudan"`; pricing supports European only.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  exerciseStyle(value: generated.valuations.CdsOption['exercise_style']): CdsOptionBuilder;
+  /**
+   * Set the option expiry date.
+   * @param value - Legal expiry as an ISO-8601 string; must precede the underlying maturity.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  expiry(value: string): CdsOptionBuilder;
+  /**
+   * Set the underlying CDS maturity date.
+   * @param value - Maturity of the CDS delivered or cash-settled at exercise, as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  underlyingMaturity(value: string): CdsOptionBuilder;
+  /**
+   * Set the option notional.
+   * @param value - Positive notional of the underlying CDS, as a `Money` handle.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `validation` if the builder was already consumed by `build()`.
+   */
+  notional(value: Money): CdsOptionBuilder;
+  /**
+   * Set the settlement type.
+   * @param value - `"cash"` or `"physical"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  settlement(value: generated.valuations.CdsOption['settlement']): CdsOptionBuilder;
+  /**
+   * Set the option premium payment date.
+   * @param value - Premium payment date as an ISO-8601 string; when never set the CDS convention settlement lag applies.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  premiumSettlementDate(value: string): CdsOptionBuilder;
+  /**
+   * Set the exercise proceeds payment date.
+   * @param value - On or after expiry and before CDS maturity, as an ISO-8601 string; when never set legal expiry is used.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  exerciseSettlementDate(value: string): CdsOptionBuilder;
+  /**
+   * Set the underlying CDS accrual-effective date.
+   * @param value - Accrual start for the forward spread and risky annuity, as an ISO-8601 string.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  underlyingStartDate(value: string): CdsOptionBuilder;
+  /**
+   * Set the underlying accrual-start convention.
+   * @param value - `"spot"` (default, prior CDS roll) or `"forward"` (option expiry).
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  protectionStartConvention(value: 'spot' | 'forward'): CdsOptionBuilder;
+  /**
+   * Set whether the option knocks out on default before expiry.
+   * @param value - `true` for knock-out single-name options; default `false`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  knockout(value: boolean): CdsOptionBuilder;
+  /**
+   * Set the recovery rate assumption.
+   * @param value - Recovery as a decimal in `[0, 1]`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  recoveryRate(value: number): CdsOptionBuilder;
+  /**
+   * Set the discount curve identifier.
+   * @param value - Discount curve id in the market context.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  discountCurveId(value: string): CdsOptionBuilder;
+  /**
+   * Set the hazard (credit) curve identifier.
+   * @param value - Hazard curve id in the market context.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  creditCurveId(value: string): CdsOptionBuilder;
+  /**
+   * Set the volatility surface identifier.
+   * @param value - Vol surface id in the market context.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  volSurfaceId(value: string): CdsOptionBuilder;
+  /**
+   * Set the ISDA convention of the underlying CDS.
+   * @param value - `"isda_na"` (default), `"isda_eu"`, `"isda_as"` or `"custom"`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  underlyingConvention(value: NonNullable<generated.valuations.CdsOption['underlying_convention']>): CdsOptionBuilder;
+  /**
+   * Set whether the underlying is a CDS index.
+   * @param value - `true` for an index option (no knock-out, index factor applies), `false` for a single name.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  underlyingIsIndex(value: boolean): CdsOptionBuilder;
+  /**
+   * Set the current index factor.
+   * @param value - Surviving fraction of the original index notional, in `(0, 1]`; default `1.0`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  indexFactor(value: number): CdsOptionBuilder;
+  /**
+   * Set the original index factor of a clean-price strike.
+   * @param value - `f0` the clean-price strike is quoted on.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  strikeIndexFactor(value: number): CdsOptionBuilder;
+  /**
+   * Set the settled cumulative index loss since option inception.
+   * @param value - Decimal fraction of original index notional in `[0, 1]`; default `0.0`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  realizedLoss(value: number): CdsOptionBuilder;
+  /**
+   * Set the running coupon of the underlying CDS.
+   * @param value - Coupon in basis points (`100` for CDX.NA.IG, `500` for CDX.NA.HY); when never set the strike spread is the coupon.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  couponBp(value: number): CdsOptionBuilder;
+  /**
+   * Set instrument attributes (tags and metadata).
+   * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  attributes(value: JsonInput): CdsOptionBuilder;
+}
+
+/**
+ * Constructor surface for the `CdsOptionBuilder` WebAssembly class.
+ * @example
+ * ```typescript
+ * import init, { core, valuations } from "finstack-quant-wasm";
+ * await init();
+ * const option = valuations.instruments.CdsOption.builder()
+ *   .id("CDSO-1")
+ *   .strike({ spread: "0.0125" })
+ *   .optionType("put")
+ *   .exerciseStyle("european")
+ *   .expiry("2025-06-20")
+ *   .underlyingMaturity("2030-06-20")
+ *   .notional(new core.Money(5_000_000, new core.Currency("USD")))
+ *   .settlement("physical")
+ *   .recoveryRate(0.4)
+ *   .discountCurveId("USD-OIS")
+ *   .creditCurveId("CORP-HAZARD")
+ *   .volSurfaceId("CDSOPT-VOL")
+ *   .underlyingIsIndex(false)
+ *   .build();
+ * console.log(option.optionType, option.settlement);
+ * option.free();
+ * ```
+ */
+export interface CdsOptionBuilderConstructor {
+  /**
+   * JavaScript prototype of `CdsOptionBuilder`; instances come from `valuations.instruments.CdsOption.builder()`, not `new`.
+   */
+  readonly prototype: CdsOptionBuilder;
+}
+
+/**
  * Typed handle on the Rust `ConvertibleBond` instrument.
  *
  * Every public Rust field is a read-only property; `price` and `metric` run the same pricer as `valuations.instruments.priceInstrument`.
@@ -23557,6 +24001,32 @@ export interface ValuationInstrumentsNamespace {
     model: string
   ): generated.valuations.InstrumentCashflowEnvelope;
   /**
+   * Historical VaR and expected shortfall of a list of instruments.
+   *
+   * Mirrors Rust `metrics::risk::calculate_var_with_pricing`: every instrument
+   * is repriced under every `historyJson` scenario, the per-scenario P&Ls are
+   * summed across instruments, and VaR / ES are read off that single portfolio
+   * distribution (R type-7 linear-interpolated quantile), so offsetting
+   * positions diversify. Quote-recalibrated shocks (credit spreads) use the
+   * same recalibration provider as `priceInstrument`.
+   * @param instrumentsJson - Array of `finstack_quant.instrument/1` envelopes (JSON strings or plain objects), or one JSON string holding that array; an empty array returns zero VaR and ES.
+   * @param marketJson - Unshocked base market (JSON string or plain object) every scenario perturbs.
+   * @param historyJson - `MarketHistory` (JSON string or plain object); a non-empty portfolio needs at least one scenario.
+   * @param asOf - ISO-8601 valuation date for the base and every scenario revaluation.
+   * @param config - Optional `VarConfig` (JSON string or plain object): `confidence_level` (decimal in `(0, 1)`), `method` (`"full_revaluation"` or `"taylor_approximation"`) and `reporting_currency` (required for mixed-currency portfolios). Omit for the Rust default: 95%, full revaluation, natural currency.
+   * @param model - Optional model key applied to every instrument; omit or `"default"` for each instrument's canonical pricing path.
+   * @returns `VarResult` plain object: `var`, `expected_shortfall` (losses negative), the worst-first `pnl_distribution`, `num_scenarios`, `confidence_level`, `skipped_fx` and `skipped_vol`.
+   * @throws Error - Throws with kind `validation` if an envelope, the market, history, config, `asOf` or `model` is invalid, the confidence level is outside `(0, 1)`, a non-empty portfolio has no scenarios, or a mixed-currency portfolio has no reporting currency; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if a scenario revaluation fails.
+   */
+  calculateVarWithPricing(
+    instrumentsJson: JsonInput[] | string,
+    marketJson: JsonInput,
+    historyJson: JsonInput,
+    asOf: string,
+    config?: generated.valuations.VarConfig | string | null,
+    model?: string | null
+  ): generated.valuations.VarResult;
+  /**
    * List every pricing model key registered in the standard pricer registry.
    *
    * The list is registry-derived rather than enum-derived, so it reflects real
@@ -23790,6 +24260,14 @@ export interface ValuationInstrumentsNamespace {
    * Fluent `CdsTrancheBuilder` class (see `CdsTrancheBuilderConstructor`).
    */
   CdsTrancheBuilder: CdsTrancheBuilderConstructor;
+  /**
+   * Typed `CdsOption` instrument class (see `CdsOptionConstructor`).
+   */
+  CdsOption: CdsOptionConstructor;
+  /**
+   * Fluent `CdsOptionBuilder` class (see `CdsOptionBuilderConstructor`).
+   */
+  CdsOptionBuilder: CdsOptionBuilderConstructor;
   /**
    * Typed `ConvertibleBond` instrument class (see `ConvertibleBondConstructor`).
    */
@@ -24162,6 +24640,19 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws with kind `validation` if `json` is malformed, fails instrument validation, or carries another instrument type.
    */
   validateTypedInstrumentJson(typeTag: string, json: JsonInput): string;
+  /**
+   * Wrap a bare instrument spec in the canonical envelope after validating it.
+   *
+   * Mirrors Rust `pricer::instrument_envelope_from_spec`. This is the
+   * construction route for every instrument type without a typed class (FRA,
+   * deposit, inflation swaps, exotics, ...): build the type's `spec` object and
+   * pass the returned envelope to `priceInstrument` or `instrumentCashflows`.
+   * @param typeTag - Canonical instrument discriminator, one of `valuations.schema.instrumentTypes()`, e.g. `"forward_rate_agreement"` or `"fx_spot"`.
+   * @param spec - The bare `spec` object for that type (plain object or JSON string); tagged `{type, spec}` payloads and envelopes are rejected.
+   * @returns The compact canonical `finstack_quant.instrument/1` envelope JSON.
+   * @throws Error - Throws with kind `validation` if `spec` is not a bare object, does not deserialize as a `typeTag` instrument, or fails instrument validation; kind `invalid_type` for a wrong argument type.
+   */
+  instrumentEnvelopeFromSpec(typeTag: string, spec: JsonInput): string;
   /**
    * Pretty-print a canonical instrument envelope.
    *

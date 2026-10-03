@@ -17,6 +17,7 @@
 #[macro_use]
 mod macros;
 
+pub mod cds_option;
 pub mod credit;
 pub mod data;
 pub mod equity;

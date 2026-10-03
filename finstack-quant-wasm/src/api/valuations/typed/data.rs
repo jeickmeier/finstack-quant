@@ -724,6 +724,25 @@ pub fn validate_typed_instrument_json(type_tag: JsValue, json: JsValue) -> Resul
     .map_err(to_js_err)
 }
 
+/// Wrap a bare instrument spec in the canonical envelope after validating it.
+///
+/// Mirrors Rust `pricer::instrument_envelope_from_spec`. This is the
+/// construction route for every instrument type without a typed class (FRA,
+/// deposit, inflation swaps, exotics, ...): build the type's `spec` object and
+/// pass the returned envelope to `priceInstrument` or `instrumentCashflows`.
+/// @param type_tag - Canonical instrument discriminator, one of `valuations.schema.instrumentTypes()`, e.g. `"forward_rate_agreement"` or `"fx_spot"`.
+/// @param spec - The bare `spec` object for that type (plain object or JSON string); tagged `{type, spec}` payloads and envelopes are rejected.
+/// @returns The compact canonical `finstack_quant.instrument/1` envelope JSON.
+/// @throws Error - Throws with kind `validation` if `spec` is not a bare object, does not deserialize as a `typeTag` instrument, or fails instrument validation; kind `invalid_type` for a wrong argument type.
+#[wasm_bindgen(js_name = instrumentEnvelopeFromSpec)]
+pub fn instrument_envelope_from_spec(type_tag: JsValue, spec: JsValue) -> Result<String, JsValue> {
+    finstack_quant_valuations::pricer::instrument_envelope_from_spec(
+        &js_string(&type_tag, "typeTag")?,
+        crate::utils::input::from_js_json(&spec, "spec")?,
+    )
+    .map_err(to_js_err)
+}
+
 /// Pretty-print a canonical instrument envelope.
 ///
 /// Mirrors Rust `pricer::pretty_instrument_json`: validates the envelope and

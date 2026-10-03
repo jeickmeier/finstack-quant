@@ -1,0 +1,73 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/results/1/var_result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Historical-simulation portfolio VaR, expected shortfall and P&L distribution.",
+  "examples": [
+    {
+      "confidence_level": 0.95,
+      "expected_shortfall": -11670.0,
+      "num_scenarios": 5,
+      "pnl_distribution": [
+        -12500.0,
+        -4200.0,
+        1800.0,
+        3100.0,
+        6400.0
+      ],
+      "skipped_fx": false,
+      "skipped_vol": false,
+      "var": -10840.0
+    }
+  ],
+  "properties": {
+    "confidence_level": {
+      "description": "Confidence level used",
+      "format": "double",
+      "type": "number"
+    },
+    "expected_shortfall": {
+      "description": "Expected Shortfall (CVaR) at specified confidence level.\n\nSame loss convention as [`Self::var`]. The conditional tail\nexpectation: the average signed P&L over the worst `(1 - α)` fraction\nof the distribution, computed as the mean of the interpolated quantile\nfunction over `[0, 1 - α]`. By construction\n`expected_shortfall <= var` (ES lies at or beyond VaR in the loss tail).",
+      "format": "double",
+      "type": "number"
+    },
+    "num_scenarios": {
+      "description": "Number of scenarios used in calculation",
+      "format": "uint",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "pnl_distribution": {
+      "description": "Full P&L distribution from historical simulation (sorted, worst first)",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "skipped_fx": {
+      "description": "True when the Taylor approximation skipped one or more FX-spot shocks\n(no FX-delta Taylor term exists). The FX component of those scenarios\nis excluded, so VaR/ES understate FX risk; prefer full revaluation for\nFX-exposed portfolios. Always false for full revaluation.",
+      "type": "boolean"
+    },
+    "skipped_vol": {
+      "description": "True when the Taylor approximation skipped one or more `ImpliedVol`\npoint shocks for a vol-exposed instrument (only aggregate Vega is\navailable, not bucketed vol). The vega component of those scenarios is\nexcluded, so VaR/ES understate vol risk. Always false for full\nrevaluation.",
+      "type": "boolean"
+    },
+    "var": {
+      "description": "Value-at-Risk at specified confidence level.\n\nLoss convention (workspace-wide): follows the P&L sign, so losses are\nreported as **negative** numbers (zero for all-gain distributions),\nmatching `analytics::value_at_risk` and the portfolio risk engines.\nThe signed P&L at the `(1 - α)` quantile of the distribution, computed\nby linear interpolation between bracketing order statistics.",
+      "format": "double",
+      "type": "number"
+    }
+  },
+  "required": [
+    "var",
+    "expected_shortfall",
+    "pnl_distribution",
+    "num_scenarios",
+    "confidence_level",
+    "skipped_fx",
+    "skipped_vol"
+  ],
+  "title": "VarResult",
+  "type": "object"
+}

@@ -11,6 +11,7 @@
 //! - [`fx`] — typed FX instrument classes.
 //! - [`market`] — the market convention registry.
 //! - [`results`] — `ValuationResult` methods as free functions.
+//! - [`risk`] — portfolio historical VaR / expected shortfall.
 //! - [`schema`] — compiled-in JSON Schemas of the valuations wire format.
 //! - [`structured_credit`] — standalone structured-credit tranche analytics
 //!   (discount margin, OAS, break-even CDR, scenario table).
@@ -25,6 +26,7 @@ pub mod fx;
 pub mod market;
 pub mod pricing;
 pub mod results;
+pub mod risk;
 pub mod schema;
 pub mod structured_credit;
 pub mod typed;

@@ -18,6 +18,7 @@ True
 from __future__ import annotations
 
 import datetime
+import decimal
 from typing import Any, Literal
 
 import pandas as pd
@@ -56,6 +57,8 @@ __all__ = [
     "CdsIndexBuilder",
     "CdsIndexConstituent",
     "CdsIndexParams",
+    "CdsOption",
+    "CdsOptionBuilder",
     "CdsTranche",
     "CdsTrancheBuilder",
     "CdsTrancheParams",
@@ -75,6 +78,7 @@ __all__ = [
     "FxOption",
     "FxOptionBuilder",
     "HedgeSwap",
+    "InstrumentCashflowEnvelope",
     "InterestRateSwap",
     "InterestRateSwapBuilder",
     "MarketHistory",
@@ -101,9 +105,13 @@ __all__ = [
     "TrancheCashflows",
     "TrancheMetrics",
     "TrancheStructure",
+    "VarResult",
     "Waterfall",
     "bond_from_cashflows_json",
+    "calculate_var_with_pricing",
+    "instrument_cashflows",
     "instrument_cashflows_json",
+    "instrument_envelope_from_spec",
     "list_models",
     "list_models_grouped",
     "list_standard_metrics",
@@ -9357,6 +9365,1158 @@ class CreditDefaultSwapBuilder:
             (the message names the builder and the field, e.g.
             ``CreditDefaultSwapBuilder: missing required field 'id'``), or the instrument
             fails validation (recovery outside ``[0, 1]``, upfront currency mismatch, protection date outside the premium period).
+        """
+        ...
+
+class CdsOption:
+    """
+    European option on a single-name or index CDS (typed wrapper for the
+    canonical Rust ``CdsOption``).
+
+    The strike is a forward spread (``{"spread": "0.0325"}``, decimal rate)
+    or a clean index price in percentage points
+    (``{"clean_price_pct": "107.0"}``). A call is the right to buy protection
+    (payer), a put the right to sell it (receiver). Pricing uses the
+    Bloomberg CDSO numerical-quadrature model; ``delta``, ``gamma``,
+    ``vega``, ``theta`` and ``implied_vol`` are metric ids of
+    :meth:`CdsOption.price` / :meth:`CdsOption.metric`. Construct via
+    :meth:`CdsOption.builder`, :meth:`CdsOption.example` or
+    :meth:`CdsOption.from_json`; instances are accepted directly by
+    :func:`price_instrument`.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import CdsOption
+    >>> option = CdsOption.example()
+    >>> (option.id, option.option_type, option.strike, option.vol_surface_id)
+    ('CDSOPT-CALL-CORP-5Y', 'call', {'spread': '0.01'}, 'CDSOPT-VOL')
+    """
+
+    @staticmethod
+    def builder() -> CdsOptionBuilder:
+        """
+        Create a fluent builder (mirrors Rust ``CdsOption::builder()``).
+
+        Returns
+        -------
+        CdsOptionBuilder
+            A builder with fluent, consuming setter methods.
+
+        Notes
+        -----
+        This factory does not raise; it returns an empty builder.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import CdsOption
+        >>> builder = CdsOption.builder()
+        >>> builder.id("EXAMPLE") is builder
+        True
+        """
+        ...
+    @classmethod
+    def from_json(cls, json: str) -> CdsOption:
+        """
+        Deserialize a validated CdsOption from its canonical v1 envelope.
+
+        Parameters
+        ----------
+        json : str
+            A ``finstack_quant.instrument/1`` envelope containing an exact
+            ``"cds_option"`` payload. The UTF-8 input must not exceed 16 MiB.
+            Bare payloads and cross-type coercion are rejected.
+
+        Returns
+        -------
+        CdsOption
+            The validated instrument.
+
+        Raises
+        ------
+        ValueError
+            If input exceeds 16 MiB, is malformed, uses an unsupported
+            envelope schema, carries another type, or fails validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import CdsOption
+        >>> CdsOption.from_json(CdsOption.example().to_json()).id
+        'CDSOPT-CALL-CORP-5Y'
+        """
+        ...
+    def to_json(self) -> str:
+        """
+        Serialize to a canonical ``finstack_quant.instrument/1`` envelope.
+
+        Returns
+        -------
+        str
+            Canonical instrument envelope accepted by :func:`price_instrument`
+            and :meth:`CdsOption.from_json`.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+    def to_dict(self) -> dict[str, object]:
+        """
+        Serde form of the instrument spec as a plain Python ``dict``.
+
+        Returns
+        -------
+        dict[str, object]
+            The ``spec`` object of the instrument envelope (JSON-compatible
+            values: ``str``, ``float``, ``dict``, ``list``, ``None``).
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+    def price(
+        self,
+        market: MarketContext | str,
+        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
+        model: str = "default",
+        metrics: list[str] | None = None,
+        metric_pricing_overrides: MetricPricingOverrides | dict[str, Any] | str | None = None,
+        market_history: MarketHistory | dict[str, Any] | str | None = None,
+    ) -> ValuationResult:
+        """
+        Price this instrument and return a :class:`~finstack_quant.valuations.ValuationResult`.
+
+        Same pipeline and keyword surface as :func:`price_instrument`.
+
+        Parameters
+        ----------
+        market : MarketContext | str
+            Market context object or its JSON string.
+        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
+            Valuation date (ISO 8601 strings accepted).
+        model : str, default "default"
+            Model key (``"bloomberg_cdso"`` style native model).
+        metrics : list[str], optional
+            Metric identifiers to compute (see :func:`list_standard_metrics`).
+        metric_pricing_overrides : MetricPricingOverrides | dict[str, Any] | str, optional
+            Metric-time overrides merged into
+            ``instrument.spec.metric_pricing_overrides`` before pricing
+            (e.g. ``{"theta_period": {"count": 1, "unit": "days"}}``).
+        market_history : MarketHistory | dict[str, Any] | str, optional
+            ``MarketHistory`` scenarios required by ``hvar`` /
+            ``expected_shortfall``.
+
+        Returns
+        -------
+        ValuationResult
+            Typed valuation envelope with price, currency and metrics.
+
+        Raises
+        ------
+        ValueError
+            If an input cannot be interpreted or the instrument fails validation.
+        KeyError
+            If a required curve, surface or metric is missing from ``market``.
+        RuntimeError
+            If pricing or a metric computation fails.
+        """
+        ...
+    def metric(
+        self,
+        market: MarketContext | str,
+        as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
+        metric_id: str,
+        model: str = "default",
+    ) -> float:
+        """
+        Compute one scalar metric for this instrument (e.g. ``"delta"`` or ``"vega"``).
+
+        Parameters
+        ----------
+        market : MarketContext | str
+            Market context object or its JSON string.
+        as_of : datetime.date | datetime.datetime | pd.Timestamp | str
+            Valuation date.
+        metric_id : str
+            Registered metric identifier (see :func:`list_standard_metrics`).
+        model : str, default "default"
+            Model key.
+
+        Returns
+        -------
+        float
+            The metric value in the metric's native unit (decimal for rates and
+            yields, currency units for DV01/CS01-style sensitivities, basis
+            points for spreads).
+
+        Raises
+        ------
+        ValueError
+            If ``metric_id`` is unknown or an input cannot be interpreted.
+        KeyError
+            If a required curve or surface is missing from ``market``.
+        RuntimeError
+            If the metric computation fails.
+        """
+        ...
+    def market_dependencies(self) -> dict[str, object]:
+        """
+        Market-data dependencies declared by the Rust ``Instrument`` trait.
+
+        Returns
+        -------
+        dict[str, object]
+            Serde form of ``MarketDependencies`` (``curves`` grouped by role,
+            ``credit_index_ids``, ``market_scalar_ids``,
+            ``volatility_dependencies``, ``fx_pairs``, ``series_ids``).
+
+        Raises
+        ------
+        ValueError
+            If the instrument cannot enumerate its dependencies.
+        """
+        ...
+    @property
+    def id(self) -> str:
+        """
+        Stable instrument identifier used in market lookup and results.
+
+        Returns
+        -------
+        str
+            The unique instrument identifier.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def default_model(self) -> str:
+        """
+        Canonical model key used when ``model="default"`` is passed to ``price``.
+
+        Returns
+        -------
+        str
+            Registered model key such as ``"hazard_rate"`` or ``"black76"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def attributes(self) -> Attributes:
+        """
+        Instrument attributes (tags and metadata) used for scenario selection.
+
+        Returns
+        -------
+        Attributes
+            The attribute bag; empty when none were set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @staticmethod
+    def example() -> CdsOption:
+        """
+        Canonical 100bp-strike call on a 5-year USD 10,000,000 corporate CDS
+        (mirrors Rust ``CdsOption::example``): expiry 2025-06-20, CDS maturity
+        2030-06-20, cash settlement, 40% recovery, curves ``USD-OIS`` /
+        ``CORP-HAZARD`` and vol surface ``CDSOPT-VOL``.
+
+        Returns
+        -------
+        CdsOption
+            The example option.
+
+        Raises
+        ------
+        ValueError
+            If the example option fails validation.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import CdsOption
+        >>> CdsOption.example().settlement
+        'cash'
+        """
+        ...
+    @property
+    def strike(self) -> dict[str, str]:
+        """
+        Option strike in its serde form.
+
+        Returns
+        -------
+        dict[str, str]
+            ``{"spread": "<decimal rate>"}`` or ``{"clean_price_pct": "<price points>"}``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def option_type(self) -> str:
+        """
+        Option type of the CDS option.
+
+        Returns
+        -------
+        str
+            ``"call"`` (right to buy protection) or ``"put"`` (right to sell protection).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def exercise_style(self) -> str:
+        """
+        Exercise style of the option.
+
+        Returns
+        -------
+        str
+            ``"european"``, ``"american"`` or ``"bermudan"``; only European prices.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def expiry(self) -> datetime.date:
+        """
+        Legal option expiry date.
+
+        Returns
+        -------
+        datetime.date
+            The expiry date.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def underlying_maturity(self) -> datetime.date:
+        """
+        Maturity of the underlying CDS.
+
+        Returns
+        -------
+        datetime.date
+            The underlying CDS maturity date.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def notional(self) -> Money:
+        """
+        Option notional.
+
+        Returns
+        -------
+        Money
+            Notional of the underlying CDS.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def settlement(self) -> str:
+        """
+        Settlement type of the exercise proceeds.
+
+        Returns
+        -------
+        str
+            ``"cash"`` or ``"physical"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def premium_settlement_date(self) -> datetime.date | None:
+        """
+        Explicit option premium payment date.
+
+        Returns
+        -------
+        datetime.date | None
+            The date, or ``None`` for the convention settlement lag.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def exercise_settlement_date(self) -> datetime.date | None:
+        """
+        Explicit exercise proceeds payment date.
+
+        Returns
+        -------
+        datetime.date | None
+            The date, or ``None`` for legal expiry.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def underlying_start_date(self) -> datetime.date | None:
+        """
+        Explicit accrual-effective date of the underlying CDS.
+
+        Returns
+        -------
+        datetime.date | None
+            The date, or ``None`` when ``protection_start_convention`` selects it.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def protection_start_convention(self) -> str:
+        """
+        Accrual-start convention of the synthetic underlying CDS.
+
+        Returns
+        -------
+        str
+            ``"spot"`` or ``"forward"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def knockout(self) -> bool:
+        """
+        Whether the option knocks out on default before expiry.
+
+        Returns
+        -------
+        bool
+            ``True`` for knock-out options.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def recovery_rate(self) -> float:
+        """
+        Recovery rate assumption.
+
+        Returns
+        -------
+        float
+            Recovery as a decimal (``0.4`` = 40%).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def discount_curve_id(self) -> str:
+        """
+        Discount curve identifier.
+
+        Returns
+        -------
+        str
+            Discount curve id in the market context.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def credit_curve_id(self) -> str:
+        """
+        Hazard (credit) curve identifier.
+
+        Returns
+        -------
+        str
+            Hazard curve id in the market context.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def vol_surface_id(self) -> str:
+        """
+        Volatility surface identifier.
+
+        Returns
+        -------
+        str
+            Vol surface id in the market context.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def underlying_convention(self) -> str:
+        """
+        ISDA convention of the underlying CDS.
+
+        Returns
+        -------
+        str
+            ``"isda_na"``, ``"isda_eu"``, ``"isda_as"`` or ``"custom"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def underlying_is_index(self) -> bool:
+        """
+        Whether the underlying is a CDS index.
+
+        Returns
+        -------
+        bool
+            ``True`` for an index option, ``False`` for a single name.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def index_factor(self) -> float:
+        """
+        Current index factor ``f``.
+
+        Returns
+        -------
+        float
+            Surviving fraction of original index notional, in ``(0, 1]``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def strike_index_factor(self) -> float | None:
+        """
+        Original index factor ``f0`` of a clean-price strike.
+
+        Returns
+        -------
+        float | None
+            The factor, or ``None`` for spread strikes.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def realized_loss(self) -> float:
+        """
+        Settled cumulative index loss since option inception.
+
+        Returns
+        -------
+        float
+            Decimal fraction of original index notional.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def coupon_bp(self) -> decimal.Decimal | None:
+        """
+        Running coupon of the underlying CDS in basis points.
+
+        Returns
+        -------
+        decimal.Decimal | None
+            The coupon, or ``None`` when the strike spread is the coupon.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+class CdsOptionBuilder:
+    """
+    Fluent builder for :class:`CdsOption`; wraps the Rust ``FinancialBuilder``
+    output one setter for one setter.
+
+    Required: ``id``, ``strike``, ``option_type``, ``exercise_style``,
+    ``expiry``, ``underlying_maturity``, ``notional``, ``settlement``,
+    ``recovery_rate``, ``discount_curve_id``, ``credit_curve_id``,
+    ``vol_surface_id`` and ``underlying_is_index``. Builders are consumed by
+    ``build()``; create a new builder per instrument.
+
+    Examples
+    --------
+    >>> import datetime
+    >>> from finstack_quant.core.currency import Currency
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.valuations.instruments import CdsOption
+    >>> option = (
+    ...     CdsOption
+    ...     .builder()
+    ...     .id("CDSO-1")
+    ...     .strike({"spread": "0.0125"})
+    ...     .option_type("put")
+    ...     .exercise_style("european")
+    ...     .expiry(datetime.date(2025, 6, 20))
+    ...     .underlying_maturity(datetime.date(2030, 6, 20))
+    ...     .notional(Money(5_000_000, Currency("USD")))
+    ...     .settlement("physical")
+    ...     .recovery_rate(0.4)
+    ...     .discount_curve_id("USD-OIS")
+    ...     .credit_curve_id("CORP-HAZARD")
+    ...     .vol_surface_id("CDSOPT-VOL")
+    ...     .underlying_is_index(False)
+    ...     .build()
+    ... )
+    >>> (option.option_type, option.settlement, option.strike)
+    ('put', 'physical', {'spread': '0.0125'})
+    """
+
+    def id(self, value: str) -> CdsOptionBuilder:
+        """
+        Set the instrument identifier.
+
+        Parameters
+        ----------
+        value : str
+            Unique identifier for the option.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
+        """
+        ...
+    def strike(self, value: dict[str, str] | str) -> CdsOptionBuilder:
+        """
+        Set the option strike as a forward spread or a clean index price.
+
+        Parameters
+        ----------
+        value : dict[str, str] | str
+            ``{"spread": "0.0325"}`` (decimal forward spread) or ``{"clean_price_pct": "107.0"}`` (clean price points), as a dict or JSON text.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not one of the two strike forms.
+        """
+        ...
+    def option_type(self, value: str) -> CdsOptionBuilder:
+        """
+        Set the option type.
+
+        Parameters
+        ----------
+        value : str
+            ``"call"`` buys protection at expiry, ``"put"`` sells it.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a recognized option type.
+        """
+        ...
+    def exercise_style(self, value: str) -> CdsOptionBuilder:
+        """
+        Set the exercise style.
+
+        Parameters
+        ----------
+        value : str
+            ``"european"``, ``"american"`` or ``"bermudan"``; pricing supports European only.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a recognized exercise style.
+        """
+        ...
+    def expiry(self, value: datetime.date | str) -> CdsOptionBuilder:
+        """
+        Set the option expiry date.
+
+        Parameters
+        ----------
+        value : datetime.date | str
+            Legal expiry; must precede ``underlying_maturity``.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a date.
+        """
+        ...
+    def underlying_maturity(self, value: datetime.date | str) -> CdsOptionBuilder:
+        """
+        Set the underlying CDS maturity date.
+
+        Parameters
+        ----------
+        value : datetime.date | str
+            Maturity of the CDS delivered or cash-settled at exercise.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a date.
+        """
+        ...
+    def notional(self, value: Money) -> CdsOptionBuilder:
+        """
+        Set the option notional.
+
+        Parameters
+        ----------
+        value : Money
+            Positive notional of the underlying CDS.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
+        """
+        ...
+    def settlement(self, value: str) -> CdsOptionBuilder:
+        """
+        Set the settlement type.
+
+        Parameters
+        ----------
+        value : str
+            ``"cash"`` or ``"physical"``.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a recognized settlement type.
+        """
+        ...
+    def premium_settlement_date(self, value: datetime.date | str) -> CdsOptionBuilder:
+        """
+        Set the option premium payment date.
+
+        Parameters
+        ----------
+        value : datetime.date | str
+            Premium payment date; when never set the CDS convention settlement lag applies.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a date.
+        """
+        ...
+    def exercise_settlement_date(self, value: datetime.date | str) -> CdsOptionBuilder:
+        """
+        Set the exercise proceeds payment date.
+
+        Parameters
+        ----------
+        value : datetime.date | str
+            On or after expiry and before CDS maturity; when never set legal expiry is used.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a date.
+        """
+        ...
+    def underlying_start_date(self, value: datetime.date | str) -> CdsOptionBuilder:
+        """
+        Set the underlying CDS accrual-effective date.
+
+        Parameters
+        ----------
+        value : datetime.date | str
+            Accrual start for the forward spread and risky annuity.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a date.
+        """
+        ...
+    def protection_start_convention(self, value: str) -> CdsOptionBuilder:
+        """
+        Set the underlying accrual-start convention.
+
+        Parameters
+        ----------
+        value : str
+            ``"spot"`` (default, prior CDS roll) or ``"forward"`` (option expiry).
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a recognized convention.
+        """
+        ...
+    def knockout(self, value: bool) -> CdsOptionBuilder:
+        """
+        Set whether the option knocks out on default before expiry.
+
+        Parameters
+        ----------
+        value : bool
+            ``True`` for knock-out single-name options; default ``False``.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
+        """
+        ...
+    def recovery_rate(self, value: float) -> CdsOptionBuilder:
+        """
+        Set the recovery rate assumption.
+
+        Parameters
+        ----------
+        value : float
+            Recovery as a decimal in ``[0, 1]``.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
+        """
+        ...
+    def discount_curve_id(self, value: str) -> CdsOptionBuilder:
+        """
+        Set the discount curve identifier.
+
+        Parameters
+        ----------
+        value : str
+            Discount curve id in the market context.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
+        """
+        ...
+    def credit_curve_id(self, value: str) -> CdsOptionBuilder:
+        """
+        Set the hazard (credit) curve identifier.
+
+        Parameters
+        ----------
+        value : str
+            Hazard curve id in the market context.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
+        """
+        ...
+    def vol_surface_id(self, value: str) -> CdsOptionBuilder:
+        """
+        Set the volatility surface identifier.
+
+        Parameters
+        ----------
+        value : str
+            Vol surface id in the market context.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
+        """
+        ...
+    def underlying_convention(self, value: str) -> CdsOptionBuilder:
+        """
+        Set the ISDA convention of the underlying CDS.
+
+        Parameters
+        ----------
+        value : str
+            ``"isda_na"`` (default), ``"isda_eu"``, ``"isda_as"`` or ``"custom"``.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a recognized convention.
+        """
+        ...
+    def underlying_is_index(self, value: bool) -> CdsOptionBuilder:
+        """
+        Set whether the underlying is a CDS index.
+
+        Parameters
+        ----------
+        value : bool
+            ``True`` for an index option, ``False`` for a single name.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
+        """
+        ...
+    def index_factor(self, value: float) -> CdsOptionBuilder:
+        """
+        Set the current index factor.
+
+        Parameters
+        ----------
+        value : float
+            Surviving fraction of the original index notional, in ``(0, 1]``; default ``1.0``.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
+        """
+        ...
+    def strike_index_factor(self, value: float) -> CdsOptionBuilder:
+        """
+        Set the original index factor of a clean-price strike.
+
+        Parameters
+        ----------
+        value : float
+            ``f0`` the clean-price strike is quoted on.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
+        """
+        ...
+    def realized_loss(self, value: float) -> CdsOptionBuilder:
+        """
+        Set the settled cumulative index loss since option inception.
+
+        Parameters
+        ----------
+        value : float
+            Decimal fraction of original index notional in ``[0, 1]``; default ``0.0``.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by :meth:`CdsOptionBuilder.build`.
+        """
+        ...
+    def coupon_bp(self, value: decimal.Decimal | str | int | float) -> CdsOptionBuilder:
+        """
+        Set the running coupon of the underlying CDS.
+
+        Parameters
+        ----------
+        value : decimal.Decimal | str | int | float
+            Coupon in basis points (``100`` for CDX.NA.IG), parsed exactly from its string form.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If ``value`` is not a decimal number.
+        """
+        ...
+    def attributes(self, value: Attributes | dict[str, str] | None) -> CdsOptionBuilder:
+        """
+        Set free-form instrument attributes (tags and metadata).
+
+        Parameters
+        ----------
+        value : Attributes | dict[str, str] | None
+            Attribute bag; a dict populates metadata, an optional ``"tags"`` list entry populates tags.
+
+        Returns
+        -------
+        CdsOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        TypeError
+            If ``value`` is neither ``Attributes``, a dict, nor ``None``.
+        """
+        ...
+    def build(self) -> CdsOption:
+        """
+        Build the validated CDS option.
+
+        Runs only the Rust ``CdsOptionBuilder::build`` validation (structural
+        invariants); pricing-time checks run in :meth:`CdsOption.price`.
+
+        Returns
+        -------
+        CdsOption
+            The validated instrument.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed, a required field is missing
+            (e.g. ``CdsOptionBuilder: missing required field 'id'``), or the
+            option fails validation (expiry not before CDS maturity,
+            non-positive notional, inconsistent strike state).
         """
         ...
 
@@ -33512,5 +34672,646 @@ class MarketHistory:
         -------
         str
             ``MarketHistory(base_date=2024-01-01, window_days=2, scenarios=<2 items>)`` text.
+        """
+        ...
+
+def instrument_envelope_from_spec(type_tag: str, spec: dict[str, Any] | str) -> str:
+    """
+    Wrap a bare instrument spec in the canonical envelope after validating it.
+
+    Pure delegation to Rust ``pricer::instrument_envelope_from_spec``. This is
+    the construction route for every instrument type without a typed Python
+    class (FRA, deposit, FX spot/swap, inflation swaps, exotics, ...): build
+    the type's ``spec`` object (see
+    ``finstack_quant.valuations.schema.instrument_type_schema(type_tag)``) and
+    pass the returned envelope to :func:`price_instrument` or
+    :func:`instrument_cashflows`.
+
+    Parameters
+    ----------
+    type_tag : str
+        Canonical instrument discriminator, one of
+        ``finstack_quant.valuations.schema.instrument_types()`` (e.g.
+        ``"forward_rate_agreement"``, ``"fx_spot"``).
+    spec : dict[str, Any] | str
+        The bare ``spec`` object for that type, as a dict or JSON text. Tagged
+        ``{"type", "spec"}`` payloads and envelopes are rejected.
+
+    Returns
+    -------
+    str
+        The compact canonical ``finstack_quant.instrument/1`` envelope.
+
+    Raises
+    ------
+    ValueError
+        If ``spec`` is not a bare object, does not deserialize as a
+        ``type_tag`` instrument (unknown tag, missing or unknown field), or
+        fails instrument validation.
+
+    Examples
+    --------
+    >>> import json
+    >>> from finstack_quant.valuations.instruments import instrument_envelope_from_spec
+    >>> envelope = json.loads(
+    ...     instrument_envelope_from_spec(
+    ...         "fx_spot",
+    ...         {
+    ...             "id": "EURUSD-SPOT",
+    ...             "base_currency": "EUR",
+    ...             "quote_currency": "USD",
+    ...             "settlement_date": "2025-01-17",
+    ...             "quoted_spot": 1.2,
+    ...             "notional": {"amount": "1000000", "currency": "EUR"},
+    ...             "attributes": {},
+    ...         },
+    ...     )
+    ... )
+    >>> (envelope["instrument"]["type"], envelope["instrument"]["spec"]["id"])
+    ('fx_spot', 'EURUSD-SPOT')
+    """
+    ...
+
+def instrument_cashflows(
+    instrument: Any,
+    market: MarketContext | str,
+    as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
+    model: str,
+) -> InstrumentCashflowEnvelope:
+    """
+    Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
+
+    Typed twin of :func:`instrument_cashflows_json`: the same Rust
+    ``instrument_cashflows`` export, returned as an
+    :class:`InstrumentCashflowEnvelope`. Hazard-rate export rejects bonds with
+    call, put, or return-floor rights because static rows cannot represent
+    their exercise-contingent value. For supported static-flow combinations
+    ``total_pv`` reconciles with the instrument's ``base_value``.
+
+    Parameters
+    ----------
+    instrument : Bond | TermLoan | InterestRateSwap | CdsOption | ... | str
+        Typed instrument instance or a canonical
+        ``finstack_quant.instrument/1`` JSON envelope.
+    market : MarketContext | str
+        Typed ``MarketContext`` or serialized market-context JSON.
+    as_of : datetime.date | datetime.datetime | pd.Timestamp | str
+        Valuation date, either a date-like object or an ISO 8601 string.
+    model : str
+        Must be ``"discounting"`` or ``"hazard_rate"``. ``"default"`` is not
+        accepted on cashflow export.
+
+    Returns
+    -------
+    InstrumentCashflowEnvelope
+        Header fields plus one ``flows`` row per cashflow.
+
+    Raises
+    ------
+    TypeError
+        If ``instrument`` is neither a typed instrument nor a JSON string.
+    KeyError
+        If a curve or fixing series the instrument depends on is missing
+        from ``market``.
+    ValueError
+        If ``model`` is unsupported, the instrument/model pair is not
+        registered for cashflow export, a bond with embedded exercise rights
+        is requested under a static cashflow model, or a payload is malformed.
+    RuntimeError
+        If the pricer fails numerically.
+
+    Examples
+    --------
+    >>> import datetime
+    >>> from finstack_quant.core.currency import Currency
+    >>> from finstack_quant.core.dates import StubKind
+    >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.core.types import Rate
+    >>> from finstack_quant.valuations.instruments import Bond, instrument_cashflows
+    >>> as_of = datetime.date(2024, 1, 1)
+    >>> bond = Bond.fixed(
+    ...     "B", Money(1000.0, Currency("USD")), Rate(0.05), as_of, datetime.date(2026, 1, 1), StubKind.NONE, "USD-OIS"
+    ... )
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+    >>> envelope = instrument_cashflows(bond, market, as_of, "discounting")
+    >>> (envelope.instrument_id, len(envelope.to_dataframe()))
+    ('B', 6)
+    """
+    ...
+
+class InstrumentCashflowEnvelope:
+    """
+    Cashflow export for one instrument: header fields plus per-flow rows.
+
+    Typed wrapper of the Rust ``InstrumentCashflowEnvelope`` returned by
+    :func:`instrument_cashflows`. ``flows`` holds one dict per cashflow;
+    :meth:`InstrumentCashflowEnvelope.to_dataframe` is the tabular view.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import InstrumentCashflowEnvelope
+    >>> envelope = InstrumentCashflowEnvelope.from_json(
+    ...     '{"instrument_id": "B", "currency": "USD", "model": "discounting",'
+    ...     ' "as_of": "2025-01-15", "discount_curve_id": "USD-OIS", "flows": [],'
+    ...     ' "total_pv": 0.0, "reconciles_with_base_value": true}'
+    ... )
+    >>> (envelope.instrument_id, envelope.currency, len(envelope.to_dataframe()))
+    ('B', 'USD', 0)
+    """
+
+    @property
+    def instrument_id(self) -> str:
+        """
+        Instrument identifier.
+
+        Returns
+        -------
+        str
+            The exported instrument's id.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def currency(self) -> str:
+        """
+        Reporting currency of the row PVs and ``total_pv``.
+
+        Returns
+        -------
+        str
+            ISO-4217 currency code.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def model(self) -> str:
+        """
+        Model key used for the export.
+
+        Returns
+        -------
+        str
+            ``"discounting"`` or ``"hazard_rate"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def as_of(self) -> datetime.date:
+        """
+        Valuation date of the export.
+
+        Returns
+        -------
+        datetime.date
+            The valuation date.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def discount_curve_id(self) -> str:
+        """
+        Discount curve used for every row.
+
+        Returns
+        -------
+        str
+            Discount curve id.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def credit_curve_id(self) -> str | None:
+        """
+        Hazard curve used under ``hazard_rate``.
+
+        Returns
+        -------
+        str | None
+            The curve id, or ``None`` under ``"discounting"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def recovery_rate(self) -> float | None:
+        """
+        Recovery rate of the hazard curve.
+
+        Returns
+        -------
+        float | None
+            Recovery as a decimal, or ``None`` under ``"discounting"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def flows(self) -> list[dict[str, Any]]:
+        """
+        Per-flow rows (serde form of ``CashflowRow``).
+
+        Returns
+        -------
+        list[dict[str, Any]]
+            One dict per cashflow, in schedule order.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def total_pv(self) -> float:
+        """
+        Sum of the row PVs in the envelope currency.
+
+        Returns
+        -------
+        float
+            Total present value.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def reconciles_with_base_value(self) -> bool:
+        """
+        Whether ``total_pv`` agrees with the instrument's ``base_value``.
+
+        Returns
+        -------
+        bool
+            ``True`` for every successful export.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        One row per cashflow as a pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            Columns ``date``, ``amount``, ``currency``, ``kind``,
+            ``accrual_factor``, ``year_fraction``, ``rate``, ``reset_date``,
+            ``discount_factor``, ``discount_curve_id``,
+            ``survival_probability``, ``conditional_default_prob``,
+            ``inflation_index_ratio``, ``prepayment_smm``,
+            ``beginning_balance``, ``ending_balance`` and ``pv``; ``date`` and
+            ``reset_date`` are ``datetime64`` and fields the model does not
+            populate are null.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+        """
+        ...
+    @staticmethod
+    def from_json(json: str) -> InstrumentCashflowEnvelope:
+        """
+        Deserialize an envelope from ``to_json`` / ``instrument_cashflows_json`` output.
+
+        Parameters
+        ----------
+        json : str
+            Serialized ``InstrumentCashflowEnvelope``.
+
+        Returns
+        -------
+        InstrumentCashflowEnvelope
+            The parsed envelope.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or misses a required field.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import InstrumentCashflowEnvelope
+        >>> text = (
+        ...     '{"instrument_id": "B", "currency": "USD", "model": "discounting",'
+        ...     ' "as_of": "2025-01-15", "discount_curve_id": "USD-OIS", "flows": [],'
+        ...     ' "total_pv": 0.0, "reconciles_with_base_value": true}'
+        ... )
+        >>> InstrumentCashflowEnvelope.from_json(text).model
+        'discounting'
+        """
+        ...
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON, identical to ``instrument_cashflows_json``.
+
+        Returns
+        -------
+        str
+            The envelope JSON.
+
+        Raises
+        ------
+        ValueError
+            If the envelope cannot be serialized.
+        """
+        ...
+
+def calculate_var_with_pricing(
+    instruments: list[Any],
+    market: MarketContext | str,
+    history: MarketHistory | dict[str, Any] | str,
+    as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
+    config: dict[str, Any] | str | None = None,
+    model: str = "default",
+) -> VarResult:
+    """
+    Historical VaR and expected shortfall of a list of instruments.
+
+    Mirrors Rust ``metrics::risk::calculate_var_with_pricing``: every
+    instrument is repriced under every ``history`` scenario, the per-scenario
+    P&Ls are summed across instruments, and VaR / ES are read off that single
+    portfolio distribution (R type-7 linear-interpolated quantile). Unlike
+    summing the per-instrument ``hvar`` metric, offsetting positions
+    diversify. Quote-recalibrated shocks (credit spreads) use the same
+    recalibration provider as :func:`price_instrument`.
+
+    Parameters
+    ----------
+    instruments : list[Bond | InterestRateSwap | ... | str]
+        Typed instruments or ``finstack_quant.instrument/1`` envelopes. An
+        empty list returns zero VaR and ES.
+    market : MarketContext | str
+        Unshocked base market every scenario perturbs.
+    history : MarketHistory | dict[str, Any] | str
+        Historical risk-factor shifts; a non-empty portfolio needs at least
+        one scenario.
+    as_of : datetime.date | datetime.datetime | pd.Timestamp | str
+        Valuation date for the base and every scenario revaluation.
+    config : dict[str, Any] | str | None, default None
+        Rust ``VarConfig``: ``confidence_level`` (decimal in ``(0, 1)``),
+        ``method`` (``"full_revaluation"`` or ``"taylor_approximation"``) and
+        ``reporting_currency`` (required for mixed-currency portfolios).
+        ``None`` uses Rust ``VarConfig::default()``: 95%, full revaluation,
+        natural currency.
+    model : str, default "default"
+        ``"default"`` (each instrument's canonical pricing path) or one model
+        key from :func:`list_models` applied to every instrument.
+
+    Returns
+    -------
+    VarResult
+        VaR, expected shortfall and the sorted P&L distribution; losses are
+        negative.
+
+    Raises
+    ------
+    TypeError
+        If an ``instruments`` entry is neither a typed instrument nor a JSON string.
+    ValueError
+        If an instrument, ``config``, ``history`` or ``model`` is invalid, the
+        confidence level is outside ``(0, 1)``, a non-empty portfolio has no
+        scenarios, or a mixed-currency portfolio has no ``reporting_currency``.
+    KeyError
+        If a curve, surface or price an instrument needs is missing.
+    RuntimeError
+        If a scenario revaluation fails numerically.
+
+    Examples
+    --------
+    >>> import datetime
+    >>> from finstack_quant.core.currency import Currency
+    >>> from finstack_quant.core.dates import StubKind
+    >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
+    >>> from finstack_quant.core.money import Money
+    >>> from finstack_quant.core.types import Rate
+    >>> from finstack_quant.valuations.instruments import Bond, MarketHistory, calculate_var_with_pricing
+    >>> as_of = datetime.date(2024, 1, 2)
+    >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+    >>> def bond(id):
+    ...     return Bond.fixed(
+    ...         id, Money(1e6, Currency("USD")), Rate(0.05), as_of, datetime.date(2029, 1, 2), StubKind.NONE, "USD-OIS"
+    ...     )
+    >>> shift = lambda s: [{"factor": {"type": "discount_rate", "curve_id": "USD-OIS", "tenor_years": 5.0}, "shift": s}]
+    >>> history = MarketHistory(
+    ...     as_of,
+    ...     2,
+    ...     [{"date": "2023-12-29", "shifts": shift(0.0010)}, {"date": "2023-12-28", "shifts": shift(-0.0005)}],
+    ... )
+    >>> one = calculate_var_with_pricing([bond("A")], market, history, as_of)
+    >>> two = calculate_var_with_pricing([bond("A"), bond("B")], market, history, as_of)
+    >>> (two.num_scenarios, one.var < 0, abs(two.var - 2 * one.var) < 1e-6)
+    (2, True, True)
+    """
+    ...
+
+class VarResult:
+    """
+    Historical VaR / expected shortfall with its P&L distribution.
+
+    Typed wrapper of the Rust ``VarResult`` returned by
+    :func:`calculate_var_with_pricing`. VaR and ES follow the P&L sign: losses
+    are negative, and ``expected_shortfall <= var``.
+
+    Examples
+    --------
+    >>> from finstack_quant.valuations.instruments import VarResult
+    >>> result = VarResult.from_json(
+    ...     '{"var": -10.0, "expected_shortfall": -12.0, "pnl_distribution": [-12.0, 3.0],'
+    ...     ' "num_scenarios": 2, "confidence_level": 0.95, "skipped_fx": false,'
+    ...     ' "skipped_vol": false}'
+    ... )
+    >>> (result.var, list(result.to_dataframe()["pnl"]))
+    (-10.0, [-12.0, 3.0])
+    """
+
+    @property
+    def var(self) -> float:
+        """
+        Value-at-Risk at ``confidence_level``.
+
+        Returns
+        -------
+        float
+            Signed P&L at the ``1 - confidence_level`` quantile (negative for a loss, ``0.0`` for an all-gain distribution).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def expected_shortfall(self) -> float:
+        """
+        Expected shortfall at ``confidence_level``.
+
+        Returns
+        -------
+        float
+            Mean signed P&L over the worst ``1 - confidence_level`` tail.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def pnl_distribution(self) -> list[float]:
+        """
+        Portfolio P&L per scenario.
+
+        Returns
+        -------
+        list[float]
+            Values sorted ascending (worst first).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def num_scenarios(self) -> int:
+        """
+        Number of scenarios in the distribution.
+
+        Returns
+        -------
+        int
+            The scenario count.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def confidence_level(self) -> float:
+        """
+        Confidence level used.
+
+        Returns
+        -------
+        float
+            Decimal confidence (``0.95`` = 95%).
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def skipped_fx(self) -> bool:
+        """
+        Whether the Taylor method skipped FX-spot shocks.
+
+        Returns
+        -------
+        bool
+            ``True`` when VaR understates FX risk; always ``False`` for full revaluation.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def skipped_vol(self) -> bool:
+        """
+        Whether the Taylor method skipped implied-vol point shocks.
+
+        Returns
+        -------
+        bool
+            ``True`` when VaR understates vol risk; always ``False`` for full revaluation.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        The P&L distribution as a one-column pandas ``DataFrame``.
+
+        Returns
+        -------
+        pd.DataFrame
+            Column ``pnl`` (``float64``), one row per scenario, worst first.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+        """
+        ...
+    @staticmethod
+    def from_json(json: str) -> VarResult:
+        """
+        Deserialize a result from the JSON produced by :meth:`VarResult.to_json`.
+
+        Parameters
+        ----------
+        json : str
+            Serialized ``VarResult``.
+
+        Returns
+        -------
+        VarResult
+            The parsed result.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed, misses a field or carries an unknown one.
+
+        Examples
+        --------
+        >>> from finstack_quant.valuations.instruments import VarResult
+        >>> text = (
+        ...     '{"var": 0.0, "expected_shortfall": 0.0, "pnl_distribution": [],'
+        ...     ' "num_scenarios": 0, "confidence_level": 0.99, "skipped_fx": false,'
+        ...     ' "skipped_vol": false}'
+        ... )
+        >>> VarResult.from_json(text).confidence_level
+        0.99
+        """
+        ...
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON (the WASM ``calculateVarWithPricing`` object).
+
+        Returns
+        -------
+        str
+            The result JSON.
+
+        Raises
+        ------
+        ValueError
+            If the result cannot be serialized.
         """
         ...

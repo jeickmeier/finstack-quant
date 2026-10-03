@@ -203,6 +203,18 @@
 
 - `RebalanceRule::Calendar` with no `end` (an open-ended cadence), with `end == start`, or with an end that is not a whole number of periods after `start` now validates in every host. Rebalance dates are `start + k * frequency` adjusted to business days and cut off at `min(end, horizon)`; the cut-off itself is not a rebalance date unless it falls on the cadence.
 
+### Valuations: instrument coverage (Python-binding audit PR 14)
+
+#### Added
+
+- Python and WASM: `calculate_var_with_pricing` / `valuations.instruments.calculateVarWithPricing` bind the multi-instrument full-revaluation historical VaR / expected shortfall (Rust `metrics::risk::calculate_var_with_pricing`) and return a typed `VarResult` (getters, `to_json`/`from_json`, `to_dataframe`, pickle in Python; the schema-backed `VarResult` object in WASM). `VarResult` now derives serde and has a published `var_result.schema.json`; Rust adds `PricingDispatch::from_model` for the host `model` argument.
+- Python and WASM: `instrument_envelope_from_spec` / `valuations.instruments.instrumentEnvelopeFromSpec` wrap and validate a bare instrument spec into the canonical envelope. The 54 registered instrument types without a typed Python class, and the JSON-first fixed-income types, are recorded in `parity_contract.toml` as JSON-envelope only by decision.
+- Python and WASM: typed `CdsOption` / `CdsOptionBuilder` (example, one getter per field, one builder setter per Rust `FinancialBuilder` setter, `price`/`metric`); Rust re-exports `CdsOptionBuilder` from `cds_option`.
+
+#### Changed (breaking)
+
+- Python: `finstack_quant.valuations.instrument_cashflows` (a pure-Python wrapper returning `(dict, DataFrame)`) is removed. Use the compiled `finstack_quant.valuations.instruments.instrument_cashflows(instrument, market, as_of, model)`, which returns a typed `InstrumentCashflowEnvelope`; call `.to_dataframe()` for the per-flow frame. `model` is now positional.
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

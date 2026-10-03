@@ -71,4 +71,4 @@ mod types;
 
 pub use parameters::CdsOptionParams;
 pub use strike::{CdsOptionStrike, CdsOptionStrikeKind};
-pub use types::{CdsOption, ProtectionStartConvention};
+pub use types::{CdsOption, CdsOptionBuilder, ProtectionStartConvention};

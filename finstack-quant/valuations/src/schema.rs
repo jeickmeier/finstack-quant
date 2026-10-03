@@ -1001,6 +1001,15 @@ pub fn artifacts() -> Vec<SchemaArtifact> {
         .with_packager(package_valuations_schema)
         .with_kind(SchemaKind::Output)
     .with_examples(examples::composite_history_row),
+        SchemaArtifact::new::<crate::metrics::risk::VarResult>(
+            "schemas/results/1/var_result.schema.json",
+            "https://finstack_quant.dev/schemas/results/1/var_result.schema.json",
+            "VarResult",
+            "Historical-simulation portfolio VaR, expected shortfall and P&L distribution.",
+        )
+        .with_packager(package_valuations_schema)
+        .with_kind(SchemaKind::Output)
+    .with_examples(examples::var_result),
         SchemaArtifact::new::<crate::market::listed::ListedProductCoverage>(
             "schemas/results/1/listed_product_coverage.schema.json",
             "https://finstack_quant.dev/schemas/results/1/listed_product_coverage.schema.json",

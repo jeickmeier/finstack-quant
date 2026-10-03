@@ -9,6 +9,7 @@ use crate::bindings::extract::{extract_instrument_json, extract_market};
 use crate::bindings::module_utils::{py_to_json_string, py_to_serde};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
 use crate::errors::{core_to_py, display_to_py, value_error};
+use finstack_quant_valuations::instruments::cashflow_export::InstrumentCashflowEnvelope;
 use finstack_quant_valuations::instruments::MetricPricingOverrides;
 use finstack_quant_valuations::metrics::risk::{MarketHistory, MarketScenario};
 use pyo3::prelude::*;
@@ -1011,8 +1012,9 @@ fn listed_product_catalog<'py>(
 /// Returns
 /// -------
 /// str
-///     JSON-serialized ``InstrumentCashflowEnvelope``. Parse and wrap in a
-///     DataFrame via :func:`finstack_quant.valuations.instrument_cashflows`.
+///     JSON-serialized ``InstrumentCashflowEnvelope``; the typed twin
+///     :func:`instrument_cashflows` returns the same envelope as an
+///     ``InstrumentCashflowEnvelope`` object.
 ///
 /// Raises
 /// ------
@@ -1033,6 +1035,19 @@ fn instrument_cashflows_json(
     as_of: &Bound<'_, PyAny>,
     model: &str,
 ) -> PyResult<String> {
+    let envelope = cashflow_envelope(py, instrument, market, as_of, model)?;
+    serde_json::to_string(&envelope).map_err(display_to_py)
+}
+
+/// Parse the instrument (before the market) and run the Rust
+/// `instrument_cashflows` export shared by both cashflow entry points.
+fn cashflow_envelope(
+    py: Python<'_>,
+    instrument: &Bound<'_, PyAny>,
+    market: &Bound<'_, PyAny>,
+    as_of: &Bound<'_, PyAny>,
+    model: &str,
+) -> PyResult<InstrumentCashflowEnvelope> {
     let instrument_json = extract_instrument_json(instrument)?;
     let instrument = py.detach(move || {
         finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(&instrument_json, None)
@@ -1041,24 +1056,287 @@ fn instrument_cashflows_json(
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
     let model = model.to_owned();
-
     py.detach(move || {
-        let envelope =
-            finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
-                &instrument,
-                &market,
-                &as_of,
-                &model,
-            )
-            .map_err(core_to_py)?;
-        serde_json::to_string(&envelope).map_err(display_to_py)
+        finstack_quant_valuations::instruments::cashflow_export::instrument_cashflows(
+            &instrument,
+            &market,
+            &as_of,
+            &model,
+        )
+        .map_err(core_to_py)
     })
+}
+
+/// Per-flow cashflow envelope (DF / survival / PV) for a discountable instrument.
+///
+/// Typed twin of :func:`instrument_cashflows_json`: the same Rust
+/// ``instrument_cashflows`` export, returned as an
+/// :class:`InstrumentCashflowEnvelope` (``to_dataframe()`` gives one row per
+/// flow). Supported ``model`` values are ``"discounting"`` (DF-only PV) and
+/// ``"hazard_rate"`` (DF × survival + recovery on principal). Hazard-rate
+/// export rejects bonds with call, put, or return-floor rights because static
+/// rows cannot represent their exercise-contingent value. For supported
+/// static-flow combinations ``total_pv`` reconciles with the instrument's
+/// ``base_value``.
+///
+/// Parameters
+/// ----------
+/// instrument : str | Bond | TermLoan | InterestRateSwap | Swaption |
+///     CapFloor | CreditDefaultSwap | CdsIndex | FxForward | FxOption |
+///     CdsTranche | CdsOption | ConvertibleBond | EquityOption |
+///     StructuredCredit | CompositeInstrument
+///     A typed instrument instance or a ``finstack_quant.instrument/1``
+///     JSON envelope.
+/// market : MarketContext | str
+///     A ``MarketContext`` object or a JSON string.
+/// as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
+///     Valuation date, either a date-like object or an ISO 8601 string.
+/// model : str
+///     ``"discounting"`` or ``"hazard_rate"``. ``"default"`` is not accepted.
+///
+/// Returns
+/// -------
+/// InstrumentCashflowEnvelope
+///     Header fields plus one ``flows`` row per cashflow.
+///
+/// Raises
+/// ------
+/// KeyError
+///     If a curve or fixing series the instrument depends on is missing.
+/// ValueError
+///     If ``model`` is unsupported, the instrument/model pair is not
+///     registered, a bond with embedded exercise rights is requested under a
+///     static cashflow model, or a payload is malformed.
+/// RuntimeError
+///     If the pricer fails numerically.
+///
+/// Examples
+/// --------
+/// >>> import datetime
+/// >>> from finstack_quant.core.currency import Currency
+/// >>> from finstack_quant.core.dates import StubKind
+/// >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
+/// >>> from finstack_quant.core.money import Money
+/// >>> from finstack_quant.core.types import Rate
+/// >>> from finstack_quant.valuations.instruments import Bond, instrument_cashflows
+/// >>> as_of = datetime.date(2024, 1, 1)
+/// >>> bond = Bond.fixed(
+/// ...     "B", Money(1000.0, Currency("USD")), Rate(0.05), as_of, datetime.date(2026, 1, 1), StubKind.NONE, "USD-OIS"
+/// ... )
+/// >>> market = MarketContext().insert(DiscountCurve.flat("USD-OIS", as_of, 0.04))
+/// >>> envelope = instrument_cashflows(bond, market, as_of, "discounting")
+/// >>> (envelope.instrument_id, len(envelope.to_dataframe()))
+/// ('B', 6)
+#[pyfunction]
+#[pyo3(text_signature = "(instrument, market, as_of, model)")]
+fn instrument_cashflows(
+    py: Python<'_>,
+    instrument: &Bound<'_, PyAny>,
+    market: &Bound<'_, PyAny>,
+    as_of: &Bound<'_, PyAny>,
+    model: &str,
+) -> PyResult<PyInstrumentCashflowEnvelope> {
+    cashflow_envelope(py, instrument, market, as_of, model)
+        .map(|inner| PyInstrumentCashflowEnvelope { inner })
+}
+
+/// Cashflow export for one instrument: header fields plus per-flow rows.
+///
+/// Typed wrapper of the Rust ``InstrumentCashflowEnvelope`` returned by
+/// :func:`instrument_cashflows`. ``flows`` holds one dict per cashflow;
+/// ``to_dataframe()`` is the tabular view.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.valuations.instruments import InstrumentCashflowEnvelope
+/// >>> envelope = InstrumentCashflowEnvelope.from_json(
+/// ...     '{"instrument_id": "B", "currency": "USD", "model": "discounting",'
+/// ...     ' "as_of": "2025-01-15", "discount_curve_id": "USD-OIS", "flows": [],'
+/// ...     ' "total_pv": 0.0, "reconciles_with_base_value": true}')
+/// >>> (envelope.instrument_id, envelope.currency, len(envelope.to_dataframe()))
+/// ('B', 'USD', 0)
+#[pyclass(
+    name = "InstrumentCashflowEnvelope",
+    module = "finstack_quant.valuations.instruments",
+    frozen,
+    skip_from_py_object
+)]
+#[derive(Clone)]
+pub(crate) struct PyInstrumentCashflowEnvelope {
+    pub(crate) inner: InstrumentCashflowEnvelope,
+}
+
+/// Documented column order of ``InstrumentCashflowEnvelope.to_dataframe``:
+/// every ``CashflowRow`` field, in struct order, with its empty-frame dtype.
+const CASHFLOW_ROW_COLUMNS: &[(&str, &str)] = &[
+    ("date", "str"),
+    ("amount", "float64"),
+    ("currency", "str"),
+    ("kind", "str"),
+    ("accrual_factor", "float64"),
+    ("year_fraction", "float64"),
+    ("rate", "float64"),
+    ("reset_date", "str"),
+    ("discount_factor", "float64"),
+    ("discount_curve_id", "str"),
+    ("survival_probability", "float64"),
+    ("conditional_default_prob", "float64"),
+    ("inflation_index_ratio", "float64"),
+    ("prepayment_smm", "float64"),
+    ("beginning_balance", "float64"),
+    ("ending_balance", "float64"),
+    ("pv", "float64"),
+];
+
+#[pymethods]
+impl PyInstrumentCashflowEnvelope {
+    /// Instrument identifier.
+    #[getter]
+    fn instrument_id(&self) -> String {
+        self.inner.instrument_id.clone()
+    }
+
+    /// Reporting currency code of the row PVs and ``total_pv``.
+    #[getter]
+    fn currency(&self) -> String {
+        self.inner.currency.to_string()
+    }
+
+    /// Model key used: ``"discounting"`` or ``"hazard_rate"``.
+    #[getter]
+    fn model(&self) -> String {
+        self.inner.model.clone()
+    }
+
+    /// Valuation date, as ``datetime.date``.
+    #[getter]
+    fn as_of<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::date_utils::date_to_py(py, self.inner.as_of)
+    }
+
+    /// Discount curve identifier used for every row.
+    #[getter]
+    fn discount_curve_id(&self) -> String {
+        self.inner.discount_curve_id.to_string()
+    }
+
+    /// Hazard curve identifier (``None`` under ``"discounting"``).
+    #[getter]
+    fn credit_curve_id(&self) -> Option<String> {
+        self.inner.credit_curve_id.as_ref().map(ToString::to_string)
+    }
+
+    /// Recovery rate of the hazard curve as a decimal (``None`` under ``"discounting"``).
+    #[getter]
+    fn recovery_rate(&self) -> Option<f64> {
+        self.inner.recovery_rate
+    }
+
+    /// Per-flow rows as a list of dicts (the serde form of ``CashflowRow``).
+    #[getter]
+    fn flows<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        serde_to_py(py, &self.inner.flows)
+    }
+
+    /// Sum of the row ``pv`` values in the envelope currency.
+    #[getter]
+    fn total_pv(&self) -> f64 {
+        self.inner.total_pv
+    }
+
+    /// ``True`` when ``total_pv`` agrees with the instrument's ``base_value``.
+    #[getter]
+    fn reconciles_with_base_value(&self) -> bool {
+        self.inner.reconciles_with_base_value
+    }
+
+    /// One row per cashflow as a pandas ``DataFrame``.
+    ///
+    /// Columns, in order: ``date``, ``amount``, ``currency``, ``kind``,
+    /// ``accrual_factor``, ``year_fraction``, ``rate``, ``reset_date``,
+    /// ``discount_factor``, ``discount_curve_id``, ``survival_probability``,
+    /// ``conditional_default_prob``, ``inflation_index_ratio``,
+    /// ``prepayment_smm``, ``beginning_balance``, ``ending_balance``, ``pv``.
+    /// ``date`` and ``reset_date`` are ``datetime64``; a field the model does
+    /// not populate is null.
+    #[pyo3(text_signature = "($self)")]
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let frame =
+            serde_rows_to_dataframe_with_schema(py, &self.inner.flows, CASHFLOW_ROW_COLUMNS)?;
+        let to_datetime = py.import("pandas")?.getattr("to_datetime")?;
+        let parsed = pyo3::types::PyDict::new(py);
+        for column in ["date", "reset_date"] {
+            parsed.set_item(column, to_datetime.call1((frame.get_item(column)?,))?)?;
+        }
+        frame.call_method("assign", (), Some(&parsed))
+    }
+
+    /// Deserialize an envelope from the JSON produced by ``to_json`` or
+    /// ``instrument_cashflows_json``.
+    ///
+    /// Parameters
+    /// ----------
+    /// json : str
+    ///     Serialized ``InstrumentCashflowEnvelope``.
+    ///
+    /// Returns
+    /// -------
+    /// InstrumentCashflowEnvelope
+    ///     The parsed envelope.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``json`` is malformed or misses a required field.
+    #[staticmethod]
+    #[pyo3(text_signature = "(json)")]
+    fn from_json(json: &str) -> PyResult<Self> {
+        Ok(Self {
+            inner: serde_json::from_str(json).map_err(|e| {
+                crate::errors::serde_json_to_py(e, "invalid InstrumentCashflowEnvelope JSON")
+            })?,
+        })
+    }
+
+    /// Serialize to compact JSON, identical to ``instrument_cashflows_json``.
+    ///
+    /// Returns
+    /// -------
+    /// str
+    ///     The envelope JSON.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the envelope cannot be serialized.
+    #[pyo3(text_signature = "($self)")]
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner).map_err(display_to_py)
+    }
+
+    /// Support ``pickle`` (and therefore ``multiprocessing``, ``joblib``, ``dask``).
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
+        let from_json = py.get_type::<Self>().getattr("from_json")?;
+        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "InstrumentCashflowEnvelope(instrument_id={:?}, model={:?}, flows=<{} rows>, total_pv={})",
+            self.inner.instrument_id,
+            self.inner.model,
+            self.inner.flows.len(),
+            self.inner.total_pv
+        )
+    }
 }
 
 /// Register pricing functions on the valuations submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyMetricPricingOverrides>()?;
     m.add_class::<PyMarketHistory>()?;
+    m.add_class::<PyInstrumentCashflowEnvelope>()?;
+    m.add_function(pyo3::wrap_pyfunction!(instrument_cashflows, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(price_instrument, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(list_models, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(list_models_grouped, m)?)?;
@@ -1079,4 +1357,8 @@ pub fn register_market(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()>
 ///
 /// Extend this list (sorted) when adding a class or function here; `mod.rs`
 /// merges every submodule list so registration stays in one place per file.
-pub(crate) const EXPORTS: &[&str] = &["MarketHistory", "MetricPricingOverrides"];
+pub(crate) const EXPORTS: &[&str] = &[
+    "InstrumentCashflowEnvelope",
+    "MarketHistory",
+    "MetricPricingOverrides",
+];

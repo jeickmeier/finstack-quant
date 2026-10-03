@@ -146,7 +146,9 @@ fn validate_confidence_level(confidence_level: f64) -> Result<()> {
 /// definition: the R type-7 / numpy-default linear-interpolated empirical
 /// quantile function (see [`VarResult::from_distribution`]). This guarantees
 /// the two measures are mutually consistent.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct VarResult {
     /// Value-at-Risk at specified confidence level.
     ///
@@ -1329,6 +1331,29 @@ mod tests {
         usd_ois_market,
     };
     use time::macros::date;
+
+    #[test]
+    fn var_result_round_trips_through_strict_json() -> Result<()> {
+        let result = VarResult::from_distribution(vec![-3.0, 1.0, -1.0, 2.0], 0.95)?;
+        let json = serde_json::to_string(&result)
+            .map_err(|e| finstack_quant_core::Error::Internal(e.to_string()))?;
+        let back: VarResult = serde_json::from_str(&json)
+            .map_err(|e| finstack_quant_core::Error::Internal(e.to_string()))?;
+        assert_eq!(back, result);
+        assert!(serde_json::from_str::<VarResult>(&json.replace("\"var\"", "\"vaR\"")).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn pricing_dispatch_from_model_maps_default_and_explicit_keys() -> Result<()> {
+        assert!(PricingDispatch::from_model("default")?.model().is_none());
+        assert_eq!(
+            PricingDispatch::from_model("discounting")?.model(),
+            Some(crate::pricer::ModelKey::Discounting)
+        );
+        assert!(PricingDispatch::from_model("no_such_model").is_err());
+        Ok(())
+    }
 
     #[test]
     fn taylor_equity_pnl_uses_market_spot_ids_and_aggregates_shared_spots() -> Result<()> {

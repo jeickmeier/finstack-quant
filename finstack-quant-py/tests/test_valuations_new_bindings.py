@@ -1,8 +1,8 @@
 """Smoke tests for valuation-owned cashflow and coupon-profile bindings.
 
 Covers:
-- B4: `instrument_cashflows_json` and the `instrument_cashflows`
-      DataFrame helper.
+- B4: `instrument_cashflows_json` and its typed twin `instrument_cashflows`
+      (``InstrumentCashflowEnvelope``).
 - Product-specific coupon-profile entry points.
 """
 
@@ -15,11 +15,12 @@ import pytest
 
 from finstack_quant.core.market_data import DiscountCurve, ForwardCurve, HazardCurve, MarketContext
 from finstack_quant.valuations import (
-    instrument_cashflows,
     inverse_floater_coupon_profile,
     snowball_coupon_profile,
 )
 from finstack_quant.valuations.instruments import (
+    InstrumentCashflowEnvelope,
+    instrument_cashflows,
     instrument_cashflows_json,
     price_instrument,
     validate_instrument_json,
@@ -61,11 +62,14 @@ def _build_deposit_market() -> tuple[str, MarketContext]:
 
 def test_instrument_cashflows_deposit_reconciles_with_price() -> None:
     inst_json, market = _build_deposit_market()
-    envelope, df = instrument_cashflows(inst_json, market, "2025-01-15", model="discounting")
+    envelope = instrument_cashflows(inst_json, market, "2025-01-15", "discounting")
+    df = envelope.to_dataframe()
 
-    assert envelope["reconciles_with_base_value"] is True
-    assert envelope["model"] == "discounting"
-    assert envelope["currency"] == "USD"
+    assert isinstance(envelope, InstrumentCashflowEnvelope)
+    assert envelope.reconciles_with_base_value is True
+    assert envelope.model == "discounting"
+    assert envelope.currency == "USD"
+    assert envelope.as_of == date(2025, 1, 15)
     assert len(df) > 0
     for col in ("date", "amount", "currency", "kind", "discount_factor", "pv"):
         assert col in df.columns
@@ -73,12 +77,29 @@ def test_instrument_cashflows_deposit_reconciles_with_price() -> None:
     # total_pv reconciles with price_instrument within rounding.
     pr = price_instrument(inst_json, market.to_json(), "2025-01-15", model="discounting")
     price = float(pr.price)
-    assert abs(envelope["total_pv"] - price) < 0.01
+    assert abs(envelope.total_pv - price) < 0.01
 
     # DataFrame pv sum matches the envelope total.
     pv_series = df["pv"]
     pv_sum = float(pv_series.sum())  # type: ignore[arg-type]
-    assert abs(pv_sum - envelope["total_pv"]) < 1e-6
+    assert abs(pv_sum - envelope.total_pv) < 1e-6
+
+
+def test_instrument_cashflows_is_the_compiled_typed_twin_of_the_json_export() -> None:
+    """PYPY-010: the typed twin is compiled Rust, not a Python dict wrapper."""
+    from finstack_quant import valuations
+
+    inst_json, market = _build_deposit_market()
+    envelope = instrument_cashflows(inst_json, market, "2025-01-15", "discounting")
+    text = instrument_cashflows_json(inst_json, market, "2025-01-15", "discounting")
+
+    assert not hasattr(valuations, "instrument_cashflows")
+    assert type(instrument_cashflows).__name__ == "builtin_function_or_method"
+    assert json.loads(envelope.to_json()) == json.loads(text)
+    assert InstrumentCashflowEnvelope.from_json(text).to_json() == envelope.to_json()
+    df = envelope.to_dataframe()
+    assert str(df["date"].dtype).startswith("datetime64")
+    assert list(df.columns)[:4] == ["date", "amount", "currency", "kind"]
 
 
 def test_instrument_cashflows_unsupported_model_raises() -> None:

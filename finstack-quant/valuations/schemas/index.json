@@ -1088,6 +1088,15 @@
       "summary": "PV plus requested measures, with rounding and FX policy stamps.",
       "title": "Valuation Result",
       "type_name": "ValuationResult"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/results/1/var_result.schema.json",
+      "bytes": 3032,
+      "kind": "output",
+      "path": "schemas/results/1/var_result.schema.json",
+      "summary": "Historical-simulation portfolio VaR, expected shortfall and P&L distribution.",
+      "title": "VarResult",
+      "type_name": "VarResult"
     }
   ],
   "schema_index_version": 1

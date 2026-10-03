@@ -205,7 +205,6 @@ RUNTIME_RESULT_EXCEPTIONS = (
         ("FundingLegSpec",),
         "runtime-spec",
     ),
-    *_runtime_exception("valuations", "src/metrics/risk/var_calculator.rs", ("VarResult",)),
     *_runtime_exception(
         "models",
         "src/trees/short_rate_tree/tree.rs",
