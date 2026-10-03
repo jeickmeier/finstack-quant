@@ -10824,14 +10824,16 @@ class CdsOptionBuilder:
             If ``value`` is not a decimal number.
         """
         ...
-    def attributes(self, value: Attributes | dict[str, str] | None) -> CdsOptionBuilder:
+    def attributes(self, value: Attributes | dict[str, Any] | None) -> CdsOptionBuilder:
         """
         Set free-form instrument attributes (tags and metadata).
 
         Parameters
         ----------
-        value : Attributes | dict[str, str] | None
-            Attribute bag; a dict populates metadata, an optional ``"tags"`` list entry populates tags.
+        value : Attributes | dict | None
+            Attribute bag: an ``Attributes`` or its serde ``dict`` form
+            (``{"tags": [...], "meta": {...}}``, as ``to_dict()`` returns it);
+            ``None`` clears it.
 
         Returns
         -------
@@ -10841,7 +10843,9 @@ class CdsOptionBuilder:
         Raises
         ------
         TypeError
-            If ``value`` is neither ``Attributes``, a dict, nor ``None``.
+            If ``value`` is neither ``Attributes``, a ``dict`` nor ``None``.
+        ValueError
+            If the ``dict`` has a key other than ``tags`` / ``meta`` or a non-string tag or value.
         """
         ...
     def build(self) -> CdsOption:
