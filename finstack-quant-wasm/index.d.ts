@@ -26166,7 +26166,7 @@ export interface TransitionMatrix extends WasmOwned {
    * @returns The probability of moving from `from` to `to` over the horizon.
    * @throws Error - Throws a `validation` error if either index is outside the scale.
    */
-  probabilityByIndex(from: string, to: string): number;
+  probabilityByIndex(from: number, to: number): number;
   /**
    * One row of transition probabilities, indexed by destination state.
    * @param from - Label of the starting state.

@@ -1167,6 +1167,11 @@ fn models_and_valuations_dts_expose_owned_credit_namespaces() {
     assert!(merton_statics
         .contains("kmvDefaultPoint(shortTermDebt: number, longTermDebt: number): number;"));
     assert!(merton_statics.contains("creditGrades("));
+    // Label lookups take strings; the index lookup takes numbers (the binding
+    // converts with `js_uint` and throws a `TypeError` for a string).
+    let transition = interface_block(&dts, "TransitionMatrix");
+    assert!(transition.contains("probability(from: string, to: string): number;"));
+    assert!(transition.contains("probabilityByIndex(from: number, to: number): number;"));
     assert!(model_credit.contains("MertonModel: MertonModelConstructor;"));
     assert!(model_credit.contains("ToggleExerciseModel: ToggleExerciseModelConstructor;"));
     assert!(!dts.contains("mertonModelJson("));
