@@ -12,6 +12,21 @@
 - Python and WASM: `RatingFactorTable` / `MasterScale` / `DownturnLgd` `from_registry_id` with an unknown id raise `KeyError` / throw kind `not_found` (was `ValueError` / `validation`); the Rust credit registry returns `InputError::NotFound`.
 - Python: typed Rust errors at the remaining statements-analytics, attribution, calibration, margin, portfolio and scenarios binding sites now go through their kind-aware mapper; `display_to_py` accepts only kind-less parse/serde errors (`KindlessError`), so routing a typed error through it no longer compiles.
 
+### Valuations: overrides and composites (Python-binding audit PR 13)
+
+#### Added
+
+- Python and WASM: every typed builder (Bond, TermLoan, InterestRateSwap, Swaption, CapFloor, FxForward, FxOption, EquityOption, CreditDefaultSwap, CdsIndex, CdsTranche, ConvertibleBond, RevolvingCredit, AssetBackedFacility, StructuredCredit) sets `instrument_pricing_overrides` / `metric_pricing_overrides` / `scenario_pricing_overrides` (`instrumentPricingOverrides` / ... in WASM), and the typed instruments expose them as serde-dict getters, so quoted prices, quoted premiums and `model_config` no longer need JSON surgery.
+
+#### Changed (breaking)
+
+- Rust: `CompositeInstrument::primitive_exposures` / `rebalance`, `CompositeSpec::initialize`, `composite::history` and `composite::history_from_spec` take a `PricingOptions` argument; the crate-private `primitive_exposures_with_options` is gone. Python and WASM pass the calibration recalibration provider, so `cs01` and other quote-recalibrated metrics work through composite exposures, history and metric-weighted initialize/rebalance as they do through `price_instrument`.
+- Rust: `portfolio::primitive_exposures` prices with the calibration recalibration provider instead of `PricingOptions::default()`, so `cs01` primitive exposures no longer fail.
+
+#### Fixed
+
+- `RebalanceRule::Calendar` with no `end` (an open-ended cadence), with `end == start`, or with an end that is not a whole number of periods after `start` now validates in every host. Rebalance dates are `start + k * frequency` adjusted to business days and cut off at `min(end, horizon)`; the cut-off itself is not a rebalance date unless it falls on the cadence.
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

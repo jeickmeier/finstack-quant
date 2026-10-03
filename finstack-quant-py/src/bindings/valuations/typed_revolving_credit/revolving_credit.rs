@@ -652,6 +652,13 @@ pub struct PyRevolvingCreditBuilder {
     fields: Vec<(&'static str, String)>,
 }
 
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyRevolvingCredit,
+    PyRevolvingCreditBuilder,
+    "RevolvingCreditBuilder",
+    fields
+);
+
 /// Take the wrapped Rust builder or fail if `build()` already consumed it.
 fn take_builder(b: &mut PyRevolvingCreditBuilder) -> PyResult<RevolvingCreditBuilderInner> {
     b.inner

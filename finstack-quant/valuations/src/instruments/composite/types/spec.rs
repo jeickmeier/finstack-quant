@@ -29,6 +29,13 @@ fn annualized_volatility(pnl: &[f64], annualization_factor: f64) -> Result<f64> 
     Ok(sample_std_dev(pnl)? * annualization_factor.sqrt())
 }
 
+/// Market, date and pricing options used when weighting prices the legs.
+struct LegPricing<'a> {
+    market: &'a MarketContext,
+    as_of: Date,
+    options: &'a PricingOptions,
+}
+
 struct VolatilityWeightingConfig<'a> {
     anchor_leg_id: &'a InstrumentId,
     anchor_quantity: f64,
@@ -347,6 +354,10 @@ impl CompositeSpec {
     ///   later history observation is permitted.
     /// * `history` - Strictly increasing dated snapshots available through
     ///   `as_of`. Required for volatility weighting; optional otherwise.
+    /// * `options` - Pricing options used when metric-weighted or
+    ///   user-defined weighting prices the legs, as for
+    ///   the host `price_instrument` entry points; quote-recalibrated
+    ///   weighting metrics such as `cs01` need a recalibration provider.
     ///
     /// # Errors
     ///
@@ -357,10 +368,11 @@ impl CompositeSpec {
         market: &MarketContext,
         as_of: Date,
         history: &[CompositeMarketObservation],
+        options: PricingOptions,
     ) -> Result<CompositeRebalanceResult> {
         self.validate()?;
         validate_history(history, Some(as_of))?;
-        let (quantities, inputs) = self.resolve_quantities(market, as_of, history)?;
+        let (quantities, inputs) = self.resolve_quantities(market, as_of, history, options)?;
         self.build_rebalance_result(as_of, quantities, inputs, None)
     }
 
@@ -420,6 +432,7 @@ impl CompositeSpec {
         market: &MarketContext,
         as_of: Date,
         history: &[CompositeMarketObservation],
+        options: PricingOptions,
     ) -> Result<(Vec<f64>, IndexMap<String, f64>)> {
         match &self.weighting_method {
             WeightingMethod::FixedQuantity => Ok((
@@ -435,8 +448,11 @@ impl CompositeSpec {
                 anchor_quantity,
                 neutralize,
             } => self.resolve_metric_weighted(
-                market,
-                as_of,
+                LegPricing {
+                    market,
+                    as_of,
+                    options: &options,
+                },
                 metric,
                 anchor_leg_id,
                 *anchor_quantity,
@@ -464,8 +480,11 @@ impl CompositeSpec {
                 quantity_expressions,
                 annualization_factor,
             } => self.resolve_user_defined(
-                market,
-                as_of,
+                LegPricing {
+                    market,
+                    as_of,
+                    options: &options,
+                },
                 history,
                 required_metrics,
                 quantity_expressions,
@@ -527,13 +546,17 @@ impl CompositeSpec {
 
     fn resolve_metric_weighted(
         &self,
-        market: &MarketContext,
-        as_of: Date,
+        pricing: LegPricing<'_>,
         metric: &MetricId,
         anchor_leg_id: &InstrumentId,
         anchor_quantity: f64,
         neutralize: bool,
     ) -> Result<(Vec<f64>, IndexMap<String, f64>)> {
+        let LegPricing {
+            market,
+            as_of,
+            options,
+        } = pricing;
         let scores = normalized_scores(&self.legs, neutralize)?;
         let mut measures = Vec::with_capacity(self.legs.len());
         let mut inputs = IndexMap::new();
@@ -543,7 +566,7 @@ impl CompositeSpec {
                 market,
                 as_of,
                 std::slice::from_ref(metric),
-                PricingOptions::default(),
+                options.clone(),
             )?;
             let mut value = result.measures.get(metric).copied().ok_or_else(|| {
                 Error::Validation(format!(
@@ -648,23 +671,23 @@ impl CompositeSpec {
 
     fn resolve_user_defined(
         &self,
-        market: &MarketContext,
-        as_of: Date,
+        pricing: LegPricing<'_>,
         history: &[CompositeMarketObservation],
         required_metrics: &[MetricId],
         quantity_expressions: &IndexMap<String, Expr>,
         annualization_factor: f64,
     ) -> Result<(Vec<f64>, IndexMap<String, f64>)> {
+        let LegPricing {
+            market,
+            as_of,
+            options,
+        } = pricing;
         let mut columns = IndexMap::<String, f64>::new();
         columns.insert("as_of_days".to_string(), f64::from(as_of.to_julian_day()));
         for leg in &self.legs {
             let instrument = leg.instrument.as_ref().clone().into_boxed()?;
-            let result = instrument.price_with_metrics(
-                market,
-                as_of,
-                required_metrics,
-                PricingOptions::default(),
-            )?;
+            let result =
+                instrument.price_with_metrics(market, as_of, required_metrics, options.clone())?;
             let value = convert_amount(
                 market,
                 result.value.amount(),

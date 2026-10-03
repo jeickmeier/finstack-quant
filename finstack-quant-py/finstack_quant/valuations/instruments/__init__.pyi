@@ -1124,6 +1124,58 @@ class Bond:
         """
         ...
     @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def attributes(self) -> Attributes:
         """
         Instrument attributes (tags and metadata) used for scenario selection.
@@ -1509,6 +1561,73 @@ class BondBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``BondSettlementConvention``.
+        """
+        ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> BondBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        BondBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> BondBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        BondBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> BondBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        BondBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
         """
         ...
     def attributes(self, value: Attributes | dict[str, str]) -> BondBuilder:
@@ -3217,6 +3336,58 @@ class TermLoan:
         """
         ...
     @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def attributes(self) -> Attributes:
         """
         Instrument attributes (tags and metadata) used for scenario selection.
@@ -3716,6 +3887,73 @@ class TermLoanBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()``.
+        """
+        ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> TermLoanBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        TermLoanBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> TermLoanBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        TermLoanBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> TermLoanBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        TermLoanBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
         """
         ...
     def attributes(self, value: Attributes | dict[str, str]) -> TermLoanBuilder:
@@ -5499,6 +5737,58 @@ class InterestRateSwap:
         """
         ...
     @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def attributes(self) -> Attributes:
         """
         Instrument attributes (tags and metadata) used for scenario selection.
@@ -5693,6 +5983,75 @@ class InterestRateSwapBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``OtcMarginSpec``.
+        """
+        ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> InterestRateSwapBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        InterestRateSwapBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(
+        self, value: MetricPricingOverrides | dict[str, object] | str
+    ) -> InterestRateSwapBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        InterestRateSwapBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> InterestRateSwapBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        InterestRateSwapBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
         """
         ...
     def attributes(self, value: Attributes | dict[str, str]) -> InterestRateSwapBuilder:
@@ -6268,6 +6627,58 @@ class Swaption:
         """
         ...
     @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def attributes(self) -> Attributes:
         """
         Instrument attributes (tags and metadata) used for scenario selection.
@@ -6576,6 +6987,73 @@ class SwaptionBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``SabrParameters``.
+        """
+        ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> SwaptionBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        SwaptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> SwaptionBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        SwaptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> SwaptionBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        SwaptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
         """
         ...
     def attributes(self, value: Attributes | dict[str, str]) -> SwaptionBuilder:
@@ -7197,6 +7675,58 @@ class CapFloor:
         """
         ...
     @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def attributes(self) -> Attributes:
         """
         Instrument attributes (tags and metadata) used for scenario selection.
@@ -7698,6 +8228,73 @@ class CapFloorBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``OvernightCouponConvention``.
         """
         ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> CapFloorBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        CapFloorBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> CapFloorBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        CapFloorBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> CapFloorBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        CapFloorBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
     def attributes(self, value: Attributes | dict[str, str]) -> CapFloorBuilder:
         """
         Set instrument attributes (tags and metadata).
@@ -7992,6 +8589,58 @@ class CreditDefaultSwap:
         -------
         str
             Registered model key such as ``"hazard_rate"`` or ``"black76"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
 
         Notes
         -----
@@ -8560,6 +9209,75 @@ class CreditDefaultSwapBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as an ``OtcMarginSpec``.
         """
         ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> CreditDefaultSwapBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        CreditDefaultSwapBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(
+        self, value: MetricPricingOverrides | dict[str, object] | str
+    ) -> CreditDefaultSwapBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        CreditDefaultSwapBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> CreditDefaultSwapBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        CreditDefaultSwapBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
     def attributes(self, value: Attributes | dict[str, str] | None) -> CreditDefaultSwapBuilder:
         """
         Set instrument attributes (tags and metadata).
@@ -8852,6 +9570,58 @@ class CdsIndex:
         -------
         str
             Registered model key such as ``"hazard_rate"`` or ``"black76"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
 
         Notes
         -----
@@ -9657,6 +10427,73 @@ class CdsIndexBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as an ``OtcMarginSpec``.
         """
         ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> CdsIndexBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        CdsIndexBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> CdsIndexBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        CdsIndexBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> CdsIndexBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        CdsIndexBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
     def attributes(self, value: Attributes | dict[str, str] | None) -> CdsIndexBuilder:
         """
         Set instrument attributes (tags and metadata).
@@ -9949,6 +10786,58 @@ class CdsTranche:
         -------
         str
             Registered model key such as ``"hazard_rate"`` or ``"black76"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
 
         Notes
         -----
@@ -10865,6 +11754,73 @@ class CdsTrancheBuilder:
             If ``value`` is not a ``(date, Money)`` pair.
         """
         ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> CdsTrancheBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        CdsTrancheBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> CdsTrancheBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        CdsTrancheBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> CdsTrancheBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        CdsTrancheBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
     def attributes(self, value: Attributes | dict[str, str] | None) -> CdsTrancheBuilder:
         """
         Set instrument attributes (tags and metadata).
@@ -11161,6 +12117,58 @@ class ConvertibleBond:
         -------
         str
             Registered model key such as ``"hazard_rate"`` or ``"black76"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
 
         Notes
         -----
@@ -11939,6 +12947,75 @@ class ConvertibleBondBuilder:
             If the builder was already consumed by ``build()`` or ``value`` does not deserialize as a ``CashflowSpec``.
         """
         ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> ConvertibleBondBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        ConvertibleBondBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(
+        self, value: MetricPricingOverrides | dict[str, object] | str
+    ) -> ConvertibleBondBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        ConvertibleBondBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> ConvertibleBondBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        ConvertibleBondBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
     def attributes(self, value: Attributes | dict[str, str] | None) -> ConvertibleBondBuilder:
         """
         Set instrument attributes (tags and metadata).
@@ -12231,6 +13308,58 @@ class FxForward:
         -------
         str
             Registered model key such as ``"hazard_rate"`` or ``"black76"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
 
         Notes
         -----
@@ -12896,6 +14025,73 @@ class FxForwardBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> FxForwardBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        FxForwardBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> FxForwardBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        FxForwardBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> FxForwardBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        FxForwardBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
     def attributes(self, value: Attributes | dict[str, str] | None) -> FxForwardBuilder:
         """
         Set instrument attributes (tags and metadata).
@@ -13188,6 +14384,58 @@ class FxOption:
         -------
         str
             Registered model key such as ``"hazard_rate"`` or ``"black76"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
 
         Notes
         -----
@@ -14081,6 +15329,73 @@ class FxOptionBuilder:
             If the builder was already consumed by ``build()``.
         """
         ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> FxOptionBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        FxOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> FxOptionBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        FxOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> FxOptionBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        FxOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
     def attributes(self, value: Attributes | dict[str, str] | None) -> FxOptionBuilder:
         """
         Set instrument attributes (tags and metadata).
@@ -14375,6 +15690,58 @@ class EquityOption:
         -------
         str
             Registered model key such as ``"hazard_rate"`` or ``"black76"``.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
 
         Notes
         -----
@@ -15363,6 +16730,73 @@ class EquityOptionBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()`` or a date cannot be interpreted.
+        """
+        ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> EquityOptionBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        EquityOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(self, value: MetricPricingOverrides | dict[str, object] | str) -> EquityOptionBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        EquityOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> EquityOptionBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        EquityOptionBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
         """
         ...
     def attributes(self, value: Attributes | dict[str, str] | None) -> EquityOptionBuilder:
@@ -22908,6 +24342,58 @@ class StructuredCredit:
         ...
 
     @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def attributes(self) -> Attributes:
         """
         Free-form attributes (tags and metadata).
@@ -24060,6 +25546,75 @@ class StructuredCreditBuilder:
         """
         ...
 
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> StructuredCreditBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        StructuredCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(
+        self, value: MetricPricingOverrides | dict[str, object] | str
+    ) -> StructuredCreditBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        StructuredCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> StructuredCreditBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        StructuredCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
     def attributes(self, value: Attributes | dict[str, str]) -> StructuredCreditBuilder:
         """
         Set free-form attributes (tags and metadata) on the deal.
@@ -25768,6 +27323,58 @@ class AssetBackedFacility:
         """
         ...
     @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def attributes(self) -> Attributes:
         """
         Scenario-selection attributes.
@@ -26367,6 +27974,75 @@ class AssetBackedFacilityBuilder:
         ValueError
             If ``value`` does not match the shape or the builder was already
             consumed.
+        """
+        ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> AssetBackedFacilityBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        AssetBackedFacilityBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(
+        self, value: MetricPricingOverrides | dict[str, object] | str
+    ) -> AssetBackedFacilityBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        AssetBackedFacilityBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> AssetBackedFacilityBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        AssetBackedFacilityBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
         """
         ...
     def attributes(self, value: Attributes | dict[str, str] | None) -> AssetBackedFacilityBuilder:
@@ -27306,6 +28982,58 @@ class RevolvingCredit:
         """
         ...
     @property
+    def instrument_pricing_overrides(self) -> dict[str, object]:
+        """
+        Instrument-owned pricing inputs (``InstrumentPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``market_quotes`` (quoted clean price, yield, spreads, implied
+            volatility, premium) and ``model_config`` (tree model and steps, Monte
+            Carlo and Hull-White parameters). Empty sections are omitted; ``{}``
+            when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def metric_pricing_overrides(self) -> dict[str, object]:
+        """
+        Metric-time pricing configuration (``MetricPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            Bump sizes, theta period and the other metric settings stored on
+            the instrument; unset fields are ``None`` or omitted. A
+            ``metric_pricing_overrides`` argument to ``price`` is merged over it
+            per call.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
+    def scenario_pricing_overrides(self) -> dict[str, object]:
+        """
+        Scenario-only pricing adjustments (``ScenarioPricingOverrides``) in serde form.
+
+        Returns
+        -------
+        dict[str, object]
+            ``scenario_price_shock_decimal`` and ``scenario_spread_shock_bp``;
+            ``{}`` when none is set.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+    @property
     def attributes(self) -> Attributes:
         """
         Scenario-selection attributes.
@@ -27942,6 +29670,75 @@ class RevolvingCreditBuilder:
         ------
         ValueError
             If the builder was already consumed.
+        """
+        ...
+    def instrument_pricing_overrides(self, value: dict[str, object] | str) -> RevolvingCreditBuilder:
+        """
+        Set the instrument-owned pricing inputs.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``InstrumentPricingOverrides`` in serde form (``dict`` or JSON
+            string): ``{"market_quotes": {...}, "model_config": {...}}``, e.g.
+            ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``InstrumentPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def metric_pricing_overrides(
+        self, value: MetricPricingOverrides | dict[str, object] | str
+    ) -> RevolvingCreditBuilder:
+        """
+        Set the metric-time pricing configuration stored on the instrument.
+
+        Parameters
+        ----------
+        value : MetricPricingOverrides | dict[str, object] | str
+            Rust ``MetricPricingOverrides`` as the typed class, a ``dict`` or a
+            JSON string.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``MetricPricingOverrides`` (unknown fields are rejected).
+        """
+        ...
+    def scenario_pricing_overrides(self, value: dict[str, object] | str) -> RevolvingCreditBuilder:
+        """
+        Set the scenario-only pricing adjustments.
+
+        Parameters
+        ----------
+        value : dict[str, object] | str
+            Rust ``ScenarioPricingOverrides`` in serde form (``dict`` or JSON
+            string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+
+        Returns
+        -------
+        RevolvingCreditBuilder
+            ``self``, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the builder was already consumed by ``build()`` or ``value`` does
+            not deserialize as ``ScenarioPricingOverrides`` (unknown fields are rejected).
         """
         ...
     def attributes(self, value: Attributes | dict[str, str] | None) -> RevolvingCreditBuilder:

@@ -487,6 +487,225 @@ pub(crate) fn metric_pricing_overrides_json(
     py_to_json_string(py, obj, "metric_pricing_overrides").map(Some)
 }
 
+/// Coerce ``MetricPricingOverrides | dict | str`` into the Rust struct an
+/// instrument builder stores.
+///
+/// # Arguments
+///
+/// * `py` - GIL token used for ``json.dumps`` on dict inputs.
+/// * `obj` - A typed ``MetricPricingOverrides``, a JSON string, or a dict of
+///   override fields; unknown fields are rejected.
+pub(crate) fn metric_pricing_overrides_from_py(
+    py: Python<'_>,
+    obj: &Bound<'_, PyAny>,
+) -> PyResult<MetricPricingOverrides> {
+    if let Ok(typed) = obj.cast::<PyMetricPricingOverrides>() {
+        return Ok(typed.borrow().inner.clone());
+    }
+    super::instruments::spec_from_py(py, obj, "metric_pricing_overrides")
+}
+
+/// Bind the three Rust `*_pricing_overrides` fields of a typed instrument:
+/// serde-dict getters on the instrument and consuming setters on its
+/// `FinancialBuilder`.
+///
+/// Arguments: the Python instrument wrapper (`inner` is the Rust instrument),
+/// the Python builder wrapper (`inner: Option<RustBuilder>`), the builder's
+/// Python class name, and `fields` when the builder records set fields for
+/// `__repr__` in a `fields` vector (`no_fields` otherwise).
+macro_rules! pricing_override_methods {
+    (@record fields, $slf:ident, $name:literal) => {
+        $slf.fields.push(($name, "{...}".to_string()));
+    };
+    (@record no_fields, $slf:ident, $name:literal) => {};
+    ($instrument:ty, $builder:ty, $builder_name:literal, $record:ident) => {
+        #[pyo3::pymethods]
+        impl $instrument {
+            /// Instrument-owned pricing inputs in serde form.
+            ///
+            /// Returns
+            /// -------
+            /// dict[str, object]
+            ///     ``InstrumentPricingOverrides``: ``market_quotes`` (quoted
+            ///     clean price, yield, spreads, implied volatility, premium) and
+            ///     ``model_config`` (tree model and steps, Monte Carlo and
+            ///     Hull-White parameters). Empty sections are omitted; ``{}``
+            ///     when none is set.
+            #[getter]
+            fn instrument_pricing_overrides<'py>(
+                &self,
+                py: pyo3::Python<'py>,
+            ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::PyAny>> {
+                $crate::bindings::pandas_utils::serde_to_py(
+                    py,
+                    &self.inner.instrument_pricing_overrides,
+                )
+            }
+
+            /// Metric-time pricing configuration in serde form.
+            ///
+            /// Returns
+            /// -------
+            /// dict[str, object]
+            ///     ``MetricPricingOverrides`` (bump sizes, theta period, ...);
+            ///     unset fields are ``None`` or omitted. A
+            ///     ``metric_pricing_overrides`` argument to ``price`` is merged
+            ///     over it per call.
+            #[getter]
+            fn metric_pricing_overrides<'py>(
+                &self,
+                py: pyo3::Python<'py>,
+            ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::PyAny>> {
+                $crate::bindings::pandas_utils::serde_to_py(
+                    py,
+                    &self.inner.metric_pricing_overrides,
+                )
+            }
+
+            /// Scenario-only pricing adjustments in serde form.
+            ///
+            /// Returns
+            /// -------
+            /// dict[str, object]
+            ///     ``ScenarioPricingOverrides`` (``scenario_price_shock_decimal``,
+            ///     ``scenario_spread_shock_bp``); ``{}`` when none is set.
+            #[getter]
+            fn scenario_pricing_overrides<'py>(
+                &self,
+                py: pyo3::Python<'py>,
+            ) -> pyo3::PyResult<pyo3::Bound<'py, pyo3::PyAny>> {
+                $crate::bindings::pandas_utils::serde_to_py(
+                    py,
+                    &self.inner.scenario_pricing_overrides,
+                )
+            }
+        }
+
+        #[pyo3::pymethods]
+        impl $builder {
+            /// Set the instrument-owned pricing inputs.
+            ///
+            /// Parameters
+            /// ----------
+            /// value : dict[str, object] | str
+            ///     Rust ``InstrumentPricingOverrides`` in serde form (dict or
+            ///     JSON string): ``{"market_quotes": {...}, "model_config": {...}}``,
+            ///     e.g. ``{"market_quotes": {"quoted_clean_price_pct": 99.0}}``.
+            ///
+            /// Returns
+            /// -------
+            #[doc = concat!(" ", $builder_name)]
+            ///     ``self``, for chaining.
+            ///
+            /// Raises
+            /// ------
+            /// ValueError
+            ///     If the builder was already consumed by ``build()`` or
+            ///     ``value`` does not deserialize as ``InstrumentPricingOverrides``.
+            #[pyo3(text_signature = "($self, value)")]
+            fn instrument_pricing_overrides<'py>(
+                mut slf: pyo3::PyRefMut<'py, Self>,
+                py: pyo3::Python<'py>,
+                value: &pyo3::Bound<'py, pyo3::PyAny>,
+            ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
+                let overrides: finstack_quant_valuations::instruments::InstrumentPricingOverrides =
+                    $crate::bindings::valuations::instruments::spec_from_py(
+                        py,
+                        value,
+                        "instrument_pricing_overrides",
+                    )?;
+                let builder = slf.inner.take().ok_or_else(|| {
+                    $crate::errors::value_error("builder already consumed by build()")
+                })?;
+                slf.inner = Some(builder.instrument_pricing_overrides(overrides));
+                $crate::bindings::valuations::pricing::pricing_override_methods!(
+                    @record $record, slf, "instrument_pricing_overrides"
+                );
+                Ok(slf)
+            }
+
+            /// Set the metric-time pricing configuration stored on the instrument.
+            ///
+            /// Parameters
+            /// ----------
+            /// value : MetricPricingOverrides | dict[str, object] | str
+            ///     Rust ``MetricPricingOverrides`` as the typed class, a dict or a
+            ///     JSON string.
+            ///
+            /// Returns
+            /// -------
+            #[doc = concat!(" ", $builder_name)]
+            ///     ``self``, for chaining.
+            ///
+            /// Raises
+            /// ------
+            /// ValueError
+            ///     If the builder was already consumed by ``build()`` or
+            ///     ``value`` does not deserialize as ``MetricPricingOverrides``.
+            #[pyo3(text_signature = "($self, value)")]
+            fn metric_pricing_overrides<'py>(
+                mut slf: pyo3::PyRefMut<'py, Self>,
+                py: pyo3::Python<'py>,
+                value: &pyo3::Bound<'py, pyo3::PyAny>,
+            ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
+                let overrides =
+                    $crate::bindings::valuations::pricing::metric_pricing_overrides_from_py(
+                        py, value,
+                    )?;
+                let builder = slf.inner.take().ok_or_else(|| {
+                    $crate::errors::value_error("builder already consumed by build()")
+                })?;
+                slf.inner = Some(builder.metric_pricing_overrides(overrides));
+                $crate::bindings::valuations::pricing::pricing_override_methods!(
+                    @record $record, slf, "metric_pricing_overrides"
+                );
+                Ok(slf)
+            }
+
+            /// Set the scenario-only pricing adjustments.
+            ///
+            /// Parameters
+            /// ----------
+            /// value : dict[str, object] | str
+            ///     Rust ``ScenarioPricingOverrides`` in serde form (dict or JSON
+            ///     string), e.g. ``{"scenario_price_shock_decimal": -0.02}``.
+            ///
+            /// Returns
+            /// -------
+            #[doc = concat!(" ", $builder_name)]
+            ///     ``self``, for chaining.
+            ///
+            /// Raises
+            /// ------
+            /// ValueError
+            ///     If the builder was already consumed by ``build()`` or
+            ///     ``value`` does not deserialize as ``ScenarioPricingOverrides``.
+            #[pyo3(text_signature = "($self, value)")]
+            fn scenario_pricing_overrides<'py>(
+                mut slf: pyo3::PyRefMut<'py, Self>,
+                py: pyo3::Python<'py>,
+                value: &pyo3::Bound<'py, pyo3::PyAny>,
+            ) -> pyo3::PyResult<pyo3::PyRefMut<'py, Self>> {
+                let overrides: finstack_quant_valuations::instruments::ScenarioPricingOverrides =
+                    $crate::bindings::valuations::instruments::spec_from_py(
+                        py,
+                        value,
+                        "scenario_pricing_overrides",
+                    )?;
+                let builder = slf.inner.take().ok_or_else(|| {
+                    $crate::errors::value_error("builder already consumed by build()")
+                })?;
+                slf.inner = Some(builder.scenario_pricing_overrides(overrides));
+                $crate::bindings::valuations::pricing::pricing_override_methods!(
+                    @record $record, slf, "scenario_pricing_overrides"
+                );
+                Ok(slf)
+            }
+        }
+    };
+}
+pub(crate) use pricing_override_methods;
+
 /// Coerce ``dict | str | MarketHistory | None`` into the JSON the Rust
 /// pricing entry point accepts.
 pub(crate) fn market_history_json(

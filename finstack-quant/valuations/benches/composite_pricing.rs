@@ -6,7 +6,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::{
     CompositeInstrument, CompositeLegSpec, CompositeSpec, Equity, Instrument, InstrumentJson,
-    RebalanceRule, WeightingMethod,
+    PricingOptions, RebalanceRule, WeightingMethod,
 };
 use std::hint::black_box;
 use time::macros::date;
@@ -70,6 +70,7 @@ fn benchmark_composite_pricing(c: &mut Criterion) {
                                 black_box(&market),
                                 black_box(as_of),
                                 black_box(&[]),
+                                PricingOptions::default(),
                             )
                             .expect("benchmark decomposition must succeed"),
                     )

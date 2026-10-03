@@ -942,6 +942,13 @@ pub struct PyStructuredCreditBuilder {
     inner: Option<StructuredCreditBuilderInner>,
 }
 
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyStructuredCredit,
+    PyStructuredCreditBuilder,
+    "StructuredCreditBuilder",
+    no_fields
+);
+
 /// Take the wrapped Rust builder or fail if `build()` already consumed it.
 fn take_sc(b: &mut PyStructuredCreditBuilder) -> PyResult<StructuredCreditBuilderInner> {
     b.inner

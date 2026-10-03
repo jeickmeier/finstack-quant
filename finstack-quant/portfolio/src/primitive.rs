@@ -104,8 +104,11 @@ pub fn primitive_exposures(
         )));
     }
 
+    // One provider for the whole decomposition, as portfolio valuation does,
+    // so quote-recalibrated metrics (cs01, bucketed DV01) are available.
+    let options = finstack_quant_calibration::recalibration::pricing_options();
     let report_position = |position: &Position| -> Result<PositionPrimitiveReport> {
-        position_primitive_report(portfolio, position, market, metrics)
+        position_primitive_report(portfolio, position, market, metrics, &options)
     };
     #[cfg(not(target_arch = "wasm32"))]
     let per_position: Vec<Result<PositionPrimitiveReport>> =
@@ -154,6 +157,7 @@ fn position_primitive_report(
     position: &Position,
     market: &MarketContext,
     metrics: &[MetricId],
+    options: &PricingOptions,
 ) -> Result<PositionPrimitiveReport> {
     let position_scale = position.scale_factor();
     if let Some(composite) = position
@@ -162,7 +166,7 @@ fn position_primitive_report(
         .downcast_ref::<CompositeInstrument>()
     {
         let report = composite
-            .primitive_exposures(market, portfolio.as_of, metrics)
+            .primitive_exposures(market, portfolio.as_of, metrics, options.clone())
             .map_err(|err| {
                 Error::valuation(position.position_id.clone(), err.kind(), err.to_string())
             })?;
@@ -211,7 +215,7 @@ fn position_primitive_report(
     let instrument_id = InstrumentId::new(position.instrument.id());
     let result = position
         .instrument
-        .price_with_metrics(market, portfolio.as_of, metrics, PricingOptions::default())
+        .price_with_metrics(market, portfolio.as_of, metrics, options.clone())
         .map_err(|err| {
             Error::valuation(position.position_id.clone(), err.kind(), err.to_string())
         })?;

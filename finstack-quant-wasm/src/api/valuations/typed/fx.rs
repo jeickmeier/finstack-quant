@@ -21,6 +21,15 @@ getters!(JsFxForward, "FxForward", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
+        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+        /// @returns The overrides plain object; `{}` when none is set.
+        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
+        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+        /// @returns The overrides plain object; unset fields are `null` or omitted.
+        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
+        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+        /// @returns The overrides plain object; `{}` when none is set.
+        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
         /// Instrument attributes (tags and metadata) used for scenario selection.
         /// @returns The attribute bag; empty when none were set.
         attributes as attributes => json(i.attributes),
@@ -112,6 +121,21 @@ setters!(JsFxForwardBuilder, "FxForwardBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         quote_calendar_id as quoteCalendarId => id,
+        /// Set the instrument-owned pricing inputs.
+        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        instrument_pricing_overrides as instrumentPricingOverrides => json,
+        /// Set the metric-time pricing configuration stored on the instrument.
+        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        metric_pricing_overrides as metricPricingOverrides => json,
+        /// Set the scenario-only pricing adjustments.
+        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        scenario_pricing_overrides as scenarioPricingOverrides => json,
         /// Set instrument attributes (tags and metadata).
         /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
         /// @returns The builder, for chaining.
@@ -147,6 +171,15 @@ getters!(JsFxOption, "FxOption", |i| {
         /// Canonical model key used when `model="default"` is passed to `price`.
         /// @returns Registered model key such as `"hazard_rate"` or `"black76"`.
         default_model as defaultModel => text(Instrument::default_model(i)),
+        /// Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+        /// @returns The overrides plain object; `{}` when none is set.
+        instrument_pricing_overrides as instrumentPricingOverrides => json(i.instrument_pricing_overrides),
+        /// Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+        /// @returns The overrides plain object; unset fields are `null` or omitted.
+        metric_pricing_overrides as metricPricingOverrides => json(i.metric_pricing_overrides),
+        /// Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+        /// @returns The overrides plain object; `{}` when none is set.
+        scenario_pricing_overrides as scenarioPricingOverrides => json(i.scenario_pricing_overrides),
         /// Instrument attributes (tags and metadata) used for scenario selection.
         /// @returns The attribute bag; empty when none were set.
         attributes as attributes => json(i.attributes),
@@ -233,6 +266,21 @@ setters!(JsFxOptionBuilder, "FxOptionBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         vol_surface_id as volSurfaceId => id,
+        /// Set the instrument-owned pricing inputs.
+        /// @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        instrument_pricing_overrides as instrumentPricingOverrides => json,
+        /// Set the metric-time pricing configuration stored on the instrument.
+        /// @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        metric_pricing_overrides as metricPricingOverrides => json,
+        /// Set the scenario-only pricing adjustments.
+        /// @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+        /// @returns The builder, for chaining.
+        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+        scenario_pricing_overrides as scenarioPricingOverrides => json,
         /// Set instrument attributes (tags and metadata).
         /// @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
         /// @returns The builder, for chaining.

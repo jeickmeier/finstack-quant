@@ -11,6 +11,7 @@ ISO-string date acceptance, and builder ``__repr__``.
 from __future__ import annotations
 
 import datetime
+import inspect
 import json
 import pickle
 
@@ -37,6 +38,7 @@ from finstack_quant.valuations.instruments import (
     FloatLegSpec,
     InterestRateSwap,
     InterestRateSwapBuilder,
+    MetricPricingOverrides,
     PremiumLegSpec,
     ProtectionLegSpec,
     Swaption,
@@ -700,3 +702,80 @@ def test_metric_keys_are_human_readable_not_escaped() -> None:
     for value in long_frame["curve"].dropna().tolist():
         assert "_x2d" not in value, value
         assert "_x5f" not in value, value
+
+
+# --------------------------------------------------------------------------- pricing-override bags
+
+_OVERRIDE_BAG_TYPES = [
+    "AssetBackedFacility",
+    "Bond",
+    "CapFloor",
+    "CdsIndex",
+    "CdsTranche",
+    "ConvertibleBond",
+    "CreditDefaultSwap",
+    "EquityOption",
+    "FxForward",
+    "FxOption",
+    "InterestRateSwap",
+    "RevolvingCredit",
+    "StructuredCredit",
+    "Swaption",
+    "TermLoan",
+]
+
+
+@pytest.mark.parametrize("name", _OVERRIDE_BAG_TYPES)
+def test_typed_builders_set_the_three_pricing_override_bags(name: str) -> None:
+    from finstack_quant.valuations import instruments
+    from finstack_quant.valuations.instruments import MetricPricingOverrides
+
+    cls = getattr(instruments, name)
+    builder = cls.builder()
+    assert builder.instrument_pricing_overrides({"model_config": {"tree_steps": 50}}) is builder
+    assert builder.metric_pricing_overrides(MetricPricingOverrides(theta_period="1W")) is builder
+    assert builder.metric_pricing_overrides('{"theta_period": {"count": 1, "unit": "weeks"}}') is builder
+    assert builder.scenario_pricing_overrides({"scenario_price_shock_decimal": -0.02}) is builder
+    with pytest.raises(ValueError, match="unknown field"):
+        cls.builder().instrument_pricing_overrides({"model_cfg": {}})
+    with pytest.raises(ValueError, match="unknown field"):
+        cls.builder().metric_pricing_overrides({"market_quotes": {}})
+    for attr in ("instrument_pricing_overrides", "metric_pricing_overrides", "scenario_pricing_overrides"):
+        assert inspect.isdatadescriptor(getattr(cls, attr)), attr
+
+
+def test_bond_builder_quoted_price_drives_ytm_like_the_wire_field() -> None:
+    """VALA-001: a quoted clean price set on the builder reaches pricing and the getter."""
+    spec = Bond.example().to_dict()
+    market = _market()
+    market.insert(DiscountCurve.flat(spec["discount_curve_id"], AS_OF, 0.04))
+    quote = {"market_quotes": {"quoted_clean_price_pct": 99.0}}
+
+    def builder() -> BondBuilder:
+        return (
+            Bond
+            .builder()
+            .id(spec["id"])
+            .notional(float(spec["notional"]["amount"]), currency=spec["notional"]["currency"])
+            .issue_date(spec["issue_date"])
+            .maturity(spec["maturity"])
+            .cashflow_spec(spec["cashflow_spec"])
+            .discount_curve_id(spec["discount_curve_id"])
+        )
+
+    plain = builder().build()
+    quoted = builder().instrument_pricing_overrides(quote).build()
+    shocked = builder().scenario_pricing_overrides({"scenario_price_shock_decimal": -0.02}).build()
+    assert quoted.instrument_pricing_overrides == quote
+    assert shocked.scenario_pricing_overrides == {"scenario_price_shock_decimal": -0.02}
+    assert quoted.metric_pricing_overrides == json.loads(MetricPricingOverrides().to_json())
+    assert plain.instrument_pricing_overrides == {}
+
+    envelope = json.loads(plain.to_json())
+    envelope["instrument"]["spec"]["instrument_pricing_overrides"] = quote
+    wire = Bond.from_json(json.dumps(envelope))
+    ytm_quoted = quoted.price(market, AS_OF, metrics=["ytm"]).metrics["ytm"]
+    ytm_wire = wire.price(market, AS_OF, metrics=["ytm"]).metrics["ytm"]
+    ytm_plain = plain.price(market, AS_OF, metrics=["ytm"]).metrics["ytm"]
+    assert ytm_quoted == ytm_wire
+    assert abs(ytm_quoted - ytm_plain) > 1e-4

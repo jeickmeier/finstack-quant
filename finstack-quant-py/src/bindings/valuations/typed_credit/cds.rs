@@ -288,6 +288,13 @@ pub struct PyCreditDefaultSwapBuilder {
     fields: Vec<(&'static str, String)>,
 }
 
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyCreditDefaultSwap,
+    PyCreditDefaultSwapBuilder,
+    "CreditDefaultSwapBuilder",
+    fields
+);
+
 /// Apply one consuming Rust setter and record the field for ``__repr__``.
 macro_rules! cds_set {
     ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{

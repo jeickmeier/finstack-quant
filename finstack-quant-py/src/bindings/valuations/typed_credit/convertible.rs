@@ -772,6 +772,13 @@ pub struct PyConvertibleBondBuilder {
     fields: Vec<(&'static str, String)>,
 }
 
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyConvertibleBond,
+    PyConvertibleBondBuilder,
+    "ConvertibleBondBuilder",
+    fields
+);
+
 /// Apply one consuming Rust setter and record the field for ``__repr__``.
 macro_rules! cb_set {
     ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{

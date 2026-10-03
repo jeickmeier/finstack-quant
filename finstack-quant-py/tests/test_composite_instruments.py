@@ -124,3 +124,106 @@ def test_composite_metric_requests_reject_noncanonical_keys(entry_point: str) ->
     }
     with pytest.raises(ValueError, match="noncanonical"):
         calls[entry_point]()
+
+
+# --------------------------------------------------------------------------- calendar rules (VALA-008)
+
+
+def _monthly_rule(end: str | None = None) -> RebalanceRule:
+    return RebalanceRule.calendar("2024-01-02", "1M", "weekends_only", "following", end=end)
+
+
+@pytest.mark.parametrize("end", [None, "2024-01-02", "2024-12-02", "2024-12-15"])
+def test_calendar_rebalance_rule_accepts_open_and_partial_ends(end: str | None) -> None:
+    rule = _monthly_rule(end)
+    payload = json.loads(rule.to_json())
+    assert payload.get("end") == end
+    assert json.loads(RebalanceRule.from_json(rule.to_json()).to_json()) == payload
+
+
+def test_calendar_rebalance_rule_rejects_end_before_start() -> None:
+    with pytest.raises(ValueError, match="end precedes start"):
+        _monthly_rule("2023-12-01")
+
+
+def test_open_ended_calendar_rule_rebalances_on_cadence_in_history() -> None:
+    spec = CompositeSpec(
+        "A-B",
+        Currency("USD"),
+        Money(100.0, Currency("USD")),
+        [
+            CompositeLegSpec("A", equity_envelope("A", 100.0), 1.0),
+            CompositeLegSpec("B", equity_envelope("B", 90.0), -1.0),
+        ],
+        WeightingMethod.notional_weighted(Money(100.0, Currency("USD"))),
+        _monthly_rule(),
+    )
+    flat = json.loads(MarketContext().to_json())
+    dates = ["2024-01-02", "2024-01-20", "2024-02-02", "2024-02-15"]
+    result = history_from_spec(spec, [{"date": date, "state": flat} for date in dates])
+    rows = json.loads(result.to_json())
+    rebalanced = [row["date"] for row in rows if row["next_state_effective_date"] is not None]
+    assert rebalanced == ["2024-02-02"]
+
+
+# --------------------------------------------------------------------------- recalibrated metrics (VALA-002)
+
+
+def _hazard_market(base: dt.date) -> MarketContext:
+    from pathlib import Path
+
+    from finstack_quant.calibration import calibrate
+
+    path = Path(__file__).parents[2] / "finstack-quant/calibration/examples/market_bootstrap/03_single_name_hazard.json"
+    envelope = json.loads(path.read_text())
+    envelope.pop("$schema", None)
+    for step in envelope["plan"]["steps"]:
+        step["base_date"] = base.isoformat()
+        if step["kind"] == "hazard":
+            step.update({"id": "CORP-HAZARD", "curve_id": "CORP-HAZARD", "entity": "CORP"})
+    for quote in envelope["market_data"]:
+        if quote["kind"] == "cds_quote":
+            quote["entity"] = "CORP"
+    return calibrate(json.dumps(envelope)).market
+
+
+def test_composite_entry_points_price_cs01_like_price_instrument() -> None:
+    from finstack_quant.valuations.instruments import CreditDefaultSwap
+
+    base = dt.date(2024, 6, 20)
+    market = _hazard_market(base)
+    cds = CreditDefaultSwap.example()
+    cds_b = CreditDefaultSwap.from_json(cds.to_json().replace(f'"{cds.id}"', f'"{cds.id}-B"'))
+    usd = Currency("USD")
+
+    def legs() -> list[CompositeLegSpec]:
+        return [CompositeLegSpec(cds.id, cds, 1.0), CompositeLegSpec(cds_b.id, cds_b, -0.5)]
+
+    fixed = CompositeSpec(
+        "COMP", usd, Money(1e6, usd), legs(), WeightingMethod.fixed_quantity(), RebalanceRule.manual()
+    )
+    composite = fixed.initialize(market, base).instrument
+    expected = price_instrument(composite, market, base, metrics=["cs01"]).metrics["cs01"]
+    assert expected != 0.0
+
+    report = json.loads(composite.primitive_exposures(market, base, metrics=["cs01"]).to_json())
+    net = {row["instrument_id"]: row["net_measures"]["cs01"] for row in report["aggregates"]}
+    assert sum(net.values()) == pytest.approx(expected, rel=1e-12)
+
+    observations = [{"date": base.isoformat(), "state": json.loads(market.to_json())}]
+    for result in (
+        history(composite, observations, metrics=["cs01"]),
+        history_from_spec(fixed, observations, metrics=["cs01"]),
+    ):
+        assert len(json.loads(result.to_json())) == 1
+
+    weighted = CompositeSpec(
+        "COMP",
+        usd,
+        Money(1e6, usd),
+        legs(),
+        WeightingMethod.metric_weighted(metric="cs01", anchor_leg_id=cds.id, anchor_quantity=1.0),
+        RebalanceRule.manual(),
+    )
+    weighted_composite = weighted.initialize(market, base).instrument
+    assert weighted_composite.rebalance(market, base).instrument.to_json()

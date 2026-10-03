@@ -480,6 +480,13 @@ pub struct PyInterestRateSwapBuilder {
     fields: Vec<(&'static str, String)>,
 }
 
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyInterestRateSwap,
+    PyInterestRateSwapBuilder,
+    "InterestRateSwapBuilder",
+    fields
+);
+
 /// Take the wrapped Rust builder or fail if `build()` already consumed it.
 fn take_irs(b: &mut PyInterestRateSwapBuilder) -> PyResult<IrsBuilder> {
     b.inner
@@ -1145,6 +1152,13 @@ pub struct PySwaptionBuilder {
     inner: Option<SwaptionBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
+
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PySwaption,
+    PySwaptionBuilder,
+    "SwaptionBuilder",
+    fields
+);
 
 /// Take the wrapped Rust builder or fail if `build()` already consumed it.
 fn take_swaption(b: &mut PySwaptionBuilder) -> PyResult<SwaptionBuilderInner> {
@@ -1960,6 +1974,13 @@ pub struct PyCapFloorBuilder {
     inner: Option<CapFloorBuilderInner>,
     fields: Vec<(&'static str, String)>,
 }
+
+crate::bindings::valuations::pricing::pricing_override_methods!(
+    PyCapFloor,
+    PyCapFloorBuilder,
+    "CapFloorBuilder",
+    fields
+);
 
 /// Take the wrapped Rust builder or fail if `build()` already consumed it.
 fn take_cap_floor(b: &mut PyCapFloorBuilder) -> PyResult<CapFloorBuilderInner> {

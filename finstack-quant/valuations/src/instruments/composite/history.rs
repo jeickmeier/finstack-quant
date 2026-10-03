@@ -13,7 +13,7 @@ use super::{
     CompositeExposureReport, CompositeInstrument, CompositeMarketObservation, CompositeSpec,
     CompositeTrade,
 };
-use crate::instruments::Instrument;
+use crate::instruments::{Instrument, PricingOptions};
 use crate::metrics::MetricId;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::math::summation::neumaier_sum;
@@ -86,6 +86,11 @@ pub struct CompositeHistoryRow {
 ///   that become output rows.
 /// * `metrics` - Additive primitive risk metrics included in each
 ///   exposure report; an empty slice reports value only.
+/// * `options` - Pricing options for every exposure report and every
+///   initialize/rebalance that prices legs, as for
+///   the host `price_instrument` entry points; quote-recalibrated metrics such
+///   as `cs01` need a recalibration provider. Its caches are shared across all
+///   observations of the run.
 ///
 /// # Errors
 ///
@@ -96,6 +101,7 @@ pub fn history_from_spec(
     warmup: &[CompositeMarketObservation],
     observations: &[CompositeMarketObservation],
     metrics: &[MetricId],
+    options: PricingOptions,
 ) -> Result<Vec<CompositeHistoryRow>> {
     validate_output_history(warmup, observations)?;
     let first = observations.first().ok_or_else(|| {
@@ -105,9 +111,9 @@ pub fn history_from_spec(
     let mut initial_history = warmup.to_vec();
     initial_history.push(first.clone());
     let initial = spec
-        .initialize(&first_market, first.date, &initial_history)?
+        .initialize(&first_market, first.date, &initial_history, options.clone())?
         .instrument;
-    history_with_warmup(&initial, warmup, observations, metrics)
+    history_with_warmup(&initial, warmup, observations, metrics, options)
 }
 
 /// Run an already-resolved composite over dated market snapshots.
@@ -124,6 +130,11 @@ pub fn history_from_spec(
 ///   snapshots that become output rows.
 /// * `metrics` - Additive primitive risk metrics included in each
 ///   exposure report; an empty slice reports value only.
+/// * `options` - Pricing options for every exposure report and every
+///   initialize/rebalance that prices legs, as for
+///   the host `price_instrument` entry points; quote-recalibrated metrics such
+///   as `cs01` need a recalibration provider. Its caches are shared across all
+///   observations of the run.
 ///
 /// # Errors
 ///
@@ -133,8 +144,9 @@ pub fn history(
     initial: &CompositeInstrument,
     observations: &[CompositeMarketObservation],
     metrics: &[MetricId],
+    options: PricingOptions,
 ) -> Result<Vec<CompositeHistoryRow>> {
-    history_with_warmup(initial, &[], observations, metrics)
+    history_with_warmup(initial, &[], observations, metrics, options)
 }
 
 fn history_with_warmup(
@@ -142,6 +154,7 @@ fn history_with_warmup(
     warmup: &[CompositeMarketObservation],
     observations: &[CompositeMarketObservation],
     metrics: &[MetricId],
+    options: PricingOptions,
 ) -> Result<Vec<CompositeHistoryRow>> {
     validate_output_history(warmup, observations)?;
     initial.validate_for_pricing()?;
@@ -184,13 +197,19 @@ fn history_with_warmup(
         if previous_value.is_some() {
             return_index *= 1.0 + period_return;
         }
-        let exposures = state.primitive_exposures(&market, observation.date, metrics)?;
+        let exposures =
+            state.primitive_exposures(&market, observation.date, metrics, options.clone())?;
 
         let mut rebalance_trades = Vec::new();
         let mut next_state_effective_date = None;
         let mut financed_close_value = value.amount();
         if rebalance_due(&state, observation.date)? {
-            let result = state.rebalance(&market, observation.date, &available_history)?;
+            let result = state.rebalance(
+                &market,
+                observation.date,
+                &available_history,
+                options.clone(),
+            )?;
             rebalance_trades = result.trades;
             next_state_effective_date = Some(observation.date);
             state = result.instrument;
@@ -288,7 +307,7 @@ mod tests {
             CompositeMarketObservation::new(date!(2025 - 01 - 01), &MarketContext::new())?,
             CompositeMarketObservation::new(date!(2025 - 01 - 02), &MarketContext::new())?,
         ];
-        let rows = history(&initial, &observations, &[])?;
+        let rows = history(&initial, &observations, &[], PricingOptions::default())?;
         assert_eq!(rows.len(), 2);
         assert_eq!(rows[0].return_index, 100.0);
         assert_eq!(rows[1].pnl.amount(), 0.0);
@@ -363,7 +382,7 @@ mod tests {
         })
         .collect::<Result<Vec<_>>>()?;
 
-        let rows = history_from_spec(&spec, &[], &observations, &[])?;
+        let rows = history_from_spec(&spec, &[], &observations, &[], PricingOptions::default())?;
         assert_eq!(rows[1].held_state_effective_date, date!(2025 - 01 - 01));
         assert_eq!(
             rows[1].next_state_effective_date,

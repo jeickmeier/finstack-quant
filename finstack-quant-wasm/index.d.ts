@@ -16308,6 +16308,21 @@ export interface Bond extends WasmOwned {
    */
   readonly defaultModel: string;
   /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.Bond['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.Bond['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.Bond['scenario_pricing_overrides']>;
+  /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
    */
@@ -16703,6 +16718,21 @@ export interface TermLoan extends WasmOwned {
    */
   readonly defaultModel: string;
   /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.TermLoan['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.TermLoan['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.TermLoan['scenario_pricing_overrides']>;
+  /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
    */
@@ -17005,6 +17035,21 @@ export interface AssetBackedFacility extends WasmOwned {
    */
   readonly recoverySpec: NonNullable<generated.valuations.AssetBackedFacility['recovery_spec']>;
   /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.AssetBackedFacility['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.AssetBackedFacility['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.AssetBackedFacility['scenario_pricing_overrides']>;
+  /**
    * Scenario-selection attributes.
    * @returns The attribute map.
    */
@@ -17272,6 +17317,21 @@ export interface RevolvingCredit extends WasmOwned {
    */
   readonly settlementDays: NonNullable<generated.valuations.RevolvingCredit['settlement_days']>;
   /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.RevolvingCredit['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.RevolvingCredit['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.RevolvingCredit['scenario_pricing_overrides']>;
+  /**
    * Scenario-selection attributes.
    * @returns The attribute map.
    */
@@ -17530,6 +17590,27 @@ export interface BondBuilder extends WasmOwned {
    */
   settlementConvention(value: Pick<generated.valuations.Bond, 'settlement_days' | 'ex_coupon_days' | 'ex_coupon_calendar_id'>): BondBuilder;
   /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.Bond['instrument_pricing_overrides']>): BondBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.Bond['metric_pricing_overrides']>): BondBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.Bond['scenario_pricing_overrides']>): BondBuilder;
+  /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
    * @returns The builder, for chaining.
@@ -17717,6 +17798,27 @@ export interface TermLoanBuilder extends WasmOwned {
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
   settlementDays(value: number): TermLoanBuilder;
+  /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.TermLoan['instrument_pricing_overrides']>): TermLoanBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.TermLoan['metric_pricing_overrides']>): TermLoanBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.TermLoan['scenario_pricing_overrides']>): TermLoanBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -17927,6 +18029,27 @@ export interface RevolvingCreditBuilder extends WasmOwned {
    */
   settlementDays(value: number): RevolvingCreditBuilder;
   /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.RevolvingCredit['instrument_pricing_overrides']>): RevolvingCreditBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.RevolvingCredit['metric_pricing_overrides']>): RevolvingCreditBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.RevolvingCredit['scenario_pricing_overrides']>): RevolvingCreditBuilder;
+  /**
    * Set scenario-selection attributes.
    * @param value - Attribute map; `null` clears it.
    * @returns The builder, for chaining.
@@ -18136,6 +18259,27 @@ export interface AssetBackedFacilityBuilder extends WasmOwned {
    */
   recoverySpec(value: NonNullable<generated.valuations.AssetBackedFacility['recovery_spec']>): AssetBackedFacilityBuilder;
   /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.AssetBackedFacility['instrument_pricing_overrides']>): AssetBackedFacilityBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.AssetBackedFacility['metric_pricing_overrides']>): AssetBackedFacilityBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.AssetBackedFacility['scenario_pricing_overrides']>): AssetBackedFacilityBuilder;
+  /**
    * Set scenario-selection attributes.
    * @param value - Attribute map; `null` clears it.
    * @returns The builder, for chaining.
@@ -18253,6 +18397,27 @@ export interface FxForwardBuilder extends WasmOwned {
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
   quoteCalendarId(value: string): FxForwardBuilder;
+  /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.FxForward['instrument_pricing_overrides']>): FxForwardBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.FxForward['metric_pricing_overrides']>): FxForwardBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.FxForward['scenario_pricing_overrides']>): FxForwardBuilder;
   /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
@@ -18372,6 +18537,27 @@ export interface FxOptionBuilder extends WasmOwned {
    */
   volSurfaceId(value: string): FxOptionBuilder;
   /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.FxOption['instrument_pricing_overrides']>): FxOptionBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.FxOption['metric_pricing_overrides']>): FxOptionBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.FxOption['scenario_pricing_overrides']>): FxOptionBuilder;
+  /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
    * @returns The builder, for chaining.
@@ -18462,6 +18648,21 @@ export interface InterestRateSwap extends WasmOwned {
    * @returns Registered model key such as `"discounting"` or `"black76"`.
    */
   readonly defaultModel: string;
+  /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.InterestRateSwap['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.InterestRateSwap['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.InterestRateSwap['scenario_pricing_overrides']>;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -18645,6 +18846,27 @@ export interface InterestRateSwapBuilder extends WasmOwned {
    */
   marginSpec(value: NonNullable<generated.valuations.InterestRateSwap['margin_spec']>): InterestRateSwapBuilder;
   /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.InterestRateSwap['instrument_pricing_overrides']>): InterestRateSwapBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.InterestRateSwap['metric_pricing_overrides']>): InterestRateSwapBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.InterestRateSwap['scenario_pricing_overrides']>): InterestRateSwapBuilder;
+  /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
    * @returns The builder, for chaining.
@@ -18773,6 +18995,21 @@ export interface Swaption extends WasmOwned {
    * @returns Registered model key such as `"discounting"` or `"black76"`.
    */
   readonly defaultModel: string;
+  /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.Swaption['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.Swaption['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.Swaption['scenario_pricing_overrides']>;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -18972,6 +19209,27 @@ export interface SwaptionBuilder extends WasmOwned {
    */
   sabrParams(value: NonNullable<generated.valuations.Swaption['sabr_params']>): SwaptionBuilder;
   /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.Swaption['instrument_pricing_overrides']>): SwaptionBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.Swaption['metric_pricing_overrides']>): SwaptionBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.Swaption['scenario_pricing_overrides']>): SwaptionBuilder;
+  /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
    * @returns The builder, for chaining.
@@ -19122,6 +19380,21 @@ export interface CapFloor extends WasmOwned {
    * @returns Registered model key such as `"discounting"` or `"black76"`.
    */
   readonly defaultModel: string;
+  /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.CapFloor['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.CapFloor['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.CapFloor['scenario_pricing_overrides']>;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -19376,6 +19649,27 @@ export interface CapFloorBuilder extends WasmOwned {
    */
   overnightCoupon(value: NonNullable<generated.valuations.CapFloor['overnight_coupon']>): CapFloorBuilder;
   /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.CapFloor['instrument_pricing_overrides']>): CapFloorBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.CapFloor['metric_pricing_overrides']>): CapFloorBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.CapFloor['scenario_pricing_overrides']>): CapFloorBuilder;
+  /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
    * @returns The builder, for chaining.
@@ -19434,6 +19728,21 @@ export interface CreditDefaultSwap extends WasmOwned {
    * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
    */
   readonly defaultModel: string;
+  /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.CreditDefaultSwap['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.CreditDefaultSwap['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.CreditDefaultSwap['scenario_pricing_overrides']>;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -19686,6 +19995,27 @@ export interface CreditDefaultSwapBuilder extends WasmOwned {
    */
   marginSpec(value: NonNullable<generated.valuations.CreditDefaultSwap['margin_spec']>): CreditDefaultSwapBuilder;
   /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.CreditDefaultSwap['instrument_pricing_overrides']>): CreditDefaultSwapBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.CreditDefaultSwap['metric_pricing_overrides']>): CreditDefaultSwapBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.CreditDefaultSwap['scenario_pricing_overrides']>): CreditDefaultSwapBuilder;
+  /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
    * @returns The builder, for chaining.
@@ -19744,6 +20074,21 @@ export interface CdsIndex extends WasmOwned {
    * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
    */
   readonly defaultModel: string;
+  /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.CdsIndex['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.CdsIndex['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.CdsIndex['scenario_pricing_overrides']>;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -20079,6 +20424,27 @@ export interface CdsIndexBuilder extends WasmOwned {
    */
   marginSpec(value: NonNullable<generated.valuations.CdsIndex['margin_spec']>): CdsIndexBuilder;
   /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.CdsIndex['instrument_pricing_overrides']>): CdsIndexBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.CdsIndex['metric_pricing_overrides']>): CdsIndexBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.CdsIndex['scenario_pricing_overrides']>): CdsIndexBuilder;
+  /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
    * @returns The builder, for chaining.
@@ -20137,6 +20503,21 @@ export interface CdsTranche extends WasmOwned {
    * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
    */
   readonly defaultModel: string;
+  /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.CdsTranche['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.CdsTranche['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.CdsTranche['scenario_pricing_overrides']>;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -20513,6 +20894,27 @@ export interface CdsTrancheBuilder extends WasmOwned {
    */
   stub(value: NonNullable<generated.valuations.CdsTranche['stub']>): CdsTrancheBuilder;
   /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.CdsTranche['instrument_pricing_overrides']>): CdsTrancheBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.CdsTranche['metric_pricing_overrides']>): CdsTrancheBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.CdsTranche['scenario_pricing_overrides']>): CdsTrancheBuilder;
+  /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
    * @returns The builder, for chaining.
@@ -20571,6 +20973,21 @@ export interface ConvertibleBond extends WasmOwned {
    * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
    */
   readonly defaultModel: string;
+  /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.ConvertibleBond['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.ConvertibleBond['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.ConvertibleBond['scenario_pricing_overrides']>;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -20901,6 +21318,27 @@ export interface ConvertibleBondBuilder extends WasmOwned {
    */
   cashflowSpec(value: generated.valuations.ConvertibleBond['cashflow_spec']): ConvertibleBondBuilder;
   /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.ConvertibleBond['instrument_pricing_overrides']>): ConvertibleBondBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.ConvertibleBond['metric_pricing_overrides']>): ConvertibleBondBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.ConvertibleBond['scenario_pricing_overrides']>): ConvertibleBondBuilder;
+  /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
    * @returns The builder, for chaining.
@@ -20951,6 +21389,21 @@ export interface EquityOption extends WasmOwned {
    * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
    */
   readonly defaultModel: string;
+  /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.EquityOption['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.EquityOption['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.EquityOption['scenario_pricing_overrides']>;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
@@ -21333,6 +21786,27 @@ export interface EquityOptionBuilder extends WasmOwned {
    */
   exerciseDates(value: string[]): EquityOptionBuilder;
   /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.EquityOption['instrument_pricing_overrides']>): EquityOptionBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.EquityOption['metric_pricing_overrides']>): EquityOptionBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.EquityOption['scenario_pricing_overrides']>): EquityOptionBuilder;
+  /**
    * Set instrument attributes (tags and metadata).
    * @param value - Attribute bag; a plain object populates `meta` and an optional `"tags"` entry holding a list of strings populates `tags`.
    * @returns The builder, for chaining.
@@ -21542,6 +22016,21 @@ export interface StructuredCredit extends WasmOwned {
    * @returns `null` when the deal-type template applies.
    */
   readonly waterfall: NonNullable<generated.valuations.StructuredCredit['waterfall']> | null;
+  /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.StructuredCredit['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.StructuredCredit['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.StructuredCredit['scenario_pricing_overrides']>;
   /**
    * Free-form attributes (tags and metadata).
    * @returns The attribute bag.
@@ -22106,6 +22595,27 @@ export interface StructuredCreditBuilder extends WasmOwned {
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
   dealMetadata(value: NonNullable<generated.valuations.StructuredCredit['deal_metadata']>): StructuredCreditBuilder;
+  /**
+   * Set the instrument-owned pricing inputs.
+   * @param value - Rust `InstrumentPricingOverrides` in serde form (plain object or JSON string): `{"market_quotes": {...}, "model_config": {...}}`, e.g. `{"market_quotes": {"quoted_clean_price_pct": 99.0}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  instrumentPricingOverrides(value: NonNullable<generated.valuations.StructuredCredit['instrument_pricing_overrides']>): StructuredCreditBuilder;
+  /**
+   * Set the metric-time pricing configuration stored on the instrument.
+   * @param value - Rust `MetricPricingOverrides` in serde form (plain object or JSON string), e.g. `{"bump_config": {"rate_bump_bp": 0.5}}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  metricPricingOverrides(value: NonNullable<generated.valuations.StructuredCredit['metric_pricing_overrides']>): StructuredCreditBuilder;
+  /**
+   * Set the scenario-only pricing adjustments.
+   * @param value - Rust `ScenarioPricingOverrides` in serde form (plain object or JSON string), e.g. `{"scenario_price_shock_decimal": -0.02}`.
+   * @returns The builder, for chaining.
+   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
+   */
+  scenarioPricingOverrides(value: NonNullable<generated.valuations.StructuredCredit['scenario_pricing_overrides']>): StructuredCreditBuilder;
   /**
    * Set free-form attributes (tags and metadata) on the deal.
    * @param value - Attribute bag; a plain object populates `meta` (an optional `"tags"` list populates `tags`).
@@ -23471,6 +23981,21 @@ export interface FxForwardInstrument extends FxInstrument {
    */
   readonly defaultModel: string;
   /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.FxForward['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.FxForward['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.FxForward['scenario_pricing_overrides']>;
+  /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.
    */
@@ -23590,6 +24115,21 @@ export interface FxVanillaOptionInstrument extends FxOptionInstrument {
    * @returns Registered model key such as `"hazard_rate"` or `"black76"`.
    */
   readonly defaultModel: string;
+  /**
+   * Instrument-owned pricing inputs (`InstrumentPricingOverrides`) in serde form: `market_quotes` (quoted clean price, yield, spreads, implied volatility, premium) and `model_config` (tree model and steps, Monte Carlo and Hull-White parameters).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly instrumentPricingOverrides: NonNullable<generated.valuations.FxOption['instrument_pricing_overrides']>;
+  /**
+   * Metric-time pricing configuration (`MetricPricingOverrides`: bump sizes, theta period, ...) stored on the instrument; a `metricPricingOverrides` argument to `price` is merged over it per call.
+   * @returns The overrides plain object; unset fields are `null` or omitted.
+   */
+  readonly metricPricingOverrides: NonNullable<generated.valuations.FxOption['metric_pricing_overrides']>;
+  /**
+   * Scenario-only pricing adjustments (`ScenarioPricingOverrides`: `scenario_price_shock_decimal`, `scenario_spread_shock_bp`).
+   * @returns The overrides plain object; `{}` when none is set.
+   */
+  readonly scenarioPricingOverrides: NonNullable<generated.valuations.FxOption['scenario_pricing_overrides']>;
   /**
    * Instrument attributes (tags and metadata) used for scenario selection.
    * @returns The attribute bag; empty when none were set.

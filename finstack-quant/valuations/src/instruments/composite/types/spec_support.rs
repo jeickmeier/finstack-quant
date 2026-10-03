@@ -4,7 +4,10 @@
 use crate::instruments::InstrumentJson;
 use crate::metrics::MetricId;
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, Date, ScheduleBuilder, Tenor};
+use finstack_quant_core::dates::calendar::{adjust, calendar_by_id_strict};
+use finstack_quant_core::dates::{
+    BusinessDayConvention, Date, DateExt, HolidayCalendar, Tenor, TenorUnit,
+};
 use finstack_quant_core::expr::Expr;
 use finstack_quant_core::market_data::context::{MarketContext, MarketContextState};
 use finstack_quant_core::math::summation::neumaier_sum;
@@ -110,13 +113,15 @@ impl RebalanceRule {
     /// Validate ordering, calendar, and schedule bounds.
     ///
     /// Explicit dates must be strictly increasing. Calendar rules must have
-    /// `end >= start` when an end date is supplied, and the named holiday
-    /// calendar plus business-day convention must produce a valid schedule.
+    /// `end >= start` when an end date is supplied (`end == start` is a
+    /// single rebalance date; `end = None` is an open-ended cadence), and the
+    /// named holiday calendar must resolve.
     ///
     /// # Errors
     ///
-    /// Returns an error for duplicate or unordered explicit dates, invalid
-    /// calendar ranges, or unknown calendar identifiers.
+    /// Returns an error for duplicate or unordered explicit dates, an end
+    /// before the start, unknown calendar identifiers, or a bounded cadence
+    /// whose dates cannot be generated or business-day adjusted.
     pub fn validate(&self) -> Result<()> {
         match self {
             Self::Manual => Ok(()),
@@ -140,11 +145,10 @@ impl RebalanceRule {
                         "composite rebalance calendar end precedes start".to_string(),
                     ));
                 }
-                let horizon = end.unwrap_or(*start);
-                let _ = ScheduleBuilder::new(*start, horizon)?
-                    .frequency(*frequency)
-                    .adjust_with_id(*business_day_convention, calendar_id)
-                    .build()?;
+                let calendar = calendar_by_id_strict(calendar_id)?;
+                if let Some(end) = end {
+                    cadence_dates(*start, *end, *frequency, calendar, *business_day_convention)?;
+                }
                 Ok(())
             }
         }
@@ -153,9 +157,12 @@ impl RebalanceRule {
     /// Return eligible rebalance dates up to a supplied horizon.
     ///
     /// [`Self::Manual`] yields an empty list. Explicit dates are filtered to
-    /// `date <= horizon`. Calendar dates are generated from `start` through
-    /// `min(end, horizon)` (or `horizon` when `end` is omitted) and then
-    /// business-day adjusted.
+    /// `date <= horizon`. Calendar dates are the cadence `start + k * frequency`
+    /// (`k = 0, 1, ...`, each anchored on `start`) whose unadjusted date is on
+    /// or before `min(end, horizon)` (or `horizon` when `end` is omitted),
+    /// business-day adjusted and kept when the adjusted date is on or before
+    /// `horizon`. The cut-off is not itself a rebalance date unless it falls
+    /// on the cadence.
     ///
     /// # Arguments
     ///
@@ -164,7 +171,8 @@ impl RebalanceRule {
     ///
     /// # Errors
     ///
-    /// Returns an error when the configured calendar or generated schedule is invalid.
+    /// Returns an error when the configured calendar is unknown or a cadence
+    /// date cannot be generated or adjusted.
     pub fn dates_through(&self, horizon: Date) -> Result<Vec<Date>> {
         match self {
             Self::Manual => Ok(Vec::new()),
@@ -180,22 +188,60 @@ impl RebalanceRule {
                 calendar_id,
                 business_day_convention,
             } => {
-                if *start > horizon {
-                    return Ok(Vec::new());
-                }
-                let schedule_end = end.map_or(horizon, |end| end.min(horizon));
-                let schedule = ScheduleBuilder::new(*start, schedule_end)?
-                    .frequency(*frequency)
-                    .adjust_with_id(*business_day_convention, calendar_id)
-                    .build()?;
-                Ok(schedule
-                    .dates
-                    .into_iter()
-                    .filter(|date| *date <= horizon)
-                    .collect())
+                let calendar = calendar_by_id_strict(calendar_id)?;
+                let cutoff = end.map_or(horizon, |end| end.min(horizon));
+                let mut dates = cadence_dates(
+                    *start,
+                    cutoff,
+                    *frequency,
+                    calendar,
+                    *business_day_convention,
+                )?;
+                dates.retain(|date| *date <= horizon);
+                Ok(dates)
             }
         }
     }
+}
+
+/// Business-day-adjusted cadence `start + k * frequency` for every `k >= 0`
+/// whose unadjusted date is on or before `cutoff`.
+///
+/// Each date is anchored on `start` (not stepped from the previous date), so
+/// month-end starts do not drift. Adjacent dates that adjust onto the same
+/// business day are reported once. An empty list is returned when `cutoff`
+/// precedes `start`.
+fn cadence_dates(
+    start: Date,
+    cutoff: Date,
+    frequency: Tenor,
+    calendar: &dyn HolidayCalendar,
+    business_day_convention: BusinessDayConvention,
+) -> Result<Vec<Date>> {
+    let overflow = || Error::Validation("composite rebalance cadence overflows".to_string());
+    let mut dates: Vec<Date> = Vec::new();
+    for k in 0_i64.. {
+        let steps = i64::from(frequency.count())
+            .checked_mul(k)
+            .ok_or_else(overflow)?;
+        let raw = match frequency.unit() {
+            TenorUnit::Days => start.add_days(steps)?,
+            TenorUnit::Weeks => start.add_days(steps.checked_mul(7).ok_or_else(overflow)?)?,
+            TenorUnit::Months => start.add_months(i32::try_from(steps).map_err(|_| overflow())?)?,
+            TenorUnit::Years => start.add_months(
+                i32::try_from(steps.checked_mul(12).ok_or_else(overflow)?)
+                    .map_err(|_| overflow())?,
+            )?,
+        };
+        if raw > cutoff {
+            break;
+        }
+        let adjusted = adjust(raw, business_day_convention, calendar)?;
+        if dates.last() != Some(&adjusted) {
+            dates.push(adjusted);
+        }
+    }
+    Ok(dates)
 }
 
 /// Policy used to resolve signed leg quantities at initialization or rebalance.
