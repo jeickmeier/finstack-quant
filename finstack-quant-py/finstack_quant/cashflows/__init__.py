@@ -4,7 +4,7 @@ Examples:
 >>> import datetime
 >>> from finstack_quant.cashflows.primitives import CFKind, CashFlow
 >>> from finstack_quant.core.money import Money
->>> CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED).amount.amount
+>>> CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED, 0.0).amount.amount
 100.0
 
 """

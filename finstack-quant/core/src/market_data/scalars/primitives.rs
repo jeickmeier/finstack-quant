@@ -125,15 +125,47 @@ enum MarketScalarWire {
     Price(crate::money::Money),
 }
 
+impl MarketScalar {
+    /// Build a unitless scalar, rejecting non-finite values.
+    ///
+    /// This is the validating constructor behind host `insert_price` calls
+    /// without a currency; it applies the same rule as deserialization.
+    ///
+    /// # Arguments
+    ///
+    /// * `value` - Dimensionless observation (for example an equity beta or a
+    ///   recovery-rate assumption as a decimal); must be finite.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Validation`] when `value` is NaN or infinite.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use finstack_quant_core::market_data::scalars::MarketScalar;
+    ///
+    /// assert!(matches!(MarketScalar::unitless(1.2)?, MarketScalar::Unitless(v) if v == 1.2));
+    /// assert!(MarketScalar::unitless(f64::NAN).is_err());
+    /// # Ok::<(), finstack_quant_core::Error>(())
+    /// ```
+    pub fn unitless(value: f64) -> crate::Result<Self> {
+        if value.is_finite() {
+            Ok(Self::Unitless(value))
+        } else {
+            Err(crate::Error::Validation(
+                "MarketScalar unitless value must be finite".into(),
+            ))
+        }
+    }
+}
+
 impl TryFrom<MarketScalarWire> for MarketScalar {
     type Error = crate::Error;
 
     fn try_from(raw: MarketScalarWire) -> std::result::Result<Self, Self::Error> {
         match raw {
-            MarketScalarWire::Unitless(value) if value.is_finite() => Ok(Self::Unitless(value)),
-            MarketScalarWire::Unitless(_) => Err(crate::Error::Validation(
-                "MarketScalar unitless value must be finite".into(),
-            )),
+            MarketScalarWire::Unitless(value) => Self::unitless(value),
             MarketScalarWire::Price(value) if value.amount().is_finite() => Ok(Self::Price(value)),
             MarketScalarWire::Price(_) => Err(crate::Error::Validation(
                 "MarketScalar price amount must be finite".into(),
@@ -623,6 +655,20 @@ impl Bumpable for ScalarTimeSeries {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unitless_constructor_rejects_non_finite_values() {
+        assert!(matches!(
+            MarketScalar::unitless(0.1),
+            Ok(MarketScalar::Unitless(v)) if v == 0.1
+        ));
+        for bad in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(matches!(
+                MarketScalar::unitless(bad),
+                Err(crate::Error::Validation(_))
+            ));
+        }
+    }
 
     #[test]
     fn market_scalar_shadow_rejects_non_finite_values() {

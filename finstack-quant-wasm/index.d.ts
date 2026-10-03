@@ -2202,6 +2202,16 @@ export interface Rate extends WasmOwned {
    */
   readonly asBp: number;
   /**
+   * Rate in fractional basis points, without rounding (Rust `Rate::as_bp_f64`).
+   *
+   * The decimal point of the rate's shortest decimal form moves four places,
+   * so `0.0029` reports `29` rather than `28.999999999999996`, and `0.00625`
+   * keeps its `62.5`.
+   *
+   * @returns Rate in fractional bp.
+   */
+  readonly asBpF64: number;
+  /**
    * The rate as `Bps`, rounded to the nearest whole basis point.
    */
   readonly asBasisPoints: Bps;
@@ -2482,6 +2492,15 @@ export interface Percentage extends WasmOwned {
    * Value in basis points, rounded to the nearest integer (e.g. 17.5% → 1750).
    */
   readonly asBp: number;
+  /**
+   * Value in fractional basis points, without rounding (Rust `Percentage::as_bp_f64`).
+   *
+   * The decimal point of the percentage's shortest decimal form moves two
+   * places, so `1.1` reports `110` rather than `110.00000000000001`.
+   *
+   * @returns Value in fractional bp.
+   */
+  readonly asBpF64: number;
   /**
    * Value as a decimal `Rate`.
    */
@@ -4400,7 +4419,7 @@ export interface MarketContext extends WasmOwned {
    * @param value - Finite scalar value: an index level, a spot price, a recovery assumption and so on.
    * @param currency - ISO-4217 code that makes the scalar a monetary price; omitted stores a unitless number.
    * @returns This context, updated in place, so calls can be chained.
-   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an unknown currency or a monetary value that is not finite.
+   * @throws `TypeError` (kind `invalid_type`) for a mistyped argument; `FinstackError` (kind `validation`) for an unknown currency or a value that is not finite (Rust `MarketScalar::unitless` / `Money::new`).
    */
   insertPrice(id: string, value: number, currency?: string | null): MarketContext;
   /**
@@ -14449,17 +14468,21 @@ export interface CashFlowScheduleConstructor {
    */
   fromParts(flows: readonly generated.cashflows.CashFlow[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount, meta: generated.cashflows.CashFlowMeta): CashFlowSchedule;
   /**
-   * Assemble a schedule from existing flows, with default metadata unless given.
+   * Assemble a schedule from externally supplied flows, validating every row
+   * (Rust `CashFlowSchedule::from_flows`).
    *
-   * Same as `fromParts` with `meta` optional. (Python's `from_flows` also
-   * reads a pandas DataFrame; WASM takes the flow list.)
+   * Each flow must pass `CashFlow::validate` (finite amount and rate, a
+   * finite non-negative `accrual_factor`, a reset date not after the payment
+   * date) before the rows are sorted; use `fromParts` to assemble rows
+   * without validation. (Python's `from_flows` also reads a pandas
+   * DataFrame; WASM takes the flow list.)
    *
    * @param flows - `CashFlow` wire objects.
    * @param notional - `Notional` wire object: initial balance and amortization rule.
    * @param dayCount - `DayCount` wire string used for accrual and year fractions.
    * @param meta - Optional `CashFlowMeta` wire object; omitted means the default metadata (contractual representation, no issue date).
    * @returns The assembled `CashFlowSchedule`.
-   * @throws If an argument does not match its wire type (kind `validation`).
+   * @throws If an argument does not match its wire type or a flow fails validation (kind `validation`).
    */
   fromFlows(flows: readonly generated.cashflows.CashFlow[], notional: generated.cashflows.Notional, dayCount: generated.core.DayCount, meta?: generated.cashflows.CashFlowMeta | null): CashFlowSchedule;
   /**
@@ -15281,6 +15304,81 @@ export interface CashflowsNamespace {
   floatingLegCompoundingCompoundedWithRateCutoff(cutoffDays: number): generated.cashflows.FloatingLegCompounding;
 
   /**
+   * USD SOFR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::sofr`).
+   *
+   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
+   */
+  floatingLegCompoundingSofr(): generated.cashflows.FloatingLegCompounding;
+
+  /**
+   * USD Fed Funds / EFFR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::fedfunds`).
+   *
+   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
+   */
+  floatingLegCompoundingFedfunds(): generated.cashflows.FloatingLegCompounding;
+
+  /**
+   * GBP SONIA OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::sonia`).
+   *
+   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
+   */
+  floatingLegCompoundingSonia(): generated.cashflows.FloatingLegCompounding;
+
+  /**
+   * EUR €STR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::estr`).
+   *
+   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
+   */
+  floatingLegCompoundingEstr(): generated.cashflows.FloatingLegCompounding;
+
+  /**
+   * JPY TONA OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::tona`).
+   *
+   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
+   */
+  floatingLegCompoundingTona(): generated.cashflows.FloatingLegCompounding;
+
+  /**
+   * CHF SARON OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::saron`).
+   *
+   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
+   */
+  floatingLegCompoundingSaron(): generated.cashflows.FloatingLegCompounding;
+
+  /**
+   * USD SOFR FRN compounding convention: ISDA 2021 observation shift of 2 business days (Rust `FloatingLegCompounding::sofr_observation_shift`).
+   *
+   * @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days: 2 } }`.
+   */
+  floatingLegCompoundingSofrObservationShift(): generated.cashflows.FloatingLegCompounding;
+
+  /**
+   * GBP SONIA FRN compounding convention: ISDA 2021 observation shift of 5 business days (Rust `FloatingLegCompounding::sonia_observation_shift`).
+   *
+   * @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days: 5 } }`.
+   */
+  floatingLegCompoundingSoniaObservationShift(): generated.cashflows.FloatingLegCompounding;
+
+  /**
+   * Compounded RFR with an end-of-period rate cut-off (Rust `FloatingLegCompounding::rate_cutoff`).
+   *
+   * @param cutoffDays - Business days before period end over which the overnight rate is frozen (non-negative integer).
+   * @returns `FloatingLegCompounding` wire value `{ compounded_with_rate_cutoff: { cutoff_days } }`.
+   * @throws If `cutoffDays` is not a non-negative integer (kind `invalid_type`).
+   */
+  floatingLegCompoundingRateCutoff(cutoffDays: number): generated.cashflows.FloatingLegCompounding;
+
+  /**
+   * Whether a compounding convention builds the period rate from daily overnight
+   * fixings (Rust `FloatingLegCompounding::is_overnight`).
+   *
+   * @param value - `FloatingLegCompounding` wire value (for example `"simple"` or `{ compounded_in_arrears: { lookback_days: 0 } }`).
+   * @returns `false` for `"simple"`, `true` for every other convention.
+   * @throws If `value` is not a `FloatingLegCompounding` wire value (kind `validation`).
+   */
+  floatingLegCompoundingIsOvernight(value: generated.cashflows.FloatingLegCompounding): boolean;
+
+  /**
    * Check a floating-rate specification's reset lag, caps and floors.
    *
    * @param spec - `FloatingRateSpec` wire object.
@@ -15417,6 +15515,33 @@ export interface CashflowsNamespace {
    * @throws If `spec` is not a `DefaultModelSpec` or its curve parameters are invalid (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
    */
   defaultModelSpecMdr(spec: generated.cashflows.DefaultModelSpec, seasoningMonths: number): number;
+
+  /**
+   * Survival-adjusted monthly default rate (Rust `DefaultModelSpec::mdr_with_survival`).
+   *
+   * Identical to `defaultModelSpecMdr` for constant, SDA and vector curves. For
+   * cumulative-loss and timing curves the month's default share of the original
+   * balance is divided by `survivingBalanceFraction`, so applying the rate to the
+   * current balance reproduces the curve's defaults.
+   *
+   * @param spec - `DefaultModelSpec` wire object.
+   * @param seasoningMonths - Months since origination or pool start (non-negative integer).
+   * @param survivingBalanceFraction - Current pool balance divided by the balance the curve is expressed against, as a finite non-negative decimal (may exceed 1.0 after par build).
+   * @returns Monthly default rate as a decimal in `[0, 1]`; zero once the surviving balance is exhausted.
+   * @throws If `spec` is not a `DefaultModelSpec`, its curve parameters are invalid, or `survivingBalanceFraction` is negative or non-finite (kind `validation`); if `seasoningMonths` is not a non-negative integer or `survivingBalanceFraction` is not a number (kind `invalid_type`).
+   */
+  defaultModelSpecMdrWithSurvival(spec: generated.cashflows.DefaultModelSpec, seasoningMonths: number, survivingBalanceFraction: number): number;
+
+  /**
+   * Cumulative defaults through a seasoning month as a fraction of the original
+   * balance (Rust `DefaultModelSpec::cumulative_default_fraction`).
+   *
+   * @param spec - `DefaultModelSpec` wire object.
+   * @param seasoningMonths - Months since origination (non-negative integer); month 0 is before any default.
+   * @returns The fraction for cumulative-loss and timing curves (may exceed 1.0 with replenishment or par build); `undefined` for rate-based curves.
+   * @throws If `spec` is not a `DefaultModelSpec` or its curve parameters are invalid (kind `validation`), or `seasoningMonths` is not a non-negative integer (kind `invalid_type`).
+   */
+  defaultModelSpecCumulativeDefaultFraction(spec: generated.cashflows.DefaultModelSpec, seasoningMonths: number): number | undefined;
 
   /**
    * Constant annual prepayment rate.

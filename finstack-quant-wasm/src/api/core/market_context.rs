@@ -225,7 +225,7 @@ impl JsMarketContext {
     /// @returns This context, updated in place, so calls can be chained.
     /// @throws `TypeError` (kind `invalid_type`) for a mistyped argument;
     /// `FinstackError` (kind `validation`) for an unknown currency or a
-    /// monetary value that is not finite.
+    /// value that is not finite (Rust `MarketScalar::unitless` / `Money::new`).
     #[wasm_bindgen(js_name = insertPrice)]
     pub fn insert_price(
         &mut self,
@@ -240,7 +240,7 @@ impl JsMarketContext {
                 let currency: Currency = code.parse().map_err(to_js_err)?;
                 MarketScalar::Price(Money::new(value, currency).map_err(to_js_err)?)
             }
-            None => MarketScalar::Unitless(value),
+            None => MarketScalar::unitless(value).map_err(to_js_err)?,
         };
         self.context_mut().insert_price_mut(id, scalar);
         Ok(())

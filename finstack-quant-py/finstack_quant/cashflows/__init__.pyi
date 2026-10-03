@@ -10,7 +10,7 @@ Examples
 >>> import datetime
 >>> from finstack_quant.cashflows.primitives import CFKind, CashFlow
 >>> from finstack_quant.core.money import Money
->>> CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED).amount.amount
+>>> CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.FIXED, 0.0).amount.amount
 100.0
 
 """
@@ -301,7 +301,7 @@ def schedule_from_classified_flows(
     >>> from finstack_quant.cashflows.primitives import CashFlow, CFKind
     >>> from finstack_quant.core.dates import DayCount
     >>> from finstack_quant.core.money import Money
-    >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.PIK)
+    >>> flow = CashFlow(datetime.date(2025, 6, 15), Money(100.0, "USD"), CFKind.PIK, 0.0)
     >>> schedule_from_classified_flows([flow], DayCount.ACT_360).get_flows()[0].kind.name
     'pik'
     """

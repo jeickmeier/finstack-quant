@@ -72,6 +72,48 @@ class TestPrimitives:
 
 
 class TestBuilderSpecs:
+    def test_floating_leg_compounding_presets_come_from_rust(self) -> None:
+        """CFCC-010: the Rust RFR presets and is_overnight are bound."""
+        from finstack_quant.cashflows.builder import FloatingLegCompounding as C
+
+        for preset in (C.sofr, C.fedfunds, C.sonia, C.estr, C.tona, C.saron):
+            assert preset() == C.compounded_in_arrears(0)
+        assert C.sofr_observation_shift() == C.compounded_with_observation_shift(2)
+        assert C.sonia_observation_shift() == C.compounded_with_observation_shift(5)
+        assert C.rate_cutoff(3) == C.compounded_with_rate_cutoff(3)
+        assert [c.is_overnight() for c in (C.SIMPLE, C.SIMPLE_AVERAGE, C.sofr())] == [False, True, True]
+        with pytest.raises(TypeError):
+            C.compounded_in_arrears()  # type: ignore[call-arg]
+
+    def test_default_model_survival_helpers_come_from_rust(self) -> None:
+        """CFCC-010: DefaultModelSpec.mdr_with_survival / cumulative_default_fraction are bound."""
+        from finstack_quant.cashflows.builder import DefaultModelSpec
+
+        timing = DefaultModelSpec.timing(0.10, [50.0, 50.0])
+        assert timing.cumulative_default_fraction(12) == pytest.approx(0.05, abs=1e-12)
+        assert timing.cumulative_default_fraction(0) == 0.0
+        assert DefaultModelSpec.cdr_2pct().cumulative_default_fraction(12) is None
+        # Timing curve: 50% of a 10% lifetime default in year 1, spread monthly.
+        assert timing.mdr_with_survival(6, 1.0) == pytest.approx(0.05 / 12, abs=1e-15)
+        assert timing.mdr_with_survival(6, 0.5) == pytest.approx(2 * timing.mdr_with_survival(6, 1.0), abs=1e-15)
+        constant = DefaultModelSpec.cdr_2pct()
+        assert constant.mdr_with_survival(6, 0.5) == constant.mdr(6)
+        with pytest.raises(ValueError, match="surviving_balance_fraction"):
+            timing.mdr_with_survival(6, -1.0)
+
+    def test_decimal_text_parses_with_core_parser(self) -> None:
+        """CORE-009: str and Decimal inputs share Rust ``decimal::parse_decimal``."""
+        from decimal import Decimal
+
+        from finstack_quant.cashflows.builder import FloatingRateSpec
+
+        long_text = "1.23456789012345678901234567890123"
+        for value in (long_text, Decimal(long_text), "1e-30", Decimal("1e-30")):
+            with pytest.raises(ValueError, match="exactly representable as Decimal"):
+                FloatingRateSpec.sofr(value)
+        assert FloatingRateSpec.sofr(" 25 ").to_json() == FloatingRateSpec.sofr(Decimal("25")).to_json()
+        assert FloatingRateSpec.sofr("2.5e1").to_json() == FloatingRateSpec.sofr(Decimal("25")).to_json()
+
     def test_schedule_params_presets(self) -> None:
         from finstack_quant.cashflows.builder import ScheduleParams
 
@@ -414,7 +456,7 @@ class TestBuilderSpecs:
                 spread_bp=Decimal("0"),
                 reset_frequency="3M",
                 index_floor_bp=Decimal("300"),
-                compounding=FloatingLegCompounding.compounded_in_arrears(),
+                compounding=FloatingLegCompounding.compounded_in_arrears(0),
                 **kwargs,
             )
             return (
@@ -838,9 +880,11 @@ class TestCashFlowSchedule:
 
         amount = "10000000000000000000000000000" if scale == 10.0 else "1"
         if principal_delta:
-            row = CashFlow("2025-06-01", Money(0, "USD"), CFKind.NOTIONAL).with_principal_delta(Money(amount, "USD"))
+            row = CashFlow("2025-06-01", Money(0, "USD"), CFKind.NOTIONAL, 0.0).with_principal_delta(
+                Money(amount, "USD")
+            )
         else:
-            row = CashFlow("2025-06-01", Money(amount, "USD"), CFKind.FIXED)
+            row = CashFlow("2025-06-01", Money(amount, "USD"), CFKind.FIXED, 0.0)
         schedule = CashFlowSchedule.from_parts([row], Notional.par(0, "USD"), DayCount.ACT_360, CashFlowMeta())
         original = schedule.to_json()
         with pytest.raises(ValueError, match="conversion overflow"):
@@ -852,7 +896,7 @@ class TestCashFlowSchedule:
         from finstack_quant.cashflows.primitives import CashFlow, CFKind
         from finstack_quant.core.dates import DayCount
 
-        row = CashFlow("2026-01-01", Money(100, "USD"), CFKind.REVOLVING_REPAYMENT)
+        row = CashFlow("2026-01-01", Money(100, "USD"), CFKind.REVOLVING_REPAYMENT, 0.0)
         schedule = CashFlowSchedule.from_parts([row], Notional.par(100, "USD"), DayCount.ACT_360, CashFlowMeta())
         assert schedule.wal(dt.date(2025, 1, 1)) == pytest.approx(1.0)
 
@@ -861,7 +905,7 @@ class TestCashFlowSchedule:
         from finstack_quant.cashflows.primitives import CashFlow, CFKind
         from finstack_quant.core.dates import DayCount
 
-        rows = [CashFlow("2025-06-01", Money(100, currency), CFKind.FIXED) for currency in ("USD", "EUR")]
+        rows = [CashFlow("2025-06-01", Money(100, currency), CFKind.FIXED, 0.0) for currency in ("USD", "EUR")]
         schedule = CashFlowSchedule.from_parts(rows, Notional.par(0, "USD"), DayCount.ACT_360, CashFlowMeta())
         with pytest.raises(ValueError, match=r"[Cc]urrency"):
             schedule.calendar_year_ladder([100.0, 100.0])
@@ -924,9 +968,9 @@ class TestCashFlowSchedule:
         from finstack_quant.core.dates import DayCount
 
         rows = [
-            CashFlow("2025-01-02", Money(1, "USD"), CFKind.FIXED),
-            CashFlow("2025-01-05", Money(1, "USD"), CFKind.FIXED),
-            CashFlow("2025-01-06", Money(20, "USD"), CFKind.NOTIONAL)
+            CashFlow("2025-01-02", Money(1, "USD"), CFKind.FIXED, 0.0),
+            CashFlow("2025-01-05", Money(1, "USD"), CFKind.FIXED, 0.0),
+            CashFlow("2025-01-06", Money(20, "USD"), CFKind.NOTIONAL, 0.0)
             .with_principal_delta(Money(-20, "USD"))
             .with_principal_date("2025-01-05"),
         ]
@@ -1279,7 +1323,7 @@ class TestTypedTwinsAndWire:
         dated = [(dt.date(2025, 6, 15), Money(100.0, "USD"))]
         s1 = schedule_from_dated_flows(dated, "fixed", DayCount.ACT_360)
         assert s1.get_flows()[0].kind == CFKind.FIXED
-        flow = CashFlow(dt.date(2025, 6, 15), Money(100.0, "USD"), CFKind.PIK)
+        flow = CashFlow(dt.date(2025, 6, 15), Money(100.0, "USD"), CFKind.PIK, 0.0)
         opts = ScheduleBuildOpts(notional_hint=Money(500.0, "USD"), meta=CashFlowMeta("projected"))
         s2 = schedule_from_classified_flows([flow], DayCount.ACT_360, opts)
         assert s2.get_notional().initial.amount == pytest.approx(500.0)
@@ -1304,6 +1348,53 @@ class TestTypedTwinsAndWire:
         assert isinstance(frame, pd.DataFrame)
         with pytest.raises(ValueError, match="missing required column"):
             CashFlowSchedule.from_flows(frame.drop(columns=["kind"]), Notional.par(1.0, "USD"), DayCount.ACT_360)
+
+    @pytest.mark.parametrize(
+        ("accrual_factor", "reset_date", "message"),
+        [
+            (-1.0, None, "accrual_factor must be non-negative"),
+            (0.25, dt.date(2025, 6, 16), "reset_date must not be after payment date"),
+        ],
+    )
+    def test_from_flows_validates_list_and_dataframe_rows_alike(
+        self, accrual_factor: float, reset_date: dt.date | None, message: str
+    ) -> None:
+        pd = pytest.importorskip("pandas")
+        from finstack_quant.cashflows.builder import CashFlowMeta, CashFlowSchedule, Notional
+        from finstack_quant.cashflows.primitives import CashFlow, CFKind
+        from finstack_quant.core.dates import DayCount
+
+        notional = Notional.par(1_000.0, "USD")
+        row = CashFlow(dt.date(2025, 6, 15), Money(10.0, "USD"), CFKind.FIXED, accrual_factor, reset_date=reset_date)
+        frame = pd.DataFrame({
+            "date": [dt.date(2025, 6, 15)],
+            "amount": [10.0],
+            "currency": ["USD"],
+            "kind": ["fixed"],
+            "accrual_factor": [accrual_factor],
+            "reset_date": [reset_date],
+        })
+        for flows in ([row], frame):
+            with pytest.raises(ValueError, match=message):
+                CashFlowSchedule.from_flows(flows, notional, DayCount.ACT_360)
+        # from_parts keeps its documented no-validation contract.
+        assert len(CashFlowSchedule.from_parts([row], notional, DayCount.ACT_360, CashFlowMeta()).get_flows()) == 1
+
+    def test_from_flows_requires_accrual_factor(self) -> None:
+        pd = pytest.importorskip("pandas")
+        from finstack_quant.cashflows.builder import CashFlowSchedule, Notional
+        from finstack_quant.cashflows.primitives import CashFlow, CFKind
+        from finstack_quant.core.dates import DayCount
+
+        frame = pd.DataFrame({"date": ["2025-06-15"], "amount": [10.0], "currency": ["USD"], "kind": ["fixed"]})
+        with pytest.raises(ValueError, match="missing required column 'accrual_factor'"):
+            CashFlowSchedule.from_flows(frame, Notional.par(1.0, "USD"), DayCount.ACT_360)
+        with pytest.raises(ValueError, match="Non-finite"):
+            CashFlowSchedule.from_flows(
+                frame.assign(accrual_factor=[float("nan")]), Notional.par(1.0, "USD"), DayCount.ACT_360
+            )
+        with pytest.raises(TypeError):
+            CashFlow(dt.date(2025, 6, 15), Money(10.0, "USD"), CFKind.FIXED)  # type: ignore[call-arg]
 
     def test_calendar_year_ladder_dataframe(self) -> None:
         pytest.importorskip("pandas")
@@ -1369,7 +1460,7 @@ class TestTypedTwinsAndWire:
 
         sofr = FloatingRateSpec.sofr(50)
         assert sofr.forward_curve_id == "USD-SOFR"
-        assert sofr.compounding == FloatingLegCompounding.compounded_in_arrears()
+        assert sofr.compounding == FloatingLegCompounding.compounded_in_arrears(0)
         assert sofr.overnight_basis == DayCount.ACT_360
         assert sofr.reset_lag_days == 0
         assert FloatingRateSpec.sonia(10).forward_curve_id == "GBP-SONIA"
@@ -1468,9 +1559,9 @@ def test_cashflow_metadata_dataframe_roundtrip() -> None:
     metadata = CashFlowAccrual(
         "2025-01-01", "2025-04-01", DayCount.ACT_360, projected_index_rate=0.03, calendar_id="weekends_only"
     )
-    row = CashFlow("2025-04-03", Money(25, "USD"), CFKind.FIXED).with_accrual(metadata)
+    row = CashFlow("2025-04-03", Money(25, "USD"), CFKind.FIXED, 0.0).with_accrual(metadata)
     assert row.accrual.projected_index_rate == 0.03
-    draw = CashFlow("2025-02-01", Money(-98, "USD"), CFKind.NOTIONAL).with_principal_delta(Money(100, "USD"))
+    draw = CashFlow("2025-02-01", Money(-98, "USD"), CFKind.NOTIONAL, 0.0).with_principal_delta(Money(100, "USD"))
     draw.validate()
     assert CashFlow.from_json(draw.to_json()).principal_delta.amount == 100
     delayed = draw.with_principal_date("2025-01-31")

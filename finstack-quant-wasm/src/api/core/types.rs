@@ -126,6 +126,18 @@ impl JsRate {
         self.inner.as_bp()
     }
 
+    /// Rate in fractional basis points, without rounding (Rust `Rate::as_bp_f64`).
+    ///
+    /// The decimal point of the rate's shortest decimal form moves four places,
+    /// so `0.0029` reports `29` rather than `28.999999999999996`, and `0.00625`
+    /// keeps its `62.5`.
+    ///
+    /// @returns Rate in fractional bp.
+    #[wasm_bindgen(getter, js_name = asBpF64)]
+    pub fn as_bp_f64(&self) -> f64 {
+        self.inner.as_bp_f64()
+    }
+
     /// Parse a rate quote through Rust `Rate::from_str` (the twin of Python `Rate(text)`).
     ///
     /// # Arguments
@@ -429,6 +441,17 @@ impl JsPercentage {
     #[wasm_bindgen(getter, js_name = asBp)]
     pub fn as_bp(&self) -> i32 {
         self.inner.as_bp()
+    }
+
+    /// Value in fractional basis points, without rounding (Rust `Percentage::as_bp_f64`).
+    ///
+    /// The decimal point of the percentage's shortest decimal form moves two
+    /// places, so `1.1` reports `110` rather than `110.00000000000001`.
+    ///
+    /// @returns Value in fractional bp.
+    #[wasm_bindgen(getter, js_name = asBpF64)]
+    pub fn as_bp_f64(&self) -> f64 {
+        self.inner.as_bp_f64()
     }
 
     /// Value as a decimal `Rate`.

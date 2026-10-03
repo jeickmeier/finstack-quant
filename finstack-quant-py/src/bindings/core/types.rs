@@ -136,6 +136,14 @@ impl PyRate {
         self.inner.as_bp()
     }
 
+    /// Rate in fractional basis points, without rounding (Rust ``Rate::as_bp_f64``).
+    ///
+    /// ``Rate(0.0029).as_bp_f64 == 29.0`` and ``Rate("62.5bp").as_bp_f64 == 62.5``.
+    #[getter]
+    fn as_bp_f64(&self) -> f64 {
+        self.inner.as_bp_f64()
+    }
+
     /// Rate as a ``Bps`` value (rounded to the nearest whole basis point).
     #[getter]
     fn as_basis_points(&self) -> PyBps {
@@ -535,6 +543,13 @@ impl PyPercentage {
     #[getter]
     fn as_bp(&self) -> i32 {
         self.inner.as_bp()
+    }
+
+    /// Value in fractional basis points, without rounding (Rust
+    /// ``Percentage::as_bp_f64``): ``Percentage(1.1).as_bp_f64 == 110.0``.
+    #[getter]
+    fn as_bp_f64(&self) -> f64 {
+        self.inner.as_bp_f64()
     }
 
     /// Value as a decimal ``Rate``.

@@ -32,15 +32,18 @@ use crate::errors::core_to_py;
 type DateMoneyRows<'py> = Vec<(Bound<'py, PyAny>, PyMoney)>;
 
 /// Extract a `rust_decimal::Decimal` from `decimal.Decimal`, `float`, `int`,
-/// or a numeric `str` (parsed losslessly, e.g. ``"0.05"``).
+/// or a numeric `str` (e.g. ``"0.05"``).
+///
+/// `str` and `decimal.Decimal` both go through
+/// `finstack_quant_core::decimal::parse_decimal` (the parser behind
+/// `Money::from_decimal_str`), so text that is not exactly representable as a
+/// Rust `Decimal` is rejected rather than rounded.
 pub(crate) fn decimal_from_any(obj: &Bound<'_, PyAny>) -> PyResult<Decimal> {
     if is_python_decimal(obj)? {
         return decimal_from_py(obj);
     }
     if let Ok(text) = obj.extract::<String>() {
-        return text.trim().parse::<Decimal>().map_err(|e| {
-            crate::errors::value_error(format!("'{text}' is not a decimal number: {e}"))
-        });
+        return finstack_quant_core::decimal::parse_decimal(&text).map_err(core_to_py);
     }
     let value: f64 = obj.extract().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err("expected decimal.Decimal, float, int, or str")
@@ -401,9 +404,10 @@ impl PyFloatingLegCompounding {
     };
 
     /// Compounded in arrears with a lookback of ``lookback_days`` business
-    /// days (``0`` is plain in-arrears, the cleared-OIS convention).
+    /// days (``0`` is plain in-arrears, the cleared-OIS convention; the
+    /// market presets such as ``sofr()`` name it).
     #[staticmethod]
-    #[pyo3(signature = (lookback_days = 0), text_signature = "(lookback_days=0)")]
+    #[pyo3(text_signature = "(lookback_days)")]
     fn compounded_in_arrears(lookback_days: u32) -> Self {
         Self {
             inner: FloatingLegCompounding::CompoundedInArrears { lookback_days },
@@ -429,6 +433,95 @@ impl PyFloatingLegCompounding {
         Self {
             inner: FloatingLegCompounding::CompoundedWithRateCutoff { cutoff_days },
         }
+    }
+
+    /// USD SOFR OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::sofr``).
+    #[staticmethod]
+    #[pyo3(text_signature = "()")]
+    fn sofr() -> Self {
+        Self {
+            inner: FloatingLegCompounding::sofr(),
+        }
+    }
+
+    /// USD Fed Funds / EFFR OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::fedfunds``).
+    #[staticmethod]
+    #[pyo3(text_signature = "()")]
+    fn fedfunds() -> Self {
+        Self {
+            inner: FloatingLegCompounding::fedfunds(),
+        }
+    }
+
+    /// GBP SONIA OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::sonia``).
+    #[staticmethod]
+    #[pyo3(text_signature = "()")]
+    fn sonia() -> Self {
+        Self {
+            inner: FloatingLegCompounding::sonia(),
+        }
+    }
+
+    /// EUR €STR OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::estr``).
+    #[staticmethod]
+    #[pyo3(text_signature = "()")]
+    fn estr() -> Self {
+        Self {
+            inner: FloatingLegCompounding::estr(),
+        }
+    }
+
+    /// JPY TONA OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::tona``).
+    #[staticmethod]
+    #[pyo3(text_signature = "()")]
+    fn tona() -> Self {
+        Self {
+            inner: FloatingLegCompounding::tona(),
+        }
+    }
+
+    /// CHF SARON OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::saron``).
+    #[staticmethod]
+    #[pyo3(text_signature = "()")]
+    fn saron() -> Self {
+        Self {
+            inner: FloatingLegCompounding::saron(),
+        }
+    }
+
+    /// USD SOFR FRN convention: ISDA 2021 observation shift of 2 business days (Rust ``FloatingLegCompounding::sofr_observation_shift``).
+    #[staticmethod]
+    #[pyo3(text_signature = "()")]
+    fn sofr_observation_shift() -> Self {
+        Self {
+            inner: FloatingLegCompounding::sofr_observation_shift(),
+        }
+    }
+
+    /// GBP SONIA FRN convention: ISDA 2021 observation shift of 5 business days (Rust ``FloatingLegCompounding::sonia_observation_shift``).
+    #[staticmethod]
+    #[pyo3(text_signature = "()")]
+    fn sonia_observation_shift() -> Self {
+        Self {
+            inner: FloatingLegCompounding::sonia_observation_shift(),
+        }
+    }
+
+    /// Compounded RFR with an end-of-period rate cut-off of ``cutoff_days``
+    /// business days (Rust ``FloatingLegCompounding::rate_cutoff``).
+    #[staticmethod]
+    #[pyo3(text_signature = "(cutoff_days)")]
+    fn rate_cutoff(cutoff_days: u32) -> Self {
+        Self {
+            inner: FloatingLegCompounding::rate_cutoff(cutoff_days),
+        }
+    }
+
+    /// Whether the period rate is built from daily overnight fixings (every
+    /// convention except ``SIMPLE``; Rust ``FloatingLegCompounding::is_overnight``).
+    #[pyo3(text_signature = "(self)")]
+    fn is_overnight(&self) -> bool {
+        self.inner.is_overnight()
     }
 
     /// Python-style representation.
@@ -2223,6 +2316,45 @@ impl PyDefaultModelSpec {
     #[pyo3(text_signature = "(self, seasoning_months)")]
     fn mdr(&self, seasoning_months: u32) -> PyResult<f64> {
         self.inner.mdr(seasoning_months).map_err(core_to_py)
+    }
+
+    /// Survival-adjusted monthly default rate (Rust
+    /// ``DefaultModelSpec::mdr_with_survival``).
+    ///
+    /// For cumulative-loss and timing curves the period default is divided by
+    /// ``surviving_balance_fraction`` so applying the rate to the current
+    /// balance reproduces the curve's defaults regardless of amortization and
+    /// prepayments; rate-based curves ignore the fraction.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``surviving_balance_fraction`` is negative or non-finite, or the
+    ///     curve parameters are invalid.
+    #[pyo3(text_signature = "(self, seasoning_months, surviving_balance_fraction)")]
+    fn mdr_with_survival(
+        &self,
+        seasoning_months: u32,
+        surviving_balance_fraction: f64,
+    ) -> PyResult<f64> {
+        self.inner
+            .mdr_with_survival(seasoning_months, surviving_balance_fraction)
+            .map_err(core_to_py)
+    }
+
+    /// Cumulative defaults through ``seasoning_months`` as a fraction of the
+    /// original balance (Rust ``DefaultModelSpec::cumulative_default_fraction``);
+    /// ``None`` for rate-based curves.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the curve parameters are invalid.
+    #[pyo3(text_signature = "(self, seasoning_months)")]
+    fn cumulative_default_fraction(&self, seasoning_months: u32) -> PyResult<Option<f64>> {
+        self.inner
+            .cumulative_default_fraction(seasoning_months)
+            .map_err(core_to_py)
     }
 
     /// Python-style field summary.

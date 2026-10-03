@@ -224,3 +224,27 @@ def test_surface_validators_accept_a_clean_surface_and_reject_arbitrage() -> Non
         validate_surface_with_forwards(clean, config, [100.0])
     with pytest.raises(ValueError, match="volatility"):
         validate_vol_bounds(clean, ValidationConfig(max_volatility=0.1))
+
+
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [("pct_1.1", 110.0), ("pct_0.07", 7.0), ("pct_0.29", 29.0), ("rate_0.0029", 29.0), ("rate_62.5bp", 62.5)],
+)
+def test_cds_quote_basis_points_come_from_rust_accessor(label: str, expected: float) -> None:
+    """CORE-006: Rate/Percentage spreads use Rust ``as_bp_f64`` (no ``* 10_000`` noise)."""
+    from finstack_quant.calibration import CdsQuote
+    from finstack_quant.core.types import Percentage, Rate
+
+    kind, raw = label.split("_", 1)
+    value = Percentage(float(raw)) if kind == "pct" else Rate(raw if raw.endswith("bp") else float(raw))
+    assert value.as_bp_f64 == expected
+    quote = CdsQuote.par_spread(
+        id="Q",
+        entity="ACME",
+        currency="USD",
+        doc_clause="isda_na",
+        pillar="5Y",
+        spread_bp=value,
+        recovery_rate=0.4,
+    )
+    assert json.loads(quote.to_json())["spread_bp"] == expected

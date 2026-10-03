@@ -379,8 +379,9 @@ pub fn extract_rate_decimal(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
 ///
 /// A `Bps` wrapper contributes its integer basis points as `f64`; a bare
 /// number is taken as already in basis points (`25.0` for 25 bp). A `Rate` or
-/// `Percentage` is converted from its decimal value (`x 10 000`) so a caller
-/// holding a decimal rate never has to rescale by hand.
+/// `Percentage` reports its fractional basis points through the Rust
+/// `as_bp_f64` accessor, so a caller holding a decimal rate never has to
+/// rescale by hand.
 ///
 /// # Errors
 ///
@@ -390,10 +391,10 @@ pub fn extract_basis_points(obj: &Bound<'_, PyAny>) -> PyResult<f64> {
         return Ok(f64::from(bps.borrow().inner.as_bp()));
     }
     if let Ok(rate) = obj.cast::<crate::bindings::core::types::PyRate>() {
-        return Ok(rate.borrow().inner.as_decimal() * 10_000.0);
+        return Ok(rate.borrow().inner.as_bp_f64());
     }
     if let Ok(pct) = obj.cast::<crate::bindings::core::types::PyPercentage>() {
-        return Ok(pct.borrow().inner.as_decimal() * 10_000.0);
+        return Ok(pct.borrow().inner.as_bp_f64());
     }
     obj.extract::<f64>().map_err(|_| {
         pyo3::exceptions::PyTypeError::new_err(format!(
