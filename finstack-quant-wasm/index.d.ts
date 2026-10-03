@@ -24250,6 +24250,12 @@ export interface SabrParameters extends WasmOwned {
    * @returns `true` when a SABR displacement shift is configured.
    */
   isShifted(): boolean;
+  /**
+   * Serialize to the Rust `SabrParameters` JSON wire form.
+   * @returns JSON text with `alpha`, `beta`, `nu`, `rho` and, when set, `shift`.
+   * @throws If serialization fails (not expected).
+   */
+  toJson(): string;
 }
 
 /**
@@ -24287,6 +24293,69 @@ export interface SabrParametersConstructor {
    * @returns A `SabrParameters` handle.
    */
   ratesDefault(): SabrParameters;
+  /**
+   * Equity market standard SABR parameters (`beta = 1.0`).
+   * @param alpha - Positive initial Black volatility as a decimal.
+   * @param nu - Finite non-negative volatility of volatility per square-root year.
+   * @param rho - Forward/volatility correlation in `[-1, 1]`.
+   * @returns A validated `SabrParameters` handle.
+   * @throws Error - Throws a `FinstackError` (kind `validation`) if `alpha` is not finite and positive, `nu` is negative or non-finite, `rho` is outside `[-1, 1]`.
+   */
+  equityStandard(alpha: number, nu: number, rho: number): SabrParameters;
+  /**
+   * Rates market standard SABR parameters (`beta = 0.5`).
+   * @param alpha - Positive initial volatility on the `beta = 0.5` CEV backbone (decimal).
+   * @param nu - Finite non-negative volatility of volatility per square-root year.
+   * @param rho - Forward/volatility correlation in `[-1, 1]`.
+   * @returns A validated `SabrParameters` handle.
+   * @throws Error - Throws a `FinstackError` (kind `validation`) if `alpha` is not finite and positive, `nu` is negative or non-finite, `rho` is outside `[-1, 1]`.
+   */
+  ratesStandard(alpha: number, nu: number, rho: number): SabrParameters;
+  /**
+   * Normal SABR parameters (`beta = 0`; negative forwards allowed).
+   * @param alpha - Positive initial normal volatility in absolute rate units.
+   * @param nu - Finite non-negative volatility of volatility per square-root year.
+   * @param rho - Forward/volatility correlation in `[-1, 1]`.
+   * @returns A validated `SabrParameters` handle.
+   * @throws Error - Throws a `FinstackError` (kind `validation`) if `alpha` is not finite and positive, `nu` is negative or non-finite, `rho` is outside `[-1, 1]`.
+   */
+  normal(alpha: number, nu: number, rho: number): SabrParameters;
+  /**
+   * Lognormal SABR parameters (`beta = 1`).
+   * @param alpha - Positive initial Black volatility as a decimal.
+   * @param nu - Finite non-negative volatility of volatility per square-root year.
+   * @param rho - Forward/volatility correlation in `[-1, 1]`.
+   * @returns A validated `SabrParameters` handle.
+   * @throws Error - Throws a `FinstackError` (kind `validation`) if `alpha` is not finite and positive, `nu` is negative or non-finite, `rho` is outside `[-1, 1]`.
+   */
+  lognormal(alpha: number, nu: number, rho: number): SabrParameters;
+  /**
+   * Shifted normal SABR parameters (`beta = 0` with a displacement).
+   * @param alpha - Positive initial normal volatility in absolute rate units.
+   * @param nu - Finite non-negative volatility of volatility per square-root year.
+   * @param rho - Forward/volatility correlation in `[-1, 1]`.
+   * @param shift - Positive displacement added to forward and strike, in the forward's rate units.
+   * @returns A validated `SabrParameters` handle.
+   * @throws Error - Throws a `FinstackError` (kind `validation`) if `alpha` is not finite and positive, `nu` is negative or non-finite, `rho` is outside `[-1, 1]` or `shift` is not finite and positive.
+   */
+  shiftedNormal(alpha: number, nu: number, rho: number, shift: number): SabrParameters;
+  /**
+   * Shifted lognormal SABR parameters (`beta = 1` with a displacement).
+   * @param alpha - Positive initial Black volatility of the shifted forward `F + shift` (decimal).
+   * @param nu - Finite non-negative volatility of volatility per square-root year.
+   * @param rho - Forward/volatility correlation in `[-1, 1]`.
+   * @param shift - Positive displacement added to forward and strike, in the forward's rate units.
+   * @returns A validated `SabrParameters` handle.
+   * @throws Error - Throws a `FinstackError` (kind `validation`) if `alpha` is not finite and positive, `nu` is negative or non-finite, `rho` is outside `[-1, 1]` or `shift` is not finite and positive.
+   */
+  shiftedLognormal(alpha: number, nu: number, rho: number, shift: number): SabrParameters;
+  /**
+   * Deserialize from the Rust `SabrParameters` JSON wire form produced by `toJson`.
+   * @param json - JSON text with `alpha`, `beta`, `nu`, `rho` and an optional `shift`; unknown fields are rejected and every field is range-checked.
+   * @returns The parsed `SabrParameters` handle.
+   * @throws `TypeError` if `json` is not a string; `FinstackError` (kind `validation`) on malformed JSON, an unknown field, or a parameter outside its domain.
+   */
+  fromJson(json: string): SabrParameters;
 }
 
 /**
@@ -24378,6 +24447,37 @@ export interface SabrSmile extends WasmOwned {
    */
   validateNoArbitrage(strikes: NumericArray, r: number): ArbitrageValidationResult;
   /**
+   * Strike for an absolute forward delta, using the smile's ATM volatility.
+   *
+   * Bachelier delta when `beta == 0`, Black delta on the (shifted) forward
+   * otherwise; an ATM-vol approximation, not a smile-consistent solve.
+   * @param delta - Absolute undiscounted forward delta strictly between 0 and 1.
+   * @param isCall - `true` for call delta, `false` for absolute put delta.
+   * @returns Strike in the forward's units.
+   * @throws Error - Throws a `FinstackError` (kind `validation`) if `delta` is outside `(0, 1)`, the smile coordinates are outside the model domain, or the strike overflows.
+   */
+  strikeFromDelta(delta: number, isCall: boolean): number;
+  /**
+   * Throw when the smile has static arbitrage on `strikes`.
+   *
+   * Same butterfly and monotonicity checks as `validateNoArbitrage`; the
+   * error message counts each kind of violation.
+   * @param strikes - Finite, strictly ascending strikes with arbitrary spacing.
+   * @param r - Finite continuously compounded risk-free rate (decimal) that discounts the forward-based Black call prices.
+   * @throws Error - Throws a `FinstackError` (kind `validation`) if any violation is found, the grid is not finite and strictly ascending, `r` is non-finite, or the smile cannot be evaluated on the grid.
+   */
+  checkNoArbitrage(strikes: NumericArray, r: number): void;
+  /**
+   * Smile vols on `strikes` after a greedy monotonicity/convexity repair
+   * (not a full Fengler QP); strikes without violations keep their SABR vol.
+   * @param strikes - Finite, strictly ascending strikes in the model domain.
+   * @param r - Finite continuously compounded risk-free rate (decimal) that discounts the forward-based Black call prices.
+   * @param maxIterations - Maximum number of repair passes (non-negative integer).
+   * @returns Repaired vols aligned with `strikes`.
+   * @throws Error - Throws a `TypeError` for a non-integer `maxIterations`, and a `FinstackError` (kind `validation`) if the grid is not finite and strictly ascending, `r` is non-finite, or the smile or a price inversion fails.
+   */
+  repairArbitrage(strikes: NumericArray, r: number, maxIterations: number): Float64Array;
+  /**
    * Forward price or rate the smile is built around.
    */
   readonly forward: number;
@@ -24467,6 +24567,23 @@ export interface SabrCalibrator extends WasmOwned {
    * @param atmPinning - When `true`, alpha is solved analytically so the model reproduces the ATM volatility interpolated from the quotes exactly, and only nu and rho are fitted to the smile.
    */
   withAtmPinning(atmPinning: boolean): SabrCalibrator;
+  /**
+   * Maximum accepted relative error of every fitted volatility quote.
+   */
+  readonly tolerance: number;
+  /**
+   * Iteration cap before the solver reports non-convergence.
+   */
+  readonly maxIterations: number;
+  /**
+   * Displacement policy: `null` (no shift), a fixed numeric shift in the
+   * forward's units, or `"auto"` — the same forms `withShift` accepts.
+   */
+  readonly shift: number | 'auto' | null;
+  /**
+   * Whether alpha is pinned to the interpolated ATM volatility.
+   */
+  readonly atmPinning: boolean;
 }
 
 /**
@@ -28043,6 +28160,40 @@ export interface VolatilityNamespace {
    * @param expiry - Positive option expiry in years.
    */
   strikeToDelta(strike: number, forward: number, vol: number, expiry: number): number;
+  /**
+   * Bachelier (normal) implied volatility from an undiscounted option price.
+   *
+   * Inverts the Bachelier price per unit annuity (`df = 1`); forward and
+   * strike may be zero or negative.
+   * @param price - Non-negative undiscounted option price (forward premium per unit annuity) in the forward's units.
+   * @param forward - Finite forward rate or price; negative values are allowed.
+   * @param strike - Finite strike in the forward's units; negative values are allowed.
+   * @param t - Strictly positive time to expiry in years.
+   * @param isCall - `true` for a call, `false` for a put.
+   * @returns Normal volatility in absolute forward units per square-root year; `0` when `price` equals intrinsic value.
+   * @throws Error - Throws a `FinstackError` (kind `validation`) if `forward` or `strike` is non-finite, `t` is not positive, `price` is negative, non-finite or below intrinsic value, or the solver does not converge.
+   */
+  impliedVolBachelier(
+    price: number,
+    forward: number,
+    strike: number,
+    t: number,
+    isCall: boolean
+  ): number;
+  /**
+   * Black-76 (lognormal) implied volatility from an undiscounted option price.
+   *
+   * Inverts the Black-76 price per unit annuity (`df = 1`); for a discounted
+   * price use `models.black76ImpliedVol`.
+   * @param price - Non-negative undiscounted option price (forward premium per unit annuity) in the forward's units.
+   * @param forward - Strictly positive forward rate or price.
+   * @param strike - Strictly positive strike in the forward's units.
+   * @param t - Strictly positive time to expiry in years.
+   * @param isCall - `true` for a call, `false` for a put.
+   * @returns Black volatility as an annualized decimal; `0` when `price` equals intrinsic value.
+   * @throws Error - Throws a `FinstackError` (kind `validation`) if `forward`, `strike` or `t` is not positive and finite, `price` is negative or non-finite, `price` is below intrinsic value or at/above the upper bound (forward for a call, strike for a put), or the solver does not converge.
+   */
+  impliedVolBlack(price: number, forward: number, strike: number, t: number, isCall: boolean): number;
   /**
    * Convert an ATM volatility quote between normal, lognormal and shifted-lognormal conventions.
    * @returns Volatility in the target convention (decimal Black vol, or absolute normal vol).

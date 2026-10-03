@@ -111,6 +111,78 @@ impl PySabrParameters {
         }
     }
 
+    /// Equity market standard: ``beta = 1.0`` with the supplied ``alpha``, ``nu``, ``rho``.
+    ///
+    /// Parameters
+    /// ----------
+    /// alpha : float
+    ///     Positive initial Black volatility as a decimal.
+    /// nu : float
+    ///     Non-negative volatility of volatility as a decimal.
+    /// rho : float
+    ///     Forward/volatility correlation in ``[-1, 1]``.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If any parameter is outside its domain.
+    #[staticmethod]
+    fn equity_standard(alpha: f64, nu: f64, rho: f64) -> PyResult<Self> {
+        SabrParameters::equity_standard(alpha, nu, rho)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    /// Rates market standard: ``beta = 0.5`` with the supplied ``alpha``, ``nu``, ``rho``.
+    ///
+    /// Raises ``ValueError`` if any parameter is outside its domain.
+    #[staticmethod]
+    fn rates_standard(alpha: f64, nu: f64, rho: f64) -> PyResult<Self> {
+        SabrParameters::rates_standard(alpha, nu, rho)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    /// Normal SABR: ``beta = 0``; ``alpha`` is an absolute normal vol.
+    ///
+    /// Raises ``ValueError`` if any parameter is outside its domain.
+    #[staticmethod]
+    fn normal(alpha: f64, nu: f64, rho: f64) -> PyResult<Self> {
+        SabrParameters::normal(alpha, nu, rho)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    /// Lognormal SABR: ``beta = 1``.
+    ///
+    /// Raises ``ValueError`` if any parameter is outside its domain.
+    #[staticmethod]
+    fn lognormal(alpha: f64, nu: f64, rho: f64) -> PyResult<Self> {
+        SabrParameters::lognormal(alpha, nu, rho)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    /// Shifted normal SABR: ``beta = 0`` with a positive displacement ``shift``.
+    ///
+    /// Raises ``ValueError`` if any parameter is outside its domain.
+    #[staticmethod]
+    fn shifted_normal(alpha: f64, nu: f64, rho: f64, shift: f64) -> PyResult<Self> {
+        SabrParameters::shifted_normal(alpha, nu, rho, shift)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    /// Shifted lognormal SABR: ``beta = 1`` with a positive displacement ``shift``.
+    ///
+    /// Raises ``ValueError`` if any parameter is outside its domain.
+    #[staticmethod]
+    fn shifted_lognormal(alpha: f64, nu: f64, rho: f64, shift: f64) -> PyResult<Self> {
+        SabrParameters::shifted_lognormal(alpha, nu, rho, shift)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
     #[getter]
     fn alpha(&self) -> f64 {
         self.inner.alpha
@@ -139,6 +211,36 @@ impl PySabrParameters {
     /// ``True`` if the parameters include a non-zero shift (negative-rate support).
     fn is_shifted(&self) -> bool {
         self.inner.is_shifted()
+    }
+
+    /// Serialize to compact JSON (``alpha, beta, nu, rho`` and ``shift`` when set).
+    fn to_json(&self) -> PyResult<String> {
+        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "SabrParameters"))
+    }
+
+    /// Deserialize from JSON; the Rust wire format validates every field on load.
+    ///
+    /// Raises ``ValueError`` on malformed JSON or invalid parameters.
+    #[staticmethod]
+    #[pyo3(text_signature = "(json)")]
+    fn from_json(json: &str) -> PyResult<Self> {
+        let inner: SabrParameters = serde_json::from_str(json)
+            .map_err(|e| serde_json_to_py(e, "invalid SabrParameters JSON"))?;
+        Ok(Self { inner })
+    }
+
+    /// Support ``pickle`` (and therefore ``copy.deepcopy``, ``multiprocessing``).
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
+        let from_json = py.get_type::<Self>().getattr("from_json")?;
+        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
+    }
+
+    /// Exact equality of all parameters (Rust ``PartialEq``).
+    fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
+        other
+            .extract::<PyRef<'_, PySabrParameters>>()
+            .map(|rhs| self.inner == rhs.inner)
+            .unwrap_or(false)
     }
 
     fn __repr__(&self) -> String {
@@ -322,6 +424,65 @@ impl PySabrSmile {
             .validate_no_arbitrage(&strikes, r)
             .map_err(core_to_py)?;
         serde_to_py(py, &result)
+    }
+
+    /// Strike for an absolute forward delta, using the smile's ATM volatility.
+    ///
+    /// Bachelier delta for ``beta == 0``, Black delta on displaced coordinates
+    /// otherwise. An ATM-vol approximation, not a smile-consistent solve.
+    ///
+    /// Parameters
+    /// ----------
+    /// delta : float
+    ///     Absolute undiscounted forward delta strictly between 0 and 1.
+    /// is_call : bool
+    ///     ``True`` for call delta, ``False`` for absolute put delta.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``delta`` is outside ``(0, 1)`` or the smile coordinates are invalid.
+    fn strike_from_delta(&self, delta: f64, is_call: bool) -> PyResult<f64> {
+        self.inner
+            .strike_from_delta(delta, is_call)
+            .map_err(core_to_py)
+    }
+
+    /// Raise ``ValueError`` when the smile has static arbitrage on ``strikes``.
+    ///
+    /// Same checks as :meth:`validate_no_arbitrage`; the message counts the
+    /// butterfly and monotonicity violations.
+    fn check_no_arbitrage(&self, strikes: Vec<f64>, r: f64) -> PyResult<()> {
+        self.inner
+            .check_no_arbitrage(&strikes, r)
+            .map_err(core_to_py)
+    }
+
+    /// Smile vols on ``strikes`` after a greedy monotonicity/convexity repair.
+    ///
+    /// Parameters
+    /// ----------
+    /// strikes : list[float]
+    ///     Finite, strictly ascending strikes in the model domain.
+    /// r : float
+    ///     Continuously compounded risk-free rate (decimal) discounting the
+    ///     forward-based Black call prices.
+    /// max_iterations : int
+    ///     Maximum repair passes.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the grid, rate or smile coordinates are invalid.
+    fn repair_arbitrage(
+        &self,
+        strikes: Vec<f64>,
+        r: f64,
+        max_iterations: usize,
+    ) -> PyResult<Vec<f64>> {
+        self.inner
+            .repair_arbitrage(&strikes, r, max_iterations)
+            .map_err(core_to_py)
     }
 
     /// Tabulate the smile on a strike grid as a ``pandas.DataFrame``.
@@ -571,6 +732,34 @@ impl PySabrCalibrator {
         }
     }
 
+    /// Maximum accepted relative error of every fitted volatility quote.
+    #[getter]
+    fn tolerance(&self) -> f64 {
+        self.inner.tolerance()
+    }
+
+    /// Iteration cap before the solver reports non-convergence.
+    #[getter]
+    fn max_iterations(&self) -> usize {
+        self.inner.max_iterations()
+    }
+
+    /// Displacement policy: ``None``, a fixed float shift, or ``"auto"``.
+    #[getter]
+    fn shift<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        Ok(match self.inner.shift() {
+            SabrShift::None => py.None().into_bound(py),
+            SabrShift::Fixed(value) => value.into_pyobject(py)?.into_any(),
+            SabrShift::Auto => SabrShift::Auto.to_string().into_pyobject(py)?.into_any(),
+        })
+    }
+
+    /// Whether ``alpha`` is pinned to the interpolated ATM volatility.
+    #[getter]
+    fn atm_pinning(&self) -> bool {
+        self.inner.atm_pinning()
+    }
+
     fn __repr__(&self) -> String {
         let shift = match self.inner.shift() {
             SabrShift::None => "None".to_string(),
@@ -589,6 +778,45 @@ impl PySabrCalibrator {
             }
         )
     }
+}
+
+/// Bachelier (normal) implied volatility from an undiscounted option price.
+///
+/// Inverts ``bachelier_price`` (per unit annuity, ``df = 1``). Forward and
+/// strike may be zero or negative. Returns an absolute normal vol in the
+/// forward's units.
+///
+/// Raises ``ValueError`` for non-finite forward/strike, non-positive ``t``,
+/// a negative price, a price below intrinsic, or solver non-convergence.
+#[pyfunction]
+#[pyo3(signature = (price, forward, strike, t, is_call))]
+fn implied_vol_bachelier(
+    price: f64,
+    forward: f64,
+    strike: f64,
+    t: f64,
+    is_call: bool,
+) -> PyResult<f64> {
+    vol::implied_vol_bachelier(price, forward, strike, t, is_call).map_err(core_to_py)
+}
+
+/// Black-76 (lognormal) implied volatility from an undiscounted option price.
+///
+/// Inverts the Black-76 price per unit annuity (``df = 1``). Forward and
+/// strike must be strictly positive. Returns a decimal Black vol.
+///
+/// Raises ``ValueError`` for non-positive forward/strike/``t``, a negative
+/// price, a price outside the no-arbitrage bounds, or solver non-convergence.
+#[pyfunction]
+#[pyo3(signature = (price, forward, strike, t, is_call))]
+fn implied_vol_black(
+    price: f64,
+    forward: f64,
+    strike: f64,
+    t: f64,
+    is_call: bool,
+) -> PyResult<f64> {
+    vol::implied_vol_black(price, forward, strike, t, is_call).map_err(core_to_py)
 }
 
 /// Evaluate a core volatility surface with checked grid bounds.
@@ -1124,6 +1352,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_fx_delta_vol, &m)?)?;
     m.add_function(wrap_pyfunction!(materialize_fx_delta_surface, &m)?)?;
     m.add_function(wrap_pyfunction!(delta_to_strike, &m)?)?;
+    m.add_function(wrap_pyfunction!(implied_vol_bachelier, &m)?)?;
+    m.add_function(wrap_pyfunction!(implied_vol_black, &m)?)?;
     m.add_function(wrap_pyfunction!(strike_to_delta, &m)?)?;
     super::volatility_arbitrage::register(py, &m)?;
     m.setattr(
@@ -1154,6 +1384,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
                 "get_fx_delta_vol",
                 "get_surface_vol",
                 "get_surface_vol_clamped",
+                "implied_vol_bachelier",
+                "implied_vol_black",
                 "materialize_cube_expiry_slice",
                 "materialize_cube_expiry_slice_normal",
                 "materialize_cube_tenor_slice",

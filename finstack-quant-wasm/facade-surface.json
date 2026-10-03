@@ -3485,6 +3485,8 @@
       "getFxDeltaVol",
       "getSurfaceVol",
       "getSurfaceVolClamped",
+      "impliedVolBachelier",
+      "impliedVolBlack",
       "materializeCubeExpirySlice",
       "materializeCubeExpirySliceNormal",
       "materializeCubeTenorSlice",
@@ -3507,7 +3509,7 @@
       "withShift",
       "withTolerance"
     ],
-    "getters": []
+    "getters": ["atmPinning", "maxIterations", "shift", "tolerance"]
   },
   "models.volatility.SabrModel": {
     "kind": "class",
@@ -3517,14 +3519,33 @@
   },
   "models.volatility.SabrParameters": {
     "kind": "class",
-    "statics": ["equityDefault", "ratesDefault"],
-    "methods": ["free", "isShifted"],
+    "statics": [
+      "equityDefault",
+      "equityStandard",
+      "fromJson",
+      "lognormal",
+      "normal",
+      "ratesDefault",
+      "ratesStandard",
+      "shiftedLognormal",
+      "shiftedNormal"
+    ],
+    "methods": ["free", "isShifted", "toJson"],
     "getters": ["alpha", "beta", "nu", "rho", "shift"]
   },
   "models.volatility.SabrSmile": {
     "kind": "class",
     "statics": [],
-    "methods": ["atmVol", "free", "generateSmile", "impliedVol", "validateNoArbitrage"],
+    "methods": [
+      "atmVol",
+      "checkNoArbitrage",
+      "free",
+      "generateSmile",
+      "impliedVol",
+      "repairArbitrage",
+      "strikeFromDelta",
+      "validateNoArbitrage"
+    ],
     "getters": ["forward", "t"]
   },
   "models.volatility.calibrateSvi": {
@@ -3558,6 +3579,12 @@
     "kind": "function"
   },
   "models.volatility.getFxDeltaVol": {
+    "kind": "function"
+  },
+  "models.volatility.impliedVolBachelier": {
+    "kind": "function"
+  },
+  "models.volatility.impliedVolBlack": {
     "kind": "function"
   },
   "models.volatility.strikeToDelta": {

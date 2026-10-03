@@ -16,6 +16,8 @@ export const volatility = {
   getCubeExpirySliceVolClamped: wasm.getCubeExpirySliceVolClamped,
   getFxDeltaPillarVols: wasm.getFxDeltaPillarVols,
   getFxDeltaVol: wasm.getFxDeltaVol,
+  impliedVolBachelier: wasm.impliedVolBachelier,
+  impliedVolBlack: wasm.impliedVolBlack,
   strikeToDelta: wasm.strikeToDelta,
   sviImpliedVol: wasm.sviImpliedVol,
   sviTotalVariance: wasm.sviTotalVariance,
