@@ -56,19 +56,6 @@ fn test_invalid_period_error() {
 }
 
 #[test]
-fn test_unsupported_operation_error() {
-    let error = Error::UnsupportedOperation {
-        operation: "parallel_bump".to_string(),
-        target: "curve_xyz".to_string(),
-    };
-
-    let display = format!("{}", error);
-    assert!(display.contains("Unsupported operation"));
-    assert!(display.contains("parallel_bump"));
-    assert!(display.contains("curve_xyz"));
-}
-
-#[test]
 fn test_validation_error() {
     let error = Error::Validation("Invalid input".to_string());
 
@@ -84,28 +71,6 @@ fn test_internal_error() {
     let display = format!("{}", error);
     assert!(display.contains("Internal error"));
     assert!(display.contains("Something went wrong"));
-}
-
-#[test]
-fn test_instrument_not_found_error() {
-    let error = Error::InstrumentNotFound("BOND123".to_string());
-
-    let display = format!("{}", error);
-    assert!(display.contains("Instrument not found"));
-    assert!(display.contains("BOND123"));
-}
-
-#[test]
-fn test_curve_type_mismatch_error() {
-    let error = Error::CurveTypeMismatch {
-        expected: "Discount".to_string(),
-        actual: "Forward".to_string(),
-    };
-
-    let display = format!("{}", error);
-    assert!(display.contains("Curve type mismatch"));
-    assert!(display.contains("Discount"));
-    assert!(display.contains("Forward"));
 }
 
 #[test]

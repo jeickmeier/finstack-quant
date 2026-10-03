@@ -49,13 +49,14 @@ test('OIS theta equals the reprice on the one-day time-rolled market', () => {
       { kind: 'time_roll_forward', period: '1D', apply_shocks: false, roll_mode: 'calendar_days' },
     ],
   };
-  const rolled = scenarios.applyScenarioToMarket(
+  const rolled = scenarios.applyScenario(
     JSON.stringify(spec),
     MARKET,
     AS_OF,
+    undefined,
     JSON.stringify([golden.instrument])
   );
-  assert.deepEqual(rolled.time_roll.failed_instruments, []);
+  assert.deepEqual(rolled.report.time_roll.failed_instruments, []);
   const fixing = rolled.market.series.find((series) => series.id === 'FIXING:USD-SOFR');
   assert.ok(
     fixing.observations.some(([date]) => date === AS_OF),
@@ -73,6 +74,6 @@ test('rolled OIS pricing still requires the SOFR fixing', () => {
       { kind: 'time_roll_forward', period: '1D', apply_shocks: false, roll_mode: 'calendar_days' },
     ],
   };
-  const rolled = scenarios.applyScenarioToMarket(JSON.stringify(spec), MARKET, AS_OF);
+  const rolled = scenarios.applyScenario(JSON.stringify(spec), MARKET, AS_OF);
   assert.throws(() => pv(JSON.stringify(rolled.market), ROLLED), /FIXING:USD-SOFR/);
 });

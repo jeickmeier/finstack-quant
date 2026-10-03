@@ -784,6 +784,71 @@
         }
       ]
     },
+    "ApplicationReport": {
+      "additionalProperties": false,
+      "description": "Report describing what happened during [`super::ScenarioEngine::apply`].\n\n# Examples\n```rust\nuse finstack_quant_scenarios::engine::ApplicationReport;\n\nlet report = ApplicationReport {\n    operations_applied: 3,\n    user_operations: 1,\n    expanded_operations: 3,\n    changes: Default::default(),\n    warnings: vec![],\n    meta: None,\n    time_roll: None,\n};\n\nassert_eq!(report.operations_applied, 3);\nassert_eq!(report.user_operations, 1);\nassert_eq!(report.expanded_operations, 3);\n```",
+      "properties": {
+        "changes": {
+          "$ref": "#/$defs/ScenarioChangeManifest",
+          "description": "Authoritative metadata describing the state changed by applied effects."
+        },
+        "expanded_operations": {
+          "description": "Number of direct (non-hierarchy) operations produced after hierarchy\nexpansion and resolution-mode deduplication. No-match expansion and\ndeduplication can make this smaller than `user_operations`. Because\n`operations_applied` counts effects rather than operations, the two\ncounters are not directly comparable.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "meta": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ResultsMeta"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Audit stamp describing the numeric mode, rounding context, and FX\npolicy under which the scenario was applied."
+        },
+        "operations_applied": {
+          "description": "Number of effects successfully applied to the execution context.\n\nOne user-level operation can produce zero, one, or many effects after\nhierarchy expansion and target resolution. This low-level effect count\nis therefore not an operation-coverage ratio; inspect `changes` and\n`warnings` to determine which targets changed or were skipped.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "time_roll": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RollForwardReport"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Roll-forward report from the Phase 0 `TimeRollForward` operation,\nwhen the scenario contained one. Carries the per-instrument carry\ndecomposition and the new valuation date; instruments whose valuation\nfailed during the roll are also surfaced as\n[`Warning::TimeRollInstrumentFailed`] entries in `warnings`."
+        },
+        "user_operations": {
+          "description": "Number of user-provided `OperationSpec` entries in the scenario\n(before hierarchy expansion and deduplication).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "warnings": {
+          "description": "Structured warnings generated during application (non-fatal).",
+          "items": {
+            "$ref": "#/$defs/Warning"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "operations_applied",
+        "user_operations",
+        "expanded_operations",
+        "changes",
+        "warnings"
+      ],
+      "type": "object"
+    },
     "AsianOption": {
       "additionalProperties": false,
       "description": "Asian option instrument.\n\nAsian options depend on the average price over a period rather than\njust the terminal price. Supports both call and put options with\narithmetic or geometric averaging.\n\n# Averaging Methods\n\n- **Arithmetic**: `A = (1/n) × Σ S(t_i)` - Market standard, approximated via Turnbull-Wakeman\n- **Geometric**: `G = [Π S(t_i)]^(1/n)` - Closed-form solution available (Kemna-Vorst)\n\n# Fixing Dates and Business Day Conventions\n\n**Important**: The `fixing_dates` field expects dates that have already been adjusted\nfor business day conventions. In production use, callers should:\n\n1. Generate the schedule of observation dates (e.g., monthly end-of-month)\n2. Apply the appropriate business day convention (typically Modified Following)\n3. Adjust for the relevant holiday calendar (based on underlying asset's market)\n\nCommon conventions by market:\n- **US Equity (SPX)**: NYSE calendar, Modified Following\n- **FX Options**: Joint calendar of currency pair, Modified Following\n- **Commodities**: Exchange-specific calendar\n\nThe number of fixing dates directly affects the averaging calculation and pricing.\nTypical configurations:\n- Daily averaging: ~252 dates per year (trading days)\n- Weekly averaging: ~52 dates per year\n- Monthly averaging: 12 dates per year (typically month-end)\n\n# Pricing Models\n\n| Averaging | Model | Accuracy |\n|-----------|-------|----------|\n| Geometric | Kemna-Vorst (1990) | Exact closed-form |\n| Arithmetic | Turnbull-Wakeman (1991) | ~1% vs Monte Carlo |\n| Either | Monte Carlo | Configurable accuracy |",
@@ -27728,14 +27793,6 @@
   "description": "Scenario application result: mutated market, model and instruments with the report.",
   "examples": [
     {
-      "changes": {
-        "all_dirty": false,
-        "as_of_changed": false,
-        "changed_instrument_indices": [],
-        "market_targets": [],
-        "portfolio_shape_changed": false
-      },
-      "expanded_operations": 1,
       "market": {
         "collateral": {},
         "credit_indices": [],
@@ -27751,37 +27808,37 @@
         "surfaces": [],
         "vol_cubes": []
       },
-      "meta": {
-        "fx_policy_applied": null,
-        "numeric_mode": "f64",
-        "rounding": {
-          "ingest_scale_by_currency": {},
-          "mode": "bankers",
-          "output_scale_by_currency": {},
-          "tolerances": {
-            "generic_epsilon": 1e-10,
-            "rate_epsilon": 1e-12
-          },
-          "version": 1
+      "report": {
+        "changes": {
+          "all_dirty": false,
+          "as_of_changed": false,
+          "changed_instrument_indices": [],
+          "market_targets": [],
+          "portfolio_shape_changed": false
         },
-        "version": "0.9.0"
-      },
-      "operations_applied": 1,
-      "user_operations": 1,
-      "warnings": []
+        "expanded_operations": 1,
+        "meta": {
+          "fx_policy_applied": null,
+          "numeric_mode": "f64",
+          "rounding": {
+            "ingest_scale_by_currency": {},
+            "mode": "bankers",
+            "output_scale_by_currency": {},
+            "tolerances": {
+              "generic_epsilon": 1e-10,
+              "rate_epsilon": 1e-12
+            },
+            "version": 1
+          },
+          "version": "0.9.0"
+        },
+        "operations_applied": 1,
+        "user_operations": 1,
+        "warnings": []
+      }
     }
   ],
   "properties": {
-    "changes": {
-      "$ref": "#/$defs/ScenarioChangeManifest",
-      "description": "Authoritative metadata describing the state changed by applied effects."
-    },
-    "expanded_operations": {
-      "description": "Number of expanded operations the engine attempted.",
-      "format": "uint",
-      "minimum": 0,
-      "type": "integer"
-    },
     "instruments": {
       "description": "Mutated instruments in input order, encoded as canonical envelopes.\nAbsent when no inventory was supplied; an empty inventory stays empty.",
       "items": {
@@ -27795,58 +27852,17 @@
     "market": {
       "description": "Mutated market context."
     },
-    "meta": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/ResultsMeta"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Audit stamp copied from the report."
-    },
     "model": {
       "description": "Mutated financial model, when a model was supplied."
     },
-    "operations_applied": {
-      "description": "Number of effects successfully applied.",
-      "format": "uint",
-      "minimum": 0,
-      "type": "integer"
-    },
-    "time_roll": {
-      "anyOf": [
-        {
-          "$ref": "#/$defs/RollForwardReport"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Roll-forward report, when the scenario contained a time-roll operation."
-    },
-    "user_operations": {
-      "description": "Number of user-provided operations before expansion.",
-      "format": "uint",
-      "minimum": 0,
-      "type": "integer"
-    },
-    "warnings": {
-      "description": "Structured warnings produced while applying the scenario.",
-      "items": {
-        "$ref": "#/$defs/Warning"
-      },
-      "type": "array"
+    "report": {
+      "$ref": "#/$defs/ApplicationReport",
+      "description": "Canonical application counters, change manifest, warnings and policy stamp."
     }
   },
   "required": [
     "market",
-    "operations_applied",
-    "user_operations",
-    "expanded_operations",
-    "changes",
-    "warnings"
+    "report"
   ],
   "title": "ApplicationEnvelope",
   "type": "object"

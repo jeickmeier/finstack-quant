@@ -7,15 +7,6 @@ use pyo3::types::PyAny;
 
 use super::operation_spec::PyOperationSpec;
 
-fn enum_label<T: serde::Serialize>(value: &T) -> PyResult<String> {
-    match serde_json::to_value(value).map_err(display_to_py)? {
-        serde_json::Value::String(label) => Ok(label),
-        _ => Err(crate::errors::value_error(
-            "scenario enum did not serialize to a string",
-        )),
-    }
-}
-
 fn parse_resolution_mode(
     value: &str,
 ) -> PyResult<finstack_quant_core::market_data::hierarchy::ResolutionMode> {
@@ -189,13 +180,15 @@ impl PyScenarioSpec {
     /// Hierarchy conflict policy as its canonical snake-case label.
     #[getter]
     fn resolution_mode(&self) -> PyResult<String> {
-        enum_label(&self.inner.resolution_mode)
+        finstack_quant_core::wire::serde_label(&self.inner.resolution_mode)
+            .map_err(crate::errors::core_to_py)
     }
 
     /// ParCDS hazard delivery as its canonical snake-case label.
     #[getter]
     fn hazard_bump_mode(&self) -> PyResult<String> {
-        enum_label(&self.inner.hazard_bump_mode)
+        finstack_quant_core::wire::serde_label(&self.inner.hazard_bump_mode)
+            .map_err(crate::errors::core_to_py)
     }
 
     /// Validate the scenario using the canonical Rust rules.
@@ -316,7 +309,13 @@ impl PyTemplateMetadata {
     /// Canonical snake-case asset-class labels affected by the scenario.
     #[getter]
     fn asset_classes(&self) -> PyResult<Vec<String>> {
-        self.inner.asset_classes.iter().map(enum_label).collect()
+        self.inner
+            .asset_classes
+            .iter()
+            .map(|value| {
+                finstack_quant_core::wire::serde_label(value).map_err(crate::errors::core_to_py)
+            })
+            .collect()
     }
 
     /// Freeform discovery tags.
@@ -328,7 +327,8 @@ impl PyTemplateMetadata {
     /// Canonical snake-case severity label.
     #[getter]
     fn severity(&self) -> PyResult<String> {
-        enum_label(&self.inner.severity)
+        finstack_quant_core::wire::serde_label(&self.inner.severity)
+            .map_err(crate::errors::core_to_py)
     }
 
     /// Component identifiers in deterministic build order.

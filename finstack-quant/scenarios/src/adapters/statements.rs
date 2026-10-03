@@ -1,37 +1,13 @@
 //! Statement shock and rate binding adapters.
 
-use crate::adapters::traits::ScenarioEffect;
 use crate::error::{Error, Result};
 use crate::spec::{Compounding, RateBindingSpec};
 use crate::warning::Warning;
 use finstack_quant_core::dates::{BusinessDayConvention, HolidayCalendar, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_statements::evaluator::Evaluator;
-use finstack_quant_statements::types::{AmountOrScalar, NodeId, NodeValueType};
+use finstack_quant_statements::types::{AmountOrScalar, NodeValueType};
 use finstack_quant_statements::FinancialModelSpec;
-
-/// Generate effect for a forecast-percent statement op.
-pub(crate) fn stmt_forecast_percent_effects(node_id: &NodeId, pct: f64) -> Vec<ScenarioEffect> {
-    vec![ScenarioEffect::StmtForecastPercent {
-        node_id: node_id.clone(),
-        pct,
-    }]
-}
-
-/// Generate effect for a forecast-assign statement op.
-pub(crate) fn stmt_forecast_assign_effects(node_id: &NodeId, value: f64) -> Vec<ScenarioEffect> {
-    vec![ScenarioEffect::StmtForecastAssign {
-        node_id: node_id.clone(),
-        value,
-    }]
-}
-
-/// Generate effect for a rate-binding op.
-pub(crate) fn rate_binding_effects(binding: &RateBindingSpec) -> Vec<ScenarioEffect> {
-    vec![ScenarioEffect::RateBinding {
-        binding: binding.clone(),
-    }]
-}
 
 fn with_node_values_mut<F>(model: &mut FinancialModelSpec, node_id: &str, mut f: F) -> Result<bool>
 where

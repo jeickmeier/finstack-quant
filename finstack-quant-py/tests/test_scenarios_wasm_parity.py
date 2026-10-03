@@ -26,6 +26,7 @@ from finstack_quant.scenarios import (
     TenorMatchMode,
     TimeRollMode,
     compute_horizon_return,
+    parallel_bp_many,
 )
 
 GOLDEN: dict[str, Any] = json.loads((Path(__file__).parent / "data" / "scenarios_wasm_parity.json").read_text())
@@ -61,7 +62,8 @@ def wire(value: Any) -> Any:
 
 @pytest.mark.parametrize("case", GOLDEN["constructors"], ids=lambda case: case["py"])
 def test_operation_constructors_match_the_shared_golden(case: dict[str, Any]) -> None:
-    built = getattr(OperationSpec, case["py"])(*python_args(case["py"], case["args"]))
+    factory = parallel_bp_many if case["py"] == "parallel_bp_many" else getattr(OperationSpec, case["py"])
+    built = factory(*python_args(case["py"], case["args"]))
     assert wire(built) == case["expected"]
     if not isinstance(built, list):
         assert built.requires_instruments() is case["requires_instruments"]
@@ -72,7 +74,7 @@ def test_operation_constructors_match_the_shared_golden(case: dict[str, Any]) ->
 def test_every_operation_constructor_has_a_golden_case() -> None:
     predicates = {"from_json", "to_json", "validate", "requires_instruments", "mutates_instruments"}
     constructors = {name for name in dir(OperationSpec) if not name.startswith("_")} - predicates - {"kind"}
-    assert constructors == {case["py"] for case in GOLDEN["constructors"]}
+    assert constructors == {case["py"] for case in GOLDEN["constructors"]} - {"parallel_bp_many"}
 
 
 @pytest.mark.parametrize("case", GOLDEN["invalid_operations"], ids=lambda case: case["operation"]["kind"])

@@ -5,7 +5,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_scenarios::spec::OperationSpec;
 use finstack_quant_statements::types::NodeId;
 use pyo3::prelude::*;
-use pyo3::types::{PyList, PyType};
+use pyo3::types::PyType;
 
 use super::helpers::{
     extract_attrs, extract_curve_kind, extract_hierarchy_target, extract_tenor_match_mode,
@@ -51,7 +51,7 @@ pub struct PyOperationSpec {
 }
 
 impl PyOperationSpec {
-    fn wrap(inner: OperationSpec) -> Self {
+    pub(crate) fn from_inner(inner: OperationSpec) -> Self {
         Self { inner }
     }
 }
@@ -70,14 +70,18 @@ impl PyOperationSpec {
     ) -> PyResult<Self> {
         let base = parse_currency(base)?;
         let quote = parse_currency(quote)?;
-        Ok(Self::wrap(OperationSpec::MarketFxPct { base, quote, pct }))
+        Ok(Self::from_inner(OperationSpec::MarketFxPct {
+            base,
+            quote,
+            pct,
+        }))
     }
 
     /// Equity price percent shock applied to every identifier in ``ids``.
     #[classmethod]
     #[pyo3(signature = (ids, pct))]
     fn equity_price_pct(_cls: &Bound<'_, PyType>, ids: Vec<String>, pct: f64) -> Self {
-        Self::wrap(OperationSpec::EquityPricePct { ids, pct })
+        Self::from_inner(OperationSpec::EquityPricePct { ids, pct })
     }
 
     /// Instrument price percent shock by exact attribute match.
@@ -92,71 +96,51 @@ impl PyOperationSpec {
         attrs: &Bound<'_, PyAny>,
         pct: f64,
     ) -> PyResult<Self> {
-        Ok(Self::wrap(OperationSpec::InstrumentPricePctByAttr {
+        Ok(Self::from_inner(OperationSpec::InstrumentPricePctByAttr {
             attrs: extract_attrs(attrs)?,
             pct,
         }))
     }
 
-    /// Parallel basis-point shift on a curve (percent of forward for
-    /// ``CurveKind.commodity()``).
+    /// Construct one parallel basis-point shift (percent of forward for commodity curves).
     ///
     /// Parameters
     /// ----------
     /// curve_kind : CurveKind | str
-    ///     Curve family (``"discount"``, ``"forward"``, ``"par_cds"``,
-    ///     ``"inflation"``, ``"commodity"``).
-    /// curve_id : str | list[str]
-    ///     One curve identifier, or several: a list expands to one operation
-    ///     per identifier and the method returns ``list[OperationSpec]``.
+    ///     Target curve family; accepts the typed wrapper or canonical wire label.
+    /// curve_id : str
+    ///     Identifier of the single curve to shock.
     /// bp : float
-    ///     Additive shift in basis points (percent of forward for commodity
-    ///     curves).
+    ///     Additive basis points; percent of forward for commodity curves.
     /// discount_curve_id : str | None
-    ///     Discount curve used when re-bootstrapping shocked ParCDS quotes.
+    ///     Discount curve used to re-bootstrap ParCDS quotes; omit for Rust resolution.
     ///
     /// Returns
     /// -------
-    /// OperationSpec | list[OperationSpec]
-    ///     A single operation for a ``str`` curve id, a list for a list.
+    /// OperationSpec
+    ///     Single parallel-shift operation; use parallel_bp_many for a batch.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the curve family label is unknown.
+    /// TypeError
+    ///     If curve_id is not a string.
     #[classmethod]
     #[pyo3(signature = (curve_kind, curve_id, bp, discount_curve_id=None))]
-    fn curve_parallel_bp<'py>(
-        _cls: &Bound<'py, PyType>,
-        curve_kind: &Bound<'py, PyAny>,
-        curve_id: &Bound<'py, PyAny>,
+    fn curve_parallel_bp(
+        _cls: &Bound<'_, PyType>,
+        curve_kind: &Bound<'_, PyAny>,
+        curve_id: &str,
         bp: f64,
         discount_curve_id: Option<String>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        let py = curve_kind.py();
-        let curve_kind = extract_curve_kind(curve_kind)?;
-        let discount_curve_id = discount_curve_id.map(CurveId::from);
-        if let Ok(single) = curve_id.extract::<String>() {
-            let op = OperationSpec::CurveParallelBp {
-                curve_kind,
-                curve_id: CurveId::from(single.as_str()),
-                discount_curve_id,
-                bp,
-            };
-            return Ok(Bound::new(py, Self::wrap(op))?.into_any());
-        }
-        let ids: Vec<String> = curve_id.extract().map_err(|_| {
-            crate::errors::value_error(format!(
-                "curve_id must be a str or a list of str; got {}",
-                curve_id.get_type()
-            ))
-        })?;
-        let ops = finstack_quant_scenarios::ScenarioSpec::parallel_bp_many(
-            curve_kind,
-            ids.iter().map(String::as_str),
+    ) -> PyResult<Self> {
+        Ok(Self::from_inner(OperationSpec::CurveParallelBp {
+            curve_kind: extract_curve_kind(curve_kind)?,
+            curve_id: CurveId::from(curve_id),
+            discount_curve_id: discount_curve_id.map(CurveId::from),
             bp,
-            discount_curve_id,
-        );
-        let items = ops
-            .into_iter()
-            .map(|op| Bound::new(py, Self::wrap(op)).map(Bound::into_any))
-            .collect::<PyResult<Vec<_>>>()?;
-        Ok(PyList::new(py, items)?.into_any())
+        }))
     }
 
     /// Node-level basis-point shifts on a curve.
@@ -177,7 +161,7 @@ impl PyOperationSpec {
             .map(extract_tenor_match_mode)
             .transpose()?
             .unwrap_or_default();
-        Ok(Self::wrap(OperationSpec::CurveNodeBp {
+        Ok(Self::from_inner(OperationSpec::CurveNodeBp {
             curve_kind: extract_curve_kind(curve_kind)?,
             curve_id: CurveId::from(curve_id),
             discount_curve_id: discount_curve_id.map(CurveId::from),
@@ -190,7 +174,7 @@ impl PyOperationSpec {
     #[classmethod]
     #[pyo3(signature = (curve_id, points))]
     fn vol_index_parallel_pts(_cls: &Bound<'_, PyType>, curve_id: &str, points: f64) -> Self {
-        Self::wrap(OperationSpec::VolIndexParallelPts {
+        Self::from_inner(OperationSpec::VolIndexParallelPts {
             curve_id: CurveId::from(curve_id),
             points,
         })
@@ -212,7 +196,7 @@ impl PyOperationSpec {
             .map(extract_tenor_match_mode)
             .transpose()?
             .unwrap_or_default();
-        Ok(Self::wrap(OperationSpec::VolIndexNodePts {
+        Ok(Self::from_inner(OperationSpec::VolIndexNodePts {
             curve_id: CurveId::from(curve_id),
             nodes,
             match_mode,
@@ -224,7 +208,7 @@ impl PyOperationSpec {
     #[classmethod]
     #[pyo3(signature = (surface_id, points))]
     fn base_corr_parallel_pts(_cls: &Bound<'_, PyType>, surface_id: &str, points: f64) -> Self {
-        Self::wrap(OperationSpec::BaseCorrParallelPts {
+        Self::from_inner(OperationSpec::BaseCorrParallelPts {
             surface_id: CurveId::from(surface_id),
             points,
         })
@@ -241,7 +225,7 @@ impl PyOperationSpec {
         points: f64,
         detachment_bp: Option<Vec<i32>>,
     ) -> Self {
-        Self::wrap(OperationSpec::BaseCorrBucketPts {
+        Self::from_inner(OperationSpec::BaseCorrBucketPts {
             surface_id: CurveId::from(surface_id),
             detachment_bp,
             points,
@@ -252,7 +236,7 @@ impl PyOperationSpec {
     #[classmethod]
     #[pyo3(signature = (vol_surface_id, pct))]
     fn vol_surface_parallel_pct(_cls: &Bound<'_, PyType>, vol_surface_id: &str, pct: f64) -> Self {
-        Self::wrap(OperationSpec::VolSurfaceParallelPct {
+        Self::from_inner(OperationSpec::VolSurfaceParallelPct {
             vol_surface_id: CurveId::from(vol_surface_id),
             pct,
         })
@@ -269,7 +253,7 @@ impl PyOperationSpec {
         tenors: Option<Vec<String>>,
         strikes: Option<Vec<f64>>,
     ) -> Self {
-        Self::wrap(OperationSpec::VolSurfaceBucketPct {
+        Self::from_inner(OperationSpec::VolSurfaceBucketPct {
             vol_surface_id: CurveId::from(vol_surface_id),
             tenors,
             strikes,
@@ -281,7 +265,7 @@ impl PyOperationSpec {
     #[classmethod]
     #[pyo3(signature = (node_id, pct))]
     fn stmt_forecast_percent(_cls: &Bound<'_, PyType>, node_id: &str, pct: f64) -> Self {
-        Self::wrap(OperationSpec::StmtForecastPercent {
+        Self::from_inner(OperationSpec::StmtForecastPercent {
             node_id: NodeId::from(node_id),
             pct,
         })
@@ -291,7 +275,7 @@ impl PyOperationSpec {
     #[classmethod]
     #[pyo3(signature = (node_id, value))]
     fn stmt_forecast_assign(_cls: &Bound<'_, PyType>, node_id: &str, value: f64) -> Self {
-        Self::wrap(OperationSpec::StmtForecastAssign {
+        Self::from_inner(OperationSpec::StmtForecastAssign {
             node_id: NodeId::from(node_id),
             value,
         })
@@ -301,7 +285,7 @@ impl PyOperationSpec {
     #[classmethod]
     #[pyo3(signature = (binding))]
     fn rate_binding(_cls: &Bound<'_, PyType>, binding: PyRef<'_, PyRateBindingSpec>) -> Self {
-        Self::wrap(OperationSpec::RateBinding {
+        Self::from_inner(OperationSpec::RateBinding {
             binding: binding.inner.clone(),
         })
     }
@@ -315,7 +299,7 @@ impl PyOperationSpec {
         attrs: &Bound<'_, PyAny>,
         bp: f64,
     ) -> PyResult<Self> {
-        Ok(Self::wrap(OperationSpec::InstrumentSpreadBpByAttr {
+        Ok(Self::from_inner(OperationSpec::InstrumentSpreadBpByAttr {
             attrs: extract_attrs(attrs)?,
             bp,
         }))
@@ -331,7 +315,7 @@ impl PyOperationSpec {
         pct: f64,
     ) -> PyResult<Self> {
         let instrument_types = parse_instrument_types(instrument_types)?;
-        Ok(Self::wrap(OperationSpec::InstrumentPricePctByType {
+        Ok(Self::from_inner(OperationSpec::InstrumentPricePctByType {
             instrument_types,
             pct,
         }))
@@ -346,7 +330,7 @@ impl PyOperationSpec {
         bp: f64,
     ) -> PyResult<Self> {
         let instrument_types = parse_instrument_types(instrument_types)?;
-        Ok(Self::wrap(OperationSpec::InstrumentSpreadBpByType {
+        Ok(Self::from_inner(OperationSpec::InstrumentSpreadBpByType {
             instrument_types,
             bp,
         }))
@@ -357,7 +341,7 @@ impl PyOperationSpec {
     #[classmethod]
     #[pyo3(signature = (delta_pts))]
     fn asset_correlation_pts(_cls: &Bound<'_, PyType>, delta_pts: f64) -> Self {
-        Self::wrap(OperationSpec::AssetCorrelationPts { delta_pts })
+        Self::from_inner(OperationSpec::AssetCorrelationPts { delta_pts })
     }
 
     /// Structured-credit prepay/default correlation shock in decimal
@@ -365,7 +349,7 @@ impl PyOperationSpec {
     #[classmethod]
     #[pyo3(signature = (delta_pts))]
     fn prepay_default_correlation_pts(_cls: &Bound<'_, PyType>, delta_pts: f64) -> Self {
-        Self::wrap(OperationSpec::PrepayDefaultCorrelationPts { delta_pts })
+        Self::from_inner(OperationSpec::PrepayDefaultCorrelationPts { delta_pts })
     }
 
     /// Hierarchy-targeted parallel curve shift (basis points; percent of
@@ -382,7 +366,7 @@ impl PyOperationSpec {
         bp: f64,
         discount_curve_id: Option<String>,
     ) -> PyResult<Self> {
-        Ok(Self::wrap(OperationSpec::HierarchyCurveParallelBp {
+        Ok(Self::from_inner(OperationSpec::HierarchyCurveParallelBp {
             curve_kind: extract_curve_kind(curve_kind)?,
             target: extract_hierarchy_target(target)?,
             bp,
@@ -399,10 +383,12 @@ impl PyOperationSpec {
         target: &Bound<'_, PyAny>,
         pct: f64,
     ) -> PyResult<Self> {
-        Ok(Self::wrap(OperationSpec::HierarchyVolSurfaceParallelPct {
-            target: extract_hierarchy_target(target)?,
-            pct,
-        }))
+        Ok(Self::from_inner(
+            OperationSpec::HierarchyVolSurfaceParallelPct {
+                target: extract_hierarchy_target(target)?,
+                pct,
+            },
+        ))
     }
 
     /// Hierarchy-targeted equity price percent shift. ``target`` is a
@@ -414,7 +400,7 @@ impl PyOperationSpec {
         target: &Bound<'_, PyAny>,
         pct: f64,
     ) -> PyResult<Self> {
-        Ok(Self::wrap(OperationSpec::HierarchyEquityPricePct {
+        Ok(Self::from_inner(OperationSpec::HierarchyEquityPricePct {
             target: extract_hierarchy_target(target)?,
             pct,
         }))
@@ -429,10 +415,12 @@ impl PyOperationSpec {
         target: &Bound<'_, PyAny>,
         points: f64,
     ) -> PyResult<Self> {
-        Ok(Self::wrap(OperationSpec::HierarchyBaseCorrParallelPts {
-            target: extract_hierarchy_target(target)?,
-            points,
-        }))
+        Ok(Self::from_inner(
+            OperationSpec::HierarchyBaseCorrParallelPts {
+                target: extract_hierarchy_target(target)?,
+                points,
+            },
+        ))
     }
 
     /// Time-roll the valuation horizon forward by ``period`` (a tenor such as
@@ -449,7 +437,7 @@ impl PyOperationSpec {
         roll_mode: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
         let roll_mode = roll_mode.map(extract_time_roll_mode).transpose()?;
-        Ok(Self::wrap(OperationSpec::time_roll_forward(
+        Ok(Self::from_inner(OperationSpec::time_roll_forward(
             period,
             Some(apply_shocks),
             roll_mode,

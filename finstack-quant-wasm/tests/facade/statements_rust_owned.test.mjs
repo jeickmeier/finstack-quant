@@ -212,12 +212,12 @@ const EMPTY_MARKET = {
 
 test('every model entry point applies the Rust semantic validation', () => {
   const empty = { id: 'empty', schema_version: 1, periods: [], nodes: {} };
-  const spec = scenarios.buildScenarioSpec('noop', []);
+  const spec = scenarios.parseScenarioSpec({ id: 'noop', operations: [] });
   for (const call of [
     () => statements.validateFinancialModelJson(empty),
     () => statements.modelNodeIds(empty),
     () => new sa.DependencyTracer(empty).dependencyTree('x'),
-    () => scenarios.applyScenario(spec, EMPTY_MARKET, empty, '2025-01-01'),
+    () => scenarios.applyScenario(spec, EMPTY_MARKET, '2025-01-01', empty),
   ]) {
     assert.throws(call, (e) => e.kind === 'validation' && /at least one period/.test(e.message));
   }

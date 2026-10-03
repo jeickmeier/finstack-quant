@@ -53,7 +53,7 @@ ENTRY_SHAPES: list[tuple[str, str, str]] = [
     ("finstack_quant.scenarios", "build_template_component", "wrapper"),
     ("finstack_quant.scenarios", "list_builtin_template_metadata", "list"),
     ("finstack_quant.scenarios", "apply_scenario", "wrapper"),
-    ("finstack_quant.scenarios", "apply_scenario_to_market", "wrapper"),
+    ("finstack_quant.scenarios", "parallel_bp_many", "list"),
     # statements analytics
     ("finstack_quant.statements_analytics", "generate_tornado_entries", "list"),
     ("finstack_quant.statements_analytics", "run_checks", "wrapper"),

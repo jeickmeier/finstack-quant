@@ -137,7 +137,7 @@ valuation.covenants = undefined;
 valuation.meta = {};
 void [roundingMode, covenantReports, explanation];
 
-const scenarioSpec = scenarios.buildScenarioSpec('metadata', []);
+const scenarioSpec = scenarios.parseScenarioSpec({ id: 'metadata', operations: [] });
 const scenarioName: string | null | undefined = scenarioSpec.name;
 scenarioSpec.name = null;
 scenarioSpec.description = null;

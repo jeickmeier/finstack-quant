@@ -913,7 +913,7 @@
       "finstack_quant.scenarios.CurveKind",
       "finstack_quant.scenarios.OperationSpec",
       "finstack_quant.scenarios.ScenarioSpec",
-      "finstack_quant.scenarios.apply_scenario_to_market",
+      "finstack_quant.scenarios.apply_scenario",
       "finstack_quant.valuations.instruments.price_instrument"
     ],
     "models": [

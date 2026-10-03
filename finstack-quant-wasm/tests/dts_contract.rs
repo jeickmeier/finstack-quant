@@ -727,7 +727,7 @@ fn scenarios_dts_matches_structured_surface() {
     assert!(declares_type(&dts, "ApplicationEnvelope"));
     assert!(
         interface_block(&generated_types("scenarios"), "ApplicationEnvelope")
-            .contains("warnings: Warning[];")
+            .contains("report: ApplicationReport;")
     );
     assert!(contains_ignoring_ws(
         &dts,
@@ -740,22 +740,13 @@ fn scenarios_dts_matches_structured_surface() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "applyScenario(scenarioJson: JsonInput, marketJson: JsonInput, modelJson: JsonInput, asOf: string, instrumentsJson?: JsonInput, configJson?: JsonInput): ApplicationEnvelope;",
+        "applyScenario(scenarioJson: JsonInput, marketJson: JsonInput, asOf: string, modelJson?: JsonInput, instrumentsJson?: JsonInput, configJson?: JsonInput): ApplicationEnvelope;",
     ));
-    assert!(contains_ignoring_ws(
-        &dts,
-        "applyScenarioToMarket(scenarioJson: JsonInput, marketJson: JsonInput, asOf: string, instrumentsJson?: JsonInput, configJson?: JsonInput): ApplicationEnvelope;",
-    ));
-    // `priority` mirrors the Rust serde default (0) and the Python keyword
-    // default, so it must stay optional.
-    assert!(contains_ignoring_ws(
-        &dts,
-        "buildScenarioSpec(id: string, operations: OperationSpec[], name?: string, description?: string, priority?: number, resolutionMode?: 'most_specific_wins' | 'cumulative', hazardBumpMode?: 'solve_to_par' | 'first_order_shift'): ScenarioSpec;",
-    ));
+    assert!(!dts.contains("buildScenarioSpec("));
     // Free-function twins of the Python OperationSpec / HorizonResult members:
     // the omitted trailing arguments resolve to the Rust defaults.
     for signature in [
-        "operationSpecCurveParallelBp(curveKind: CurveKind, curveId: string | string[], bp: number, discountCurveId?: string): OperationSpec | OperationSpec[];",
+        "operationSpecCurveParallelBp(curveKind: CurveKind, curveId: string, bp: number, discountCurveId?: string): OperationSpec;",
         "operationSpecTimeRollForward(period: string, applyShocks?: boolean, rollMode?: TimeRollMode): OperationSpec;",
         "scenarioSpecWithHazardBumpMode(spec: ScenarioSpec | string, mode: HazardBumpMode): ScenarioSpec;",
         "horizonResultExplainText(result: HorizonReport | HorizonResult | string): string;",

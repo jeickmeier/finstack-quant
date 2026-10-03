@@ -95,41 +95,61 @@ fn generate_effects(
             *pct,
             ctx,
         ),
-        OperationSpec::StmtForecastPercent { node_id, pct } => Ok(
-            adapters::statements::stmt_forecast_percent_effects(node_id, *pct),
-        ),
-        OperationSpec::StmtForecastAssign { node_id, value } => Ok(
-            adapters::statements::stmt_forecast_assign_effects(node_id, *value),
-        ),
-        OperationSpec::RateBinding { binding } => {
-            Ok(adapters::statements::rate_binding_effects(binding))
+        OperationSpec::StmtForecastPercent { node_id, pct } => {
+            Ok(vec![ScenarioEffect::StmtForecastPercent {
+                node_id: node_id.clone(),
+                pct: *pct,
+            }])
         }
+        OperationSpec::StmtForecastAssign { node_id, value } => {
+            Ok(vec![ScenarioEffect::StmtForecastAssign {
+                node_id: node_id.clone(),
+                value: *value,
+            }])
+        }
+        OperationSpec::RateBinding { binding } => Ok(vec![ScenarioEffect::RateBinding {
+            binding: binding.clone(),
+        }]),
         OperationSpec::InstrumentPricePctByType {
             instrument_types,
             pct,
-        } => Ok(adapters::instruments::instrument_price_by_type_effects(
-            instrument_types,
-            *pct,
-        )),
-        OperationSpec::InstrumentPricePctByAttr { attrs, pct } => Ok(
-            adapters::instruments::instrument_price_by_attr_effects(attrs, *pct),
-        ),
+        } => Ok(vec![ScenarioEffect::InstrumentPriceShock {
+            types: Some(instrument_types.clone()),
+            attrs: None,
+            pct: *pct,
+        }]),
+        OperationSpec::InstrumentPricePctByAttr { attrs, pct } => {
+            Ok(vec![ScenarioEffect::InstrumentPriceShock {
+                types: None,
+                attrs: Some(attrs.clone()),
+                pct: *pct,
+            }])
+        }
         OperationSpec::InstrumentSpreadBpByType {
             instrument_types,
             bp,
-        } => Ok(adapters::instruments::instrument_spread_by_type_effects(
-            instrument_types,
-            *bp,
-        )),
-        OperationSpec::InstrumentSpreadBpByAttr { attrs, bp } => Ok(
-            adapters::instruments::instrument_spread_by_attr_effects(attrs, *bp),
-        ),
-        OperationSpec::AssetCorrelationPts { delta_pts } => {
-            Ok(adapters::asset_corr::asset_corr_effects(*delta_pts))
+        } => Ok(vec![ScenarioEffect::InstrumentSpreadShock {
+            types: Some(instrument_types.clone()),
+            attrs: None,
+            bp: *bp,
+        }]),
+        OperationSpec::InstrumentSpreadBpByAttr { attrs, bp } => {
+            Ok(vec![ScenarioEffect::InstrumentSpreadShock {
+                types: None,
+                attrs: Some(attrs.clone()),
+                bp: *bp,
+            }])
         }
-        OperationSpec::PrepayDefaultCorrelationPts { delta_pts } => Ok(
-            adapters::asset_corr::prepay_default_corr_effects(*delta_pts),
-        ),
+        OperationSpec::AssetCorrelationPts { delta_pts } => {
+            Ok(vec![ScenarioEffect::AssetCorrelationShock {
+                delta_pts: *delta_pts,
+            }])
+        }
+        OperationSpec::PrepayDefaultCorrelationPts { delta_pts } => {
+            Ok(vec![ScenarioEffect::PrepayDefaultCorrelationShock {
+                delta_pts: *delta_pts,
+            }])
+        }
         OperationSpec::TimeRollForward { .. }
         | OperationSpec::HierarchyCurveParallelBp { .. }
         | OperationSpec::HierarchyVolSurfaceParallelPct { .. }

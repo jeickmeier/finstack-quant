@@ -54,7 +54,7 @@ the bindings exercise the typed Rust helpers instead.
 | `wasm_models_liquidity.rs`        | liquidity estimators                                                         |
 | `wasm_models_volatility.rs`       | SABR / SVI parameters, smile and surface helpers                             |
 | `wasm_portfolio.rs`               | every portfolio computation result, asserted to be a plain structured object |
-| `wasm_scenarios.rs`               | template listing and `apply_scenario` / `apply_scenario_to_market`           |
+| `wasm_scenarios.rs`               | template listing and `apply_scenario` with or without a model                |
 | `wasm_statements.rs`              | node enumeration, evaluator, validator, DSL                                  |
 | `wasm_statements_analytics.rs`    | `goal_seek`, `backtest_forecast`, `pl_summary_report_text`                   |
 | `wasm_valuations.rs`              | `list_standard_metrics`, `price_instrument` and the FX classes               |

@@ -970,8 +970,8 @@ async function main() {
     w.composeScenarios(COMPOSE_SCENARIOS);
   });
 
-  bench('scenarios', 'buildScenarioSpec', 4000, () => {
-    w.buildScenarioSpec('composed-inline', [], undefined, undefined, 0);
+  bench('scenarios', 'parseScenarioSpec (object)', 4000, () => {
+    w.parseScenarioSpec({ id: 'composed-inline', operations: [], priority: 0 });
   });
 
   let firstTemplateComponentId = null;
@@ -1003,11 +1003,11 @@ async function main() {
   }
 
   benchTry('scenarios', 'applyScenario', 100, () => {
-    w.applyScenario(SCENARIO_SPEC_JSON, MARKET_CONTEXT_JSON, FINANCIAL_MODEL_JSON, '2024-01-02');
+    w.applyScenario(SCENARIO_SPEC_JSON, MARKET_CONTEXT_JSON, '2024-01-02', FINANCIAL_MODEL_JSON);
   });
 
-  benchTry('scenarios', 'applyScenarioToMarket', 150, () => {
-    w.applyScenarioToMarket(SCENARIO_SPEC_JSON, MARKET_CONTEXT_JSON, '2024-01-02');
+  benchTry('scenarios', 'applyScenario (market only)', 150, () => {
+    w.applyScenario(SCENARIO_SPEC_JSON, MARKET_CONTEXT_JSON, '2024-01-02');
   });
 
   printRows();
