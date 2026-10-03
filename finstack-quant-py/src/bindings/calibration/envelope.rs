@@ -16,7 +16,7 @@ use crate::errors::{core_to_py, serde_json_to_py, value_error};
 use finstack_quant_calibration::api::market_datum::MarketDatum;
 use finstack_quant_calibration::api::prior_market::PriorMarketObject;
 use finstack_quant_calibration::api::schema::{
-    CalibrationEnvelope, CalibrationPlan, CalibrationStep,
+    AttachedStep, CalibrationEnvelope, CalibrationPlan, CalibrationStep,
 };
 use finstack_quant_calibration::api::validate as validate_api;
 use finstack_quant_calibration::quotes::cds::CdsQuote;
@@ -912,7 +912,8 @@ fn extract_prior_market(
 /// remaining optional fields are keyword overrides named exactly as in the
 /// Rust ``StepParams`` wire schema (see ``schema.get("calibration.schema.json")``).
 /// Quotes may be attached directly (``quotes=[...]``): the plan then derives
-/// the quote set from them.
+/// the quote set from them. Attached quotes are part of the step value (Rust
+/// ``AttachedStep``) and travel with its JSON and pickle forms.
 ///
 /// Examples
 /// --------
@@ -929,17 +930,12 @@ fn extract_prior_market(
 )]
 #[derive(Clone)]
 pub struct PyCalibrationStep {
-    pub(crate) inner: CalibrationStep,
-    /// Quotes attached at construction; the plan derives a quote set from them.
-    pub(crate) quotes: Vec<MarketDatum>,
+    pub(crate) inner: AttachedStep,
 }
 
 impl PyCalibrationStep {
-    pub(crate) fn from_inner(inner: CalibrationStep) -> Self {
-        Self {
-            inner,
-            quotes: Vec::new(),
-        }
+    pub(crate) fn from_inner(inner: AttachedStep) -> Self {
+        Self { inner }
     }
 
     /// Shared constructor: `kind` + `id` + explicit fields + `**params`.
@@ -956,12 +952,12 @@ impl PyCalibrationStep {
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
         merge_kwargs(py, &mut fields, params, kind)?;
-        let inner = CalibrationStep::from_wire_fields(kind, id, quote_set.as_deref(), fields)
+        let step = CalibrationStep::from_wire_fields(kind, id, quote_set.as_deref(), fields)
             .map_err(core_to_py)?;
-        Ok(Self {
-            inner,
+        Ok(Self::from_inner(AttachedStep {
+            step,
             quotes: extract_market_data(py, quotes)?,
-        })
+        }))
     }
 }
 
@@ -1676,19 +1672,19 @@ impl PyCalibrationStep {
     /// Step identifier.
     #[getter]
     fn id(&self) -> String {
-        self.inner.id.clone()
+        self.inner.step.id.clone()
     }
 
     /// Name of the quote set this step reads from ``plan.quote_sets``.
     #[getter]
     fn quote_set(&self) -> String {
-        self.inner.quote_set.clone()
+        self.inner.step.quote_set.clone()
     }
 
     /// Step kind (``"discount"``, ``"forward"``, ``"hazard"``, ...).
     #[getter]
     fn kind(&self) -> PyResult<String> {
-        let value = serde_json::to_value(&self.inner.params)
+        let value = serde_json::to_value(&self.inner.step.params)
             .map_err(|e| serde_json_to_py(e, "failed to serialize step params"))?;
         Ok(value
             .get("kind")
@@ -1700,22 +1696,29 @@ impl PyCalibrationStep {
     /// Kind-specific parameters as a dict (including ``kind``).
     #[getter]
     fn params<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.params)
+        serde_to_py(py, &self.inner.step.params)
     }
 
-    /// Identifiers of the quotes attached at construction.
+    /// Identifiers of the quotes attached to this step.
     #[getter]
     fn quote_ids(&self) -> Vec<String> {
-        self.quotes.iter().map(|q| q.id().to_string()).collect()
+        self.inner
+            .quotes
+            .iter()
+            .map(|q| q.id().to_string())
+            .collect()
     }
 
-    /// Quotes attached at construction as ``market_data`` dicts.
+    /// Quotes attached to this step as ``market_data`` dicts.
     #[getter]
     fn quotes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.quotes)
+        serde_to_py(py, &self.inner.quotes)
     }
 
-    /// Serialize the step (without attached quotes) to compact JSON.
+    /// Serialize the step to compact JSON.
+    ///
+    /// The step fields are followed by a ``quotes`` array holding the attached
+    /// quotes; the key is omitted when no quotes are attached.
     ///
     /// Raises
     /// ------
@@ -1726,7 +1729,7 @@ impl PyCalibrationStep {
             .map_err(|e| serde_json_to_py(e, "failed to serialize CalibrationStep"))
     }
 
-    /// Rebuild a step from its wire JSON (``{"id", "quote_set", "kind", ...}``).
+    /// Rebuild a step from its wire JSON (``{"id", "quote_set", "kind", ..., "quotes"}``).
     ///
     /// Raises
     /// ------
@@ -1739,30 +1742,19 @@ impl PyCalibrationStep {
             .map_err(|e| serde_json_to_py(e, "invalid CalibrationStep JSON"))
     }
 
-    /// Pickle support: step JSON plus attached quotes.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String, String))> {
-        let restore = py.get_type::<Self>().getattr("_restore")?;
-        let quotes = serde_json::to_string(&self.quotes)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize attached quotes"))?;
-        Ok((restore, (self.to_json()?, quotes)))
-    }
-
-    /// Pickle helper: rebuild from step JSON and attached-quote JSON.
-    #[staticmethod]
-    fn _restore(step_json: &str, quotes_json: &str) -> PyResult<Self> {
-        let mut step = Self::from_json(step_json)?;
-        step.quotes = serde_json::from_str(quotes_json)
-            .map_err(|e| serde_json_to_py(e, "invalid attached quote JSON"))?;
-        Ok(step)
+    /// Pickle support through the JSON wire format.
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
+        let from_json = py.get_type::<Self>().getattr("from_json")?;
+        reduce_via_json(from_json, self.to_json()?)
     }
 
     fn __repr__(&self) -> String {
         format!(
             "CalibrationStep(id={:?}, kind={:?}, quote_set={:?}, quotes={})",
-            self.inner.id,
+            self.inner.step.id,
             self.kind().unwrap_or_default(),
-            self.inner.quote_set,
-            self.quotes.len()
+            self.inner.step.quote_set,
+            self.inner.quotes.len()
         )
     }
 }
@@ -1771,7 +1763,9 @@ impl PyCalibrationStep {
 ///
 /// Quotes attached to steps are collected into ``quote_sets`` (keyed by each
 /// step's ``quote_set`` name) and carried along as ``market_data`` when the
-/// plan is calibrated or wrapped in a ``CalibrationEnvelope``.
+/// plan is calibrated or wrapped in a ``CalibrationEnvelope``. The plan is held
+/// as a Rust ``CalibrationEnvelope`` without prior market, so the attached
+/// market data is part of its JSON and pickle forms.
 ///
 /// Examples
 /// --------
@@ -1793,17 +1787,15 @@ impl PyCalibrationStep {
 )]
 #[derive(Clone)]
 pub struct PyCalibrationPlan {
-    pub(crate) inner: CalibrationPlan,
-    /// Market data attached through the steps.
-    pub(crate) market_data: Vec<MarketDatum>,
+    /// The plan together with its attached market data; `prior_market` is empty.
+    pub(crate) inner: CalibrationEnvelope,
 }
 
 impl PyCalibrationPlan {
-    pub(crate) fn from_inner(inner: CalibrationPlan) -> Self {
-        Self {
-            inner,
-            market_data: Vec::new(),
-        }
+    /// Wrap an envelope as a plan, dropping its prior market.
+    pub(crate) fn from_inner(mut inner: CalibrationEnvelope) -> Self {
+        inner.prior_market.clear();
+        Self { inner }
     }
 
     /// Wrap this plan (plus attached quotes) into a request envelope.
@@ -1818,9 +1810,13 @@ impl PyCalibrationPlan {
         extra_market_data: Vec<MarketDatum>,
         prior_market: Vec<PriorMarketObject>,
     ) -> PyResult<CalibrationEnvelope> {
-        CalibrationEnvelope::new(self.inner.clone(), self.market_data.clone(), prior_market)
+        let mut envelope = self
+            .inner
+            .clone()
             .with_market_data(extra_market_data)
-            .map_err(|error| super::envelope_error_to_py(py, error))
+            .map_err(|error| super::envelope_error_to_py(py, error))?;
+        envelope.prior_market = prior_market;
+        Ok(envelope)
     }
 }
 
@@ -1878,10 +1874,7 @@ impl PyCalibrationPlan {
                 );
             }
         }
-        let steps = steps
-            .iter()
-            .map(|step| (step.inner.clone(), step.quotes.clone()))
-            .collect();
+        let steps = steps.iter().map(|step| step.inner.clone()).collect();
         let envelope = CalibrationEnvelope::from_attached_steps(
             id.to_string(),
             description,
@@ -1890,37 +1883,37 @@ impl PyCalibrationPlan {
             steps,
         )
         .map_err(|error| super::envelope_error_to_py(py, error))?;
-        Ok(Self {
-            inner: envelope.plan,
-            market_data: envelope.market_data,
-        })
+        Ok(Self::from_inner(envelope))
     }
 
     /// Plan identifier.
     #[getter]
     fn id(&self) -> String {
-        self.inner.id.clone()
+        self.inner.plan.id.clone()
     }
 
     /// Plan description, when set.
     #[getter]
     fn description(&self) -> Option<String> {
-        self.inner.description.clone()
+        self.inner.plan.description.clone()
     }
 
     /// Step identifiers in execution order.
     #[getter]
     fn step_ids(&self) -> Vec<String> {
-        self.inner.steps.iter().map(|s| s.id.clone()).collect()
+        self.inner.plan.steps.iter().map(|s| s.id.clone()).collect()
     }
 
-    /// Typed steps in execution order (without attached quotes).
+    /// Typed steps in execution order, each with its attached quotes.
+    ///
+    /// Rust ``CalibrationEnvelope::attached_steps`` resolves a step's quote set
+    /// against the plan's market data; a step whose set names an id that is
+    /// not in ``market_data`` carries no quotes.
     #[getter]
     fn steps(&self) -> Vec<PyCalibrationStep> {
         self.inner
-            .steps
-            .iter()
-            .cloned()
+            .attached_steps()
+            .into_iter()
             .map(PyCalibrationStep::from_inner)
             .collect()
     }
@@ -1929,7 +1922,7 @@ impl PyCalibrationPlan {
     #[getter]
     fn quote_sets<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
-        for (name, ids) in &self.inner.quote_sets {
+        for (name, ids) in &self.inner.plan.quote_sets {
             let list: Vec<&str> = ids.iter().map(|id| id.as_str()).collect();
             dict.set_item(name, PyList::new(py, list)?)?;
         }
@@ -1939,16 +1932,20 @@ impl PyCalibrationPlan {
     /// Solver settings.
     #[getter]
     fn settings(&self) -> super::config::PyCalibrationConfig {
-        super::config::PyCalibrationConfig::from_inner(self.inner.settings.clone())
+        super::config::PyCalibrationConfig::from_inner(self.inner.plan.settings.clone())
     }
 
-    /// Market data attached through the steps, as ``market_data`` dicts.
+    /// Market data attached to the plan, as ``market_data`` dicts.
     #[getter]
     fn market_data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.market_data)
+        serde_to_py(py, &self.inner.market_data)
     }
 
-    /// Serialize the plan (without attached market data) to compact JSON.
+    /// Serialize the plan and its attached market data to compact JSON.
+    ///
+    /// The wire form is the calibration envelope without prior market:
+    /// ``{"schema": ..., "plan": {...}, "market_data": [...]}``
+    /// (``market_data`` is omitted when empty).
     ///
     /// Raises
     /// ------
@@ -1959,12 +1956,17 @@ impl PyCalibrationPlan {
             .map_err(|e| serde_json_to_py(e, "failed to serialize CalibrationPlan"))
     }
 
-    /// Rebuild a plan from its wire JSON.
+    /// Rebuild a plan from the JSON written by ``to_json``.
+    ///
+    /// Only the shape is checked; quote-set ids that are absent from
+    /// ``market_data`` are reported when the plan is calibrated or validated.
+    /// A ``prior_market`` entry in the JSON is dropped.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If ``json`` is malformed or has unknown fields.
+    ///     If ``json`` is malformed, lacks the schema marker or has unknown
+    ///     fields.
     #[staticmethod]
     fn from_json(json: &str) -> PyResult<Self> {
         serde_json::from_str(json)
@@ -1972,29 +1974,19 @@ impl PyCalibrationPlan {
             .map_err(|e| serde_json_to_py(e, "invalid CalibrationPlan JSON"))
     }
 
-    /// Pickle support: plan JSON plus attached market data.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String, String))> {
-        let restore = py.get_type::<Self>().getattr("_restore")?;
-        let market_data = serde_json::to_string(&self.market_data)
-            .map_err(|e| serde_json_to_py(e, "failed to serialize attached market data"))?;
-        Ok((restore, (self.to_json()?, market_data)))
-    }
-
-    /// Pickle helper: rebuild from plan JSON and attached market-data JSON.
-    #[staticmethod]
-    fn _restore(plan_json: &str, market_data_json: &str) -> PyResult<Self> {
-        let mut plan = Self::from_json(plan_json)?;
-        plan.market_data = serde_json::from_str(market_data_json)
-            .map_err(|e| serde_json_to_py(e, "invalid attached market data JSON"))?;
-        Ok(plan)
+    /// Pickle support through the JSON wire format.
+    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
+        let from_json = py.get_type::<Self>().getattr("from_json")?;
+        reduce_via_json(from_json, self.to_json()?)
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "CalibrationPlan(id={:?}, steps={:?}, quote_sets={})",
-            self.inner.id,
+            "CalibrationPlan(id={:?}, steps={:?}, quote_sets={}, market_data={})",
+            self.inner.plan.id,
             self.step_ids(),
-            self.inner.quote_sets.len()
+            self.inner.plan.quote_sets.len(),
+            self.inner.market_data.len()
         )
     }
 }
@@ -2072,10 +2064,10 @@ impl PyCalibrationEnvelope {
         Ok(value.as_str().unwrap_or_default().to_string())
     }
 
-    /// The calibration plan.
+    /// The calibration plan together with this envelope's market data.
     #[getter]
     fn plan(&self) -> PyCalibrationPlan {
-        PyCalibrationPlan::from_inner(self.inner.plan.clone())
+        PyCalibrationPlan::from_inner(self.inner.clone())
     }
 
     /// Flat market data as ``{"kind": ..., ...}`` dicts.

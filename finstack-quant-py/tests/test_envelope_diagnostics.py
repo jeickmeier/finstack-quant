@@ -272,3 +272,65 @@ def test_envelope_market_data_rejects_a_conflicting_repeat_of_an_attached_quote(
     with pytest.raises(CalibrationEnvelopeError, match="conflicting payloads") as info:
         CalibrationEnvelope(plan, market_data=[RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.06)])
     assert info.value.kind == "conflicting_market_datum"
+
+
+def _attached_plan() -> tuple[CalibrationStep, CalibrationPlan]:
+    quotes = [
+        RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.052),
+        RateQuote.swap("USD-SWAP-2Y", "USD-SOFR-OIS", "2Y", 0.049),
+    ]
+    step = CalibrationStep.discount("USD-OIS", "USD", "2026-05-08", quotes=quotes)
+    return step, CalibrationPlan([step])
+
+
+def test_attached_quotes_survive_step_json_round_trip() -> None:
+    """CFCC-014: a step's attached quotes are part of its Rust value and wire JSON."""
+    step, _ = _attached_plan()
+    restored = CalibrationStep.from_json(step.to_json())
+    assert restored.quote_ids == ["USD-DEP-3M", "USD-SWAP-2Y"]
+    assert restored.quotes == step.quotes
+    assert restored.to_json() == step.to_json()
+    pickled = pickle.loads(pickle.dumps(step))  # noqa: S301 - trusted in-process round trip
+    assert pickled.quotes == step.quotes
+    bare = CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")
+    assert "quotes" not in json.loads(bare.to_json())
+
+
+def test_attached_quotes_survive_plan_json_round_trip() -> None:
+    """CFCC-014: plan JSON carries the attached market data, so the reloaded plan calibrates identically."""
+    _, plan = _attached_plan()
+    restored = CalibrationPlan.from_json(plan.to_json())
+    assert restored.market_data == plan.market_data
+    assert len(restored.market_data) == 2
+    assert restored.quote_sets == plan.quote_sets
+    assert restored.to_json() == plan.to_json()
+    pickled = pickle.loads(pickle.dumps(plan))  # noqa: S301 - trusted in-process round trip
+    assert pickled.market_data == plan.market_data
+    original = calibrate(plan)
+    assert original.success
+    assert calibrate(restored).to_json() == original.to_json()
+
+
+def test_plan_steps_getter_keeps_attached_quotes() -> None:
+    """CFCC-014: ``plan.steps`` returns each step with the quotes its quote set resolves to."""
+    step, plan = _attached_plan()
+    assert plan.steps[0].quote_ids == step.quote_ids
+    assert plan.steps[0].quotes == step.quotes
+    rebuilt = CalibrationPlan(plan.steps, quote_sets=plan.quote_sets)
+    assert rebuilt.market_data == plan.market_data
+    assert calibrate(rebuilt).to_json() == calibrate(plan).to_json()
+    # A set whose ids are not all present in the market data attaches nothing.
+    unresolved = CalibrationPlan(
+        [CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")], quote_sets={"USD-OIS": ["MISSING"]}
+    )
+    assert unresolved.steps[0].quote_ids == []
+
+
+def test_envelope_plan_getter_keeps_market_data() -> None:
+    """CFCC-014: ``CalibrationEnvelope.plan`` returns a plan that still carries the envelope market data."""
+    _, plan = _attached_plan()
+    envelope = CalibrationEnvelope(plan)
+    assert envelope.plan.market_data == plan.market_data
+    assert envelope.plan.steps[0].quote_ids == ["USD-DEP-3M", "USD-SWAP-2Y"]
+    assert calibrate(envelope.plan).to_json() == calibrate(plan).to_json()
+    assert CalibrationEnvelope(envelope.plan).to_json() == envelope.to_json()

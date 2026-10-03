@@ -627,8 +627,8 @@ mod tests {
     use super::*;
     use crate::api::market_datum::{MarketDatum, PriceDatum};
     use crate::api::schema::{
-        CalibrationPlan, CalibrationResultEnvelope, CalibrationSchema, CalibrationStep,
-        DiscountCurveParams, StepParams,
+        AttachedStep, CalibrationPlan, CalibrationResultEnvelope, CalibrationSchema,
+        CalibrationStep, DiscountCurveParams, StepParams,
     };
     use crate::quotes::ids::{Pillar, QuoteId};
     use finstack_quant_core::currency::Currency;
@@ -808,6 +808,10 @@ mod tests {
         })
     }
 
+    fn with_quotes(step: CalibrationStep, quotes: Vec<MarketDatum>) -> AttachedStep {
+        AttachedStep { step, quotes }
+    }
+
     #[test]
     fn from_attached_steps_derives_quote_sets_and_dedups_market_data() {
         let shared = deposit("USD-DEP-1M", 0.05);
@@ -817,9 +821,9 @@ mod tests {
             Default::default(),
             Default::default(),
             vec![
-                (discount_step("a", "set", "USD-OIS"), vec![shared.clone()]),
-                (discount_step("b", "set", "USD-OIS-2"), vec![shared]),
-                (discount_step("c", "other", "USD-OIS-3"), Vec::new()),
+                with_quotes(discount_step("a", "set", "USD-OIS"), vec![shared.clone()]),
+                with_quotes(discount_step("b", "set", "USD-OIS-2"), vec![shared]),
+                with_quotes(discount_step("c", "other", "USD-OIS-3"), Vec::new()),
             ],
         )
         .expect("identical attached quotes are collected once");
@@ -842,11 +846,11 @@ mod tests {
             Default::default(),
             Default::default(),
             vec![
-                (
+                with_quotes(
                     discount_step("a", "set", "USD-OIS"),
                     vec![deposit("Q1", 0.05)],
                 ),
-                (
+                with_quotes(
                     discount_step("b", "set", "USD-OIS-2"),
                     vec![deposit("Q2", 0.05)],
                 ),
@@ -870,11 +874,11 @@ mod tests {
             Default::default(),
             Default::default(),
             vec![
-                (
+                with_quotes(
                     discount_step("a", "set_a", "USD-OIS"),
                     vec![deposit("Q1", 0.05)],
                 ),
-                (
+                with_quotes(
                     discount_step("b", "set_b", "USD-OIS-2"),
                     vec![deposit("Q1", 0.06)],
                 ),
@@ -898,7 +902,7 @@ mod tests {
                 None,
                 Default::default(),
                 Default::default(),
-                vec![(
+                vec![with_quotes(
                     discount_step("a", "set", "USD-OIS"),
                     vec![deposit("Q1", 0.05), deposit("Q2", 0.06)],
                 )],
@@ -919,6 +923,87 @@ mod tests {
             EnvelopeError::ConflictingMarketDatum {
                 id: "Q1".to_string()
             }
+        );
+    }
+
+    #[test]
+    fn attached_steps_inverts_from_attached_steps_and_round_trips_json() {
+        let steps = vec![
+            with_quotes(
+                discount_step("a", "set", "USD-OIS"),
+                vec![deposit("Q1", 0.05), deposit("Q2", 0.06)],
+            ),
+            with_quotes(discount_step("b", "set", "USD-OIS-2"), Vec::new()),
+            with_quotes(discount_step("c", "missing", "USD-OIS-3"), Vec::new()),
+        ];
+        let mut explicit = indexmap::IndexMap::new();
+        explicit.insert("missing".to_string(), vec![QuoteId::new("ABSENT")]);
+        let envelope = CalibrationEnvelope::from_attached_steps(
+            "p".to_string(),
+            None,
+            Default::default(),
+            explicit,
+            steps,
+        )
+        .expect("attached envelope");
+
+        // A non-quote datum sharing a quote id never resolves a quote set.
+        let price = |id: &str| {
+            MarketDatum::Price(PriceDatum {
+                id: id.into(),
+                scalar: MarketScalar::Unitless(1.0),
+            })
+        };
+        let mut envelope = envelope;
+        envelope.market_data.insert(0, price("Q1"));
+        envelope.market_data.push(price("ABSENT"));
+
+        let recovered = envelope.attached_steps();
+        assert!(recovered
+            .iter()
+            .all(|step| step.quotes.iter().all(MarketDatum::is_quote)));
+        let ids = |step: &AttachedStep| -> Vec<String> {
+            step.quotes.iter().map(|q| q.id().to_string()).collect()
+        };
+        assert_eq!(ids(&recovered[0]), ["Q1", "Q2"]);
+        assert_eq!(
+            ids(&recovered[1]),
+            ["Q1", "Q2"],
+            "a step naming the same set carries the same quotes"
+        );
+        assert!(
+            recovered[2].quotes.is_empty(),
+            "a set with an id absent from market_data attaches nothing"
+        );
+
+        // Step wire JSON carries the attached quotes and round-trips.
+        let json = serde_json::to_string(&recovered[0]).expect("serialize attached step");
+        let decoded: AttachedStep = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(ids(&decoded), ["Q1", "Q2"]);
+        assert_eq!(serde_json::to_string(&decoded).expect("serialize"), json);
+        // Without quotes the wire form is exactly the plain step.
+        assert_eq!(
+            serde_json::to_string(&recovered[2]).expect("serialize"),
+            serde_json::to_string(&recovered[2].step).expect("serialize")
+        );
+        // Unknown step fields are still rejected through the flattened step.
+        let mut stray: serde_json::Value = serde_json::from_str(&json).expect("value");
+        stray["not_a_field"] = serde_json::json!(1);
+        assert!(serde_json::from_value::<AttachedStep>(stray).is_err());
+
+        // Rebuilding from the recovered steps and quote sets gives the same envelope.
+        let rebuilt = CalibrationEnvelope::from_attached_steps(
+            envelope.plan.id.clone(),
+            envelope.plan.description.clone(),
+            envelope.plan.settings.clone(),
+            envelope.plan.quote_sets.clone(),
+            recovered,
+        )
+        .expect("rebuilt envelope");
+        envelope.market_data.retain(MarketDatum::is_quote);
+        assert_eq!(
+            serde_json::to_value(&rebuilt).expect("serialize"),
+            serde_json::to_value(&envelope).expect("serialize")
         );
     }
 

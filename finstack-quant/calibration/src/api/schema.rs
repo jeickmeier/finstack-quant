@@ -440,8 +440,9 @@ impl CalibrationEnvelope {
     /// * `quote_sets` - Explicitly named quote sets whose ids must resolve in
     ///   the envelope `market_data`; they take precedence and are merged with
     ///   the sets derived from attached quotes.
-    /// * `steps` - Calibration steps in execution order, each paired with the
-    ///   quotes attached to it (possibly empty).
+    /// * `steps` - Calibration steps in execution order, each carrying the
+    ///   quotes attached to it (possibly empty). [`Self::attached_steps`]
+    ///   recovers them from the assembled envelope.
     ///
     /// # Errors
     ///
@@ -455,13 +456,13 @@ impl CalibrationEnvelope {
         description: Option<String>,
         settings: CalibrationConfig,
         mut quote_sets: IndexMap<String, Vec<QuoteId>>,
-        steps: Vec<(CalibrationStep, Vec<MarketDatum>)>,
+        steps: Vec<AttachedStep>,
     ) -> Result<Self, super::errors::EnvelopeError> {
         use super::errors::EnvelopeError;
         let mut market_data = Vec::new();
         let mut payloads = DatumPayloads::new();
         let mut plan_steps = Vec::with_capacity(steps.len());
-        for (step, quotes) in steps {
+        for AttachedStep { step, quotes } in steps {
             if !quotes.is_empty() {
                 let ids: Vec<QuoteId> = quotes.iter().map(|q| QuoteId::new(q.id())).collect();
                 match quote_sets.get(&step.quote_set) {
@@ -489,6 +490,45 @@ impl CalibrationEnvelope {
             settings,
         };
         Ok(Self::new(plan, market_data, Vec::new()))
+    }
+
+    /// Steps of this envelope's plan, each with the quotes its quote set resolves to.
+    ///
+    /// This is the inverse of [`Self::from_attached_steps`]: a step carries, in
+    /// quote-set order, the quote entries of `market_data` named by
+    /// `plan.quote_sets[step.quote_set]` (non-quote data such as prices never
+    /// resolve a quote id, as in validation). A step carries no quotes when
+    /// its quote set is undefined or names an id with no quote in
+    /// `market_data`, so feeding the result back to
+    /// [`Self::from_attached_steps`] together with `plan.quote_sets` rebuilds
+    /// the same plan and the quote-referenced market data.
+    #[must_use]
+    pub fn attached_steps(&self) -> Vec<AttachedStep> {
+        self.plan
+            .steps
+            .iter()
+            .map(|step| {
+                let quotes = self
+                    .plan
+                    .quote_sets
+                    .get(&step.quote_set)
+                    .and_then(|ids| {
+                        ids.iter()
+                            .map(|id| {
+                                self.market_data
+                                    .iter()
+                                    .find(|datum| datum.is_quote() && datum.id() == id.as_str())
+                                    .cloned()
+                            })
+                            .collect::<Option<Vec<_>>>()
+                    })
+                    .unwrap_or_default();
+                AttachedStep {
+                    step: step.clone(),
+                    quotes,
+                }
+            })
+            .collect()
     }
 
     /// Append market data to this envelope under the attached-quote rule.
@@ -646,6 +686,27 @@ impl<'de> Deserialize<'de> for CalibrationStep {
             params,
         })
     }
+}
+
+/// A calibration step together with the quotes attached to it.
+///
+/// Host builders let a caller attach quotes to a step instead of naming a
+/// quote set by hand; [`CalibrationEnvelope::from_attached_steps`] turns the
+/// attached quotes into `plan.quote_sets` and `market_data`, and
+/// [`CalibrationEnvelope::attached_steps`] recovers them.
+///
+/// On the wire the step fields are flattened and `quotes` is omitted when
+/// empty, so a step without attached quotes serializes exactly like a
+/// [`CalibrationStep`]:
+/// `{"id": ..., "quote_set": ..., "kind": ..., ..., "quotes": [...]}`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AttachedStep {
+    /// The calibration step.
+    #[serde(flatten)]
+    pub step: CalibrationStep,
+    /// Quotes attached to the step, in quote-set order (possibly empty).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub quotes: Vec<MarketDatum>,
 }
 
 /// Polymorphic parameters for different calibration step types.

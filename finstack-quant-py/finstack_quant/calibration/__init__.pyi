@@ -3296,27 +3296,30 @@ class CalibrationStep:
     @property
     def quote_ids(self) -> list[str]:
         """
-        Identifiers of the quotes attached inline to this step.
+        Identifiers of the quotes attached to this step.
 
         This property does not raise.
 
         Returns
         -------
         list[str]
-            Identifiers of the quotes attached inline to this step.
+            Identifiers of the quotes attached to this step, in quote-set
+            order; empty when the step only names a quote set.
         """
 
     @property
     def quotes(self) -> list[Any]:
         """
-        Quotes attached inline to this step, as plain dictionaries.
+        Quotes attached to this step, as plain dictionaries.
 
         This property does not raise.
 
         Returns
         -------
         list[Any]
-            Quotes attached inline to this step, as plain dictionaries.
+            Quotes attached to this step as ``{"kind": ..., ...}`` market-data
+            dictionaries. They are part of the step value and are kept by
+            :meth:`to_json`, :meth:`from_json` and pickle.
         """
 
     def to_json(self) -> str:
@@ -3326,7 +3329,9 @@ class CalibrationStep:
         Returns
         -------
         str
-            Compact JSON encoding of the step definition (without its quotes).
+            Compact JSON encoding of the step: its ``id``, ``quote_set``,
+            ``kind`` and parameters, followed by a ``quotes`` array holding the
+            attached quotes. ``quotes`` is omitted when none are attached.
 
         Raises
         ------
@@ -3347,7 +3352,7 @@ class CalibrationStep:
         Returns
         -------
         CalibrationStep
-            The decoded step, with no inline quotes.
+            The decoded step, including the quotes in its ``quotes`` array.
 
         Raises
         ------
@@ -3356,13 +3361,17 @@ class CalibrationStep:
 
         Examples
         --------
-        >>> from finstack_quant.calibration import CalibrationStep
+        >>> from finstack_quant.calibration import CalibrationStep, RateQuote
+        >>> quotes = [RateQuote.deposit("D3M", "USD-SOFR-OIS", "3M", 0.052)]
+        >>> step = CalibrationStep.discount("USD-OIS", "USD", "2026-05-08", quotes=quotes)
+        >>> CalibrationStep.from_json(step.to_json()).quote_ids
+        ['D3M']
         >>> CalibrationStep.from_json("{")
         Traceback (most recent call last):
         ValueError: ...
         """
 
-    def __reduce__(self) -> tuple[Any, tuple[str, str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
 class CalibrationPlan:
@@ -3457,14 +3466,19 @@ class CalibrationPlan:
     @property
     def steps(self) -> list[CalibrationStep]:
         """
-        The plan's steps in order.
+        The plan's steps in order, each with its attached quotes.
 
         This property does not raise.
 
         Returns
         -------
         list[CalibrationStep]
-            The plan's steps in order.
+            The plan's steps in order. Each step carries the ``market_data``
+            entries named by its quote set (Rust
+            ``CalibrationEnvelope::attached_steps``), so
+            ``CalibrationPlan(plan.steps, quote_sets=plan.quote_sets)`` rebuilds
+            the plan. A step whose quote set names an id that is not in
+            ``market_data`` carries no quotes.
         """
 
     @property
@@ -3494,26 +3508,31 @@ class CalibrationPlan:
         """
 
     @property
-    def market_data(self) -> dict[str, Any]:
+    def market_data(self) -> list[dict[str, Any]]:
         """
-        Market-data payload assembled from the plan's inline quotes.
+        Market data attached to the plan.
 
         This property does not raise.
 
         Returns
         -------
-        dict[str, Any]
-            Market-data payload assembled from the plan's inline quotes.
+        list[dict[str, Any]]
+            Market data attached to the plan as ``{"kind": ..., ...}``
+            dictionaries: the distinct quotes attached to its steps, or the
+            envelope's market data for a plan read from
+            :attr:`CalibrationEnvelope.plan`.
         """
 
     def to_json(self) -> str:
         """
-        Serialize the plan to compact JSON.
+        Serialize the plan and its attached market data to compact JSON.
 
         Returns
         -------
         str
-            Compact JSON encoding of the plan.
+            Compact JSON in the calibration-envelope shape without prior
+            market: ``{"schema": ..., "plan": {...}, "market_data": [...]}``.
+            ``market_data`` is omitted when the plan has none.
 
         Raises
         ------
@@ -3534,22 +3553,31 @@ class CalibrationPlan:
         Returns
         -------
         CalibrationPlan
-            The decoded plan.
+            The decoded plan with its attached market data. Only the shape is
+            checked here; a quote-set id missing from ``market_data`` is
+            reported when the plan is calibrated or validated. A
+            ``prior_market`` entry is dropped.
 
         Raises
         ------
         ValueError
-            If ``json`` is malformed or carries unknown fields.
+            If ``json`` is malformed, lacks the ``schema`` marker or carries
+            unknown fields.
 
         Examples
         --------
-        >>> from finstack_quant.calibration import CalibrationPlan
+        >>> from finstack_quant.calibration import CalibrationPlan, CalibrationStep, RateQuote
+        >>> quotes = [RateQuote.deposit("D3M", "USD-SOFR-OIS", "3M", 0.052)]
+        >>> plan = CalibrationPlan([CalibrationStep.discount("USD-OIS", "USD", "2026-05-08", quotes=quotes)])
+        >>> restored = CalibrationPlan.from_json(plan.to_json())
+        >>> restored.market_data == plan.market_data, restored.steps[0].quote_ids
+        (True, ['D3M'])
         >>> CalibrationPlan.from_json("{")
         Traceback (most recent call last):
         ValueError: ...
         """
 
-    def __reduce__(self) -> tuple[Any, tuple[str, str]]: ...
+    def __reduce__(self) -> tuple[Any, tuple[str]]: ...
     def __repr__(self) -> str: ...
 
 class CalibrationEnvelope:
@@ -3615,14 +3643,16 @@ class CalibrationEnvelope:
     @property
     def plan(self) -> CalibrationPlan:
         """
-        The plan carried by this envelope.
+        The plan carried by this envelope, with the envelope's market data.
 
         This property does not raise.
 
         Returns
         -------
         CalibrationPlan
-            The plan carried by this envelope.
+            The plan together with this envelope's ``market_data`` (the prior
+            market is not part of a plan), so ``calibrate(envelope.plan)``
+            resolves the same quotes as the envelope.
         """
 
     @property
