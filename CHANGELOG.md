@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added
+
+- `models.volatility.implied_vol_bachelier` / `implied_vol_black` (WASM `models.volatility.impliedVolBachelier` / `impliedVolBlack`) bind the Rust undiscounted implied-vol solvers, so a normal-model price (including negative forwards/strikes) can be inverted from Python and JavaScript (MODB-019).
+- SABR: `SabrSmile.strike_from_delta` / `check_no_arbitrage` / `repair_arbitrage`, the `SabrParameters` factories (`normal`, `lognormal`, `shifted_normal`, `shifted_lognormal`, `equity_standard`, `rates_standard`), `SabrParameters.to_json` / `from_json`, and the `SabrCalibrator` getters `tolerance` / `max_iterations` / `shift` / `atm_pinning`, in Python and WASM (camelCase). Python `SabrParameters` also supports `==`, `pickle` and `copy.deepcopy` (MODB-020).
+
 ## [0.9.0] - 2026-10-02
 
 ### Carry and breakeven across coupon fixings (2026-10-01)

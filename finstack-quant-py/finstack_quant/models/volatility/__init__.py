@@ -34,6 +34,8 @@ get_fx_delta_pillar_vols = _volatility.get_fx_delta_pillar_vols
 get_fx_delta_vol = _volatility.get_fx_delta_vol
 get_surface_vol = _volatility.get_surface_vol
 get_surface_vol_clamped = _volatility.get_surface_vol_clamped
+implied_vol_bachelier = _volatility.implied_vol_bachelier
+implied_vol_black = _volatility.implied_vol_black
 materialize_cube_expiry_slice = _volatility.materialize_cube_expiry_slice
 materialize_cube_expiry_slice_normal = _volatility.materialize_cube_expiry_slice_normal
 materialize_cube_tenor_slice = _volatility.materialize_cube_tenor_slice
@@ -66,6 +68,8 @@ __all__ = [
     "get_fx_delta_vol",
     "get_surface_vol",
     "get_surface_vol_clamped",
+    "implied_vol_bachelier",
+    "implied_vol_black",
     "materialize_cube_expiry_slice",
     "materialize_cube_expiry_slice_normal",
     "materialize_cube_tenor_slice",

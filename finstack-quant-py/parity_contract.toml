@@ -652,15 +652,22 @@ python_package = "finstack_quant.models.volatility"
 # takes the serde form of `VolatilityConvention` (`"normal"`, `"lognormal"`,
 # `{"shifted_lognormal": {"shift": s}}`). `delta_to_strike` / `strike_to_delta`
 # have one fixed convention (forward, premium-unadjusted call delta) — there is
-# no delta-convention enum in Rust. Rust-only, deliberately not bound:
+# no delta-convention enum in Rust. The `implied` solvers `implied_vol_black` /
+# `implied_vol_bachelier` are bound under their Rust names (undiscounted price
+# per unit annuity); `models.bs_implied_vol` / `black76_implied_vol` are the
+# discounted lognormal adapters. Rust-only, deliberately not bound:
 # `local_vol` (Dupire surface construction), `heston` / `rough_heston` model
 # helpers (Heston pricing is `models.heston_price` / `models.monte_carlo`),
-# the `implied` solvers (`implied_vol_black` / `implied_vol_bachelier`; hosts use
-# `models.bs_implied_vol` / `black76_implied_vol`), `source` (`VolSource`,
+# `source` (`VolSource`,
 # `materialize_cube_grid`, `measure_vol_surface_shift`,
 # `get_surface_vol_extrapolated`), `sabr_derivatives`
 # (`SabrCalibrationDerivatives`, `SabrMarketData`), the `black` helpers
-# (`d1` / `d2` / `d1_d2` / `*_black76`), `vega_weight`, `SabrVolType`,
+# (`d1` / `d2` / `d1_d2` / `*_black76`), `vega_weight`, `SabrVolType` (and so
+# `SabrModel::vol_type` / `SabrSmile::vol_type` / `implied_volatility_with_type`:
+# the hosts' `implied_vol` returns the beta-dependent vol, documented on each
+# method), `SabrModel::effective_rates` (the shift is on `SabrParameters.shift`),
+# `SabrParameters::{implied_vol_normal, implied_vol_lognormal}` (raw Hagan
+# expansions; hosts use `SabrModel.implied_vol`, which selects the branch),
 # `SabrCalibrationOutcome` and the `*_with_diagnostics` / `*_with_derivatives`
 # / `*_with_atm_pinning` calibrator variants, `ArbitrageCheckConfig` /
 # `check_surface` on a `VolSurface`, and `SviParams::{validate, butterfly_violation}`
@@ -689,6 +696,8 @@ public = [
     "get_fx_delta_vol",
     "get_surface_vol",
     "get_surface_vol_clamped",
+    "implied_vol_bachelier",
+    "implied_vol_black",
     "materialize_cube_expiry_slice",
     "materialize_cube_expiry_slice_normal",
     "materialize_cube_tenor_slice",

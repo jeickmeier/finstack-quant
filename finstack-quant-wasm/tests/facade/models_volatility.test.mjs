@@ -204,3 +204,63 @@ test('canonical volatility state constructors preserve named parameters and opti
     (error) => error.kind === 'validation'
   );
 });
+
+// MODB-019: twin of Python implied_vol_bachelier / implied_vol_black.
+test('implied vol solvers invert Bachelier and undiscounted Black prices', () => {
+  const { impliedVolBachelier, impliedVolBlack } = facade.models.volatility;
+  for (const [forward, strike, isCall] of [
+    [0.03, 0.025, true],
+    [-0.002, -0.001, true],
+    [-0.002, -0.001, false],
+  ]) {
+    const price = facade.models.bachelierPrice(forward, strike, 0.006, 1, isCall);
+    assert.ok(Math.abs(impliedVolBachelier(price, forward, strike, 1, isCall) - 0.006) < 1e-12);
+  }
+  const price = facade.models.black76Price(100, 105, 1, 1, 0.25, true);
+  assert.ok(Math.abs(impliedVolBlack(price, 100, 105, 1, true) - 0.25) < 1e-12);
+  assert.throws(() => impliedVolBlack(0.001, -0.002, -0.001, 1, true), { kind: 'validation' });
+});
+
+// MODB-020: twin of the Python SABR typed-surface additions.
+test('SABR parameters, smile and calibrator expose the Rust members', () => {
+  const { SabrParameters, SabrSmile, SabrCalibrator } = facade.models.volatility;
+  const params = new SabrParameters(0.2, 1.0, 0.3, -0.3, 0.01);
+  const copy = SabrParameters.fromJson(params.toJson());
+  assert.deepEqual(
+    [copy.alpha, copy.beta, copy.nu, copy.rho, copy.shift],
+    [0.2, 1.0, 0.3, -0.3, 0.01]
+  );
+  assert.throws(() => SabrParameters.fromJson('{"alpha":-0.2,"beta":1,"nu":0.3,"rho":0}'), {
+    kind: 'validation',
+  });
+  assert.equal(SabrParameters.equityStandard(0.2, 0.3, -0.2).beta, 1.0);
+  assert.equal(SabrParameters.ratesStandard(0.2, 0.3, -0.2).beta, 0.5);
+  assert.equal(SabrParameters.normal(0.01, 0.3, -0.2).beta, 0.0);
+  assert.equal(SabrParameters.lognormal(0.2, 0.3, -0.2).beta, 1.0);
+  assert.equal(SabrParameters.shiftedNormal(0.01, 0.3, -0.2, 0.02).shift, 0.02);
+  assert.equal(SabrParameters.shiftedLognormal(0.2, 0.3, -0.2, 0.02).shift, 0.02);
+
+  const smile = new SabrSmile(SabrParameters.equityDefault(), 100, 1);
+  assert.ok(smile.strikeFromDelta(0.25, true) > 100);
+  assert.ok(smile.strikeFromDelta(0.25, false) < 100);
+  const strikes = [80, 90, 100, 110, 120];
+  assert.equal(smile.checkNoArbitrage(strikes, 0), undefined);
+  assert.throws(() => smile.checkNoArbitrage([120, 100, 80], 0), { kind: 'validation' });
+  assert.deepEqual(
+    Array.from(smile.repairArbitrage(strikes, 0, 10)),
+    Array.from(smile.generateSmile(strikes))
+  );
+
+  const defaults = new SabrCalibrator();
+  assert.equal(defaults.shift, null);
+  assert.equal(defaults.withShift('auto').shift, 'auto');
+  const calibrator = defaults
+    .withTolerance(1e-8)
+    .withMaxIterations(77)
+    .withShift(0.01)
+    .withAtmPinning(true);
+  assert.deepEqual(
+    [calibrator.tolerance, calibrator.maxIterations, calibrator.shift, calibrator.atmPinning],
+    [1e-8, 77, 0.01, true]
+  );
+});
