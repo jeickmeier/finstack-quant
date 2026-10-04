@@ -44,7 +44,7 @@ The module doc comment in [`mod.rs`](mod.rs) says the module "lives under
 | [`grid.rs`](grid.rs) | `Grid1D` (uniform / sinh-concentrated / user points), `PdeGridError`, `pub(crate)` `find_interval` and `find_nearest` |
 | [`grid2d.rs`](grid2d.rs) | `Grid2D` tensor product, row-major indexing, bilinear interpolation |
 | [`operator.rs`](operator.rs) | `TridiagOperator` assembly, boundary elimination, Thomas solve, `ThomasError` |
-| [`operator2d.rs`](operator2d.rs) | `Operators2D` (per-line directional tridiagonals + cross-derivative coefficients), the monotone upwind switch, `apply_cross_derivative[_into]` |
+| [`operator2d.rs`](operator2d.rs) | `Operators2D` (per-line directional tridiagonals + cross-derivative coefficients), the monotone upwind switch, `apply_cross_derivative` |
 | [`stepper.rs`](stepper.rs) | `TimeStepper` trait, `ThetaStepper`, `RannacherStepper`, the CFL bound, `StepperError` |
 | [`adi.rs`](adi.rs) | `CraigSneydStepper` (Modified Craig-Sneyd), `AdiWorkBuffers`, `fill_boundaries` |
 | [`exercise.rs`](exercise.rs) | `PenaltyExercise`, `ExerciseType::{American, Bermudan}` |
@@ -66,23 +66,15 @@ Implementation submodules are private. The supported surface is explicitly
 re-exported at the `pde` root:
 
 `CraigSneydStepper`, `BoundaryCondition`, `BlackScholesPde`, `HestonPde`,
-`ExerciseType`, `PenaltyExercise`, `Grid1D`, `PdeGridError`, `Grid2D`,
-`TridiagOperator`, `apply_cross_derivative`, `Operators2D`, `PdeProblem1D`,
+`ExerciseError`, `Grid1D`, `PdeGridError`, `Grid2D`, `PdeProblem1D`,
 `PdeProblem2D`, `PdeSolution`, `PdeSolverError`, `Solver1D`, `Solver1DBuilder`,
 `PdeSolution2D`, `PdeSolver2DError`, `Solver2D`, `RannacherStepper`,
 `StepperError`, `ThetaStepper`, and `TimeStepper`.
 
-Work buffers, in-place operator helpers, interval searches, and test-only
-steppers remain internal. The crate root re-exports the smaller set used by
-most valuation engines; advanced solver components remain under `pde::*`.
-
-Outside this directory only `Grid1D`, `Grid2D`, `BlackScholesPde`, `HestonPde`,
-`BoundaryCondition`, `PdeProblem1D`, `Solver1D`, and `Solver2D` are actually
-named. `TridiagOperator`, `Operators2D`, `apply_cross_derivative`,
-`ThetaStepper`, `RannacherStepper`, `PenaltyExercise`, and `ExerciseType` are
-public but reached only through the builders. `apply_cross_derivative` (the
-allocating variant) has no caller at all outside `operator2d`'s own tests — the
-ADI hot path uses `apply_cross_derivative_into`.
+The operators (`TridiagOperator`, `Operators2D`, `apply_cross_derivative`), the
+exercise constraint (`PenaltyExercise`, `ExerciseType`), work buffers, interval
+searches, and test-only steppers are internal; early exercise is configured
+through `Solver1DBuilder::american` / `bermudan`.
 
 ## Grids
 
@@ -114,7 +106,7 @@ domain, or `center` sits far outside it — `sinh_concentrated` returns
 with none of the requested strike resolution.
 
 `Grid2D::new(x, y)` is a tensor product of two `Grid1D`s. Layout is **row-major
-with `y` fastest**: `flat_index(i, j) == i * ny + j`, and `index_2d` inverts it.
+with `y` fastest**: node `(i, j)` is at flat index `i * ny + j`.
 `interpolate(values, x, y)` is bilinear and clamps outside the domain.
 
 ## Boundary conditions
@@ -132,8 +124,8 @@ from the tridiagonal system and folding its contribution into an RHS correction.
 The Neumann form is deliberately one-sided rather than a centered ghost node: a
 centered ghost imposes the derivative at a different location and is wrong on a
 non-uniform grid. It must stay identical to the reconstruction in
-`solver::boundary_value` and `adi::fill_boundaries`, or the interior solve and
-the reported boundary value disagree. `solver::tests::neumann_preserves_linear_profile_on_nonuniform_grid`
+`solver::boundary_value` (shared by the 1D solver and `adi::fill_boundaries`),
+or the interior solve and the reported boundary value disagree. `solver::tests::neumann_preserves_linear_profile_on_nonuniform_grid`
 is the guard.
 
 Both option bridges use `LinearInExp` on their deep-ITM log-spot edges to make
@@ -182,9 +174,9 @@ implicit steps at the terminal condition and Crank-Nicolson thereafter, which
 damps the high-frequency modes a payoff kink injects and which plain CN
 propagates undamped.
 
-`Solver1DBuilder` exposes `grid`, `crank_nicolson`, `implicit`, `rannacher`,
-`american`, `bermudan`, `build`. There is no `explicit` on the builder —
-construct `ThetaStepper::explicit` directly if you need it.
+`Solver1D::builder()` is the only way to obtain a `Solver1DBuilder`, which
+exposes `grid`, `crank_nicolson`, `implicit`, `rannacher`, `american`,
+`bermudan`, `build`. There is no `explicit` on the builder.
 
 ### Stability and failure modes
 
@@ -248,8 +240,8 @@ validated before mutation. The solver builder also rejects malformed payoff
 vectors before pricing starts.
 
 `iterations` defaults to 1 and both builder methods (`american`, `bermudan`)
-hard-code it; the field is `pub`, so raising it requires constructing
-`PenaltyExercise` by hand. The doc comment on the struct describing the solver
+hard-code it; `PenaltyExercise` is internal, so it cannot be raised through
+the public API. The doc comment on the struct describing the solver
 as "optionally doing 2–3" overstates what `Solver1D` actually does — it calls
 `apply` exactly once per exercise-eligible step.
 
@@ -338,14 +330,13 @@ Each halfstep solves the x and y directional operators implicitly and keeps
 the mixed derivative explicit. This first-order directional split damps stiff
 payoff modes; it is not a fully coupled backward-Euler solve, nor MCS with θ=1.
 Note the stepper does **not** implement `TimeStepper`
-(that trait is 1D-only); it carries its own inherent `step`,
-`step_with_buffers`, `n_steps`, and `time_levels`. `Solver2D` holds it
+(that trait is 1D-only); it carries its own inherent `step`, `n_steps`, and
+`time_levels`. `Solver2D` holds it
 concretely, so there is no 2D stepper polymorphism.
 
 `AdiWorkBuffers` holds the fourteen scratch vectors one step needs.
 `Solver2D::solve` allocates them once per solve and reuses them across the whole
-time march; the allocating `step` is a convenience wrapper that builds fresh
-buffers per call.
+time march.
 
 `fill_boundaries` writes the interior into `u_full`, then fills the two y-edges
 across interior `i`, followed by the x-edges across all `j`. The corners thus

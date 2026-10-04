@@ -29,10 +29,6 @@ pub struct Operators2D {
     /// Cross-derivative contribution `a_xy * d²u/(dx dy)` evaluated
     /// at each interior point. Length `nx_interior * ny_interior`.
     pub cross_deriv: Vec<f64>,
-    /// Number of interior x-points.
-    pub nx_int: usize,
-    /// Number of interior y-points.
-    pub ny_int: usize,
 }
 
 impl Operators2D {
@@ -53,7 +49,14 @@ impl Operators2D {
             let y = y_pts[j];
             let bc_lo = problem.boundary_x_lower(y, t);
             let bc_hi = problem.boundary_x_upper(y, t);
-            let op = assemble_x_line(problem, grid.x(), y, t, bc_lo, bc_hi);
+            let op = assemble_line(grid.x(), bc_lo, bc_hi, |x| {
+                (
+                    problem.diffusion_xx(x, y, t),
+                    problem.convection_x(x, y, t),
+                    problem.reaction(x, y, t),
+                    problem.source(x, y, t),
+                )
+            });
             op_x.push(op);
         }
 
@@ -63,7 +66,14 @@ impl Operators2D {
             let x = x_pts[i];
             let bc_lo = problem.boundary_y_lower(x, t);
             let bc_hi = problem.boundary_y_upper(x, t);
-            let op = assemble_y_line(problem, grid.y(), x, t, bc_lo, bc_hi);
+            let op = assemble_line(grid.y(), bc_lo, bc_hi, |y| {
+                (
+                    problem.diffusion_yy(x, y, t),
+                    problem.convection_y(x, y, t),
+                    problem.reaction(x, y, t),
+                    problem.source(x, y, t),
+                )
+            });
             op_y.push(op);
         }
 
@@ -73,25 +83,24 @@ impl Operators2D {
             op_x,
             op_y,
             cross_deriv,
-            nx_int,
-            ny_int,
         }
     }
 }
 
-/// Assemble the x-direction tridiagonal operator at a fixed y-level.
+/// Assemble one directional tridiagonal operator along `line_grid`.
 ///
-/// Discretizes `a_xx * d²u/dx² + b_x * du/dx` with half-reaction.
-fn assemble_x_line(
-    problem: &dyn PdeProblem2D,
-    x_grid: &Grid1D,
-    y: f64,
-    t: f64,
+/// Discretizes `a * d²u/ds² + b * du/ds` with half of the reaction and source
+/// terms. `coeffs(s)` returns `(diffusion, convection, reaction, source)` at
+/// coordinate `s` along the line, with the other coordinate held fixed by the
+/// caller.
+fn assemble_line(
+    line_grid: &Grid1D,
     bc_lower: BoundaryCondition,
     bc_upper: BoundaryCondition,
+    coeffs: impl Fn(f64) -> (f64, f64, f64, f64),
 ) -> TridiagOperator {
-    let n = x_grid.n_interior();
-    let pts = x_grid.points();
+    let n = line_grid.n_interior();
+    let pts = line_grid.points();
 
     let mut lower = vec![0.0; n];
     let mut main = vec![0.0; n];
@@ -100,62 +109,21 @@ fn assemble_x_line(
 
     for k in 0..n {
         let i = k + 1;
-        let x = pts[i];
-        let h_m = x_grid.h_left(i);
-        let h_p = x_grid.h_right(i);
+        let h_m = line_grid.h_left(i);
+        let h_p = line_grid.h_right(i);
 
-        let a = problem.diffusion_xx(x, y, t);
-        let b = problem.convection_x(x, y, t);
-        // Half-reaction goes into the x-direction operator
-        let c_half = 0.5 * problem.reaction(x, y, t);
+        let (a, b, reaction, src) = coeffs(pts[i]);
+        // Half-reaction goes into each directional operator
+        let c_half = 0.5 * reaction;
 
         let (lo, mi, up) = node_stencil(a, b, h_m, h_p);
         lower[k] = lo;
         main[k] = mi + c_half;
         upper[k] = up;
-        source[k] = 0.5 * problem.source(x, y, t);
+        source[k] = 0.5 * src;
     }
 
-    TridiagOperator::from_parts(lower, main, upper, source, bc_lower, bc_upper, x_grid)
-}
-
-/// Assemble the y-direction tridiagonal operator at a fixed x-level.
-///
-/// Discretizes `a_yy * d²u/dy² + b_y * du/dy` with half-reaction.
-fn assemble_y_line(
-    problem: &dyn PdeProblem2D,
-    y_grid: &Grid1D,
-    x: f64,
-    t: f64,
-    bc_lower: BoundaryCondition,
-    bc_upper: BoundaryCondition,
-) -> TridiagOperator {
-    let n = y_grid.n_interior();
-    let pts = y_grid.points();
-
-    let mut lower = vec![0.0; n];
-    let mut main = vec![0.0; n];
-    let mut upper = vec![0.0; n];
-    let mut source = vec![0.0; n];
-
-    for k in 0..n {
-        let j = k + 1;
-        let y = pts[j];
-        let h_m = y_grid.h_left(j);
-        let h_p = y_grid.h_right(j);
-
-        let a = problem.diffusion_yy(x, y, t);
-        let b = problem.convection_y(x, y, t);
-        let c_half = 0.5 * problem.reaction(x, y, t);
-
-        let (lo, mi, up) = node_stencil(a, b, h_m, h_p);
-        lower[k] = lo;
-        main[k] = mi + c_half;
-        upper[k] = up;
-        source[k] = 0.5 * problem.source(x, y, t);
-    }
-
-    TridiagOperator::from_parts(lower, main, upper, source, bc_lower, bc_upper, y_grid)
+    TridiagOperator::from_parts(lower, main, upper, source, bc_lower, bc_upper, line_grid)
 }
 
 /// Compute the explicit cross-derivative `a_xy * d²u/(dx dy)` applied to the
@@ -199,45 +167,23 @@ fn compute_cross_derivative(problem: &dyn PdeProblem2D, grid: &Grid2D, t: f64) -
     cross
 }
 
-/// Apply the cross-derivative operator to a 2D solution vector.
+/// Apply the cross-derivative operator to a 2D solution vector, writing
+/// `a_xy / (4 hx hy) * [u(i+1,j+1) - u(i+1,j-1) - u(i-1,j+1) + u(i-1,j-1)]`
+/// into `out`.
 ///
-/// `u_full` has length `nx * ny` (row-major, including boundaries).
-/// `cross_coeffs` has length `nx_int * ny_int` from `compute_cross_derivative`
-/// (private helper in this module).
-///
-/// Returns a flat vector of length `nx_int * ny_int` containing
-/// `a_xy / (4 hx hy) * [u(i+1,j+1) - u(i+1,j-1) - u(i-1,j+1) + u(i-1,j-1)]`.
-///
-/// # Arguments
-///
-/// * `cross_coeffs` - Row-major interior cross-derivative coefficients with
-///   length `nx_int * ny_int`.
-/// * `u_full` - Row-major full-grid solution including boundaries, with length
-///   `grid.total()`.
-/// * `grid` - Two-dimensional grid defining full and interior dimensions.
-pub fn apply_cross_derivative(cross_coeffs: &[f64], u_full: &[f64], grid: &Grid2D) -> Vec<f64> {
-    let mut result = vec![0.0; grid.nx_interior() * grid.ny_interior()];
-    apply_cross_derivative_into(&mut result, cross_coeffs, u_full, grid);
-    result
-}
-
-/// In-place variant of [`apply_cross_derivative`] that writes into `out`
-/// (length `nx_int * ny_int`) rather than allocating a fresh vector.
-///
-/// The Modified Craig-Sneyd ADI stepper applies the cross-derivative operator
-/// twice per timestep; reusing a caller-owned scratch buffer here removes two
-/// full interior-grid allocations from every step of the time march.
+/// The Modified Craig-Sneyd ADI stepper applies this twice per timestep into
+/// caller-owned scratch buffers.
 ///
 /// # Arguments
 ///
 /// * `out` - Mutable row-major interior buffer of length `nx_int * ny_int`
 ///   overwritten with the cross-derivative result.
-/// * `cross_coeffs` - Row-major interior cross-derivative coefficients with
-///   the same required length as `out`.
+/// * `cross_coeffs` - Row-major interior cross-derivative coefficients from
+///   `compute_cross_derivative`, with the same required length as `out`.
 /// * `u_full` - Row-major full-grid solution including boundaries, with length
 ///   `grid.total()`.
 /// * `grid` - Two-dimensional grid defining full and interior dimensions.
-pub fn apply_cross_derivative_into(
+pub(crate) fn apply_cross_derivative(
     out: &mut [f64],
     cross_coeffs: &[f64],
     u_full: &[f64],
@@ -302,7 +248,8 @@ mod tests {
             })
             .collect();
 
-        let result = apply_cross_derivative(&cross_coeffs, &u_full, &grid);
+        let mut result = vec![0.0; nx_int * ny_int];
+        apply_cross_derivative(&mut result, &cross_coeffs, &u_full, &grid);
 
         // d²(x*y)/(dx dy) = 1.0 at all interior points
         for val in &result {
@@ -347,7 +294,8 @@ mod tests {
             })
             .collect();
 
-        let result = apply_cross_derivative(&cross_coeffs, &u_full, &grid);
+        let mut result = vec![0.0; nx_int * ny_int];
+        apply_cross_derivative(&mut result, &cross_coeffs, &u_full, &grid);
 
         // d²(xy)/(dx dy) = 1 — must hold to machine epsilon on any grid because
         // the central-difference cross-derivative is exact for bilinear u.

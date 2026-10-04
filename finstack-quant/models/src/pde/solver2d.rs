@@ -97,7 +97,7 @@ impl Solver2D {
         let mut buffers = AdiWorkBuffers::for_grid(&self.grid);
 
         for step in 0..n_steps {
-            self.stepper.step_with_buffers(
+            self.stepper.step(
                 problem,
                 &self.grid,
                 &mut u_full,

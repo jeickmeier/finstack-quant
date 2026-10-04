@@ -5,6 +5,7 @@
 //! [`PdeSolution`] with the solution values, interpolation, and finite-difference
 //! Greeks (delta, gamma) read directly from the grid.
 
+use super::boundary::BoundaryCondition;
 use super::exercise::{ExerciseError, ExerciseType, PenaltyExercise};
 use super::grid::{find_nearest, Grid1D};
 use super::problem::PdeProblem1D;
@@ -15,10 +16,10 @@ use super::stepper::{RannacherStepper, StepperError, ThetaStepper, TimeStepper};
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_models::pde::{Grid1D, Solver1DBuilder};
+/// use finstack_quant_models::pde::{Grid1D, Solver1D};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let solver = Solver1DBuilder::new()
+/// let solver = Solver1D::builder()
 ///     .grid(Grid1D::sinh_concentrated(-5.0, 5.0, 200, 0.0, 0.1)?)
 ///     .crank_nicolson(100)
 ///     .build()?;
@@ -34,22 +35,7 @@ pub struct Solver1DBuilder {
     exercise: Option<PenaltyExercise>,
 }
 
-impl Default for Solver1DBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Solver1DBuilder {
-    /// Create a new builder with no configuration.
-    pub fn new() -> Self {
-        Self {
-            grid: None,
-            stepper: None,
-            exercise: None,
-        }
-    }
-
     /// Set the spatial grid.
     pub fn grid(mut self, grid: Grid1D) -> Self {
         self.grid = Some(grid);
@@ -125,7 +111,11 @@ impl Solver1D {
     /// Create a solver builder.
     #[must_use]
     pub fn builder() -> Solver1DBuilder {
-        Solver1DBuilder::new()
+        Solver1DBuilder {
+            grid: None,
+            stepper: None,
+            exercise: None,
+        }
     }
 
     /// Solve the PDE problem and return the solution at `t = 0`.
@@ -218,9 +208,10 @@ impl Solver1D {
         let bc_lower = problem.lower_boundary(0.0);
         let bc_upper = problem.upper_boundary(0.0);
 
-        values.push(boundary_value(bc_lower, &u, &self.grid, true));
+        let last = u.len() - 1;
+        values.push(boundary_value(bc_lower, &self.grid, true, |k| u[k]));
         values.extend_from_slice(&u);
-        values.push(boundary_value(bc_upper, &u, &self.grid, false));
+        values.push(boundary_value(bc_upper, &self.grid, false, |k| u[last - k]));
 
         let exercise_boundary_out = if exercise_boundary.is_empty() {
             None
@@ -237,39 +228,46 @@ impl Solver1D {
     }
 }
 
-/// Extract boundary value from a boundary condition and the interior solution.
-fn boundary_value(
-    bc: super::boundary::BoundaryCondition,
-    u: &[f64],
+/// Reconstruct a boundary-node value from a boundary condition and the
+/// interior solution along one grid line.
+///
+/// For Dirichlet, returns the fixed value. For Neumann, extrapolates one-sided
+/// using the derivative value. For Linear / LinearInExp, continues the
+/// interior slope over the boundary-cell width. `interior(k)` returns the
+/// `k`-th interior value counted inward from the boundary (`0` is adjacent to
+/// it); it is only called with `k = 1` when the line has at least two
+/// interior nodes. Shared by the 1D solver and the 2D `fill_boundaries` so the
+/// reconstruction cannot drift from the operator's boundary elimination.
+pub(super) fn boundary_value(
+    bc: BoundaryCondition,
     grid: &Grid1D,
     is_lower: bool,
+    interior: impl Fn(usize) -> f64,
 ) -> f64 {
-    use super::boundary::BoundaryCondition;
     match bc {
         BoundaryCondition::Dirichlet(g) => g,
         BoundaryCondition::Neumann(g) => {
             if is_lower {
                 let h = grid.h_left(1);
-                u[0] - h * g
+                interior(0) - h * g
             } else {
                 let h = grid.h_right(grid.n() - 2);
-                u[u.len() - 1] + h * g
+                interior(0) + h * g
             }
         }
         BoundaryCondition::Linear | BoundaryCondition::LinearInExp => {
-            let n = u.len();
-            if n < 2 {
-                return u[0];
+            let u1 = interior(0);
+            if grid.n_interior() < 2 {
+                return u1;
             }
-            if is_lower {
-                let ratio = bc.extrapolation_ratio(grid.h_left(1), grid.h_right(1), true);
-                u[0] + ratio * (u[0] - u[1])
+            let u2 = interior(1);
+            let ratio = if is_lower {
+                bc.extrapolation_ratio(grid.h_left(1), grid.h_right(1), true)
             } else {
-                let interior = grid.n() - 2;
-                let ratio =
-                    bc.extrapolation_ratio(grid.h_right(interior), grid.h_left(interior), false);
-                u[n - 1] + ratio * (u[n - 1] - u[n - 2])
-            }
+                let last = grid.n() - 2;
+                bc.extrapolation_ratio(grid.h_right(last), grid.h_left(last), false)
+            };
+            u1 + ratio * (u1 - u2)
         }
     }
 }
