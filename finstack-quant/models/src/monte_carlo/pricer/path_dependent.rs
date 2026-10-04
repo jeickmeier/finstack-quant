@@ -1536,8 +1536,6 @@ mod tests {
     /// "stderr" over dependent Sobol points has no such guarantee.)
     #[test]
     fn test_sobol_rqmc_stderr_covers_true_error() {
-        use crate::closed_form::black_scholes_spot_call;
-
         let (s0, k, r, q, sigma, t) = (100.0, 100.0, 0.05, 0.0, 0.2, 1.0);
         let num_steps = 16usize;
         let config = PathDependentPricerConfig::new(16_384)
@@ -1553,7 +1551,9 @@ mod tests {
             .price_with_paths(&gbm, s0, t, num_steps, &payoff, Currency::USD, df)
             .expect("sobol pricing should succeed");
 
-        let bs = black_scholes_spot_call(s0, k, r, q, sigma, t);
+        let bs =
+            crate::closed_form::bs_price(s0, k, r, q, sigma, t, crate::types::OptionType::Call)
+                .expect("valid Black-Scholes inputs");
         let mean = result.estimate.mean.amount();
         let stderr = result.estimate.stderr;
 

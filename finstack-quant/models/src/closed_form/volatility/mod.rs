@@ -8,44 +8,47 @@
 //! All prices assume a unit annuity (PV01 = 1). To get the actual option price,
 //! multiply by the annuity factor: `price = annuity × formula_price`.
 
-mod approximations;
 mod bachelier;
 mod black;
 
-pub use approximations::{
-    brenner_subrahmanyam_approx, implied_vol_initial_guess, manaster_koehler_approx,
-};
 pub use bachelier::{
     bachelier_call, bachelier_delta_call, bachelier_delta_put, bachelier_gamma, bachelier_put,
     bachelier_vega,
 };
 pub use black::{
-    black_call, black_delta_call, black_delta_put, black_gamma, black_put, black_scholes_spot_call,
-    black_scholes_spot_put, black_shifted_call, black_shifted_put, black_vega,
+    black_call, black_delta_call, black_delta_put, black_gamma, black_put, black_shifted_call,
+    black_vega,
 };
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::closed_form::vanilla::bs_price;
+    use crate::types::OptionType;
 
     const EPSILON: f64 = 1e-10;
 
     #[test]
-    fn spot_helpers_price_zero_volatility_from_discounted_forward() {
-        let call = black_scholes_spot_call(100.0, 102.0, 0.05, 0.0, 0.0, 1.0);
-        let put = black_scholes_spot_put(100.0, 102.0, 0.05, 0.0, 0.0, 1.0);
+    fn spot_price_at_zero_volatility_is_the_discounted_forward_payoff() {
+        let spot_call = |spot, strike, rate, div_yield, vol, expiry| {
+            bs_price(spot, strike, rate, div_yield, vol, expiry, OptionType::Call)
+                .expect("valid Black-Scholes inputs")
+        };
+        let spot_put = |spot, strike, rate, div_yield, vol, expiry| {
+            bs_price(spot, strike, rate, div_yield, vol, expiry, OptionType::Put)
+                .expect("valid Black-Scholes inputs")
+        };
+        let call = spot_call(100.0, 102.0, 0.05, 0.0, 0.0, 1.0);
+        let put = spot_put(100.0, 102.0, 0.05, 0.0, 0.0, 1.0);
         let discounted_intrinsic = 100.0 - 102.0 * (-0.05_f64).exp();
         assert!((call - 2.974_598_700_927_174_4).abs() < 1e-12);
         assert_eq!(put, 0.0);
         assert!((call - put - discounted_intrinsic).abs() < 1e-12);
-        let negative_carry_call = black_scholes_spot_call(100.0, 100.0, 0.0, 0.05, 0.0, 1.0);
-        let negative_carry_put = black_scholes_spot_put(100.0, 100.0, 0.0, 0.05, 0.0, 1.0);
+        let negative_carry_call = spot_call(100.0, 100.0, 0.0, 0.05, 0.0, 1.0);
+        let negative_carry_put = spot_put(100.0, 100.0, 0.0, 0.05, 0.0, 1.0);
         assert_eq!(negative_carry_call, 0.0);
         assert!((negative_carry_put - 100.0 * (1.0 - (-0.05_f64).exp())).abs() < 1e-12);
-        assert_eq!(
-            black_scholes_spot_call(110.0, 100.0, 0.05, 0.02, 0.0, 0.0),
-            10.0
-        );
+        assert_eq!(spot_call(110.0, 100.0, 0.05, 0.02, 0.0, 0.0), 10.0);
     }
 
     #[test]
@@ -78,8 +81,6 @@ mod tests {
             assert!(formula(100.0, 100.0, -0.2, 1.0).is_nan());
             assert!(formula(100.0, 100.0, 0.2, -1.0).is_nan());
         }
-        assert!(black_scholes_spot_call(100.0, 100.0, 0.05, 0.0, -0.2, 1.0).is_nan());
-        assert!(black_scholes_spot_put(f64::NAN, 100.0, 0.05, 0.0, 0.0, 0.0).is_nan());
     }
 
     #[test]
@@ -323,104 +324,5 @@ mod tests {
             forward - strike_itm
         );
         assert_eq!(black_call(forward, strike_otm, 0.0, t), 0.0);
-    }
-
-    // Implied Volatility Approximation Tests
-
-    #[test]
-    fn test_brenner_subrahmanyam_atm() {
-        let forward = 0.05;
-        let strike = 0.05; // ATM
-        let sigma_actual = 0.20;
-        let t = 1.0;
-
-        let price = black_call(forward, strike, sigma_actual, t);
-        let sigma_approx = brenner_subrahmanyam_approx(forward, strike, price, t);
-
-        let rel_error = (sigma_approx - sigma_actual).abs() / sigma_actual;
-        assert!(
-            rel_error < 0.15,
-            "ATM approximation error {:.2}% exceeds 15%",
-            rel_error * 100.0
-        );
-    }
-
-    #[test]
-    fn test_brenner_subrahmanyam_various_vols() {
-        let forward = 0.05;
-        let strike = 0.05; // ATM
-        let t = 1.0;
-
-        for sigma_actual in [0.10, 0.20, 0.30, 0.40, 0.50] {
-            let price = black_call(forward, strike, sigma_actual, t);
-            let sigma_approx = brenner_subrahmanyam_approx(forward, strike, price, t);
-
-            let rel_error = (sigma_approx - sigma_actual).abs() / sigma_actual;
-            assert!(
-                rel_error < 0.20,
-                "Approximation for σ={:.0}% has error {:.2}%",
-                sigma_actual * 100.0,
-                rel_error * 100.0
-            );
-        }
-    }
-
-    #[test]
-    fn test_manaster_koehler_otm() {
-        // Test OTM case where M-K approximation helps
-        let forward = 0.05;
-        let strike = 0.07; // OTM
-        let t = 1.0;
-
-        let approx = manaster_koehler_approx(forward, strike, t);
-
-        assert!(approx > 0.0, "Approximation should be positive");
-        assert!(approx < 2.0, "Approximation should be reasonable (<200%)");
-    }
-
-    #[test]
-    fn test_implied_vol_initial_guess_consistency() {
-        let forward = 0.05;
-        let t = 1.0;
-
-        for &strike in &[0.03, 0.04, 0.05, 0.06, 0.07] {
-            let sigma = 0.25;
-            let price = black_call(forward, strike, sigma, t);
-            let guess = implied_vol_initial_guess(forward, strike, price, t);
-
-            assert!(
-                (0.01..=5.0).contains(&guess),
-                "Guess {:.4} for K={:.2} outside valid range",
-                guess,
-                strike
-            );
-        }
-    }
-
-    #[test]
-    fn test_implied_vol_edge_cases() {
-        assert_eq!(brenner_subrahmanyam_approx(0.05, 0.05, 0.001, 0.0), 0.2); // t = 0
-        assert_eq!(brenner_subrahmanyam_approx(0.05, 0.05, 0.0, 1.0), 0.2); // price = 0
-        assert_eq!(brenner_subrahmanyam_approx(0.0, 0.05, 0.001, 1.0), 0.2); // forward = 0
-        assert_eq!(brenner_subrahmanyam_approx(0.05, 0.0, 0.001, 1.0), 0.2); // strike = 0
-    }
-
-    #[test]
-    fn test_brenner_subrahmanyam_rates_market() {
-        // Test with interest rate market typical values (swaption)
-        let forward = 0.03; // 3% forward swap rate
-        let strike = 0.03; // ATM
-        let sigma_actual = 0.50; // 50% lognormal vol (typical for rates)
-        let t = 5.0; // 5Y expiry
-
-        let price = black_call(forward, strike, sigma_actual, t);
-        let sigma_approx = brenner_subrahmanyam_approx(forward, strike, price, t);
-
-        let rel_error = (sigma_approx - sigma_actual).abs() / sigma_actual;
-        assert!(
-            rel_error < 0.25,
-            "Rates market approximation error {:.2}% exceeds 25%",
-            rel_error * 100.0
-        );
     }
 }

@@ -434,7 +434,6 @@ fn price_engine_gbm(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::closed_form::{black_scholes_spot_call, black_scholes_spot_put};
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
     use crate::monte_carlo::process::gbm::GbmParams;
 
@@ -614,14 +613,16 @@ mod tests {
                             Currency::USD,
                         )
                         .expect("call pricing should succeed"),
-                    black_scholes_spot_call(
+                    crate::closed_form::bs_price(
                         case.spot,
                         case.strike,
                         case.rate,
                         case.div_yield,
                         case.vol,
                         case.expiry,
-                    ),
+                        crate::types::OptionType::Call,
+                    )
+                    .expect("valid Black-Scholes inputs"),
                 )
             } else {
                 (
@@ -637,14 +638,16 @@ mod tests {
                             Currency::USD,
                         )
                         .expect("put pricing should succeed"),
-                    black_scholes_spot_put(
+                    crate::closed_form::bs_price(
                         case.spot,
                         case.strike,
                         case.rate,
                         case.div_yield,
                         case.vol,
                         case.expiry,
-                    ),
+                        crate::types::OptionType::Put,
+                    )
+                    .expect("valid Black-Scholes inputs"),
                 )
             };
 

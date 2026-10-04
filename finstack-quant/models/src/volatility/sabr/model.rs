@@ -352,15 +352,6 @@ impl SabrModel {
         &self.params
     }
 
-    /// Replace the model's SABR parameters.
-    ///
-    /// # Arguments
-    ///
-    /// * `params` - Replacement validated SABR parameters.
-    pub fn set_parameters(&mut self, params: SabrParameters) {
-        self.params = params;
-    }
-
     /// Whether normal beta=0 dynamics or a displacement permit negative rates.
     pub fn supports_negative_rates(&self) -> bool {
         self.params.beta < BETA_SNAP_TOL || self.params.shift.is_some()

@@ -1,7 +1,7 @@
 //! Tests for the surrounding crate component and its documented behavior.
 //!
 use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType, BumpUnits, Bumpable};
-use finstack_quant_core::market_data::surfaces::{VolQuoteType, VolSurface};
+use finstack_quant_core::market_data::surfaces::VolSurface;
 
 #[test]
 fn test_vol_surface_builder_basic() {
@@ -108,27 +108,6 @@ fn value_clamped_handles_nan_and_singleton_axes() {
             - 0.25)
             .abs()
             < 1e-12
-    );
-}
-
-#[test]
-fn normal_vol_surface_wing_extrapolation_uses_flat_clamp() {
-    let surface = VolSurface::builder("NORMAL")
-        .expiries(&[1.0])
-        .strikes(&[0.01, 0.015, 0.02, 0.025, 0.03])
-        .quote_type(VolQuoteType::Normal)
-        .row(&[0.0060, 0.0065, 0.0070, 0.0075, 0.0080])
-        .build()
-        .unwrap();
-
-    let wing =
-        finstack_quant_models::volatility::get_surface_vol_extrapolated(&surface, 1.0, 0.05, 0.02)
-            .expect("normal-vol extrapolation should clamp without fitting");
-    let clamped = finstack_quant_models::volatility::get_surface_vol_clamped(&surface, 1.0, 0.05);
-
-    assert!(
-        (wing - clamped).abs() < 1e-14,
-        "normal-vol wings should clamp in normal-vol units, got {wing} vs {clamped}"
     );
 }
 

@@ -2,8 +2,7 @@
 //!
 //! Provides model-free arbitrage detection for any
 //! [`VolSurface`] regardless of how
-//! it was constructed (market quotes, SABR, SVI, etc.), plus SVI-specific
-//! checks that operate on raw calibrated parameters.
+//! it was constructed (market quotes, SABR, SVI, etc.).
 //!
 //! # Architecture
 //!
@@ -13,9 +12,6 @@
 //!   Composable [`ArbitrageCheck`]
 //!   trait with implementations for butterfly, calendar spread, and local vol
 //!   density
-//! - **SVI checks** ([`checks::svi`]):
-//!   Moment bounds, Gatheral-Jacquier density, and cross-slice calendar spread
-//!   for SVI parameterizations
 //! - **Orchestrator**
 //!   ([`check_surface`]): Runs all
 //!   enabled checks and aggregates results into an
@@ -54,9 +50,7 @@
 pub mod checks;
 pub mod types;
 
-pub use checks::{
-    ArbitrageCheck, ButterflyCheck, CalendarSpreadCheck, LocalVolDensityCheck, SviArbitrageCheck,
-};
+pub use checks::{ArbitrageCheck, ButterflyCheck, CalendarSpreadCheck, LocalVolDensityCheck};
 pub use types::{
     ArbitrageReport, ArbitrageSeverity, ArbitrageType, ArbitrageViolation, ViolationLocation,
 };
@@ -405,7 +399,6 @@ pub fn check_surface_grid(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::volatility::svi::SviParams;
 
     /// Flat vol surface: constant 20% vol everywhere. Must pass all checks.
     fn flat_surface() -> VolSurface {
@@ -756,13 +749,6 @@ mod tests {
             !report.violations.is_empty(),
             "Should have violations on dirty surface"
         );
-
-        // Filtering at Critical should return fewer or equal
-        let critical_only = report.above_severity(ArbitrageSeverity::Critical);
-        assert!(
-            critical_only.len() <= report.violations.len(),
-            "Critical filter should return subset"
-        );
     }
 
     #[test]
@@ -801,103 +787,6 @@ mod tests {
             ..Default::default()
         };
         assert!(check_surface(&surface, &config).is_err());
-    }
-
-    #[test]
-    fn svi_moment_bound_violation_detected() {
-        let bad_params = SviParams {
-            a: 0.04,
-            b: 1.5,
-            rho: 0.5,
-            m: 0.0,
-            sigma: 0.1,
-        };
-
-        let check = SviArbitrageCheck {
-            expiries: vec![1.0],
-            params: vec![bad_params],
-            k_range: (-2.0, 2.0),
-            n_samples: 100,
-        };
-
-        let violations = check.check_moment_bounds();
-        assert!(
-            !violations.is_empty(),
-            "Should detect moment bound violation for b*(1+rho) > 2"
-        );
-        assert!(
-            violations
-                .iter()
-                .any(|v| v.violation_type == ArbitrageType::SviMomentBound),
-            "Violation should be SviMomentBound type"
-        );
-    }
-
-    #[test]
-    fn svi_clean_params_pass_all_checks() {
-        let clean_params = SviParams {
-            a: 0.04,
-            b: 0.3,
-            rho: -0.3,
-            m: 0.0,
-            sigma: 0.15,
-        };
-        clean_params.validate().expect("params should be valid");
-
-        let check = SviArbitrageCheck {
-            expiries: vec![1.0],
-            params: vec![clean_params],
-            k_range: (-1.0, 1.0),
-            n_samples: 200,
-        };
-
-        let violations = check.check_all();
-        assert!(
-            violations.is_empty(),
-            "Clean SVI params should pass all checks. Violations: {:?}",
-            violations
-                .iter()
-                .map(|v| &v.description)
-                .collect::<Vec<_>>()
-        );
-    }
-
-    #[test]
-    fn svi_calendar_spread_violation_detected() {
-        // First slice has higher total variance than second at some k
-        let slice1 = SviParams {
-            a: 0.10,
-            b: 0.3,
-            rho: -0.2,
-            m: 0.0,
-            sigma: 0.15,
-        };
-        let slice2 = SviParams {
-            a: 0.02, // much lower a => lower total variance
-            b: 0.2,
-            rho: -0.2,
-            m: 0.0,
-            sigma: 0.15,
-        };
-
-        let check = SviArbitrageCheck {
-            expiries: vec![1.0, 2.0],
-            params: vec![slice1, slice2],
-            k_range: (-1.0, 1.0),
-            n_samples: 100,
-        };
-
-        let violations = check.check_calendar_spread();
-        assert!(
-            !violations.is_empty(),
-            "Should detect SVI calendar spread violation when T2 slice has lower total variance"
-        );
-        assert!(
-            violations
-                .iter()
-                .all(|v| v.violation_type == ArbitrageType::SviCalendarSpread),
-            "All violations should be SviCalendarSpread type"
-        );
     }
 
     #[test]

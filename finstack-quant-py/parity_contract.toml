@@ -532,11 +532,10 @@ rates        = { python = "finstack_quant.models.rates", status = "exists", note
 # `quanto_option_price` / `heston_price` defaults to a call in both hosts (a
 # host signature default mapped to `OptionType::Call`). Rust-only closed-form
 # items, deliberately not bound: `bs_price_unchecked` / `bs_greeks_unchecked`,
-# the `*_df` Asian variants, `barrier_rebate` / `PayoutTiming` /
+# `barrier_rebate` / `PayoutTiming` /
 # `BarrierParams` / `barrier_touch_probability`, `quanto_call` / `quanto_put` /
-# `quanto_drift_adjustment` (use `quanto_option_price`), the implied-vol
-# approximations (`brenner_subrahmanyam_approx`, `manaster_koehler_approx`,
-# `implied_vol_initial_guess`), `HestonStripPricer` / `HestonFourierSettings` /
+# `quanto_drift_adjustment` (use `quanto_option_price`),
+# `HestonStripPricer` / `HestonFourierSettings` /
 # `heston_*_prices_fourier` strips, `OptionMarketParams`, `ExerciseStyle`,
 # `OptionType` (hosts pass `is_call`), `ONE_PERCENT`, and the per-model COS
 # `CosPricer` / `CosConfig` / characteristic functions (hosts use `*_cos_price`).
@@ -568,8 +567,8 @@ public = [
 [crates.models.monte_carlo]
 python_package = "finstack_quant.models.monte_carlo"
 # `finite_diff_*` take `is_call: bool` and return a typed `Estimate`. The
-# closed-form `black_scholes_spot_call` / `_put` references are not bound here
-# (use `models.bs_price`). Rust-only: engine/process/discretization/RNG/payoff
+# closed-form Black-Scholes reference is `models.bs_price`. Rust-only:
+# engine/process/discretization/RNG/payoff
 # graph, `GbmEuropeanFdSpec` (flattened into kwargs), `PathDependentPricerConfig`
 # / `LsmcConfig` (flattened into constructor kwargs), captured-path datasets,
 # the registry defaults module, and `monte_carlo::convenience` (the one place
@@ -658,10 +657,8 @@ python_package = "finstack_quant.models.volatility"
 # discounted lognormal adapters. Rust-only, deliberately not bound:
 # `local_vol` (Dupire surface construction), `heston` / `rough_heston` model
 # helpers (Heston pricing is `models.heston_price` / `models.monte_carlo`),
-# `source` (`VolSource`,
-# `materialize_cube_grid`, `measure_vol_surface_shift`,
-# `get_surface_vol_extrapolated`), the `black` helpers
-# (`d1` / `d2` / `d1_d2` / `*_black76`), `vega_weight`, `SabrVolType` (and so
+# `source` (`VolSource`, `measure_vol_surface_shift`), the `black` helpers
+# (`d1` / `d1_d2` / `*_black76`), `vega_weight`, `SabrVolType` (and so
 # `SabrModel::vol_type` / `SabrSmile::vol_type` / `implied_volatility_with_type`:
 # the hosts' `implied_vol` returns the beta-dependent vol, documented on each
 # method), `SabrModel::effective_rates` (the shift is on `SabrParameters.shift`),

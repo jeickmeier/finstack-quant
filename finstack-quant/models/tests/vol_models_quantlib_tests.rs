@@ -27,7 +27,7 @@
 //! - BSM expected prices are discounted spot-based values; QuantLib computed
 //!   them via `blackFormula` on `F = S*exp((r-q)T)` with `discount =
 //!   exp(-rT)`, which is identical to the BSM spot formula implemented by
-//!   [`black_scholes_spot_call`].
+//!   [`finstack_quant_models::closed_form::bs_price`].
 //! - QuantLib `sabrVolatility(strike, forward, T, alpha, beta, nu, rho)`
 //!   swaps the (nu, rho) order relative to [`SabrParameters::new`].
 //!
@@ -72,10 +72,7 @@
 //! - El Euch, O., & Rosenbaum, M. (2019). "The characteristic function of
 //!   rough Heston models." *Mathematical Finance*, 29(1), 3-38.
 
-use finstack_quant_models::closed_form::{
-    bachelier_call, bachelier_put, black_call, black_put, black_scholes_spot_call,
-    black_scholes_spot_put,
-};
+use finstack_quant_models::closed_form::{bachelier_call, bachelier_put, black_call, black_put};
 use finstack_quant_models::volatility::heston::HestonParams;
 use finstack_quant_models::volatility::rough_heston::RoughHestonFourierParams;
 use finstack_quant_models::volatility::sabr::SabrParameters;
@@ -321,10 +318,26 @@ fn test_vol_models_quantlib_parity() {
                     continue;
                 }
                 *counts.entry("bsm").or_default() += 1;
-                let call =
-                    black_scholes_spot_call(*spot, *strike, *rate, *dividend_yield, *sigma, *t);
-                let put =
-                    black_scholes_spot_put(*spot, *strike, *rate, *dividend_yield, *sigma, *t);
+                let call = finstack_quant_models::closed_form::bs_price(
+                    *spot,
+                    *strike,
+                    *rate,
+                    *dividend_yield,
+                    *sigma,
+                    *t,
+                    finstack_quant_models::types::OptionType::Call,
+                )
+                .expect("valid Black-Scholes inputs");
+                let put = finstack_quant_models::closed_form::bs_price(
+                    *spot,
+                    *strike,
+                    *rate,
+                    *dividend_yield,
+                    *sigma,
+                    *t,
+                    finstack_quant_models::types::OptionType::Put,
+                )
+                .expect("valid Black-Scholes inputs");
                 let tol = expected.tolerance_rel;
                 check_rel(&mut failures, id, "call", call, expected.call, tol);
                 check_rel(&mut failures, id, "put", put, expected.put, tol);

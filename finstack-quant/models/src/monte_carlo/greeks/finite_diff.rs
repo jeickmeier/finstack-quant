@@ -563,7 +563,6 @@ where
 mod tests {
     use super::super::super::engine::McEngineConfig;
     use super::*;
-    use crate::closed_form::black_scholes_spot_call;
     use crate::monte_carlo::discretization::exact::ExactGbm;
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
     use crate::monte_carlo::process::gbm::{GbmParams, GbmProcess};
@@ -592,7 +591,16 @@ mod tests {
     }
 
     fn bs_call(spot: f64) -> f64 {
-        black_scholes_spot_call(spot, STRIKE, RATE, DIVIDEND_YIELD, VOLATILITY, EXPIRY)
+        crate::closed_form::bs_price(
+            spot,
+            STRIKE,
+            RATE,
+            DIVIDEND_YIELD,
+            VOLATILITY,
+            EXPIRY,
+            crate::types::OptionType::Call,
+        )
+        .expect("valid Black-Scholes inputs")
     }
 
     fn deterministic_stencil(bump_size: f64) -> (f64, f64) {

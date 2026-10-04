@@ -435,39 +435,6 @@ fn normal_sabr_clamped_path_rejects_nonpositive_shifted_levels() {
     );
 }
 
-#[test]
-fn test_vol_cube_materialize_grid_flattens_expiry_tenor_strike_order() {
-    let p = SabrParameterData::new(0.035, 0.5, -0.2, 0.4).unwrap();
-    let cube = VolCube::from_grid(
-        "TEST",
-        &[1.0, 5.0],
-        &[5.0, 10.0],
-        &[p; 4],
-        &[0.03, 0.035, 0.04, 0.045],
-    )
-    .unwrap();
-    let strikes = [0.02, 0.03, 0.04];
-
-    let grid = finstack_quant_models::volatility::materialize_cube_grid(&cube, &strikes)
-        .expect("materializes");
-
-    assert_eq!(grid.len(), 2 * 2 * strikes.len());
-    let expected_first =
-        finstack_quant_models::volatility::get_cube_vol(&cube, 1.0, 5.0, strikes[0])
-            .expect("cube vol");
-    let expected_second_strike =
-        finstack_quant_models::volatility::get_cube_vol(&cube, 1.0, 5.0, strikes[1])
-            .expect("cube vol");
-    let expected_next_tenor =
-        finstack_quant_models::volatility::get_cube_vol(&cube, 1.0, 10.0, strikes[0])
-            .expect("cube vol");
-    assert!((grid[0] - expected_first).abs() < 1e-14);
-    assert!((grid[1] - expected_second_strike).abs() < 1e-14);
-    assert!((grid[strikes.len()] - expected_next_tenor).abs() < 1e-14);
-
-    assert!(finstack_quant_models::volatility::materialize_cube_grid(&cube, &[]).is_err());
-}
-
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_models::volatility::VolSource;

@@ -1995,8 +1995,16 @@ mod tests {
         let div_yield = 0.0;
         let vol = 0.2;
         let expiry = 1.0;
-        let european =
-            crate::closed_form::black_scholes_spot_put(spot, strike, rate, div_yield, vol, expiry);
+        let european = crate::closed_form::bs_price(
+            spot,
+            strike,
+            rate,
+            div_yield,
+            vol,
+            expiry,
+            crate::types::OptionType::Put,
+        )
+        .expect("valid Black-Scholes inputs");
         let pricer = LsmcPricer::gbm_american(8_000, 8, 11, false, true)
             .expect("GBM American pricer should construct");
         let estimate = pricer
@@ -2030,8 +2038,16 @@ mod tests {
         let div_yield = 0.0;
         let vol = 0.2;
         let expiry = 1.0;
-        let european =
-            crate::closed_form::black_scholes_spot_call(spot, strike, rate, div_yield, vol, expiry);
+        let european = crate::closed_form::bs_price(
+            spot,
+            strike,
+            rate,
+            div_yield,
+            vol,
+            expiry,
+            crate::types::OptionType::Call,
+        )
+        .expect("valid Black-Scholes inputs");
         let pricer = LsmcPricer::gbm_american(8_000, 8, 13, false, true)
             .expect("GBM American pricer should construct");
         let estimate = pricer

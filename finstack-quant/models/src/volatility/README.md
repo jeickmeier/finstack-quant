@@ -19,8 +19,8 @@ Consumed by [`models::closed_form`](../closed_form/) and
 SABR slice fitter used by calibration's volatility surface step), and by the rates/FX/vol
 instrument pricers — `rates/{swaption, cap_floor, cms_option, cms_swap}`,
 the asset-owned futures-option instruments, `fx/fx_digital_option`,
-`exotics/range_accrual` — which reach for `normal::{bachelier_price_with_annuity,
-d_bachelier}`, `black::{d1_d2, d1_black76, d2_black76, d1_d2_black76}`, and
+`exotics/range_accrual` — which reach for `normal::bachelier_price_with_annuity`,
+`black::{d1_d2, d1_black76, d1_d2_black76}`, and
 `SABRParameters` / `sabr::SabrVolType`.
 
 ## Layout
@@ -28,8 +28,8 @@ d_bachelier}`, `black::{d1_d2, d1_black76, d2_black76, d1_d2_black76}`, and
 | File | Contents |
 |------|----------|
 | [`mod.rs`](mod.rs) | Re-exports |
-| [`black.rs`](black.rs) | `d1`, `d2`, `d1_d2`, `d1_black76`, `d2_black76`, `d1_d2_black76` |
-| [`normal.rs`](normal.rs) | `d_bachelier`, `bachelier_price_with_annuity` |
+| [`black.rs`](black.rs) | `d1`, `d1_d2`, `d1_black76`, `d1_d2_black76` |
+| [`normal.rs`](normal.rs) | `bachelier_price_with_annuity` |
 | [`sabr/`](sabr/) | `SabrParameters`, `SabrModel`, `SabrVolType`, `SabrCalibrator`, `SabrSmile` |
 | [`source.rs`](source.rs) | `VolSource` plus surface, cube, and FX delta-volatility evaluation/materialization |
 | [`arbitrage/`](arbitrage/) | Model-dependent volatility arbitrage checks |
@@ -40,7 +40,7 @@ caller convenience; they are not defined here.
 
 ## Black-Scholes helpers (`black.rs`)
 
-All six functions are `#[inline]` — they sit inside Greeks and calibration
+All four functions are `#[inline]` — they sit inside Greeks and calibration
 loops.
 
 | Function | Formula | Argument order |
@@ -49,8 +49,8 @@ loops.
 | `d1_d2_black76` | `d₁ = [ln(F/K) + σ²T/2] / (σ√T)`, `d₂ = d₁ - σ√T` | `(forward, strike, sigma, t)` |
 
 Note the `d1_d2` argument order: rate, then **volatility**, then time, then
-dividend yield. Prefer the combined `d1_d2` / `d1_d2_black76` over separate
-`d1` + `d2` calls in hot paths — they share one `ln` and one `sqrt`.
+dividend yield. `d1_d2` / `d1_d2_black76` return both terms from one `ln` and
+one `sqrt`; `d1` / `d1_black76` return the first term alone.
 
 Degenerate inputs (`t <= 0` or `σ <= 0`) return the limiting values:
 
@@ -76,7 +76,6 @@ d = (F − K) / (σ√T)
 
 | Function | Signature |
 |----------|-----------|
-| `d_bachelier` | `(forward, strike, sigma, t) -> f64` |
 | `bachelier_price_with_annuity` | `(OptionType, forward, strike, sigma, t, annuity) -> f64` |
 
 `sigma` is **normal** volatility in absolute rate/price units, not a percentage

@@ -73,8 +73,8 @@ d₂ = d₁ - σ√T
 
 `BsGreeks` carries `delta`, `gamma`, `vega`, `theta`, `rho_r` (domestic /
 risk-free) and `rho_q` (dividend yield or foreign rate), so the same struct
-serves equity and FX. `is_valid()` and `clamped()` deliberately check and clamp
-only gamma and vega: the true delta bound is `|Δ| ≤ e^{−qT}`, which exceeds 1
+serves equity and FX. `is_valid()` deliberately checks the sign of gamma and
+vega only: the true delta bound is `|Δ| ≤ e^{−qT}`, which exceeds 1
 under negative carry, and this type does not know `q` or `T`.
 
 `bs_greeks` asserts `theta_days_per_year > 0.0` in release builds; a
@@ -87,9 +87,7 @@ References: Black & Scholes (1973); Merton (1973); Garman & Kohlhagen (1983).
 | Item | Notes |
 |------|-------|
 | `geometric_asian_call` / `_put` | Exact under geometric averaging (Kemna-Vorst) |
-| `geometric_asian_call_df` / `_put_df` | Discount-factor-first variant; derives `r = -ln(df)/t` |
 | `arithmetic_asian_call_tw` / `_put_tw` | Turnbull-Wakeman two-moment lognormal match |
-| `arithmetic_asian_call_tw_df` / `_put_tw_df` | Discount-factor-first variant |
 | `geometric_asian_price_times` | Arbitrary (unequally spaced) fixing schedule, `-> Result<f64>` |
 | `arithmetic_asian_tw_price_times` | Same, Turnbull-Wakeman |
 

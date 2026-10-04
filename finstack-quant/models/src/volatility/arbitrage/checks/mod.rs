@@ -7,12 +7,10 @@
 pub mod butterfly;
 pub mod calendar_spread;
 pub mod local_vol_density;
-pub mod svi;
 
 pub use butterfly::ButterflyCheck;
 pub use calendar_spread::CalendarSpreadCheck;
 pub use local_vol_density::LocalVolDensityCheck;
-pub use svi::SviArbitrageCheck;
 
 use super::types::{ArbitrageSeverity, ArbitrageViolation};
 use finstack_quant_core::market_data::surfaces::VolSurface;

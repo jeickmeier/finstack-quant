@@ -213,54 +213,6 @@ pub fn geometric_asian_call(
     geometric_asian_call_core(spot, strike, time, rate, df, div_yield, vol, num_fixings)
 }
 
-/// Price a geometric Asian call with explicit discount factor (DF-first API).
-///
-/// Derives `r_eff = -ln(df)/t` from a curve-looked-up discount factor.
-///
-/// See [`geometric_asian_call`] for formula details.
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's price units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `time` - Remaining time to maturity in years.
-/// * `df` - Positive discount factor from valuation date to maturity.
-/// * `div_yield` - Continuously compounded dividend yield or carry as a
-///   decimal annual rate.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-/// * `num_fixings` - Number of equally spaced observations; `0` selects the
-///   continuous-monitoring limit.
-///
-/// # Errors
-///
-/// Returns a [`finstack_quant_core::Error::Validation`] when `df` is not a strictly
-/// positive finite number (corrupt or inverted curve).
-pub fn geometric_asian_call_df(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    df: f64,
-    div_yield: f64,
-    vol: f64,
-    num_fixings: usize,
-) -> Result<f64> {
-    if time <= 0.0 {
-        return Ok((spot - strike).max(0.0));
-    }
-    validate_discount_factor(df)?;
-    let rate = -df.ln() / time;
-    Ok(geometric_asian_call_core(
-        spot,
-        strike,
-        time,
-        rate,
-        df,
-        div_yield,
-        vol,
-        num_fixings,
-    ))
-}
-
 /// Shared infallible core for the geometric Asian call.
 ///
 /// `rate` and `df` are assumed consistent (`df = exp(-rate·time)`); callers
@@ -351,54 +303,6 @@ pub fn geometric_asian_put(
 ) -> f64 {
     let df = (-rate * time).exp();
     geometric_asian_put_core(spot, strike, time, rate, df, div_yield, vol, num_fixings)
-}
-
-/// Price a geometric Asian put with explicit discount factor (DF-first API).
-///
-/// Derives `r_eff = -ln(df)/t` from a curve-looked-up discount factor.
-///
-/// See [`geometric_asian_call`] for formula details.
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's price units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `time` - Remaining time to maturity in years.
-/// * `df` - Positive discount factor from valuation date to maturity.
-/// * `div_yield` - Continuously compounded dividend yield or carry as a
-///   decimal annual rate.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-/// * `num_fixings` - Number of equally spaced observations; `0` selects the
-///   continuous-monitoring limit.
-///
-/// # Errors
-///
-/// Returns a [`finstack_quant_core::Error::Validation`] when `df` is not a strictly
-/// positive finite number (corrupt or inverted curve).
-pub fn geometric_asian_put_df(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    df: f64,
-    div_yield: f64,
-    vol: f64,
-    num_fixings: usize,
-) -> Result<f64> {
-    if time <= 0.0 {
-        return Ok((strike - spot).max(0.0));
-    }
-    validate_discount_factor(df)?;
-    let rate = -df.ln() / time;
-    Ok(geometric_asian_put_core(
-        spot,
-        strike,
-        time,
-        rate,
-        df,
-        div_yield,
-        vol,
-        num_fixings,
-    ))
 }
 
 /// Shared infallible core for the geometric Asian put. See
@@ -510,58 +414,6 @@ pub fn arithmetic_asian_call_tw(
     arithmetic_asian_call_tw_core(spot, strike, time, rate, df, div_yield, vol, num_fixings)
 }
 
-/// Price an arithmetic Asian call with explicit discount factor (DF-first API).
-///
-/// Derives `r_eff = -ln(df)/t` internally for moment calculations that require a
-/// rate.
-///
-/// See [`arithmetic_asian_call_tw`] for formula details.
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's price units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `time` - Remaining time to maturity in years.
-/// * `df` - Positive discount factor from valuation date to maturity.
-/// * `div_yield` - Continuously compounded dividend yield or carry as a
-///   decimal annual rate.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-/// * `num_fixings` - Number of equally spaced arithmetic-average observations;
-///   zero returns zero because no average can be formed.
-///
-/// # Errors
-///
-/// Returns a [`finstack_quant_core::Error::Validation`] when `df` is not a strictly
-/// positive finite number (corrupt or inverted curve).
-pub fn arithmetic_asian_call_tw_df(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    df: f64,
-    div_yield: f64,
-    vol: f64,
-    num_fixings: usize,
-) -> Result<f64> {
-    if time <= 0.0 {
-        return Ok((spot - strike).max(0.0));
-    }
-    if num_fixings == 0 {
-        return Ok(0.0); // Need at least one fixing
-    }
-    validate_discount_factor(df)?;
-    let rate = -df.ln() / time;
-    Ok(arithmetic_asian_call_tw_core(
-        spot,
-        strike,
-        time,
-        rate,
-        df,
-        div_yield,
-        vol,
-        num_fixings,
-    ))
-}
-
 /// Shared infallible core for the Turnbull-Wakeman arithmetic Asian call. See
 /// [`geometric_asian_call_core`] for the `rate`/`df` consistency contract.
 #[allow(clippy::too_many_arguments)]
@@ -662,58 +514,6 @@ pub fn arithmetic_asian_put_tw(
 ) -> f64 {
     let df = (-rate * time).exp();
     arithmetic_asian_put_tw_core(spot, strike, time, rate, df, div_yield, vol, num_fixings)
-}
-
-/// Price an arithmetic Asian put with explicit discount factor (DF-first API).
-///
-/// Derives `r_eff = -ln(df)/t` internally for moment calculations that require a
-/// rate.
-///
-/// See [`arithmetic_asian_call_tw`] for formula details.
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option's price units.
-/// * `strike` - Exercise price in the same units as `spot`.
-/// * `time` - Remaining time to maturity in years.
-/// * `df` - Positive discount factor from valuation date to maturity.
-/// * `div_yield` - Continuously compounded dividend yield or carry as a
-///   decimal annual rate.
-/// * `vol` - Annualized lognormal volatility as a decimal.
-/// * `num_fixings` - Number of equally spaced arithmetic-average observations;
-///   zero returns zero because no average can be formed.
-///
-/// # Errors
-///
-/// Returns a [`finstack_quant_core::Error::Validation`] when `df` is not a strictly
-/// positive finite number (corrupt or inverted curve).
-pub fn arithmetic_asian_put_tw_df(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    df: f64,
-    div_yield: f64,
-    vol: f64,
-    num_fixings: usize,
-) -> Result<f64> {
-    if time <= 0.0 {
-        return Ok((strike - spot).max(0.0));
-    }
-    if num_fixings == 0 {
-        return Ok(0.0);
-    }
-    validate_discount_factor(df)?;
-    let rate = -df.ln() / time;
-    Ok(arithmetic_asian_put_tw_core(
-        spot,
-        strike,
-        time,
-        rate,
-        df,
-        div_yield,
-        vol,
-        num_fixings,
-    ))
 }
 
 /// Shared infallible core for the Turnbull-Wakeman arithmetic Asian put. See
@@ -1279,93 +1079,6 @@ mod tests {
         assert!((m1 - forward_approx).abs() < 5.0);
     }
 
-    // ==================== DF-WRAPPER TESTS ====================
-
-    #[test]
-    fn test_df_wrapper_consistency_geometric_call() {
-        let spot = 100.0_f64;
-        let strike = 100.0_f64;
-        let time = 1.0_f64;
-        let rate = 0.05_f64;
-        let div_yield = 0.02_f64;
-        let vol = 0.2_f64;
-        let num_fixings = 12;
-        let df = (-rate * time).exp();
-
-        let price_rate =
-            geometric_asian_call(spot, strike, time, rate, div_yield, vol, num_fixings);
-        let price_df = geometric_asian_call_df(spot, strike, time, df, div_yield, vol, num_fixings)
-            .expect("positive df");
-
-        assert!(
-            (price_rate - price_df).abs() < 1e-10,
-            "rate-based {} vs df-based {}",
-            price_rate,
-            price_df
-        );
-    }
-
-    #[test]
-    fn test_df_wrapper_consistency_arithmetic_call() {
-        let spot = 100.0_f64;
-        let strike = 100.0_f64;
-        let time = 1.0_f64;
-        let rate = 0.05_f64;
-        let div_yield = 0.02_f64;
-        let vol = 0.2_f64;
-        let num_fixings = 12;
-        let df = (-rate * time).exp();
-
-        let price_rate =
-            arithmetic_asian_call_tw(spot, strike, time, rate, div_yield, vol, num_fixings);
-        let price_df =
-            arithmetic_asian_call_tw_df(spot, strike, time, df, div_yield, vol, num_fixings)
-                .expect("positive df");
-
-        assert!(
-            (price_rate - price_df).abs() < 1e-10,
-            "rate-based {} vs df-based {}",
-            price_rate,
-            price_df
-        );
-    }
-
-    #[test]
-    fn test_df_wrapper_consistency_puts() {
-        let spot = 100.0_f64;
-        let strike = 105.0_f64; // OTM call, ITM put
-        let time = 0.5_f64;
-        let rate = 0.03_f64;
-        let div_yield = 0.01_f64;
-        let vol = 0.25_f64;
-        let num_fixings = 26;
-        let df = (-rate * time).exp();
-
-        let geo_put_rate =
-            geometric_asian_put(spot, strike, time, rate, div_yield, vol, num_fixings);
-        let geo_put_df =
-            geometric_asian_put_df(spot, strike, time, df, div_yield, vol, num_fixings)
-                .expect("positive df");
-        assert!(
-            (geo_put_rate - geo_put_df).abs() < 1e-10,
-            "geo put rate {} vs df {}",
-            geo_put_rate,
-            geo_put_df
-        );
-
-        let arith_put_rate =
-            arithmetic_asian_put_tw(spot, strike, time, rate, div_yield, vol, num_fixings);
-        let arith_put_df =
-            arithmetic_asian_put_tw_df(spot, strike, time, df, div_yield, vol, num_fixings)
-                .expect("positive df");
-        assert!(
-            (arith_put_rate - arith_put_df).abs() < 1e-10,
-            "arith put rate {} vs df {}",
-            arith_put_rate,
-            arith_put_df
-        );
-    }
-
     // ==================== TW FORMULA FIX REGRESSION TESTS ====================
 
     #[test]
@@ -1566,37 +1279,6 @@ mod tests {
             (1.0..10.0).contains(&var_ratio),
             "W-51 variance ratio out of range for {num_fixings} fixings: {var_ratio:.6}"
         );
-    }
-
-    /// Audit item 1: the `*_df` Asian helpers previously coerced a non-positive
-    /// discount factor (corrupt / inverted curve) to `rate = 0.0`, silently
-    /// mispricing rather than surfacing the bad input.
-    ///
-    /// Failure mode locked in: `df <= 0` (or non-finite) must produce a
-    /// validation `Err`, not a price computed from a fabricated zero rate.
-    #[test]
-    fn asian_df_helpers_reject_non_positive_discount_factor() {
-        for df in [0.0_f64, -0.5, f64::NAN, f64::INFINITY] {
-            assert!(
-                geometric_asian_call_df(100.0, 100.0, 1.0, df, 0.02, 0.2, 12).is_err(),
-                "geometric_asian_call_df must reject df={df}"
-            );
-            assert!(
-                geometric_asian_put_df(100.0, 100.0, 1.0, df, 0.02, 0.2, 12).is_err(),
-                "geometric_asian_put_df must reject df={df}"
-            );
-            assert!(
-                arithmetic_asian_call_tw_df(100.0, 100.0, 1.0, df, 0.02, 0.2, 12).is_err(),
-                "arithmetic_asian_call_tw_df must reject df={df}"
-            );
-            assert!(
-                arithmetic_asian_put_tw_df(100.0, 100.0, 1.0, df, 0.02, 0.2, 12).is_err(),
-                "arithmetic_asian_put_tw_df must reject df={df}"
-            );
-        }
-        // Positive df still prices successfully.
-        assert!(geometric_asian_call_df(100.0, 100.0, 1.0, 0.95, 0.02, 0.2, 12).is_ok());
-        assert!(arithmetic_asian_call_tw_df(100.0, 100.0, 1.0, 0.95, 0.02, 0.2, 12).is_ok());
     }
 
     /// Audit item 3: the Turnbull-Wakeman arithmetic-Asian price had only a
