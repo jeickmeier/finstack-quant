@@ -1,42 +1,86 @@
 //! Shared node, evolution, and backward-induction components for pricing trees.
 //!
 use super::*;
-use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::HashMap;
+use finstack_quant_core::Result;
 
-fn sample_state_variables() -> HashMap<&'static str, f64> {
-    let mut vars = HashMap::default();
-    vars.insert(state_keys::SPOT, 100.0);
-    vars.insert(state_keys::INTEREST_RATE, 0.03);
-    vars.insert(state_keys::HAZARD_RATE, 0.02);
-    vars.insert(state_keys::DF, 0.95);
-    vars
+/// Valuator recording the node state it is handed.
+struct StateProbe {
+    seen: std::sync::Mutex<Vec<NodeState>>,
+}
+
+impl TreeValuator for StateProbe {
+    fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
+        self.record(state);
+        Ok(0.0)
+    }
+
+    fn value_at_node(&self, state: &NodeState, continuation_value: f64, _dt: f64) -> Result<f64> {
+        self.record(state);
+        Ok(continuation_value)
+    }
+}
+
+impl StateProbe {
+    fn record(&self, state: &NodeState) {
+        if let Ok(mut seen) = self.seen.lock() {
+            seen.push(*state);
+        }
+    }
+
+    fn price(lattice: RecombiningLattice<'_>) -> Vec<NodeState> {
+        let probe = Self {
+            seen: std::sync::Mutex::new(Vec::new()),
+        };
+        price_recombining_tree(RecombiningInputs {
+            steps: 1,
+            time_to_maturity: 1.0,
+            valuator: &probe,
+            prob_up: 0.5,
+            prob_down: 0.5,
+            lattice,
+        })
+        .expect("price");
+        probe.seen.into_inner().expect("probe states")
+    }
 }
 
 #[test]
-fn node_state_caches_common_fields() {
-    let market = MarketContext::new();
-    let vars = sample_state_variables();
-
-    let state = NodeState::new(2, 0.5, &vars, &market);
-    assert_eq!(state.step, 2);
-    assert_eq!(state.time, 0.5);
-    assert_eq!(state.spot(), Some(100.0));
-    assert_eq!(state.interest_rate(), Some(0.03));
-    assert_eq!(state.hazard_rate(), Some(0.02));
-    assert_eq!(state.discount_factor(), Some(0.95));
-    assert_eq!(state.get_var(state_keys::VOLATILITY), None);
-    assert_eq!(state.get_var_or(state_keys::VOLATILITY, 0.2), 0.2);
+fn spot_lattice_hands_spot_and_flat_rate_to_the_valuator() {
+    let seen = StateProbe::price(RecombiningLattice::Spot {
+        spot: 100.0,
+        up_factor: 2.0,
+        down_factor: 0.5,
+        interest_rate: 0.03,
+    });
+    let node = |step: usize, spot: f64| NodeState {
+        step,
+        spot: Some(spot),
+        interest_rate: Some(0.03),
+        ..NodeState::default()
+    };
+    assert_eq!(seen, [node(1, 50.0), node(1, 200.0), node(0, 100.0)]);
+    assert_eq!(seen[0].spot(), Some(50.0));
+    assert_eq!(seen[0].interest_rate(), Some(0.03));
+    assert_eq!(seen[0].hazard_rate(), None);
+    assert_eq!(seen[0].discount_factor(), None);
 }
 
 #[test]
-fn state_helper_builder_populates_expected_keys() {
-    let single = single_factor_equity_state(100.0, 0.03, 0.01, 0.20);
-    assert_eq!(single.get(state_keys::SPOT), Some(&100.0));
-    assert_eq!(single.get(state_keys::INTEREST_RATE), Some(&0.03));
-    assert_eq!(single.get(state_keys::DIVIDEND_YIELD), Some(&0.01));
-    assert_eq!(single.get(state_keys::VOLATILITY), Some(&0.20));
-    assert_eq!(single.len(), 4);
+fn short_rate_lattice_hands_node_rate_and_oas_to_the_valuator() {
+    let node_rate = |step: usize, node: usize| 0.01 * (step + node) as f64;
+    let discount_rate = |_step: usize, _node: usize| 0.0;
+    let seen = StateProbe::price(RecombiningLattice::ShortRate {
+        node_rate: &node_rate,
+        discount_rate: &discount_rate,
+        oas_bp: 125.0,
+    });
+    let node = |step: usize, rate: f64| NodeState {
+        step,
+        oas_bp: 125.0,
+        interest_rate: Some(rate),
+        ..NodeState::default()
+    };
+    assert_eq!(seen, [node(1, 0.01), node(1, 0.02), node(0, 0.0)]);
 }
 
 #[test]

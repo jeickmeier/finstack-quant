@@ -321,7 +321,6 @@ fn test_bond_valuator_street_call_redemption_includes_accrued_interest() {
 #[test]
 fn test_rates_credit_default_lowers_price() {
     use finstack_quant_core::market_data::term_structures::HazardCurve;
-    use finstack_quant_core::HashMap;
     use finstack_quant_models::trees::two_factor_rates_credit::{
         RatesCreditConfig, RatesCreditTree,
     };
@@ -435,14 +434,14 @@ fn test_rates_credit_default_lowers_price() {
         .calibrate(&high_targets)
         .expect("calibration high");
 
-    let vars = HashMap::<&'static str, f64>::default();
+    let oas_bp = 0.0;
 
     let pv_low = tree_low
-        .price_with_node_coupons(vars.clone(), &ctx_low, &valuator_low, &[])
+        .price_with_node_coupons(oas_bp, &valuator_low, &[])
         .expect("price low");
 
     let pv_high = tree_high
-        .price_with_node_coupons(vars, &ctx_high, &valuator_high, &[])
+        .price_with_node_coupons(oas_bp, &valuator_high, &[])
         .expect("price high");
 
     assert!(pv_high < pv_low, "pv_high={} pv_low={}", pv_high, pv_low);

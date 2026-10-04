@@ -13,11 +13,9 @@
 //! triggering an integration regression.
 
 use finstack_quant_core::dates::Date;
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCurve, ParInterp};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::InterpStyle;
-use finstack_quant_core::HashMap;
 use finstack_quant_models::trees::tree_framework::{NodeState, TreeValuator};
 use finstack_quant_models::trees::two_factor_rates_credit::{
     RatesCreditCalibrationTargets, RatesCreditConfig, RatesCreditTree,
@@ -126,11 +124,10 @@ fn rates_credit_tree_reproduces_disc_curve_when_hazard_is_silent() {
     });
     calibrate_tree(&mut tree, &disc, &haz, ttm);
 
-    let ctx = MarketContext::new();
-    let vars = HashMap::<&'static str, f64>::default();
+    let oas_bp = 0.0;
     let val = DefaultableZcbValuator;
     let price = tree
-        .price_with_node_coupons(vars, &ctx, &val, &[])
+        .price_with_node_coupons(oas_bp, &val, &[])
         .expect("price");
 
     let market_df = 0.78; // disc curve knot at t=5
@@ -148,7 +145,6 @@ fn rates_credit_tree_correlation_extremes_are_well_defined() {
     let disc = discount_curve();
     let haz = hazard_curve(150.0, 0.40);
     let ttm = 5.0;
-    let ctx = MarketContext::new();
     let val = DefaultableZcbValuator;
 
     let price_at = |rho: f64| -> f64 {
@@ -160,8 +156,8 @@ fn rates_credit_tree_correlation_extremes_are_well_defined() {
             ..Default::default()
         });
         calibrate_tree(&mut tree, &disc, &haz, ttm);
-        let vars = HashMap::<&'static str, f64>::default();
-        tree.price_with_node_coupons(vars, &ctx, &val, &[])
+        let oas_bp = 0.0;
+        tree.price_with_node_coupons(oas_bp, &val, &[])
             .expect("price")
     };
 
@@ -189,10 +185,9 @@ fn rates_credit_tree_correlation_extremes_are_well_defined() {
 #[test]
 fn rates_credit_tree_uncalibrated_returns_error() {
     let tree = RatesCreditTree::new(RatesCreditConfig::default());
-    let ctx = MarketContext::new();
-    let vars = HashMap::<&'static str, f64>::default();
+    let oas_bp = 0.0;
     let val = DefaultableZcbValuator;
-    let result = tree.price_with_node_coupons(vars, &ctx, &val, &[]);
+    let result = tree.price_with_node_coupons(oas_bp, &val, &[]);
     assert!(
         result.is_err(),
         "price() without calibrate() must fail loudly",

@@ -111,7 +111,7 @@
 //!
 //! # OAS
 //!
-//! Option-adjusted spread is read from `initial_vars["oas"]` (basis points) and
+//! Option-adjusted spread is passed to pricing as `oas_bp` (basis points) and
 //! applied as a parallel shift to calibrated short rates during backward induction.
 //! This matches the `ShortRateTree` convention.
 //!
@@ -146,16 +146,13 @@
 use finstack_quant_cashflows::builder::rate_helpers::{
     calculate_floating_rate, FloatingRateParams,
 };
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::BrentSolver;
-use finstack_quant_core::HashMap;
 use finstack_quant_core::{Error, Result};
 
 use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::RandomStream;
 
-use super::short_rate_keys;
-use super::tree_framework::{CachedValues, NodeState, TreeValuator};
+use super::tree_framework::{NodeState, TreeValuator};
 
 mod calibration;
 mod pricing;

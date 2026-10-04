@@ -56,8 +56,6 @@ mod black_karasinski;
 mod config;
 mod ho_lee;
 mod pricing;
-/// State variable keys specific to short-rate trees.
-pub mod short_rate_keys;
 mod tree;
 
 pub use config::TreeDiscounting;

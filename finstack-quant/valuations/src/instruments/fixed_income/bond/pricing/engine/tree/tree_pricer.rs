@@ -9,12 +9,11 @@ use crate::instruments::common_impl::pricing::rates_credit::build_daily_bond_rat
 use crate::instruments::pricing_overrides::resolve_rates_credit_config;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::HashMap;
 use finstack_quant_core::{Error, Result};
 use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
 use finstack_quant_models::trees::short_rate_tree::TreeCalibrationResult;
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
-use finstack_quant_models::{short_rate_keys, ShortRateTree, ShortRateTreeConfig};
+use finstack_quant_models::{ShortRateTree, ShortRateTreeConfig};
 use std::borrow::Cow;
 
 /// Tree-based pricer for bonds with embedded options and OAS calculations.
@@ -672,12 +671,7 @@ impl OasPricer<'_> {
                 valuator.price_deterministic_rates_credit(tree, oas)?
             }
             PreparedTree::HullWhite(tree, valuator) => valuator.price_with_hw_tree(tree, oas)?,
-            PreparedTree::ShortRate { tree, valuator } => {
-                let mut vars = HashMap::<&'static str, f64>::default();
-                vars.insert(short_rate_keys::SHORT_RATE, tree.rate_at_node(0, 0)?);
-                vars.insert(short_rate_keys::OAS, oas);
-                tree.price(vars, self.market, valuator)?
-            }
+            PreparedTree::ShortRate { tree, valuator } => tree.price(oas, valuator)?,
         };
         Ok(TreePriceOutcome::deterministic(amount))
     }

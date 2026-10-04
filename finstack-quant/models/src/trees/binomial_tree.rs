@@ -6,15 +6,13 @@
 use crate::trees::NodeState;
 use crate::types::{OptionMarketParams, OptionType};
 use crate::volatility::black::d1_d2;
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::validation::validate_f64_positive;
-use finstack_quant_core::HashMap;
 use finstack_quant_core::HashSet;
 use finstack_quant_core::{Error, Result};
 
 use super::tree_framework::{
-    map_exercise_dates_to_steps, price_recombining_tree, single_factor_equity_state,
-    EvolutionParams, RecombiningInputs, TreeValuator,
+    map_exercise_dates_to_steps, price_recombining_tree, EvolutionParams, RecombiningInputs,
+    RecombiningLattice, TreeValuator,
 };
 
 /// Binomial tree types
@@ -216,30 +214,28 @@ impl BinomialTree {
         Ok((params.up_factor, params.down_factor, params.prob_up))
     }
 
-    /// Run backward induction on the shared recombining engine with flat
-    /// discounting at `rate` and the lattice factors `(u, d, p)`.
+    /// Run backward induction on the shared recombining engine from `spot`
+    /// with flat discounting at `rate` and the lattice factors `(u, d, p)`.
     fn induct<V: TreeValuator>(
         &self,
         (u, d, p): (f64, f64, f64),
-        initial_vars: HashMap<&'static str, f64>,
+        spot: f64,
         time_to_maturity: f64,
         rate: f64,
-        market_context: &MarketContext,
         valuator: &V,
     ) -> Result<f64> {
         price_recombining_tree(RecombiningInputs {
             steps: self.steps,
-            initial_vars,
             time_to_maturity,
-            market_context,
             valuator,
-            up_factor: u,
-            down_factor: d,
             prob_up: p,
             prob_down: 1.0 - p,
-            interest_rate: rate,
-            custom_state_generator: None,
-            custom_rate_generator: None,
+            lattice: RecombiningLattice::Spot {
+                spot,
+                up_factor: u,
+                down_factor: d,
+                interest_rate: rate,
+            },
         })
     }
 
@@ -268,19 +264,11 @@ impl BinomialTree {
             remaining_dividend_values: None,
         };
 
-        let initial_vars = single_factor_equity_state(
-            market_params.spot,
-            market_params.rate,
-            market_params.dividend_yield,
-            market_params.volatility,
-        );
-
         self.induct(
             factors,
-            initial_vars,
+            market_params.spot,
             market_params.time_to_expiry,
             market_params.rate,
-            &MarketContext::new(), // not used by valuator
             &valuator,
         )
     }
@@ -368,19 +356,11 @@ impl BinomialTree {
             exercise_steps: exercise_steps.map(|steps| steps.iter().copied().collect()),
             remaining_dividend_values: Some(remaining_dividend_values),
         };
-        let initial_vars = single_factor_equity_state(
-            escrowed_spot,
-            market_params.rate,
-            market_params.dividend_yield,
-            market_params.volatility,
-        );
-
         self.induct(
             factors,
-            initial_vars,
+            escrowed_spot,
             market_params.time_to_expiry,
             market_params.rate,
-            &MarketContext::new(),
             &valuator,
         )
     }
@@ -457,6 +437,41 @@ impl BinomialTree {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Bit-exact prices across lattice kinds and exercise styles: the node
+    /// state plumbing must not perturb the backward induction arithmetic.
+    #[test]
+    fn binomial_tree_prices_are_bit_pinned() {
+        let put = OptionMarketParams::put(100.0, 110.0, 0.05, 0.20, 1.0);
+        let call = OptionMarketParams::call(100.0, 95.0, 0.04, 0.25, 0.75);
+        let prices = [
+            BinomialTree::crr(50).price_american(&put),
+            BinomialTree::crr(50).price_european(&put),
+            BinomialTree::leisen_reimer(51).price_european(&call),
+            BinomialTree::leisen_reimer(51).price_bermudan(&put, &[0.25, 0.5, 0.75]),
+            BinomialTree::crr(40).price_american_with_discrete_dividends(&call, &[(0.3, 2.0)]),
+            BinomialTree::crr(40).price_bermudan_with_discrete_dividends(
+                &put,
+                &[0.5],
+                &[(0.25, 1.5), (0.6, 1.5)],
+            ),
+        ];
+        let bits: Vec<u64> = prices
+            .into_iter()
+            .map(|price| price.expect("price").to_bits())
+            .collect();
+        assert_eq!(
+            bits,
+            [
+                4_622_935_351_032_042_556_u64,
+                4_622_210_892_806_378_861,
+                4_623_374_120_383_711_458,
+                4_622_789_733_392_889_670,
+                4_622_659_889_955_153_198,
+                4_623_290_800_700_467_377,
+            ]
+        );
+    }
 
     #[test]
     fn vanilla_tree_entry_points_reject_invalid_prices() {

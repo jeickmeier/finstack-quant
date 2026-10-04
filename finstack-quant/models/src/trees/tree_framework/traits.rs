@@ -14,9 +14,10 @@ pub trait TreeValuator: Send + Sync {
     ///
     /// # Arguments
     ///
-    /// * `state` - Node state with cached common variables
+    /// * `state` - Typed node state: step index, OAS and the per-node values
+    ///   the tree models
     /// * `continuation_value` - Discounted expected value from child nodes
-    /// * `dt` - Time step size (passed explicitly to avoid hash lookup)
+    /// * `dt` - Time step size in years
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64>;
 }
 

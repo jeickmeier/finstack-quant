@@ -25,7 +25,7 @@ only through the instrument pricers.
 
 | Path | Contents |
 |------|----------|
-| [`tree_framework/`](tree_framework/) | Traits, `NodeState`, evolution parameters, the generic recombining engine, `state_keys` |
+| [`tree_framework/`](tree_framework/) | Traits, `NodeState`, evolution parameters, the generic recombining engine |
 | [`binomial_tree.rs`](binomial_tree.rs) | `BinomialTree` (CRR, Leisen-Reimer) plus American/European/Bermudan entry points |
 | [`short_rate_tree/`](short_rate_tree/) | `ShortRateTree`: Ho-Lee, Black-Derman-Toy, Black-Karasinski |
 | [`hull_white_tree.rs`](hull_white_tree.rs) | `HullWhiteTree`: 1-factor trinomial in auxiliary x-space |
@@ -52,13 +52,13 @@ trait over the trees.
 
 | Tree | Valuator-driven entry point |
 |------|-----------------------------|
-| `ShortRateTree` | `price(initial_vars, &MarketContext, &valuator)` |
-| `RatesCreditTree` | `price_with_node_coupons(initial_vars, &MarketContext, &valuator, &node_coupons)` |
+| `ShortRateTree` | `price(oas_bp, &valuator)` |
+| `RatesCreditTree` | `price_with_node_coupons(oas_bp, &valuator, &node_coupons)` |
 | `BinomialTree` | `price_european` / `price_american` / `price_bermudan` (option payoffs built in) |
 
-Calibrated trees price over the horizon they were calibrated to.
-`initial_vars` is a plain `HashMap<&'static str, f64>` keyed by `state_keys`
-constants.
+Calibrated trees price over the horizon they were calibrated to. `oas_bp` is
+the option-adjusted spread in basis points (continuously compounded); pass
+`0.0` to price on the calibrated curve.
 
 `HullWhiteTree` exposes `backward_induction`, `bond_price`,
 `forward_swap_rate`, and `annuity` accessors instead, because swaption pricing
@@ -174,9 +174,8 @@ Ho-Lee σ is absolute (50-150 bp, i.e. 0.005-0.015); BDT σ is proportional
 BDT (binomial): node 0 is the *highest* rate (`α·u^(n-1)`).
 Black-Karasinski (trinomial): node 0 is the lowest (`j = −j_max`).
 
-`short_rate_keys` supplies `SHORT_RATE` (the same key as
-`state_keys::INTEREST_RATE`) and `OAS` (basis points). Every OAS reader and
-writer uses the constant; a missing key prices with OAS = 0.
+The OAS is an explicit `oas_bp` argument (basis points) of `price`; it shifts
+every node's discounting rate and reaches the valuator as `NodeState::oas_bp`.
 
 ## Hull-White tree
 
@@ -295,21 +294,20 @@ Other accessors: `max_feasible_correlation(ttm)`, `rate_at_node`,
 
 ## State variables
 
-Nodes carry a `HashMap<&'static str, f64>` keyed by `state_keys`:
+Each node hands the valuator a `NodeState`, a small `Copy` struct of typed
+fields:
 
-| Constant | Key | Meaning |
-|----------|-----|---------|
-| `SPOT` | `"spot"` | Underlying asset price |
-| `INTEREST_RATE` | `"interest_rate"` | Risk-free short rate |
-| `HAZARD_RATE` | `"hazard_rate"` | Default intensity |
-| `DIVIDEND_YIELD` | `"dividend_yield"` | Continuous dividend yield |
-| `VOLATILITY` | `"volatility"` | Volatility |
-| `DF` | `"df"` | Pre-computed per-node discount factor |
+| Field | Meaning | Set by |
+|-------|---------|--------|
+| `step` | Time-step index | every tree |
+| `oas_bp` | Option-adjusted spread in basis points | `ShortRateTree`, `RatesCreditTree` |
+| `spot` | Underlying asset price | `BinomialTree` |
+| `interest_rate` | Short rate | every tree (flat rate on `BinomialTree`) |
+| `hazard_rate` | Default intensity | `RatesCreditTree` |
+| `df` | Discount factor over the interval starting at the node | `RatesCreditTree` interior nodes |
 
-`NodeState` pre-extracts `spot`, `interest_rate`, `hazard_rate`, and
-`discount_factor` into cached fields so the hot path avoids hash lookups; the
-accessors return `Option<f64>`. `get_var` / `get_var_or` reach anything else.
-`single_factor_equity_state` assembles the common equity map.
+The optional fields are `Option<f64>`; a tree leaves the ones it does not
+model as `None`.
 
 ## Usage in the codebase
 
@@ -335,7 +333,8 @@ types non-serializable.
 
 - Complexity as tabulated above; step-count guidance: 50 for fast estimates,
   100-200 for production, 200+ for high precision.
-- `NodeState` caching removes hash lookups from the inner loop.
+- `NodeState` is a plain `Copy` struct, so the inner loop does no hashing or
+  allocation.
 - Parallel Greeks, node-value caching, and SIMD are deliberately deferred to
   keep the engine simple and deterministic.
 
@@ -364,17 +363,16 @@ mise run rust-bench
    public re-exports.
 2. Give the tree an inherent pricing method. The shortest path is to build a `RecombiningInputs`
    and call `price_recombining_tree(inputs)` — note it takes the struct **by
-   value**. Fields: `steps`, `initial_vars`, `time_to_maturity`,
-   `market_context`, `valuator`, `up_factor`, `down_factor`, `prob_up`,
-   `prob_down`, `interest_rate`, `custom_state_generator`,
-   `custom_rate_generator`.
+   value**. Fields: `steps`, `time_to_maturity`, `valuator`, `prob_up`,
+   `prob_down`, and `lattice` — a `RecombiningLattice::Spot` (multiplicative
+   factors and a flat rate) or `RecombiningLattice::ShortRate` (per-node rate
+   and discount-rate closures plus `oas_bp`).
 3. Implement `TreeValuator` for the instrument: terminal payoff in
    `value_at_maturity`, the hold-vs-exercise decision in `value_at_node`.
 4. For calibrated trees, add a `calibrate()` that stores per-node state
-   privately and inject it through `custom_state_generator` /
-   `custom_rate_generator`.
-5. Add any new state keys to `state_keys`; add a cached `NodeState` field only
-   if the key is read on the hot path.
+   privately and inject it through the `RecombiningLattice::ShortRate`
+   closures.
+5. Add a typed `NodeState` field for any new per-node datum a valuator reads.
 6. Derive evolution parameters through `EvolutionParams::equity_crr` /
    `equity_trinomial` / `with_drift` where possible — they validate that the
    risk-neutral probabilities lie in `[0, 1]` and sum to one in release builds,

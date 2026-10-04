@@ -8,7 +8,6 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_core::HashMap;
 use finstack_quant_models::{NodeState, ShortRateTree, ShortRateTreeConfig, TreeValuator};
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::Instrument;
@@ -64,7 +63,6 @@ fn test_tree_calibrates_to_curve() {
     // Check that tree produces correct discount factors at key points
     let test_times = [0.5, 1.0, 2.0, 3.0, 5.0];
     let valuator = ZeroCouponValuator { notional: 1.0 };
-    let market = MarketContext::new();
 
     for &t in &test_times {
         // Node spacing and calibrated rates belong to one horizon. Each
@@ -72,9 +70,7 @@ fn test_tree_calibrates_to_curve() {
         // reusing the 5Y rates on a shorter clock changes their economics.
         tree.calibrate(&curve, t).unwrap();
         let expected_df = (-rate * t).exp();
-        let tree_df = tree
-            .price(HashMap::<&'static str, f64>::default(), &market, &valuator)
-            .unwrap();
+        let tree_df = tree.price(0.0, &valuator).unwrap();
 
         assert!(
             (tree_df - expected_df).abs() < 1e-3,

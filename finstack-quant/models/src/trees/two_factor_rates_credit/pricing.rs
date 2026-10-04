@@ -158,9 +158,9 @@ impl RatesCreditTree {
     ///
     /// # Arguments
     ///
-    /// * `initial_vars` - initial state variables; `"oas"` (basis points)
-    ///   is applied as a parallel shift to the calibrated short rates
-    /// * `market_context` - market data passed through to the valuator
+    /// * `oas_bp` - option-adjusted spread in basis points, continuously
+    ///   compounded; applied as a parallel shift to the calibrated short
+    ///   rates and passed to the valuator as [`NodeState::oas_bp`]
     /// * `valuator` - instrument value function driven by the induction
     /// * `node_coupons` - future floating-coupon increments to fold at
     ///   their reset slices
@@ -172,21 +172,15 @@ impl RatesCreditTree {
     /// [`NodeCoupon`]), or the valuator fails.
     pub fn price_with_node_coupons<V: TreeValuator>(
         &self,
-        initial_vars: HashMap<&'static str, f64>,
-        market_context: &MarketContext,
+        oas_bp: f64,
         valuator: &V,
         node_coupons: &[NodeCoupon],
     ) -> Result<f64> {
         let steps = self.config.steps;
         let dt = self.calibrated_dt()?;
-        let time_to_maturity = self.time_grid()?[steps];
 
-        // OAS from initial variables (bp units, same convention as ShortRateTree)
-        let oas_decimal = initial_vars
-            .get(short_rate_keys::OAS)
-            .copied()
-            .unwrap_or(0.0)
-            / 10_000.0;
+        // OAS in bp units, same convention as ShortRateTree
+        let oas_decimal = oas_bp / 10_000.0;
 
         // Fold every node coupon's increment onto its reset slice up front;
         // the claims are independent of the instrument value function, so
@@ -213,27 +207,17 @@ impl RatesCreditTree {
         let mut curr_values: Vec<f64> = vec![0.0; max_nodes * max_nodes];
         let mut next_values: Vec<f64> = vec![0.0; max_nodes * max_nodes];
 
-        // No valuator used with this tree reads node coordinates from
-        // `state.vars`; they consume the cached `interest_rate`/`hazard_rate`
-        // fields and `state.step`. Build each `NodeState` via `with_cached`
-        // (supplying the per-node values directly) and skip the per-node
-        // `HashMap` writes entirely — `initial_vars` passes through unchanged.
         for i in 0..=steps {
             let r_t = self.calibrated_rates[steps].value_unchecked(i);
             for j in 0..=steps {
                 let h_t = self.calibrated_hazards[steps].value_unchecked(j);
-                let cached = CachedValues {
+                let state = NodeState {
+                    step: steps,
+                    oas_bp,
                     interest_rate: Some(r_t.max(1e-8)),
                     hazard_rate: Some(Self::effective_hazard(h_t)),
-                    ..CachedValues::default()
+                    ..NodeState::default()
                 };
-                let state = NodeState::with_cached(
-                    steps,
-                    time_to_maturity,
-                    &initial_vars,
-                    market_context,
-                    cached,
-                );
                 curr_values[i * max_nodes + j] = valuator.value_at_maturity(&state)?;
             }
         }
@@ -281,7 +265,7 @@ impl RatesCreditTree {
                     // backward induction must do the same or the tree will not
                     // reprice the discount curve once a wide lattice produces
                     // negative node rates. The `1e-8` floor is still applied
-                    // below to the INTEREST_RATE / HAZARD_RATE *state
+                    // below to the interest-rate / hazard-rate *state
                     // variables*, which shields valuators that cannot accept
                     // non-positive rates.
                     let df = (-(r_t + oas_decimal) * dt).exp();
@@ -294,23 +278,18 @@ impl RatesCreditTree {
                         cont += folded[i * max_nodes + j];
                     }
 
-                    // `r_t`/`h_t` are floored only for the cached *state*
+                    // `r_t`/`h_t` are floored only for the node *state*
                     // variables (shields valuators that reject non-positive
                     // rates); the discounting above intentionally uses the raw
                     // calibrated rate.
-                    let cached = CachedValues {
+                    let state = NodeState {
+                        step: k,
+                        oas_bp,
                         interest_rate: Some(r_t.max(1e-8)),
                         hazard_rate: Some(Self::effective_hazard(h_t)),
                         df: Some(df),
-                        ..CachedValues::default()
+                        ..NodeState::default()
                     };
-                    let state = NodeState::with_cached(
-                        k,
-                        k as f64 * dt,
-                        &initial_vars,
-                        market_context,
-                        cached,
-                    );
                     next_values[i * max_nodes + j] = valuator.value_at_node(&state, cont, dt)?;
                 }
             }

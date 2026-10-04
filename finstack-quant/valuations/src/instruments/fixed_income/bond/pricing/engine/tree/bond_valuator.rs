@@ -1116,15 +1116,13 @@ impl BondValuator {
 impl TreeValuator for BondValuator {
     fn value_at_maturity(&self, state: &NodeState) -> Result<f64> {
         let final_step = self.time_steps.len() - 1;
-        let oas_rate =
-            state.get_var_or(finstack_quant_models::short_rate_keys::OAS, 0.0) / 10_000.0;
+        let oas_rate = state.oas_bp / 10_000.0;
         Ok(self.terminal_value(final_step, oas_rate))
     }
 
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64> {
         let step = state.step;
-        let oas_rate =
-            state.get_var_or(finstack_quant_models::short_rate_keys::OAS, 0.0) / 10_000.0;
+        let oas_rate = state.oas_bp / 10_000.0;
         // The tree has already rate/OAS-discounted `continuation_value` from
         // the child slice to this node. Apply only survival to that value, and
         // add continuously paid FRP recovery with the same interval discount.
@@ -1177,12 +1175,11 @@ mod tests {
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_core::HashMap;
     use finstack_quant_models::trees::tree_framework::map_date_to_step;
     use finstack_quant_models::trees::two_factor_rates_credit::{
         RatesCreditCalibrationTargets, RatesCreditConfig,
     };
-    use finstack_quant_models::{state_keys, NodeState};
+    use finstack_quant_models::NodeState;
     use time::macros::date;
 
     fn node_test_valuator(
@@ -1225,16 +1222,17 @@ mod tests {
     #[test]
     fn risky_hold_is_survival_weighted_before_exercise_and_current_payment_is_not() {
         let valuator = node_test_valuator(5.0, 100.0, [None; 2], [None; 2], 100.0, Some(0.4), 0.0);
-        let market = MarketContext::new();
         let rate: f64 = 0.03;
         let hazard: f64 = 0.10;
         let dt: f64 = 1.0;
         let interval_df = (-rate * dt).exp();
-        let mut vars = HashMap::default();
-        vars.insert(state_keys::INTEREST_RATE, rate);
-        vars.insert(state_keys::HAZARD_RATE, hazard);
-        vars.insert(state_keys::DF, interval_df);
-        let state = NodeState::new(0, 0.0, &vars, &market);
+        let state = NodeState {
+            step: 0,
+            interest_rate: Some(rate),
+            hazard_rate: Some(hazard),
+            df: Some(interval_df),
+            ..NodeState::default()
+        };
         let discounted_continuation = 100.0 * interval_df;
 
         let actual = valuator
@@ -1261,12 +1259,13 @@ mod tests {
             Some(0.4),
             0.0,
         );
-        let market = MarketContext::new();
-        let mut vars = HashMap::default();
-        vars.insert(state_keys::INTEREST_RATE, 0.0);
-        vars.insert(state_keys::HAZARD_RATE, 1.0);
-        vars.insert(state_keys::DF, 1.0);
-        let state = NodeState::new(0, 0.0, &vars, &market);
+        let state = NodeState {
+            step: 0,
+            interest_rate: Some(0.0),
+            hazard_rate: Some(1.0),
+            df: Some(1.0),
+            ..NodeState::default()
+        };
 
         let actual = valuator
             .value_at_node(&state, 0.0, 1.0)
@@ -1323,9 +1322,10 @@ mod tests {
             None,
             0.0,
         );
-        let market = MarketContext::new();
-        let vars = HashMap::default();
-        let state = NodeState::new(1, 1.0, &vars, &market);
+        let state = NodeState {
+            step: 1,
+            ..NodeState::default()
+        };
 
         let actual = valuator.value_at_maturity(&state).expect("terminal value");
         assert_eq!(actual, 1_150.0);
