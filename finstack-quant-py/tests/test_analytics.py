@@ -257,7 +257,9 @@ class TestReturnRiskMetrics:
             [0.005, -0.01, 0.0, 0.005, 0.02, -0.015],
         ]
         perf = Performance.from_returns_arrays(dates, returns, ["A", "B"])
-        corr = perf.correlation_matrix()
+        corr, repaired = perf.correlation_matrix()
+        assert repaired is False
+        assert perf.to_correlation_dataframe().attrs["repaired"] is False
         assert len(corr) == 2
         assert len(corr[0]) == 2
         assert corr[0][0] == pytest.approx(1.0)
@@ -515,6 +517,10 @@ class TestMultiFactor:
         factor = [0.001] * n
         with pytest.raises(ValueError, match="return_kind"):
             perf_prices.multi_factor_greeks(0, [factor], return_kind="jensen")
+        with pytest.raises(ValueError, match="risk_free_rate"):
+            perf_prices.multi_factor_greeks(0, [factor], return_kind="excess", risk_free_rate=0.02)
+        with pytest.raises(ValueError, match="risk_free_rate"):
+            perf_prices.multi_factor_greeks(0, [factor], risk_free_rate=0.02)
 
 
 # Date window mutation

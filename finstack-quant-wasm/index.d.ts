@@ -9679,21 +9679,16 @@ declare class Performance {
    */
   drawdownSeries(): Float64Array[];
   /**
-   * Return correlation matrix across assets.
+   * Return the correlation matrix across assets and whether it was repaired.
    *
    * Uses the complete-case common window when every ticker has at least
-   * two overlapping points; otherwise pairwise intersecting spans, then
-   * Higham repair.
-   * @returns Square correlation matrix as nested Float64Array rows in `tickerNames()` order.
+   * two overlapping points; otherwise pairwise intersecting spans. A raw
+   * estimate that is not a valid correlation matrix is Higham-repaired to
+   * the nearest valid correlation matrix.
+   * @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `tickerNames()` order, and `true` when Higham repair was applied.
    * @throws Error - Rejects a degenerate pair or a matrix that cannot be repaired to a valid correlation matrix.
    */
-  correlationMatrix(): Float64Array[];
-  /**
-   * `true` when `correlationMatrix()` had to be Higham-repaired to the nearest valid correlation matrix (ragged panels can yield a raw pairwise estimate that is not positive semi-definite).
-   * @returns `true` when the estimate was projected to the nearest correlation matrix.
-   * @throws Error - Rejects the same degenerate-pair conditions as `correlationMatrix`.
-   */
-  correlationMatrixRepaired(): boolean;
+  correlationMatrix(): { matrix: Float64Array[]; repaired: boolean };
   /**
    * Cumulative outperformance versus the benchmark per asset.
    * @returns One Float64Array per ticker in `tickerNames()` order.
@@ -9789,9 +9784,9 @@ declare class Performance {
    * @param tickerIdx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
    * @param factorReturns - Matrix of aligned already-excess decimal factor-return series, one row per factor.
    * @param returnKind - `"excess"` or `"total"`; defaults to `"excess"`.
-   * @param riskFreeRate - Annualized decimal risk-free rate used when `returnKind` is `"total"`; defaults to 0.0.
+   * @param riskFreeRate - Annualized decimal risk-free rate, used only when `returnKind` is `"total"`; defaults to 0.0 and must be 0.0 for `"excess"`.
    * @returns `{ alpha, betas, r_squared, adjusted_r_squared, residual_vol }` for the selected ticker.
-   * @throws Error - Rejects a non-numeric `factor_returns` matrix, an unknown `returnKind`, an out-of-range `ticker_idx`, no factors, too few observations, non-finite or length-mismatched inputs, a singular factor design, a fitted coefficient, annualized intercept, or residual volatility that cannot be represented as a finite value, or a result that cannot be serialized to JavaScript. Constant responses retain undefined `NaN` R-squared statistics.
+   * @throws Error - Rejects a non-numeric `factor_returns` matrix, an unknown `returnKind`, a non-zero `riskFreeRate` with `"excess"`, an out-of-range `ticker_idx`, no factors, too few observations, non-finite or length-mismatched inputs, a singular factor design, a fitted coefficient, annualized intercept, or residual volatility that cannot be represented as a finite value, or a result that cannot be serialized to JavaScript. Constant responses retain undefined `NaN` R-squared statistics.
    */
   multiFactorGreeks(
     tickerIdx: number,

@@ -823,13 +823,14 @@ impl PyDatedSeries {
     #[staticmethod]
     #[pyo3(text_signature = "(json)")]
     fn from_json(json: &str) -> PyResult<Self> {
-        let inner: fa::DatedSeries = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
+        Ok(Self {
+            inner: serde_from_json(json)?,
+        })
     }
 
     /// Serialize to compact JSON (the Rust `DatedSeries` serde form).
     fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
+        serde_to_json(&self.inner)
     }
 
     /// Numeric values, one per window.
@@ -994,7 +995,7 @@ pub(super) fn drawdowns_to_dataframe<'py>(
     dict_to_dataframe(py, &data, None)
 }
 
-pub fn register(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPeriodStats>()?;
     m.add_class::<PyBetaResult>()?;
     m.add_class::<PyGreeksResult>()?;
@@ -1003,6 +1004,5 @@ pub fn register(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyDrawdownEpisode>()?;
     m.add_class::<PyLookbackReturns>()?;
     m.add_class::<PyDatedSeries>()?;
-    let _ = py;
     Ok(())
 }

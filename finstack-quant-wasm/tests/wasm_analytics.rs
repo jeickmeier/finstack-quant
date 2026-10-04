@@ -275,7 +275,10 @@ fn periodic_returns_reject_unknown_frequency() {
 #[wasm_bindgen_test]
 fn correlation_matrix_is_square() {
     let perf = build_perf();
-    let mat = typed_matrix(perf.correlation_matrix().unwrap());
+    let result = perf.correlation_matrix().unwrap();
+    let repaired = js_sys::Reflect::get(&result, &JsValue::from("repaired")).unwrap();
+    assert_eq!(repaired.as_bool(), Some(false));
+    let mat = typed_matrix(js_sys::Reflect::get(&result, &JsValue::from("matrix")).unwrap());
     assert_eq!(mat.len(), 2);
     assert_eq!(mat[0].len(), 2);
     assert!((mat[0][0] - 1.0).abs() < 1e-12);

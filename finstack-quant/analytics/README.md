@@ -133,11 +133,14 @@ link against this crate.
 - Calmar is CAGR / |max DD| over the **active window**, not Young's
   36-month CTA definition.
 - `correlation_matrix` uses complete-case when every ticker has ≥2 points
-  on the common span, otherwise pairwise, then Higham. Degenerate pairs
-  or repair failure return `Err`.
+  on the common span, otherwise pairwise, then Higham. It returns
+  `(matrix, repaired)`; `repaired` is `true` when Higham repair was
+  applied. Degenerate pairs or repair failure return `Err`.
 - `multi_factor_greeks` takes `ReturnKind::Excess` or
   `ReturnKind::Total { risk_free_rate }`. Factors are already-excess;
   Total subtracts decompounded rf from the dependent series only.
+  `ReturnKind::from_label` builds the kind from a host label and rate and
+  rejects a non-zero rate with `excess`.
 - Drawdown depths are non-positive fractions: `-0.25` is a 25% loss.
 - Rolling series are right-labeled — each output value carries the date of the
   last observation in its window.

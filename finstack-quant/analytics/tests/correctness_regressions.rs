@@ -315,7 +315,7 @@ fn benchmark_relative_metrics_use_overlapping_dates_only() {
     assert_close(greeks.adjusted_r_squared, 1.0);
     assert!(perf.treynor(0.0)[1].is_finite());
     assert_close(
-        perf.correlation_matrix().expect("psd correlation")[0][1],
+        perf.correlation_matrix().expect("psd correlation").0[0][1],
         1.0,
     );
 

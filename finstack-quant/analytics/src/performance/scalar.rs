@@ -324,7 +324,7 @@ impl Performance {
     /// Returns two parallel vectors `(skewness_per_ticker, kurtosis_per_ticker)`
     /// in column order. Equivalent to calling [`Self::skewness`] and
     /// [`Self::kurtosis`] but walks each ticker once instead of twice.
-    pub fn skew_kurt(&self) -> (Vec<f64>, Vec<f64>) {
+    pub(crate) fn skew_kurt(&self) -> (Vec<f64>, Vec<f64>) {
         let n = self.ticker_names().len();
         let mut sk = Vec::with_capacity(n);
         let mut ku = Vec::with_capacity(n);
@@ -341,7 +341,7 @@ impl Performance {
     /// Returns two parallel vectors `(var_per_ticker, es_per_ticker)` in
     /// column order. Equivalent to calling [`Self::value_at_risk`] and
     /// [`Self::expected_shortfall`] but shares the partition / allocation.
-    pub fn value_at_risk_and_es(&self, confidence: f64) -> (Vec<f64>, Vec<f64>) {
+    pub(crate) fn value_at_risk_and_es(&self, confidence: f64) -> (Vec<f64>, Vec<f64>) {
         let n = self.ticker_names().len();
         let mut vars = Vec::with_capacity(n);
         let mut ess = Vec::with_capacity(n);
@@ -660,6 +660,29 @@ mod from_returns_cagr_tests {
 
     fn d(year: i32, month: Month, day: u8) -> Date {
         Date::from_calendar_date(year, month, day).expect("valid date")
+    }
+
+    #[test]
+    fn batched_tail_and_moment_metrics_match_the_single_metric_methods() {
+        let dates = (1..=6).map(|day| d(2025, Month::January, day)).collect();
+        let returns = vec![
+            vec![0.01, -0.02, 0.015, 0.003, -0.01, 0.02],
+            vec![-0.005, 0.01, -0.03, 0.02, 0.004, -0.012],
+        ];
+        let perf = Performance::from_returns(
+            dates,
+            returns,
+            vec!["A".into(), "B".into()],
+            None,
+            PeriodKind::Daily,
+        )
+        .expect("daily panel");
+        let (var, es) = perf.value_at_risk_and_es(0.95);
+        assert_eq!(var, perf.value_at_risk(0.95).expect("valid confidence"));
+        assert_eq!(es, perf.expected_shortfall(0.95).expect("valid confidence"));
+        let (skew, kurt) = perf.skew_kurt();
+        assert_eq!(skew, perf.skewness());
+        assert_eq!(kurt, perf.kurtosis());
     }
 
     #[test]

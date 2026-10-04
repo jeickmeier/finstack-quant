@@ -72,7 +72,7 @@ impl Performance {
     }
 
     /// Pearson correlation matrix of all tickers, repaired to a valid
-    /// correlation matrix when needed.
+    /// correlation matrix when needed, plus a flag saying whether it was.
     ///
     /// Uses the complete-case common window when every ticker has at least
     /// two observations on the intersection of all active spans. Otherwise
@@ -89,26 +89,13 @@ impl Performance {
     ///
     /// # Returns
     ///
-    /// An `n × n` matrix in [`Self::ticker_names`] order. The diagonal is
-    /// `1.0`. The result passes
-    /// [`crate::correlation::validate_correlation_matrix`].
-    pub fn correlation_matrix(&self) -> crate::Result<Vec<Vec<f64>>> {
-        self.correlation_matrix_with_repair_flag()
-            .map(|(matrix, _)| matrix)
-    }
-
-    /// Correlation matrix plus a flag saying whether Higham repair was applied.
-    ///
-    /// Same estimator and error behaviour as [`Self::correlation_matrix`];
-    /// the boolean is `true` when the raw pairwise matrix failed
-    /// [`crate::correlation::validate_correlation_matrix`] and was projected
-    /// to the nearest valid correlation matrix, so a reader can tell a
-    /// clean estimate from a repaired one.
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::correlation_matrix`].
-    pub fn correlation_matrix_with_repair_flag(&self) -> crate::Result<(Vec<Vec<f64>>, bool)> {
+    /// `(matrix, repaired)`. `matrix` is `n × n` in [`Self::ticker_names`]
+    /// order with a unit diagonal and passes
+    /// [`crate::correlation::validate_correlation_matrix`]. `repaired` is
+    /// `true` when the raw pairwise matrix failed that validation and was
+    /// projected to the nearest valid correlation matrix, so a reader can
+    /// tell a clean estimate from a repaired one.
+    pub fn correlation_matrix(&self) -> crate::Result<(Vec<Vec<f64>>, bool)> {
         let n = self.ticker_names().len();
         let mut matrix = vec![vec![0.0; n]; n];
         if n == 0 {
@@ -575,7 +562,8 @@ mod correlation_matrix_tests {
             PeriodKind::Daily,
         )
         .expect("panel");
-        let m = perf.correlation_matrix().expect("psd correlation");
+        let (m, repaired) = perf.correlation_matrix().expect("psd correlation");
+        assert!(!repaired);
         assert!((m[0][0] - 1.0).abs() < 1e-12);
         assert!((m[1][1] - 1.0).abs() < 1e-12);
         assert!((m[0][1] - 1.0).abs() < 1e-12);

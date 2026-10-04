@@ -10,15 +10,16 @@ use crate::utils::input::{
     js_f64_matrix, js_f64_seq, js_opt_bool, js_opt_f64, js_opt_string, js_opt_uint, js_string,
     js_string_seq, js_uint,
 };
-use crate::utils::{date_to_iso, to_js_err, to_js_rows_numeric, to_js_value_numeric};
+use crate::utils::{
+    date_to_iso, parse_iso_date, parse_iso_dates, to_js_err, to_js_rows_numeric, to_js_value,
+    to_js_value_numeric,
+};
 use finstack_quant_analytics as fa;
 use finstack_quant_core::dates::{
     calendar_by_id_strict, FiscalConfig, HolidayCalendar, PeriodKind,
 };
 use js_sys::{Array, Float64Array, Reflect};
 use wasm_bindgen::prelude::*;
-
-use super::support::{parse_iso_date, parse_iso_dates};
 
 struct PanelInputs {
     dates: Vec<time::Date>,
@@ -67,18 +68,6 @@ fn resolve_optional_calendar(
         .map_err(to_js_err)
 }
 
-fn parse_return_kind(
-    return_kind: Option<&str>,
-    risk_free_rate: Option<f64>,
-) -> Result<fa::ReturnKind, JsValue> {
-    let kind = return_kind
-        .map(str::parse::<fa::ReturnKind>)
-        .transpose()
-        .map_err(to_js_err)?
-        .unwrap_or_default();
-    Ok(kind.with_risk_free_rate(risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE)))
-}
-
 fn parse_dates(dates: JsValue) -> Result<Vec<time::Date>, JsValue> {
     let strs = js_string_seq(&dates, "dates")?;
     parse_iso_dates(&strs)
@@ -96,10 +85,6 @@ fn parse_panel_inputs(
         ticker_names: js_string_seq(&ticker_names, "tickerNames")?,
         frequency: parse_frequency(frequency.as_deref(), fa::DEFAULT_FREQUENCY)?,
     })
-}
-
-fn to_js<T: serde::Serialize>(value: &T) -> Result<JsValue, JsValue> {
-    crate::utils::to_js_value(value)
 }
 
 /// Serialize a `Vec<f64>` as a JavaScript `Float64Array`.
@@ -282,7 +267,7 @@ impl JsPerformance {
     /// @returns Ticker labels in column order as a JavaScript string array.
     #[wasm_bindgen(js_name = tickerNames)]
     pub fn ticker_names(&self) -> Result<JsValue, JsValue> {
-        to_js(&self.inner.ticker_names().to_vec())
+        to_js_value(&self.inner.ticker_names().to_vec())
     }
 
     /// Benchmark column index.
@@ -523,7 +508,7 @@ impl JsPerformance {
     pub fn max_drawdown_duration(&self) -> Result<JsValue, JsValue> {
         // `i64` day counts do not fit a `Float64Array` contract; they cross as a
         // plain JS number array through the serde path.
-        to_js(&self.inner.max_drawdown_duration())
+        to_js_value(&self.inner.max_drawdown_duration())
     }
 
     /// Empyrical-style annualized geometric up-capture versus the benchmark per asset.
@@ -873,7 +858,7 @@ impl JsPerformance {
                 confidence.unwrap_or(fa::DEFAULT_CONFIDENCE),
             )
             .map_err(to_js_err)?;
-        to_js(&table)
+        to_js_value(&table)
     }
 
     /// Calendar-bucketed compounded returns per ticker.
@@ -899,7 +884,7 @@ impl JsPerformance {
     pub fn periodic_returns(&self, frequency: Option<JsValue>) -> Result<JsValue, JsValue> {
         let frequency = js_opt_string(frequency.as_ref(), "frequency")?;
         let kind = parse_frequency(frequency.as_deref(), fa::DEFAULT_PERIODIC_FREQUENCY)?;
-        to_js(&self.inner.periodic_returns(kind))
+        to_js_value(&self.inner.periodic_returns(kind))
     }
 
     /// Drawdown series per asset.
@@ -909,37 +894,26 @@ impl JsPerformance {
         matrix_f64_to_js(&self.inner.drawdown_series())
     }
 
-    /// Return correlation matrix across assets.
+    /// Return the correlation matrix across assets and whether it was repaired.
     ///
     /// Uses the complete-case common window when every ticker has at least
-    /// two overlapping points; otherwise pairwise intersecting spans, then
-    /// Higham repair.
+    /// two overlapping points; otherwise pairwise intersecting spans. A raw
+    /// estimate that is not a valid correlation matrix (ragged panels can
+    /// yield one that is not positive semi-definite) is Higham-repaired to
+    /// the nearest valid correlation matrix.
     ///
     /// # Errors
     ///
     /// Rejects a degenerate pair or a matrix that cannot be repaired to a
     /// valid correlation matrix.
-    /// @returns Square correlation matrix as nested Float64Array rows in `tickerNames()` order.
+    /// @returns `{ matrix, repaired }`: the square correlation matrix as nested Float64Array rows in `tickerNames()` order, and `true` when Higham repair was applied.
     #[wasm_bindgen(js_name = correlationMatrix)]
     pub fn correlation_matrix(&self) -> Result<JsValue, JsValue> {
-        let matrix = self.inner.correlation_matrix().map_err(to_js_err)?;
-        Ok(matrix_f64_to_js(&matrix))
-    }
-
-    /// `true` when `correlationMatrix()` had to be Higham-repaired to the
-    /// nearest valid correlation matrix (ragged panels can yield a raw
-    /// pairwise estimate that is not positive semi-definite).
-    ///
-    /// # Errors
-    ///
-    /// Rejects the same degenerate-pair conditions as `correlationMatrix`.
-    /// @returns `true` when the estimate was projected to the nearest correlation matrix.
-    #[wasm_bindgen(js_name = correlationMatrixRepaired)]
-    pub fn correlation_matrix_repaired(&self) -> Result<bool, JsValue> {
-        self.inner
-            .correlation_matrix_with_repair_flag()
-            .map(|(_, repaired)| repaired)
-            .map_err(to_js_err)
+        let (matrix, repaired) = self.inner.correlation_matrix().map_err(to_js_err)?;
+        obj_from_pairs(&[
+            ("matrix", matrix_f64_to_js(&matrix)),
+            ("repaired", JsValue::from(repaired)),
+        ])
     }
 
     /// Cumulative outperformance versus the benchmark per asset.
@@ -1169,7 +1143,7 @@ impl JsPerformance {
     ) -> Result<JsValue, JsValue> {
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let n = js_opt_uint(n.as_ref(), "n")?;
-        to_js(
+        to_js_value(
             &self
                 .inner
                 .drawdown_details(ticker_idx, n.unwrap_or(fa::DEFAULT_DRAWDOWN_COUNT))
@@ -1186,7 +1160,7 @@ impl JsPerformance {
     /// # Errors
     ///
     /// Rejects a non-numeric `factor_returns` matrix, an unknown
-    /// `returnKind`, an out-of-range `ticker_idx`, no factors, too few
+    /// `returnKind`, a non-zero `riskFreeRate` with `"excess"`, an out-of-range `ticker_idx`, no factors, too few
     /// observations, non-finite or length-mismatched inputs, a singular
     /// factor design, a fitted coefficient, annualized intercept, or residual
     /// volatility that cannot be represented as a finite value, or a result
@@ -1195,7 +1169,7 @@ impl JsPerformance {
     /// @param ticker_idx - Finite non-negative integer column index in tickerNames order; fractional or out-of-range values are rejected.
     /// @param factor_returns - Matrix of aligned already-excess decimal factor-return series, one row per factor.
     /// @param return_kind - `"excess"` or `"total"`; defaults to `"excess"`.
-    /// @param risk_free_rate - Annualized decimal risk-free rate used when `returnKind` is `"total"`; defaults to 0.0.
+    /// @param risk_free_rate - Annualized decimal risk-free rate, used only when `returnKind` is `"total"`; defaults to 0.0 and must be 0.0 for `"excess"`.
     /// @returns `{ alpha, betas, r_squared, adjusted_r_squared, residual_vol }` for the selected ticker.
     #[wasm_bindgen(js_name = multiFactorGreeks)]
     pub fn multi_factor_greeks(
@@ -1210,7 +1184,11 @@ impl JsPerformance {
         let ticker_idx = js_uint(&ticker_idx, "tickerIdx")?;
         let factors = js_f64_matrix(&factor_returns, "factorReturns")?;
         let refs: Vec<&[f64]> = factors.iter().map(|v| v.as_slice()).collect();
-        let kind = parse_return_kind(return_kind.as_deref(), risk_free_rate)?;
+        let kind = fa::ReturnKind::from_label(
+            return_kind.as_deref(),
+            risk_free_rate.unwrap_or(fa::DEFAULT_RISK_FREE_RATE),
+        )
+        .map_err(to_js_err)?;
         let result = self
             .inner
             .multi_factor_greeks(ticker_idx, &refs, kind)
@@ -1253,7 +1231,7 @@ impl JsPerformance {
             fiscal_year_start_month.as_ref(),
             fiscal_year_start_day.as_ref(),
         )?;
-        to_js(&self.inner.lookback_returns(d, fc))
+        to_js_value(&self.inner.lookback_returns(d, fc))
     }
 
     /// Aggregated period statistics for one asset at the given frequency.
