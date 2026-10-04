@@ -105,30 +105,23 @@ fn regression_covariance(returns: &[f64], benchmark: &[f64]) -> (usize, OnlineCo
 /// * `returns` - Portfolio return series.
 /// * `benchmark` - Benchmark return series. Lengths are matched to the
 ///   shorter of the two.
-/// * `annualize` - Whether to scale by `sqrt(ann_factor)`.
 /// * `ann_factor` - Number of periods per year.
 ///
 /// # Returns
 ///
 /// Tracking error (non-negative). Returns `0.0` for empty or mismatched series.
-/// When `annualize` is `true`, returns [`f64::NAN`] if `ann_factor` is not finite
-/// or is `<= 0`.
+/// Returns [`f64::NAN`] if `ann_factor` is not finite or is `<= 0`.
 ///
 /// # References
 ///
 /// - Grinold & Kahn (1999): see docs/REFERENCES.md#grinoldKahn1999ActivePortfolio
 #[must_use]
-pub(crate) fn tracking_error(
-    returns: &[f64],
-    benchmark: &[f64],
-    annualize: bool,
-    ann_factor: f64,
-) -> f64 {
+pub(crate) fn tracking_error(returns: &[f64], benchmark: &[f64], ann_factor: f64) -> f64 {
     let n = returns.len().min(benchmark.len());
     if n == 0 {
         return 0.0;
     }
-    if crate::risk_metrics::invalid_annualization_factor(annualize, ann_factor) {
+    if crate::risk_metrics::invalid_annualization_factor(true, ann_factor) {
         return f64::NAN;
     }
     let mut os = OnlineStats::new();
@@ -136,11 +129,7 @@ pub(crate) fn tracking_error(
         os.update(returns[i] - benchmark[i]);
     }
     let te = os.std_dev();
-    if annualize {
-        te * ann_factor.sqrt()
-    } else {
-        te
-    }
+    te * ann_factor.sqrt()
 }
 
 /// Information ratio: annualized active return divided by tracking error.
@@ -160,7 +149,6 @@ pub(crate) fn tracking_error(
 ///
 /// * `returns`    - Portfolio return series.
 /// * `benchmark`  - Benchmark return series.
-/// * `annualize`  - Whether to annualize numerator and denominator.
 /// * `ann_factor` - Number of periods per year.
 ///
 /// # Returns
@@ -169,24 +157,19 @@ pub(crate) fn tracking_error(
 /// tracking error is zero and mean active return is also zero. When the
 /// tracking error is zero but mean active return is nonzero, returns
 /// `+∞` or `-∞` matching the sign of the excess (consistent with
-/// [`crate::risk_metrics::sharpe`]). When `annualize` is
-/// `true`, returns [`f64::NAN`] if `ann_factor` is not finite or is `<= 0`.
+/// [`crate::risk_metrics::sharpe`]). Returns [`f64::NAN`] if `ann_factor`
+/// is not finite or is `<= 0`.
 ///
 /// # References
 ///
 /// - Grinold & Kahn (1999): see docs/REFERENCES.md#grinoldKahn1999ActivePortfolio
 #[must_use]
-pub(crate) fn information_ratio(
-    returns: &[f64],
-    benchmark: &[f64],
-    annualize: bool,
-    ann_factor: f64,
-) -> f64 {
+pub(crate) fn information_ratio(returns: &[f64], benchmark: &[f64], ann_factor: f64) -> f64 {
     let n = returns.len().min(benchmark.len());
     if n == 0 {
         return 0.0;
     }
-    if crate::risk_metrics::invalid_annualization_factor(annualize, ann_factor) {
+    if crate::risk_metrics::invalid_annualization_factor(true, ann_factor) {
         return f64::NAN;
     }
     let mut os = OnlineStats::new();
@@ -204,11 +187,7 @@ pub(crate) fn information_ratio(
             0.0
         };
     }
-    if annualize {
-        (er * ann_factor) / (te * ann_factor.sqrt())
-    } else {
-        er / te
-    }
+    (er * ann_factor) / (te * ann_factor.sqrt())
 }
 
 /// R-squared: proportion of portfolio variance explained by the benchmark.
@@ -795,18 +774,18 @@ pub(crate) fn down_capture(returns: &[f64], benchmark: &[f64], ann_factor: f64) 
 /// The capture ratio. Returns `0.0` if either capture component is zero.
 #[must_use]
 pub(crate) fn capture_ratio(returns: &[f64], benchmark: &[f64], ann_factor: f64) -> f64 {
-    let day_count = down_capture(returns, benchmark, ann_factor);
-    if day_count.is_nan() {
+    let down = down_capture(returns, benchmark, ann_factor);
+    if down.is_nan() {
         return f64::NAN;
     }
-    if day_count == 0.0 {
+    if down == 0.0 {
         return 0.0;
     }
     let uc = up_capture(returns, benchmark, ann_factor);
     if uc.is_nan() {
         return f64::NAN;
     }
-    uc / day_count
+    uc / down
 }
 
 /// Batting average: fraction of periods where portfolio outperforms benchmark.
@@ -861,39 +840,31 @@ pub enum ReturnKind {
 }
 
 impl ReturnKind {
-    /// Attach an annualized risk-free rate to a [`ReturnKind::Total`] kind.
-    ///
-    /// [`ReturnKind::Excess`] ignores the rate and is returned unchanged, so
-    /// hosts can parse a label and then apply the caller's rate uniformly.
+    /// Build a return kind from its label and the caller's risk-free rate.
     ///
     /// # Arguments
     ///
+    /// * `label` - `"excess"` or `"total"`; `None` selects the default,
+    ///   [`ReturnKind::Excess`].
     /// * `risk_free_rate` - Annualized risk-free rate in decimal form
-    ///   (`0.02` for 2%), geometrically decompounded to the observation
-    ///   frequency before it is subtracted from the dependent series.
-    #[must_use]
-    pub fn with_risk_free_rate(self, risk_free_rate: f64) -> Self {
-        match self {
-            Self::Excess => Self::Excess,
-            Self::Total { .. } => Self::Total { risk_free_rate },
-        }
-    }
-}
-
-impl std::str::FromStr for ReturnKind {
-    type Err = crate::error::Error;
-
-    /// Parse `"excess"` or `"total"`.
+    ///   (`0.02` for 2%). [`ReturnKind::Total`] geometrically decompounds it
+    ///   to the observation frequency and subtracts it from the dependent
+    ///   series. [`ReturnKind::Excess`] has no use for a rate, so it must be
+    ///   `0.0`.
     ///
-    /// `"total"` yields [`ReturnKind::Total`] with a zero risk-free rate;
-    /// use [`ReturnKind::with_risk_free_rate`] to attach the caller's rate.
-    fn from_str(label: &str) -> Result<Self, Self::Err> {
+    /// # Errors
+    ///
+    /// Returns [`crate::error::Error::Validation`] for an unknown label, or
+    /// for a non-zero `risk_free_rate` with [`ReturnKind::Excess`].
+    pub fn from_label(label: Option<&str>, risk_free_rate: f64) -> crate::Result<Self> {
         match label {
-            "excess" => Ok(Self::Excess),
-            "total" => Ok(Self::Total {
-                risk_free_rate: 0.0,
-            }),
-            other => Err(crate::error::Error::Validation(format!(
+            None | Some("excess") if risk_free_rate == 0.0 => Ok(Self::Excess),
+            None | Some("excess") => Err(crate::error::Error::Validation(format!(
+                "risk_free_rate {risk_free_rate} has no effect on excess returns; \
+                 pass return_kind \"total\" or leave risk_free_rate at 0.0"
+            ))),
+            Some("total") => Ok(Self::Total { risk_free_rate }),
+            Some(other) => Err(crate::error::Error::Validation(format!(
                 "unknown return_kind {other:?}; expected \"excess\" or \"total\""
             ))),
         }
@@ -1219,6 +1190,18 @@ mod tests {
     #[test]
     fn return_kind_defaults_to_excess() {
         assert_eq!(ReturnKind::default(), ReturnKind::Excess);
+        assert_eq!(
+            ReturnKind::from_label(None, 0.0).expect("default"),
+            ReturnKind::Excess
+        );
+        assert_eq!(
+            ReturnKind::from_label(Some("total"), 0.02).expect("total"),
+            ReturnKind::Total {
+                risk_free_rate: 0.02
+            }
+        );
+        assert!(ReturnKind::from_label(Some("excess"), 0.02).is_err());
+        assert!(ReturnKind::from_label(Some("jensen"), 0.0).is_err());
     }
 
     use super::*;
@@ -1232,7 +1215,7 @@ mod tests {
     #[test]
     fn tracking_error_zero_when_identical() {
         let r = [0.01, 0.02, -0.01, 0.03];
-        let te = tracking_error(&r, &r, false, 252.0);
+        let te = tracking_error(&r, &r, 252.0);
         assert!(te.abs() < 1e-12);
     }
 
@@ -1240,16 +1223,16 @@ mod tests {
     fn tracking_error_nan_when_annualized_with_invalid_ann_factor() {
         let r = [0.01, 0.02];
         let b = [0.01, 0.01];
-        assert!(tracking_error(&r, &b, true, 0.0).is_nan());
-        assert!(tracking_error(&r, &b, true, -1.0).is_nan());
-        assert!(tracking_error(&r, &b, true, f64::NAN).is_nan());
+        assert!(tracking_error(&r, &b, 0.0).is_nan());
+        assert!(tracking_error(&r, &b, -1.0).is_nan());
+        assert!(tracking_error(&r, &b, f64::NAN).is_nan());
     }
 
     #[test]
     fn information_ratio_basic() {
         let r = [0.02, 0.03, 0.01, 0.04];
         let b = [0.01, 0.01, 0.01, 0.01];
-        let ir = information_ratio(&r, &b, false, 252.0);
+        let ir = information_ratio(&r, &b, 252.0);
         assert!(ir > 0.0);
     }
 
@@ -1257,8 +1240,8 @@ mod tests {
     fn information_ratio_nan_when_annualized_with_invalid_ann_factor() {
         let r = [0.02, 0.03, 0.01, 0.04];
         let b = [0.01, 0.01, 0.01, 0.01];
-        assert!(information_ratio(&r, &b, true, 0.0).is_nan());
-        assert!(information_ratio(&r, &b, true, f64::INFINITY).is_nan());
+        assert!(information_ratio(&r, &b, 0.0).is_nan());
+        assert!(information_ratio(&r, &b, f64::INFINITY).is_nan());
     }
 
     #[test]
@@ -1677,8 +1660,8 @@ mod tests {
         // down_capture = (0.95−1) / (0.90−1) = −0.05/−0.10 = 0.5
         let r = [0.10, -0.05];
         let b = [0.05, -0.10];
-        let day_count = down_capture(&r, &b, 1.0);
-        assert!((day_count - 0.5).abs() < 1e-12);
+        let down = down_capture(&r, &b, 1.0);
+        assert!((down - 0.5).abs() < 1e-12);
     }
 
     #[test]
@@ -1727,25 +1710,25 @@ mod tests {
 
     #[test]
     fn down_capture_defensive_portfolio() {
-        // Portfolio loses less than benchmark → day_count < 1.0 (desirable)
+        // Portfolio loses less than benchmark → down < 1.0 (desirable)
         let r = [0.04, -0.01, 0.06];
         let b = [0.02, -0.03, 0.03];
-        let day_count = down_capture(&r, &b, 1.0);
+        let down = down_capture(&r, &b, 1.0);
         // Down periods: index 1. port_prod=0.99, bench_prod=0.97
         let expected = (0.99 - 1.0) / (0.97 - 1.0);
-        assert!((day_count - expected).abs() < 1e-12);
-        assert!(day_count < 1.0);
+        assert!((down - expected).abs() < 1e-12);
+        assert!(down < 1.0);
     }
 
     #[test]
     fn down_capture_uses_geometric_subset_returns() {
         let r = [-0.25, 0.0, 0.1];
         let b = [-0.5, -0.5, 0.1];
-        let day_count = down_capture(&r, &b, 1.0);
+        let down = down_capture(&r, &b, 1.0);
         let expected_port = (0.75_f64 * 1.0_f64).sqrt() - 1.0;
         let expected_bench = (0.5_f64 * 0.5_f64).sqrt() - 1.0;
         let expected = expected_port / expected_bench;
-        assert!((day_count - expected).abs() < 1e-12);
+        assert!((down - expected).abs() < 1e-12);
     }
 
     #[test]

@@ -41,9 +41,10 @@
 //! - [`beta`] is kept public for cross-crate regression use.
 //! - [`correlation`] owns shared row-major correlation-matrix validation and
 //!   repair infrastructure used by valuations and factor-model crates.
-//! - [`regression`] owns [`regression::constrained_least_squares`], an equality-constrained
-//!   least-squares solver consumed by `finstack-quant-portfolio` for
-//!   factor-Brinson attribution.
+//! - [`regression`] owns [`regression::constrained_least_squares`], an
+//!   equality-constrained least-squares solver exposed through the bindings.
+//!   It fits the factor returns that `finstack-quant-portfolio`'s
+//!   factor-Brinson attribution takes as caller-supplied input.
 //!
 //! Key conventions:
 //! - returns are simple decimal returns

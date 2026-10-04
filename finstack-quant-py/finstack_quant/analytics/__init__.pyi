@@ -2864,41 +2864,29 @@ class Performance:
         This method does not raise; it returns the stored or derived value.
         """
 
-    def correlation_matrix(self) -> list[list[float]]:
+    def correlation_matrix(self) -> tuple[list[list[float]], bool]:
         """
-        Correlation matrix across all tickers.
+        Correlation matrix across all tickers, and whether it was repaired.
 
         Uses the complete-case common window when every ticker has at least
-        two overlapping points; otherwise pairwise intersecting spans. The
-        matrix is Higham-repaired to the nearest correlation matrix.
+        two overlapping points; otherwise pairwise intersecting spans. A raw
+        estimate that is not a valid correlation matrix (ragged panels can
+        yield one that is not positive semi-definite) is Higham-repaired to
+        the nearest correlation matrix.
 
         Returns
         -------
-        list[list[float]]
-            Symmetric correlation matrix indexed by ticker column order.
+        tuple[list[list[float]], bool]
+            ``(matrix, repaired)``. ``matrix`` is the symmetric correlation
+            matrix indexed by ticker column order. ``repaired`` is ``True``
+            when the raw pairwise estimate was projected to the nearest
+            correlation matrix and ``False`` for a clean estimate.
 
         Raises
         ------
         AnalyticsError
             If a pair is degenerate (zero variance or non-finite) or Higham
             repair fails.
-        """
-
-    def correlation_matrix_repaired(self) -> bool:
-        """
-        Whether :meth:`correlation_matrix` had to be Higham-repaired.
-
-        Returns
-        -------
-        bool
-            ``True`` when the raw pairwise estimate failed positive
-            semi-definiteness and was projected to the nearest correlation
-            matrix; ``False`` for a clean estimate.
-
-        Raises
-        ------
-        AnalyticsError
-            If a pair is degenerate or Higham repair fails.
 
         Examples
         --------
@@ -2909,8 +2897,9 @@ class Performance:
         ...     [[0.01, 0.02, -0.01], [0.02, -0.01, 0.01]],
         ...     ["A", "B"],
         ... )
-        >>> perf.correlation_matrix_repaired()
-        False
+        >>> matrix, repaired = perf.correlation_matrix()
+        >>> matrix[0][0], repaired
+        (1.0, False)
         """
 
     def cumulative_returns_outperformance(self) -> list[list[float]]:
@@ -2943,7 +2932,7 @@ class Performance:
 
     def excess_returns(
         self,
-        rf: list[float],
+        rf: pd.Series | Sequence[float],
         nperiods: float | None = None,
     ) -> list[list[float]]:
         """
@@ -2955,7 +2944,7 @@ class Performance:
 
         Parameters
         ----------
-        rf : list[float]
+        rf : pandas.Series or numpy.ndarray or sequence of float
             Risk-free series with one value per active panel date.
         nperiods : float, optional
             Periods per year used to decompound annual ``rf``. ``None`` uses
@@ -2970,6 +2959,8 @@ class Performance:
         ------
         AnalyticsError
             If ``len(rf)`` differs from the number of active panel dates.
+        TypeError
+            If ``rf`` is not a float sequence, NumPy array or Series.
         """
 
     # -- Per-ticker structured methods --
@@ -3191,7 +3182,9 @@ class Performance:
         Factor series are already-excess (Fama–French style).
         ``return_kind="excess"`` leaves the ticker series unchanged.
         ``return_kind="total"`` subtracts the geometrically decompounded
-        period risk-free rate from the ticker series only.
+        period risk-free rate from the ticker series only. Excess returns
+        have no use for a risk-free rate, so a non-zero ``risk_free_rate``
+        with ``"excess"`` is rejected.
 
         Parameters
         ----------
@@ -3206,7 +3199,7 @@ class Performance:
             ``ReturnKind::Excess``.
         risk_free_rate : float, default 0.0
             Annualized decimal risk-free rate used when ``return_kind`` is
-            ``"total"``.
+            ``"total"``. Must be ``0.0`` for ``"excess"``.
 
         Returns
         -------
@@ -3216,7 +3209,8 @@ class Performance:
         Raises
         ------
         ValueError
-            If ``return_kind`` is not ``"excess"`` or ``"total"``.
+            If ``return_kind`` is not ``"excess"`` or ``"total"``, or
+            ``risk_free_rate`` is non-zero with ``"excess"``.
         AnalyticsError
             If ``ticker_idx`` is out of range, no factors are supplied, factor
             lengths differ from the ticker return series, returns are
@@ -3502,7 +3496,7 @@ class Performance:
         pd.DataFrame
             Symmetric correlation matrix with ticker names on both axes;
             ``df.attrs["repaired"]`` is ``True`` when the estimate was
-            Higham-repaired (see :meth:`correlation_matrix_repaired`).
+            Higham-repaired (see :meth:`correlation_matrix`).
 
         Raises
         ------
@@ -3543,44 +3537,6 @@ class Performance:
             If an integer ``ticker_idx`` is outside the loaded ticker columns.
         KeyError
             If a string ``ticker_idx`` is not a loaded ticker name.
-        """
-        ...
-
-    def to_lookback_returns_dataframe(
-        self,
-        ref_date: object,
-        fiscal_year_start_month: int | None = None,
-        fiscal_year_start_day: int | None = None,
-    ) -> pd.DataFrame:
-        """
-        Period-to-date lookback returns as a pandas DataFrame.
-
-        Indexed by ticker name with columns ``mtd``, ``qtd``, ``ytd``,
-        and ``fytd``. See :meth:`lookback_returns` for the FYTD fiscal-start
-        semantics.
-
-        Parameters
-        ----------
-        ref_date : object
-            Reference date.
-        fiscal_year_start_month : int, optional
-            Fiscal year start month in ``1..=12``. When only the day is given
-            the month is January; with both omitted the fiscal year is the
-            calendar year (Rust ``FiscalConfig::from_parts``).
-        fiscal_year_start_day : int, optional
-            Fiscal year start day in ``1..=31``. When only the month is given
-            the day is the 1st.
-
-        Returns
-        -------
-        pd.DataFrame
-            Lookback returns indexed by ticker name.
-
-        Raises
-        ------
-        ValueError
-            If *fiscal_year_start_month* is not in ``1..=12`` or
-            *fiscal_year_start_day* is not in ``1..=31``.
         """
         ...
 
@@ -3639,7 +3595,7 @@ class Performance:
 
     def to_excess_returns_dataframe(
         self,
-        rf: float | pd.Series | Sequence[float],
+        rf: pd.Series | Sequence[float],
         nperiods: float | None = None,
     ) -> pd.DataFrame:
         """
@@ -3647,9 +3603,8 @@ class Performance:
 
         Parameters
         ----------
-        rf : float or pandas.Series or sequence of float
-            Annualized decimal risk-free rate. A scalar is broadcast to every
-            active panel date; a Series/sequence must already be aligned to
+        rf : pandas.Series or numpy.ndarray or sequence of float
+            Annualized decimal risk-free rate, aligned to
             :meth:`active_dates` (one value per date).
         nperiods : float, optional
             ``None`` geometrically decompounds the annual rate using the panel
@@ -3666,7 +3621,7 @@ class Performance:
         AnalyticsError
             If ``rf`` does not have one value per active date.
         TypeError
-            If ``rf`` is neither a number nor a float sequence / Series.
+            If ``rf`` is not a float sequence, NumPy array or Series.
         """
         ...
 

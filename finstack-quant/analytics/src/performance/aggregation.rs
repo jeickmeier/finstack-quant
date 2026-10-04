@@ -2,11 +2,9 @@
 //! [`Performance`].
 
 use super::{LookbackReturns, Performance};
-use crate::aggregation::{
-    group_by_period_dated, group_period_buckets, period_stats_inner, PeriodStats, PeriodicReturn,
-};
+use crate::aggregation::{group_period_buckets, period_stats_inner, PeriodStats, PeriodicReturn};
 use crate::correlation::{
-    nearest_correlation_matrix, validate_correlation_matrix, NearestCorrelationOpts,
+    nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts,
 };
 use crate::dates::{Date, FiscalConfig, PeriodKind};
 use crate::drawdown::{drawdown_details, to_drawdown_series, DrawdownEpisode};
@@ -72,7 +70,7 @@ impl Performance {
     }
 
     /// Pearson correlation matrix of all tickers, repaired to a valid
-    /// correlation matrix when needed.
+    /// correlation matrix when needed, plus a flag saying whether it was.
     ///
     /// Uses the complete-case common window when every ticker has at least
     /// two observations on the intersection of all active spans. Otherwise
@@ -89,26 +87,13 @@ impl Performance {
     ///
     /// # Returns
     ///
-    /// An `n × n` matrix in [`Self::ticker_names`] order. The diagonal is
-    /// `1.0`. The result passes
-    /// [`crate::correlation::validate_correlation_matrix`].
-    pub fn correlation_matrix(&self) -> crate::Result<Vec<Vec<f64>>> {
-        self.correlation_matrix_with_repair_flag()
-            .map(|(matrix, _)| matrix)
-    }
-
-    /// Correlation matrix plus a flag saying whether Higham repair was applied.
-    ///
-    /// Same estimator and error behaviour as [`Self::correlation_matrix`];
-    /// the boolean is `true` when the raw pairwise matrix failed
-    /// [`crate::correlation::validate_correlation_matrix`] and was projected
-    /// to the nearest valid correlation matrix, so a reader can tell a
-    /// clean estimate from a repaired one.
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::correlation_matrix`].
-    pub fn correlation_matrix_with_repair_flag(&self) -> crate::Result<(Vec<Vec<f64>>, bool)> {
+    /// `(matrix, repaired)`. `matrix` is `n × n` in [`Self::ticker_names`]
+    /// order with a unit diagonal and passes
+    /// [`crate::correlation::validate_correlation_matrix`]. `repaired` is
+    /// `true` when the raw pairwise matrix failed that validation and was
+    /// projected to the nearest valid correlation matrix, so a reader can
+    /// tell a clean estimate from a repaired one.
+    pub fn correlation_matrix(&self) -> crate::Result<(Vec<Vec<f64>>, bool)> {
         let n = self.ticker_names().len();
         let mut matrix = vec![vec![0.0; n]; n];
         if n == 0 {
@@ -232,7 +217,7 @@ impl Performance {
             let rf_aligned = rf
                 .get(offset..offset.saturating_add(returns.len()))
                 .unwrap_or(&[]);
-            excess_returns(returns, rf_aligned, Some(nperiods))
+            excess_returns(returns, rf_aligned, nperiods)
         }))
     }
 
@@ -313,7 +298,9 @@ impl Performance {
             aggregation_frequency,
             fiscal_config,
         );
-        Ok(period_stats_inner(grouped.into_iter().map(|(_, _, r)| r)))
+        Ok(period_stats_inner(
+            grouped.into_iter().map(|point| point.value),
+        ))
     }
 
     /// Calendar-bucketed compounded returns per ticker.
@@ -336,10 +323,11 @@ impl Performance {
     /// the active analysis window.
     pub fn periodic_returns(&self, frequency: PeriodKind) -> Vec<Vec<PeriodicReturn>> {
         self.map_tickers(|i| {
-            group_by_period_dated(
+            group_period_buckets(
                 self.active_dates_for_ticker_unchecked(i),
                 self.active_returns(i),
                 frequency,
+                None,
             )
         })
     }
@@ -400,11 +388,13 @@ fn finalize_correlation_matrix(matrix: Vec<Vec<f64>>) -> crate::Result<(Vec<Vec<
     if validate_correlation_matrix(&flat, n).is_ok() {
         return Ok((matrix, false));
     }
-    let repaired = nearest_correlation_matrix(&flat, n, NearestCorrelationOpts::default())
-        .map_err(|err| crate::error::InputError::InvalidReturnSeries {
-            ticker: "<correlation>".into(),
-            index: 0,
-            reason: err.to_string(),
+    let repaired =
+        nearest_correlation(&flat, n, NearestCorrelationOpts::default()).map_err(|err| {
+            crate::error::InputError::InvalidReturnSeries {
+                ticker: "<correlation>".into(),
+                index: 0,
+                reason: err.to_string(),
+            }
         })?;
     if validate_correlation_matrix(&repaired, n).is_err() {
         return Err(crate::error::InputError::InvalidReturnSeries {
@@ -575,7 +565,8 @@ mod correlation_matrix_tests {
             PeriodKind::Daily,
         )
         .expect("panel");
-        let m = perf.correlation_matrix().expect("psd correlation");
+        let (m, repaired) = perf.correlation_matrix().expect("psd correlation");
+        assert!(!repaired);
         assert!((m[0][0] - 1.0).abs() < 1e-12);
         assert!((m[1][1] - 1.0).abs() < 1e-12);
         assert!((m[0][1] - 1.0).abs() < 1e-12);

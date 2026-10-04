@@ -163,12 +163,6 @@ fn performance_facade_exercises_broad_api_surface() {
         assert_finite_metric(label, &values, ticker_count);
     }
 
-    let standalone_var = perf.value_at_risk(0.95).expect("valid confidence");
-    let standalone_es = perf.expected_shortfall(0.95).expect("valid confidence");
-    let (batch_var, batch_es) = perf.value_at_risk_and_es(0.95);
-    assert_eq!(batch_var, standalone_var);
-    assert_eq!(batch_es, standalone_es);
-
     let durations = perf.max_drawdown_duration();
     assert_eq!(durations.len(), ticker_count);
     assert!(durations.iter().all(|duration| *duration >= 0));
@@ -271,7 +265,7 @@ fn performance_facade_exercises_broad_api_surface() {
     assert!(period_stats.avg_return.is_finite());
     assert!((0.0..=1.0).contains(&period_stats.win_rate));
 
-    let correlation = perf.correlation_matrix().expect("psd correlation");
+    let (correlation, _) = perf.correlation_matrix().expect("psd correlation");
     assert_eq!(correlation.len(), ticker_count);
     for (i, row) in correlation.iter().enumerate() {
         assert_eq!(row.len(), ticker_count);

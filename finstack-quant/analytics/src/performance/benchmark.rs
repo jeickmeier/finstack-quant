@@ -71,7 +71,7 @@ impl Performance {
     pub fn tracking_error(&self) -> Vec<f64> {
         self.map_tickers(|i| {
             let (r, bench) = self.active_pair_returns(i);
-            tracking_error(r, bench, true, self.ann())
+            tracking_error(r, bench, self.ann())
         })
     }
 
@@ -86,7 +86,7 @@ impl Performance {
             if r.len().min(bench.len()) < 2 {
                 return f64::NAN;
             }
-            information_ratio(r, bench, true, self.ann())
+            information_ratio(r, bench, self.ann())
         })
     }
 

@@ -14,7 +14,6 @@ mod performance;
 mod performance_io;
 mod regression;
 mod scalar;
-mod support;
 
 pub use performance::JsPerformance;
 pub use regression::constrained_least_squares;

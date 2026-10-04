@@ -56,16 +56,6 @@ fn resolve_optional_calendar(
         .map_err(core_to_py)
 }
 
-/// Parse a return kind; `None` is the Rust default ([`fa::ReturnKind::Excess`]).
-fn parse_return_kind(return_kind: Option<&str>, risk_free_rate: f64) -> PyResult<fa::ReturnKind> {
-    let kind = return_kind
-        .map(str::parse::<fa::ReturnKind>)
-        .transpose()
-        .map_err(core_to_py)?
-        .unwrap_or_default();
-    Ok(kind.with_risk_free_rate(risk_free_rate))
-}
-
 /// Parse a frequency token into a [`PeriodKind`].
 ///
 /// Accepts the canonical tokens (`daily`, `weekly`, `monthly`, `quarterly`,
@@ -94,16 +84,6 @@ fn extract_f64_vec(obj: &Bound<'_, PyAny>, label: &str) -> PyResult<Vec<f64>> {
     )))
 }
 
-fn ensure_pandas_dataframe(value: &Bound<'_, PyAny>, error_message: &str) -> PyResult<()> {
-    let pd = value.py().import("pandas")?;
-    let df_type = pd.getattr("DataFrame")?;
-    if value.is_instance(&df_type)? {
-        Ok(())
-    } else {
-        Err(PyTypeError::new_err(error_message.to_owned()))
-    }
-}
-
 /// Decomposed DataFrame: dates, column-major numeric values, and ticker names.
 struct DataFramePanel {
     /// Chronological observation dates.
@@ -114,18 +94,17 @@ struct DataFramePanel {
     ticker_names: Vec<String>,
 }
 
-fn extract_dataframe_panel(df: &Bound<'_, PyAny>, error_message: &str) -> PyResult<DataFramePanel> {
-    ensure_pandas_dataframe(df, error_message)?;
-    extract_dataframe(df)
-}
-
 /// Extract dates, numeric matrix, and ticker names from a pandas DataFrame.
 ///
-/// Expects a DataFrame with a date-like index and float64 columns. Numeric
-/// data flows through the NumPy buffer protocol rather than
-/// ``Series.tolist()`` so a 100k×N price panel does not pay for a Python list
-/// of `float` objects per cell.
-fn extract_dataframe(df: &Bound<'_, PyAny>) -> PyResult<DataFramePanel> {
+/// Expects a DataFrame with a date-like index and float64 columns; any other
+/// object raises `TypeError` with `error_message`. Numeric data flows through
+/// the NumPy buffer protocol rather than ``Series.tolist()`` so a 100k×N price
+/// panel does not pay for a Python list of `float` objects per cell.
+fn extract_dataframe_panel(df: &Bound<'_, PyAny>, error_message: &str) -> PyResult<DataFramePanel> {
+    let df_type = df.py().import("pandas")?.getattr("DataFrame")?;
+    if !df.is_instance(&df_type)? {
+        return Err(PyTypeError::new_err(error_message.to_owned()));
+    }
     let index = df.getattr("index")?;
     let dates_list = index.call_method0("tolist")?;
     let dates_py: Vec<Bound<'_, PyAny>> = dates_list.extract()?;
@@ -1134,9 +1113,14 @@ impl PyPerformance {
     ///
     /// Uses the complete-case common window when every ticker has at least
     /// two overlapping points; otherwise pairwise intersecting spans. The
-    /// matrix is Higham-repaired to the nearest correlation matrix.
+    /// matrix is Higham-repaired to the nearest correlation matrix when the
+    /// raw pairwise estimate is not a valid correlation matrix.
+    ///
+    /// Returns ``(matrix, repaired)``: the matrix in ticker order, and
+    /// ``True`` when Higham repair was applied, which distinguishes a clean
+    /// estimate from a repaired one.
     /// Raises when a pair is degenerate or repair fails.
-    fn correlation_matrix(&self, py: Python<'_>) -> PyResult<Vec<Vec<f64>>> {
+    fn correlation_matrix(&self, py: Python<'_>) -> PyResult<(Vec<Vec<f64>>, bool)> {
         py.detach(|| self.inner.correlation_matrix().map_err(core_to_py))
     }
 
@@ -1152,11 +1136,17 @@ impl PyPerformance {
 
     /// Excess returns over a risk-free rate series aligned to the panel grid.
     ///
-    /// ``rf`` must have one value per active panel date. ``nperiods=None``
+    /// ``rf`` is a sequence of floats, NumPy array or pandas ``Series`` with
+    /// one value per active panel date. ``nperiods=None``
     /// geometrically decompounds an annual series using the engine frequency;
     /// pass ``1.0`` when ``rf`` is already periodic.
     #[pyo3(signature = (rf, nperiods = None))]
-    fn excess_returns(&self, rf: Vec<f64>, nperiods: Option<f64>) -> PyResult<Vec<Vec<f64>>> {
+    fn excess_returns(
+        &self,
+        rf: &Bound<'_, PyAny>,
+        nperiods: Option<f64>,
+    ) -> PyResult<Vec<Vec<f64>>> {
+        let rf = extract_f64_vec(rf, "rf")?;
         self.inner.excess_returns(&rf, nperiods).map_err(core_to_py)
     }
 
@@ -1272,7 +1262,8 @@ impl PyPerformance {
     /// Factor series are already-excess. ``return_kind="excess"`` leaves the
     /// ticker series unchanged. ``return_kind="total"`` subtracts the
     /// geometrically decompounded period risk-free rate from the ticker
-    /// series only.
+    /// series only. A non-zero ``risk_free_rate`` with ``"excess"`` is
+    /// rejected, since excess returns have no use for it.
     ///
     /// Raises AnalyticsError if the inputs are invalid or numerically singular,
     /// or a fitted coefficient, annualized intercept, or residual volatility
@@ -1289,7 +1280,7 @@ impl PyPerformance {
     ) -> PyResult<PyMultiFactorResult> {
         let ticker_idx = self.resolve_ticker(ticker_idx)?;
         let refs: Vec<&[f64]> = factor_returns.iter().map(|v| v.as_slice()).collect();
-        let kind = parse_return_kind(return_kind, risk_free_rate)?;
+        let kind = fa::ReturnKind::from_label(return_kind, risk_free_rate).map_err(core_to_py)?;
         py.detach(|| self.inner.multi_factor_greeks(ticker_idx, &refs, kind))
             .map(|r| PyMultiFactorResult { inner: r })
             .map_err(core_to_py)
@@ -1441,13 +1432,10 @@ impl PyPerformance {
     ///
     /// Returns a ticker × ticker matrix with ticker names as index and columns.
     /// ``df.attrs["repaired"]`` is ``True`` when the estimate was
-    /// Higham-repaired (see :meth:`correlation_matrix_repaired`).
+    /// Higham-repaired (see :meth:`correlation_matrix`).
     fn to_correlation_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let names = self.inner.ticker_names();
-        let (matrix, repaired) = self
-            .inner
-            .correlation_matrix_with_repair_flag()
-            .map_err(core_to_py)?;
+        let (matrix, repaired) = self.inner.correlation_matrix().map_err(core_to_py)?;
 
         let pd = py.import("pandas")?;
         let kwargs = PyDict::new(py);
@@ -1478,25 +1466,6 @@ impl PyPerformance {
             .drawdown_details(ticker_idx, n)
             .map_err(core_to_py)?;
         drawdowns_to_dataframe(py, &episodes)
-    }
-
-    /// Period-to-date lookback returns as a pandas ``DataFrame``.
-    ///
-    /// Returns a DataFrame with ticker names as index and columns:
-    /// mtd, qtd, ytd, and fytd. See :meth:`lookback_returns` for the FYTD
-    /// fiscal-start semantics.
-    #[pyo3(signature = (ref_date, fiscal_year_start_month = None, fiscal_year_start_day = None))]
-    fn to_lookback_returns_dataframe<'py>(
-        &self,
-        py: Python<'py>,
-        ref_date: Bound<'_, PyAny>,
-        fiscal_year_start_month: Option<u8>,
-        fiscal_year_start_day: Option<u8>,
-    ) -> PyResult<Bound<'py, PyAny>> {
-        let d = py_to_date(&ref_date)?;
-        let lb = self.lookback_returns_inner(d, fiscal_year_start_month, fiscal_year_start_day)?;
-
-        PyLookbackReturns { inner: lb }.to_dataframe(py)
     }
 
     /// Beta regression statistics for every ticker vs the benchmark as a
@@ -1543,9 +1512,8 @@ impl PyPerformance {
     ///
     /// Parameters
     /// ----------
-    /// rf : float | pandas.Series | sequence of float
-    ///     Annualized decimal risk-free rate. A scalar is broadcast to every
-    ///     active panel date; a Series/sequence must already be aligned to
+    /// rf : pandas.Series | numpy.ndarray | sequence of float
+    ///     Annualized decimal risk-free rate, aligned to
     ///     :meth:`active_dates` (one value per date).
     /// nperiods : float, optional
     ///     ``None`` geometrically decompounds the annual rate using the
@@ -1562,31 +1530,8 @@ impl PyPerformance {
         rf: &Bound<'py, PyAny>,
         nperiods: Option<f64>,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let rf = if let Ok(rate) = rf.extract::<f64>() {
-            vec![rate; self.inner.active_dates().len()]
-        } else {
-            extract_f64_vec(rf, "rf")?
-        };
-        let excess = self
-            .inner
-            .excess_returns(&rf, nperiods)
-            .map_err(core_to_py)?;
+        let excess = self.excess_returns(rf, nperiods)?;
         panel_to_dataframe(py, &self.inner, excess)
-    }
-
-    /// ``True`` when :meth:`correlation_matrix` had to be Higham-repaired.
-    ///
-    /// The raw pairwise estimate on ragged panels can fail positive
-    /// semi-definiteness; the engine then projects it to the nearest valid
-    /// correlation matrix. This flag distinguishes a clean estimate from a
-    /// repaired one.
-    fn correlation_matrix_repaired(&self, py: Python<'_>) -> PyResult<bool> {
-        py.detach(|| {
-            self.inner
-                .correlation_matrix_with_repair_flag()
-                .map(|(_, repaired)| repaired)
-                .map_err(core_to_py)
-        })
     }
 
     /// Serialize authoritative engine inputs (dates, returns, spans, benchmark,
