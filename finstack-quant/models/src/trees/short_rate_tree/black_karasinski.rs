@@ -6,7 +6,7 @@ use crate::trees::hull_white_tree::HullWhiteTree;
 
 use super::{ShortRateTree, TreeCalibrationResult, TreeDiscounting};
 
-/// Calibrated Black-Karasinski trinomial lattice data (κ ≠ 0).
+/// Calibrated Black-Karasinski trinomial lattice data.
 ///
 /// The lattice lives in x = ln r with Hull-White trinomial geometry: node
 /// spacing `dx = σ√(3Δt)`, width capped at `j_max` with branch switching at
@@ -20,6 +20,122 @@ pub(super) struct BkTrinomialLattice {
     pub(super) j_max: usize,
     /// Per-step per-node transition probabilities `(p_up, p_mid, p_down)`
     pub(super) probs: Vec<Vec<(f64, f64, f64)>>,
+}
+
+/// Compute trinomial transition probabilities for node j.
+///
+/// Hull & White (1994) branching for the mean-reverting residual
+/// `dx = −κx dt + σ dW`:
+/// - p_up = 1/6 + (j²M² - jM)/2
+/// - p_mid = 2/3 - j²M²
+/// - p_down = 1/6 + (j²M² + jM)/2
+///
+/// where M = κ·dt
+///
+/// At boundaries (|j| >= j_max), we use drift-adjusted branching that:
+/// 1. Prevents the tree from growing beyond j_max
+/// 2. Accounts for mean reversion to maintain martingale property
+///
+/// # Arguments
+///
+/// * `kappa` - Mean reversion speed κ of `x`, per year.
+/// * `dt` - Step width in years; must be positive.
+/// * `dx` - Node spacing in `x`; must be positive.
+/// * `j` - Signed node index (`x = j·dx`).
+/// * `j_max` - Width cap; nodes with `|j| >= j_max` use shifted branching.
+pub(super) fn compute_probabilities(
+    kappa: f64,
+    dt: f64,
+    dx: f64,
+    j: i32,
+    j_max: usize,
+) -> Result<(f64, f64, f64)> {
+    if !kappa.is_finite() || !dt.is_finite() || !dx.is_finite() || dt <= 0.0 || dx <= 0.0 {
+        return Err(Error::Validation(
+            "Black-Karasinski probabilities require finite, positive inputs".to_string(),
+        ));
+    }
+
+    let m = kappa * dt;
+    let jf = j as f64;
+
+    // Standard interior node probabilities (Hull-White trinomial).
+    // The expected offset is -j*kappa*dt, pulling x back toward zero.
+    let mut p_up = 1.0 / 6.0 + (jf * jf * m * m - jf * m) / 2.0;
+    let mut p_mid = 2.0 / 3.0 - jf * jf * m * m;
+    let mut p_down = 1.0 / 6.0 + (jf * jf * m * m + jf * m) / 2.0;
+
+    // At boundaries (|j| >= j_max), use Hull & White (1994) shifted
+    // branching to stay inside the capped lattice while matching the first
+    // two moments.
+    //
+    // The tuple still stores probabilities in the branch order used by
+    // transition_offsets(): upper boundary (0, -1, -2), lower boundary
+    // (+2, +1, 0), interior (+1, 0, -1).
+    let j_abs = j.unsigned_abs() as usize;
+    if j_abs >= j_max && j_max > 0 {
+        let mean = -jf * m;
+        let second_moment = 1.0 / 3.0 + mean * mean;
+        if j > 0 {
+            // Upper boundary Type B: offsets 0, -1, -2.
+            p_down = (second_moment + mean) / 2.0;
+            p_mid = -second_moment - 2.0 * mean;
+            p_up = 1.0 - p_mid - p_down;
+        } else if j < 0 {
+            // Lower boundary Type C: offsets +2, +1, 0.
+            p_up = (second_moment - mean) / 2.0;
+            p_mid = 2.0 * mean - second_moment;
+            p_down = 1.0 - p_up - p_mid;
+        }
+    }
+
+    HullWhiteTree::normalize_probabilities(p_up, p_mid, p_down, j)
+}
+
+/// Child offsets and probabilities of node `j`, in the branch order
+/// [`compute_probabilities`] stores them.
+///
+/// # Arguments
+///
+/// * `j` - Signed node index.
+/// * `j_max` - Width cap; pass `usize::MAX` while the lattice is still
+///   growing so every node branches normally.
+/// * `probs` - `(p_up, p_mid, p_down)` from [`compute_probabilities`].
+pub(super) fn transition_offsets(j: i32, j_max: usize, probs: (f64, f64, f64)) -> [(i32, f64); 3] {
+    let (p_up, p_mid, p_down) = probs;
+    let j_abs = j.unsigned_abs() as usize;
+    if j_abs >= j_max && j_max > 0 {
+        if j > 0 {
+            // Upper boundary: branches to j, j-1, j-2.
+            [(0, p_up), (-1, p_mid), (-2, p_down)]
+        } else if j < 0 {
+            // Lower boundary: branches to j+2, j+1, j.
+            [(2, p_up), (1, p_mid), (0, p_down)]
+        } else {
+            [(1, p_up), (0, p_mid), (-1, p_down)]
+        }
+    } else {
+        [(1, p_up), (0, p_mid), (-1, p_down)]
+    }
+}
+
+/// Storage index of child `j + offset` on a level of half-width
+/// `next_j_max`, or `None` when the child falls outside that level.
+///
+/// # Arguments
+///
+/// * `j` - Signed parent node index.
+/// * `offset` - Signed child offset from [`transition_offsets`].
+/// * `next_j_max` - Half-width of the child level (`2·next_j_max + 1` nodes).
+pub(super) fn transition_index(j: i32, offset: i32, next_j_max: usize) -> Option<usize> {
+    let next_j = j + offset;
+    let lower = -(next_j_max as i32);
+    let upper = next_j_max as i32;
+    if (lower..=upper).contains(&next_j) {
+        Some((next_j + next_j_max as i32) as usize)
+    } else {
+        None
+    }
 }
 
 impl ShortRateTree {
@@ -40,6 +156,22 @@ impl ShortRateTree {
     /// variance `σ²Δt`. The per-step shift `a_i` is calibrated by forward
     /// induction on Arrow-Debreu prices with a Brent solve (the rate enters
     /// the discount factor as `exp(a_i + x_j)`, so no closed form exists).
+    ///
+    /// # Arguments
+    ///
+    /// * `rates` - Output rows, one per step, filled with the node short
+    ///   rates in ascending `j` order.
+    /// * `discount_curve` - Curve the lattice must reprice at every step.
+    /// * `dt` - Uniform step width in years.
+    /// * `kappa` - Mean reversion speed κ of `ln r`, per year; positive.
+    ///
+    /// # References
+    ///
+    /// - Black, F. & Karasinski, P. (1991). "Bond and Option Pricing when
+    ///   Short Rates are Lognormal." *Financial Analysts Journal*, 47(4), 52-59.
+    /// - Hull, J. & White, A. (1994). "Numerical Procedures for Implementing
+    ///   Term Structure Models I: Single-Factor Models." *Journal of
+    ///   Derivatives*, 2(1), 7-16.
     ///
     /// # Errors
     ///
@@ -77,9 +209,7 @@ impl ShortRateTree {
             let mut step_probs = Vec::with_capacity(num_nodes);
             for j in 0..num_nodes {
                 let j_signed = j as i32 - curr_j_max as i32;
-                step_probs.push(HullWhiteTree::compute_probabilities(
-                    kappa, dt, dx, j_signed, j_max,
-                )?);
+                step_probs.push(compute_probabilities(kappa, dt, dx, j_signed, j_max)?);
             }
 
             let t_next = self.time_steps[step + 1];
@@ -138,10 +268,9 @@ impl ShortRateTree {
                 let r_j = (a + j_signed as f64 * dx).exp();
                 let contribution = qj * comp.tree_df(r_j, dt);
                 for (offset, probability) in
-                    HullWhiteTree::transition_offsets(j_signed, boundary_j_max, step_probs[j])
+                    transition_offsets(j_signed, boundary_j_max, step_probs[j])
                 {
-                    if let Some(idx) = HullWhiteTree::transition_index(j_signed, offset, next_j_max)
-                    {
+                    if let Some(idx) = transition_index(j_signed, offset, next_j_max) {
                         if idx < next_q.len() {
                             next_q[idx] += contribution * probability;
                         }

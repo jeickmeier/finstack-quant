@@ -1,14 +1,13 @@
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{Error, HashMap, Result};
 
-use crate::trees::hull_white_tree::HullWhiteTree;
 use crate::trees::tree_framework::{
     price_recombining_tree, state_keys, CachedValues, NodeState, RecombiningInputs, TreeModel,
     TreeValuator,
 };
 
-use super::black_karasinski::BkTrinomialLattice;
-use super::{short_rate_keys, ShortRateTree, TreeDiscounting};
+use super::black_karasinski::{transition_index, transition_offsets, BkTrinomialLattice};
+use super::{short_rate_keys, ShortRateModel, ShortRateTree, TreeDiscounting};
 
 impl ShortRateTree {
     /// Backward induction over the Black-Karasinski trinomial lattice.
@@ -75,10 +74,9 @@ impl ShortRateTree {
 
                 let mut expected_value = 0.0;
                 for (offset, probability) in
-                    HullWhiteTree::transition_offsets(j_signed, boundary_j_max, node_probs)
+                    transition_offsets(j_signed, boundary_j_max, node_probs)
                 {
-                    if let Some(idx) = HullWhiteTree::transition_index(j_signed, offset, next_j_max)
-                    {
+                    if let Some(idx) = transition_index(j_signed, offset, next_j_max) {
                         if idx < values.len() {
                             expected_value += probability * values[idx];
                         }
@@ -138,7 +136,10 @@ impl TreeModel for ShortRateTree {
         // capped width with branch switching cannot be expressed through the
         // constant-probability recombining engine, so it has a dedicated
         // backward induction.
-        if let Some(lattice) = &self.bk_trinomial {
+        if self.config.model == ShortRateModel::BlackKarasinski {
+            let lattice = self.bk_trinomial.as_ref().ok_or_else(|| {
+                Error::internal("Black-Karasinski tree has no calibrated trinomial lattice")
+            })?;
             return self.price_bk_trinomial(
                 lattice,
                 &initial_vars,

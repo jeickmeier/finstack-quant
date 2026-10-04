@@ -175,6 +175,7 @@ impl TreePricer {
         match &self.config.tree_model {
             TreeModelChoice::HullWhite { sigma, .. }
             | TreeModelChoice::BlackDermanToy { sigma, .. }
+            | TreeModelChoice::BlackKarasinski { sigma, .. }
             | TreeModelChoice::HoLee { sigma } => *sigma == 0.0,
         }
     }
@@ -244,7 +245,10 @@ impl TreePricer {
         day_count: finstack_quant_core::dates::DayCount,
         model: &TreeModelChoice,
     ) -> usize {
-        if !matches!(model, TreeModelChoice::BlackDermanToy { .. }) {
+        if !matches!(
+            model,
+            TreeModelChoice::BlackDermanToy { .. } | TreeModelChoice::BlackKarasinski { .. }
+        ) {
             return self.config.tree_steps;
         }
 
@@ -547,11 +551,38 @@ impl TreePricer {
                     discount_curve.day_count(),
                     &model,
                 );
-                let tree_config = ShortRateTreeConfig::bdt(tree_steps, sigma, 0.0)
+                let tree_config = ShortRateTreeConfig::bdt(tree_steps, sigma)
                     .with_compounding(self.config.tree_compounding);
                 let mut tree = ShortRateTree::new(tree_config);
                 tree.calibrate(discount_curve.as_ref(), time_to_maturity)?;
-                validate_bdt_calibration_quality(tree.calibration_result())?;
+                validate_calibration_quality("BDT", tree.calibration_result())?;
+                let valuator = BondValuator::new(
+                    tree_bond.clone(),
+                    market_context,
+                    as_of,
+                    time_to_maturity,
+                    tree_steps,
+                )?;
+                PreparedTree::ShortRate {
+                    tree,
+                    valuator,
+                    time_to_maturity,
+                }
+            }
+            model @ TreeModelChoice::BlackKarasinski { sigma, kappa } => {
+                // Same uniform grid and exercise-date step alignment as BDT;
+                // only the lattice differs.
+                let tree_steps = self.effective_steps_for_model(
+                    &tree_bond,
+                    as_of,
+                    discount_curve.day_count(),
+                    &model,
+                );
+                let tree_config = ShortRateTreeConfig::black_karasinski(tree_steps, sigma, kappa)
+                    .with_compounding(self.config.tree_compounding);
+                let mut tree = ShortRateTree::new(tree_config);
+                tree.calibrate(discount_curve.as_ref(), time_to_maturity)?;
+                validate_calibration_quality("Black-Karasinski", tree.calibration_result())?;
                 let valuator = BondValuator::new(
                     tree_bond.clone(),
                     market_context,
@@ -605,7 +636,7 @@ enum PreparedTree {
     RatesCredit(RatesCreditTree, BondValuator),
     /// Hull-White trinomial tree through the bond's mandatory dates.
     HullWhite(HullWhiteTree, BondValuator),
-    /// BDT or Ho-Lee short-rate tree on a uniform grid.
+    /// BDT, Black-Karasinski or Ho-Lee short-rate tree on a uniform grid.
     ShortRate {
         tree: ShortRateTree,
         valuator: BondValuator,
@@ -675,9 +706,17 @@ impl Default for TreePricer {
     }
 }
 
-fn validate_bdt_calibration_quality(quality: Option<&TreeCalibrationResult>) -> Result<()> {
+/// Reject a lognormal short-rate tree whose calibration missed the curve.
+///
+/// `model` names the lattice ("BDT", "Black-Karasinski") in the error.
+fn validate_calibration_quality(
+    model: &str,
+    quality: Option<&TreeCalibrationResult>,
+) -> Result<()> {
     let quality = quality.ok_or_else(|| {
-        Error::internal("BDT calibration quality is unavailable after calibration")
+        Error::internal(format!(
+            "{model} calibration quality is unavailable after calibration"
+        ))
     })?;
 
     if quality.is_acceptable() {
@@ -685,7 +724,7 @@ fn validate_bdt_calibration_quality(quality: Option<&TreeCalibrationResult>) -> 
     }
 
     Err(Error::Validation(format!(
-        "BDT calibration quality is unacceptable: max_error_bp={:.6}, max_error_step={}, fallback_count={}, converged={}",
+        "{model} calibration quality is unacceptable: max_error_bp={:.6}, max_error_step={}, fallback_count={}, converged={}",
         quality.max_error_bp, quality.max_error_step, quality.fallback_count, quality.converged
     )))
 }
@@ -712,7 +751,7 @@ mod tests {
             converged: true,
         };
 
-        let err = validate_bdt_calibration_quality(Some(&poor))
+        let err = validate_calibration_quality("BDT", Some(&poor))
             .expect_err("poor BDT calibration should be rejected");
         let msg = err.to_string();
 

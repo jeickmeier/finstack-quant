@@ -321,7 +321,7 @@ export type D_02A11B30Ee627630F221 = "per_name" | "large_homogeneous";
  * Selected by `instrument_pricing_overrides.model_config.tree_model`; when the
  * field is absent the bond tree uses Hull-White.
  */
-export type D_948Cdc4Db846A21357A4 = "hull_white" | "black_derman_toy";
+export type D_948Cdc4Db846A21357A4 = "hull_white" | "black_derman_toy" | "black_karasinski";
 /**
  * Basis used for bond duration, convexity, and DV01-style risk metrics.
  */
@@ -751,6 +751,29 @@ export interface D_572Ad1Befb7D94914652 {
    */
   bdt_sigma?: number | null;
   /**
+   * Black-Karasinski mean-reversion speed (κ) of the log short rate, in
+   * annualised units (`0.03` = 3% per year).
+   *
+   * Companion to [`Self::bk_sigma`]: read only by the rates-only bond tree
+   * when `tree_model = black_karasinski`, where it is required. Must be
+   * finite and strictly positive; typical values are 0.01–0.10. A lognormal
+   * short rate without mean reversion is `tree_model = black_derman_toy`
+   * with [`Self::bdt_sigma`].
+   */
+  bk_mean_reversion?: number | null;
+  /**
+   * Black-Karasinski lognormal short-rate volatility (σ), as an annual
+   * decimal proportion of the short rate (`0.20` = 20%).
+   *
+   * Read only by the rates-only bond tree when `tree_model = black_karasinski`,
+   * where it is required together with [`Self::bk_mean_reversion`]. It is
+   * a relative (lognormal) volatility on the same scale as
+   * [`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical
+   * values are 0.10–0.40. Must be finite and non-negative; `0.0` prices on
+   * the deterministic curve.
+   */
+  bk_sigma?: number | null;
+  /**
    * Exercise friction cost for issuer/borrower calls, expressed as **cents per 100 of par**.
    *
    * This models the real-world costs of refinancing / reissue (fees, OID, documentation),
@@ -952,8 +975,8 @@ export interface D_572Ad1Befb7D94914652 {
    */
   tree_discount_curve_id?: D_94Cb251104De5Cf587B6 | null;
   /**
-   * Short-rate lattice for the rates-only bond tree (`hull_white` or
-   * `black_derman_toy`). `None` selects Hull-White.
+   * Short-rate lattice for the rates-only bond tree (`hull_white`,
+   * `black_derman_toy` or `black_karasinski`). `None` selects Hull-White.
    */
   tree_model?: D_948Cdc4Db846A21357A4 | null;
   /**

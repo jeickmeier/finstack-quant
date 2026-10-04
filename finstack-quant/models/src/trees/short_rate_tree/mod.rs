@@ -1,8 +1,9 @@
 //! Short-rate tree models for bond valuation with embedded options.
 //!
 //! Implements curve-consistent short-rate trees for pricing callable/putable bonds
-//! and calculating Option-Adjusted Spread (OAS). Uses industry-standard models
-//! like Ho-Lee and Black-Derman-Toy.
+//! and calculating Option-Adjusted Spread (OAS). Uses industry-standard models:
+//! Ho-Lee, Black-Derman-Toy and Black-Karasinski, selected by
+//! [`ShortRateModel`].
 //!
 //! # Volatility Conventions
 //!
@@ -12,6 +13,7 @@
 //! |-------|----------|-----------|---------|---------------|
 //! | Ho-Lee | Normal/Absolute | σ (bp/yr) | dr = θdt + σdW | 50-150 bp (0.005-0.015) |
 //! | BDT | Lognormal/Relative | σ (%) | dr/r = θdt + σdW | 15-30% (0.15-0.30) |
+//! | Black-Karasinski | Lognormal/Relative | σ (%), κ | d(ln r) = [θ − κ ln r]dt + σdW | 15-30% (0.15-0.30) |
 //!
 //! ## Converting Between Conventions
 //!

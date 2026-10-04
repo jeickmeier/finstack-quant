@@ -822,6 +822,22 @@
             "null"
           ]
         },
+        "bk_mean_reversion": {
+          "description": "Black-Karasinski mean-reversion speed (κ) of the log short rate, in\nannualised units (`0.03` = 3% per year).\n\nCompanion to [`Self::bk_sigma`]: read only by the rates-only bond tree\nwhen `tree_model = black_karasinski`, where it is required. Must be\nfinite and strictly positive; typical values are 0.01–0.10. A lognormal\nshort rate without mean reversion is `tree_model = black_derman_toy`\nwith [`Self::bdt_sigma`].",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "bk_sigma": {
+          "description": "Black-Karasinski lognormal short-rate volatility (σ), as an annual\ndecimal proportion of the short rate (`0.20` = 20%).\n\nRead only by the rates-only bond tree when `tree_model = black_karasinski`,\nwhere it is required together with [`Self::bk_mean_reversion`]. It is\na relative (lognormal) volatility on the same scale as\n[`Self::bdt_sigma`], unlike the absolute [`Self::hw1f_sigma`]; typical\nvalues are 0.10–0.40. Must be finite and non-negative; `0.0` prices on\nthe deterministic curve.",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "call_friction_cents": {
           "default": null,
           "description": "Exercise friction cost for issuer/borrower calls, expressed as **cents per 100 of par**.\n\nThis models the real-world costs of refinancing / reissue (fees, OID, documentation),\nby requiring the issuer/borrower to see sufficient economic benefit before exercising.\n\n## Convention\n- `0.0` (or `None`) means frictionless optimal exercise (pure model)\n- `50.0` means **$0.50 per $100** of outstanding principal (0.50 points)\n- `200.0` means **$2.00 per $100** of outstanding principal (2.00 points)\n\nThe friction affects the **exercise decision threshold**, but redemption still occurs\nat the contractual call price.",
@@ -973,7 +989,7 @@
               "type": "null"
             }
           ],
-          "description": "Short-rate lattice for the rates-only bond tree (`hull_white` or\n`black_derman_toy`). `None` selects Hull-White."
+          "description": "Short-rate lattice for the rates-only bond tree (`hull_white`,\n`black_derman_toy` or `black_karasinski`). `None` selects Hull-White."
         },
         "tree_steps": {
           "default": null,
@@ -1298,6 +1314,11 @@
         {
           "const": "black_derman_toy",
           "description": "Black-Derman-Toy (lognormal short rate) with volatility\n`model_config.bdt_sigma`.",
+          "type": "string"
+        },
+        {
+          "const": "black_karasinski",
+          "description": "Black-Karasinski (mean-reverting lognormal short rate) with `(κ, σ)`\nfrom `model_config.bk_mean_reversion` / `model_config.bk_sigma`.",
           "type": "string"
         }
       ]

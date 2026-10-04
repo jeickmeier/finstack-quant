@@ -64,7 +64,7 @@ internals directly.
 | Model | Branching | Factors | Calibration target | Primary use |
 |-------|-----------|---------|--------------------|-------------|
 | `BinomialTree` | Binomial | 1 (equity) | None (parametric) | American / Bermudan equity and commodity options |
-| `ShortRateTree` | Binomial (Ho-Lee, BDT) or trinomial (BK, κ > 0) | 1 (short rate) | Discount curve | Callable/putable bonds, term loans, OAS |
+| `ShortRateTree` | Binomial (Ho-Lee, BDT) or trinomial (Black-Karasinski) | 1 (short rate) | Discount curve | Callable/putable bonds, term loans, OAS |
 | `HullWhiteTree` | Trinomial | 1 (short rate) | Discount curve | Bermudan swaptions, mean reversion beyond the binomial limit |
 | `RatesCreditTree` | Binomial × binomial | 2 (rate + hazard) | Discount + hazard curves | Credit-risky bonds and loans with embedded options |
 
@@ -123,11 +123,13 @@ payments. This matches the reserve convention in
 | Model | Dynamics | Vol convention | Negative rates | Mean reversion |
 |-------|----------|----------------|----------------|----------------|
 | Ho-Lee | `dr = θ(t)dt + σdW` | Normal (rate units) | Yes | Not supported — breaks lattice recombination; use `HullWhiteTree` |
-| BDT / Black-Karasinski | `d(ln r) = [θ(t) − κ·ln r]dt + σdW` | Lognormal (proportional) | No | κ = 0 → binomial BDT; κ > 0 → trinomial BK |
+| Black-Derman-Toy | `d(ln r) = θ(t)dt + σdW` | Lognormal (proportional) | No | Not supported (binomial); a non-zero κ is rejected |
+| Black-Karasinski | `d(ln r) = [θ(t) − κ·ln r]dt + σdW` | Lognormal (proportional) | No | Required, κ > 0 (trinomial) |
 
+The lattice is chosen by `ShortRateModel`, never by the value of κ.
 Calibration uses Arrow-Debreu forward induction to reproduce the input discount
-curve exactly at every step. For κ > 0 the lattice is a genuine trinomial
-Black-Karasinski tree in `x = ln r`, reusing the Hull-White trinomial geometry
+curve exactly at every step. Black-Karasinski is a trinomial
+tree in `x = ln r`, reusing the Hull-White trinomial geometry
 (spacing `σ√(3dt)`, width cap with edge branch switching, per-node
 mean-reverting probabilities) with a Brent solve on the per-step additive shift
 in `x`.
@@ -135,7 +137,8 @@ in `x`.
 ```rust
 use finstack_quant_models::trees::{ShortRateTree, ShortRateTreeConfig};
 
-// Ho-Lee, 100 steps, 80 bp normal vol. Or: ShortRateTreeConfig::bdt(100, 0.20, 0.0)
+// Ho-Lee, 100 steps, 80 bp normal vol. Or: ShortRateTreeConfig::bdt(100, 0.20),
+// ShortRateTreeConfig::black_karasinski(100, 0.20, 0.03)
 let config = ShortRateTreeConfig::ho_lee(100, 0.008);
 let mut tree = ShortRateTree::new(config);
 tree.calibrate(discount_curve, time_to_maturity)?;
@@ -143,12 +146,13 @@ tree.calibrate(discount_curve, time_to_maturity)?;
 let rate = tree.rate_at_node(10, 3)?;
 ```
 
-`ShortRateTreeConfig` fields: `steps`, `model` (`ShortRateModel::HoLee` or
-`::BlackDermanToy`), `volatility`, `mean_reversion` (must be `0.0` for Ho-Lee),
+`ShortRateTreeConfig` fields: `steps`, `model` (`ShortRateModel::HoLee`,
+`::BlackDermanToy` or `::BlackKarasinski`), `volatility`, `mean_reversion`
+(must be `0.0` for Ho-Lee and BDT, positive for Black-Karasinski),
 `compounding` (`TreeDiscounting::{Continuous, Simple, SemiAnnual, Quarterly,
 Monthly}` — Bloomberg's lognormal OAS model uses `Simple`), and
-`curve_fit_tolerance_bp`. Constructors `ho_lee` and `bdt` set consistent
-defaults; `Default` is Ho-Lee with `DEFAULT_NORMAL_VOL = 0.01`.
+`curve_fit_tolerance_bp`. Constructors `ho_lee`, `bdt` and `black_karasinski`
+set consistent defaults; `Default` is Ho-Lee with `DEFAULT_NORMAL_VOL = 0.01`.
 
 `calibrate` takes `(&dyn Discounting, time_to_maturity)` and rejects
 `steps == 0`, a non-finite/non-positive horizon, or any non-finite/non-positive
@@ -163,8 +167,8 @@ Ho-Lee σ is absolute (50-150 bp, i.e. 0.005-0.015); BDT σ is proportional
 `finstack_quant_models::volatility::convert_atm_volatility`.
 
 **Node ordering differs by model.** Ho-Lee: node 0 is the *lowest* rate.
-BDT (κ = 0, binomial): node 0 is the *highest* rate (`α·u^(n-1)`).
-BK (κ > 0, trinomial): node 0 is the lowest (`j = −j_max`).
+BDT (binomial): node 0 is the *highest* rate (`α·u^(n-1)`).
+Black-Karasinski (trinomial): node 0 is the lowest (`j = −j_max`).
 
 `short_rate_keys` supplies `SHORT_RATE` (the same key as
 `state_keys::INTEREST_RATE`) and `OAS` (basis points). Every OAS reader and

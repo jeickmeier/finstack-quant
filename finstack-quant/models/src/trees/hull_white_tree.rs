@@ -528,7 +528,10 @@ impl HullWhiteTree {
     /// Reject negative or non-finite branch probabilities, normalize them to
     /// sum to one, and enforce the sum-to-one invariant in all builds so a
     /// mispriced lattice can never escape silently.
-    fn normalize_probabilities(
+    ///
+    /// `pub(crate)`: the Black-Karasinski trinomial lattice normalizes its
+    /// branch probabilities with the same check.
+    pub(crate) fn normalize_probabilities(
         p_up: f64,
         p_mid: f64,
         p_down: f64,
@@ -563,104 +566,6 @@ impl HullWhiteTree {
         }
 
         Ok((p_up, p_mid, p_down))
-    }
-
-    /// Compute trinomial transition probabilities for node j.
-    ///
-    /// For the Hull-White model with mean reversion κ:
-    /// - p_up = 1/6 + (j²M² - jM)/2
-    /// - p_mid = 2/3 - j²M²
-    /// - p_down = 1/6 + (j²M² + jM)/2
-    ///
-    /// where M = κ·dt
-    ///
-    /// At boundaries (|j| >= j_max), we use drift-adjusted branching that:
-    /// 1. Prevents the tree from growing beyond j_max
-    /// 2. Accounts for mean reversion to maintain martingale property
-    ///
-    /// `pub(crate)`: the Black-Karasinski trinomial lattice in
-    /// `short_rate_tree.rs` reuses this geometry — its x = ln r process is the
-    /// same mean-reverting OU dynamics this branching discretizes.
-    pub(crate) fn compute_probabilities(
-        kappa: f64,
-        dt: f64,
-        dx: f64,
-        j: i32,
-        j_max: usize,
-    ) -> finstack_quant_core::Result<(f64, f64, f64)> {
-        if !kappa.is_finite() || !dt.is_finite() || !dx.is_finite() || dt <= 0.0 || dx <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "Hull-White probabilities require finite, positive inputs".to_string(),
-            ));
-        }
-
-        let m = kappa * dt;
-        let jf = j as f64;
-
-        // Standard interior node probabilities (Hull-White trinomial).
-        // The expected offset is -j*kappa*dt, pulling x back toward zero.
-        let mut p_up = 1.0 / 6.0 + (jf * jf * m * m - jf * m) / 2.0;
-        let mut p_mid = 2.0 / 3.0 - jf * jf * m * m;
-        let mut p_down = 1.0 / 6.0 + (jf * jf * m * m + jf * m) / 2.0;
-
-        // At boundaries (|j| >= j_max), use Hull & White (1994) shifted
-        // branching to stay inside the capped lattice while matching the first
-        // two moments.
-        //
-        // The tuple still stores probabilities in the branch order used by
-        // transition_offsets(): upper boundary (0, -1, -2), lower boundary
-        // (+2, +1, 0), interior (+1, 0, -1).
-        let j_abs = j.unsigned_abs() as usize;
-        if j_abs >= j_max && j_max > 0 {
-            let mean = -jf * m;
-            let second_moment = 1.0 / 3.0 + mean * mean;
-            if j > 0 {
-                // Upper boundary Type B: offsets 0, -1, -2.
-                p_down = (second_moment + mean) / 2.0;
-                p_mid = -second_moment - 2.0 * mean;
-                p_up = 1.0 - p_mid - p_down;
-            } else if j < 0 {
-                // Lower boundary Type C: offsets +2, +1, 0.
-                p_up = (second_moment - mean) / 2.0;
-                p_mid = 2.0 * mean - second_moment;
-                p_down = 1.0 - p_up - p_mid;
-            }
-        }
-
-        Self::normalize_probabilities(p_up, p_mid, p_down, j)
-    }
-
-    pub(crate) fn transition_offsets(
-        j: i32,
-        j_max: usize,
-        probs: (f64, f64, f64),
-    ) -> [(i32, f64); 3] {
-        let (p_up, p_mid, p_down) = probs;
-        let j_abs = j.unsigned_abs() as usize;
-        if j_abs >= j_max && j_max > 0 {
-            if j > 0 {
-                // Upper boundary: branches to j, j-1, j-2.
-                [(0, p_up), (-1, p_mid), (-2, p_down)]
-            } else if j < 0 {
-                // Lower boundary: branches to j+2, j+1, j.
-                [(2, p_up), (1, p_mid), (0, p_down)]
-            } else {
-                [(1, p_up), (0, p_mid), (-1, p_down)]
-            }
-        } else {
-            [(1, p_up), (0, p_mid), (-1, p_down)]
-        }
-    }
-
-    pub(crate) fn transition_index(j: i32, offset: i32, next_j_max: usize) -> Option<usize> {
-        let next_j = j + offset;
-        let lower = -(next_j_max as i32);
-        let upper = next_j_max as i32;
-        if (lower..=upper).contains(&next_j) {
-            Some((next_j + next_j_max as i32) as usize)
-        } else {
-            None
-        }
     }
 
     /// Calibrate α for the interval starting at the current level to match
@@ -1335,80 +1240,6 @@ mod tests {
     }
 
     #[test]
-    fn probabilities_fail_fast_when_invalid() {
-        let err =
-            HullWhiteTree::compute_probabilities(0.03, 0.25, 0.0, 1, 1).expect_err("should fail");
-        match err {
-            finstack_quant_core::Error::Validation(msg) => {
-                assert!(msg.contains("finite"), "message={msg}");
-            }
-            other => panic!("expected validation error, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn interior_probabilities_match_mean_reversion_moments() {
-        let kappa = 0.03;
-        let dt = 0.05;
-        let dx = 0.01 * (3.0_f64 * dt).sqrt();
-        let j = 12;
-        let j_max = 50;
-
-        let (p_up, p_mid, p_down) =
-            HullWhiteTree::compute_probabilities(kappa, dt, dx, j, j_max).expect("probabilities");
-
-        let m = kappa * dt;
-        let expected_mean_offset = -(j as f64) * m;
-        let expected_second_moment = 1.0 / 3.0 + expected_mean_offset * expected_mean_offset;
-
-        let actual_mean_offset = p_up - p_down;
-        let actual_second_moment = p_up + p_down;
-
-        assert!(
-            (actual_mean_offset - expected_mean_offset).abs() < 1e-12,
-            "mean offset should pull positive j back toward zero: actual={actual_mean_offset}, expected={expected_mean_offset}"
-        );
-        assert!(
-            (actual_second_moment - expected_second_moment).abs() < 1e-12,
-            "second moment mismatch: actual={actual_second_moment}, expected={expected_second_moment}"
-        );
-        assert!((p_up + p_mid + p_down - 1.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn boundary_probabilities_match_shifted_branch_moments() {
-        let kappa = 0.15;
-        let dt = 0.05;
-        let dx = 0.01 * (3.0_f64 * dt).sqrt();
-        let j_max = 25;
-
-        let (p_upper_0, p_upper_m1, p_upper_m2) =
-            HullWhiteTree::compute_probabilities(kappa, dt, dx, j_max as i32, j_max)
-                .expect("upper boundary probabilities");
-        let m = kappa * dt;
-        let upper_expected_mean = -(j_max as f64) * m;
-        let upper_expected_second = 1.0 / 3.0 + upper_expected_mean * upper_expected_mean;
-        let upper_mean = -p_upper_m1 - 2.0 * p_upper_m2;
-        let upper_second = p_upper_m1 + 4.0 * p_upper_m2;
-
-        assert!((upper_mean - upper_expected_mean).abs() < 1e-12);
-        assert!((upper_second - upper_expected_second).abs() < 1e-12);
-        assert!((p_upper_0 + p_upper_m1 + p_upper_m2 - 1.0).abs() < 1e-12);
-
-        let (p_lower_p2, p_lower_p1, p_lower_0) =
-            HullWhiteTree::compute_probabilities(kappa, dt, dx, -(j_max as i32), j_max)
-                .expect("lower boundary probabilities");
-        let lower_expected_mean = (j_max as f64) * m;
-        let lower_expected_second = 1.0 / 3.0 + lower_expected_mean * lower_expected_mean;
-        let lower_mean = 2.0 * p_lower_p2 + p_lower_p1;
-        let lower_second = 4.0 * p_lower_p2 + p_lower_p1;
-
-        assert!((lower_mean - lower_expected_mean).abs() < 1e-12);
-        assert!((lower_second - lower_expected_second).abs() < 1e-12);
-        assert!((p_lower_p2 + p_lower_p1 + p_lower_0 - 1.0).abs() < 1e-12);
-    }
-
-    #[test]
     fn test_backward_induction_zero_payoff() {
         let config = HullWhiteTreeConfig::new(0.03, 0.01, 10);
         let curve = test_discount_curve();
@@ -1588,27 +1419,6 @@ mod tests {
         let tree = HullWhiteTree::calibrate(config, &curve, 0.25)
             .expect("small positive maturity should calibrate");
         assert_eq!(tree.num_steps(), 10);
-    }
-
-    #[test]
-    fn computed_probabilities_sum_to_one_in_release_builds() {
-        // The probability-sum invariant must hold even when `debug_assert!`
-        // is compiled out (release builds). Sweep interior and boundary
-        // nodes across a range of mean-reversion regimes.
-        for &(kappa, dt) in &[(0.03_f64, 0.05_f64), (0.15, 0.05), (0.50, 0.02)] {
-            let dx = 0.01 * (3.0 * dt).sqrt();
-            let j_max = (0.184 / (kappa * dt)).ceil() as usize;
-            for j in -(j_max as i32)..=(j_max as i32) {
-                let (p_up, p_mid, p_down) =
-                    HullWhiteTree::compute_probabilities(kappa, dt, dx, j, j_max)
-                        .expect("probabilities should be valid");
-                let sum = p_up + p_mid + p_down;
-                assert!(
-                    (sum - 1.0).abs() < 1e-12,
-                    "probabilities must sum to 1 (kappa={kappa}, j={j}): sum={sum}"
-                );
-            }
-        }
     }
 
     #[test]

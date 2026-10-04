@@ -36,6 +36,17 @@ pub enum TreeModelChoice {
         /// Lognormal short-rate volatility (e.g., 0.20 for 20%)
         sigma: f64,
     },
+    /// Black-Karasinski mean-reverting lognormal short-rate model.
+    ///
+    /// Calibrated on a trinomial lattice in `ln r`; as `kappa` tends to zero
+    /// its prices approach the Black-Derman-Toy ones.
+    BlackKarasinski {
+        /// Lognormal short-rate volatility (e.g., 0.20 for 20%)
+        sigma: f64,
+        /// Mean reversion speed of `ln r` per year (e.g., 0.03 for 3%);
+        /// strictly positive
+        kappa: f64,
+    },
 }
 
 impl Default for TreeModelChoice {
@@ -57,6 +68,7 @@ impl Default for TreeModelChoice {
 /// |-------|----------|-----------|---------------|
 /// | Ho-Lee (default) | Normal/Absolute | σ (rate units) | 50-150 bp (0.005-0.015) |
 /// | BDT | Lognormal/Relative | σ (proportion) | 15-30% (0.15-0.30) |
+/// | Black-Karasinski | Lognormal/Relative | σ (proportion), κ | 15-30% (0.15-0.30) |
 ///
 /// The default configuration uses Ho-Lee with **normal volatility**.
 ///
@@ -228,6 +240,9 @@ pub(crate) fn bond_tree_settings(bond: &Bond) -> TreePricerConfig {
 ///
 /// - `model_config.tree_model = black_derman_toy` selects Black-Derman-Toy with the
 ///   lognormal volatility `model_config.bdt_sigma`.
+/// - `model_config.tree_model = black_karasinski` selects Black-Karasinski with
+///   the lognormal volatility `model_config.bk_sigma` and the positive mean
+///   reversion `model_config.bk_mean_reversion`; both are required.
 /// - Otherwise the Hull-White tree takes `(κ, σ)` from
 ///   [`resolve_hw1f_params`]: a complete `model_config.hw1f_mean_reversion` /
 ///   `model_config.hw1f_sigma` pair, or else the complete pre-fitted
@@ -254,7 +269,11 @@ pub(crate) fn bond_tree_settings(bond: &Bond) -> TreePricerConfig {
 ///
 /// Returns a validation error when:
 /// - BDT is selected but `model_config.bdt_sigma` is missing;
-/// - `model_config.bdt_sigma` is set but the Hull-White tree is selected;
+/// - Black-Karasinski is selected but `model_config.bk_sigma` or
+///   `model_config.bk_mean_reversion` is missing, or the mean reversion is
+///   not finite and strictly positive;
+/// - `model_config.bdt_sigma`, `bk_sigma` or `bk_mean_reversion` is set but a
+///   different tree model is selected;
 /// - the Hull-White parameters are missing, partial, non-positive (other than
 ///   an explicit zero `hw1f_sigma`) or given as a `hw1f_sigma_schedule`.
 ///
@@ -277,51 +296,108 @@ pub fn bond_tree_config(
     bond: &Bond,
     market: &MarketContext,
 ) -> finstack_quant_core::Result<TreePricerConfig> {
-    let model = &bond.instrument_pricing_overrides.model_config;
-    let uses_black_lognormal = matches!(
-        model.tree_model,
-        Some(crate::instruments::ShortRateTreeModel::BlackDermanToy)
-    );
+    use crate::instruments::ShortRateTreeModel;
 
-    let tree_model = if uses_black_lognormal {
-        let Some(sigma) = model.bdt_sigma else {
+    let model = &bond.instrument_pricing_overrides.model_config;
+    let selected = model.tree_model.unwrap_or(ShortRateTreeModel::HullWhite);
+    let selected_name = match selected {
+        ShortRateTreeModel::HullWhite => "hull_white",
+        ShortRateTreeModel::BlackDermanToy => "black_derman_toy",
+        ShortRateTreeModel::BlackKarasinski => "black_karasinski",
+    };
+    // A volatility or mean reversion belonging to a model that is not
+    // selected would be silently ignored; reject it instead.
+    for (field, value, owner, owner_name) in [
+        (
+            "bdt_sigma",
+            model.bdt_sigma,
+            ShortRateTreeModel::BlackDermanToy,
+            "black_derman_toy",
+        ),
+        (
+            "bk_sigma",
+            model.bk_sigma,
+            ShortRateTreeModel::BlackKarasinski,
+            "black_karasinski",
+        ),
+        (
+            "bk_mean_reversion",
+            model.bk_mean_reversion,
+            ShortRateTreeModel::BlackKarasinski,
+            "black_karasinski",
+        ),
+    ] {
+        if value.is_some() && selected != owner {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "Bond '{}' selects the Black-Derman-Toy tree \
-                 (instrument_pricing_overrides.model_config.tree_model = black_derman_toy) but provides \
-                 no instrument_pricing_overrides.model_config.bdt_sigma. BDT requires an \
-                 explicit lognormal short-rate volatility (e.g. 0.20 for 20%).",
-                bond.id.as_str()
-            )));
-        };
-        TreeModelChoice::BlackDermanToy { sigma }
-    } else {
-        if model.bdt_sigma.is_some() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "Bond '{}' sets instrument_pricing_overrides.model_config.bdt_sigma but \
-                 selects the Hull-White tree; set \
-                 instrument_pricing_overrides.model_config.tree_model = black_derman_toy for BDT or \
-                 remove bdt_sigma",
+                "Bond '{}' sets instrument_pricing_overrides.model_config.{field} but \
+                 selects the {selected_name} tree; set \
+                 instrument_pricing_overrides.model_config.tree_model = {owner_name} or \
+                 remove {field}",
                 bond.id.as_str()
             )));
         }
-        if model.hw1f_sigma == Some(0.0) && model.hw1f_sigma_schedule.is_none() {
-            deterministic_hull_white(bond)?
-        } else {
-            let curve_id = model
-                .tree_discount_curve_id
-                .as_ref()
-                .unwrap_or(&bond.discount_curve_id);
-            let params = resolve_hw1f_params(
-                Hw1fParamFamily::Swaption,
-                curve_id.as_str(),
-                model,
-                None,
-                &format!("Bond '{}' Hull-White tree", bond.id.as_str()),
-                market,
-            )?;
-            TreeModelChoice::HullWhite {
-                kappa: params.kappa,
-                sigma: params.sigma,
+    }
+
+    let tree_model = match selected {
+        ShortRateTreeModel::BlackDermanToy => {
+            let Some(sigma) = model.bdt_sigma else {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Bond '{}' selects the Black-Derman-Toy tree \
+                     (instrument_pricing_overrides.model_config.tree_model = black_derman_toy) but provides \
+                     no instrument_pricing_overrides.model_config.bdt_sigma. BDT requires an \
+                     explicit lognormal short-rate volatility (e.g. 0.20 for 20%).",
+                    bond.id.as_str()
+                )));
+            };
+            TreeModelChoice::BlackDermanToy { sigma }
+        }
+        ShortRateTreeModel::BlackKarasinski => {
+            let Some(sigma) = model.bk_sigma else {
+                return Err(finstack_quant_core::Error::Validation(format!(
+                    "Bond '{}' selects the Black-Karasinski tree \
+                     (instrument_pricing_overrides.model_config.tree_model = black_karasinski) but \
+                     provides no instrument_pricing_overrides.model_config.bk_sigma. \
+                     Black-Karasinski requires an explicit lognormal short-rate volatility \
+                     (e.g. 0.20 for 20%).",
+                    bond.id.as_str()
+                )));
+            };
+            match model.bk_mean_reversion {
+                Some(kappa) if kappa.is_finite() && kappa > 0.0 => {
+                    TreeModelChoice::BlackKarasinski { sigma, kappa }
+                }
+                kappa => {
+                    return Err(finstack_quant_core::Error::Validation(format!(
+                        "Bond '{}' selects the Black-Karasinski tree \
+                         (instrument_pricing_overrides.model_config.tree_model = black_karasinski) but \
+                         instrument_pricing_overrides.model_config.bk_mean_reversion is {kappa:?}; \
+                         supply a positive finite mean reversion (e.g. 0.03 for 3% per year), or \
+                         select black_derman_toy for a lognormal short rate without mean reversion",
+                        bond.id.as_str()
+                    )));
+                }
+            }
+        }
+        ShortRateTreeModel::HullWhite => {
+            if model.hw1f_sigma == Some(0.0) && model.hw1f_sigma_schedule.is_none() {
+                deterministic_hull_white(bond)?
+            } else {
+                let curve_id = model
+                    .tree_discount_curve_id
+                    .as_ref()
+                    .unwrap_or(&bond.discount_curve_id);
+                let params = resolve_hw1f_params(
+                    Hw1fParamFamily::Swaption,
+                    curve_id.as_str(),
+                    model,
+                    None,
+                    &format!("Bond '{}' Hull-White tree", bond.id.as_str()),
+                    market,
+                )?;
+                TreeModelChoice::HullWhite {
+                    kappa: params.kappa,
+                    sigma: params.sigma,
+                }
             }
         }
     };
@@ -356,10 +432,14 @@ fn deterministic_hull_white(bond: &Bond) -> finstack_quant_core::Result<TreeMode
 
 fn tree_config_with_model(bond: &Bond, tree_model: TreeModelChoice) -> TreePricerConfig {
     let model = &bond.instrument_pricing_overrides.model_config;
-    let tree_compounding = if matches!(&tree_model, TreeModelChoice::BlackDermanToy { .. }) {
-        Compounding::Simple
-    } else {
-        Compounding::default()
+    // Both lognormal lattices use the money-market (simple) per-node
+    // convention of the Bloomberg lognormal OAS model, so Black-Karasinski
+    // tends to the Black-Derman-Toy price as its mean reversion vanishes.
+    let tree_compounding = match &tree_model {
+        TreeModelChoice::BlackDermanToy { .. } | TreeModelChoice::BlackKarasinski { .. } => {
+            Compounding::Simple
+        }
+        TreeModelChoice::HoLee { .. } | TreeModelChoice::HullWhite { .. } => Compounding::default(),
     };
     TreePricerConfig {
         tree_steps: model.tree_steps.unwrap_or(100),
@@ -416,6 +496,126 @@ mod tests {
             config.tree_model,
             TreeModelChoice::BlackDermanToy { sigma, .. } if (sigma - 0.20).abs() < 1e-12
         ));
+    }
+
+    fn black_karasinski_bond(model_config: serde_json::Value) -> Bond {
+        let mut bond = Bond::fixed(
+            "BK-CALLABLE",
+            Money::from((1_000_i64, Currency::USD)),
+            finstack_quant_core::types::Rate::from_decimal(0.05).expect("valid rate fixture"),
+            date!(2025 - 01 - 01),
+            date!(2030 - 01 - 01),
+            finstack_quant_core::dates::StubKind::ShortFront,
+            "USD-OIS",
+        )
+        .expect("fixed bond should build");
+        bond.call_put = Some(CallPutSchedule {
+            calls: vec![CallPut {
+                start: date!(2027 - 01 - 01),
+                end: date!(2028 - 01 - 01),
+                price_pct_of_par: 101.0,
+                make_whole: None,
+            }],
+            puts: vec![],
+        });
+        bond.instrument_pricing_overrides.model_config =
+            serde_json::from_value(model_config).expect("model_config should deserialize");
+        bond
+    }
+
+    #[test]
+    fn black_karasinski_config_reads_bk_sigma_and_mean_reversion() {
+        let bond = black_karasinski_bond(serde_json::json!({
+            "tree_model": "black_karasinski",
+            "bk_sigma": 0.20,
+            "bk_mean_reversion": 0.03
+        }));
+        let config = bond_tree_config(&bond, &MarketContext::new())
+            .expect("complete Black-Karasinski inputs should produce a config");
+
+        assert_eq!(config.tree_compounding, Compounding::Simple);
+        assert!(matches!(
+            config.tree_model,
+            TreeModelChoice::BlackKarasinski { sigma, kappa }
+                if (sigma - 0.20).abs() < 1e-12 && (kappa - 0.03).abs() < 1e-12
+        ));
+    }
+
+    #[test]
+    fn black_karasinski_config_requires_sigma_and_positive_mean_reversion() {
+        for (model_config, expected) in [
+            (
+                serde_json::json!({ "tree_model": "black_karasinski", "bk_mean_reversion": 0.03 }),
+                "no instrument_pricing_overrides.model_config.bk_sigma",
+            ),
+            (
+                serde_json::json!({ "tree_model": "black_karasinski", "bk_sigma": 0.20 }),
+                "instrument_pricing_overrides.model_config.bk_mean_reversion is None",
+            ),
+            (
+                serde_json::json!({
+                    "tree_model": "black_karasinski",
+                    "bk_sigma": 0.20,
+                    "bk_mean_reversion": 0.0
+                }),
+                "instrument_pricing_overrides.model_config.bk_mean_reversion is Some(0.0)",
+            ),
+        ] {
+            let err = bond_tree_config(&black_karasinski_bond(model_config), &MarketContext::new())
+                .expect_err("incomplete Black-Karasinski inputs must error");
+            assert!(err.to_string().contains(expected), "{err}");
+        }
+    }
+
+    #[test]
+    fn short_rate_inputs_of_an_unselected_model_are_rejected() {
+        for (model_config, field, selected) in [
+            (
+                serde_json::json!({ "bk_sigma": 0.20 }),
+                "bk_sigma",
+                "hull_white",
+            ),
+            (
+                serde_json::json!({ "tree_model": "hull_white", "bk_mean_reversion": 0.03 }),
+                "bk_mean_reversion",
+                "hull_white",
+            ),
+            (
+                serde_json::json!({
+                    "tree_model": "black_derman_toy",
+                    "bdt_sigma": 0.20,
+                    "bk_mean_reversion": 0.03
+                }),
+                "bk_mean_reversion",
+                "black_derman_toy",
+            ),
+            (
+                serde_json::json!({
+                    "tree_model": "black_karasinski",
+                    "bk_sigma": 0.20,
+                    "bk_mean_reversion": 0.03,
+                    "bdt_sigma": 0.20
+                }),
+                "bdt_sigma",
+                "black_karasinski",
+            ),
+            (
+                serde_json::json!({ "bdt_sigma": 0.20 }),
+                "bdt_sigma",
+                "hull_white",
+            ),
+        ] {
+            let err = bond_tree_config(&black_karasinski_bond(model_config), &MarketContext::new())
+                .expect_err("an input of an unselected model must error");
+            let message = err.to_string();
+            assert!(
+                message.contains(&format!(
+                    "sets instrument_pricing_overrides.model_config.{field} but selects the \
+                     {selected} tree"
+                )),
+                "{message}"
+            );
+        }
     }
 
     #[test]

@@ -107,7 +107,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1250496
+            "bytes": 1252031
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
@@ -2005,7 +2005,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1132858
+            "bytes": 1134393
           },
           {
             "path": "schemas/scenarios/1/horizon_result.schema.json",
@@ -2128,7 +2128,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 379302
+            "bytes": 380837
           },
           {
             "path": "schemas/statements/1/metric_registry.schema.json",
@@ -2678,7 +2678,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
             "type_name": "InstrumentPricingOverrides",
             "kind": "component",
-            "bytes": 62669
+            "bytes": 64204
           },
           {
             "path": "schemas/common/1/ir_future_conventions.schema.json",
@@ -3582,7 +3582,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1250496
+            "bytes": 1252031
           },
           {
             "domain": "attribution",
@@ -4486,7 +4486,7 @@
             "$id": "https://finstack_quant.dev/schemas/scenarios/1/application_envelope.schema.json",
             "type_name": "ApplicationEnvelope",
             "kind": "output",
-            "bytes": 1132858
+            "bytes": 1134393
           },
           {
             "domain": "scenarios",
@@ -4534,7 +4534,7 @@
             "$id": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json",
             "type_name": "FinancialModelSpec",
             "kind": "input",
-            "bytes": 379302
+            "bytes": 380837
           },
           {
             "domain": "statements",
@@ -4694,7 +4694,7 @@
             "$id": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json",
             "type_name": "InstrumentPricingOverrides",
             "kind": "component",
-            "bytes": 62669
+            "bytes": 64204
           },
           {
             "domain": "valuations",

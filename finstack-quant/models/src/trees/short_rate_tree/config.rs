@@ -100,7 +100,11 @@ impl TreeDiscounting for Compounding {
 /// | Model | Vol Type | Negative Rates | Mean Reversion | Use Case |
 /// |-------|----------|----------------|----------------|----------|
 /// | Ho-Lee | Normal | ✅ Yes | ❌ No | Low/negative rate environments |
-/// | BDT/BK | Lognormal | ❌ No | ✅ Yes (κ ≠ 0 → trinomial BK lattice) | Traditional positive rate environments |
+/// | Black-Derman-Toy | Lognormal | ❌ No | ❌ No | Traditional positive rate environments |
+/// | Black-Karasinski | Lognormal | ❌ No | ✅ Yes (κ > 0) | Positive rates with bounded long-horizon dispersion |
+///
+/// The lattice is chosen by the variant alone: Ho-Lee and Black-Derman-Toy
+/// calibrate a binomial lattice, Black-Karasinski a trinomial one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShortRateModel {
     /// Ho-Lee model: Gaussian/normal short rates.
@@ -125,24 +129,21 @@ pub enum ShortRateModel {
     /// - Crisis: 150-300 bp (0.015-0.030)
     HoLee,
 
-    /// Black-Derman-Toy / Black-Karasinski model: Lognormal short rates.
+    /// Black-Derman-Toy model: Lognormal short rates without mean reversion.
     ///
     /// ## Rate Dynamics
     /// ```text
-    /// d(ln r) = [θ(t) - κ ln r] dt + σ dW
+    /// d(ln r) = θ(t) dt + σ dW
     /// ```
     /// where:
     /// - `θ(t)` is calibrated to match the discount curve
     /// - `σ` is the **lognormal volatility** (relative, like 0.20 = 20%)
-    /// - `κ` is the mean reversion speed (0 recovers standard BDT)
     ///
     /// ## Properties
     /// - ❌ Cannot handle negative rates (rates stay positive)
-    /// - When `κ = 0`: standard BDT with constant lognormal volatility on a
-    ///   binomial lattice
-    /// - When `κ > 0`: Black-Karasinski on a trinomial lattice in x = ln r
-    ///   (Hull-White geometry with edge branch switching); terminal log-rate
-    ///   dispersion tightens toward `σ√((1-e^{-2κT})/(2κ))`
+    /// - ❌ No mean reversion: constant lognormal volatility on a binomial
+    ///   lattice, so log-rate dispersion grows like `σ√T`; use
+    ///   [`ShortRateModel::BlackKarasinski`] for a mean-reverting lognormal rate
     /// - Lognormal distribution matches cap/floor market conventions
     ///
     /// ## Typical Volatility Range
@@ -154,6 +155,40 @@ pub enum ShortRateModel {
     /// ⚠️ A normal-vol-sized value such as 1% is **far too low** for BDT.
     /// Use ~20% or calibrate to the swaption market.
     BlackDermanToy,
+
+    /// Black-Karasinski model: mean-reverting lognormal short rates.
+    ///
+    /// ## Rate Dynamics
+    /// ```text
+    /// d(ln r) = [θ(t) - κ ln r] dt + σ dW
+    /// ```
+    /// where:
+    /// - `θ(t)` is calibrated to match the discount curve
+    /// - `σ` is the **lognormal volatility** (relative, like 0.20 = 20%)
+    /// - `κ > 0` is the mean reversion speed of `ln r` (per year)
+    ///
+    /// ## Lattice
+    /// Trinomial in `x = ln r` with the Hull-White geometry: node spacing
+    /// `σ√(3Δt)`, width capped at `j_max = ⌈0.184/(κΔt)⌉` with branch switching
+    /// at the edges, and a per-step shift solved numerically so the lattice
+    /// reprices the discount curve.
+    ///
+    /// ## Properties
+    /// - ❌ Cannot handle negative rates (rates stay positive)
+    /// - ✅ Mean reversion: terminal log-rate dispersion tightens toward
+    ///   `σ√((1-e^{-2κT})/(2κ))` instead of growing like `σ√T`
+    /// - As `κ → 0` prices converge to [`ShortRateModel::BlackDermanToy`] up to
+    ///   the trinomial-versus-binomial discretization difference; `κ = 0`
+    ///   itself is rejected, select Black-Derman-Toy instead
+    /// - Same volatility ranges and convention as Black-Derman-Toy
+    ///
+    /// ## References
+    /// - Black, F. & Karasinski, P. (1991). "Bond and Option Pricing when
+    ///   Short Rates are Lognormal." *Financial Analysts Journal*, 47(4), 52-59.
+    /// - Hull, J. & White, A. (1994). "Numerical Procedures for Implementing
+    ///   Term Structure Models I: Single-Factor Models." *Journal of
+    ///   Derivatives*, 2(1), 7-16.
+    BlackKarasinski,
 }
 
 /// Configuration for short-rate tree construction.
@@ -166,9 +201,10 @@ pub enum ShortRateModel {
 /// |-------|-----------------|---------|
 /// | [`ShortRateModel::HoLee`] | Normal (absolute) | 0.01 = 100 bp/yr |
 /// | [`ShortRateModel::BlackDermanToy`] | Lognormal (relative) | 0.20 = 20%/yr |
+/// | [`ShortRateModel::BlackKarasinski`] | Lognormal (relative) | 0.20 = 20%/yr |
 ///
-/// Use the helper constructors ([`ShortRateTreeConfig::ho_lee`], [`ShortRateTreeConfig::bdt`])
-/// or `crate::volatility::convert_atm_volatility` to avoid convention errors.
+/// Use the helper constructors ([`ShortRateTreeConfig::ho_lee`],
+/// [`ShortRateTreeConfig::bdt`], [`ShortRateTreeConfig::black_karasinski`]) or `crate::volatility::convert_atm_volatility` to avoid convention errors.
 ///
 /// # Examples
 ///
@@ -182,8 +218,12 @@ pub enum ShortRateModel {
 /// assert_eq!(ho_lee.model, ShortRateModel::HoLee);
 ///
 /// // BDT with 20% lognormal vol (recommended for positive rate environments)
-/// let bdt = ShortRateTreeConfig::bdt(100, 0.20, 0.03);
+/// let bdt = ShortRateTreeConfig::bdt(100, 0.20);
 /// assert_eq!(bdt.model, ShortRateModel::BlackDermanToy);
+///
+/// // Black-Karasinski: the same lognormal vol with 3%/yr mean reversion
+/// let bk = ShortRateTreeConfig::black_karasinski(100, 0.20, 0.03);
+/// assert_eq!(bk.model, ShortRateModel::BlackKarasinski);
 ///
 /// // `Default` is Ho-Lee with 100 steps and the default normal volatility
 /// let default = ShortRateTreeConfig::default();
@@ -204,7 +244,8 @@ pub struct ShortRateTreeConfig {
     ///
     /// ⚠️ **Interpretation depends on model**:
     /// - **Ho-Lee**: Normal volatility in rate units (0.01 = 100 bp/yr)
-    /// - **BDT**: Lognormal volatility as proportion (0.20 = 20%/yr)
+    /// - **BDT / Black-Karasinski**: Lognormal volatility as proportion
+    ///   (0.20 = 20%/yr)
     ///
     /// See [`ShortRateModel`] for typical ranges per model type.
     pub volatility: f64,
@@ -215,8 +256,11 @@ pub struct ShortRateTreeConfig {
     /// - Higher values = faster reversion, less rate dispersion
     /// - Ho-Lee: must be `0.0` (mean reversion breaks lattice recombination);
     ///   use `HullWhiteTree` for mean-reverting normal models
-    /// - BDT/Black-Karasinski: κ = 0 calibrates standard binomial BDT;
-    ///   κ > 0 calibrates a trinomial Black-Karasinski lattice in x = ln r
+    /// - Black-Derman-Toy: must be `0.0`; use Black-Karasinski for a
+    ///   mean-reverting lognormal model
+    /// - Black-Karasinski: must be finite and strictly positive
+    ///
+    /// Calibration rejects any other combination.
     pub mean_reversion: f64,
 
     /// Per-node discount factor convention.
@@ -267,15 +311,13 @@ impl ShortRateTreeConfig {
         }
     }
 
-    /// Create a Black-Derman-Toy / Black-Karasinski configuration.
+    /// Create a Black-Derman-Toy configuration (binomial lattice, no mean
+    /// reversion).
     ///
     /// # Arguments
     ///
     /// * `steps` - Number of tree steps (50-200 typical)
     /// * `lognormal_vol` - Lognormal volatility (e.g., 0.20 = 20%/yr)
-    /// * `mean_reversion` - Mean reversion speed; `0.0` calibrates standard
-    ///   binomial BDT, any positive value calibrates a trinomial
-    ///   Black-Karasinski lattice in x = ln r
     ///
     /// # Examples
     ///
@@ -283,12 +325,52 @@ impl ShortRateTreeConfig {
     /// use finstack_quant_models::trees::short_rate_tree::ShortRateTreeConfig;
     ///
     /// // 100 steps, 20% lognormal vol
-    /// let config = ShortRateTreeConfig::bdt(100, 0.20, 0.0);
+    /// let config = ShortRateTreeConfig::bdt(100, 0.20);
     /// ```
-    pub fn bdt(steps: usize, lognormal_vol: f64, mean_reversion: f64) -> Self {
+    pub fn bdt(steps: usize, lognormal_vol: f64) -> Self {
         Self {
             steps,
             model: ShortRateModel::BlackDermanToy,
+            volatility: lognormal_vol,
+            mean_reversion: 0.0,
+            compounding: Compounding::default(),
+            curve_fit_tolerance_bp: DEFAULT_CURVE_FIT_TOLERANCE_BP,
+        }
+    }
+
+    /// Create a Black-Karasinski configuration (trinomial lattice in
+    /// `x = ln r` with mean reversion).
+    ///
+    /// The short rate follows `d(ln r) = [θ(t) − κ·ln r] dt + σ dW`
+    /// (Black & Karasinski, 1991), discretized on the Hull & White (1994)
+    /// trinomial geometry; see [`ShortRateModel::BlackKarasinski`].
+    ///
+    /// # Arguments
+    ///
+    /// * `steps` - Number of tree steps (50-200 typical). The lattice width is
+    ///   capped at `2·⌈0.184/(κΔt)⌉ + 1` nodes, so cost grows more slowly than
+    ///   the binomial `O(steps²)` once the cap binds.
+    /// * `lognormal_vol` - Annualized lognormal short-rate volatility σ as a
+    ///   decimal proportion of the rate (e.g., 0.20 = 20%/yr); must be finite
+    ///   and non-negative.
+    /// * `mean_reversion` - Mean reversion speed κ of `ln r`, per year, as a
+    ///   decimal (e.g., 0.03 = 3%/yr; typical 0.01-0.10). Must be finite and
+    ///   strictly positive: calibration rejects `κ <= 0`, for which
+    ///   [`ShortRateTreeConfig::bdt`] is the model.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use finstack_quant_models::trees::short_rate_tree::ShortRateTreeConfig;
+    ///
+    /// // 100 steps, 20% lognormal vol, 3%/yr mean reversion
+    /// let config = ShortRateTreeConfig::black_karasinski(100, 0.20, 0.03);
+    /// assert_eq!(config.mean_reversion, 0.03);
+    /// ```
+    pub fn black_karasinski(steps: usize, lognormal_vol: f64, mean_reversion: f64) -> Self {
+        Self {
+            steps,
+            model: ShortRateModel::BlackKarasinski,
             volatility: lognormal_vol,
             mean_reversion,
             compounding: Compounding::default(),
