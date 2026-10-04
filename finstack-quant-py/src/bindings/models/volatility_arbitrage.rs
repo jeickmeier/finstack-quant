@@ -7,6 +7,7 @@
 //! rows of the Rust `ArbitrageViolation`; the combined `check_surface_grid`
 //! returns a typed `ArbitrageReport`.
 
+use crate::bindings::macros::wire_methods;
 use finstack_quant_models::volatility::arbitrage::{
     self as model_arbitrage, ArbitrageReport, ArbitrageSeverity, ArbitrageType, ArbitrageViolation,
 };
@@ -14,7 +15,7 @@ use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyModule};
 
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe, serde_to_py};
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 
 /// Serde name of an arbitrage enum variant (the `snake_case` wire form).
 fn label<T: serde::Serialize>(value: &T) -> PyResult<String> {
@@ -168,28 +169,6 @@ impl PyArbitrageReport {
         serde_rows_to_dataframe(py, &rows)
     }
 
-    /// Serialize to compact JSON (the Rust ``ArbitrageReport`` wire form).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "ArbitrageReport"))
-    }
-
-    /// Deserialize from the JSON produced by ``to_json``.
-    ///
-    /// Raises ``ValueError`` on malformed JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: ArbitrageReport = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid ArbitrageReport JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` (and therefore ``copy.deepcopy``, ``multiprocessing``).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "ArbitrageReport(passed={}, total_violations={}, vol_surface_id='{}')",
@@ -199,6 +178,8 @@ impl PyArbitrageReport {
         )
     }
 }
+
+wire_methods!(PyArbitrageReport, ArbitrageReport, "ArbitrageReport");
 
 /// Check butterfly arbitrage via Durrleman's g(k) density condition.
 ///

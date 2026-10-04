@@ -21,6 +21,7 @@
 //! Rust and Python use the canonical PascalCase forms (`SabrParameters`,
 //! `SabrModel`, `SabrSmile`, `SabrCalibrator`).
 
+use crate::bindings::macros::wire_methods;
 use std::sync::Arc;
 
 use crate::bindings::core::market_data::curves::{
@@ -30,7 +31,7 @@ use crate::bindings::module_utils::py_to_serde;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::repr_support::repr_from_serde;
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_models::volatility as vol;
 use finstack_quant_models::volatility::sabr::{
     SabrCalibrator, SabrModel, SabrParameters, SabrShift, SabrSmile,
@@ -191,28 +192,6 @@ impl PySabrParameters {
         self.inner.is_shifted()
     }
 
-    /// Serialize to compact JSON (``alpha, beta, nu, rho`` and ``shift`` when set).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "SabrParameters"))
-    }
-
-    /// Deserialize from JSON; the Rust wire format validates every field on load.
-    ///
-    /// Raises ``ValueError`` on malformed JSON or invalid parameters.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: SabrParameters = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid SabrParameters JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` (and therefore ``copy.deepcopy``, ``multiprocessing``).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Exact equality of all parameters (Rust ``PartialEq``).
     fn __eq__(&self, other: &Bound<'_, PyAny>) -> bool {
         other
@@ -232,6 +211,8 @@ impl PySabrParameters {
         )
     }
 }
+
+wire_methods!(PySabrParameters, SabrParameters, "SabrParameters");
 
 /// Hagan-2002 SABR model wrapping a :class:`SabrParameters` instance.
 ///
@@ -1212,32 +1193,12 @@ impl PySviParams {
         self.inner.durrleman_g(k)
     }
 
-    /// Serialize to compact JSON (``a, b, rho, m, sigma``).
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(|e| serde_json_to_py(e, "SviParams"))
-    }
-
-    /// Deserialize from JSON; validation runs on load.
-    ///
-    /// Raises ``ValueError`` on malformed JSON or invalid parameters.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: SviParams = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid SviParams JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Support ``pickle`` (and therefore ``copy.deepcopy``, ``multiprocessing``).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         repr_from_serde("SviParams", &self.inner)
     }
 }
+
+wire_methods!(PySviParams, SviParams, "SviParams");
 
 /// Calibrate SVI parameters to a market smile (Gatheral 2004).
 ///
