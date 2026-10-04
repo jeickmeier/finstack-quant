@@ -692,7 +692,7 @@ impl PyScheduleParams {
             end_of_month,
             payment_lag_days,
             adjust_accrual_dates,
-            roll_rule: roll_rule.map_or(RollRule::None, |r| r.inner),
+            roll_rule: roll_rule.map(|r| r.inner).unwrap_or_default(),
         };
         inner.validate().map_err(core_to_py)?;
         Ok(Self::from_inner(inner))
@@ -1828,8 +1828,7 @@ impl PyFeeSpec {
                 },
                 calendar_id: calendar_id.to_string(),
                 stub: stub.map_or_else(serde_defaults::stub_short_front, |s| s.inner),
-                accrual_basis: accrual_basis
-                    .map_or(FeeAccrualBasis::PointInTime, |a| a.inner.clone()),
+                accrual_basis: accrual_basis.map(|a| a.inner.clone()).unwrap_or_default(),
             },
         })
     }
