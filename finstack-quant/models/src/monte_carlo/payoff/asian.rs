@@ -559,46 +559,6 @@ impl Payoff for AsianPut {
     }
 }
 
-/// Closed-form price for geometric Asian call under GBM.
-///
-/// Delegates to the canonical implementation in `closed_form::asian::geometric_asian_call`
-/// which uses the correct adjusted volatility formula:
-///   σ_adj = σ × √((n+1)(2n+1)/(6n²))
-///
-/// # Arguments
-///
-/// * `spot` - Initial underlying spot in the same price units as `strike`.
-/// * `strike` - Option exercise price in the same price units as `spot`.
-/// * `time_to_maturity` - Time to maturity
-/// * `rate` - Continuously compounded annual risk-free rate as a decimal.
-/// * `dividend_yield` - Continuously compounded annual dividend or carry yield
-///   as a decimal.
-/// * `volatility` - Annualized lognormal volatility as a decimal.
-/// * `num_fixings` - Number of averaging points
-///
-/// # Returns
-///
-/// Present value of geometric Asian call
-pub fn geometric_asian_call_closed_form(
-    spot: f64,
-    strike: f64,
-    time_to_maturity: f64,
-    rate: f64,
-    dividend_yield: f64,
-    volatility: f64,
-    num_fixings: usize,
-) -> f64 {
-    crate::closed_form::geometric_asian_call(
-        spot,
-        strike,
-        time_to_maturity,
-        rate,
-        dividend_yield,
-        volatility,
-        num_fixings,
-    )
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -779,7 +739,8 @@ mod tests {
 
     #[test]
     fn test_geometric_asian_closed_form() {
-        let price = geometric_asian_call_closed_form(100.0, 100.0, 1.0, 0.05, 0.02, 0.2, 12);
+        let price =
+            crate::closed_form::geometric_asian_call(100.0, 100.0, 1.0, 0.05, 0.02, 0.2, 12);
 
         assert!(price > 0.0);
         assert!(price < 10.0);

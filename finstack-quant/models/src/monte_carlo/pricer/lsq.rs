@@ -112,47 +112,6 @@ where
     solve_least_squares(&design, y, n, k)
 }
 
-/// Fit continuation values in-sample: design matrix, SVD, then predict.
-///
-/// # Arguments
-///
-/// * `x` - State variables (spot prices or swap rates)
-/// * `y` - Discounted continuation values to fit
-/// * `basis` - Basis functions to evaluate at each x value
-///
-/// # Returns
-///
-/// Predicted continuation values for each x value (same length as x)
-///
-/// This fits and predicts on the same sample; it is an in-sample continuation
-/// estimate, not an independently validated exercise policy.
-///
-/// # Errors
-///
-/// Propagates the coefficient-fit errors from
-/// [`regression_coefficients_with_basis`], including insufficient observations
-/// for the selected basis or an unsuccessful SVD solve.
-pub fn regression_with_basis<B>(x: &[f64], y: &[f64], basis: &B) -> Result<Vec<f64>>
-where
-    B: BasisFunctions + ?Sized,
-{
-    let coeffs = regression_coefficients_with_basis(x, y, basis)?;
-    let k = basis.num_basis();
-
-    let mut basis_vals = vec![0.0; k];
-    let mut predictions = vec![0.0; x.len()];
-    for (i, &x_val) in x.iter().enumerate() {
-        basis.evaluate(x_val, &mut basis_vals);
-        let mut pred = 0.0;
-        for j in 0..k {
-            pred += coeffs[j] * basis_vals[j];
-        }
-        predictions[i] = pred;
-    }
-
-    Ok(predictions)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,60 +161,53 @@ mod tests {
         assert!(beta.iter().all(|&x| x.is_finite()));
     }
 
+    fn assert_fit_reproduces(x: &[f64], y: &[f64], basis: &PolynomialBasis) {
+        let coeffs = regression_coefficients_with_basis(x, y, basis).expect("should succeed");
+        let mut basis_vals = vec![0.0; basis.num_basis()];
+        for (i, &x_val) in x.iter().enumerate() {
+            basis.evaluate(x_val, &mut basis_vals);
+            let pred: f64 = coeffs.iter().zip(&basis_vals).map(|(c, b)| c * b).sum();
+            assert!(
+                (pred - y[i]).abs() < 1e-6,
+                "Prediction {} differs from y[{}]: {} vs {}",
+                i,
+                i,
+                pred,
+                y[i]
+            );
+        }
+    }
+
     #[test]
-    fn test_regression_with_basis_polynomial() {
+    fn test_regression_coefficients_polynomial() {
         let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let y = vec![3.0, 5.0, 7.0, 9.0, 11.0];
 
         let basis = PolynomialBasis::new(1).expect("valid regression basis");
 
-        let predictions = regression_with_basis(&x, &y, &basis).expect("should succeed");
-
-        for (i, &pred) in predictions.iter().enumerate() {
-            assert!(
-                (pred - y[i]).abs() < 1e-6,
-                "Prediction {} differs from y[{}]: {} vs {}",
-                i,
-                i,
-                pred,
-                y[i]
-            );
-        }
+        assert_fit_reproduces(&x, &y, &basis);
     }
 
     #[test]
-    fn test_regression_with_basis_quadratic() {
+    fn test_regression_coefficients_quadratic() {
         let x = vec![0.0, 1.0, 2.0, 3.0, 4.0];
         let y = vec![1.0, 6.0, 17.0, 34.0, 57.0];
 
         let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
-        let predictions = regression_with_basis(&x, &y, &basis).expect("should succeed");
-
-        for (i, &pred) in predictions.iter().enumerate() {
-            assert!(
-                (pred - y[i]).abs() < 1e-6,
-                "Prediction {} differs from y[{}]: {} vs {}",
-                i,
-                i,
-                pred,
-                y[i]
-            );
-        }
+        assert_fit_reproduces(&x, &y, &basis);
     }
 
     #[test]
-    fn test_regression_with_basis_stability() {
+    fn test_regression_coefficients_stability() {
         let x = vec![10.0, 50.0, 100.0, 200.0, 500.0, 1000.0];
         let y = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
 
         let basis = PolynomialBasis::new(3).expect("valid regression basis");
 
-        let result = regression_with_basis(&x, &y, &basis);
+        let coeffs = regression_coefficients_with_basis(&x, &y, &basis).expect("should succeed");
 
-        assert!(result.is_ok());
-        let predictions = result.expect("should succeed");
-        assert_eq!(predictions.len(), x.len());
-        assert!(predictions.iter().all(|&p| p.is_finite()));
+        assert_eq!(coeffs.len(), basis.num_basis());
+        assert!(coeffs.iter().all(|c| c.is_finite()));
     }
 }

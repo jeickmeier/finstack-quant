@@ -119,20 +119,6 @@ impl PathDependentPricerConfig {
         self
     }
 
-    /// Enable path capture for all paths.
-    #[must_use]
-    pub fn capture_all_paths(mut self) -> Self {
-        self.path_capture = PathCaptureConfig::all();
-        self
-    }
-
-    /// Enable path capture for a sample.
-    #[must_use]
-    pub fn capture_sample_paths(mut self, count: usize, seed: u64) -> Self {
-        self.path_capture = PathCaptureConfig::sample(count, seed);
-        self
-    }
-
     /// Enable Sobol quasi-random sequence.
     ///
     /// Defaults `use_brownian_bridge` to `true` when enabling Sobol because
@@ -750,31 +736,6 @@ impl PathDependentPricer {
         .map(|result| result.estimate)
     }
 
-    /// Price with full Monte Carlo result (including captured paths if enabled).
-    #[allow(clippy::too_many_arguments)]
-    pub fn price_with_paths<P>(
-        &self,
-        process: &GbmProcess,
-        initial_spot: f64,
-        time_to_maturity: f64,
-        num_steps: usize,
-        payoff: &P,
-        currency: Currency,
-        discount_factor: f64,
-    ) -> Result<MonteCarloResult>
-    where
-        P: Payoff,
-    {
-        self.price_with_paths_and_grid(
-            process,
-            initial_spot,
-            TimeGrid::uniform(time_to_maturity, num_steps)?,
-            payoff,
-            currency,
-            discount_factor,
-        )
-    }
-
     /// Price with captured paths on a grid containing the contractual events.
     ///
     /// # Arguments
@@ -809,7 +770,7 @@ impl PathDependentPricer {
         // with a different estimator than the caller configured.
         if self.config.antithetic {
             return Err(Error::Validation(
-                "price_with_paths cannot honor antithetic = true: path capture and \
+                "price_with_paths_and_grid cannot honor antithetic = true: path capture and \
                  antithetic sampling are mutually exclusive. Disable antithetic or \
                  use price() without capture."
                     .to_string(),
@@ -1227,6 +1188,7 @@ mod tests {
         }
     }
 
+    use crate::monte_carlo::engine::PathCaptureConfig;
     use crate::monte_carlo::paths::PathSamplingMethod;
     use crate::monte_carlo::payoff::asian::{AsianCall, AsianPut, AveragingMethod};
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
@@ -1438,17 +1400,24 @@ mod tests {
 
     #[test]
     fn test_sampled_path_capture_prices_and_records_subset() {
-        let config = PathDependentPricerConfig::new(256)
+        let mut config = PathDependentPricerConfig::new(256)
             .with_seed(42)
             .with_parallel(false)
-            .with_antithetic(false)
-            .capture_sample_paths(32, 17);
+            .with_antithetic(false);
+        config.path_capture = PathCaptureConfig::sample(32, 17);
         let pricer = PathDependentPricer::new(config);
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.02, 0.2).expect("valid GBM parameters"));
         let call = EuropeanCall::new(100.0, 1.0, 4);
 
         let result = pricer
-            .price_with_paths(&gbm, 100.0, 1.0, 4, &call, Currency::USD, 0.95)
+            .price_with_paths_and_grid(
+                &gbm,
+                100.0,
+                TimeGrid::uniform(1.0, 4).expect("grid"),
+                &call,
+                Currency::USD,
+                0.95,
+            )
             .expect("sampled path capture should succeed");
 
         assert!(result.estimate.mean.amount().is_finite());
@@ -1464,9 +1433,9 @@ mod tests {
         );
         assert!(!captured.is_complete());
         assert!(
-            (16..=48).contains(&captured.num_captured()),
+            (16..=48).contains(&captured.paths.len()),
             "target sample size 32 should yield an approximate sample, got {}",
-            captured.num_captured()
+            captured.paths.len()
         );
         assert!(captured.paths.iter().all(|path| path.points.len() == 5));
     }
@@ -1548,7 +1517,14 @@ mod tests {
         let df = (-r * t).exp();
 
         let result = pricer
-            .price_with_paths(&gbm, s0, t, num_steps, &payoff, Currency::USD, df)
+            .price_with_paths_and_grid(
+                &gbm,
+                s0,
+                TimeGrid::uniform(t, num_steps).expect("grid"),
+                &payoff,
+                Currency::USD,
+                df,
+            )
             .expect("sobol pricing should succeed");
 
         let bs =
@@ -1622,11 +1598,11 @@ mod tests {
             }
         }
 
-        let config = PathDependentPricerConfig::new(8)
+        let mut config = PathDependentPricerConfig::new(8)
             .with_seed(11)
             .with_parallel(false)
-            .with_sobol(true)
-            .capture_all_paths();
+            .with_sobol(true);
+        config.path_capture = PathCaptureConfig::all();
         let pricer = PathDependentPricer::new(config);
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.2).unwrap());
         let fixing_steps = vec![1, 2, 3, 4];
@@ -1634,24 +1610,35 @@ mod tests {
             .expect("nonempty fixing schedule");
 
         let first = pricer
-            .price_with_paths(&gbm, 100.0, 1.0, 4, &asian, Currency::USD, 1.0)
+            .price_with_paths_and_grid(
+                &gbm,
+                100.0,
+                TimeGrid::uniform(1.0, 4).expect("grid"),
+                &asian,
+                Currency::USD,
+                1.0,
+            )
             .expect("Sobol path capture should succeed for multiple paths");
         let second = pricer
-            .price_with_paths(&gbm, 100.0, 1.0, 4, &asian, Currency::USD, 1.0)
+            .price_with_paths_and_grid(
+                &gbm,
+                100.0,
+                TimeGrid::uniform(1.0, 4).expect("grid"),
+                &asian,
+                Currency::USD,
+                1.0,
+            )
             .expect("repeated Sobol path capture should succeed");
 
         assert_eq!(first.estimate.num_paths, 8);
-        assert_eq!(
-            first.paths.as_ref().map(|p| p.num_captured()).unwrap_or(0),
-            8
-        );
+        assert_eq!(first.paths.as_ref().map(|p| p.paths.len()).unwrap_or(0), 8);
 
         let captured = first.paths.as_ref().expect("paths should be captured");
         let repeated = second
             .paths
             .as_ref()
             .expect("repeated paths should be captured");
-        assert_eq!(captured.num_captured(), repeated.num_captured());
+        assert_eq!(captured.paths.len(), repeated.paths.len());
         for (path_a, path_b) in captured.paths.iter().zip(&repeated.paths) {
             assert_eq!(path_a.path_id, path_b.path_id);
             assert_eq!(path_a.final_value.to_bits(), path_b.final_value.to_bits());

@@ -205,7 +205,7 @@ let result = engine
 println!("estimate={}", result.estimate.mean);
 
 if let Some(paths) = result.paths.as_ref() {
-    println!("captured={} of {}", paths.num_captured(), paths.num_paths_total);
+    println!("captured={} of {}", paths.paths.len(), paths.num_paths_total);
     println!("sampling={:?}", paths.sampling_method);
     println!("state_keys={:?}", paths.state_var_keys());
 }
