@@ -9,7 +9,7 @@ use syn::{parse_macro_input, Data, DeriveInput, Expr, Fields, Lit, Meta};
 ///
 /// Automatically generates a type-safe builder with:
 /// - Required fields (non-Option types must be set)
-/// - Optional fields (Option<T> or marked with #[builder(optional)])
+/// - Optional fields (Option<T>)
 /// - Validation on build (e.g., start_date < maturity)
 /// - Ergonomic setter methods
 ///
@@ -92,7 +92,7 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
         }
     };
 
-    // By default, treat Option<T> as optional; #[builder(optional)] is honored only when field type is Option<...>
+    // Treat Option<T> fields as optional.
     if let Fields::Named(named) = fields {
         for f in named.named {
             let Some(ident) = f.ident else {
@@ -130,14 +130,11 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
             };
             field_docs.insert(ident.clone(), docs);
 
-            let mut has_optional_attr = false;
             let mut default_expr: Option<Expr> = None;
             for attr in f.attrs {
                 if attr.path().is_ident("builder") {
-                    let _ = attr.parse_nested_meta(|meta| {
-                        if meta.path.is_ident("optional") {
-                            has_optional_attr = true;
-                        } else if meta.path.is_ident("default") {
+                    if let Err(error) = attr.parse_nested_meta(|meta| {
+                        if meta.path.is_ident("default") {
                             // Support #[builder(default)] and #[builder(default = <expr>)]
                             if meta.input.peek(syn::Token![=]) {
                                 let value: Expr = meta.value()?.parse()?;
@@ -148,9 +145,15 @@ pub(crate) fn derive_financial_builder_impl(input: TokenStream) -> TokenStream {
                                     syn::parse_quote! { ::core::default::Default::default() };
                                 default_expr = Some(ty_default);
                             }
+                        } else {
+                            return Err(
+                                meta.error("unsupported builder attribute; expected default")
+                            );
                         }
                         Ok(())
-                    });
+                    }) {
+                        return error.to_compile_error().into();
+                    }
                 }
             }
 

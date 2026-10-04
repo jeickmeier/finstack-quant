@@ -120,25 +120,8 @@ impl MetricCalculator for ParRateCalculator {
                     .curves
                     .get_discount(&irs.fixed_leg.discount_curve_id)?;
                 let fixed = irs.resolved_fixed_leg()?;
-                let periods = crate::cashflow::builder::periods::build_periods(
-                    crate::cashflow::builder::periods::BuildPeriodsParams {
-                        start: fixed.start,
-                        end: fixed.end,
-                        frequency: fixed.frequency,
-                        stub: fixed.stub,
-                        business_day_convention: fixed.business_day_convention,
-                        calendar_id: fixed
-                            .calendar_id
-                            .as_deref()
-                            .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
-                        end_of_month: fixed.end_of_month,
-                        day_count: fixed.day_count,
-                        payment_lag_days: fixed.payment_lag_days,
-                        reset_lag_days: None,
-                        adjust_accrual_dates: false,
-                        roll_rule: crate::cashflow::builder::specs::RollRule::None,
-                    },
-                )?;
+                let periods =
+                    crate::cashflow::builder::periods::build_periods(fixed.schedule_params(false))?;
                 if periods.is_empty() {
                     return Err(finstack_quant_core::Error::Validation(
                         "Par rate calculation failed: swap schedule has no dates.".into(),

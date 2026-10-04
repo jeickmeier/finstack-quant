@@ -45,4 +45,4 @@ pub(crate) mod heston_mc_pricer;
 
 pub use types::{BarrierOption, BarrierOptionBuilder};
 
-crate::impl_equity_exotic_traits!(BarrierOption);
+crate::instruments::common_impl::traits::impl_equity_exotic_traits!(BarrierOption);

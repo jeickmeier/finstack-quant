@@ -43,8 +43,8 @@
 //! - Whaley, R. E. (2009). "Understanding the VIX." *Journal of Portfolio Management*. `docs/REFERENCES.md#whaley-2009-vix`
 
 use super::pricer;
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::listed::ListedFutureTerms;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -286,7 +286,7 @@ impl crate::instruments::common_impl::traits::Instrument for VolatilityIndexFutu
         self.validate()
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for VolatilityIndexFuture {

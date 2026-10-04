@@ -181,8 +181,8 @@ mod discount_margin_tests {
     use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         calculate_tranche_discount_margin, calculate_tranche_metrics, calculate_tranche_z_spread,
-        generate_tranche_cashflows, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
-        TrancheSeniority, TrancheStructure,
+        AssetPool, DealType, PoolAsset, StructuredCredit, Tranche, TrancheSeniority,
+        TrancheStructure,
     };
     use time::Month;
 
@@ -366,7 +366,7 @@ mod discount_margin_tests {
         )
         .unwrap();
 
-        let flows = generate_tranche_cashflows(&sc, "SR", &mkt, closing()).unwrap();
+        let flows = (sc).tranche_cashflows("SR", &mkt, closing()).unwrap();
         let curve = mkt.get_discount("USD-OIS").unwrap();
         let z_bp = calculate_tranche_z_spread(&flows.cashflows, curve.as_ref(), target, closing())
             .unwrap();
@@ -452,7 +452,6 @@ mod breakeven_cdr_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
-    use finstack_quant_valuations::instruments::fixed_income::structured_credit::generate_tranche_cashflows;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         calculate_tranche_breakeven_cdr, AssetPool, DealType, PoolAsset, StructuredCredit, Tranche,
         TrancheSeniority, TrancheStructure,
@@ -522,7 +521,7 @@ mod breakeven_cdr_tests {
     fn senior_writedown(sc: &StructuredCredit, mkt: &MarketContext, cdr: f64) -> f64 {
         let mut d = sc.clone();
         d.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
-        generate_tranche_cashflows(&d, "SR", mkt, closing())
+        (d).tranche_cashflows("SR", mkt, closing())
             .unwrap()
             .total_writedown
             .amount()
@@ -698,7 +697,6 @@ mod oas_tests {
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
     use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
-    use finstack_quant_valuations::instruments::fixed_income::structured_credit::generate_tranche_cashflows;
     use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
         calculate_tranche_oas, calculate_tranche_z_spread, AssetPool, DealType, OasConfig,
         PoolAsset, StructuredCredit, Tranche, TrancheSeniority, TrancheStructure,
@@ -797,7 +795,7 @@ mod oas_tests {
         let target_pv = Money::new(market_price / 100.0 * original, Currency::USD)
             .expect("valid money fixture");
 
-        let cf = generate_tranche_cashflows(&sc, "SR", &mkt, as_of).unwrap();
+        let cf = (sc).tranche_cashflows("SR", &mkt, as_of).unwrap();
         let disc = mkt.get_discount(&sc.discount_curve_id).unwrap();
         let z_bp =
             calculate_tranche_z_spread(&cf.cashflows, disc.as_ref(), target_pv, as_of).unwrap();
@@ -833,7 +831,7 @@ mod oas_tests {
         let target_pv = Money::new(market_price / 100.0 * original, Currency::USD)
             .expect("valid money fixture");
 
-        let cf = generate_tranche_cashflows(&sc, "SR", &mkt, as_of).unwrap();
+        let cf = (sc).tranche_cashflows("SR", &mkt, as_of).unwrap();
         let disc = mkt.get_discount(&sc.discount_curve_id).unwrap();
         let z_bp =
             calculate_tranche_z_spread(&cf.cashflows, disc.as_ref(), target_pv, as_of).unwrap();
@@ -893,7 +891,7 @@ mod oas_tests {
         let target_pv = Money::new(market_price / 100.0 * original, Currency::USD)
             .expect("valid money fixture");
 
-        let cf = generate_tranche_cashflows(&sc, "SR", &mkt, as_of).unwrap();
+        let cf = (sc).tranche_cashflows("SR", &mkt, as_of).unwrap();
         let disc = mkt.get_discount(&sc.discount_curve_id).unwrap();
         let z = calculate_tranche_z_spread(&cf.cashflows, disc.as_ref(), target_pv, as_of).unwrap()
             / 10_000.0;

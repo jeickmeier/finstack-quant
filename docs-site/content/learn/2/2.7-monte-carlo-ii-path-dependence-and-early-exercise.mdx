@@ -282,7 +282,7 @@ import math
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.valuations.instruments import Swaption, list_models_grouped, price_instrument
 
-underlying = json.loads(Swaption.example_bermudan().to_json())["instrument"]["spec"]
+underlying = json.loads(Swaption.example().to_json())["instrument"]["spec"]
 for leg_name in ("underlying_fixed_leg", "underlying_float_leg"):
     underlying[leg_name]["start"] = "2027-01-15"
     underlying[leg_name]["end"] = "2032-01-15"

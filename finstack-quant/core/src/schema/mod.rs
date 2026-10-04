@@ -212,3 +212,7 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     .with_kind(SchemaKind::Output)
     .with_examples(vol_cube_expiry_slice_examples),
 ];
+
+/// Shared diagnostics for compiled JSON Schema validators.
+#[cfg(feature = "jsonschema-validate")]
+pub mod diagnostics;

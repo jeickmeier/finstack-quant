@@ -34,6 +34,8 @@ rand = { version = "0.9.3", default-features = false, features = ["std"] }
 rand_pcg = { version = "0.9", features = ["serde"] }
 tracing = { version = "0.1", default-features = false }
 
+jsonschema = { version = "0.28", default-features = false, optional = true }
+
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 time = { workspace = true, features = ["wasm-bindgen"] }
 
@@ -45,6 +47,7 @@ rayon = "1.11"
 [features]
 default = ["json-schema"]
 json-schema = ["dep:schemars"]
+jsonschema-validate = ["json-schema", "dep:jsonschema"]
 
 [[bin]]
 name = "gen_core_schemas"

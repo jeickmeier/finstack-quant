@@ -95,7 +95,6 @@ def swaption_legs() -> tuple[FixedLegSpec, FloatLegSpec]:
 def build_swaption(
     *,
     option_type: str = "call",
-    exercise_style: str = "european",
     settlement: str = "cash",
     cash_settlement_method: str = "collateralized_cash_price",
     vol_model: str = "normal",
@@ -108,7 +107,6 @@ def build_swaption(
         .option_type(option_type)
         .notional(Money(10_000_000.0, Currency("USD")))
         .expiry(datetime.date(2025, 1, 13))
-        .exercise_style(exercise_style)
         .settlement(settlement)
         .cash_settlement_method(cash_settlement_method)
         .vol_model(vol_model)

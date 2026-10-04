@@ -44,36 +44,6 @@ fn parse_instance(instrument_json: &str) -> PyResult<Value> {
         .map_err(|err| serde_json_to_py(err, "invalid instrument JSON"))
 }
 
-/// Validate `instance` against one rendered schema, raising on any failure.
-///
-/// Routes through [`finstack_quant::schema::validate_document`] rather than the
-/// crate-local validator so the two mistakes a generated payload makes most
-/// often — a decimal sent as a JSON number, and a wrong enum spelling — are
-/// reported at the offending field with the accepted values enumerated, instead
-/// of as one `oneOf` failure against the enclosing subtree.
-fn ensure_valid_against(schema: &Value, instance: &Value, context: &str) -> PyResult<()> {
-    let failures =
-        finstack_quant::schema::validate_document(schema, instance).map_err(core_to_py)?;
-    if failures.is_empty() {
-        return Ok(());
-    }
-    let rendered: Vec<String> = failures
-        .iter()
-        .map(|failure| {
-            if failure.pointer.is_empty() {
-                failure.message.clone()
-            } else {
-                format!("{}: {}", failure.pointer, failure.message)
-            }
-        })
-        .collect();
-    Err(pyo3::exceptions::PyValueError::new_err(format!(
-        "{context} validation failed with {} error(s):\n  {}",
-        rendered.len(),
-        rendered.join("\n  ")
-    )))
-}
-
 /// Return the JSON Schema for the canonical instrument envelope.
 ///
 /// The envelope is the ``finstack_quant.instrument/1`` wrapper carrying a
@@ -238,19 +208,8 @@ fn valuation_result_schema() -> PyResult<String> {
 fn validate_instrument_envelope_json(instrument_json: &Bound<'_, PyAny>) -> PyResult<String> {
     let instrument_json = crate::bindings::extract::envelope_json_text(instrument_json)?;
     let instance = parse_instance(&instrument_json)?;
-    let envelope = canonical::instrument_envelope_schema().map_err(core_to_py)?;
-    ensure_valid_against(envelope, &instance, "instrument envelope")?;
-
-    let instrument_type = instance
-        .pointer("/instrument/type")
-        .and_then(Value::as_str)
-        .ok_or_else(|| {
-            pyo3::exceptions::PyValueError::new_err(
-                "instrument envelope validation passed but instrument.type is missing".to_string(),
-            )
-        })?
-        .to_string();
-    validate_instance_as_type(&instrument_type, &instance)
+    canonical::validate_instrument_envelope_json(&instance).map_err(core_to_py)?;
+    canonical_json(&instance)
 }
 
 /// Validate a payload against one specific instrument type's schema.
@@ -304,8 +263,7 @@ fn validate_instrument_type_json(
 /// Validate a decoded payload against one instrument type's schema and
 /// return its canonical compact JSON.
 fn validate_instance_as_type(instrument_type: &str, instance: &Value) -> PyResult<String> {
-    let schema = canonical::instrument_schema(instrument_type).map_err(core_to_py)?;
-    ensure_valid_against(&schema, instance, instrument_type)?;
+    canonical::validate_instrument_type_json(instrument_type, instance).map_err(core_to_py)?;
     canonical_json(instance)
 }
 

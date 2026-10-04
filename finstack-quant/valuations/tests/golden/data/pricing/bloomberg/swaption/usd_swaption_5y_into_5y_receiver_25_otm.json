@@ -302,8 +302,7 @@
             "legacy_fixture_name": "usd_swaption_5y_into_5y_receiver_25_otm"
           }
         },
-        "settlement": "cash",
-        "exercise_style": "european"
+        "settlement": "cash"
       }
     }
   },

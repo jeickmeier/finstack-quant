@@ -79,8 +79,8 @@ pub fn parse_instrument_from_json(json: &str) -> finstack_quant_core::Result<Ins
             MAX_JSON_BYTES / (1024 * 1024)
         )));
     }
-    let envelope: InstrumentEnvelope = serde_json::from_str(json)
-        .map_err(|error| Error::Validation(format!("invalid instrument envelope JSON: {error}")))?;
+    let envelope: InstrumentEnvelope =
+        crate::instruments::json_loader::decode_capped_json(json.as_bytes())?;
     let instrument = envelope.instrument;
     instrument.validate_for_pricing()?;
     Ok(instrument)
@@ -418,8 +418,8 @@ pub fn parse_boxed_instruments_from_json(
             MAX_JSON_BYTES / (1024 * 1024)
         )));
     }
-    let envelopes: Vec<InstrumentEnvelope> = serde_json::from_str(json)
-        .map_err(|error| Error::Validation(format!("invalid instrument envelope JSON: {error}")))?;
+    let envelopes: Vec<InstrumentEnvelope> =
+        crate::instruments::json_loader::decode_capped_json(json.as_bytes())?;
     envelopes
         .into_iter()
         .map(InstrumentEnvelope::into_boxed)
@@ -1345,6 +1345,13 @@ mod tests {
             parse_instrument_from_json(&json).expect("envelope payload"),
             InstrumentJson::Bond(_)
         ));
+
+        let mut invalid: Value = serde_json::from_str(&json).expect("fixture");
+        invalid["instrument"]["spec"]["retired_field"] = Value::Bool(false);
+        let error = parse_instrument_from_json(&invalid.to_string()).expect_err("unknown field");
+        assert!(error.to_string().contains("retired_field"), "{error}");
+        let syntax = parse_instrument_from_json("{").expect_err("invalid JSON");
+        assert!(syntax.to_string().contains("EOF"), "{syntax}");
 
         let oversized = " ".repeat(MAX_JSON_BYTES + 1);
         let error = parse_instrument_from_json(&oversized).expect_err("oversized payload fails");

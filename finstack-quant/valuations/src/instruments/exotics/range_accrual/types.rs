@@ -1,7 +1,7 @@
 //! Range accrual instrument definition.
 
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::QuantoSpec;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use finstack_quant_core::dates::Date;
@@ -164,15 +164,12 @@ pub struct RangeAccrualTerms {
     )]
     pub start_date: Date,
     /// Rate-index identity (e.g. `USD-SOFR`) of a rate-linked range accrual.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_id: Option<IndexId>,
     /// Rates forward curve that projects the observed index of a rate-linked range accrual.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub forward_curve_id: Option<CurveId>,
     /// Contractual tenor of the observed rate index.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_tenor: Option<finstack_quant_core::dates::Tenor>,
     /// Discount curve ID for present value calculations
@@ -186,7 +183,6 @@ pub struct RangeAccrualTerms {
     /// Optional quanto adjustment parameters. When provided, applies a drift
     /// correction for instruments whose payoff currency differs from the
     /// underlying asset currency.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quanto: Option<QuantoSpec>,
     /// Optional payment date (defaults to last observation date)
@@ -538,7 +534,7 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
         self.terms.observation_dates.first().copied()
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl crate::metrics::HasExpiry for RangeAccrual {

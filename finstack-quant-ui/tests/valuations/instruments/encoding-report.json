@@ -7030,12 +7030,12 @@
             "keyword": "oneOf"
           },
           { "pointer": "#/$defs/CashSettlementMethod", "keyword": "oneOf" },
-          { "pointer": "#/$defs/ExerciseStyle", "keyword": "oneOf" },
           { "pointer": "#/$defs/OptionType", "keyword": "oneOf" },
           { "pointer": "#/$defs/SettlementType", "keyword": "oneOf" },
           { "pointer": "#/$defs/VolatilityModel", "keyword": "oneOf" },
           { "pointer": "#/$defs/BermudanType", "keyword": "oneOf" },
           { "pointer": "#/$defs/Position", "keyword": "oneOf" },
+          { "pointer": "#/$defs/ExerciseStyle", "keyword": "oneOf" },
           { "pointer": "#/$defs/FutureOptionModel", "keyword": "oneOf" },
           { "pointer": "#/$defs/FutureOptionPremiumStyle", "keyword": "oneOf" },
           {
@@ -18601,12 +18601,12 @@
             "keyword": "oneOf"
           },
           { "pointer": "#/$defs/CashSettlementMethod", "keyword": "oneOf" },
-          { "pointer": "#/$defs/ExerciseStyle", "keyword": "oneOf" },
           { "pointer": "#/$defs/OptionType", "keyword": "oneOf" },
           { "pointer": "#/$defs/SettlementType", "keyword": "oneOf" },
           { "pointer": "#/$defs/VolatilityModel", "keyword": "oneOf" },
           { "pointer": "#/$defs/BermudanType", "keyword": "oneOf" },
           { "pointer": "#/$defs/Position", "keyword": "oneOf" },
+          { "pointer": "#/$defs/ExerciseStyle", "keyword": "oneOf" },
           { "pointer": "#/$defs/FutureOptionModel", "keyword": "oneOf" },
           { "pointer": "#/$defs/FutureOptionPremiumStyle", "keyword": "oneOf" },
           {
@@ -38224,7 +38224,6 @@
         ],
         "unit-union": [
           { "pointer": "#/$defs/d_4520915824b7b8b413d6", "keyword": "oneOf" },
-          { "pointer": "#/$defs/d_b94043078b268e4bb4c5", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_af1cbfbbe87bff81e3b3", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_02a11b30ee627630f221", "keyword": "oneOf" },
           { "pointer": "#/$defs/d_948cdc4db846a21357a4", "keyword": "oneOf" },

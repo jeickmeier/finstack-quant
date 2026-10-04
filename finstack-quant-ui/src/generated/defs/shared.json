@@ -3378,7 +3378,7 @@
     },
     "BasisSwap": {
       "additionalProperties": false,
-      "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;\nuse finstack_quant_valuations::instruments::FloatLegSpec;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::new(\n    \"BASIS_SWAP_001\",\n    Money::from((1_000_000_i64, Currency::USD)),\n    primary_leg,\n    reference_leg,\n);\n```",
+      "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;\nuse finstack_quant_valuations::instruments::FloatLegSpec;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::builder()\n    .id(\"BASIS_SWAP_001\".into())\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .primary_leg(primary_leg)\n    .reference_leg(reference_leg)\n    .allow_calendar_fallback(true)\n    .attributes(Default::default())\n    .build().expect(\"valid basis swap\");\n```",
       "properties": {
         "allow_calendar_fallback": {
           "default": false,
@@ -27406,11 +27406,6 @@
           ],
           "description": "Advanced Monte Carlo configuration (optional).\n\nWhen present, enables multi-factor modeling with credit spread\nand interest rate dynamics, correlation, and default modeling."
         },
-        "use_sobol_qmc": {
-          "default": false,
-          "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `model_config.mc_antithetic = true`; validation\nrejects the combination.",
-          "type": "boolean"
-        },
         "utilization_process": {
           "$ref": "#/$defs/UtilizationProcess",
           "description": "Utilization process specification."
@@ -27839,7 +27834,7 @@
     },
     "Swaption": {
       "additionalProperties": false,
-      "description": "Swaption instrument\n\n# Exercise lifecycle boundary\n\n`Instrument::value` prices the option claim through expiry. At expiry it\nreturns model-free intrinsic value; after expiry it returns zero. For\nphysical settlement, trade lifecycle infrastructure must materialize the\ndelivered [`InterestRateSwap`] from `underlying_fixed_leg`,\n`underlying_float_leg`, `notional`, and `option_type`. This instrument does\nnot retain an exercised swap position after expiry.",
+      "description": "European swaption instrument\n\n# Exercise lifecycle boundary\n\n`Instrument::value` prices the option claim through expiry. At expiry it\nreturns model-free intrinsic value; after expiry it returns zero. For\nphysical settlement, trade lifecycle infrastructure must materialize the\ndelivered [`InterestRateSwap`] from `underlying_fixed_leg`,\n`underlying_float_leg`, `notional`, and `option_type`. This instrument does\nnot retain an exercised swap position after expiry.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_2c88e4d1e2e4f7c22e02",
@@ -27848,10 +27843,6 @@
         "cash_settlement_method": {
           "$ref": "#/$defs/CashSettlementMethod",
           "description": "Cash settlement annuity method (only used when settlement = Cash).\n\n- `CollateralizedCashPrice` (default): Actual collateral-discounted fixed-leg annuity\n- `ParYield`: Legacy flat-yield cash annuity\n- `IsdaParPar`: Legacy par-par annuity from the discount curve\n- `ZeroCoupon`: Single discount to swap maturity"
-        },
-        "exercise_style": {
-          "$ref": "#/$defs/ExerciseStyle",
-          "description": "Exercise style (European, Bermudan, American). Defaults to European."
         },
         "expiry": {
           "$ref": "#/$defs/d_1b2ccb88c9229e7463e8",
@@ -27918,7 +27909,6 @@
         "option_type",
         "notional",
         "expiry",
-        "exercise_style",
         "settlement",
         "cash_settlement_method",
         "vol_model",

@@ -1,6 +1,6 @@
 //! Fixed-income index total-return swap contract.
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::{
     cashflow::builder::ScheduleParams,
     instruments::common_impl::parameters::{
@@ -394,7 +394,7 @@ impl crate::instruments::common_impl::traits::Instrument for FiIndexTotalReturnS
         Some(self.schedule.start)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for FiIndexTotalReturnSwap {

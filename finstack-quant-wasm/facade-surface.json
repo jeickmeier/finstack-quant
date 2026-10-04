@@ -4836,7 +4836,6 @@
       "callableRangeAccrualAccrued",
       "cmsSpreadOptionIntrinsic",
       "composite",
-      "creditDerivatives",
       "fx",
       "instruments",
       "inverseFloaterCouponProfile",
@@ -4844,7 +4843,6 @@
       "schema",
       "snowballCouponProfile",
       "tarnCouponProfile",
-      "validateValuationResultJson",
       "valuationResultAllCovenantsPassed",
       "valuationResultFailedCovenants",
       "valuationResultGetMetric",
@@ -4931,27 +4929,6 @@
     "kind": "function"
   },
   "valuations.composite.compositeHistoryResultRowJson": {
-    "kind": "function"
-  },
-  "valuations.creditDerivatives": {
-    "kind": "namespace",
-    "keys": [
-      "cdsIndexExampleJson",
-      "cdsOptionExampleJson",
-      "cdsTrancheExampleJson",
-      "creditDefaultSwapExampleJson"
-    ]
-  },
-  "valuations.creditDerivatives.creditDefaultSwapExampleJson": {
-    "kind": "function"
-  },
-  "valuations.creditDerivatives.cdsIndexExampleJson": {
-    "kind": "function"
-  },
-  "valuations.creditDerivatives.cdsTrancheExampleJson": {
-    "kind": "function"
-  },
-  "valuations.creditDerivatives.cdsOptionExampleJson": {
     "kind": "function"
   },
   "valuations.fx": {
@@ -5236,14 +5213,7 @@
       "assetPoolWac",
       "assetPoolWeightedAvgMaturity",
       "assetPoolWeightedAvgSpreadBp",
-      "assetPoolWithAccounts",
-      "assetPoolWithAssets",
-      "assetPoolWithInstruments",
-      "assetPoolWithReinvestmentPeriod",
-      "assetPoolWithRepLines",
       "assetPoolWithReserve",
-      "barrierCrossingBrownianBridge",
-      "barrierCrossingDiscrete",
       "bondFromCashflowsJson",
       "calculatePoolStats",
       "calculateVarWithPricing",
@@ -5262,13 +5232,7 @@
       "listStandardMetrics",
       "listStandardMetricsGrouped",
       "metricMetadata",
-      "pikModeCash",
-      "pikModePik",
-      "pikModeSplit",
-      "pikModeToggle",
       "pikScheduleModeAt",
-      "pikScheduleStepped",
-      "pikScheduleUniform",
       "poolAssetFixedRateBond",
       "poolAssetFloatingRateLoan",
       "prepaymentPenaltyFixed",
@@ -5546,7 +5510,7 @@
   },
   "valuations.instruments.Swaption": {
     "kind": "class",
-    "statics": ["builder", "example", "exampleBermudan", "fromJson"],
+    "statics": ["builder", "example", "fromJson"],
     "methods": [
       "forwardSwapRate",
       "free",
@@ -5563,7 +5527,6 @@
       "attributes",
       "cashSettlementMethod",
       "defaultModel",
-      "exerciseStyle",
       "expiry",
       "id",
       "instrumentPricingOverrides",
@@ -6064,7 +6027,6 @@
       "attributes",
       "build",
       "cashSettlementMethod",
-      "exerciseStyle",
       "expiry",
       "free",
       "id",
@@ -6389,30 +6351,6 @@
     ],
     "getters": []
   },
-  "valuations.instruments.barrierCrossingDiscrete": {
-    "kind": "function"
-  },
-  "valuations.instruments.barrierCrossingBrownianBridge": {
-    "kind": "function"
-  },
-  "valuations.instruments.pikModeCash": {
-    "kind": "function"
-  },
-  "valuations.instruments.pikModePik": {
-    "kind": "function"
-  },
-  "valuations.instruments.pikModeSplit": {
-    "kind": "function"
-  },
-  "valuations.instruments.pikModeToggle": {
-    "kind": "function"
-  },
-  "valuations.instruments.pikScheduleUniform": {
-    "kind": "function"
-  },
-  "valuations.instruments.pikScheduleStepped": {
-    "kind": "function"
-  },
   "valuations.instruments.pikScheduleModeAt": {
     "kind": "function"
   },
@@ -6428,22 +6366,7 @@
   "valuations.instruments.poolAssetFloatingRateLoan": {
     "kind": "function"
   },
-  "valuations.instruments.assetPoolWithRepLines": {
-    "kind": "function"
-  },
-  "valuations.instruments.assetPoolWithAssets": {
-    "kind": "function"
-  },
-  "valuations.instruments.assetPoolWithInstruments": {
-    "kind": "function"
-  },
   "valuations.instruments.assetPoolWithReserve": {
-    "kind": "function"
-  },
-  "valuations.instruments.assetPoolWithReinvestmentPeriod": {
-    "kind": "function"
-  },
-  "valuations.instruments.assetPoolWithAccounts": {
     "kind": "function"
   },
   "valuations.instruments.assetPoolTotalBalance": {
@@ -6591,9 +6514,6 @@
     "kind": "function"
   },
   "valuations.schema.validateInstrumentTypeJson": {
-    "kind": "function"
-  },
-  "valuations.validateValuationResultJson": {
     "kind": "function"
   },
   "valuations.valuationResultToJson": {

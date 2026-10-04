@@ -953,13 +953,13 @@ async function main() {
       ]);
     });
 
-    bench('valuations', 'validateValuationResultJson', 2000, () => {
-      w.validateValuationResultJson(sampleValuationJson);
+    bench('valuations', 'valuationResultToJson', 2000, () => {
+      w.valuationResultToJson(sampleValuationJson);
     });
   } else {
     skipBench('valuations', 'priceInstrument (discounting)', 'pricing fixture failed');
     skipBench('valuations', 'priceInstrument', 'pricing fixture failed');
-    skipBench('valuations', 'validateValuationResultJson', 'pricing fixture failed');
+    skipBench('valuations', 'valuationResultToJson', 'pricing fixture failed');
   }
 
   bench('scenarios', 'parseScenarioSpec', 5000, () => {

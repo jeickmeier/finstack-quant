@@ -94,7 +94,7 @@ const service = createService({
   statements: wasm,
   statements_analytics: wasm,
   valuations: {
-    validateValuationResultJson: wasm.validateValuationResultJson,
+    valuationResultToJson: wasm.valuationResultToJson,
     instruments: {
       ...wasm,
       priceInstrumentWithMarket(...args) {

@@ -50,10 +50,18 @@ pub fn register(py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// parent; `CdsOption` and the helper classes are listed here.
 pub(crate) const EXPORTS: &[&str] = &[
     "CallPutSchedule",
+    "CdsIndex",
+    "CdsIndexBuilder",
     "CdsIndexConstituent",
     "CdsIndexParams",
     "CdsOption",
     "CdsOptionBuilder",
+    "CdsTranche",
+    "CdsTrancheBuilder",
     "CdsTrancheParams",
     "ConversionSpec",
+    "ConvertibleBond",
+    "ConvertibleBondBuilder",
+    "CreditDefaultSwap",
+    "CreditDefaultSwapBuilder",
 ];

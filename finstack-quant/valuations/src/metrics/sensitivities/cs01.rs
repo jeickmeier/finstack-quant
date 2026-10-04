@@ -130,19 +130,6 @@ pub(crate) fn require_hazard_replay(
     })
 }
 
-fn require_cs01_discount_id<'a>(
-    discount_id: Option<&'a CurveId>,
-    hazard: &HazardCurve,
-) -> finstack_quant_core::Result<&'a CurveId> {
-    discount_id.ok_or_else(|| finstack_quant_core::Error::Calibration {
-        message: format!(
-            "quote-space CS01 requires the calibration discount curve for hazard curve '{}'",
-            hazard.id()
-        ),
-        category: "cs01_rebootstrap".to_string(),
-    })
-}
-
 /// Compute parallel quote-space CS01 through an explicit recalibration provider.
 ///
 /// This is the common engine for direct pricer APIs and registered metrics. It
@@ -284,8 +271,6 @@ where
     let curves = Arc::clone(&context.curves);
     let base_ctx = curves.as_ref();
     let hazard = base_ctx.get_hazard(hazard_id.as_str())?;
-    let discount_id = require_cs01_discount_id(Some(&request.discount_curve_id), hazard.as_ref())?;
-    debug_assert_eq!(discount_id, &request.discount_curve_id);
     // Preserve the quote-space contract before looking up the execution
     // provider, so an unreplayable curve reports the primary input defect.
     require_hazard_replay(hazard.as_ref(), "quote-space CS01")?;
@@ -352,8 +337,6 @@ where
     let curves = Arc::clone(&context.curves);
     let hazard_ref = hazard.as_ref();
     require_hazard_replay(hazard_ref, "quote-space bucketed CS01")?;
-    let discount_id = require_cs01_discount_id(Some(discount_curve_id), hazard_ref)?;
-    debug_assert_eq!(discount_id, discount_curve_id);
     let buckets = context.hazard_spread_risk_buckets(hazard_ref)?;
 
     let (series, total) = context.with_market_scratch(|context, scratch| {
@@ -467,9 +450,6 @@ pub(crate) fn resolve_optional_cs01_curves<I: Instrument>(
 /// Generic BucketedCs01 calculator that works for any instrument implementing
 /// the required traits.
 pub(crate) struct GenericBucketedCs01<I> {
-    /// When `true`, an instrument with no credit curve reports CS01 as `0.0`
-    /// instead of raising a validation error.
-    empty_credit_curve_zero: bool,
     _phantom: PhantomData<I>,
 }
 
@@ -477,16 +457,12 @@ pub(crate) struct GenericBucketedCs01<I> {
 ///
 /// Computes CS01 by applying a parallel bump to the entire hazard curve.
 pub(crate) struct GenericParallelCs01<I> {
-    /// When `true`, an instrument with no credit curve reports CS01 as `0.0`
-    /// instead of raising a validation error.
-    empty_credit_curve_zero: bool,
     _phantom: PhantomData<I>,
 }
 
 impl<I> Default for GenericParallelCs01<I> {
     fn default() -> Self {
         Self {
-            empty_credit_curve_zero: false,
             _phantom: PhantomData,
         }
     }
@@ -498,11 +474,12 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let Some((hazard_id, discount_id)) =
-            resolve_optional_cs01_curves(instrument, self.empty_credit_curve_zero, "CS01")?
-        else {
-            return Ok(0.0);
-        };
+        let (hazard_id, discount_id) = resolve_optional_cs01_curves(instrument, false, "CS01")?
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "CS01 requires a credit curve identifier".into(),
+                )
+            })?;
 
         let bump_bp = sens_config::from_context_or_default(
             context.get_config(),
@@ -533,7 +510,6 @@ where
 impl<I> Default for GenericBucketedCs01<I> {
     fn default() -> Self {
         Self {
-            empty_credit_curve_zero: false,
             _phantom: PhantomData,
         }
     }
@@ -545,11 +521,12 @@ where
 {
     fn calculate(&self, context: &mut MetricContext) -> finstack_quant_core::Result<f64> {
         let instrument: &I = context.instrument_as()?;
-        let Some((hazard_id, discount_id)) =
-            resolve_optional_cs01_curves(instrument, self.empty_credit_curve_zero, "CS01")?
-        else {
-            return Ok(0.0);
-        };
+        let (hazard_id, discount_id) = resolve_optional_cs01_curves(instrument, false, "CS01")?
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "CS01 requires a credit curve identifier".into(),
+                )
+            })?;
 
         let defaults = sens_config::from_context_or_default(
             context.get_config(),

@@ -69,7 +69,6 @@ fn zero_vol_stochastic() -> DrawRepaySpec {
             sigma: 0.0,
             spread_sensitivity: 0.0,
         },
-        use_sobol_qmc: false,
         mc_config: Some(McConfig {
             correlation_matrix: None,
             credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
@@ -466,7 +465,6 @@ fn zero_vol_stochastic_at(target: f64) -> DrawRepaySpec {
             sigma: 0.0,
             spread_sensitivity: 0.0,
         },
-        use_sobol_qmc: false,
         mc_config: Some(McConfig {
             correlation_matrix: None,
             credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
@@ -845,7 +843,6 @@ fn stochastic_utilization_is_capped_by_outstanding_letters_of_credit() {
             sigma: 0.3,
             spread_sensitivity: 0.0,
         },
-        use_sobol_qmc: false,
         mc_config: Some(McConfig {
             correlation_matrix: None,
             credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),

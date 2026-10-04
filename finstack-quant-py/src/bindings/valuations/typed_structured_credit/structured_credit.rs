@@ -10,7 +10,7 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{
     attributes_from_py, attributes_to_py, bool_repr, enum_to_py_string,
 };
-use crate::errors::{core_to_py, value_error};
+use crate::errors::core_to_py;
 use finstack_quant_cashflows::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
 use finstack_quant_core::dates::BusinessDayConvention;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -1166,13 +1166,6 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
     no_fields
 );
 
-/// Take the wrapped Rust builder or fail if `build()` already consumed it.
-fn take_sc(b: &mut PyStructuredCreditBuilder) -> PyResult<StructuredCreditBuilderInner> {
-    b.inner
-        .take()
-        .ok_or_else(|| value_error("builder already consumed by build()"))
-}
-
 #[pymethods]
 impl PyStructuredCreditBuilder {
     /// Set the instrument identifier.
@@ -1194,7 +1187,7 @@ impl PyStructuredCreditBuilder {
     ///     :meth:`StructuredCreditBuilder.build`.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.id(InstrumentId::new(value.to_string())));
         Ok(slf)
     }
@@ -1218,7 +1211,7 @@ impl PyStructuredCreditBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn deal_type<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let deal_type: DealType = enum_from_str(value, "deal_type")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.deal_type(deal_type));
         Ok(slf)
     }
@@ -1245,7 +1238,7 @@ impl PyStructuredCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyAssetPool>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.pool(value.inner.clone()));
         Ok(slf)
     }
@@ -1272,7 +1265,7 @@ impl PyStructuredCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyTrancheStructure>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.tranches(value.inner.clone()));
         Ok(slf)
     }
@@ -1300,7 +1293,7 @@ impl PyStructuredCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = extract_date(value)?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.closing_date(date));
         Ok(slf)
     }
@@ -1328,7 +1321,7 @@ impl PyStructuredCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = extract_date(value)?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.first_payment_date(date));
         Ok(slf)
     }
@@ -1357,7 +1350,7 @@ impl PyStructuredCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = extract_date(value)?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.quote_settlement_date(date));
         Ok(slf)
     }
@@ -1385,7 +1378,7 @@ impl PyStructuredCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = extract_date(value)?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.maturity(date));
         Ok(slf)
     }
@@ -1413,7 +1406,7 @@ impl PyStructuredCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let frequency = crate::bindings::valuations::convert::tenor_from_py(value, "frequency")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.frequency(frequency));
         Ok(slf)
     }
@@ -1441,7 +1434,7 @@ impl PyStructuredCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.calendar_id(value.into()));
         Ok(slf)
     }
@@ -1471,7 +1464,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let business_day_convention: BusinessDayConvention =
             crate::bindings::valuations::convert::bdc_from_str(value, "business_day_convention")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.business_day_convention(business_day_convention));
         Ok(slf)
     }
@@ -1498,7 +1491,7 @@ impl PyStructuredCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.discount_curve_id(CurveId::new(value.to_string())));
         Ok(slf)
     }
@@ -1529,7 +1522,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let market_conditions: MarketConditions =
             crate::bindings::module_utils::py_to_serde(py, value, "market_conditions")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.market_conditions(market_conditions));
         Ok(slf)
     }
@@ -1560,7 +1553,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let waterfall_rules: WaterfallRules =
             crate::bindings::module_utils::py_to_serde(py, value, "waterfall_rules")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.waterfall_rules(waterfall_rules));
         Ok(slf)
     }
@@ -1593,7 +1586,7 @@ impl PyStructuredCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let fees: DealFees = crate::bindings::module_utils::py_to_serde(py, value, "fees")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.fees(fees));
         Ok(slf)
     }
@@ -1625,7 +1618,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted: CreditModelConfig =
             crate::bindings::module_utils::py_to_serde(py, value, "credit_model")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.credit_model(converted));
         Ok(slf)
     }
@@ -1660,7 +1653,7 @@ impl PyStructuredCreditBuilder {
             } else {
                 crate::bindings::module_utils::py_to_serde(py, value, "prepayment_spec")?
             };
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.prepayment_spec(converted));
         Ok(slf)
     }
@@ -1694,7 +1687,7 @@ impl PyStructuredCreditBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "default_spec")?
         };
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.default_spec(converted));
         Ok(slf)
     }
@@ -1727,7 +1720,7 @@ impl PyStructuredCreditBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "recovery_spec")?
         };
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.recovery_spec(converted));
         Ok(slf)
     }
@@ -1759,7 +1752,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted =
             crate::bindings::module_utils::py_to_serde(py, value, "stochastic_prepay_spec")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.stochastic_prepay_spec(converted));
         Ok(slf)
     }
@@ -1790,7 +1783,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted =
             crate::bindings::module_utils::py_to_serde(py, value, "stochastic_default_spec")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.stochastic_default_spec(converted));
         Ok(slf)
     }
@@ -1825,7 +1818,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted =
             crate::bindings::module_utils::py_to_serde(py, value, "stochastic_recovery_spec")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.stochastic_recovery_spec(converted));
         Ok(slf)
     }
@@ -1855,7 +1848,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted =
             crate::bindings::module_utils::py_to_serde(py, value, "correlation_structure")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.correlation_structure(converted));
         Ok(slf)
     }
@@ -1890,7 +1883,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted: finstack_quant_valuations::instruments::fixed_income::structured_credit::DelinquencyModel =
             crate::bindings::module_utils::py_to_serde(py, value, "delinquency")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.delinquency(converted));
         Ok(slf)
     }
@@ -1925,7 +1918,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted: finstack_quant_valuations::instruments::fixed_income::structured_credit::CardPortfolioSpec =
             crate::bindings::module_utils::py_to_serde(py, value, "card")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.card(converted));
         Ok(slf)
     }
@@ -1959,7 +1952,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let converted: Vec<finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec> =
             crate::bindings::module_utils::py_to_serde(py, value, "coverage_triggers")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.coverage_triggers(converted));
         Ok(slf)
     }
@@ -1992,7 +1985,7 @@ impl PyStructuredCreditBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "coverage_rules")?
         };
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.coverage_rules(converted));
         Ok(slf)
     }
@@ -2026,7 +2019,7 @@ impl PyStructuredCreditBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "call_assumption")?
         };
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.call_assumption(converted));
         Ok(slf)
     }
@@ -2060,7 +2053,7 @@ impl PyStructuredCreditBuilder {
         } else {
             crate::bindings::module_utils::py_to_serde(py, value, "waterfall")?
         };
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.waterfall(converted));
         Ok(slf)
     }
@@ -2090,7 +2083,7 @@ impl PyStructuredCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let hedges = hedge_swaps_from_py(py, value)?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.hedge_swaps(hedges));
         Ok(slf)
     }
@@ -2119,7 +2112,7 @@ impl PyStructuredCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.cleanup_call_decimal(value));
         Ok(slf)
     }
@@ -2147,7 +2140,7 @@ impl PyStructuredCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: f64,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.liquidation_price_pct(value));
         Ok(slf)
     }
@@ -2179,7 +2172,7 @@ impl PyStructuredCreditBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let policy: LossAllocationPolicy = enum_from_str(value, "loss_allocation")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.loss_allocation(policy));
         Ok(slf)
     }
@@ -2213,7 +2206,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let draws: Vec<TrancheDraw> =
             crate::bindings::module_utils::py_to_serde(py, value, "tranche_draws")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.tranche_draws(draws));
         Ok(slf)
     }
@@ -2246,7 +2239,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: TrancheReadvance =
             crate::bindings::module_utils::py_to_serde(py, value, "tranche_readvance")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.tranche_readvance(spec));
         Ok(slf)
     }
@@ -2278,7 +2271,7 @@ impl PyStructuredCreditBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let timing: LossRecognition = enum_from_str(value, "loss_recognition")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.loss_recognition(timing));
         Ok(slf)
     }
@@ -2308,7 +2301,7 @@ impl PyStructuredCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: bool,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.principal_covers_senior_interest(value));
         Ok(slf)
     }
@@ -2338,7 +2331,7 @@ impl PyStructuredCreditBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let metadata: Metadata =
             crate::bindings::module_utils::py_to_serde(py, value, "deal_metadata")?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.deal_metadata(metadata));
         Ok(slf)
     }
@@ -2371,7 +2364,7 @@ impl PyStructuredCreditBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attributes = attributes_from_py(value)?;
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.attributes(attributes));
         Ok(slf)
     }
@@ -2390,7 +2383,7 @@ impl PyStructuredCreditBuilder {
     ///     or the completed deal fails pricing validation.
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyStructuredCredit> {
-        let b = take_sc(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         let inner = b.build().map_err(core_to_py)?;
         Ok(PyStructuredCredit { inner })
     }

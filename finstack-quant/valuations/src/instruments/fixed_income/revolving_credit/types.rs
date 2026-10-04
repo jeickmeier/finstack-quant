@@ -12,7 +12,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
 
 use crate::cashflow::builder::{evaluate_fee_tiers, FeeTier, FloatingRateSpec};
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::instruments::fixed_income::loan_terms::{
@@ -586,12 +586,6 @@ pub struct DrawRepayEvent {
 pub struct StochasticUtilizationSpec {
     /// Utilization process specification.
     pub utilization_process: UtilizationProcess,
-
-    /// Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).
-    /// Mutually exclusive with `model_config.mc_antithetic = true`; validation
-    /// rejects the combination.
-    #[serde(default)]
-    pub use_sobol_qmc: bool,
 
     /// Advanced Monte Carlo configuration (optional).
     ///
@@ -1278,7 +1272,7 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
         Some(self.issue_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 // Implement CashflowProvider for standard cashflow interface

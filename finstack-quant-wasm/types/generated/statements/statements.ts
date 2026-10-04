@@ -4855,12 +4855,6 @@ export interface StochasticUtilizationSpec {
    */
   mc_config?: McConfig | null;
   /**
-   * Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).
-   * Mutually exclusive with `model_config.mc_antithetic = true`; validation
-   * rejects the combination.
-   */
-  use_sobol_qmc?: boolean;
-  /**
    * Utilization process specification.
    */
   utilization_process: UtilizationProcess;
@@ -6085,7 +6079,7 @@ export interface VmParameters {
   threshold: Money;
 }
 /**
- * Swaption instrument
+ * European swaption instrument
  *
  * # Exercise lifecycle boundary
  *
@@ -6110,10 +6104,6 @@ export interface Swaption {
    * - `ZeroCoupon`: Single discount to swap maturity
    */
   cash_settlement_method: CashSettlementMethod;
-  /**
-   * Exercise style (European, Bermudan, American). Defaults to European.
-   */
-  exercise_style: ExerciseStyle;
   /**
    * Option expiry date
    */

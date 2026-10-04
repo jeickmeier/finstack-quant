@@ -123,11 +123,11 @@ it("covers every canonical detail variant through actual facade pricing", async 
     expect(clone).toEqual(result);
     expect(() => adaptValuation(result), result.details.type).not.toThrow();
     expect(adaptValuation(result)).toEqual(result);
-    const text = exportValuation(clone, valuations.validateValuationResultJson);
+    const text = exportValuation(clone, valuations.valuationResultToJson);
     expect(
       valuationCodec.stringify(
         valuationCodec.parse(text),
-        valuations.validateValuationResultJson,
+        valuations.valuationResultToJson,
       ),
     ).toBe(text);
   }
@@ -142,7 +142,7 @@ it("preserves the actual derived seed above 2^53 through clone and Rust export",
   expect(Array.isArray(result.details.data.time_grid)).toBe(true);
   const canonical = exportValuation(
     structuredClone(result),
-    valuations.validateValuationResultJson,
+    valuations.valuationResultToJson,
   );
   expect(valuationCodec.parse(canonical).details.data.seed).toBe(
     result.details.data.seed,
@@ -154,7 +154,7 @@ it("preserves the actual derived seed above 2^53 through clone and Rust export",
     const broken = structuredClone(result);
     broken.details.data.seed = seed;
     expect(() =>
-      exportValuation(broken, valuations.validateValuationResultJson),
+      exportValuation(broken, valuations.valuationResultToJson),
     ).toThrow();
   }
 });
@@ -163,12 +163,12 @@ it("tests u64::MAX as a transport boundary on an actual result, not a repricing 
   boundary.details.data.seed = (1n << 64n) - 1n;
   const text = exportValuation(
     structuredClone(boundary),
-    valuations.validateValuationResultJson,
+    valuations.valuationResultToJson,
   );
   expect(text).toContain('"seed":18446744073709551615');
   expect(valuationCodec.parse(text).details.data.seed).toBe((1n << 64n) - 1n);
   expect(() =>
-    valuations.validateValuationResultJson(
+    valuations.valuationResultToJson(
       text.replace(
         '"seed":18446744073709551615',
         '"seed":"18446744073709551615"',

@@ -24156,12 +24156,6 @@ export interface StochasticUtilizationSpec {
    * and interest rate dynamics, correlation, and default modeling.
    */
   mc_config?: McConfig | null;
-  /**
-   * Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).
-   * Mutually exclusive with `model_config.mc_antithetic = true`; validation
-   * rejects the combination.
-   */
-  use_sobol_qmc?: boolean;
   utilization_process: UtilizationProcess;
 }
 /**
@@ -29087,12 +29081,14 @@ export interface ScenarioPricingOverrides9 {
  *     compounding: Default::default(),
  * };
  *
- * let swap = BasisSwap::new(
- *     "BASIS_SWAP_001",
- *     Money::from((1_000_000_i64, Currency::USD)),
- *     primary_leg,
- *     reference_leg,
- * );
+ * let swap = BasisSwap::builder()
+ *     .id("BASIS_SWAP_001".into())
+ *     .notional(Money::from((1_000_000_i64, Currency::USD)))
+ *     .primary_leg(primary_leg)
+ *     .reference_leg(reference_leg)
+ *     .allow_calendar_fallback(true)
+ *     .attributes(Default::default())
+ *     .build().expect("valid basis swap");
  * ```
  *
  * This interface was referenced by `SharedDefs`'s JSON-Schema
@@ -34596,7 +34592,7 @@ export interface ScenarioPricingOverrides19 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * Swaption instrument
+ * European swaption instrument
  *
  * # Exercise lifecycle boundary
  *
@@ -34621,10 +34617,6 @@ export interface Swaption {
    * - `ZeroCoupon`: Single discount to swap maturity
    */
   cash_settlement_method: "collateralized_cash_price" | "par_yield" | "isda_par_par" | "zero_coupon";
-  /**
-   * Exercise style (European, Bermudan, American). Defaults to European.
-   */
-  exercise_style: "european" | "american" | "bermudan";
   expiry: Date64;
   id: Id67;
   instrument_pricing_overrides?: InstrumentPricingOverrides20;

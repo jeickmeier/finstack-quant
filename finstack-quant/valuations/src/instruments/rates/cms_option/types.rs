@@ -1,6 +1,6 @@
 //! CMS option instrument definition.
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::rates::cms_common::CmsReferenceSwap;
 use crate::instruments::OptionType;
@@ -62,23 +62,18 @@ pub struct CmsOption {
     /// When set, provides default values for `swap_fixed_frequency`, `swap_float_frequency`,
     /// `swap_fixed_day_count`, and `swap_float_day_count`. Individual fields still
     /// override the convention when explicitly set. Required for USD CMS.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_id: Option<IndexId>,
     /// Fixed leg frequency of the underlying swap (overrides convention if set)
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_fixed_frequency: Option<Tenor>,
     /// Floating leg frequency of the underlying swap (overrides convention if set)
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_float_frequency: Option<Tenor>,
     /// Day count convention of the underlying swap fixed leg (overrides convention if set)
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_fixed_day_count: Option<DayCount>,
     /// Optional day count convention of the underlying swap floating leg
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_float_day_count: Option<DayCount>,
 
@@ -272,7 +267,7 @@ impl crate::instruments::common_impl::traits::Instrument for CmsOption {
         self.fixing_dates.first().copied()
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.

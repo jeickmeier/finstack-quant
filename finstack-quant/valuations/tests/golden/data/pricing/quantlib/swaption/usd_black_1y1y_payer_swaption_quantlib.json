@@ -15,7 +15,6 @@
           ]
         },
         "cash_settlement_method": "par_yield",
-        "exercise_style": "european",
         "expiry": "2027-04-30",
         "id": "USD-BLACK-1Y1Y-PAYER-SWAPTION-QUANTLIB",
         "notional": {

@@ -6,7 +6,7 @@
 use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::mbs_passthrough::AgencyProgram;
 use crate::instruments::fixed_income::tba::{AgencyTba, TbaTerm};
@@ -89,13 +89,11 @@ pub struct DollarRoll {
     /// SIFMA settlement class override.
     ///
     /// When `None`, inferred from agency + term.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settlement_class: Option<SifmaSettlementClass>,
     /// Explicit front-month settlement date override.
     ///
     /// When set, bypasses the SIFMA calendar lookup for the front leg.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -106,7 +104,6 @@ pub struct DollarRoll {
     /// Explicit back-month settlement date override.
     ///
     /// When set, bypasses the SIFMA calendar lookup for the back leg.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -119,7 +116,6 @@ pub struct DollarRoll {
     /// Back-month price (buy price).
     pub back_price: f64,
     /// Trade date.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -130,7 +126,6 @@ pub struct DollarRoll {
     /// Prepayment model of the generic pool both legs deliver.
     ///
     /// `None` uses the embedded generic PSA assumption of the TBA legs.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prepayment_spec: Option<PrepaymentModelSpec>,
     /// Discount curve identifier.
@@ -148,7 +143,6 @@ pub struct DollarRoll {
     ///
     /// When `None`, the discount curve rate is used as the reference
     /// financing rate for carry analytics.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repo_curve_id: Option<CurveId>,
     /// Instrument-owned pricing inputs.
@@ -428,7 +422,7 @@ impl crate::instruments::common_impl::traits::Instrument for DollarRoll {
         Ok(Some(Box::new(rebuilt)))
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for DollarRoll {

@@ -6,9 +6,9 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::{CFKind, CashFlow};
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::legs::PayReceive;
 use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::cashflow::CashFlowAccrual;
 use finstack_quant_core::currency::Currency;
@@ -106,7 +106,6 @@ pub struct CommoditySwap {
     /// Payment frequency as a Tenor.
     pub frequency: Tenor,
     /// Optional calendar ID for date adjustments.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub calendar_id: Option<CalendarId>,
     /// Business day convention for payment-schedule date adjustments.
@@ -122,7 +121,6 @@ pub struct CommoditySwap {
     /// Optional index lag in **calendar days**: the floating-leg averaging
     /// window is shifted back by exactly this many calendar days (no
     /// business-day adjustment of the shifted window endpoints).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_lag_days: Option<i32>,
     /// Realized floating-index fixings as `(date, price)` pairs.
@@ -434,7 +432,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwap {
         Some(self.maturity)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CommoditySwap {

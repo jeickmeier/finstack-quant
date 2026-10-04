@@ -1,6 +1,6 @@
 //! Target Redemption Note (TARN) instrument definition.
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use finstack_quant_core::dates::{Date, DayCount, Tenor};
@@ -246,7 +246,7 @@ impl crate::instruments::common_impl::traits::Instrument for Tarn {
         Some(self.start_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

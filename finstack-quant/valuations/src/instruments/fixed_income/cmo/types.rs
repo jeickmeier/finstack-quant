@@ -4,7 +4,7 @@
 //! redistribute the cashflows from underlying MBS pools into tranches with
 //! different risk/return profiles.
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::mbs_passthrough::{AgencyMbsPassthrough, AgencyProgram};
 use finstack_quant_core::currency::Currency;
@@ -299,15 +299,12 @@ pub struct AgencyCmo {
     /// Reference tranche ID for pricing (which tranche to value)
     pub reference_tranche_id: String,
     /// Collateral pool (optional - for detailed cashflow projection)
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collateral: Option<Box<AgencyMbsPassthrough>>,
     /// Collateral WAC (if no explicit collateral)
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collateral_wac: Option<f64>,
     /// Remaining collateral WAM in months (if no explicit collateral).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collateral_wam_months: Option<u32>,
     /// Discount curve identifier.
@@ -736,7 +733,7 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyCmo {
         Ok(Some(Box::new(rebuilt)))
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 #[cfg(test)]

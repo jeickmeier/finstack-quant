@@ -1057,4 +1057,9 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 ///
 /// Extend this list (sorted) when adding a class or function here; `mod.rs`
 /// merges every submodule list so registration stays in one place per file.
-pub(crate) const EXPORTS: &[&str] = &[];
+pub(crate) const EXPORTS: &[&str] = &[
+    "FixedLegSpec",
+    "FloatLegSpec",
+    "PremiumLegSpec",
+    "ProtectionLegSpec",
+];

@@ -2,9 +2,9 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::{CFKind, CashFlow};
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::legs::PayReceive;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use finstack_quant_core::cashflow::CashFlowAccrual;
@@ -82,15 +82,12 @@ pub struct InflationSwap {
     pub side: PayReceive,
     /// Contractual CPI observation lag; when `None` the index lag, then the
     /// curve's indexation lag, applies.
-    #[builder(optional)]
     pub lag: Option<InflationLag>,
     /// Contractual monthly reference-index interpolation; takes precedence over index metadata;
     /// without either source the default is monthly step interpolation.
-    #[builder(optional)]
     pub interpolation: Option<InflationInterpolation>,
     /// Explicit Base CPI (reference index level at start with lag applied).
     /// If not provided, it will be looked up/calculated from start date.
-    #[builder(optional)]
     pub base_cpi: Option<f64>,
     /// Business day convention for payment date adjustment.
     /// Defaults to `Following` if not specified.
@@ -99,7 +96,6 @@ pub struct InflationSwap {
     pub business_day_convention: BusinessDayConvention,
     /// Holiday calendar identifier for payment date adjustment.
     /// If not specified, payment dates are used unadjusted.
-    #[builder(optional)]
     pub calendar_id: Option<CalendarId>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
@@ -534,7 +530,7 @@ impl crate::instruments::common_impl::traits::Instrument for InflationSwap {
         Some(self.start_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for InflationSwap {
@@ -661,22 +657,18 @@ pub struct YoYInflationSwap {
     pub side: PayReceive,
     /// Contractual CPI observation lag; when `None` the index lag, then the
     /// curve's indexation lag, applies.
-    #[builder(optional)]
     pub lag: Option<InflationLag>,
     /// Contractual monthly reference-index interpolation; takes precedence over index metadata;
     /// without either source the default is monthly step interpolation.
-    #[builder(optional)]
     pub interpolation: Option<InflationInterpolation>,
     /// Observed contractual reference CPI at start, with lag and interpolation
     /// already applied. If absent, start CPI must resolve from market observations.
-    #[builder(optional)]
     pub base_cpi: Option<f64>,
     /// Business day convention for payment date adjustment.
     #[builder(default = BusinessDayConvention::ModifiedFollowing)]
     #[serde(default = "crate::serde_defaults::bdc_modified_following")]
     pub business_day_convention: BusinessDayConvention,
     /// Holiday calendar identifier for payment date adjustment.
-    #[builder(optional)]
     pub calendar_id: Option<CalendarId>,
     /// Instrument-owned pricing inputs.
     #[builder(default)]
@@ -1078,7 +1070,7 @@ impl crate::instruments::common_impl::traits::Instrument for YoYInflationSwap {
         Some(self.start_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for YoYInflationSwap {

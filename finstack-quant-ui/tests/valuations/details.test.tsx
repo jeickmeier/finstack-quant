@@ -78,7 +78,7 @@ it("pins fixture sources and restores exact current host transport for all five 
     expect(withoutClock(restored)).toEqual(withoutClock(current));
     expect(adaptValuation(restored)).toEqual(restored);
     expect(structuredClone(restored)).toEqual(restored);
-    expect(exportValuation(restored, native.validateValuationResultJson)).toBe(
+    expect(exportValuation(restored, native.valuationResultToJson)).toBe(
       entry.resultJson,
     );
   }
@@ -149,7 +149,7 @@ it("retains full-width seed digits through display, clone, copy and native canon
   });
   fireEvent.click(within(raw).getByRole("button", { name: "Copy" }));
   await waitFor(() => expect(copy).toHaveBeenCalledWith(serializeHost(result)));
-  const canonical = exportValuation(result, native.validateValuationResultJson);
+  const canonical = exportValuation(result, native.valuationResultToJson);
   expect(
     (valuationCodec.parse(canonical) as { details: { data: { seed: bigint } } })
       .details.data.seed,
@@ -216,7 +216,7 @@ it("preserves optional canonical trace and covenant sections as raw transport", 
     covenants: reports,
   };
   expect(() =>
-    native.validateValuationResultJson(serializeHost(result)),
+    native.valuationResultToJson(serializeHost(result)),
   ).not.toThrow();
   render(<ValuationDetails result={result} />);
   const trace = await screen.findByRole("region", {

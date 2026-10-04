@@ -23,6 +23,40 @@ use std::sync::Arc;
 /// so a multi-gigabyte file can never cause an OOM allocation.
 pub const MAX_JSON_BYTES: usize = 16 * 1024 * 1024; // 16 MiB
 
+// Strict callers retain their supplied limits; capped adapters retain the
+// 16 MiB instrument policy and serde_json's 128-level recursion backstop.
+fn decode_json<T: serde::de::DeserializeOwned>(
+    bytes: &[u8],
+    limits: &LoadLimits,
+) -> std::result::Result<T, ContractError> {
+    deserialize_json_value(parse_json_value(bytes, limits)?, limits)
+}
+
+pub(crate) fn decode_capped_json<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T> {
+    let limits = LoadLimits::default()
+        .with_max_bytes(MAX_JSON_BYTES)
+        .with_max_depth(128);
+    decode_json(bytes, &limits).map_err(|error| {
+        let message = match error {
+            ContractError::Report(report) => report
+                .diagnostics
+                .iter()
+                .map(|diagnostic| match diagnostic.pointer.as_deref() {
+                    Some(pointer) if !pointer.is_empty() => {
+                        format!("{pointer}: {}", diagnostic.message)
+                    }
+                    _ => diagnostic.message.clone(),
+                })
+                .collect::<Vec<_>>()
+                .join("; "),
+            error => error.to_string(),
+        };
+        finstack_quant_core::Error::Validation(format!(
+            "invalid instrument envelope JSON: {message}"
+        ))
+    })
+}
+
 /// Persistence contract for [`InstrumentEnvelope`].
 pub const INSTRUMENT_CONTRACT: ContractDescriptor =
     ContractDescriptor::new("finstack_quant.instrument");
@@ -801,8 +835,7 @@ impl InstrumentEnvelope {
         bytes: &[u8],
         limits: &LoadLimits,
     ) -> std::result::Result<(Box<dyn Instrument>, ValidationReport), ContractError> {
-        let value = parse_json_value(bytes, limits)?;
-        let envelope: Self = deserialize_json_value(value, limits)?;
+        let envelope: Self = decode_json(bytes, limits)?;
         let instrument = envelope.into_boxed()?;
         Ok((instrument, ValidationReport::default()))
     }
@@ -869,10 +902,8 @@ impl InstrumentEnvelope {
             )));
         }
 
-        let value: serde_json::Value = serde_json::from_slice(&buf).map_err(|e| {
-            finstack_quant_core::Error::Validation(format!("Failed to parse JSON: {e}"))
-        })?;
-        Self::from_value(value)
+        let envelope: Self = decode_capped_json(&buf)?;
+        envelope.into_boxed()
     }
 
     /// Load an instrument from a JSON string.
@@ -898,7 +929,8 @@ impl InstrumentEnvelope {
                 MAX_JSON_BYTES / (1024 * 1024),
             )));
         }
-        Self::from_reader(s.as_bytes())
+        let envelope: Self = decode_capped_json(s.as_bytes())?;
+        envelope.into_boxed()
     }
 
     /// Load an instrument from a JSON file path.
@@ -1382,7 +1414,7 @@ mod tests {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: Some("USGS".into()),
+            calendar_id: Some("usny".into()),
             stub: StubKind::ShortFront,
             spread_bp: Decimal::from(5),
             payment_lag_days: 0,
@@ -1400,7 +1432,7 @@ mod tests {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: Some("USGS".into()),
+            calendar_id: Some("usny".into()),
             stub: StubKind::ShortFront,
             spread_bp: Decimal::ZERO,
             payment_lag_days: 0,
@@ -1429,7 +1461,7 @@ mod tests {
                     i.primary_leg.discount_curve_id,
                     swap.primary_leg.discount_curve_id
                 );
-                assert_eq!(i.primary_leg.calendar_id.as_deref(), Some("USGS"));
+                assert_eq!(i.primary_leg.calendar_id.as_deref(), Some("usny"));
             }
             _ => panic!("Expected BasisSwap variant"),
         }
@@ -1515,7 +1547,7 @@ mod tests {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: None,
+            calendar_id: Some("usny".into()),
             stub: StubKind::ShortFront,
             spread_bp: Decimal::from(5),
             payment_lag_days: 0,
@@ -1532,7 +1564,7 @@ mod tests {
             frequency: Tenor::quarterly(),
             day_count: DayCount::Act360,
             business_day_convention: BusinessDayConvention::ModifiedFollowing,
-            calendar_id: None,
+            calendar_id: Some("usny".into()),
             stub: StubKind::ShortFront,
             spread_bp: Decimal::ZERO,
             payment_lag_days: 0,

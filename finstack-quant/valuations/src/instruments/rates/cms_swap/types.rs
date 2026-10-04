@@ -15,7 +15,7 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::{CFKind, CashFlow};
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::rates::cms_common::CmsReferenceSwap;
 use finstack_quant_core::cashflow::CashFlowAccrual;
@@ -85,33 +85,26 @@ pub struct CmsSwap {
     #[builder(default)]
     pub cms_spread_bp: Decimal,
     /// Optional cap on the CMS rate (decimal).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cms_cap: Option<f64>,
     /// Optional floor on the CMS rate (decimal).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cms_floor: Option<f64>,
 
     /// Rate-index convention-registry key of the underlying swap (e.g. `USD-SOFR-OIS`).
     /// Required for USD CMS; legacy contracts must name their legacy index explicitly.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_id: Option<IndexId>,
     /// Fixed leg frequency of the underlying swap (overrides convention).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_fixed_frequency: Option<Tenor>,
     /// Floating leg frequency of the underlying swap (overrides convention).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_float_frequency: Option<Tenor>,
     /// Day count of the underlying swap fixed leg (overrides convention).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_fixed_day_count: Option<DayCount>,
     /// Day count of the underlying swap floating leg (overrides convention).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub swap_float_day_count: Option<DayCount>,
 
@@ -769,7 +762,7 @@ impl crate::instruments::common_impl::traits::Instrument for CmsSwap {
         self.fixing_dates.first().copied()
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CmsSwap {

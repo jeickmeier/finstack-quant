@@ -17,26 +17,21 @@ use super::pricing::{
 };
 use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
-use finstack_quant_valuations::pricer::{instrument_from_spec, parse_typed_instrument_json};
 use indexmap::IndexMap;
-use serde_json::Value;
 use wasm_bindgen::prelude::*;
 
-/// Build the concrete instrument from a bare JS spec object through the Rust
-/// validating constructor.
+/// Convert a bare JS spec through the canonical Rust validating constructor.
 fn from_spec<T>(type_tag: &str, spec: JsValue) -> Result<T, JsValue>
 where
-    T: TryFrom<InstrumentJson, Error = finstack_quant_core::Error>,
+    T: TryFrom<
+        finstack_quant_valuations::instruments::InstrumentJson,
+        Error = finstack_quant_core::Error,
+    >,
 {
-    let spec: Value = from_js_json(&spec, "spec")?;
-    let instrument = instrument_from_spec(type_tag, spec).map_err(to_js_err)?;
+    let spec: serde_json::Value = from_js_json(&spec, "spec")?;
+    let instrument = finstack_quant_valuations::pricer::instrument_from_spec(type_tag, spec)
+        .map_err(to_js_err)?;
     T::try_from(instrument).map_err(to_js_err)
-}
-
-/// Serialize a concrete instrument as its compact canonical v1 envelope.
-fn envelope_json(instrument: impl Into<InstrumentJson>) -> Result<String, JsValue> {
-    serde_json::to_string(&InstrumentEnvelope::new(instrument.into())).map_err(to_js_err)
 }
 
 fn metric_value(
@@ -82,143 +77,24 @@ fn option_greeks_object(
 
 macro_rules! fx_class {
     ($rust_name:ident, $js_name:literal, $type_tag:literal, $rust_ty:ty) => {
-        #[doc = concat!("Typed WASM wrapper for the Rust FX instrument `", $js_name, "`.")]
-        #[wasm_bindgen(js_name = $js_name)]
-        #[derive(Clone)]
-        pub struct $rust_name {
-            pub(crate) inner: $rust_ty,
-        }
-
-        impl $rust_name {
-            /// The instrument as its compact canonical v1 envelope.
-            fn envelope_json(&self) -> Result<String, JsValue> {
-                envelope_json(self.inner.clone())
-            }
-        }
-
+        crate::api::valuations::typed::macros::instrument_class!(
+            #[doc = concat!("Typed WASM wrapper for the Rust FX instrument ", $js_name, ".")]
+            $rust_name,
+            $js_name,
+            $rust_ty
+        );
+        crate::api::valuations::typed::macros::instrument_pricing!($rust_name, $js_name);
         #[wasm_bindgen(js_class = $js_name)]
         impl $rust_name {
-            /// Create the instrument from a JS spec object.
-            /// @param spec - Bare JavaScript spec object for this exact instrument type.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if `spec` cannot be converted from
-            /// JavaScript, is not a bare object for this FX instrument type, or
-            /// fails instrument validation.
+            /// Construct a validated FX instrument from its bare spec.
+            /// @param spec - Bare spec for this exact instrument type, with canonical Rust units and conventions.
+            /// @returns The validated instrument.
+            /// @throws Error - Throws if the spec has the wrong type, cannot be deserialized or fails Rust validation.
             #[wasm_bindgen(constructor)]
             pub fn new(spec: JsValue) -> Result<$rust_name, JsValue> {
                 Ok(Self {
                     inner: from_spec($type_tag, spec)?,
                 })
-            }
-
-            /// Deserialize the instrument from its canonical v1 envelope.
-            /// @param json - A `finstack_quant.instrument/1` envelope for this exact instrument type.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if `json` is malformed, is not a
-            /// canonical envelope for this exact FX instrument type, or fails
-            /// instrument validation.
-            #[wasm_bindgen(js_name = fromJson)]
-            pub fn from_json(json: JsValue) -> Result<$rust_name, JsValue> {
-                let json: &str = &json_text(&json, "json")?;
-                Ok(Self {
-                    inner: parse_typed_instrument_json::<$rust_ty>(json).map_err(to_js_err)?,
-                })
-            }
-
-            /// Serialize to the canonical `finstack_quant.instrument/1` envelope.
-            ///
-            /// The output is compact JSON, byte-identical to the Python
-            /// `to_json()` of the same instrument.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the instrument cannot be serialized.
-            #[wasm_bindgen(js_name = toJson)]
-            pub fn to_json(&self) -> Result<String, JsValue> {
-                self.envelope_json()
-            }
-
-            /// Instrument identifier (mirrors the Python wrappers' `id` property).
-            #[wasm_bindgen(getter)]
-            pub fn id(&self) -> String {
-                self.inner.id.to_string()
-            }
-
-            /// Price the instrument against a market JSON snapshot.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @param metrics - Optional canonical metric IDs such as `"delta"`,
-            /// `"vega"`, `"hvar"`, or `"expected_shortfall"`. Omit, `null`, or
-            /// `undefined` for a valuation-only result.
-            /// @param metric_pricing_overrides - Optional JSON object patch applied before validation.
-            /// Only supplied fields replace stored overrides; `{}` preserves them. Supplied
-            /// `bump_config` fields merge into the stored object. Explicit `null` clears
-            /// nullable fields to their Rust fallback. Omit the argument or pass JavaScript
-            /// `null`/`undefined` to retain the envelope configuration.
-            /// @param market_history - Optional serialized market-history JSON
-            /// required by historical risk metrics such as historical VaR.
-            /// @returns Structured `ValuationResult` for the selected model, preserving Monte Carlo seeds as lossless JavaScript `BigInt` values.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if an instrument, market,
-            /// metric-pricing-override, or market-history payload is invalid; `metrics` is not a
-            /// string array; `asOf`, `model`, or a metric identifier is invalid;
-            /// required market data is missing; pricing or a metric fails; or the
-            /// valuation cannot be converted to JavaScript.
-            pub fn price(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                model: Option<JsValue>,
-                metrics: Option<JsValue>,
-                metric_pricing_overrides: Option<JsValue>,
-                market_history: Option<JsValue>,
-            ) -> Result<JsValue, JsValue> {
-                super::pricing::PriceRequest::from_js(
-                    &market_json,
-                    &as_of,
-                    model.as_ref(),
-                    metrics.as_ref(),
-                    metric_pricing_overrides.as_ref(),
-                    market_history.as_ref(),
-                )?
-                .price(&self.envelope_json()?)
-            }
-
-            /// Compute one metric of the instrument against a market JSON snapshot.
-            ///
-            /// Mirrors Python `metric`: the same Rust metric path as `price(..., [metricId])`,
-            /// returning just the value.
-            /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-            /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-            /// @param metric_id - Fully qualified metric identifier, e.g. `"delta"` or `"dv01"`.
-            /// @param model - Optional pricing-model identifier; omit to use the instrument's default model.
-            /// @returns The metric value in the metric's documented unit.
-            ///
-            /// # Errors
-            ///
-            /// Throws a JavaScript exception if the market JSON, `asOf`, `model`
-            /// or `metricId` is invalid, the metric is not defined for this
-            /// instrument, required market data is missing (kind `not_found`), or
-            /// the computation fails.
-            pub fn metric(
-                &self,
-                market_json: JsValue,
-                as_of: JsValue,
-                metric_id: JsValue,
-                model: Option<JsValue>,
-            ) -> Result<f64, JsValue> {
-                let market_json: &str = &json_text(&market_json, "marketJson")?;
-                let as_of: &str = &js_string(&as_of, "asOf")?;
-                let metric_id: &str = &js_string(&metric_id, "metricId")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                metric_value(&self.envelope_json()?, market_json, as_of, model, metric_id)
             }
         }
     };
@@ -272,7 +148,7 @@ macro_rules! fx_option_class {
                     let market_json: &str = &json_text(&market_json, "marketJson")?;
                     let as_of: &str = &js_string(&as_of, "asOf")?;
                     let model = js_opt_string(model.as_ref(), "model")?;
-                    metric_value(&self.envelope_json()?, market_json, as_of, model, $metric)
+                    metric_value(&self.to_json()?, market_json, as_of, model, $metric)
                 }
             )+
 
@@ -299,7 +175,7 @@ macro_rules! fx_option_class {
                 let market_json: &str = &json_text(&market_json, "marketJson")?;
                 let as_of: &str = &js_string(&as_of, "asOf")?;
                 let model = js_opt_string(model.as_ref(), "model")?;
-                option_greeks_object(&self.envelope_json()?, market_json, as_of, model.as_deref())
+                option_greeks_object(&self.to_json()?, market_json, as_of, model.as_deref())
             }
         }
     };

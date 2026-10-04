@@ -164,31 +164,10 @@ impl AutocallableMcPricer {
         let future_coupon_barriers = inst.coupon_barriers[n_past..].to_vec();
         let future_coupons = inst.coupons[n_past..].to_vec();
 
-        // Dividend yield from scalar id if provided
-        //
-        // When a dividend yield ID is explicitly provided, we require the lookup to succeed
-        // and return a unitless scalar. Silent fallback to 0.0 would mask market data
-        // configuration errors.
-        let q = if let Some(div_id) = &inst.div_yield_id {
-            let ms = curves.get_price(div_id.as_str()).map_err(|e| {
-                finstack_quant_core::Error::Validation(format!(
-                    "Failed to fetch dividend yield '{}': {}",
-                    div_id, e
-                ))
-            })?;
-            match ms {
-                finstack_quant_core::market_data::scalars::MarketScalar::Unitless(v) => *v,
-                finstack_quant_core::market_data::scalars::MarketScalar::Price(m) => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "Dividend yield '{}' should be a unitless scalar, got Price({})",
-                        div_id,
-                        m.currency()
-                    )));
-                }
-            }
-        } else {
-            0.0
-        };
+        let q = crate::instruments::common_impl::helpers::resolve_optional_dividend_yield(
+            curves,
+            inst.div_yield_id.as_ref(),
+        )?;
 
         // Map remaining (future) observation dates to model times on the
         // instrument clock (matches the vol-surface calibration basis).

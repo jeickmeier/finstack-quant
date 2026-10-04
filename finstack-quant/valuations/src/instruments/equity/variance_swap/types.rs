@@ -11,7 +11,7 @@ use finstack_quant_core::{
 use time::macros::date;
 
 use super::pricer;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::{common_impl::traits::Attributes, MarketDependencies};
 
 pub use crate::instruments::common_impl::parameters::PayReceive;
@@ -102,7 +102,6 @@ pub struct VarianceSwap {
     /// Optional unitless continuous dividend-yield scalar id (decimal,
     /// 0.02 = 2%). `None` means a zero dividend yield.
     #[serde(default)]
-    #[builder(optional)]
     pub div_yield_id: Option<PriceId>,
     /// Variance notional (in variance units)
     pub notional: Money,
@@ -124,7 +123,6 @@ pub struct VarianceSwap {
     pub maturity: Date,
     /// Optional cash-settlement date. Defaults to the adjusted final observation date.
     #[serde(default)]
-    #[builder(optional)]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
@@ -165,19 +163,15 @@ pub struct VarianceSwap {
     pub price_series_policy: EquityPriceSeriesPolicy,
     /// Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
     #[serde(default)]
-    #[builder(optional)]
     pub open_series_id: Option<String>,
     /// Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
     #[serde(default)]
-    #[builder(optional)]
     pub high_series_id: Option<String>,
     /// Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
     #[serde(default)]
-    #[builder(optional)]
     pub low_series_id: Option<String>,
     /// Series ID for close prices. Defaults to `spot_id` when absent.
     #[serde(default)]
-    #[builder(optional)]
     pub close_series_id: Option<String>,
     /// Pay/receive variance
     pub side: PayReceive,
@@ -557,7 +551,7 @@ impl crate::instruments::common_impl::traits::Instrument for VarianceSwap {
         Some(self.start_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();

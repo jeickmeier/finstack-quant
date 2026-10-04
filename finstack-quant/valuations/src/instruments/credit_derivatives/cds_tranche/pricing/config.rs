@@ -75,9 +75,6 @@ pub(super) const MAX_GRID_POINTS: usize = 200_000;
 /// does not bound the number of adaptive factor quadrature evaluations.
 pub(super) const MAX_CONVOLUTION_WORK: usize = 5_000_000;
 
-/// Maximum iterations for par spread solver
-pub(super) const PAR_SPREAD_MAX_ITER: usize = 50;
-
 /// Tolerance for par spread solver convergence
 pub(super) const PAR_SPREAD_TOLERANCE: f64 = 1e-6;
 

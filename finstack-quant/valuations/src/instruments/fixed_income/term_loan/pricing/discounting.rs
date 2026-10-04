@@ -211,7 +211,7 @@ impl TermLoanDiscountingPricer {
                 &flows,
                 settlement_date,
                 disc.as_ref(),
-                crate::instruments::fixed_income::loan_quotes::compounding_frequency(
+                crate::instruments::common_impl::pricing::time::compounding_frequency(
                     loan.frequency,
                 ),
                 spread,

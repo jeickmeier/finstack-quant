@@ -14,7 +14,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 
 use crate::cashflow::builder::{schedule::merge_cashflow_schedules, CashFlowSchedule, Notional};
 use crate::cashflow::primitives::CFKind;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 
 /// FX Swap instrument definition
 #[derive(
@@ -56,11 +56,9 @@ pub struct FxSwap {
     pub foreign_discount_curve_id: CurveId,
     /// Optional near leg FX rate (quote per base). If absent, use the market
     /// outright forward from the valuation date to near settlement.
-    #[builder(optional)]
     pub near_rate: Option<f64>,
     /// Optional far leg FX rate (quote per base). If absent, use the market
     /// outright forward from the valuation date to far settlement.
-    #[builder(optional)]
     pub far_rate: Option<f64>,
     /// Optional base currency calendar for spot/settlement adjustment metadata.
     #[builder(default)]
@@ -411,7 +409,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxSwap {
         Some(self.near_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for FxSwap {

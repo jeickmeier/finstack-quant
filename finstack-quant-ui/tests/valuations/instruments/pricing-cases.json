@@ -2717,7 +2717,7 @@
       "type": "swaption",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/swaption.json",
-        "sha256": "bb6c4c8188f0fa04f95748e0be455ccd9bb9c8298964e47b5c15d985b9d37643",
+        "sha256": "b9459942f3163236c5d8ad96767bfbfe7da38f2d915697d7d272f1546a2c36fb",
         "pointer": []
       },
       "instrumentPatches": [],

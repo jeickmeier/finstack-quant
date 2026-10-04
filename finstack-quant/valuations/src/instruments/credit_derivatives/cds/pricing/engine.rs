@@ -56,6 +56,31 @@ impl Default for CdsPricer {
 }
 
 impl CdsPricer {
+    fn add_premium_period(
+        &self,
+        total: &mut f64,
+        inputs: AodInputs<'_>,
+        accrual: f64,
+        df: f64,
+    ) -> Result<()> {
+        let sp = if inputs.end_date <= inputs.as_of {
+            1.0
+        } else {
+            sp_cond_to(inputs.surv, inputs.as_of, inputs.end_date)?
+        };
+        let scheduled_coupon = inputs.cds.notional.amount() * inputs.spread * accrual;
+        *total += scheduled_coupon * sp * df;
+        if self.config.include_accrual_on_default {
+            *total += inputs.spread.signum()
+                * inputs.cds.notional.amount()
+                * self.accrual_on_default_isda_standard_model_cond(AodInputs {
+                    spread: inputs.spread.abs(),
+                    ..inputs
+                })?;
+        }
+        Ok(())
+    }
+
     /// Create new pricer with default ISDA-compliant config.
     #[must_use]
     pub(crate) fn new() -> Self {
@@ -243,36 +268,24 @@ impl CdsPricer {
             // Discounting uses discount curve's day-count and relative DF from as_of
             let df = disc.df_between_dates(as_of, payment_date)?;
 
-            // Survival uses hazard curve's day-count and conditional probability
-            let sp = if end_date <= as_of {
-                // This receivable is no longer contingent on reference default.
-                1.0
-            } else {
-                sp_cond_to(surv, as_of, end_date)?
-            };
-
             let accrual = self.coupon_accrual(cds, &period)?;
-            let scheduled_coupon = cds.notional.amount() * spread * accrual;
-            premium_pv += scheduled_coupon * sp * df;
-
-            if self.config.include_accrual_on_default {
-                let spread_sign = spread.signum();
-                // Keep AoD on the same dollar basis as the scheduled coupon leg.
-                premium_pv += spread_sign
-                    * cds.notional.amount()
-                    * self.accrual_on_default_isda_standard_model_cond(AodInputs {
-                        cds,
-                        spread: spread.abs(),
-                        accrual_start_date: start_date,
-                        start_date: start_date.max(as_of),
-                        end_date,
-                        settlement_delay: cds.protection_leg.settlement_delay,
-                        calendar,
-                        as_of,
-                        disc,
-                        surv,
-                    })?;
-            }
+            self.add_premium_period(
+                &mut premium_pv,
+                AodInputs {
+                    cds,
+                    spread,
+                    accrual_start_date: start_date,
+                    start_date: start_date.max(as_of),
+                    end_date,
+                    settlement_delay: cds.protection_leg.settlement_delay,
+                    calendar,
+                    as_of,
+                    disc,
+                    surv,
+                },
+                accrual,
+                df,
+            )?;
         }
 
         Ok(premium_pv)
@@ -516,9 +529,6 @@ impl CdsHazardRepriceCache {
     /// * `surv` - Bumped or original survival/hazard curve used for protection
     ///   and accrual-on-default. Discount factors stay at the cached values.
     pub(crate) fn npv(&self, surv: &HazardCurve) -> Result<f64> {
-        use super::helpers::sp_cond_to;
-        use crate::instruments::credit_derivatives::cds::PayReceive;
-
         let protection_pv =
             self.pricer
                 .pv_protection_leg_raw(&self.cds, self.disc.as_ref(), surv, self.as_of)?;
@@ -530,45 +540,54 @@ impl CdsHazardRepriceCache {
             .and_then(finstack_quant_core::dates::calendar::calendar_by_id);
         let mut premium_pv = 0.0;
         for &(period, accrual, df) in &self.periods {
-            let sp = if period.accrual_end <= self.as_of {
-                1.0
-            } else {
-                sp_cond_to(surv, self.as_of, period.accrual_end)?
-            };
-            premium_pv += self.cds.notional.amount() * self.spread * accrual * sp * df;
-            if self.pricer.config.include_accrual_on_default {
-                let spread_sign = self.spread.signum();
-                premium_pv += spread_sign
-                    * self.cds.notional.amount()
-                    * self
-                        .pricer
-                        .accrual_on_default_isda_standard_model_cond(AodInputs {
-                            cds: &self.cds,
-                            spread: self.spread.abs(),
-                            accrual_start_date: period.accrual_start,
-                            start_date: period.accrual_start.max(self.as_of),
-                            end_date: period.accrual_end,
-                            settlement_delay: self.cds.protection_leg.settlement_delay,
-                            calendar,
-                            as_of: self.as_of,
-                            disc: self.disc.as_ref(),
-                            surv,
-                        })?;
-            }
+            self.pricer.add_premium_period(
+                &mut premium_pv,
+                AodInputs {
+                    cds: &self.cds,
+                    spread: self.spread,
+                    accrual_start_date: period.accrual_start,
+                    start_date: period.accrual_start.max(self.as_of),
+                    end_date: period.accrual_end,
+                    settlement_delay: self.cds.protection_leg.settlement_delay,
+                    calendar,
+                    as_of: self.as_of,
+                    disc: self.disc.as_ref(),
+                    surv,
+                },
+                accrual,
+                df,
+            )?;
         }
 
-        let mut npv_amount = match self.cds.side {
-            PayReceive::Pay => protection_pv - premium_pv - self.upfront_pv,
-            PayReceive::Receive => premium_pv - protection_pv + self.upfront_pv,
-        };
-        if self.cds.uses_clean_price() {
-            npv_amount = match self.cds.side {
-                PayReceive::Pay => npv_amount + self.clean_accrued,
-                PayReceive::Receive => npv_amount - self.clean_accrued,
-            };
-        }
-        Ok(npv_amount)
+        Ok(signed_npv(
+            &self.cds,
+            protection_pv,
+            premium_pv,
+            self.upfront_pv,
+            self.clean_accrued,
+        ))
     }
+}
+
+pub(super) fn signed_npv(
+    cds: &CreditDefaultSwap,
+    protection_pv: f64,
+    premium_pv: f64,
+    upfront_pv: f64,
+    clean_accrued: f64,
+) -> f64 {
+    use crate::instruments::credit_derivatives::cds::PayReceive;
+    let mut value = match cds.side {
+        PayReceive::Pay => protection_pv - premium_pv - upfront_pv,
+        PayReceive::Receive => premium_pv - protection_pv + upfront_pv,
+    };
+    if cds.uses_clean_price() {
+        value = match cds.side {
+            PayReceive::Pay => value + clean_accrued,
+            PayReceive::Receive => value - clean_accrued,
+        };
+    }
+    value
 }
 
 #[cfg(test)]

@@ -112,7 +112,7 @@ for (const type of [
     request,
     detailType: expected,
     hostBigIntPaths: bigintPaths(result),
-    resultJson: native.validateValuationResultJson(serializeHost(result)),
+    resultJson: native.valuationResultToJson(serializeHost(result)),
   });
 }
 const specs = JSON.parse(native.lboStandardJson(5, 1.5, 1.2, 10000000));

@@ -390,7 +390,7 @@ pub(crate) struct PreparedDealSimulation {
 
 /// Prepare everything about a deal simulation that does not depend on path
 /// shocks. Returns `None` when the pool is exhausted (zero balance), which
-/// [`run_simulation_with_source`] maps to an empty result.
+/// [`simulate_with_source`] returns an empty tranche map.
 ///
 /// # Errors
 ///
@@ -744,23 +744,6 @@ pub(crate) fn simulate_prepared<S: PoolFlowSource + ?Sized>(
     })
 }
 
-/// Run full cashflow simulation for a structured credit instrument.
-///
-/// Prepares the loop-invariant [`PreparedDealSimulation`] then executes the
-/// period loop. Single-shot callers (deterministic pricing, OAS scenarios)
-/// use this entry point; the stochastic engines prepare once per pricing run
-/// and call [`simulate_prepared`] per path.
-///
-/// Returns detailed cashflow results for each tranche.
-pub(crate) fn run_simulation_with_source<S: PoolFlowSource + ?Sized>(
-    instrument: &StructuredCredit,
-    context: &MarketContext,
-    as_of: Date,
-    source: &mut S,
-) -> Result<HashMap<String, TrancheCashflows>> {
-    simulate_with_source(instrument, context, as_of, source).map(|run| run.tranches)
-}
-
 /// Resolve, prepare and simulate a deal whose pool holds instrument
 /// collateral, driving period flows from the instruments' own schedules.
 ///
@@ -897,16 +880,4 @@ pub(crate) fn aggregate_tranche_cashflows(
     all_flows.sort_by_key(|(d, _)| *d);
 
     Ok(all_flows)
-}
-
-/// Remove one tranche's cashflows from a full simulation result map.
-pub(crate) fn take_tranche_cashflows(
-    full_results: &mut HashMap<String, TrancheCashflows>,
-    tranche_id: &str,
-) -> Result<TrancheCashflows> {
-    full_results.remove(tranche_id).ok_or_else(|| {
-        finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
-            id: format!("tranche:{}", tranche_id),
-        })
-    })
 }

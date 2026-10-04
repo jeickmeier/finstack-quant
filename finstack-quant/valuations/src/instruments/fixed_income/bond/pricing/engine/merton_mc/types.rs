@@ -444,3 +444,76 @@ pub struct PathStatistics {
     /// Fraction of coupon dates where PIK was elected.
     pub pik_exercise_rate: f64,
 }
+
+impl MertonMcResult {
+    /// Project the headline pricing and path statistics into one row, retaining decimal price percentages, loss fractions and spread basis points.
+    ///
+    /// The independent-estimator count is a signed 64-bit column; counts beyond
+    /// that range return an error. Path statistics retain their original units.
+    pub fn to_table(
+        &self,
+    ) -> finstack_quant_core::Result<finstack_quant_core::table::TableEnvelope> {
+        use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
+        let mut columns = vec![
+            TableColumn::new(
+                "clean_price_pct",
+                TableColumnData::Float64(vec![self.clean_price_pct]),
+            ),
+            TableColumn::new(
+                "dirty_price_pct",
+                TableColumnData::Float64(vec![self.dirty_price_pct]),
+            ),
+            TableColumn::new(
+                "expected_loss",
+                TableColumnData::Float64(vec![self.expected_loss]),
+            ),
+            TableColumn::new(
+                "unexpected_loss",
+                TableColumnData::Float64(vec![self.unexpected_loss]),
+            ),
+            TableColumn::new(
+                "expected_shortfall_95",
+                TableColumnData::Float64(vec![self.expected_shortfall_95]),
+            ),
+            TableColumn::new(
+                "average_pik_fraction",
+                TableColumnData::Float64(vec![self.average_pik_fraction]),
+            ),
+            TableColumn::new(
+                "effective_spread_bp",
+                TableColumnData::Float64(vec![self.effective_spread_bp]),
+            ),
+        ];
+        columns.push(TableColumn::new(
+            "num_paths",
+            TableColumnData::Int64(vec![i64::try_from(self.num_paths).map_err(|_| {
+                finstack_quant_core::Error::Validation("estimator count exceeds i64".into())
+            })?]),
+        ));
+        columns.push(TableColumn::new(
+            "standard_error",
+            TableColumnData::Float64(vec![self.standard_error]),
+        ));
+        columns.push(TableColumn::new(
+            "default_rate",
+            TableColumnData::Float64(vec![self.path_statistics.default_rate]),
+        ));
+        columns.push(TableColumn::new(
+            "avg_default_time",
+            TableColumnData::Float64(vec![self.path_statistics.avg_default_time]),
+        ));
+        columns.push(TableColumn::new(
+            "avg_terminal_notional",
+            TableColumnData::Float64(vec![self.path_statistics.avg_terminal_notional]),
+        ));
+        columns.push(TableColumn::new(
+            "avg_recovery_rate",
+            TableColumnData::Float64(vec![self.path_statistics.avg_recovery_rate]),
+        ));
+        columns.push(TableColumn::new(
+            "pik_exercise_rate",
+            TableColumnData::Float64(vec![self.path_statistics.pik_exercise_rate]),
+        ));
+        TableEnvelope::new(columns)
+    }
+}

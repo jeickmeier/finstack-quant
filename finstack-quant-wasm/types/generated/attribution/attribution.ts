@@ -2994,10 +2994,6 @@ export type InflationVolatilityExpiry = "reference_date" | "publication_date";
  */
 export type CashSettlementMethod = "collateralized_cash_price" | "par_yield" | "isda_par_par" | "zero_coupon";
 /**
- * Exercise schedule convention for option models.
- */
-export type ExerciseStyle = "european" | "american" | "bermudan";
-/**
  * Finite JSON number that is strictly greater than zero.
  *
  * This type is used by serde field adapters so runtime deserialization and
@@ -3055,6 +3051,10 @@ export type ListedFutureSettlement =
       quantity_per_contract: number;
       type: "physical";
     };
+/**
+ * Exercise schedule convention for option models.
+ */
+export type ExerciseStyle = "european" | "american" | "bermudan";
 /**
  * Quotation model used for an option on a futures price.
  */
@@ -8317,12 +8317,6 @@ export interface StochasticUtilizationSpec {
    */
   mc_config?: McConfig | null;
   /**
-   * Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).
-   * Mutually exclusive with `model_config.mc_antithetic = true`; validation
-   * rejects the combination.
-   */
-  use_sobol_qmc?: boolean;
-  /**
    * Utilization process specification.
    */
   utilization_process: UtilizationProcess;
@@ -11706,7 +11700,7 @@ export interface ForwardRateAgreement {
   start_date: DateWire;
 }
 /**
- * Swaption instrument
+ * European swaption instrument
  *
  * # Exercise lifecycle boundary
  *
@@ -11731,10 +11725,6 @@ export interface Swaption {
    * - `ZeroCoupon`: Single discount to swap maturity
    */
   cash_settlement_method: CashSettlementMethod;
-  /**
-   * Exercise style (European, Bermudan, American). Defaults to European.
-   */
-  exercise_style: ExerciseStyle;
   /**
    * Option expiry date
    */

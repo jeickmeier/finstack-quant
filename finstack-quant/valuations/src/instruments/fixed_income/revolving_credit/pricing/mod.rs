@@ -115,7 +115,6 @@ mod tests {
                         sigma: 0.1,
                         spread_sensitivity: 0.0,
                     },
-                    use_sobol_qmc: false,
                     mc_config: Some(mc_config),
                 },
             )))

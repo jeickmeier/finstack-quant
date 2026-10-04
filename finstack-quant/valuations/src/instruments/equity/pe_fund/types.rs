@@ -1,7 +1,7 @@
 //! Private markets fund investment instrument type and implementations.
 
 use super::pricer;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::equity::pe_fund::waterfall::{
     AllocationLedger, FundEvent, PeFundWaterfallSpec,
@@ -42,7 +42,6 @@ pub struct PrivateMarketsFund {
     ///
     /// When `None`, future cashflows are included undiscounted relative to the
     /// caller's valuation date.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discount_curve_id: Option<CurveId>,
     /// Unrealized net asset value attributable to the LP, stated as of the
@@ -59,7 +58,6 @@ pub struct PrivateMarketsFund {
     /// model either realized history + NAV mark (marked fund), or realized
     /// history + projected future events with no NAV (cashflow projection).
     /// The NAV is added undiscounted, taken as stated at the valuation date.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unrealized_nav: Option<Money>,
     /// Instrument-owned pricing inputs.
@@ -234,7 +232,7 @@ impl Instrument for PrivateMarketsFund {
         None
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for PrivateMarketsFund {

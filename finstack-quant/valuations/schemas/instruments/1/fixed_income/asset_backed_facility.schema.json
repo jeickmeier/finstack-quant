@@ -5919,11 +5919,6 @@
           ],
           "description": "Advanced Monte Carlo configuration (optional).\n\nWhen present, enables multi-factor modeling with credit spread\nand interest rate dynamics, correlation, and default modeling."
         },
-        "use_sobol_qmc": {
-          "default": false,
-          "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `model_config.mc_antithetic = true`; validation\nrejects the combination.",
-          "type": "boolean"
-        },
         "utilization_process": {
           "$ref": "#/$defs/UtilizationProcess",
           "description": "Utilization process specification."

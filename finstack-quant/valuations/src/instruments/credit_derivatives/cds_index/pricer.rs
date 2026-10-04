@@ -479,6 +479,42 @@ impl CdsIndexPricer {
 
     // ----- internals -----
 
+    fn visit_positions<'a>(
+        &self,
+        index: &'a CdsIndex,
+        curves: &MarketContext,
+        as_of: Date,
+        mut visit: impl FnMut(
+            &CdsPricer,
+            &CreditDefaultSwap,
+            &DiscountCurve,
+            &HazardCurve,
+            Option<ResolvedConstituent<'a>>,
+        ) -> Result<()>,
+    ) -> Result<()> {
+        index.validate()?;
+        if as_of >= index.premium_leg.end {
+            return Ok(());
+        }
+        let pricer = CdsPricer::with_config(self.cds_config.clone());
+        let mut cds = self.synthetic_cds(index)?;
+        let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
+        match index.pricing {
+            IndexPricing::SingleCurve => {
+                let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
+                visit(&pricer, &cds, disc.as_ref(), surv.as_ref(), None)
+            }
+            IndexPricing::Constituents => {
+                self.for_each_constituent(index, |position| {
+                    position.apply_to_cds(index, &mut cds)?;
+                    let surv = curves.get_hazard(position.credit_curve_id)?;
+                    visit(&pricer, &cds, disc.as_ref(), surv.as_ref(), Some(position))
+                })?;
+                Ok(())
+            }
+        }
+    }
+
     /// Aggregate a per-CDS scalar metric across the resolved positions.
     ///
     /// Caches discount-curve lookups by `CurveId`: the common case is that
@@ -494,47 +530,26 @@ impl CdsIndexPricer {
     where
         F: Fn(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve, Date) -> Result<f64>,
     {
-        index.validate()?;
-        if as_of >= index.premium_leg.end {
-            return Ok(IndexResult {
-                total: 0.0,
-                constituents: Vec::new(),
-            });
-        }
-        let pricer = CdsPricer::with_config(self.cds_config.clone());
-        match index.pricing {
-            IndexPricing::SingleCurve => {
-                let cds = self.synthetic_cds(index)?;
-                let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
-                let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
-                let total = f(&pricer, &cds, disc.as_ref(), surv.as_ref(), as_of)?;
-                Ok(IndexResult::single_curve(total))
+        let mut total = 0.0;
+        let mut constituents = Vec::with_capacity(index.constituents.len());
+        self.visit_positions(index, curves, as_of, |pricer, cds, disc, surv, position| {
+            let value = f(pricer, cds, disc, surv, as_of)?;
+            total += value;
+            if let Some(position) = position {
+                constituents.push(ConstituentResult {
+                    credit_curve_id: position.credit_curve_id.clone(),
+                    recovery_rate: position.recovery_rate,
+                    weight_raw: position.weight_raw,
+                    weight_effective: position.weight_effective,
+                    value,
+                });
             }
-            IndexPricing::Constituents => {
-                let mut cds = self.synthetic_cds(index)?;
-                let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
-                let mut total = 0.0;
-                let mut constituents = Vec::with_capacity(index.constituents.len());
-                self.for_each_constituent(index, |position| {
-                    position.apply_to_cds(index, &mut cds)?;
-                    let surv = curves.get_hazard(position.credit_curve_id)?;
-                    let value = f(&pricer, &cds, disc.as_ref(), surv.as_ref(), as_of)?;
-                    total += value;
-                    constituents.push(ConstituentResult {
-                        credit_curve_id: position.credit_curve_id.clone(),
-                        recovery_rate: position.recovery_rate,
-                        weight_raw: position.weight_raw,
-                        weight_effective: position.weight_effective,
-                        value,
-                    });
-                    Ok(())
-                })?;
-                Ok(IndexResult {
-                    total,
-                    constituents,
-                })
-            }
-        }
+            Ok(())
+        })?;
+        Ok(IndexResult {
+            total,
+            constituents,
+        })
     }
 
     /// Aggregate a per-CDS Money metric across the resolved positions.
@@ -551,48 +566,26 @@ impl CdsIndexPricer {
     where
         F: Fn(&CdsPricer, &CreditDefaultSwap, &DiscountCurve, &HazardCurve, Date) -> Result<Money>,
     {
-        index.validate()?;
-        let currency = index.notional.currency();
-        if as_of >= index.premium_leg.end {
-            return Ok(IndexResult {
-                total: Money::from((0_i64, currency)),
-                constituents: Vec::new(),
-            });
-        }
-        let pricer = CdsPricer::with_config(self.cds_config.clone());
-        match index.pricing {
-            IndexPricing::SingleCurve => {
-                let cds = self.synthetic_cds(index)?;
-                let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
-                let surv = curves.get_hazard(&cds.protection_leg.credit_curve_id)?;
-                let total = f(&pricer, &cds, disc.as_ref(), surv.as_ref(), as_of)?;
-                Ok(IndexResult::single_curve(total))
+        let mut total = Money::from((0_i64, index.notional.currency()));
+        let mut constituents = Vec::with_capacity(index.constituents.len());
+        self.visit_positions(index, curves, as_of, |pricer, cds, disc, surv, position| {
+            let value = f(pricer, cds, disc, surv, as_of)?;
+            total = total.checked_add(value)?;
+            if let Some(position) = position {
+                constituents.push(ConstituentResult {
+                    credit_curve_id: position.credit_curve_id.clone(),
+                    recovery_rate: position.recovery_rate,
+                    weight_raw: position.weight_raw,
+                    weight_effective: position.weight_effective,
+                    value,
+                });
             }
-            IndexPricing::Constituents => {
-                let mut cds = self.synthetic_cds(index)?;
-                let disc = curves.get_discount(&cds.premium_leg.discount_curve_id)?;
-                let mut total = Money::from((0_i64, currency));
-                let mut constituents = Vec::with_capacity(index.constituents.len());
-                self.for_each_constituent(index, |position| {
-                    position.apply_to_cds(index, &mut cds)?;
-                    let surv = curves.get_hazard(position.credit_curve_id)?;
-                    let value = f(&pricer, &cds, disc.as_ref(), surv.as_ref(), as_of)?;
-                    total = total.checked_add(value)?;
-                    constituents.push(ConstituentResult {
-                        credit_curve_id: position.credit_curve_id.clone(),
-                        recovery_rate: position.recovery_rate,
-                        weight_raw: position.weight_raw,
-                        weight_effective: position.weight_effective,
-                        value,
-                    });
-                    Ok(())
-                })?;
-                Ok(IndexResult {
-                    total,
-                    constituents,
-                })
-            }
-        }
+            Ok(())
+        })?;
+        Ok(IndexResult {
+            total,
+            constituents,
+        })
     }
 
     fn for_each_constituent<'a>(
@@ -880,28 +873,14 @@ impl CdsIndexPricer {
 }
 
 /// Registry pricer for CDS Index using the engine
-pub(crate) struct SimpleCdsIndexHazardPricer {
-    model_key: crate::pricer::ModelKey,
-}
-
-impl SimpleCdsIndexHazardPricer {
-    /// Create a new CDS index pricer with default hazard rate model
-    pub(crate) fn new() -> Self {
-        Self {
-            model_key: crate::pricer::ModelKey::HazardRate,
-        }
-    }
-}
-
-impl Default for SimpleCdsIndexHazardPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub(crate) struct SimpleCdsIndexHazardPricer;
 
 impl crate::pricer::Pricer for SimpleCdsIndexHazardPricer {
     fn key(&self) -> crate::pricer::PricerKey {
-        crate::pricer::PricerKey::new(crate::pricer::InstrumentType::CdsIndex, self.model_key)
+        crate::pricer::PricerKey::new(
+            crate::pricer::InstrumentType::CdsIndex,
+            crate::pricer::ModelKey::HazardRate,
+        )
     }
 
     fn price_dyn(
@@ -933,7 +912,7 @@ impl crate::pricer::Pricer for SimpleCdsIndexHazardPricer {
             crate::results::ValuationResult::stamped(cds_index.id(), as_of, pv).with_details(
                 crate::results::ValuationDetails::CreditDerivative(
                     crate::results::CreditDerivativeValuationDetails {
-                        model_key: self.model_key,
+                        model_key: crate::pricer::ModelKey::HazardRate,
                         integration_method: Some("isda_standard_model".to_string()),
                     },
                 ),

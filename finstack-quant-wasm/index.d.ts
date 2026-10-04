@@ -16456,7 +16456,7 @@ export declare const covenants: CovenantsNamespace;
 export interface Bond extends WasmOwned {
   /**
    * Instrument identifier.
-   * @returns Stable instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
    */
   readonly id: string;
   /**
@@ -16464,8 +16464,8 @@ export interface Bond extends WasmOwned {
    *
    * Pass the result to `valuations.instruments.priceInstrument` (or the
    * other generic pricing entry points) to price this bond.
-   * @returns Canonical instrument envelope accepted by `priceInstrument` and `Bond.fromJson`.
-   * @throws If serialization fails.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
    */
   toJson(): string;
   /**
@@ -16783,9 +16783,9 @@ export interface BondConstructor {
    * Deserialize a bond from its canonical v1 instrument envelope.
    *
    * Bare payloads are rejected; the loader's validation runs on the result.
-   * @param json - A `finstack_quant.instrument/1` envelope containing type `"bond"`.
-   * @returns The validated bond.
-   * @throws If the JSON is malformed, has a different instrument type, or fails validation.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
    */
   fromJson(json: JsonInput): Bond;
   /**
@@ -16886,7 +16886,7 @@ export interface BondConstructor {
 export interface TermLoan extends WasmOwned {
   /**
    * Instrument identifier.
-   * @returns Stable instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
    */
   readonly id: string;
   /**
@@ -16894,8 +16894,8 @@ export interface TermLoan extends WasmOwned {
    *
    * Pass the result to `valuations.instruments.priceInstrument` (or the
    * other generic pricing entry points) to price this loan.
-   * @returns Canonical instrument envelope accepted by `priceInstrument` and `TermLoan.fromJson`.
-   * @throws If serialization fails.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
    */
   toJson(): string;
   /**
@@ -17111,9 +17111,9 @@ export interface TermLoanConstructor {
    * Deserialize a term loan from its canonical v1 instrument envelope.
    *
    * Bare payloads are rejected; the loader's validation runs on the result.
-   * @param json - A `finstack_quant.instrument/1` envelope containing type `"term_loan"`.
-   * @returns The validated term loan.
-   * @throws If the JSON is malformed, has a different instrument type, or fails validation.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
    */
   fromJson(json: JsonInput): TermLoan;
   /**
@@ -17159,13 +17159,13 @@ export interface TermLoanConstructor {
 export interface AssetBackedFacility extends WasmOwned {
   /**
    * Instrument identifier.
-   * @returns Stable instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
    */
   readonly id: string;
   /**
    * Serialize to a canonical `finstack_quant.instrument/1` envelope.
-   * @returns Canonical instrument envelope accepted by `priceInstrument` and `AssetBackedFacility.fromJson`.
-   * @throws If serialization fails.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
    */
   toJson(): string;
   /**
@@ -17438,9 +17438,9 @@ export interface AssetBackedFacilityConstructor {
   readonly prototype: AssetBackedFacility;
   /**
    * Parse a canonical `finstack_quant.instrument/1` envelope whose instrument is an `asset_backed_facility`.
-   * @param json - Canonical instrument envelope JSON.
-   * @returns The typed facility.
-   * @throws If the JSON is malformed, has a different instrument type, or fails validation.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
    */
   fromJson(json: JsonInput): AssetBackedFacility;
   /**
@@ -17468,7 +17468,7 @@ export interface AssetBackedFacilityConstructor {
 export interface RevolvingCredit extends WasmOwned {
   /**
    * Instrument identifier.
-   * @returns Stable instrument identifier.
+   * @returns Stable instrument identifier used in metric keys.
    */
   readonly id: string;
   /**
@@ -17476,8 +17476,8 @@ export interface RevolvingCredit extends WasmOwned {
    *
    * Pass the result to `valuations.instruments.priceInstrument` (or the
    * other generic pricing entry points) to price this facility.
-   * @returns Canonical instrument envelope accepted by `priceInstrument` and `RevolvingCredit.fromJson`.
-   * @throws If serialization fails.
+   * @returns Canonical instrument envelope JSON.
+   * @throws Error - Throws if the instrument cannot be serialized.
    */
   toJson(): string;
   /**
@@ -17738,9 +17738,9 @@ export interface RevolvingCreditConstructor {
    * Deserialize a revolving credit facility from its canonical v1 instrument envelope.
    *
    * Bare payloads are rejected; the loader's validation runs on the result.
-   * @param json - A `finstack_quant.instrument/1` envelope containing type `"revolving_credit"`.
-   * @returns The validated facility.
-   * @throws If the JSON is malformed, has a different instrument type, or fails validation.
+   * @param json - A `finstack_quant.instrument/1` envelope (JSON string or plain object) for this exact instrument type.
+   * @returns The validated instrument.
+   * @throws Error - Throws with kind `validation` if `json` is malformed, carries a different instrument type, or fails instrument validation.
    */
   fromJson(json: JsonInput): RevolvingCredit;
   /**
@@ -18301,7 +18301,7 @@ export interface RevolvingCreditBuilder extends WasmOwned {
   ): RevolvingCreditBuilder;
   /**
    * Set the draw/repay specification from its serde shape.
-   * @param value - `DrawRepaySpec` as a plain object or JSON string: `{"deterministic": [{"date": ..., "amount": Money, "is_draw": boolean}, ...]}` or `{"stochastic": {"utilization_process": {...}, "use_sobol_qmc": ..., "mc_config": ...}}`. The estimator count, antithetic flag and seed label come from `instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`, `mc_seed_scenario`).
+   * @param value - `DrawRepaySpec` as a plain object or JSON string: `{"deterministic": [{"date": ..., "amount": Money, "is_draw": boolean}, ...]}` or `{"stochastic": {"utilization_process": {...}, "mc_config": ...}}`. The estimator count, antithetic flag and seed label come from `instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`, `mc_seed_scenario`).
    * @returns The builder, for chaining.
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
@@ -19353,11 +19353,7 @@ export interface Swaption extends WasmOwned {
    * @returns The expiry date.
    */
   readonly expiry: string;
-  /**
-   * Exercise style of the swaption.
-   * @returns `"european"`, `"bermudan"` or `"american"`.
-   */
-  readonly exerciseStyle: generated.valuations.Swaption['exercise_style'];
+
   /**
    * Settlement method.
    * @returns `"physical"` or `"cash"`.
@@ -19511,12 +19507,7 @@ export interface SwaptionConstructor {
    * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
    */
   example(): Swaption;
-  /**
-   * Bermudan-exercise variant of the example (mirrors Rust `Swaption::example_bermudan`).
-   * @returns The example swaption with `exercise_style == "bermudan"`.
-   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
-   */
-  exampleBermudan(): Swaption;
+
 }
 
 /**
@@ -19561,13 +19552,7 @@ export interface SwaptionBuilder extends WasmOwned {
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
   expiry(value: string): SwaptionBuilder;
-  /**
-   * Set the exercise style.
-   * @param value - Exercise style (serde string). Default `"european"`.
-   * @returns The builder, for chaining.
-   * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-   */
-  exerciseStyle(value: generated.valuations.Swaption['exercise_style']): SwaptionBuilder;
+
   /**
    * Set the settlement method.
    * @param value - Settlement method (serde string).
@@ -23967,7 +23952,7 @@ export interface TrancheBuilderConstructor {
 export interface MertonMcConfig extends WasmOwned {
   /**
    * Return a copy with a different PIK schedule.
-   * @param s - `PikSchedule` plain object or JSON string, e.g. from `valuations.instruments.pikScheduleUniform`.
+   * @param s - `PikSchedule` plain object or JSON string, e.g. `{ uniform: "cash" }`.
    * @returns A new configuration; the receiver is not modified.
    * @throws Error - Throws with kind `validation` if `s` does not match the `PikSchedule` schema.
    */
@@ -24427,7 +24412,7 @@ export interface ValuationInstrumentsNamespace {
    * distribution (R type-7 linear-interpolated quantile), so offsetting
    * positions diversify. Quote-recalibrated shocks (credit spreads) use the
    * same recalibration provider as `priceInstrument`.
-   * @param instrumentsJson - Array of `finstack_quant.instrument/1` envelopes (JSON strings or plain objects), or one JSON string holding that array; an empty array returns zero VaR and ES.
+   * @param instrumentsJson - Array of plain `finstack_quant.instrument/1` envelope objects, or one JSON string holding that array; nested JSON strings are rejected. The whole inventory is capped at 16 MiB; an empty array returns zero VaR and ES.
    * @param marketJson - Unshocked base market (JSON string or plain object) every scenario perturbs.
    * @param historyJson - `MarketHistory` (JSON string or plain object); a non-empty portfolio needs at least one scenario.
    * @param asOf - ISO-8601 valuation date for the base and every scenario revaluation.
@@ -24437,7 +24422,7 @@ export interface ValuationInstrumentsNamespace {
    * @throws Error - Throws with kind `validation` if an envelope, the market, history, config, `asOf` or `model` is invalid, the confidence level is outside `(0, 1)`, a non-empty portfolio has no scenarios, or a mixed-currency portfolio has no reporting currency; kind `not_found` if required market data is missing; kind `invalid_type` for a wrong argument type; and kind `computation` if a scenario revaluation fails.
    */
   calculateVarWithPricing(
-    instrumentsJson: JsonInput[] | string,
+    instrumentsJson: generated.valuations.InstrumentEnvelope[] | string,
     marketJson: JsonInput,
     historyJson: JsonInput,
     asOf: string,
@@ -24719,60 +24704,6 @@ export interface ValuationInstrumentsNamespace {
    */
   MertonMcConfig: MertonMcConfigConstructor;
   /**
-   * `BarrierCrossing::Discrete`: default is checked only on the simulation grid.
-   * @returns The `BarrierCrossing` value `"discrete"`.
-   * @throws Error - Throws if the value cannot be converted to JavaScript.
-   */
-  barrierCrossingDiscrete(): generated.valuations.BarrierCrossing;
-  /**
-   * `BarrierCrossing::BrownianBridge`: corrects for crossings between grid points.
-   * @returns The `BarrierCrossing` value `"brownian_bridge"`.
-   * @throws Error - Throws if the value cannot be converted to JavaScript.
-   */
-  barrierCrossingBrownianBridge(): generated.valuations.BarrierCrossing;
-  /**
-   * `PikMode::Cash`: the coupon is paid in cash.
-   * @returns The `PikMode` value.
-   * @throws Error - Throws if the value cannot be converted to JavaScript.
-   */
-  pikModeCash(): generated.valuations.PikMode;
-  /**
-   * `PikMode::Pik`: the coupon accretes to the notional.
-   * @returns The `PikMode` value.
-   * @throws Error - Throws if the value cannot be converted to JavaScript.
-   */
-  pikModePik(): generated.valuations.PikMode;
-  /**
-   * `PikMode::Split`: part of the coupon is paid in cash and part accretes.
-   * @param cashFraction - Fraction of the coupon paid in cash, in `[0, 1]`.
-   * @param pikFraction - Fraction of the coupon accreted, in `[0, 1]`.
-   * @returns The `PikMode` value.
-   * @throws Error - Throws with kind `invalid_type` if a fraction is not a number.
-   */
-  pikModeSplit(cashFraction: number, pikFraction: number): generated.valuations.PikMode;
-  /**
-   * `PikMode::Toggle`: the issuer elects cash or PIK each period under the toggle model.
-   * @returns The `PikMode` value.
-   * @throws Error - Throws if the value cannot be converted to JavaScript.
-   */
-  pikModeToggle(): generated.valuations.PikMode;
-  /**
-   * `PikSchedule::Uniform`: one PIK mode for the life of the bond.
-   * @param mode - `PikMode` plain value or JSON string.
-   * @returns The `PikSchedule` plain object.
-   * @throws Error - Throws with kind `validation` if `mode` does not match the `PikMode` schema.
-   */
-  pikScheduleUniform(mode: generated.valuations.PikMode): generated.valuations.PikSchedule;
-  /**
-   * `PikSchedule::Stepped`: the PIK mode changes at given times.
-   * @param steps - `[timeInYears, PikMode]` pairs in increasing time order; each mode applies from its time on.
-   * @returns The `PikSchedule` plain object.
-   * @throws Error - Throws with kind `validation` if `steps` is not an array of `[number, PikMode]` pairs.
-   */
-  pikScheduleStepped(
-    steps: [number, generated.valuations.PikMode][] | string
-  ): generated.valuations.PikSchedule;
-  /**
    * The PIK mode in force at a time (mirrors Rust `PikSchedule::mode_at`).
    * @param schedule - `PikSchedule` plain object or JSON string.
    * @param t - Time from issue in years.
@@ -24837,39 +24768,6 @@ export interface ValuationInstrumentsNamespace {
     dayCount: generated.valuations.PoolAsset['day_count']
   ): generated.valuations.PoolAsset;
   /**
-   * Return a copy of a pool with its representative lines replaced.
-   * @param pool - `AssetPool` plain object or JSON string.
-   * @param repLines - `RepLine` plain objects (or a JSON array string).
-   * @returns A new `AssetPool` plain object carrying `rep_lines`.
-   * @throws Error - Throws with kind `validation` if `pool` or `repLines` does not match its schema.
-   */
-  assetPoolWithRepLines(
-    pool: generated.valuations.AssetPool | string,
-    repLines: generated.valuations.RepLine[] | string
-  ): generated.valuations.AssetPool;
-  /**
-   * Return a copy of a pool with its loan-level assets replaced.
-   * @param pool - `AssetPool` plain object or JSON string.
-   * @param value - `PoolAsset` plain objects (or a JSON array string).
-   * @returns A new `AssetPool` plain object carrying `assets`.
-   * @throws Error - Throws with kind `validation` if `pool` or `value` does not match its schema.
-   */
-  assetPoolWithAssets(
-    pool: generated.valuations.AssetPool | string,
-    value: generated.valuations.PoolAsset[] | string
-  ): generated.valuations.AssetPool;
-  /**
-   * Return a copy of a pool collateralized by typed instruments.
-   * @param pool - `AssetPool` plain object or JSON string.
-   * @param collateral - `InstrumentCollateral` plain object: `bonds`, `term_loans` and `revolvers` instrument specs plus the optional `call_exercise`, `put_exercise` and `overrides` exercise policies.
-   * @returns A new `AssetPool` plain object carrying `instruments`.
-   * @throws Error - Throws with kind `validation` if `pool` or `collateral` does not match its schema.
-   */
-  assetPoolWithInstruments(
-    pool: generated.valuations.AssetPool | string,
-    collateral: generated.valuations.InstrumentCollateral | string
-  ): generated.valuations.AssetPool;
-  /**
    * Return a copy of a pool with its reserve account configured.
    * @param pool - `AssetPool` plain object or JSON string.
    * @param reserveAccount - Opening reserve balance as a `Money` plain object.
@@ -24886,39 +24784,6 @@ export interface ValuationInstrumentsNamespace {
     reserveTarget?: MoneyValue | null,
     reserveInterestDestination?:
       generated.valuations.AssetPool['reserve_interest_destination'] | null
-  ): generated.valuations.AssetPool;
-  /**
-   * Return a copy of a pool with a reinvestment period.
-   * @param pool - `AssetPool` plain object or JSON string.
-   * @param value - `ReinvestmentPeriod` plain object or JSON string: end date, active flag and reinvestment criteria.
-   * @returns A new `AssetPool` plain object carrying `reinvestment_period`.
-   * @throws Error - Throws with kind `validation` if `pool` or `value` does not match its schema.
-   */
-  assetPoolWithReinvestmentPeriod(
-    pool: generated.valuations.AssetPool | string,
-    value: generated.valuations.ReinvestmentPeriod | string
-  ): generated.valuations.AssetPool;
-  /**
-   * Return a copy of a pool with seasoned account balances.
-   * @param pool - `AssetPool` plain object or JSON string.
-   * @param accounts - Plain object with any of `cumulative_defaults`, `cumulative_recoveries`, `cumulative_prepayments`, `cumulative_scheduled_amortization`, `collection_account`, `excess_spread_account` and `original_balance`, each a `Money` plain object; absent fields keep the pool's value.
-   * @returns A new `AssetPool` plain object with the given balances.
-   * @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema or `accounts` has an unknown field or a malformed amount.
-   */
-  assetPoolWithAccounts(
-    pool: generated.valuations.AssetPool | string,
-    accounts: Partial<
-      Pick<
-        generated.valuations.AssetPool,
-        | 'cumulative_defaults'
-        | 'cumulative_recoveries'
-        | 'cumulative_prepayments'
-        | 'cumulative_scheduled_amortization'
-        | 'collection_account'
-        | 'excess_spread_account'
-        | 'original_balance'
-      >
-    >
   ): generated.valuations.AssetPool;
   /**
    * Current balance of the whole pool (mirrors Rust `AssetPool::total_balance`).
@@ -28848,42 +28713,7 @@ export interface ModelCreditNamespace {
   ): generated.models.ScoringResult;
 }
 
-/**
- * Namespaced TypeScript entry points for credit derivatives calculations and types.
- * @example
- * ```typescript
- * import init, { valuations } from "finstack-quant-wasm";
- * await init();
- * const cds = JSON.parse(valuations.creditDerivatives.creditDefaultSwapExampleJson());
- * console.log(cds.instrument.type);
- * ```
- */
-export interface CreditDerivativesNamespace {
-  /**
-   * Example tagged `CreditDefaultSwap` instrument JSON.
-   * @returns Example tagged `CreditDefaultSwap` instrument JSON.
-   * @throws Error - Throws a JavaScript exception if the example instrument fails validation or the example envelope cannot be serialized to JSON.
-   */
-  creditDefaultSwapExampleJson(): string;
-  /**
-   * Example tagged `CdsIndex` instrument JSON.
-   * @returns Example tagged `CdsIndex` instrument JSON.
-   * @throws Error - Throws a JavaScript exception if the example instrument fails validation or the example envelope cannot be serialized to JSON.
-   */
-  cdsIndexExampleJson(): string;
-  /**
-   * Example tagged `CdsTranche` instrument JSON.
-   * @returns Example tagged `CdsTranche` instrument JSON.
-   * @throws Error - Throws a JavaScript exception if the example instrument fails validation or the example envelope cannot be serialized to JSON.
-   */
-  cdsTrancheExampleJson(): string;
-  /**
-   * Example tagged `CdsOption` instrument JSON.
-   * @returns Example tagged `CdsOption` instrument JSON.
-   * @throws Error - Throws a JavaScript exception if the example option cannot be constructed or its envelope cannot be serialized to JSON.
-   */
-  cdsOptionExampleJson(): string;
-}
+
 
 /**
  * A structured input: JSON text, or the equivalent plain object or array.
@@ -31939,10 +31769,6 @@ export interface ValuationsNamespace {
    */
   composite: CompositeNamespace;
   /**
-   * CDS-family example instrument payload factories.
-   */
-  creditDerivatives: CreditDerivativesNamespace;
-  /**
    * Direct FX instrument wrappers.
    */
   fx: FxNamespace;
@@ -31955,27 +31781,18 @@ export interface ValuationsNamespace {
    */
   market: ValuationMarketNamespace;
   /**
-   * Deserialize a `ValuationResult` from JSON and return the canonical JSON.
-   *
-   * Validates the input conforms to the `ValuationResult` schema.
-   * @returns Canonical `ValuationResult` JSON after deserialization.
-   * @param json - Canonical valuation-result JSON to validate and reserialize.
-   * @throws Error - Throws a JavaScript exception if `json` is malformed or does not match the `ValuationResult` schema, or the canonical result cannot be serialized.
-   */
-  validateValuationResultJson(json: JsonInput): string;
-  /**
-   * Serialize a structured `ValuationResult` object to canonical JSON.
+   * Validate and serialize a `ValuationResult` object or JSON text to canonical JSON.
    *
    * The inverse of the structured `priceInstrument*` return: it accepts the
    * plain object those entry points return, with 64-bit fields such as the
    * Monte Carlo `seed` as `bigint`, and writes the same canonical JSON as
    * Python `ValuationResult.to_json()`, keeping every integer exact. Use it in
    * place of `JSON.stringify`, which throws on `bigint`.
-   * @param result - `ValuationResult` object returned by `priceInstrument`, `priceInstrumentWithMarket`, a typed instrument's `price`, or a portfolio valuation's `valuation_result` entry; 64-bit fields must be `BigInt` or safe-integer numbers.
+   * @param result - Canonical JSON text or a `ValuationResult` object returned by `priceInstrument`, `priceInstrumentWithMarket`, a typed instrument's `price`, or a portfolio valuation's `valuation_result` entry; 64-bit fields must be `BigInt` or safe-integer numbers.
    * @returns Canonical `ValuationResult` JSON text.
    * @throws Error - Throws a JavaScript exception if `result` does not match the `ValuationResult` schema (for example a seed given as a string) or the canonical result cannot be serialized.
    */
-  valuationResultToJson(result: ValuationResult): string;
+  valuationResultToJson(result: JsonInput): string;
   /**
    * Decoded series of one composite base metric from a valuation result (twin of Python `ValuationResult.metric_series`).
    * @param result - `ValuationResult` object returned by `priceInstrument` (or its canonical JSON); 64-bit fields may be `BigInt`.

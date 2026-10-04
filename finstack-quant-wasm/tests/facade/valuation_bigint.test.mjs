@@ -105,7 +105,7 @@ test('valuationResultToJson writes the canonical JSON with an exact seed', () =>
   const result = valuations.instruments.priceInstrument(json, MARKET, AS_OF, 'monte_carlo_gbm', []);
   const text = valuations.valuationResultToJson(result);
   assert.ok(text.includes(`"seed":${result.details.data.seed}`), 'seed digits are exact');
-  assert.equal(valuations.validateValuationResultJson(text), text);
+  assert.equal(valuations.valuationResultToJson(text), text);
   assert.throws(() => JSON.stringify(result), TypeError);
 });
 

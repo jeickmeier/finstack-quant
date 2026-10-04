@@ -360,7 +360,6 @@ fn test_revolving_credit_cs01_stochastic_without_credit_curve_errors() {
                     sigma: 0.1,
                     spread_sensitivity: 0.0,
                 },
-                use_sobol_qmc: false,
                 mc_config: None,
             },
         )))
@@ -769,7 +768,6 @@ fn test_deterministic_stochastic_convergence_with_credit_risk() {
             sigma: 1e-6,  // Near-zero sigma
             spread_sensitivity: 0.0,
         },
-        use_sobol_qmc: false,
         mc_config: Some(mc_config),
     };
 

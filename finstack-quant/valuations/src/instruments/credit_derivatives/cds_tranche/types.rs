@@ -13,7 +13,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 
 use super::parameters::CdsTrancheParams;
 use super::pricing;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 
 /// CDS Tranche instrument definition (boilerplate)
 #[derive(
@@ -541,7 +541,7 @@ impl Instrument for CdsTranche {
         self.start_date
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CdsTranche {

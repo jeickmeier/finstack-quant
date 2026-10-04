@@ -2,13 +2,11 @@
 
 use super::RealEstateAsset;
 use finstack_quant_core::dates::{Date, DayCountContext};
-use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Error as CoreError;
 
 pub(crate) fn compute_pv(
     asset: &RealEstateAsset,
-    market: &MarketContext,
     as_of: Date,
 ) -> finstack_quant_core::Result<Money> {
     if let Some(appraisal) = &asset.appraisal_value {
@@ -23,7 +21,7 @@ pub(crate) fn compute_pv(
     }
 
     let value = match asset.valuation_method {
-        super::RealEstateValuationMethod::Dcf => compute_npv_dcf(asset, market, as_of)?,
+        super::RealEstateValuationMethod::Dcf => pv_with_rf_bump_dcf(asset, as_of, &|_| 0.0)?,
         super::RealEstateValuationMethod::DirectCap => compute_npv_direct_cap(asset, as_of)?,
     };
 
@@ -54,22 +52,6 @@ pub(crate) fn pv_with_rf_bump(
         super::RealEstateValuationMethod::Dcf => pv_with_rf_bump_dcf(asset, as_of, bump_at),
         super::RealEstateValuationMethod::DirectCap => compute_npv_direct_cap(asset, as_of),
     }
-}
-
-/// DCF NPV at the property discount rate.
-///
-/// Always discounts at the asset's own `discount_rate` via `(1 + r)^{-t}`
-/// (the previous behavior silently switched to
-/// risk-free curve discounting whenever `discount_curve_id` was loaded in
-/// the market context). The PV does not depend on the market context. Rate
-/// sensitivity comes from bumping the risk-free component inside the rate
-/// (see [`pv_with_rf_bump`]).
-pub(crate) fn compute_npv_dcf(
-    asset: &RealEstateAsset,
-    _market: &MarketContext,
-    as_of: Date,
-) -> finstack_quant_core::Result<f64> {
-    pv_with_rf_bump_dcf(asset, as_of, &|_| 0.0)
 }
 
 /// DCF NPV with the risk-free component of the discount rate bumped by
@@ -350,7 +332,6 @@ mod tests {
     use super::*;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
-    use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::types::InstrumentId;
     use time::Month;
 
@@ -377,8 +358,7 @@ mod tests {
             .attributes(Default::default())
             .build()?;
 
-        let market = MarketContext::new();
-        let pv = compute_pv(&asset, &market, valuation_date)?;
+        let pv = compute_pv(&asset, valuation_date)?;
 
         let t1 =
             DayCount::Act365F.year_fraction(valuation_date, noi1, DayCountContext::default())?;

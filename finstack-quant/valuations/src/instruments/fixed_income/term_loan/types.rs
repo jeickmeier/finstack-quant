@@ -51,7 +51,7 @@ use super::spec::{
 };
 use crate::cashflow::builder::specs::CouponType;
 use crate::cashflow::builder::FloatingRateSpec;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 pub use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::loan_terms::UpfrontFee;
@@ -913,7 +913,7 @@ impl crate::instruments::common_impl::traits::Instrument for TermLoan {
         Some(self.issue_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl crate::cashflow::traits::CashflowScheduleSource for TermLoan {

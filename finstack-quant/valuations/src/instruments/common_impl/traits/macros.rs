@@ -26,7 +26,6 @@
 ///     }
 /// }
 /// ```
-#[macro_export]
 macro_rules! impl_instrument_base {
     ($key:expr) => {
         fn id(&self) -> &str {
@@ -61,7 +60,6 @@ macro_rules! impl_instrument_base {
 
 /// Implements the focused pricing-override accessors for instruments that
 /// store the three canonical runtime categories directly.
-#[macro_export]
 macro_rules! impl_focused_pricing_overrides {
     () => {
         fn get_instrument_pricing_overrides(
@@ -144,3 +142,5 @@ macro_rules! impl_empty_cashflow_provider {
         }
     };
 }
+
+pub(crate) use {impl_focused_pricing_overrides, impl_instrument_base};

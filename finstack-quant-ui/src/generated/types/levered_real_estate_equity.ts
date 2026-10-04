@@ -6767,12 +6767,6 @@ export interface DDb361Df79C3Ba201A17A {
    * and interest rate dynamics, correlation, and default modeling.
    */
   mc_config?: D_7Ab5Bac7015D046B3Dfb | null;
-  /**
-   * Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).
-   * Mutually exclusive with `model_config.mc_antithetic = true`; validation
-   * rejects the combination.
-   */
-  use_sobol_qmc?: boolean;
   utilization_process: D_85A377Cd9542Ce372249;
 }
 /**

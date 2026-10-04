@@ -224,6 +224,23 @@ impl CdsTranchePricer {
         market_ctx: &MarketContext,
         as_of: Date,
     ) -> Result<Vec<ProjectedDiscountedRow>> {
+        self.project_coupon_rows(
+            tranche,
+            market_ctx,
+            as_of,
+            tranche.coupon_bp / BASIS_POINTS_PER_UNIT,
+            false,
+        )
+    }
+
+    pub(super) fn project_coupon_rows(
+        &self,
+        tranche: &CdsTranche,
+        market_ctx: &MarketContext,
+        as_of: Date,
+        coupon: f64,
+        include_tiny_premiums: bool,
+    ) -> Result<Vec<ProjectedDiscountedRow>> {
         if as_of >= tranche.maturity {
             return Ok(Vec::new());
         }
@@ -233,7 +250,6 @@ impl CdsTranchePricer {
             return Ok(Vec::new());
         }
 
-        let coupon = tranche.coupon_bp / BASIS_POINTS_PER_UNIT;
         let tranche_notional = tranche.notional.amount();
         let premium_sign = match tranche.side {
             PayReceive::Pay => -1.0,
@@ -341,7 +357,7 @@ impl CdsTranchePricer {
             let premium_amount =
                 coupon * accrual_period * (outstanding_notional - aod_adjustment).max(0.0);
 
-            if premium_amount.abs() > f64::EPSILON {
+            if include_tiny_premiums || premium_amount.abs() > f64::EPSILON {
                 rows.push(ProjectedDiscountedRow {
                     cashflow: CashFlow::new(
                         payment_date,

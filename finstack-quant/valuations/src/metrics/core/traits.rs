@@ -153,11 +153,6 @@ pub struct MetricPricingInputs {
     finstack_config: Arc<FinstackConfig>,
 }
 
-#[derive(Default)]
-struct RiskRebuildWorkspace {
-    recalibration_provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
-}
-
 /// Context containing all data needed for metric calculations.
 ///
 /// Provides access to the instrument, market data, base valuation,
@@ -179,8 +174,8 @@ pub struct MetricContext {
     /// Reusable mutable market snapshot for finite-difference calculations.
     market_scratch: Option<MarketContext>,
 
-    /// Quote-rebuild requests and provider access behind the risk boundary.
-    risk_rebuild: RiskRebuildWorkspace,
+    /// Provider for quote-space curve recalibration.
+    recalibration_provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 
     /// Previously computed metrics (by ID).
     pub computed: finstack_quant_core::HashMap<MetricId, f64>,
@@ -287,7 +282,7 @@ impl MetricContext {
                 finstack_config,
             },
             market_scratch: None,
-            risk_rebuild: RiskRebuildWorkspace::default(),
+            recalibration_provider: None,
             computed: finstack_quant_core::HashMap::default(),
             computed_series: finstack_quant_core::HashMap::default(),
             computed_matrix: finstack_quant_core::HashMap::default(),
@@ -367,7 +362,7 @@ impl MetricContext {
     pub(crate) fn get_recalibration_provider(
         &self,
     ) -> Option<Arc<dyn crate::recalibration::RecalibrationProvider>> {
-        self.risk_rebuild.recalibration_provider.clone()
+        self.recalibration_provider.clone()
     }
 
     /// Attach the batch-local quote recalibration provider.
@@ -375,7 +370,7 @@ impl MetricContext {
         &mut self,
         provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
     ) {
-        self.risk_rebuild.recalibration_provider = provider;
+        self.recalibration_provider = provider;
     }
 
     /// Recalibrate linked discount and forward curves for a parallel quote bump.
@@ -459,8 +454,7 @@ impl MetricContext {
         &self,
         operation: &str,
     ) -> finstack_quant_core::Result<&dyn crate::recalibration::RecalibrationProvider> {
-        self.risk_rebuild
-            .recalibration_provider
+        self.recalibration_provider
             .as_deref()
             .ok_or_else(|| crate::recalibration::provider_missing(operation))
     }
@@ -470,8 +464,7 @@ impl MetricContext {
         &self,
         operation: &str,
     ) -> finstack_quant_core::Result<Arc<dyn crate::recalibration::RecalibrationProvider>> {
-        self.risk_rebuild
-            .recalibration_provider
+        self.recalibration_provider
             .as_ref()
             .cloned()
             .ok_or_else(|| crate::recalibration::provider_missing(operation))

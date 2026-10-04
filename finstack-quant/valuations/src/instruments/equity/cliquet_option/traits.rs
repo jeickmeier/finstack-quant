@@ -3,7 +3,7 @@
 use crate::instruments::equity::cliquet_option::CliquetOption;
 use crate::metrics::HasExpiry;
 
-crate::impl_equity_exotic_traits!(@mc_daycount CliquetOption);
+crate::instruments::common_impl::traits::impl_equity_exotic_traits!(@mc_daycount CliquetOption);
 
 impl HasExpiry for CliquetOption {
     fn expiry(&self) -> finstack_quant_core::dates::Date {

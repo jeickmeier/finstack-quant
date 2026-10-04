@@ -640,7 +640,7 @@ impl Bond {
         // more robust than using just the first interval, which may be a stub.
         use crate::cashflow::primitives::CFKind;
         use finstack_quant_core::dates::Tenor;
-        use std::collections::HashMap;
+        use std::collections::BTreeMap;
 
         let mut coupon_dates: Vec<Date> = schedule
             .get_flows()
@@ -655,7 +655,7 @@ impl Bond {
             // Fallback to annual if we cannot infer a pattern
             Tenor::annual()
         } else {
-            let mut interval_counts: HashMap<i64, usize> = HashMap::new();
+            let mut interval_counts: BTreeMap<i64, usize> = BTreeMap::new();
             for window in coupon_dates.windows(2) {
                 let d0 = window[0];
                 let d1 = window[1];
@@ -676,9 +676,10 @@ impl Bond {
                 *interval_counts.entry(bucket).or_insert(0) += 1;
             }
 
+            // Equal counts choose the shorter interval deterministically.
             let (mode_days, _mode_count) = interval_counts
                 .iter()
-                .max_by_key(|(_, count)| *count)
+                .max_by_key(|(days, count)| (**count, std::cmp::Reverse(**days)))
                 .map(|(days, count)| (*days, *count))
                 .unwrap_or((365, 1));
 

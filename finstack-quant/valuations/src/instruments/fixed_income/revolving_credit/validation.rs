@@ -548,16 +548,6 @@ impl RevolvingCredit {
                         run.num_paths
                     )
                 })?;
-                // Antithetic pairing is defined for pseudorandom draws only;
-                // negating Sobol points destroys the low-discrepancy
-                // structure. Reject the combination rather than silently
-                // dropping the antithetic flag.
-                validation::require_with(!(run.antithetic && spec.use_sobol_qmc), || {
-                    "RevolvingCredit cannot combine \
-                     instrument_pricing_overrides.model_config.mc_antithetic with \
-                     draw_repay_spec.stochastic.use_sobol_qmc; disable one of the two"
-                        .to_string()
-                })?;
                 match &spec.utilization_process {
                     UtilizationProcess::MeanReverting {
                         theta,

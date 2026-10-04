@@ -10,7 +10,6 @@ export default [
           "spec": {
             "attributes": {},
             "cash_settlement_method": "collateralized_cash_price",
-            "exercise_style": "european",
             "expiry": "2027-01-15",
             "id": "SWPN-1Yx5Y-USD",
             "notional": {
@@ -1634,7 +1633,7 @@ export default [
   {
     "path": "#/$defs/d_818134538ec82f6d27c9",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/Swaption",
-    "description": "Swaption instrument\n\n# Exercise lifecycle boundary\n\n`Instrument::value` prices the option claim through expiry. At expiry it\nreturns model-free intrinsic value; after expiry it returns zero. For\nphysical settlement, trade lifecycle infrastructure must materialize the\ndelivered [`InterestRateSwap`] from `underlying_fixed_leg`,\n`underlying_float_leg`, `notional`, and `option_type`. This instrument does\nnot retain an exercised swap position after expiry."
+    "description": "European swaption instrument\n\n# Exercise lifecycle boundary\n\n`Instrument::value` prices the option claim through expiry. At expiry it\nreturns model-free intrinsic value; after expiry it returns zero. For\nphysical settlement, trade lifecycle infrastructure must materialize the\ndelivered [`InterestRateSwap`] from `underlying_fixed_leg`,\n`underlying_float_leg`, `notional`, and `option_type`. This instrument does\nnot retain an exercised swap position after expiry."
   },
   {
     "path": "#/$defs/d_818134538ec82f6d27c9/properties/attributes",
@@ -1649,13 +1648,6 @@ export default [
     "description": "Cash settlement annuity method (only used when settlement = Cash).\n\n- `CollateralizedCashPrice` (default): Actual collateral-discounted fixed-leg annuity\n- `ParYield`: Legacy flat-yield cash annuity\n- `IsdaParPar`: Legacy par-par annuity from the discount curve\n- `ZeroCoupon`: Single discount to swap maturity",
     "ref": "#/$defs/CashSettlementMethod",
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/CashSettlementMethod"
-  },
-  {
-    "path": "#/$defs/d_818134538ec82f6d27c9/properties/exercise_style",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/Swaption/properties/exercise_style",
-    "description": "Exercise style (European, Bermudan, American). Defaults to European.",
-    "ref": "#/$defs/ExerciseStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/ExerciseStyle"
   },
   {
     "path": "#/$defs/d_818134538ec82f6d27c9/properties/expiry",
@@ -3948,29 +3940,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/common/1/metric_pricing_overrides.schema.json#/$defs/Currency/oneOf/99",
     "const": "NGN",
     "description": "Naira (566)"
-  },
-  {
-    "path": "#/$defs/d_b94043078b268e4bb4c5",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/ExerciseStyle",
-    "description": "Exercise schedule convention for option models."
-  },
-  {
-    "path": "#/$defs/d_b94043078b268e4bb4c5/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/ExerciseStyle/oneOf/0",
-    "const": "european",
-    "description": "Exercise only at expiry."
-  },
-  {
-    "path": "#/$defs/d_b94043078b268e4bb4c5/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/ExerciseStyle/oneOf/1",
-    "const": "american",
-    "description": "Exercise at any eligible time through expiry."
-  },
-  {
-    "path": "#/$defs/d_b94043078b268e4bb4c5/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/swaption.schema.json#/$defs/ExerciseStyle/oneOf/2",
-    "const": "bermudan",
-    "description": "Exercise on a finite schedule of eligible dates."
   },
   {
     "path": "#/$defs/d_bdf84b73c34f6ec51af5",

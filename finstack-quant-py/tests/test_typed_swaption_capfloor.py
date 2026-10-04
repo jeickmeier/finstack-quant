@@ -24,53 +24,9 @@ class TestSwaptionTyped:
         assert payload["instrument"]["type"] == "swaption"
         assert payload["instrument"]["spec"]["id"] == "SWPT-1"
 
-    def test_bermudan_exercise_style_round_trips(self) -> None:
-        fixed, float_leg = _legs()
-        swpt = (
-            Swaption
-            .builder()
-            .id("SWPT-B")
-            .option_type("call")
-            .notional(Money(1_000_000.0, Currency("USD")))
-            .expiry(datetime.date(2025, 1, 13))
-            .exercise_style("bermudan")
-            .settlement("physical")
-            .cash_settlement_method("par_yield")
-            .vol_model("normal")
-            .vol_surface_id("USD-SWPT-VOL")
-            .underlying_fixed_leg(fixed)
-            .underlying_float_leg(float_leg)
-            .build()
-        )
-        assert Swaption.from_json(swpt.to_json()).id == "SWPT-B"
-
-    def test_american_exercise_style_accepted(self) -> None:
-        fixed, float_leg = _legs()
-        swpt = (
-            Swaption
-            .builder()
-            .id("SWPT-A")
-            .option_type("put")
-            .notional(Money(1_000_000.0, Currency("USD")))
-            .expiry(datetime.date(2025, 1, 13))
-            .exercise_style("american")
-            .settlement("physical")
-            .cash_settlement_method("isda_par_par")
-            .vol_model("black")
-            .vol_surface_id("USD-SWPT-VOL")
-            .underlying_fixed_leg(fixed)
-            .underlying_float_leg(float_leg)
-            .build()
-        )
-        assert swpt.id == "SWPT-A"
-
     @pytest.mark.parametrize("value", ["call", "put"])
     def test_every_option_type_literal_value_accepted(self, value: str) -> None:
         assert _payer_swaption(option_type=value).id == "SWPT-1"
-
-    @pytest.mark.parametrize("value", ["european", "bermudan", "american"])
-    def test_every_exercise_style_literal_value_accepted(self, value: str) -> None:
-        assert _payer_swaption(exercise_style=value).id == "SWPT-1"
 
     @pytest.mark.parametrize("value", ["physical", "cash"])
     def test_every_settlement_literal_value_accepted(self, value: str) -> None:
@@ -96,7 +52,6 @@ class TestSwaptionTyped:
             .option_type("call")
             .notional(Money(1_000_000.0, Currency("USD")))
             .expiry(datetime.date(2025, 1, 13))
-            .exercise_style("european")
             .settlement("cash")
             .cash_settlement_method("par_yield")
             .vol_model("black")
@@ -109,9 +64,11 @@ class TestSwaptionTyped:
         payload = json.loads(swpt.to_json())
         assert payload["instrument"]["spec"]["sabr_params"]["alpha"] == 0.025
 
-    def test_invalid_exercise_style_raises(self) -> None:
-        with pytest.raises(ValueError, match="invalid exercise_style"):
-            Swaption.builder().exercise_style("asian")
+    def test_retired_exercise_style_is_rejected(self) -> None:
+        payload = json.loads(Swaption.example().to_json())
+        payload["instrument"]["spec"]["exercise_style"] = "european"
+        with pytest.raises(ValueError, match="exercise_style"):
+            Swaption.from_json(json.dumps(payload))
 
     def test_from_json_rejects_wrong_type(self) -> None:
         with pytest.raises(ValueError, match="swaption"):

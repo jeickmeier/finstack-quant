@@ -5,9 +5,9 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::contract_specs::{embedded_registry, ContractSpecRegistry};
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::listed::ListedFutureTerms;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::money::Money;
@@ -493,7 +493,6 @@ pub struct BondFuture {
     /// different from the general funding curve.
     ///
     /// If `None`, the `discount_curve_id` is used for financing calculations.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repo_curve_id: Option<CurveId>,
 
@@ -2073,7 +2072,7 @@ impl crate::instruments::common_impl::traits::Instrument for BondFuture {
         Some(self.terms.settlement_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for DV01 calculators.

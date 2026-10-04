@@ -16,7 +16,6 @@ use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CreditRating, InstrumentId};
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
-use finstack_quant_valuations::instruments::fixed_income::structured_credit::generate_tranche_cashflows;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::CoverageTestSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, AssetType, DealType, PaymentCalculation, PaymentType, PoolAsset, Recipient,
@@ -219,9 +218,11 @@ fn attaching_the_template_waterfall_is_an_exact_identity() {
     let market = create_test_market();
 
     for tranche_id in ["SENIOR_A", "SUB_B", "EQUITY"] {
-        let a = generate_tranche_cashflows(&base, tranche_id, &market, test_date())
+        let a = (base)
+            .tranche_cashflows(tranche_id, &market, test_date())
             .expect("base flows");
-        let b = generate_tranche_cashflows(&custom, tranche_id, &market, test_date())
+        let b = (custom)
+            .tranche_cashflows(tranche_id, &market, test_date())
             .expect("custom flows");
         assert_eq!(
             a.cashflows, b.cashflows,
@@ -247,9 +248,12 @@ fn principal_tier_priority_does_not_transfer_subordinated_interest() {
         .with_waterfall(by_class_waterfall())
         .expect("by-class waterfall must validate");
     let market = create_test_market();
-    let template_b =
-        generate_tranche_cashflows(&template_deal, "SUB_B", &market, test_date()).unwrap();
-    let custom_b = generate_tranche_cashflows(&custom_deal, "SUB_B", &market, test_date()).unwrap();
+    let template_b = (template_deal)
+        .tranche_cashflows("SUB_B", &market, test_date())
+        .unwrap();
+    let custom_b = (custom_deal)
+        .tranche_cashflows("SUB_B", &market, test_date())
+        .unwrap();
     // Interleaving senior principal ahead of junior interest does not authorize
     // an interest-to-principal transfer. The two accounts remain independent.
     assert_eq!(custom_b.interest_flows, template_b.interest_flows);
@@ -279,9 +283,11 @@ fn capped_interest_defines_the_claim_and_never_defers() {
         )))
         .expect("capped custom waterfall");
 
-    let uncapped = generate_tranche_cashflows(&uncapped_deal, "SUB_B", &market, test_date())
+    let uncapped = (uncapped_deal)
+        .tranche_cashflows("SUB_B", &market, test_date())
         .expect("uncapped flows");
-    let capped = generate_tranche_cashflows(&capped_deal, "SUB_B", &market, test_date())
+    let capped = (capped_deal)
+        .tranche_cashflows("SUB_B", &market, test_date())
         .expect("capped flows");
 
     // First-period interest scales exactly by cap/coupon = 0.04/0.09: same
@@ -318,8 +324,9 @@ fn tranche_without_interest_recipient_owes_nothing() {
         .with_waterfall(sequential_waterfall_with(None))
         .expect("interest-less custom waterfall");
 
-    let flows =
-        generate_tranche_cashflows(&deal, "SUB_B", &market, test_date()).expect("SUB_B flows");
+    let flows = (deal)
+        .tranche_cashflows("SUB_B", &market, test_date())
+        .expect("SUB_B flows");
 
     assert!(
         flows.interest_flows.iter().all(|(_, m)| m.amount() == 0.0),
@@ -529,7 +536,8 @@ fn fees_attached_after_custom_waterfall_fail_at_pricing_time() {
         .with_standard_fees();
     let market = create_test_market();
 
-    let err = generate_tranche_cashflows(&deal, "SENIOR_A", &market, test_date())
+    let err = (deal)
+        .tranche_cashflows("SENIOR_A", &market, test_date())
         .expect_err("pricing must reject fees + custom waterfall");
     assert!(
         err.to_string().contains("fees"),
@@ -608,9 +616,11 @@ fn custom_waterfall_survives_json_round_trip_and_prices_identically() {
     let round_tripped: StructuredCredit = serde_json::from_str(&json).expect("deserialize");
 
     for tranche_id in ["SENIOR_A", "SUB_B", "EQUITY"] {
-        let a = generate_tranche_cashflows(&deal, tranche_id, &market, test_date())
+        let a = (deal)
+            .tranche_cashflows(tranche_id, &market, test_date())
             .expect("original flows");
-        let b = generate_tranche_cashflows(&round_tripped, tranche_id, &market, test_date())
+        let b = (round_tripped)
+            .tranche_cashflows(tranche_id, &market, test_date())
             .expect("round-tripped flows");
         assert_eq!(
             a.cashflows, b.cashflows,

@@ -101,127 +101,62 @@ fn selected_equity_theta(context: &MetricContext) -> Result<f64> {
     Ok(super::theta::GenericThetaAny.calculate(&mut daily)? * 365.0 / days_per_year)
 }
 
-fn extract_delta(greeks: OptionGreeks) -> Option<f64> {
-    greeks.delta
-}
-
-fn extract_gamma(greeks: OptionGreeks) -> Option<f64> {
-    greeks.gamma
-}
-
-fn extract_vega(greeks: OptionGreeks) -> Option<f64> {
-    greeks.vega
-}
-
-fn extract_theta(greeks: OptionGreeks) -> Option<f64> {
-    greeks.theta
-}
-
-fn extract_rho(greeks: OptionGreeks) -> Option<f64> {
-    greeks.rho_bp
-}
-
-fn extract_foreign_rho(greeks: OptionGreeks) -> Option<f64> {
-    greeks.foreign_rho_bp
-}
-
-fn extract_vanna(greeks: OptionGreeks) -> Option<f64> {
-    greeks.vanna
-}
-
-fn extract_volga(greeks: OptionGreeks) -> Option<f64> {
-    greeks.volga
-}
-
 pub(crate) struct OptionGreekCalculator<I> {
     kind: OptionGreekKind,
-    metric_id: MetricId,
-    base_pv: fn(&MetricContext) -> Option<f64>,
-    extract: fn(OptionGreeks) -> Option<f64>,
     _phantom: PhantomData<I>,
 }
 
 impl<I> OptionGreekCalculator<I> {
-    fn new(
-        kind: OptionGreekKind,
-        metric_id: MetricId,
-        base_pv: fn(&MetricContext) -> Option<f64>,
-        extract: fn(OptionGreeks) -> Option<f64>,
-    ) -> Self {
+    fn new(kind: OptionGreekKind) -> Self {
         Self {
             kind,
-            metric_id,
-            base_pv,
-            extract,
             _phantom: PhantomData,
         }
     }
 
+    fn metric_id(&self) -> MetricId {
+        match self.kind {
+            OptionGreekKind::Delta => MetricId::Delta,
+            OptionGreekKind::Gamma => MetricId::Gamma,
+            OptionGreekKind::Vega => MetricId::Vega,
+            OptionGreekKind::Theta => MetricId::Theta,
+            OptionGreekKind::Rho => MetricId::Rho,
+            OptionGreekKind::ForeignRho => MetricId::ForeignRho,
+            OptionGreekKind::Vanna => MetricId::Vanna,
+            OptionGreekKind::Volga => MetricId::Volga,
+        }
+    }
+
     pub(crate) fn delta() -> Self {
-        Self::new(
-            OptionGreekKind::Delta,
-            MetricId::Delta,
-            |_| None,
-            extract_delta,
-        )
+        Self::new(OptionGreekKind::Delta)
     }
 
     pub(crate) fn gamma() -> Self {
-        Self::new(
-            OptionGreekKind::Gamma,
-            MetricId::Gamma,
-            |_| None,
-            extract_gamma,
-        )
+        Self::new(OptionGreekKind::Gamma)
     }
 
     pub(crate) fn vega() -> Self {
-        Self::new(
-            OptionGreekKind::Vega,
-            MetricId::Vega,
-            |_| None,
-            extract_vega,
-        )
+        Self::new(OptionGreekKind::Vega)
     }
 
     pub(crate) fn theta() -> Self {
-        Self::new(
-            OptionGreekKind::Theta,
-            MetricId::Theta,
-            |_| None,
-            extract_theta,
-        )
+        Self::new(OptionGreekKind::Theta)
     }
 
     pub(crate) fn rho() -> Self {
-        Self::new(OptionGreekKind::Rho, MetricId::Rho, |_| None, extract_rho)
+        Self::new(OptionGreekKind::Rho)
     }
 
     pub(crate) fn foreign_rho() -> Self {
-        Self::new(
-            OptionGreekKind::ForeignRho,
-            MetricId::ForeignRho,
-            |_| None,
-            extract_foreign_rho,
-        )
+        Self::new(OptionGreekKind::ForeignRho)
     }
 
     pub(crate) fn vanna() -> Self {
-        Self::new(
-            OptionGreekKind::Vanna,
-            MetricId::Vanna,
-            |_| None,
-            extract_vanna,
-        )
+        Self::new(OptionGreekKind::Vanna)
     }
 
     pub(crate) fn volga() -> Self {
-        Self::new(
-            OptionGreekKind::Volga,
-            MetricId::Volga,
-            |context| Some(context.base_value.amount()),
-            extract_volga,
-        )
+        Self::new(OptionGreekKind::Volga)
     }
 }
 
@@ -230,7 +165,8 @@ where
     I: Instrument + OptionGreeksProvider + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
-        if let Some(value) = context.computed.get(&self.metric_id) {
+        let metric_id = self.metric_id();
+        if let Some(value) = context.computed.get(&metric_id) {
             return Ok(*value);
         }
 
@@ -243,11 +179,12 @@ where
                 .is_some_and(|model| model != crate::pricer::ModelKey::Black76)
         {
             let value = selected_equity_greek(self.kind, context)?;
-            context.computed.insert(self.metric_id.clone(), value);
+            context.computed.insert(metric_id, value);
             return Ok(value);
         }
 
-        let base_pv = (self.base_pv)(context);
+        let base_pv =
+            matches!(self.kind, OptionGreekKind::Volga).then(|| context.base_value.amount());
         let bumps = GreekBumps::from(&super::config::resolve(context)?);
         let inst: &I = context.instrument_as()?;
         let greeks = inst.option_greeks(
@@ -260,7 +197,11 @@ where
             },
         )?;
         store_available_greeks(context, greeks);
-        (self.extract)(greeks).ok_or_else(|| metric_not_found(self.metric_id.clone()))
+        context
+            .computed
+            .get(&metric_id)
+            .copied()
+            .ok_or_else(|| metric_not_found(metric_id))
     }
 }
 

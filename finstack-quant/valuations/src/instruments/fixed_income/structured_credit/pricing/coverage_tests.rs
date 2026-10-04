@@ -1611,7 +1611,7 @@ mod haircut_tests {
             .expect("coupon accrual");
         let all_in_rate = tranches.tranches[0]
             .coupon
-            .try_current_rate_with_index(as_of, coupon_end, coupon_accrual, &market)
+            .try_rate_for_period(as_of, coupon_end, coupon_accrual, as_of, &market)
             .expect("market-aware coupon");
         let tau = 1.0 / frequency_periods_per_year(tranches.tranches[0].frequency);
         let total_due = 100_000.0 * all_in_rate * tau;

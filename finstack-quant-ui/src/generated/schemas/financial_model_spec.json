@@ -7334,11 +7334,6 @@
           ],
           "description": "Advanced Monte Carlo configuration (optional).\n\nWhen present, enables multi-factor modeling with credit spread\nand interest rate dynamics, correlation, and default modeling."
         },
-        "use_sobol_qmc": {
-          "default": false,
-          "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `model_config.mc_antithetic = true`; validation\nrejects the combination.",
-          "type": "boolean"
-        },
         "utilization_process": {
           "$ref": "#/$defs/d_0db717d28554658ae7c4",
           "description": "Utilization process specification."
@@ -7421,7 +7416,7 @@
     },
     "d_dcc2738b179dc9ea48c6": {
       "additionalProperties": false,
-      "description": "Swaption instrument\n\n# Exercise lifecycle boundary\n\n`Instrument::value` prices the option claim through expiry. At expiry it\nreturns model-free intrinsic value; after expiry it returns zero. For\nphysical settlement, trade lifecycle infrastructure must materialize the\ndelivered [`InterestRateSwap`] from `underlying_fixed_leg`,\n`underlying_float_leg`, `notional`, and `option_type`. This instrument does\nnot retain an exercised swap position after expiry.",
+      "description": "European swaption instrument\n\n# Exercise lifecycle boundary\n\n`Instrument::value` prices the option claim through expiry. At expiry it\nreturns model-free intrinsic value; after expiry it returns zero. For\nphysical settlement, trade lifecycle infrastructure must materialize the\ndelivered [`InterestRateSwap`] from `underlying_fixed_leg`,\n`underlying_float_leg`, `notional`, and `option_type`. This instrument does\nnot retain an exercised swap position after expiry.",
       "properties": {
         "attributes": {
           "$ref": "#/$defs/d_87642a02554ab08b56e3",
@@ -7430,10 +7425,6 @@
         "cash_settlement_method": {
           "$ref": "#/$defs/d_4546e82873710fcbafa1",
           "description": "Cash settlement annuity method (only used when settlement = Cash).\n\n- `CollateralizedCashPrice` (default): Actual collateral-discounted fixed-leg annuity\n- `ParYield`: Legacy flat-yield cash annuity\n- `IsdaParPar`: Legacy par-par annuity from the discount curve\n- `ZeroCoupon`: Single discount to swap maturity"
-        },
-        "exercise_style": {
-          "$ref": "#/$defs/d_ead8055e75e6ac0353b0",
-          "description": "Exercise style (European, Bermudan, American). Defaults to European."
         },
         "expiry": {
           "$ref": "#/$defs/d_2331411247fb4fdd46dd",
@@ -7500,7 +7491,6 @@
         "option_type",
         "notional",
         "expiry",
-        "exercise_style",
         "settlement",
         "cash_settlement_method",
         "vol_model",

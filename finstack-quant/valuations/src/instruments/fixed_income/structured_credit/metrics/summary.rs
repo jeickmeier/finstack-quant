@@ -12,7 +12,6 @@ use crate::instruments::fixed_income::structured_credit::metrics::{
     calculate_tranche_cs01, calculate_tranche_spread_convexity, calculate_tranche_wal,
     calculate_tranche_z_spread,
 };
-use crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows;
 use crate::instruments::fixed_income::structured_credit::{
     CallAssumption, CallScope, StructuredCredit, TrancheAccrualPeriod, TrancheCashflows,
     TrancheSeniority,
@@ -132,7 +131,7 @@ fn effective_rate_sensitivities(
     }
     let dirty_under = |bp: f64| -> Result<f64> {
         let bumped = bump_rate_curves(market, bp)?;
-        let flows = generate_tranche_cashflows(deal, tranche_id, &bumped, as_of)?;
+        let flows = (deal).tranche_cashflows(tranche_id, &bumped, as_of)?;
         let disc = bumped.get_discount(deal.discount_curve_id.as_str())?;
         quote.model_dirty(&flows.cashflows, disc.as_ref())
     };
@@ -283,7 +282,7 @@ pub fn calculate_tranche_metrics(
         deal
     });
     let projection_deal = to_maturity.as_ref().unwrap_or(deal);
-    let cashflows = generate_tranche_cashflows(projection_deal, tranche_id, market, as_of)?;
+    let cashflows = (projection_deal).tranche_cashflows(tranche_id, market, as_of)?;
     let disc = market.get_discount(deal.discount_curve_id.as_str())?;
     let curve = disc.as_ref();
 
@@ -355,9 +354,7 @@ pub fn calculate_tranche_metrics(
         .as_ref()
         .map(|call| (&call.scope, call))
     {
-        Some((CallScope::Deal, _)) => {
-            Some(generate_tranche_cashflows(deal, tranche_id, market, as_of)?)
-        }
+        Some((CallScope::Deal, _)) => Some((deal).tranche_cashflows(tranche_id, market, as_of)?),
         Some((CallScope::Tranche(id), call)) if id == tranche_id => {
             truncate_at_call(&cashflows, call)?
         }
@@ -551,7 +548,7 @@ pub fn calculate_equity_metrics(
     }
     let current_balance = equity.current_balance.amount();
     let invested = current_balance * price / 100.0;
-    let cashflows = generate_tranche_cashflows(deal, equity.id.as_str(), market, as_of)?;
+    let cashflows = (deal).tranche_cashflows(equity.id.as_str(), market, as_of)?;
     let disc = market.get_discount(deal.discount_curve_id.as_str())?;
     let curve = disc.as_ref();
 

@@ -226,14 +226,14 @@ test('priceInstrumentWithMarket / …WithMetricsAndMarket return objects too', (
   }
 });
 
-test('validateValuationResultJson still accepts a stringified price result', () => {
+test('valuationResultToJson still accepts a stringified price result', () => {
   const result = valuations.instruments.priceInstrument(
     bondInstrumentJson(),
     MARKET_JSON,
     '2024-01-01',
     'discounting'
   );
-  const canonical = valuations.validateValuationResultJson(JSON.stringify(result));
+  const canonical = valuations.valuationResultToJson(JSON.stringify(result));
   assert.equal(typeof canonical, 'string');
   assert.equal(JSON.parse(canonical).instrument_id, 'WASM-RETURN-FLOOR-BOND');
 });

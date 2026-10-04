@@ -18,10 +18,9 @@ use super::super::convert::{
     money_repr, money_to_py, opt_repr,
 };
 use super::super::instruments::{enum_from_str, serialize_typed_instrument_json};
-use super::super::typed_fx::{
-    instrument_envelope_methods, instrument_pricing_methods, take_builder,
-};
+use super::super::typed_fx::{instrument_envelope_methods, instrument_pricing_methods};
 use super::super::typed_legs::{PyPremiumLegSpec, PyProtectionLegSpec};
+use crate::bindings::valuations::convert::take_builder;
 
 type CdsBuilderInner =
     finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwapBuilder;

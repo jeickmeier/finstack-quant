@@ -8714,12 +8714,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/StochasticUtilizationSpec/properties/mc_config/anyOf/1"
   },
   {
-    "path": "#/$defs/d_db361df79c3ba201a17a/properties/use_sobol_qmc",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/StochasticUtilizationSpec/properties/use_sobol_qmc",
-    "default": false,
-    "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `model_config.mc_antithetic = true`; validation\nrejects the combination."
-  },
-  {
     "path": "#/$defs/d_db361df79c3ba201a17a/properties/utilization_process",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/levered_real_estate_equity.schema.json#/$defs/StochasticUtilizationSpec/properties/utilization_process",
     "description": "Utilization process specification.",

@@ -297,7 +297,6 @@ proptest! {
 
         let spec = StochasticUtilizationSpec {
             utilization_process: process,
-            use_sobol_qmc: false,
             mc_config: None,
         };
 

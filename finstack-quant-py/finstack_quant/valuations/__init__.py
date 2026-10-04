@@ -11,7 +11,6 @@ Bindings for the ``finstack-quant-valuations`` Rust crate. Where things live:
   :func:`~finstack_quant.valuations.instruments.instrument_cashflows`.
 - Composite instruments, credit-derivative examples, the listed-market
   catalog and JSON schemas: :mod:`~finstack_quant.valuations.composite`,
-  :mod:`~finstack_quant.valuations.credit_derivatives`,
   :mod:`~finstack_quant.valuations.market`, :mod:`~finstack_quant.valuations.schema`.
 
 The module-level ``*_coupon_profile``, ``cms_spread_option_intrinsic`` and
@@ -29,7 +28,6 @@ True
 from finstack_quant.finstack_quant import valuations as _valuations
 from finstack_quant.valuations import (
     composite as composite,
-    credit_derivatives as credit_derivatives,
     instruments as instruments,
     market as market,
 )
@@ -50,7 +48,6 @@ __all__: list[str] = [
     "callable_range_accrual_accrued",
     "cms_spread_option_intrinsic",
     "composite",
-    "credit_derivatives",
     "instruments",
     "inverse_floater_coupon_profile",
     "market",

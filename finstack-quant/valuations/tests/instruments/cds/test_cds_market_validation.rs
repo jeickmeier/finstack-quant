@@ -86,11 +86,24 @@ fn test_regional_cds_lifecycle_fixtures_na_eu_asia() {
         expected_settlement,
     ) in fixtures
     {
-        let detected = CdsConvention::detect_from_currency(currency);
+        let detected = CdsConvention::detect_from_currency(currency).expect("CDS registry");
         assert_eq!(detected, expected_convention);
-        assert_eq!(detected.day_count(), expected_day_count);
-        assert_eq!(detected.default_calendar(), expected_calendar);
-        assert_eq!(detected.settlement_delay(), expected_settlement);
+        assert_eq!(
+            detected.get_spec().expect("CDS registry").day_count,
+            expected_day_count
+        );
+        assert_eq!(
+            detected
+                .get_spec()
+                .expect("CDS registry")
+                .calendar_id
+                .as_str(),
+            expected_calendar
+        );
+        assert_eq!(
+            detected.get_spec().expect("CDS registry").settlement_days,
+            expected_settlement
+        );
     }
 }
 

@@ -838,7 +838,6 @@ status = "exists"
 # lives in [crates.valuations.symbols] below.
 instruments  = { python = "finstack_quant.valuations.instruments",  status = "exists", note = "Instrument JSON validation and pricing helpers live under finstack_quant.valuations.instruments. The public Rust instruments::pricing facade remains Rust-only cross-crate infrastructure: time::rate_between_on_dates requires contractual accrual_year_fraction independently of the curve clock, alongside time discounting helpers, overnight_conventions, fixed swap-leg helpers, and GenericInstrumentPricer. Hosts consume these through canonical Rust instrument and calibration entry points." }
 composite    = { python = "finstack_quant.valuations.composite",    status = "exists", note = "Resolved generic composite instruments, primitive exposure reports, explicit rebalancing, and dated history." }
-credit_derivatives = { python = "finstack_quant.valuations.credit_derivatives", status = "exists", note = "CDS-family example-payload factories; mirrors WASM valuations.creditDerivatives" }
 schema       = { python = "finstack_quant.valuations.schema",       status = "exists", note = "Compiled-in JSON Schema accessors and envelope/type validators; bound in WASM as the `schema` sub-namespace (plain objects instead of JSON text)." }
 # Rust-only infrastructure modules, listed for completeness so the module
 # inventory covers the whole crate root. None is surfaced as a host namespace.
@@ -953,20 +952,6 @@ public = [
     "nearest_correlation",
     "simulate_portfolio_loss",
     "validate_correlation_matrix",
-]
-
-# Symbol-level pinning for finstack_quant.valuations.credit_derivatives.
-# The four example-payload factories mirror the Rust
-# finstack_quant_valuations::instruments::credit_derivatives example
-# constructors and the WASM `valuations.creditDerivatives` namespace
-# (paired by the [parity] ledger).
-[crates.valuations.credit_derivatives]
-python_package = "finstack_quant.valuations.credit_derivatives"
-public = [
-    "cds_index_example_json",
-    "cds_option_example_json",
-    "cds_tranche_example_json",
-    "credit_default_swap_example_json",
 ]
 
 # Typed rates/fixed-income instruments (Bond, TermLoan, InterestRateSwap,
@@ -2203,9 +2188,6 @@ types = { ValuationResult = "ValuationResult" }
 js = "valuations.composite"
 types = { CompositeExposureReport = "CompositeExposureReport", CompositeHistoryResult = "CompositeHistoryResult", CompositeInstrument = "CompositeInstrument", CompositeLegSpec = "CompositeLegSpec", CompositeRebalanceResult = "CompositeRebalanceResult", CompositeSpec = "CompositeSpec", CompositeState = "CompositeState", RebalanceRule = "RebalanceRule", WeightingMethod = "WeightingMethod" }
 
-[parity.modules."finstack_quant.valuations.credit_derivatives"]
-js = "valuations.creditDerivatives"
-
 [parity.modules."finstack_quant.valuations.instruments"]
 js = "valuations.instruments"
 renames = { FxForward = { js = "valuations.fx.FxForward", reason = "WASM groups the FX instrument classes under valuations.fx" }, FxForwardBuilder = { js = "valuations.fx.FxForwardBuilder", reason = "WASM groups the FX instrument classes under valuations.fx" }, FxOption = { js = "valuations.fx.FxOption", reason = "WASM groups the FX instrument classes under valuations.fx" }, FxOptionBuilder = { js = "valuations.fx.FxOptionBuilder", reason = "WASM groups the FX instrument classes under valuations.fx" } }
@@ -2595,7 +2577,6 @@ explanationToText = "free-function twin of Python Explanation.to_text (WASM data
 forecastMetricsSummaryText = "free-function twin of Python ForecastMetrics.summary (WASM data types are plain objects)"
 
 [parity.js."valuations".wasm_only]
-validateValuationResultJson = "JSON wire twin of Python ValuationResult.from_json"
 valuationResultAllCovenantsPassed = "free-function twin of Python ValuationResult.all_covenants_passed (member rename)"
 valuationResultFailedCovenants = "free-function twin of Python ValuationResult.failed_covenants (member rename)"
 valuationResultGetMetric = "free-function twin of Python ValuationResult.get_metric (member rename)"
@@ -2646,14 +2627,7 @@ assetPoolTotalBalance = "free-function twin of Python AssetPool.total_balance (m
 assetPoolWac = "free-function twin of Python AssetPool.wac (member rename)"
 assetPoolWeightedAvgMaturity = "free-function twin of Python AssetPool.weighted_avg_maturity (member rename)"
 assetPoolWeightedAvgSpreadBp = "free-function twin of Python AssetPool.weighted_avg_spread_bp (member rename)"
-assetPoolWithAccounts = "free-function twin of Python AssetPool.with_accounts (member rename)"
-assetPoolWithAssets = "free-function twin of Python AssetPool.with_assets (member rename)"
-assetPoolWithInstruments = "free-function twin of Python AssetPool.with_instruments (member rename)"
-assetPoolWithReinvestmentPeriod = "free-function twin of Python AssetPool.with_reinvestment_period (member rename)"
-assetPoolWithRepLines = "free-function twin of Python AssetPool.with_rep_lines (member rename)"
 assetPoolWithReserve = "free-function twin of Python AssetPool.with_reserve (member rename)"
-barrierCrossingBrownianBridge = "free-function twin of Python BarrierCrossing.brownian_bridge (member rename)"
-barrierCrossingDiscrete = "free-function twin of Python BarrierCrossing.discrete (member rename)"
 cdsIndexParamsCdxNaHy = "free-function twin of Python CdsIndexParams.cdx_na_hy (member rename)"
 cdsIndexParamsCdxNaIg = "free-function twin of Python CdsIndexParams.cdx_na_ig (member rename)"
 cdsIndexParamsItraxxEurope = "free-function twin of Python CdsIndexParams.itraxx_europe (member rename)"
@@ -2662,13 +2636,7 @@ cdsTrancheParamsMezzanineTranche = "free-function twin of Python CdsTrancheParam
 coverageRulesCloStandard = "free-function twin of Python CoverageRules.clo_standard (member rename)"
 coverageRulesValidate = "free-function twin of Python CoverageRules.validate (member rename)"
 instrumentCashflowsWithMarket = "WASM core.MarketContext-handle variant of instrumentCashflows"
-pikModeCash = "free-function twin of Python PikMode.cash (member rename)"
-pikModePik = "free-function twin of Python PikMode.pik (member rename)"
-pikModeSplit = "free-function twin of Python PikMode.split (member rename)"
-pikModeToggle = "free-function twin of Python PikMode.toggle (member rename)"
 pikScheduleModeAt = "free-function twin of Python PikSchedule.mode_at (member rename)"
-pikScheduleStepped = "free-function twin of Python PikSchedule.stepped (member rename)"
-pikScheduleUniform = "free-function twin of Python PikSchedule.uniform (member rename)"
 poolAssetFixedRateBond = "free-function twin of Python PoolAsset.fixed_rate_bond (member rename)"
 poolAssetFloatingRateLoan = "free-function twin of Python PoolAsset.floating_rate_loan (member rename)"
 prepaymentPenaltyFixed = "free-function twin of Python PrepaymentPenalty.fixed (member rename)"
@@ -2737,16 +2705,20 @@ renames = { fixed_rate_bond = { js = "valuations.instruments.poolAssetFixedRateB
 renames = { from_balances = { js = "valuations.instruments.trancheStructureFromBalances", reason = "WASM `TrancheStructure` values are plain objects; the Rust constructor or method is a free function" } }
 
 [parity.members."finstack_quant.valuations.instruments.AssetPool"]
-renames = { assets_by_industry = { js = "valuations.instruments.assetPoolAssetsByIndustry", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, assets_by_obligor = { js = "valuations.instruments.assetPoolAssetsByObligor", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, diversity_score = { js = "valuations.instruments.assetPoolDiversityScore", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, performing_balance = { js = "valuations.instruments.assetPoolPerformingBalance", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, total_balance = { js = "valuations.instruments.assetPoolTotalBalance", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, wac = { js = "valuations.instruments.assetPoolWac", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, weighted_avg_maturity = { js = "valuations.instruments.assetPoolWeightedAvgMaturity", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, weighted_avg_spread_bp = { js = "valuations.instruments.assetPoolWeightedAvgSpreadBp", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_rep_lines = { js = "valuations.instruments.assetPoolWithRepLines", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_assets = { js = "valuations.instruments.assetPoolWithAssets", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_instruments = { js = "valuations.instruments.assetPoolWithInstruments", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_reserve = { js = "valuations.instruments.assetPoolWithReserve", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_reinvestment_period = { js = "valuations.instruments.assetPoolWithReinvestmentPeriod", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_accounts = { js = "valuations.instruments.assetPoolWithAccounts", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" } }
+renames = { assets_by_industry = { js = "valuations.instruments.assetPoolAssetsByIndustry", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, assets_by_obligor = { js = "valuations.instruments.assetPoolAssetsByObligor", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, diversity_score = { js = "valuations.instruments.assetPoolDiversityScore", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, performing_balance = { js = "valuations.instruments.assetPoolPerformingBalance", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, total_balance = { js = "valuations.instruments.assetPoolTotalBalance", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, wac = { js = "valuations.instruments.assetPoolWac", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, weighted_avg_maturity = { js = "valuations.instruments.assetPoolWeightedAvgMaturity", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, weighted_avg_spread_bp = { js = "valuations.instruments.assetPoolWeightedAvgSpreadBp", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" }, with_reserve = { js = "valuations.instruments.assetPoolWithReserve", reason = "WASM `AssetPool` values are plain objects; the Rust constructor or method is a free function" } }
+excluded = { with_rep_lines = "literal", with_assets = "literal", with_instruments = "literal", with_reinvestment_period = "literal", with_accounts = "literal" }
 
 [parity.members."finstack_quant.valuations.instruments.PikSchedule"]
-renames = { uniform = { js = "valuations.instruments.pikScheduleUniform", reason = "WASM `PikSchedule` values are plain objects; the Rust constructor or method is a free function" }, stepped = { js = "valuations.instruments.pikScheduleStepped", reason = "WASM `PikSchedule` values are plain objects; the Rust constructor or method is a free function" }, mode_at = { js = "valuations.instruments.pikScheduleModeAt", reason = "WASM `PikSchedule` values are plain objects; the Rust constructor or method is a free function" } }
+renames = { mode_at = { js = "valuations.instruments.pikScheduleModeAt", reason = "WASM `PikSchedule` values are plain objects; the Rust constructor or method is a free function" } }
+excluded = { uniform = "literal", stepped = "literal" }
 
 [parity.members."finstack_quant.valuations.instruments.PikMode"]
-renames = { cash = { js = "valuations.instruments.pikModeCash", reason = "WASM `PikMode` values are plain objects; the Rust constructor or method is a free function" }, pik = { js = "valuations.instruments.pikModePik", reason = "WASM `PikMode` values are plain objects; the Rust constructor or method is a free function" }, split = { js = "valuations.instruments.pikModeSplit", reason = "WASM `PikMode` values are plain objects; the Rust constructor or method is a free function" }, toggle = { js = "valuations.instruments.pikModeToggle", reason = "WASM `PikMode` values are plain objects; the Rust constructor or method is a free function" } }
+renames = {  }
+excluded = { cash = "literal", pik = "literal", split = "literal", toggle = "literal" }
 
 [parity.members."finstack_quant.valuations.instruments.BarrierCrossing"]
-renames = { discrete = { js = "valuations.instruments.barrierCrossingDiscrete", reason = "WASM `BarrierCrossing` values are plain objects; the Rust constructor or method is a free function" }, brownian_bridge = { js = "valuations.instruments.barrierCrossingBrownianBridge", reason = "WASM `BarrierCrossing` values are plain objects; the Rust constructor or method is a free function" } }
+renames = {  }
+excluded = { discrete = "literal", brownian_bridge = "literal" }
 
 [parity.members."finstack_quant.valuations.ValuationResult"]
 excluded = { metric_series_dataframe = "pandas" }

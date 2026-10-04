@@ -15,7 +15,7 @@
 //! - Kirk, E. (1995). "Correlation in the Energy Markets." Managing Energy
 //!   Price Risk, Risk Publications. `docs/REFERENCES.md#kirk-1995`
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::OptionType;
 use finstack_quant_core::currency::Currency;
@@ -282,7 +282,7 @@ impl Instrument for CommoditySpreadOption {
         Some(self.expiry)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

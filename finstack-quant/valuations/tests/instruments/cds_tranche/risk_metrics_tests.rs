@@ -611,3 +611,47 @@ fn test_upfront_equals_pv() {
     // Assert
     approx_eq(upfront, pv, 1e-6, "Upfront should equal PV");
 }
+
+#[test]
+fn affine_coupon_matches_public_repricing_with_upfront_and_seasoned_losses() {
+    let market = standard_market_context();
+    let pricer = CdsTranchePricer::new();
+    let as_of = base_date();
+    for side in [PayReceive::Pay, PayReceive::Receive] {
+        let mut tranche = mezzanine_tranche();
+        tranche.side = side;
+        tranche.realized_loss = 0.01;
+        tranche.coupon_bp = 0.0;
+        tranche.upfront = Some((
+            as_of + time::Duration::days(7),
+            finstack_quant_core::money::Money::new(1000.0, tranche.notional.currency()).unwrap(),
+        ));
+        let zero = tranche.base_value(&market, as_of).unwrap().amount();
+        let derivative = pricer
+            .calculate_spread_dv01(&tranche, &market, as_of)
+            .unwrap();
+        tranche.coupon_bp = 1.0;
+        let one = tranche.base_value(&market, as_of).unwrap().amount();
+        assert!(
+            (one - zero - derivative).abs() < 1e-6,
+            "unit coupon must reconcile to pricing"
+        );
+        let par = pricer
+            .calculate_par_spread(&tranche, &market, as_of)
+            .unwrap();
+        tranche.coupon_bp = par;
+        assert!(
+            tranche.base_value(&market, as_of).unwrap().amount().abs()
+                < 1e-6 * tranche.notional.amount()
+        );
+        tranche.coupon_bp = 900.0;
+        assert!(
+            (pricer
+                .calculate_spread_dv01(&tranche, &market, as_of)
+                .unwrap()
+                - derivative)
+                .abs()
+                < 1e-8
+        );
+    }
+}

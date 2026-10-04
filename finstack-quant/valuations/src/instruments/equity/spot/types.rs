@@ -1,11 +1,11 @@
 //! Equity types and implementations.
 //!
 //! Defines the `Equity` instrument shape and integrates with the standard
-//! instrument macro. Pricing is delegated to `pricing::EquityPricer` and
+//! instrument macro. Pricing uses the canonical instrument lifecycle and
 //! metrics live under `metrics/`.
 
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
@@ -421,7 +421,7 @@ impl crate::instruments::common_impl::traits::Instrument for Equity {
         None
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for Equity {
@@ -555,5 +555,93 @@ mod tests {
         assert_eq!(result.value.amount(), 10_000.0); // This is the market value (PV)
         assert_eq!(result.measures.get("equity_price_per_share"), Some(&200.0));
         assert_eq!(result.measures.get("equity_shares"), Some(&50.0));
+    }
+}
+
+#[cfg(test)]
+mod lifecycle_tests {
+    use super::*;
+    use crate::instruments::common_impl::traits::Instrument;
+    use finstack_quant_core::currency::Currency;
+    use finstack_quant_core::dates::create_date;
+    use finstack_quant_core::market_data::{
+        context::MarketContext, term_structures::DiscountCurve,
+    };
+    use time::Month;
+
+    fn create_test_equity() -> Equity {
+        Equity::new("AAPL", "Apple Inc.", Currency::USD).with_quoted_spot(150.0)
+    }
+
+    fn create_test_market_context() -> MarketContext {
+        let base_date = create_date(2025, Month::January, 1).expect("should succeed");
+        let discount_curve = DiscountCurve::builder("USD-OIS")
+            .base_date(base_date)
+            .knots(vec![(0.0, 1.0), (1.0, 0.95), (5.0, 0.85)])
+            .build()
+            .expect("should succeed");
+
+        MarketContext::new().insert(discount_curve)
+    }
+
+    #[test]
+    fn test_equity_pricing_with_valid_market_data() {
+        let equity = create_test_equity();
+        let market = create_test_market_context();
+        let as_of =
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("valid date");
+
+        let value = equity.value(&market, as_of).expect("should succeed");
+        assert!(value.amount() > 0.0);
+    }
+
+    #[test]
+    fn test_equity_pricing_without_discount_curve() {
+        let equity = create_test_equity();
+        let empty_market = MarketContext::new(); // No discount curve
+        let as_of =
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("valid date");
+
+        // Should still price correctly even without discount curve
+        let value = equity.value(&empty_market, as_of).expect("should succeed");
+        assert!(value.amount() > 0.0);
+    }
+
+    #[test]
+    fn test_equity_pricing_with_different_currencies() {
+        let eur_equity = Equity::new("SAP", "SAP SE", Currency::EUR).with_quoted_spot(120.0);
+
+        let market = MarketContext::new(); // No discount curve for EUR
+        let as_of =
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("valid date");
+
+        let value = eur_equity.value(&market, as_of).expect("should succeed");
+        assert_eq!(value.currency(), Currency::EUR);
+        assert!(value.amount() > 0.0);
+    }
+
+    #[test]
+    fn test_equity_pricing_error_message_quality() {
+        let equity = create_test_equity();
+        let market = create_test_market_context();
+        let as_of =
+            finstack_quant_core::dates::Date::from_calendar_date(2024, time::Month::January, 1)
+                .expect("valid date");
+
+        // Test that any errors have meaningful messages
+        match equity.value(&market, as_of) {
+            Ok(value) => {
+                assert!(value.amount() >= 0.0);
+            }
+            Err(error) => {
+                let error_msg = format!("{}", error);
+                assert!(!error_msg.is_empty());
+                // Error messages should be descriptive
+                assert!(error_msg.len() > 10);
+            }
+        }
     }
 }

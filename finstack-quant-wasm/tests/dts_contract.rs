@@ -646,7 +646,7 @@ fn pricing_entry_points_declare_structured_valuation_results() {
     // The valuation-result *validator* still takes and returns a wire string.
     assert!(contains_ignoring_ws(
         &dts,
-        "validateValuationResultJson(json: JsonInput): string;",
+        "valuationResultToJson(result: JsonInput): string;",
     ));
 }
 
@@ -1180,12 +1180,10 @@ fn models_and_valuations_dts_expose_owned_credit_namespaces() {
     assert!(model_credit.contains("analyzeLme("));
     assert!(!core.contains("analyzeExchangeOffer("));
     assert!(!core.contains("analyzeLme("));
-    assert!(dts.contains("export interface CreditDerivativesNamespace"));
-    assert!(dts.contains("creditDefaultSwapExampleJson(): string;"));
-    assert!(dts.contains("cdsOptionExampleJson(): string;"));
+    assert!(!dts.contains("export interface CreditDerivativesNamespace"));
+    assert!(!valuations.contains("credit_derivatives:"));
     assert!(models.contains("credit: ModelCreditNamespace;"));
     assert!(models.contains("correlation: CorrelationNamespace;"));
-    assert!(dts.contains("creditDerivatives: CreditDerivativesNamespace;"));
     assert!(!valuations.contains("credit: ModelCreditNamespace;"));
     assert!(!valuations.contains("correlation: CorrelationNamespace;"));
     assert!(!valuations.contains("CreditFactorModel"));

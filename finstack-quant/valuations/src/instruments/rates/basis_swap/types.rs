@@ -29,8 +29,8 @@ use crate::cashflow::builder::{
     schedule::merge_cashflow_schedules, CashFlowSchedule, CouponType, FloatingCouponSpec,
     FloatingRateFallback, FloatingRateSpec, Notional, PrincipalExchange,
 };
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::validation;
 use rust_decimal::Decimal;
 
@@ -96,12 +96,14 @@ use crate::instruments::common_impl::parameters::legs::FloatLegSpec;
 ///     compounding: Default::default(),
 /// };
 ///
-/// let swap = BasisSwap::new(
-///     "BASIS_SWAP_001",
-///     Money::from((1_000_000_i64, Currency::USD)),
-///     primary_leg,
-///     reference_leg,
-/// );
+/// let swap = BasisSwap::builder()
+///     .id("BASIS_SWAP_001".into())
+///     .notional(Money::from((1_000_000_i64, Currency::USD)))
+///     .primary_leg(primary_leg)
+///     .reference_leg(reference_leg)
+///     .allow_calendar_fallback(true)
+///     .attributes(Default::default())
+///     .build().expect("valid basis swap");
 /// ```
 #[derive(
     Clone,
@@ -174,6 +176,9 @@ impl BasisSwap {
     ///   `BasisSwap::builder().allow_same_curve(true)` or set the JSON field `allow_same_curve`
     ///   for an intentional same-index spread trade)
     /// - Any lag is negative
+    /// - A leg calendar is absent or unknown; explicit fallback must be set on
+    ///   `BasisSwap::builder()` before construction
+    /// - A simple-compounded leg references an overnight index
     ///
     /// # Arguments
     ///
@@ -190,41 +195,7 @@ impl BasisSwap {
         reference_leg: FloatLegSpec,
     ) -> Result<Self> {
         let id: InstrumentId = id.into();
-        let id_str = id.as_str().to_string();
-        validation::validate_money_finite(notional, "BasisSwap notional")?;
-        validation::validate_money_gt(notional, 0.0, "BasisSwap notional")?;
-
-        if primary_leg.start >= primary_leg.end {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "BasisSwap '{}' primary leg has start ({}) >= end ({}); \
-                 leg must have positive tenor",
-                id_str, primary_leg.start, primary_leg.end
-            )));
-        }
-        if reference_leg.start >= reference_leg.end {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "BasisSwap '{}' reference leg has start ({}) >= end ({}); \
-                 leg must have positive tenor",
-                id_str, reference_leg.start, reference_leg.end
-            )));
-        }
-
-        // Validate different forward curves (unless explicitly allowed)
-        if primary_leg.forward_curve_id == reference_leg.forward_curve_id {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "BasisSwap '{}' has identical forward curves on both legs ({}). \
-                 A same-index basis swap has NPV = spread × annuity by construction. \
-                 If this is intentional, build it with BasisSwap::builder().allow_same_curve(true) \
-                 or set the JSON field `allow_same_curve: true`.",
-                id_str,
-                primary_leg.forward_curve_id.as_str()
-            )));
-        }
-
-        Self::validate_leg_lags(&id_str, "primary", &primary_leg)?;
-        Self::validate_leg_lags(&id_str, "reference", &reference_leg)?;
-
-        Ok(Self {
+        let swap = Self {
             id,
             notional,
             primary_leg,
@@ -235,7 +206,9 @@ impl BasisSwap {
             metric_pricing_overrides: Default::default(),
             scenario_pricing_overrides: Default::default(),
             attributes: crate::instruments::common_impl::traits::Attributes::default(),
-        })
+        };
+        swap.validate()?;
+        Ok(swap)
     }
 
     /// Allow (or disallow) calendar-day fallback when the calendar cannot be resolved.
@@ -877,7 +850,7 @@ impl crate::instruments::common_impl::traits::Instrument for BasisSwap {
         Some(self.primary_leg.start)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for BasisSwap {
@@ -1074,14 +1047,15 @@ mod tests {
             compounding: Default::default(),
         };
 
-        let swap = BasisSwap::new(
-            "TEST_BASIS_NO_CAL",
-            Money::from((1_000_000_i64, Currency::USD)),
-            primary_leg,
-            reference_leg,
-        )
-        .expect("should succeed")
-        .with_allow_calendar_fallback(true);
+        let swap = BasisSwap::builder()
+            .id("TEST_BASIS_NO_CAL".into())
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .primary_leg(primary_leg)
+            .reference_leg(reference_leg)
+            .allow_calendar_fallback(true)
+            .attributes(Default::default())
+            .build()
+            .expect("should succeed");
 
         let pv = swap.value(&context, base_date).expect("should succeed");
         assert!(
@@ -1618,14 +1592,15 @@ mod tests {
             frequency: Tenor::semi_annual(),
             ..primary_leg.clone()
         };
-        let swap = BasisSwap::new(
-            "BASIS-CF",
-            Money::from((1_000_000_i64, Currency::USD)),
-            primary_leg,
-            reference_leg,
-        )
-        .expect("should succeed")
-        .with_allow_calendar_fallback(true);
+        let swap = BasisSwap::builder()
+            .id("BASIS-CF".into())
+            .notional(Money::from((1_000_000_i64, Currency::USD)))
+            .primary_leg(primary_leg)
+            .reference_leg(reference_leg)
+            .allow_calendar_fallback(true)
+            .attributes(Default::default())
+            .build()
+            .expect("should succeed");
 
         let flows = swap
             .dated_cashflows(&context, base_date)
@@ -1908,16 +1883,13 @@ mod tests {
             forward_curve_id: CurveId::new("USD-SOFR-3M"),
             ..overnight.clone()
         };
-        let swap = BasisSwap::new(
+        let err = BasisSwap::new(
             "OIS-SIMPLE",
             Money::from((1_000_000_i64, Currency::USD)),
             overnight,
             term,
         )
-        .expect("construction");
-        let err = swap
-            .validate()
-            .expect_err("Simple on USD-SOFR-OIS must fail");
+        .expect_err("Simple on USD-SOFR-OIS must fail at construction");
         assert!(
             format!("{err}").contains("Overnight RFR"),
             "expected overnight/Simple rejection, got {err}"

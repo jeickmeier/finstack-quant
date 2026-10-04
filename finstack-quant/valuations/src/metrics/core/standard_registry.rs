@@ -7,7 +7,7 @@ use super::{
     registry::{MetricRegistry, MetricRegistryError},
     traits::{MetricCalculator, MetricContext},
 };
-use crate::metrics::risk::{GenericExpectedShortfall, GenericHVar, VarConfig};
+use crate::metrics::risk::{GenericExpectedShortfall, GenericHVar};
 use crate::metrics::sensitivities::breakeven::BreakevenCalculator;
 use crate::metrics::sensitivities::carry_decomposition::CarryDecompositionCalculator;
 use crate::metrics::sensitivities::theta::GenericThetaAny;
@@ -360,14 +360,10 @@ fn register_universal_metrics(
         &[],
     )?;
     registry.register_metric(MetricId::Breakeven, Arc::new(BreakevenCalculator), &[])?;
-    registry.register_metric(
-        MetricId::HVar,
-        Arc::new(GenericHVar::new(VarConfig::var_95())),
-        &[],
-    )?;
+    registry.register_metric(MetricId::HVar, Arc::new(GenericHVar), &[])?;
     registry.register_metric(
         MetricId::ExpectedShortfall,
-        Arc::new(GenericExpectedShortfall::new(VarConfig::var_95())),
+        Arc::new(GenericExpectedShortfall),
         &[],
     )?;
     Ok(())
