@@ -1,3 +1,4 @@
+use crate::bindings::macros::impl_repr_html_via_dataframe;
 use std::collections::HashMap;
 
 use pyo3::prelude::*;
@@ -618,18 +619,9 @@ impl PyPositionVarContribution {
             py_opt(self.inner.incremental_var),
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+impl_repr_html_via_dataframe!(PyPositionVarContribution);
 
 /// Per-position component ES and marginal ES.
 #[pyclass(
@@ -904,15 +896,6 @@ impl PyPositionRiskDecomposition {
             py_opt(self.inner.euler_residual),
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+impl_repr_html_via_dataframe!(PyPositionRiskDecomposition);

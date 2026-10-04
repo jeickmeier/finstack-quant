@@ -5,6 +5,7 @@
 //! [`PyFactorCovarianceForecast`] which wraps the vol-forecast engine from
 //! `finstack-quant-models`.
 
+use crate::bindings::macros::wire_methods;
 use std::collections::BTreeMap;
 
 use numpy::{PyArray2, PyArrayMethods};
@@ -1089,24 +1090,6 @@ impl PyFactorCovarianceMatrix {
         Ok(Self { inner })
     }
 
-    /// Deserialize and validate a covariance matrix from canonical JSON
-    /// (``{"factor_ids": [...], "n": N, "data": [...]}``).
-    ///
-    /// Raises:
-    ///     ValueError: If the JSON is malformed or the matrix fails validation.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid FactorCovarianceMatrix JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this covariance matrix to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "cannot serialize FactorCovarianceMatrix"))
-    }
-
     /// Number of factors represented by the matrix.
     #[getter]
     fn n_factors(&self) -> usize {
@@ -1178,12 +1161,6 @@ impl PyFactorCovarianceMatrix {
         dict_to_dataframe(py, &data, Some(index.into_any()))
     }
 
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!(
             "FactorCovarianceMatrix(factor_ids={:?}, n_factors={})",
@@ -1192,6 +1169,12 @@ impl PyFactorCovarianceMatrix {
         )
     }
 }
+
+wire_methods!(
+    PyFactorCovarianceMatrix,
+    FactorCovarianceMatrix,
+    "FactorCovarianceMatrix"
+);
 
 /// Portfolio factor-model configuration assembled at a forecast horizon.
 ///
@@ -1219,25 +1202,6 @@ impl PyFactorModelConfig {
 
 #[pymethods]
 impl PyFactorModelConfig {
-    /// Deserialize and validate a factor-model configuration from canonical JSON.
-    ///
-    /// Raises:
-    ///     ValueError: If the JSON is malformed or the configuration is
-    ///         inconsistent (unknown factor in a matching rule, bad covariance).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: FactorModelConfig = serde_json::from_str(json)
-            .map_err(|e| serde_json_to_py(e, "invalid FactorModelConfig JSON"))?;
-        inner.validate().map_err(core_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this configuration to canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| serde_json_to_py(e, "cannot serialize FactorModelConfig"))
-    }
-
     /// Number of configured factors.
     #[getter]
     fn n_factors(&self) -> usize {
@@ -1304,16 +1268,17 @@ impl PyFactorModelConfig {
         self.inner.validate().map_err(core_to_py)
     }
 
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __repr__(&self) -> String {
         format!("FactorModelConfig(n_factors={})", self.inner.factors.len(),)
     }
 }
+
+wire_methods!(
+    PyFactorModelConfig,
+    FactorModelConfig,
+    "FactorModelConfig",
+    validate
+);
 
 /// Vol-forecast view over a calibrated ``CreditFactorModel``.
 ///

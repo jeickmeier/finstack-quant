@@ -1,3 +1,4 @@
+use crate::bindings::macros::impl_repr_html_via_dataframe;
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -126,18 +127,9 @@ impl PyPositionBudgetEntry {
             self.inner.excess,
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+impl_repr_html_via_dataframe!(PyPositionBudgetEntry);
 
 /// Budget evaluation result across positions.
 #[pyclass(
@@ -244,18 +236,9 @@ impl PyRiskBudgetResult {
             },
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+impl_repr_html_via_dataframe!(PyRiskBudgetResult);
 
 /// Evaluate a per-position risk budget against actual component VaRs,
 /// returning a typed ``RiskBudgetResult``.

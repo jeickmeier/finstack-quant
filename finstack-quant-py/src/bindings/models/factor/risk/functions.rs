@@ -1,3 +1,4 @@
+use crate::bindings::macros::impl_repr_html_via_dataframe;
 use numpy::{PyReadonlyArray2, PyUntypedArrayMethods};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -497,11 +498,6 @@ impl PyParametricEsDecompositionView {
     fn __repr__(&self) -> String {
         repr_from_serde("ParametricEsDecompositionView", &self.inner)
     }
-
-    /// Render as an HTML table in Jupyter notebooks (delegates to
-    /// ``to_dataframe``; returns ``None`` if the frame cannot be built).
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+impl_repr_html_via_dataframe!(PyParametricEsDecompositionView);

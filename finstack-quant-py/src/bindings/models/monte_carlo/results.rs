@@ -1,8 +1,8 @@
 //! Result types for Monte Carlo simulations.
 
 use crate::bindings::core::money::PyMoney;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::dict_to_dataframe;
-use crate::errors::display_to_py;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -25,30 +25,6 @@ impl PyGbmPathSummary {
 
 #[pymethods]
 impl PyGbmPathSummary {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_models::monte_carlo::GbmPathSummary =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Number of independent path estimators.
     #[getter]
     fn num_paths(&self) -> usize {
@@ -114,18 +90,14 @@ impl PyGbmPathSummary {
             self.inner.times.len()
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(
+    PyGbmPathSummary,
+    finstack_quant_models::monte_carlo::GbmPathSummary,
+    "GbmPathSummary"
+);
+impl_repr_html_via_dataframe!(PyGbmPathSummary);
 
 /// Monte Carlo pricing result with discounted statistics.
 #[pyclass(
@@ -145,29 +117,6 @@ impl PyMoneyEstimate {
 
 #[pymethods]
 impl PyMoneyEstimate {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: MoneyEstimate = serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Discounted mean present value.
     #[getter]
     fn mean(&self) -> PyMoney {
@@ -259,6 +208,8 @@ impl PyMoneyEstimate {
     }
 }
 
+wire_methods!(PyMoneyEstimate, MoneyEstimate, "MoneyEstimate");
+
 /// Raw numerical estimate (non-currency).
 #[pyclass(
     name = "Estimate",
@@ -279,30 +230,6 @@ impl PyEstimate {
 
 #[pymethods]
 impl PyEstimate {
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    ///
-    /// Reconstruction goes through the same strict serde round-trip as
-    /// `to_json` / `from_json`, so an unpickled value is exactly what the wire
-    /// format defines — there is no second state format that can drift.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
-    /// Deserialize from JSON.
-    #[staticmethod]
-    #[pyo3(text_signature = "(json)")]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner: finstack_quant_models::monte_carlo::estimate::Estimate =
-            serde_json::from_str(json).map_err(display_to_py)?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize to compact JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner).map_err(display_to_py)
-    }
-
     /// Point estimate (mean).
     #[getter]
     fn mean(&self) -> f64 {
@@ -388,6 +315,12 @@ impl PyEstimate {
         )
     }
 }
+
+wire_methods!(
+    PyEstimate,
+    finstack_quant_models::monte_carlo::estimate::Estimate,
+    "Estimate"
+);
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGbmPathSummary>()?;
