@@ -3,9 +3,7 @@
 //! Exposes scenario specification parsing, validation, composition,
 //! and built-in template access via structured JavaScript values.
 
-use crate::utils::input::{
-    from_js_json, js_opt_int, js_opt_string, js_string, json_text, opt_json_text,
-};
+use crate::utils::input::{from_js_json, js_opt_string, js_string, json_text, opt_json_text};
 use crate::utils::{parse_iso_date, to_js_err};
 use wasm_bindgen::prelude::*;
 
@@ -16,27 +14,6 @@ pub mod results;
 /// Process-wide builtin template registry, parsed once by the scenarios crate.
 fn builtin_registry() -> Result<&'static finstack_quant_scenarios::TemplateRegistry, JsValue> {
     finstack_quant_scenarios::TemplateRegistry::embedded_builtins().map_err(to_js_err)
-}
-
-fn apply_with_context(
-    spec: &finstack_quant_scenarios::ScenarioSpec,
-    market: &mut finstack_quant_core::market_data::context::MarketContext,
-    model: Option<&mut finstack_quant_statements::FinancialModelSpec>,
-    as_of: time::Date,
-    instruments: Option<&mut Vec<Box<dyn finstack_quant_valuations::instruments::Instrument>>>,
-    config: finstack_quant_core::config::FinstackConfig,
-) -> Result<finstack_quant_scenarios::engine::ApplicationReport, JsValue> {
-    let mut ctx = finstack_quant_scenarios::ExecutionContext {
-        market,
-        model,
-        instruments,
-        rate_bindings: None,
-        calendar: None,
-        as_of,
-    };
-    finstack_quant_scenarios::ScenarioEngine::with_config(config)
-        .apply(spec, &mut ctx)
-        .map_err(to_js_err)
 }
 
 /// Parse the optional `FinstackConfig` argument; omitted means the Rust default.
@@ -195,69 +172,6 @@ pub fn build_template_component(
     crate::utils::to_js_value(&spec)
 }
 
-/// Build a scenario spec from fields.
-///
-/// # Errors
-///
-/// Rejects malformed or schema-incompatible `operations`, an unsupported
-/// `resolution_mode` or `hazard_bump_mode`, a blank scenario ID, multiple
-/// time-roll operations, invalid operation identifiers or numeric fields,
-/// variant-specific operation violations, or failure to serialize the scenario.
-/// @param id - Scenario identifier stored on the constructed spec.
-/// @param operations - Structured scenario operation specifications in execution order.
-/// @param name - Optional human-readable scenario name.
-/// @param description - Optional human-readable description of the scenario purpose.
-/// @param priority - Optional execution priority; lower values run earlier
-///   during composition. Omit for the Rust serde default (`0`), matching the
-///   Python `priority=0` keyword default.
-/// @param resolution_mode - Optional hierarchy conflict policy:
-///   `"most_specific_wins"` (default) or `"cumulative"`.
-/// @param hazard_bump_mode - Optional ParCDS delivery:
-///   `"solve_to_par"` (default) rebootstraps par quotes; `"first_order_shift"` applies
-///   delta hazard = delta spread / (1 - recovery) and reports an approximation warning.
-#[wasm_bindgen(js_name = buildScenarioSpec)]
-pub fn build_scenario_spec(
-    id: JsValue,
-    operations: JsValue,
-    name: Option<JsValue>,
-    description: Option<JsValue>,
-    priority: Option<JsValue>,
-    resolution_mode: Option<JsValue>,
-    hazard_bump_mode: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let id: &str = &js_string(&id, "id")?;
-    let name = js_opt_string(name.as_ref(), "name")?;
-    let description = js_opt_string(description.as_ref(), "description")?;
-    let priority: Option<i32> = js_opt_int(priority.as_ref(), "priority")?;
-    let resolution_mode = js_opt_string(resolution_mode.as_ref(), "resolutionMode")?;
-    let hazard_bump_mode = js_opt_string(hazard_bump_mode.as_ref(), "hazardBumpMode")?;
-    let operations: Vec<finstack_quant_scenarios::OperationSpec> =
-        from_js_json(&operations, "operations")?;
-    let resolution_mode = resolution_mode
-        .as_deref()
-        .map(finstack_quant_core::wire::serde_parse)
-        .transpose()
-        .map_err(to_js_err)?
-        .unwrap_or_default();
-    let hazard_bump_mode = hazard_bump_mode
-        .as_deref()
-        .map(finstack_quant_core::wire::serde_parse)
-        .transpose()
-        .map_err(to_js_err)?
-        .unwrap_or_default();
-    let spec = finstack_quant_scenarios::ScenarioSpec {
-        id: id.to_string(),
-        name,
-        description,
-        operations,
-        priority: priority.unwrap_or_default(),
-        resolution_mode,
-        hazard_bump_mode,
-    };
-    spec.validate().map_err(to_js_err)?;
-    crate::utils::to_js_value(&spec)
-}
-
 fn extract_instruments(
     json: Option<String>,
 ) -> Result<Option<Vec<Box<dyn finstack_quant_valuations::instruments::Instrument>>>, JsValue> {
@@ -267,10 +181,10 @@ fn extract_instruments(
         .map_err(to_js_err)
 }
 
-/// Apply a scenario to a market context and financial model.
+/// Apply a scenario to copied market data and an optional financial model.
 ///
 /// Returns a JavaScript object with `market` and `model` (the mutated
-/// contexts as objects, not JSON strings), `operations_applied`,
+/// contexts as objects, not JSON strings), and a canonical `report` with `operations_applied`,
 /// `user_operations`, `expanded_operations`, `changes` (a
 /// `ScenarioChangeManifest`), `warnings`, `meta` (a `ResultsMeta` audit stamp
 /// carrying the numeric mode, rounding context, and FX policy; omitted when
@@ -295,7 +209,7 @@ fn extract_instruments(
 /// JavaScript.
 /// @param scenario_json - JSON-serialized ScenarioSpec to validate and apply.
 /// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param model_json - JSON-serialized FinancialModelSpec that scenario operations may mutate.
+/// @param model_json - Optional FinancialModelSpec JSON; omit for market-only scenarios.
 /// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
 /// @param instruments_json - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
 /// @param config_json - Optional FinstackConfig JSON; its rounding policy is stamped into `meta`. Omit for the library default.
@@ -303,14 +217,14 @@ fn extract_instruments(
 pub fn apply_scenario(
     scenario_json: JsValue,
     market_json: JsValue,
-    model_json: JsValue,
     as_of: JsValue,
+    model_json: Option<JsValue>,
     instruments_json: Option<JsValue>,
     config_json: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
     let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let model_json: &str = &json_text(&model_json, "modelJson")?;
+    let model_json = opt_json_text(model_json.as_ref(), "modelJson")?;
     let as_of: &str = &js_string(&as_of, "asOf")?;
     let instruments_json = opt_json_text(instruments_json.as_ref(), "instrumentsJson")?;
     let config = parse_config(config_json.as_ref())?;
@@ -318,70 +232,30 @@ pub fn apply_scenario(
         finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
     let mut market: finstack_quant_core::market_data::context::MarketContext =
         serde_json::from_str(market_json).map_err(to_js_err)?;
-    let mut model =
-        finstack_quant_statements::FinancialModelSpec::from_json(model_json).map_err(to_js_err)?;
+    let mut model = model_json
+        .as_deref()
+        .map(finstack_quant_statements::FinancialModelSpec::from_json)
+        .transpose()
+        .map_err(to_js_err)?;
     let date = parse_iso_date(as_of)?;
     let mut instruments = extract_instruments(instruments_json)?;
-    let report = apply_with_context(
-        &spec,
-        &mut market,
-        Some(&mut model),
-        date,
-        instruments.as_mut(),
-        config,
-    )?;
+    let report = {
+        let mut ctx = finstack_quant_scenarios::ExecutionContext {
+            market: &mut market,
+            model: model.as_mut(),
+            instruments: instruments.as_mut(),
+            rate_bindings: None,
+            calendar: None,
+            as_of: date,
+        };
+        finstack_quant_scenarios::ScenarioEngine::with_config(config)
+            .apply(&spec, &mut ctx)
+            .map_err(to_js_err)?
+    };
     let out = finstack_quant_scenarios::ApplicationEnvelope::from_contexts(
         report,
         &market,
-        Some(&model),
-        instruments.as_deref(),
-    )
-    .map_err(to_js_err)?;
-    crate::utils::to_js_value(&out)
-}
-
-/// Apply a scenario to a market context only (no model mutations).
-///
-/// Returns the same envelope shape as [`apply_scenario`] minus `model`;
-/// the same inventory, configuration and calendar rules apply.
-///
-/// # Errors
-///
-/// Rejects a malformed or invalid scenario (checked before the market is
-/// parsed), malformed market, instrument, or configuration JSON,
-/// instrument-scoped operations without `instruments_json`, an invalid ISO `as_of` date, an
-/// invalid scenario operation, missing market objects or hierarchy context,
-/// failure to encode the mutated market, or failure to serialize the
-/// application envelope to JavaScript.
-/// @param scenario_json - JSON-serialized ScenarioSpec to validate and apply.
-/// @param market_json - Canonical market-context JSON supplying curves, quotes, and FX data.
-/// @param as_of - ISO-8601 valuation date used to resolve date-dependent market data.
-/// @param instruments_json - Optional JSON array of canonical instrument envelopes; required for instrument shocks and returned as shocked copies in input order.
-/// @param config_json - Optional FinstackConfig JSON; its rounding policy is stamped into `meta`. Omit for the library default.
-#[wasm_bindgen(js_name = applyScenarioToMarket)]
-pub fn apply_scenario_to_market(
-    scenario_json: JsValue,
-    market_json: JsValue,
-    as_of: JsValue,
-    instruments_json: Option<JsValue>,
-    config_json: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let scenario_json: &str = &json_text(&scenario_json, "scenarioJson")?;
-    let market_json: &str = &json_text(&market_json, "marketJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
-    let instruments_json = opt_json_text(instruments_json.as_ref(), "instrumentsJson")?;
-    let config = parse_config(config_json.as_ref())?;
-    let spec =
-        finstack_quant_scenarios::ScenarioSpec::from_json(scenario_json).map_err(to_js_err)?;
-    let mut market: finstack_quant_core::market_data::context::MarketContext =
-        serde_json::from_str(market_json).map_err(to_js_err)?;
-    let date = parse_iso_date(as_of)?;
-    let mut instruments = extract_instruments(instruments_json)?;
-    let report = apply_with_context(&spec, &mut market, None, date, instruments.as_mut(), config)?;
-    let out = finstack_quant_scenarios::ApplicationEnvelope::from_contexts(
-        report,
-        &market,
-        None,
+        model.as_ref(),
         instruments.as_deref(),
     )
     .map_err(to_js_err)?;
@@ -562,7 +436,7 @@ mod tests {
     #[test]
     fn builtin_registry_builds_typed_templates_and_components() {
         let registry =
-            finstack_quant_scenarios::TemplateRegistry::with_embedded_builtins().expect("registry");
+            finstack_quant_scenarios::TemplateRegistry::embedded_builtins().expect("registry");
         assert!(!registry.list().is_empty());
         for metadata in registry.list() {
             let built = registry.build(&metadata.id).expect("template");

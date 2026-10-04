@@ -575,3 +575,47 @@ fn parallel_default_cross_pairs_include_credit_correlations() {
         attribution.residual.amount()
     );
 }
+
+#[test]
+fn broad_snapshot_respects_narrow_restore_flags() {
+    let opening = MarketContext::new()
+        .insert(price_curve(3.0))
+        .insert(vol_index_curve(15.0))
+        .insert(basis_spread_curve(0.001))
+        .insert(parametric_curve(0.045))
+        .insert(forward_curve(0.04))
+        .insert(hazard_curve(0.02))
+        .insert(inflation_curve(105.0))
+        .insert(base_correlation_curve(0.2));
+    let closing = MarketContext::new()
+        .insert(price_curve(3.3))
+        .insert(vol_index_curve(19.0))
+        .insert(basis_spread_curve(0.002))
+        .insert(parametric_curve(0.05))
+        .insert(forward_curve(0.05))
+        .insert(hazard_curve(0.03))
+        .insert(inflation_curve(110.0))
+        .insert(base_correlation_curve(0.3));
+    let snapshot = MarketSnapshot::extract(&opening, MarketRestoreFlags::all());
+    for flag in [
+        MarketRestoreFlags::DISCOUNT,
+        MarketRestoreFlags::FORWARD,
+        MarketRestoreFlags::HAZARD,
+        MarketRestoreFlags::INFLATION,
+        MarketRestoreFlags::CORRELATION,
+        MarketRestoreFlags::VOL,
+        MarketRestoreFlags::SCALARS,
+    ] {
+        let restored = MarketSnapshot::restore_market(&closing, &snapshot, flag);
+        let narrow = MarketSnapshot::extract(&opening, flag);
+        let expected = MarketSnapshot::restore_market(&closing, &narrow, flag);
+        let state = |market: &MarketContext| {
+            serde_json::to_value(
+                finstack_quant_core::market_data::context::MarketContextState::try_from(market)
+                    .unwrap(),
+            )
+            .unwrap()
+        };
+        assert_eq!(state(&restored), state(&expected), "flag {flag:?}");
+    }
+}

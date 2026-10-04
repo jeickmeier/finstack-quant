@@ -42,35 +42,9 @@
       "type": "string"
     },
     {
-      "additionalProperties": false,
-      "description": "Generic VaR-based",
-      "properties": {
-        "generic_var": {
-          "additionalProperties": false,
-          "properties": {
-            "confidence": {
-              "description": "Confidence level (e.g., 0.99 for 99%)",
-              "format": "double",
-              "type": "number"
-            },
-            "lookback_days": {
-              "description": "Lookback period in days",
-              "format": "uint32",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          "required": [
-            "confidence",
-            "lookback_days"
-          ],
-          "type": "object"
-        }
-      },
-      "required": [
-        "generic_var"
-      ],
-      "type": "object"
+      "const": "generic_proxy",
+      "description": "Conservative exposure-times-rate fallback for an unknown CCP.",
+      "type": "string"
     }
   ],
   "title": "CcpMethodology"

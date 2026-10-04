@@ -5549,20 +5549,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json#/$defs/CsaSpec"
   },
   {
-    "path": "#/$defs/d_d95a602bcefda408da7c/properties/im_methodology",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json#/$defs/OtcMarginSpec/properties/im_methodology",
-    "description": "Initial margin calculation methodology\n\n- Bilateral: SIMM or Schedule\n- Cleared: ClearingHouse (CCP-specific)",
-    "ref": "#/$defs/ImMethodology",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json#/$defs/ImMethodology"
-  },
-  {
-    "path": "#/$defs/d_d95a602bcefda408da7c/properties/settlement_lag",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json#/$defs/OtcMarginSpec/properties/settlement_lag",
-    "description": "Settlement lag for margin transfers (business days)",
-    "format": "uint32",
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/d_d95a602bcefda408da7c/properties/simm_credit_classification",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json#/$defs/OtcMarginSpec/properties/simm_credit_classification",
     "description": "Explicit SIMM credit classification for credit-sensitive instruments.\n\nRequired when a credit product uses `ImMethodology::Simm`; leave `None`\nfor non-credit instruments and non-SIMM margin methodologies."
@@ -5576,13 +5562,6 @@ export default [
   {
     "path": "#/$defs/d_d95a602bcefda408da7c/properties/simm_credit_classification/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json#/$defs/OtcMarginSpec/properties/simm_credit_classification/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_d95a602bcefda408da7c/properties/vm_frequency",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json#/$defs/OtcMarginSpec/properties/vm_frequency",
-    "description": "Variation margin exchange frequency",
-    "ref": "#/$defs/MarginTenor",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/rates/interest_rate_swap.schema.json#/$defs/MarginTenor"
   },
   {
     "path": "#/$defs/d_d962ef8db4edf11dc092",

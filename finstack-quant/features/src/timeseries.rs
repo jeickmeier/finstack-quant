@@ -3,10 +3,10 @@
 mod advanced;
 
 use crate::types::{
-    f64_param, finite, mean, op_from_str, reject_unknown_params, required_f64_param, sample_std,
-    scaled_centered, usize_param, validate_lengths, validate_output, window_params,
+    f64_param, finite, mean, op_from_str, quantile_cont, reject_unknown_params, required_f64_param,
+    sample_std, scaled_centered, usize_param, validate_lengths, validate_output, window_params,
 };
-use advanced::{drawdown, exponential_decay_weights, rolling_advanced, AdvancedRollingOp};
+use advanced::{drawdown, exponential_decay_weights};
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -105,7 +105,7 @@ impl TimeSeriesOp {
         Self::EwmaZscore,
     ];
 
-    /// Canonical snake_case name accepted by [`transform_timeseries`].
+    /// Canonical snake_case name used by JSON and host-language APIs.
     #[must_use]
     pub fn name(self) -> String {
         crate::types::op_name(&self)
@@ -143,7 +143,7 @@ impl TimeSeriesOp {
     }
 }
 
-/// Transform a value column per entity, ordered by a sortable key.
+/// Transform a value column per entity with a typed operation.
 ///
 /// `order` is compared lexicographically within each entity. Use ISO-8601 date
 /// strings or another sortable key format when passing temporal labels.
@@ -156,42 +156,6 @@ impl TimeSeriesOp {
 /// rows. `drawdown` expects a level series. `rolling_sharpe` is a period
 /// feature, not the `analytics` Sharpe; optional JSON `risk_free` defaults to
 /// `0.0` in the same units as the return series.
-///
-/// # Arguments
-///
-/// * `values` - Row-aligned observations to transform; missing and non-finite
-///   values are handled by the selected time-series operation.
-/// * `entity` - Row-aligned entity identifiers; each entity is transformed
-///   independently.
-/// * `order` - Row-aligned sortable keys that define chronological order within
-///   an entity, typically ISO-8601 date strings.
-/// * `op` - Canonical snake-case operation name, such as `"rolling_mean"` or
-///   `"returns"`.
-/// * `params` - Optional operation-specific JSON parameters; omitted keys use
-///   the operation's documented defaults. `rolling_sharpe` accepts `risk_free`
-///   (default `0.0`, same units as the return series).
-///
-/// # Errors
-///
-/// Returns a validation error when input lengths differ, `op` is unsupported,
-/// or operation parameters are malformed, or arithmetic produces a non-finite result.
-pub fn transform_timeseries(
-    values: &[Option<f64>],
-    entity: &[String],
-    order: &[String],
-    op: &str,
-    params: Option<&Value>,
-) -> Result<Vec<Option<f64>>> {
-    transform_timeseries_with_op(values, entity, order, TimeSeriesOp::from_str(op)?, params)
-}
-
-/// Transform a value column per entity with a typed operation.
-///
-/// `order` is compared lexicographically within each entity. Use ISO-8601 date
-/// strings or another sortable key format when passing temporal labels.
-/// `periods` and EWMA spans count finite observations (observation time);
-/// rolling windows span rows and require `min_periods` finite rows.
-/// Parameter keys are strict: see [`TimeSeriesOp::param_keys`].
 ///
 /// # Arguments
 ///
@@ -209,7 +173,7 @@ pub fn transform_timeseries(
 ///
 /// Returns a validation error when input lengths differ or operation parameters
 /// are malformed or arithmetic produces a non-finite result.
-pub fn transform_timeseries_with_op(
+pub fn transform_timeseries(
     values: &[Option<f64>],
     entity: &[String],
     order: &[String],
@@ -221,111 +185,137 @@ pub fn transform_timeseries_with_op(
         &[("entity", entity.len()), ("order", order.len())],
     )?;
     reject_unknown_params(params, &op.name(), op.param_keys())?;
-    validate_params(op, params)?;
+    let op = PreparedOp::parse(op, params)?;
     let mut output = vec![None; values.len()];
     let indices = crate::index::sorted_indices(entity, order);
     crate::index::try_for_each_entity(entity, &indices, |entity_indices| {
-        transform_entity(values, entity_indices, op, params, &mut output)
+        transform_entity(values, entity_indices, op, &mut output)
     })?;
     validate_output(&output)?;
     Ok(output)
 }
 
-fn validate_params(op: TimeSeriesOp, params: Option<&Value>) -> Result<()> {
-    let keys = op.param_keys();
-    if keys.contains(&"min_periods") {
-        window_params(params)?;
-    } else if keys.contains(&"window") {
-        usize_param(params, "window", 1)?;
-    }
-    if keys.contains(&"periods") {
-        usize_param(params, "periods", 1)?;
-    }
-    if keys.contains(&"span") {
-        ewma_alpha(params)?;
-    }
-    if keys.contains(&"half_life") && required_f64_param(params, "half_life")? <= 0.0 {
-        return Err(Error::Validation("half_life must be positive".into()));
-    }
-    match op {
-        TimeSeriesOp::RollingQuantile => {
-            advanced::probability_param(params, "quantile", 0.5)?;
-        }
-        TimeSeriesOp::RollingWinsorize => {
-            let lower = advanced::probability_param(params, "lower", 0.01)?;
-            let upper = advanced::probability_param(params, "upper", 0.99)?;
-            if lower > upper {
-                return Err(Error::Validation(
-                    "rolling_winsorize requires lower <= upper".into(),
-                ));
+#[derive(Clone, Copy)]
+enum PreparedOp {
+    Returns(usize),
+    LogReturns(usize),
+    Diff(usize),
+    Lag(usize),
+    Rolling {
+        op: RollingOp,
+        window: usize,
+        min_periods: usize,
+    },
+    Drawdown,
+    Decay {
+        window: usize,
+        decay: f64,
+    },
+    EwmaMean(f64),
+    EwmaVol(f64),
+    EwmaZscore(f64),
+}
+
+impl PreparedOp {
+    fn parse(op: TimeSeriesOp, params: Option<&Value>) -> Result<Self> {
+        let rolling = |op| {
+            let (window, min_periods) = window_params(params)?;
+            Ok(Self::Rolling {
+                op,
+                window,
+                min_periods,
+            })
+        };
+        match op {
+            TimeSeriesOp::Returns => Ok(Self::Returns(usize_param(params, "periods", 1)?)),
+            TimeSeriesOp::LogReturns => Ok(Self::LogReturns(usize_param(params, "periods", 1)?)),
+            TimeSeriesOp::Diff => Ok(Self::Diff(usize_param(params, "periods", 1)?)),
+            TimeSeriesOp::Lag => Ok(Self::Lag(usize_param(params, "periods", 1)?)),
+            TimeSeriesOp::RollingMean => rolling(RollingOp::Mean),
+            TimeSeriesOp::RollingSum => rolling(RollingOp::Sum),
+            TimeSeriesOp::RollingStd => rolling(RollingOp::Std),
+            TimeSeriesOp::RollingMin => rolling(RollingOp::Min),
+            TimeSeriesOp::RollingMax => rolling(RollingOp::Max),
+            TimeSeriesOp::RollingZscore => rolling(RollingOp::Zscore),
+            TimeSeriesOp::RollingRank => rolling(RollingOp::Rank),
+            TimeSeriesOp::RollingQuantile => rolling(RollingOp::Quantile(
+                advanced::probability_param(params, "quantile", 0.5)?,
+            )),
+            TimeSeriesOp::RollingSkew => rolling(RollingOp::Skew),
+            TimeSeriesOp::RollingKurtosis => rolling(RollingOp::Kurtosis),
+            TimeSeriesOp::RollingSlope => rolling(RollingOp::Slope),
+            TimeSeriesOp::RollingSharpe => {
+                rolling(RollingOp::Sharpe(f64_param(params, "risk_free", 0.0)?))
             }
+            TimeSeriesOp::RollingWinsorize => {
+                let lower = advanced::probability_param(params, "lower", 0.01)?;
+                let upper = advanced::probability_param(params, "upper", 0.99)?;
+                if lower > upper {
+                    return Err(Error::Validation(
+                        "rolling_winsorize requires lower <= upper".into(),
+                    ));
+                }
+                rolling(RollingOp::Winsorize { lower, upper })
+            }
+            TimeSeriesOp::HampelFilter => {
+                let threshold = f64_param(params, "threshold", 3.0)?;
+                if threshold < 0.0 {
+                    return Err(Error::Validation(
+                        "hampel_filter requires threshold >= 0".into(),
+                    ));
+                }
+                rolling(RollingOp::Hampel(threshold))
+            }
+            TimeSeriesOp::Drawdown => Ok(Self::Drawdown),
+            TimeSeriesOp::ExponentialDecayWeights => {
+                let window = usize_param(params, "window", 1)?;
+                let half_life = required_f64_param(params, "half_life")?;
+                if half_life <= 0.0 {
+                    return Err(Error::Validation("half_life must be positive".into()));
+                }
+                Ok(Self::Decay {
+                    window,
+                    decay: (-std::f64::consts::LN_2 / half_life).exp(),
+                })
+            }
+            TimeSeriesOp::EwmaMean => Ok(Self::EwmaMean(ewma_alpha(params)?)),
+            TimeSeriesOp::EwmaVol => Ok(Self::EwmaVol(ewma_alpha(params)?)),
+            TimeSeriesOp::EwmaZscore => Ok(Self::EwmaZscore(ewma_alpha(params)?)),
         }
-        TimeSeriesOp::RollingSharpe => {
-            f64_param(params, "risk_free", 0.0)?;
-        }
-        TimeSeriesOp::HampelFilter if f64_param(params, "threshold", 3.0)? < 0.0 => {
-            return Err(Error::Validation(
-                "hampel_filter requires threshold >= 0".into(),
-            ));
-        }
-        _ => {}
     }
-    Ok(())
 }
 
 fn transform_entity(
     values: &[Option<f64>],
     indices: &[usize],
-    op: TimeSeriesOp,
-    params: Option<&Value>,
+    op: PreparedOp,
     output: &mut [Option<f64>],
 ) -> Result<()> {
     match op {
-        TimeSeriesOp::Returns => shifted_ratio(values, indices, params, output, false),
-        TimeSeriesOp::LogReturns => shifted_ratio(values, indices, params, output, true),
-        TimeSeriesOp::Diff => diff(values, indices, params, output),
-        TimeSeriesOp::Lag => lag(values, indices, params, output),
-        TimeSeriesOp::RollingMean => rolling(values, indices, params, output, RollingOp::Mean),
-        TimeSeriesOp::RollingSum => rolling(values, indices, params, output, RollingOp::Sum),
-        TimeSeriesOp::RollingStd => rolling(values, indices, params, output, RollingOp::Std),
-        TimeSeriesOp::RollingMin => rolling(values, indices, params, output, RollingOp::Min),
-        TimeSeriesOp::RollingMax => rolling(values, indices, params, output, RollingOp::Max),
-        TimeSeriesOp::RollingZscore => rolling(values, indices, params, output, RollingOp::Zscore),
-        TimeSeriesOp::RollingRank => {
-            rolling_advanced(values, indices, params, output, AdvancedRollingOp::Rank)
+        PreparedOp::Returns(periods) => shifted_ratio(values, indices, periods, output, false),
+        PreparedOp::LogReturns(periods) => shifted_ratio(values, indices, periods, output, true),
+        PreparedOp::Diff(periods) => diff(values, indices, periods, output),
+        PreparedOp::Lag(periods) => lag(values, indices, periods, output),
+        PreparedOp::Rolling {
+            op,
+            window,
+            min_periods,
+        } => rolling(values, indices, window, min_periods, output, op),
+        PreparedOp::Drawdown => drawdown(values, indices, output),
+        PreparedOp::Decay { window, decay } => {
+            exponential_decay_weights(values, indices, window, decay, output)
         }
-        TimeSeriesOp::RollingQuantile => {
-            rolling_advanced(values, indices, params, output, AdvancedRollingOp::Quantile)
+        PreparedOp::EwmaMean(alpha) => {
+            ewma_scan(values, indices, alpha, output, |state, _| Some(state.mean))
         }
-        TimeSeriesOp::RollingSkew => {
-            rolling_advanced(values, indices, params, output, AdvancedRollingOp::Skew)
+        PreparedOp::EwmaVol(alpha) => {
+            ewma_scan(values, indices, alpha, output, |state, _| state.vol())
         }
-        TimeSeriesOp::RollingKurtosis => {
-            rolling_advanced(values, indices, params, output, AdvancedRollingOp::Kurtosis)
+        PreparedOp::EwmaZscore(alpha) => {
+            ewma_scan(values, indices, alpha, output, |state, value| {
+                Some(state.zscore(value))
+            })
         }
-        TimeSeriesOp::RollingSlope => {
-            rolling_advanced(values, indices, params, output, AdvancedRollingOp::Slope)
-        }
-        TimeSeriesOp::RollingSharpe => {
-            rolling_advanced(values, indices, params, output, AdvancedRollingOp::Sharpe)
-        }
-        TimeSeriesOp::RollingWinsorize => rolling_advanced(
-            values,
-            indices,
-            params,
-            output,
-            AdvancedRollingOp::Winsorize,
-        ),
-        TimeSeriesOp::Drawdown => drawdown(values, indices, output),
-        TimeSeriesOp::HampelFilter => {
-            rolling_advanced(values, indices, params, output, AdvancedRollingOp::Hampel)
-        }
-        TimeSeriesOp::ExponentialDecayWeights => {
-            exponential_decay_weights(values, indices, params, output)
-        }
-        TimeSeriesOp::EwmaMean => ewma_mean(values, indices, params, output),
-        TimeSeriesOp::EwmaVol => ewma_vol(values, indices, params, output),
-        TimeSeriesOp::EwmaZscore => ewma_zscore(values, indices, params, output),
     }
 }
 
@@ -357,11 +347,10 @@ fn for_each_finite_lag(
 fn shifted_ratio(
     values: &[Option<f64>],
     indices: &[usize],
-    params: Option<&Value>,
+    periods: usize,
     output: &mut [Option<f64>],
     log_return: bool,
 ) -> Result<()> {
-    let periods = usize_param(params, "periods", 1)?;
     for_each_finite_lag(values, indices, periods, |idx, current, previous| {
         output[idx] = match (current, previous) {
             (Some(current), Some(previous)) if previous.abs() > 0.0 => {
@@ -389,10 +378,9 @@ fn shifted_ratio(
 fn lag(
     values: &[Option<f64>],
     indices: &[usize],
-    params: Option<&Value>,
+    periods: usize,
     output: &mut [Option<f64>],
 ) -> Result<()> {
-    let periods = usize_param(params, "periods", 1)?;
     for_each_finite_lag(values, indices, periods, |idx, current, previous| {
         output[idx] = current.and(previous);
     });
@@ -402,10 +390,9 @@ fn lag(
 fn diff(
     values: &[Option<f64>],
     indices: &[usize],
-    params: Option<&Value>,
+    periods: usize,
     output: &mut [Option<f64>],
 ) -> Result<()> {
-    let periods = usize_param(params, "periods", 1)?;
     for_each_finite_lag(values, indices, periods, |idx, current, previous| {
         output[idx] = match (current, previous) {
             (Some(current), Some(previous)) => Some(current - previous),
@@ -423,22 +410,34 @@ enum RollingOp {
     Min,
     Max,
     Zscore,
+    Rank,
+    Quantile(f64),
+    Skew,
+    Kurtosis,
+    Slope,
+    Sharpe(f64),
+    Winsorize { lower: f64, upper: f64 },
+    Hampel(f64),
 }
 
 fn rolling(
     values: &[Option<f64>],
     indices: &[usize],
-    params: Option<&Value>,
+    window: usize,
+    min_periods: usize,
     output: &mut [Option<f64>],
     op: RollingOp,
 ) -> Result<()> {
-    let (window, min_periods) = window_params(params)?;
     let required = match op {
-        RollingOp::Std | RollingOp::Zscore => min_periods.max(2),
+        RollingOp::Std | RollingOp::Zscore | RollingOp::Slope | RollingOp::Sharpe(_) => {
+            min_periods.max(2)
+        }
+        RollingOp::Skew => min_periods.max(3),
+        RollingOp::Kurtosis => min_periods.max(4),
         _ => min_periods,
     };
     crate::index::try_for_each_trailing_window(indices, window, |idx, window_indices| {
-        let finite_values = window_indices
+        let mut finite_values = window_indices
             .iter()
             .filter_map(|window_idx| finite(values[*window_idx]))
             .collect::<Vec<_>>();
@@ -464,6 +463,33 @@ fn rolling(
                     (Some(_), Some(_)) => Some(0.0),
                     _ => None,
                 }
+            }
+            RollingOp::Rank => {
+                advanced::rolling_rank_value(finite(values[idx]), &mut finite_values)
+            }
+            RollingOp::Quantile(q) => {
+                finite_values.sort_by(f64::total_cmp);
+                quantile_cont(&finite_values, q)
+            }
+            RollingOp::Skew => advanced::skewness(&finite_values),
+            RollingOp::Kurtosis => advanced::excess_kurtosis(&finite_values),
+            RollingOp::Slope => advanced::rolling_slope(values, window_indices),
+            RollingOp::Sharpe(risk_free) => advanced::rolling_sharpe(&finite_values, risk_free),
+            RollingOp::Winsorize { lower, upper } => {
+                finite_values.sort_by(f64::total_cmp);
+                match (
+                    finite(values[idx]),
+                    quantile_cont(&finite_values, lower),
+                    quantile_cont(&finite_values, upper),
+                ) {
+                    (Some(current), Some(lower_bound), Some(upper_bound)) => {
+                        Some(current.clamp(lower_bound, upper_bound))
+                    }
+                    _ => None,
+                }
+            }
+            RollingOp::Hampel(threshold) => {
+                advanced::hampel_value(finite(values[idx]), &mut finite_values, threshold)
             }
         };
         Ok(())
@@ -536,11 +562,10 @@ impl EwmaState {
 fn ewma_scan(
     values: &[Option<f64>],
     indices: &[usize],
-    params: Option<&Value>,
+    alpha: f64,
     output: &mut [Option<f64>],
     project: impl Fn(EwmaState, f64) -> Option<f64>,
 ) -> Result<()> {
-    let alpha = ewma_alpha(params)?;
     let mut state: Option<EwmaState> = None;
     for &idx in indices {
         output[idx] = match finite(values[idx]) {
@@ -561,33 +586,4 @@ fn ewma_scan(
         };
     }
     Ok(())
-}
-
-fn ewma_mean(
-    values: &[Option<f64>],
-    indices: &[usize],
-    params: Option<&Value>,
-    output: &mut [Option<f64>],
-) -> Result<()> {
-    ewma_scan(values, indices, params, output, |state, _| Some(state.mean))
-}
-
-fn ewma_vol(
-    values: &[Option<f64>],
-    indices: &[usize],
-    params: Option<&Value>,
-    output: &mut [Option<f64>],
-) -> Result<()> {
-    ewma_scan(values, indices, params, output, |state, _| state.vol())
-}
-
-fn ewma_zscore(
-    values: &[Option<f64>],
-    indices: &[usize],
-    params: Option<&Value>,
-    output: &mut [Option<f64>],
-) -> Result<()> {
-    ewma_scan(values, indices, params, output, |state, value| {
-        Some(state.zscore(value))
-    })
 }

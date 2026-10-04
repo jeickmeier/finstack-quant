@@ -433,8 +433,30 @@ fn test_vol_models_quantlib_parity() {
                 *counts.entry("heston").or_default() += 1;
                 let params =
                     HestonParams::new(*v0, *kappa, *theta, *sigma, *rho).expect("valid Heston");
-                let call = params.price_european(*spot, *strike, *rate, *dividend_yield, *t, true);
-                let put = params.price_european(*spot, *strike, *rate, *dividend_yield, *t, false);
+                let call = finstack_quant_models::closed_form::heston::heston_call_price_fourier(
+                    *spot,
+                    *strike,
+                    *t,
+                    &finstack_quant_models::closed_form::heston::HestonPricingParams {
+                        r: *rate,
+                        q: *dividend_yield,
+                        model: params,
+                    },
+                    None,
+                )
+                .expect("checked Heston price");
+                let put = finstack_quant_models::closed_form::heston::heston_put_price_fourier(
+                    *spot,
+                    *strike,
+                    *t,
+                    &finstack_quant_models::closed_form::heston::HestonPricingParams {
+                        r: *rate,
+                        q: *dividend_yield,
+                        model: params,
+                    },
+                    None,
+                )
+                .expect("checked Heston price");
                 let tol = expected.tolerance_rel;
                 check_rel(&mut failures, id, "call", call, expected.call, tol);
                 check_rel(&mut failures, id, "put", put, expected.put, tol);

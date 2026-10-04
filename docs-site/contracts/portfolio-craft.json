@@ -41,7 +41,7 @@
       "finstack_quant.portfolio.Portfolio",
       "finstack_quant.portfolio.aggregate_full_cashflows",
       "finstack_quant.portfolio.mwr_xirr",
-      "finstack_quant.portfolio.twrr_linked_json",
+      "finstack_quant.portfolio.twrr_linked",
       "finstack_quant.portfolio.twrr_modified_dietz",
       "finstack_quant.portfolio.value_portfolio"
     ],
@@ -157,7 +157,7 @@
       "_shared.analyst_history.risk_panel",
       "_shared.instrument_fixtures.fixed_bond",
       "finstack_quant.analytics.Performance",
-      "finstack_quant.attribution.attribute_pnl_envelope_json",
+      "finstack_quant.attribution.attribute_pnl_envelope",
       "finstack_quant.core.dates.Schedule",
       "finstack_quant.core.market_data.DiscountCurve",
       "finstack_quant.core.market_data.MarketContext",
@@ -368,7 +368,7 @@
       "finstack_quant.scenarios.OperationSpec",
       "finstack_quant.scenarios.ScenarioSpec",
       "finstack_quant.scenarios.TenorMatchMode",
-      "finstack_quant.scenarios.apply_scenario_to_market",
+      "finstack_quant.scenarios.apply_scenario",
       "finstack_quant.scenarios.build_from_template",
       "finstack_quant.scenarios.compose_scenarios",
       "finstack_quant.scenarios.compute_horizon_return",
@@ -383,7 +383,7 @@
     ],
     "expected_exceptions": [],
     "support_notes": [
-      "Fixed-hazard curve-space shocks use apply_scenario_to_market then value_portfolio(metrics=[]). Quote-space risk under changed discounting requires recalibration; preserving old hazard replay does not make that risk calculation consistent. validate_scenario_spec returns None on success."
+      "Fixed-hazard curve-space shocks use apply_scenario then value_portfolio(metrics=[]). Quote-space risk under changed discounting requires recalibration; preserving old hazard replay does not make that risk calculation consistent. validate_scenario_spec returns None on success."
     ]
   },
   {
@@ -946,7 +946,7 @@
       "finstack_quant.scenarios.CurveKind",
       "finstack_quant.scenarios.OperationSpec",
       "finstack_quant.scenarios.ScenarioSpec",
-      "finstack_quant.scenarios.apply_scenario_to_market",
+      "finstack_quant.scenarios.apply_scenario",
       "finstack_quant.valuations.instruments.price_instrument"
     ],
     "models": [],

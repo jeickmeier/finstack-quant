@@ -12,6 +12,7 @@ Examples:
 from finstack_quant.finstack_quant import scenarios as _scenarios
 
 compose_scenarios = _scenarios.compose_scenarios
+parallel_bp_many = _scenarios.parallel_bp_many
 validate_scenario_spec = _scenarios.validate_scenario_spec
 list_builtin_templates = _scenarios.list_builtin_templates
 list_builtin_template_metadata = _scenarios.list_builtin_template_metadata
@@ -19,7 +20,6 @@ build_from_template = _scenarios.build_from_template
 list_template_components = _scenarios.list_template_components
 build_template_component = _scenarios.build_template_component
 apply_scenario = _scenarios.apply_scenario
-apply_scenario_to_market = _scenarios.apply_scenario_to_market
 compute_horizon_return = _scenarios.compute_horizon_return
 HorizonResult = _scenarios.HorizonResult
 ApplicationReport = _scenarios.ApplicationReport
@@ -51,7 +51,6 @@ __all__: list[str] = [
     "TenorMatchMode",
     "TimeRollMode",
     "apply_scenario",
-    "apply_scenario_to_market",
     "build_from_template",
     "build_template_component",
     "compose_scenarios",
@@ -59,6 +58,7 @@ __all__: list[str] = [
     "list_builtin_template_metadata",
     "list_builtin_templates",
     "list_template_components",
+    "parallel_bp_many",
     "schema",
     "validate_scenario_spec",
 ]

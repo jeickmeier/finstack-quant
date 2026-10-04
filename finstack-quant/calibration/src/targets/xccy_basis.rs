@@ -87,7 +87,7 @@ impl XccyBasisTarget {
         quotes: &[MarketQuote],
         context: &MarketContext,
         global_config: &CalibrationConfig,
-    ) -> Result<(MarketContext, CalibrationReport)> {
+    ) -> Result<(DiscountCurve, Option<BasisSpreadCurve>, CalibrationReport)> {
         if schema_params.method != crate::config::CalibrationMethod::Bootstrap {
             return Err(finstack_quant_core::Error::Validation(
                 "XCCY basis calibration supports only Bootstrap; GlobalSolve is unsupported".into(),
@@ -95,8 +95,7 @@ impl XccyBasisTarget {
         }
         let domestic_discount = context.get_discount(&schema_params.domestic_discount_id)?;
 
-        let mut config = global_config.clone();
-        config.calibration_method = schema_params.method.clone();
+        let config = global_config.clone();
 
         // Rates-side preflight: foreign-currency deposits/FRAs/swaps that constrain the
         // foreign discount curve directly. Required to be present today because the
@@ -189,10 +188,8 @@ impl XccyBasisTarget {
             success_tolerance,
         )?;
 
-        let mut new_context = context.clone().insert(curve.clone());
-
         // Extract basis spread curve as byproduct if requested.
-        if let Some(spread_id) = &schema_params.basis_spread_curve_id {
+        let spread_curve = if let Some(spread_id) = &schema_params.basis_spread_curve_id {
             let mut spread_knots = Vec::with_capacity(prepared_quotes.len() + 1);
             spread_knots.push((0.0, 0.0));
             for quote in &prepared_quotes {
@@ -240,10 +237,12 @@ impl XccyBasisTarget {
                     message: format!("Failed to build basis spread curve {spread_id}: {e}"),
                     category: "xccy_basis".to_string(),
                 })?;
-            new_context = new_context.insert(spread_curve);
-        }
+            Some(spread_curve)
+        } else {
+            None
+        };
 
-        Ok((new_context, report))
+        Ok((curve, spread_curve, report))
     }
 }
 
@@ -420,7 +419,7 @@ mod xccy_quote_calibration_tests {
         let cfg = CalibrationConfig::default();
         let result = XccyBasisTarget::solve(&params, &[quote_5y], &ctx, &cfg);
 
-        let (new_ctx, report) =
+        let (calibrated, _, report) =
             result.expect("XccyBasisTarget::solve should accept XccyQuote quotes");
 
         assert!(
@@ -430,9 +429,6 @@ mod xccy_quote_calibration_tests {
         );
         assert!(report.residuals["EURUSD-XCCY-5Y"].is_finite());
 
-        let calibrated = new_ctx
-            .get_discount(CurveId::new("EUR-OIS"))
-            .expect("calibrated EUR-OIS curve should be present in the new context");
         assert!(
             calibrated.df(5.0) > 0.0 && calibrated.df(5.0) < 1.0,
             "calibrated 5Y DF must be in (0,1); got {}",

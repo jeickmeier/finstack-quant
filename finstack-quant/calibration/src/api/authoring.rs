@@ -276,8 +276,6 @@ impl CdsTrancheQuote {
 impl CalibrationStep {
     /// Seniority label of a hazard step authored without one.
     pub const DEFAULT_HAZARD_SENIORITY: &'static str = "senior";
-    /// Surface model label of a `vol_surface` step authored without one.
-    pub const DEFAULT_VOL_SURFACE_MODEL: &'static str = "sabr";
     /// Parametric family label of a `parametric` step authored without one.
     pub const DEFAULT_PARAMETRIC_MODEL: &'static str = "ns";
 
@@ -300,8 +298,7 @@ impl CalibrationStep {
     ///   variant (dates as ISO-8601 strings, currencies as ISO-4217 codes).
     ///   Omitted or `null` entries take the authoring defaults: `curve_id`
     ///   (curve kinds) or `vol_surface_id` (surface kinds) is `id`, a hazard
-    ///   `seniority` is [`Self::DEFAULT_HAZARD_SENIORITY`], a `vol_surface`
-    ///   `model` is [`Self::DEFAULT_VOL_SURFACE_MODEL`] and a `parametric`
+    ///   `seniority` is [`Self::DEFAULT_HAZARD_SENIORITY`], a `parametric`
     ///   `model` is [`Self::DEFAULT_PARAMETRIC_MODEL`]. Remaining optional
     ///   fields keep their serde defaults; unknown fields are rejected.
     ///
@@ -326,11 +323,6 @@ impl CalibrationStep {
                 &mut fields,
                 "seniority",
                 Value::from(Self::DEFAULT_HAZARD_SENIORITY),
-            ),
-            "vol_surface" => default_field(
-                &mut fields,
-                "model",
-                Value::from(Self::DEFAULT_VOL_SURFACE_MODEL),
             ),
             "parametric" => default_field(
                 &mut fields,
@@ -586,7 +578,7 @@ mod tests {
         )
         .expect("vol surface step");
         let wire = serde_json::to_value(&surface).expect("wire");
-        assert_eq!(wire["model"], "sabr");
+        assert!(wire.get("model").is_none());
         assert_eq!(wire["vol_surface_id"], "AAPL-VOL");
 
         let parametric = CalibrationStep::from_wire_fields(

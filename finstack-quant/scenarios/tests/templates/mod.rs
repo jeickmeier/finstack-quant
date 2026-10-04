@@ -14,7 +14,7 @@ fn builtin_ids() -> Vec<&'static str> {
 
 #[test]
 fn embedded_registry_contains_all_five_builtins_end_to_end() {
-    let registry = TemplateRegistry::with_embedded_builtins()
+    let registry = TemplateRegistry::embedded_builtins()
         .unwrap_or_else(|error| panic!("failed to load embedded templates: {error}"));
     let listed_ids: Vec<_> = registry
         .list()
@@ -46,7 +46,7 @@ fn embedded_registry_contains_all_five_builtins_end_to_end() {
 
 #[test]
 fn embedded_registry_filters_historical_cross_asset_builtins() {
-    let registry = TemplateRegistry::with_embedded_builtins()
+    let registry = TemplateRegistry::embedded_builtins()
         .unwrap_or_else(|error| panic!("failed to load embedded templates: {error}"));
 
     let historical_ids: Vec<_> = registry
@@ -68,7 +68,7 @@ fn embedded_registry_filters_historical_cross_asset_builtins() {
 
 #[test]
 fn cross_template_component_composition_still_works() {
-    let registry = TemplateRegistry::with_embedded_builtins()
+    let registry = TemplateRegistry::embedded_builtins()
         .unwrap_or_else(|error| panic!("failed to load embedded templates: {error}"));
     let rate_spec = registry
         .get("rate_shock_2022")
@@ -97,7 +97,7 @@ fn cross_template_component_composition_still_works() {
 
 #[test]
 fn embedded_registry_svb_credit_component_contains_attr_spread_shock() {
-    let registry = TemplateRegistry::with_embedded_builtins()
+    let registry = TemplateRegistry::embedded_builtins()
         .unwrap_or_else(|error| panic!("failed to load embedded templates: {error}"));
     let credit = registry
         .get("svb_2023")
@@ -117,7 +117,7 @@ fn embedded_registry_svb_credit_component_contains_attr_spread_shock() {
 
 #[test]
 fn embedded_registry_built_scenario_roundtrips_through_serde_and_validation() {
-    let registry = TemplateRegistry::with_embedded_builtins()
+    let registry = TemplateRegistry::embedded_builtins()
         .unwrap_or_else(|error| panic!("failed to load embedded templates: {error}"));
     let scenario = registry
         .get("ltcm_1998")

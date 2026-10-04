@@ -9,8 +9,8 @@ use finstack_quant_valuations::metrics::MetricId;
 
 use crate::errors::portfolio_to_py;
 
-use super::super::json_bridge::{deserialize_json, serialize_json};
 use super::enums::PyInequality;
+use crate::bindings::json_bridge::{deserialize_json, serialize_json};
 
 fn parse_metric_id(id: &str) -> PyResult<MetricId> {
     // `FromStr::from_str` never fails for `MetricId` — unknown names silently
@@ -98,13 +98,6 @@ impl PyPerPositionMetric {
     fn pv_base(_cls: &Bound<'_, PyType>) -> Self {
         Self::from_inner(PerPositionMetric::PvBase)
     }
-
-    /// Native-currency present value of the position (after scaling).
-    #[classmethod]
-    fn pv_native(_cls: &Bound<'_, PyType>) -> Self {
-        Self::from_inner(PerPositionMetric::PvNative)
-    }
-
     /// Numeric attribute lookup by key.
     #[classmethod]
     #[pyo3(text_signature = "(cls, key)")]
@@ -170,7 +163,6 @@ impl PyPerPositionMetric {
             PerPositionMetric::Metric(_) => "metric",
             PerPositionMetric::CustomKey(_) => "custom_key",
             PerPositionMetric::PvBase => "pv_base",
-            PerPositionMetric::PvNative => "pv_native",
             PerPositionMetric::Attribute(_) => "attribute",
             PerPositionMetric::AttributeIndicator(_) => "attribute_indicator",
             PerPositionMetric::Constant(_) => "constant",

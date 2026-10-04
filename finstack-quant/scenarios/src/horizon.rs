@@ -141,11 +141,9 @@ fn horizon_unsupported_instrument_operation(scenario: &ScenarioSpec) -> Option<&
 #[derive(Debug, Clone)]
 pub struct HorizonAnalysis {
     /// Attribution methodology for decomposing the horizon P&L.
-    pub attribution_method: AttributionMethod,
-    /// Finstack configuration (rounding, tolerances).
-    pub config: FinstackConfig,
+    attribution_method: AttributionMethod,
     /// Scenario engine instance.
-    pub engine: ScenarioEngine,
+    engine: ScenarioEngine,
     /// Holiday calendar used to business-day adjust
     /// [`OperationSpec::TimeRollForward`] targets under
     /// [`crate::TimeRollMode::BusinessDays`].
@@ -153,17 +151,12 @@ pub struct HorizonAnalysis {
     /// `None` falls back to [`finstack_quant_core::dates::WEEKENDS_ONLY`], so
     /// business-day rolls always avoid weekends even when no calendar is named.
     /// Supply an identifier (e.g. `"nyse"`, `"target"`) for holiday awareness.
-    pub calendar_id: Option<CalendarId>,
+    calendar_id: Option<CalendarId>,
 }
 
 impl Default for HorizonAnalysis {
     fn default() -> Self {
-        Self {
-            attribution_method: AttributionMethod::default(),
-            config: FinstackConfig::default(),
-            engine: ScenarioEngine::new(),
-            calendar_id: None,
-        }
+        Self::new(AttributionMethod::default(), FinstackConfig::default())
     }
 }
 
@@ -174,11 +167,15 @@ impl HorizonAnalysis {
     /// rounding policy stamped into the scenario report reflects the active
     /// configuration. No holiday calendar is set; use
     /// [`with_calendar_id`](Self::with_calendar_id) to name one.
+    ///
+    /// # Arguments
+    ///
+    /// - `attribution_method`: Canonical factor attribution method applied to horizon P&L.
+    /// - `config`: Shared rounding and numerical policy used by the scenario engine, pricing and attribution.
     pub fn new(attribution_method: AttributionMethod, config: FinstackConfig) -> Self {
-        let engine = ScenarioEngine::with_config(config.clone());
+        let engine = ScenarioEngine::with_config(config);
         Self {
             attribution_method,
-            config,
             engine,
             calendar_id: None,
         }
@@ -196,7 +193,7 @@ impl HorizonAnalysis {
     /// use finstack_quant_scenarios::HorizonAnalysis;
     ///
     /// let analyzer = HorizonAnalysis::default().with_calendar_id("nyse");
-    /// assert!(analyzer.calendar_id.is_some());
+    /// let _analyzer = analyzer;
     /// ```
     ///
     /// # Arguments
@@ -229,11 +226,11 @@ impl HorizonAnalysis {
     /// engine's recalibration provider.
     fn pricing_options(&self) -> PricingOptions {
         PricingOptions::default()
-            .with_config(&self.config)
+            .with_config(self.engine.get_config())
             .with_recalibration_provider(Arc::clone(self.engine.recalibration_provider()))
     }
 
-    /// Resolve [`Self::calendar_id`] against core's built-in calendar registry.
+    /// Resolve the configured calendar identifier against core's built-in calendar registry.
     ///
     /// # Errors
     ///
@@ -267,24 +264,6 @@ pub struct HorizonResult {
     pub scenario_report: ApplicationReport,
 }
 
-/// Borrowed JSON view of a horizon result, including Rust-derived returns.
-///
-/// Undefined or non-finite returns are represented as `null`. The underlying
-/// result fields are flattened into the same object without cloning attribution
-/// details or scenario reports.
-#[derive(Debug, serde::Serialize)]
-pub struct HorizonResultJson<'a> {
-    /// Original horizon fields flattened into the serialized result object.
-    #[serde(flatten)]
-    pub result: &'a HorizonResult,
-    /// Total P&L divided by positive initial value, as a decimal fraction.
-    pub total_return: Option<f64>,
-    /// Compounded annual return, or `None` when annualization is undefined.
-    pub annualized_return: Option<f64>,
-    /// Each canonical factor's P&L divided by positive initial value.
-    pub factor_contributions: indexmap::IndexMap<AttributionFactor, Option<f64>>,
-}
-
 impl HorizonAnalysis {
     /// Compute horizon total return under a scenario.
     ///
@@ -314,7 +293,7 @@ impl HorizonAnalysis {
     /// Returns an error if scenario application or attribution fails (e.g.
     /// missing market data for a curve referenced in the spec), if the
     /// scenario contains an instrument-scoped operation unsupported by horizon
-    /// attribution, or if [`Self::calendar_id`] does not name a built-in
+    /// attribution, or if the configured calendar identifier does not name a built-in
     /// calendar.
     ///
     /// # Arguments
@@ -448,7 +427,7 @@ impl HorizonAnalysis {
                 market_t1,
                 as_of_t0,
                 as_of_t1,
-                &self.config,
+                self.engine.get_config(),
             )
         };
         let attribution = attribute_pnl(&self.attribution_method, &request)?;
@@ -457,39 +436,6 @@ impl HorizonAnalysis {
 }
 
 impl HorizonResult {
-    /// Build the canonical serializable view with computed return fields.
-    ///
-    /// The view includes every underlying horizon field, decimal total and
-    /// annualized returns, and all factor contributions. Undefined and
-    /// non-finite derived values become JSON `null`; no financial formulas are
-    /// delegated to host bindings.
-    #[must_use]
-    pub fn to_json(&self) -> HorizonResultJson<'_> {
-        let total_return = self.total_return();
-        HorizonResultJson {
-            result: self,
-            total_return: total_return.is_finite().then_some(total_return),
-            annualized_return: self.annualized_return(),
-            factor_contributions: [
-                AttributionFactor::Carry,
-                AttributionFactor::RatesCurves,
-                AttributionFactor::CreditCurves,
-                AttributionFactor::InflationCurves,
-                AttributionFactor::Correlations,
-                AttributionFactor::Fx,
-                AttributionFactor::Volatility,
-                AttributionFactor::MarketScalars,
-                AttributionFactor::ModelParameters,
-            ]
-            .into_iter()
-            .map(|factor| {
-                let contribution = self.factor_contribution(&factor);
-                (factor, contribution.is_finite().then_some(contribution))
-            })
-            .collect(),
-        }
-    }
-
     /// Total return as a decimal fraction (e.g. `0.05` = 5%).
     ///
     /// Computed as `total_pnl / initial_value`. Returns:
@@ -1201,14 +1147,21 @@ mod tests {
     #[test]
     fn json_view_contains_canonical_returns_and_null_undefined_values() -> serde_json::Result<()> {
         let result = synthetic_result(Currency::USD, 100.0, Currency::USD, 10.0, 365);
-        let json = serde_json::to_value(result.to_json())?;
+        let json = serde_json::to_value(result.report())?;
         assert_eq!(
             json["initial_value"],
             serde_json::to_value(result.initial_value)?
         );
-        assert_eq!(json["total_return"], 0.1);
-        assert!((json["annualized_return"].as_f64().expect("annual return") - 0.1).abs() < 1e-12);
-        let factors = json["factor_contributions"]
+        assert_eq!(json["summary"]["total_return"], 0.1);
+        assert!(
+            (json["summary"]["annualized_return"]
+                .as_f64()
+                .expect("annual return")
+                - 0.1)
+                .abs()
+                < 1e-12
+        );
+        let factors = json["summary"]["factor_contributions"]
             .as_object()
             .expect("factor map");
         assert_eq!(factors.len(), 9);
@@ -1220,15 +1173,15 @@ mod tests {
             synthetic_result(Currency::USD, -100.0, Currency::USD, 10.0, 365),
             synthetic_result(Currency::USD, 100.0, Currency::EUR, 10.0, 365),
         ] {
-            let json = serde_json::to_value(result.to_json())?;
-            assert!(json["total_return"].is_null());
-            assert!(json["annualized_return"].is_null());
-            assert!(json["factor_contributions"]["carry"].is_null());
+            let json = serde_json::to_value(result.report())?;
+            assert!(json["summary"]["total_return"].is_null());
+            assert!(json["summary"]["annualized_return"].is_null());
+            assert!(json["summary"]["factor_contributions"]["carry"].is_null());
         }
         let leveraged_loss = synthetic_result(Currency::USD, 100.0, Currency::USD, -220.0, 365);
-        let json = serde_json::to_value(leveraged_loss.to_json())?;
-        assert_eq!(json["total_return"], -2.2);
-        assert!(json["annualized_return"].is_null());
+        let json = serde_json::to_value(leveraged_loss.report())?;
+        assert_eq!(json["summary"]["total_return"], -2.2);
+        assert!(json["summary"]["annualized_return"].is_null());
         Ok(())
     }
 

@@ -36,7 +36,6 @@
 //!     "factors": [],
 //!     "covariance": { "n": 0, "factor_ids": [], "data": [] },
 //!     "matching": { "mapping_table": [] },
-//!     "pricing_mode": "delta_based"
 //!   },
 //!   "issuer_betas": [],
 //!   "anchor_state": { "pc": 0.0, "by_level": [] },
@@ -1153,7 +1152,7 @@ mod tests {
     use super::*;
     use crate::factor::{
         FactorCovarianceMatrix, FactorDefinition, FactorModelConfig, FactorType, MarketMapping,
-        MatchingConfig, PricingMode,
+        MatchingConfig,
     };
     use finstack_quant_core::dates::create_date;
     use time::Month;
@@ -1163,7 +1162,7 @@ mod tests {
             factors: vec![],
             covariance: FactorCovarianceMatrix::new(vec![], vec![]).unwrap(),
             matching: MatchingConfig::MappingTable(vec![]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: Default::default(),
             bump_config: None,
             unmatched_policy: None,
@@ -1412,7 +1411,7 @@ mod tests {
                 factors: vec![factor_def],
                 covariance,
                 matching: MatchingConfig::MappingTable(vec![]),
-                pricing_mode: PricingMode::DeltaBased,
+
                 risk_measure: Default::default(),
                 bump_config: None,
                 unmatched_policy: None,

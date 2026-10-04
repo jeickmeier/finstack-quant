@@ -19,6 +19,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from . import (
+    CrossSectionalOp as _CrossSectionalOp,
+    PairwiseOp as _PairwiseOp,
+    TimeSeriesOp as _TimeSeriesOp,
+)
+
 TransformParams = dict[str, Any]
 KeySelector = str | int
 
@@ -39,7 +45,8 @@ def cross_sectional(
     df: Any,
     value: str,
     time_key: KeySelector | None = None,
-    op: str | None = None,
+    *,
+    op: str | _CrossSectionalOp,
     params: TransformParams | None = None,
 ) -> Any:
     """
@@ -57,8 +64,8 @@ def cross_sectional(
     time_key : str or int, optional
         Column, index level name, or integer index level position that
         partitions the cross-section. Omit for a ``DatetimeIndex``.
-    op : str
-        Cross-sectional operation name (required keyword-or-positional).
+    op : str or CrossSectionalOp
+        Cross-sectional operation name (required keyword-only).
     params : dict, optional
         Operation parameters forwarded to the compiled transform.
 
@@ -70,19 +77,19 @@ def cross_sectional(
     Raises
     ------
     ValueError
-        If a key is ambiguous, parameters are invalid, keys mix aware and
-        naive datetimes, or numeric validation fails.
+        If a key is ambiguous, the operation name is unknown, parameters are
+        invalid, keys mix aware and naive datetimes, or numeric validation fails.
     KeyError
         If a required column is missing.
     TypeError
-        If ``op`` is omitted.
+        If ``op`` is omitted or is an enum value from another operation family.
 
     Examples
     --------
     >>> import pandas as pd
     >>> from finstack_quant.features.dataframe import cross_sectional
     >>> frame = pd.DataFrame({"date": ["2026-01-01"] * 2, "signal": [1.0, 3.0]})
-    >>> cross_sectional(frame, "signal", "date", "rank").tolist()
+    >>> cross_sectional(frame, "signal", "date", op="rank").tolist()
     [0.0, 1.0]
     """
     ...
@@ -92,7 +99,8 @@ def timeseries(
     value: str,
     entity: KeySelector,
     order: KeySelector | None = None,
-    op: str | None = None,
+    *,
+    op: str | _TimeSeriesOp,
     params: TransformParams | None = None,
 ) -> Any:
     """
@@ -112,8 +120,8 @@ def timeseries(
         the entity key.
     order : str or int, optional
         Sort key within each entity. Omit for a ``DatetimeIndex``.
-    op : str
-        Time-series operation name (required keyword-or-positional).
+    op : str or TimeSeriesOp
+        Time-series operation name (required keyword-only).
     params : dict, optional
         Operation parameters forwarded to the compiled transform.
 
@@ -125,19 +133,19 @@ def timeseries(
     Raises
     ------
     ValueError
-        If a key is ambiguous, parameters are invalid, keys mix aware and
-        naive datetimes, or numeric validation fails.
+        If a key is ambiguous, the operation name is unknown, parameters are
+        invalid, keys mix aware and naive datetimes, or numeric validation fails.
     KeyError
         If a required column is missing.
     TypeError
-        If ``op`` is omitted.
+        If ``op`` is omitted or is an enum value from another operation family.
 
     Examples
     --------
     >>> import pandas as pd
     >>> from finstack_quant.features.dataframe import timeseries
     >>> frame = pd.DataFrame({"date": ["1", "2", "3"], "asset": ["A"] * 3, "signal": [1.0, 3.0, 6.0]})
-    >>> timeseries(frame, "signal", "asset", "date", "diff").iloc[1:].tolist()
+    >>> timeseries(frame, "signal", "asset", "date", op="diff").iloc[1:].tolist()
     [2.0, 3.0]
     """
     ...
@@ -208,8 +216,9 @@ def grouped(
     df: Any,
     value: str,
     time_key: KeySelector | None = None,
-    groups: KeySelector | None = None,
-    op: str | None = None,
+    *,
+    groups: KeySelector,
+    op: str | _CrossSectionalOp,
     params: TransformParams | None = None,
 ) -> Any:
     """
@@ -228,9 +237,9 @@ def grouped(
     time_key : str or int, optional
         Timestamp partition key. Omit for a ``DatetimeIndex``.
     groups : str or int
-        Group key forming the sub-partition (required).
-    op : str
-        Cross-sectional operation name (required keyword-or-positional).
+        Group key forming the sub-partition (required keyword-only).
+    op : str or CrossSectionalOp
+        Cross-sectional operation name (required keyword-only).
     params : dict, optional
         Operation parameters forwarded to the compiled transform.
 
@@ -242,8 +251,8 @@ def grouped(
     Raises
     ------
     ValueError
-        If a key is ambiguous, parameters are invalid, keys mix aware and
-        naive datetimes, or numeric validation fails.
+        If a key is ambiguous, the operation name is unknown, parameters are
+        invalid, keys mix aware and naive datetimes, or numeric validation fails.
     KeyError
         If a required column is missing.
     TypeError
@@ -258,7 +267,7 @@ def grouped(
     ...     "group": ["x", "x", "y", "y"],
     ...     "signal": [1.0, 3.0, 10.0, 14.0],
     ... })
-    >>> [round(value, 3) for value in grouped(frame, "signal", "date", "group", "zscore").tolist()]
+    >>> [round(value, 3) for value in grouped(frame, "signal", "date", groups="group", op="zscore").tolist()]
     [-1.0, 1.0, -1.0, 1.0]
     """
     ...
@@ -267,7 +276,8 @@ def neutralize(
     df: Any,
     value: str,
     time_key: KeySelector | None = None,
-    exposures: Sequence[str] | None = None,
+    *,
+    exposures: Sequence[str],
     params: TransformParams | None = None,
 ) -> Any:
     """
@@ -285,7 +295,7 @@ def neutralize(
     time_key : str or int, optional
         Cross-section partition key. Omit for a ``DatetimeIndex``.
     exposures : Sequence[str]
-        Exposure columns regressed against ``value`` (required).
+        Exposure columns regressed against ``value`` (required keyword-only).
     params : dict, optional
         Parameters forwarded to the compiled transform.
 
@@ -313,7 +323,7 @@ def neutralize(
     ...     "signal": [1.0, 2.0, 2.0, 4.0],
     ...     "factor": [0.0, 1.0, 0.0, 1.0],
     ... })
-    >>> [round(value, 3) for value in neutralize(frame, "signal", "date", ["factor"]).tolist()]
+    >>> [round(value, 3) for value in neutralize(frame, "signal", "date", exposures=["factor"]).tolist()]
     [-0.5, -1.0, 0.5, 1.0]
     """
     ...
@@ -324,7 +334,8 @@ def pairwise(
     other: str,
     entity: KeySelector,
     order: KeySelector | None = None,
-    op: str | None = None,
+    *,
+    op: str | _PairwiseOp,
     params: TransformParams | None = None,
 ) -> Any:
     """
@@ -346,8 +357,8 @@ def pairwise(
         Entity key.
     order : str or int, optional
         Sort key within each entity. Omit for a ``DatetimeIndex``.
-    op : str
-        Pairwise operation name (required keyword-or-positional).
+    op : str or PairwiseOp
+        Pairwise operation name (required keyword-only).
     params : dict, optional
         Operation parameters forwarded to the compiled transform.
 
@@ -359,12 +370,12 @@ def pairwise(
     Raises
     ------
     ValueError
-        If a key is ambiguous, parameters are invalid, keys mix aware and
-        naive datetimes, or numeric validation fails.
+        If a key is ambiguous, the operation name is unknown, parameters are
+        invalid, keys mix aware and naive datetimes, or numeric validation fails.
     KeyError
         If a required column is missing.
     TypeError
-        If ``op`` is omitted.
+        If ``op`` is omitted or is an enum value from another operation family.
 
     Examples
     --------
@@ -382,8 +393,8 @@ def pairwise(
     ...     "other",
     ...     "asset",
     ...     "date",
-    ...     "rolling_beta",
-    ...     {"window": 3, "min_periods": 3},
+    ...     op="rolling_beta",
+    ...     params={"window": 3, "min_periods": 3},
     ... )
     >>> round(float(beta.iloc[-1]), 3)
     0.643
@@ -456,7 +467,8 @@ def risk_scaled_weights(
     df: Any,
     value: str,
     time_key: KeySelector | None = None,
-    volatility: str | None = None,
+    *,
+    volatility: str,
 ) -> Any:
     """
     Convert a DataFrame signal column to inverse-risk-scaled weights.
@@ -502,7 +514,7 @@ def risk_scaled_weights(
     ...     "signal": [1.0, 2.0, 2.0, 4.0],
     ...     "vol": [1.0, 2.0, 1.0, 2.0],
     ... })
-    >>> risk_scaled_weights(frame, "signal", "date", "vol").tolist()
+    >>> risk_scaled_weights(frame, "signal", "date", volatility="vol").tolist()
     [-0.25, -0.25, 0.25, 0.25]
     """
     ...
@@ -554,15 +566,15 @@ def neutralize_and_zscore(
     df: Any,
     value: str,
     time_key: KeySelector | None = None,
-    exposures: Sequence[str] | None = None,
-    params: TransformParams | None = None,
+    *,
+    exposures: Sequence[str],
 ) -> Any:
     """
     Neutralize a DataFrame signal column against exposures, then z-score.
 
     Forwards to :func:`finstack_quant.features.neutralize_and_zscore`,
-    residualizing ``value`` on the exposure columns within each ``time_key``
-    partition and z-scoring the residuals.
+    residualizing ``value`` on the exposure columns with an intercept within
+    each ``time_key`` partition and z-scoring the residuals.
 
     Parameters
     ----------
@@ -573,10 +585,7 @@ def neutralize_and_zscore(
     time_key : str or int, optional
         Cross-section partition key. Omit for a ``DatetimeIndex``.
     exposures : Sequence[str]
-        Exposure columns regressed against ``value`` (required).
-    params : dict, optional
-        OLS parameters; ``fit_intercept`` must be true (the default) so
-        z-scoring preserves exposure neutrality.
+        Exposure columns regressed against ``value`` (required keyword-only).
 
     Returns
     -------
@@ -586,8 +595,8 @@ def neutralize_and_zscore(
     Raises
     ------
     ValueError
-        If a key is ambiguous, parameters are invalid, keys mix aware and
-        naive datetimes, or numeric validation fails.
+        If a key is ambiguous, keys mix aware and naive datetimes, an
+        exposure partition cannot be fitted, or numeric validation fails.
     KeyError
         If a required column is missing.
     TypeError
@@ -602,7 +611,7 @@ def neutralize_and_zscore(
     ...     "signal": [1.0, 2.0, 2.0, 4.0],
     ...     "factor": [0.0, 1.0, 0.0, 1.0],
     ... })
-    >>> scores = neutralize_and_zscore(frame, "signal", "date", ["factor"])
+    >>> scores = neutralize_and_zscore(frame, "signal", "date", exposures=["factor"])
     >>> [round(value, 3) for value in scores.tolist()]
     [-0.632, -1.265, 0.632, 1.265]
     """

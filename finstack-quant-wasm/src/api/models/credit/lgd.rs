@@ -13,11 +13,6 @@ use finstack_quant_models::credit::lgd::{
 };
 use wasm_bindgen::prelude::*;
 
-/// Re-validate a deserialized collateral piece through the Rust constructor.
-fn checked_piece(piece: CollateralPiece) -> Result<CollateralPiece, JsValue> {
-    CollateralPiece::new(piece.collateral_type, piece.book_value, piece.haircut).map_err(to_js_err)
-}
-
 /// Beta-distributed recovery rate, parameterized by its mean and standard deviation.
 #[wasm_bindgen(js_name = BetaRecovery)]
 pub struct JsBetaRecovery {
@@ -135,53 +130,6 @@ pub fn seniority_recovery_stats(
         None => lgd::seniority_recovery_stats_default(&seniority),
     }
     .map(|inner| JsBetaRecovery { inner })
-    .map_err(to_js_err)
-}
-
-/// Draw Beta-distributed recovery rates from a mean and standard deviation.
-/// @param mean - Mean recovery rate as a fraction strictly between 0 and 1.
-/// @param std - Recovery standard deviation as a fraction.
-/// @param n_samples - Number of draws; a safe non-negative integer.
-/// @param seed - Seed for reproducible draws, as a safe integer or `bigint`.
-/// @returns The sampled recovery rates.
-///
-/// # Errors
-///
-/// Throws a `validation` error if the moments do not define a Beta
-/// distribution.
-#[wasm_bindgen(js_name = betaRecoverySample)]
-pub fn beta_recovery_sample(
-    mean: JsValue,
-    std: JsValue,
-    n_samples: JsValue,
-    seed: JsValue,
-) -> Result<Box<[f64]>, JsValue> {
-    lgd::beta_recovery_sample(
-        js_f64(&mean, "mean")?,
-        js_f64(&std, "std")?,
-        js_uint(&n_samples, "nSamples")?,
-        js_u64(&seed, "seed")?,
-    )
-    .map(Vec::into_boxed_slice)
-    .map_err(to_js_err)
-}
-
-/// Quantile of a Beta recovery distribution given its mean and standard deviation.
-/// @param mean - Mean recovery rate as a fraction strictly between 0 and 1.
-/// @param std - Recovery standard deviation as a fraction.
-/// @param q - Probability level from 0 through 1.
-/// @returns The recovery rate at probability level `q`.
-///
-/// # Errors
-///
-/// Throws a `validation` error if the moments or `q` are out of range.
-#[wasm_bindgen(js_name = betaRecoveryQuantile)]
-pub fn beta_recovery_quantile(mean: JsValue, std: JsValue, q: JsValue) -> Result<f64, JsValue> {
-    lgd::beta_recovery_quantile(
-        js_f64(&mean, "mean")?,
-        js_f64(&std, "std")?,
-        js_f64(&q, "q")?,
-    )
     .map_err(to_js_err)
 }
 
@@ -372,7 +320,7 @@ impl JsWorkoutLgdBuilder {
     /// Throws a `validation` error if the piece is malformed, its book value
     /// is negative or its haircut is outside `[0, 1]`.
     pub fn collateral(self, piece: JsValue) -> Result<JsWorkoutLgdBuilder, JsValue> {
-        let piece = checked_piece(from_js_json(&piece, "piece")?)?;
+        let piece = from_js_json(&piece, "piece")?;
         Ok(Self {
             inner: self.inner.collateral(piece),
         })
@@ -387,10 +335,7 @@ impl JsWorkoutLgdBuilder {
     /// Throws a `validation` error if any piece is malformed or out of range.
     #[wasm_bindgen(js_name = collateralPieces)]
     pub fn collateral_pieces(self, pieces: JsValue) -> Result<JsWorkoutLgdBuilder, JsValue> {
-        let pieces = from_js_json::<Vec<CollateralPiece>>(&pieces, "pieces")?
-            .into_iter()
-            .map(checked_piece)
-            .collect::<Result<Vec<_>, _>>()?;
+        let pieces = from_js_json::<Vec<CollateralPiece>>(&pieces, "pieces")?;
         Ok(Self {
             inner: self.inner.collateral_pieces(pieces),
         })
@@ -710,84 +655,4 @@ impl JsEadCalculator {
             .inner
             .leq_from_observed_ead(js_f64(&observed_ead, "observedEad")?))
     }
-}
-
-/// Stressed-factor downturn LGD for a base LGD.
-/// @param base_lgd - Through-the-cycle LGD as a fraction from 0 through 1.
-/// @param asset_correlation - Asset correlation with the systematic factor, from 0 to 1.
-/// @param lgd_sensitivity - Sensitivity of LGD to the systematic factor; non-negative.
-/// @param stress_quantile - Stress quantile of the systematic factor, strictly between 0 and 1.
-/// @returns The downturn LGD as a fraction in `[0, 1]`.
-///
-/// # Errors
-///
-/// Throws a `validation` error on out-of-range inputs.
-#[wasm_bindgen(js_name = downturnLgdStressed)]
-pub fn downturn_lgd_stressed(
-    base_lgd: JsValue,
-    asset_correlation: JsValue,
-    lgd_sensitivity: JsValue,
-    stress_quantile: JsValue,
-) -> Result<f64, JsValue> {
-    lgd::downturn_lgd_stressed(
-        js_f64(&base_lgd, "baseLgd")?,
-        js_f64(&asset_correlation, "assetCorrelation")?,
-        js_f64(&lgd_sensitivity, "lgdSensitivity")?,
-        js_f64(&stress_quantile, "stressQuantile")?,
-    )
-    .map_err(to_js_err)
-}
-
-/// Regulatory downturn LGD: `max(baseLgd + addOn, floor)`.
-/// @param base_lgd - Through-the-cycle LGD as a fraction from 0 through 1.
-/// @param add_on - Additive LGD add-on as a fraction; non-negative.
-/// @param floor - Minimum downturn LGD as a fraction from 0 through 1.
-/// @returns The downturn LGD as a fraction in `[0, 1]`.
-///
-/// # Errors
-///
-/// Throws a `validation` error on out-of-range inputs.
-#[wasm_bindgen(js_name = downturnLgdRegulatoryFloor)]
-pub fn downturn_lgd_regulatory_floor(
-    base_lgd: JsValue,
-    add_on: JsValue,
-    floor: JsValue,
-) -> Result<f64, JsValue> {
-    lgd::downturn_lgd_regulatory_floor(
-        js_f64(&base_lgd, "baseLgd")?,
-        js_f64(&add_on, "addOn")?,
-        js_f64(&floor, "floor")?,
-    )
-    .map_err(to_js_err)
-}
-
-/// Exposure at default of a fully drawn term loan.
-/// @param principal - Outstanding principal in monetary units; non-negative.
-/// @returns The EAD, equal to the principal.
-///
-/// # Errors
-///
-/// Throws a `validation` error if `principal` is negative or non-finite.
-#[wasm_bindgen(js_name = eadTermLoan)]
-pub fn ead_term_loan(principal: JsValue) -> Result<f64, JsValue> {
-    lgd::ead_term_loan(js_f64(&principal, "principal")?).map_err(to_js_err)
-}
-
-/// Exposure at default of a revolver: `drawn + ccf * undrawn`.
-/// @param drawn - Drawn balance in monetary units; non-negative.
-/// @param undrawn - Undrawn commitment in monetary units; non-negative.
-/// @param ccf - Credit conversion factor applied to the undrawn amount, from 0 through 1.
-/// @returns The EAD in monetary units.
-///
-/// # Errors
-///
-/// Throws a `validation` error on negative, non-finite or out-of-range inputs.
-#[wasm_bindgen(js_name = eadRevolver)]
-pub fn ead_revolver(drawn: JsValue, undrawn: JsValue, ccf: JsValue) -> Result<f64, JsValue> {
-    lgd::ead_revolver(
-        js_f64(&drawn, "drawn")?,
-        js_f64(&undrawn, "undrawn")?,
-        js_f64(&ccf, "ccf")?,
-    )
-    .map_err(to_js_err)
 }

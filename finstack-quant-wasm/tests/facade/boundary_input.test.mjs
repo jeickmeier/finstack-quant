@@ -204,15 +204,15 @@ test('u64 seeds accept exact BigInt or safe integers and reject wrapping', () =>
   assert.throws(() => model.simulatePaths(2, 2, 1, 7n, 'no'), invalidType('antithetic'));
 });
 
-test('optional integers reject fractions (buildScenarioSpec priority)', () => {
-  assert.equal(scenarios.buildScenarioSpec('x', [], undefined, undefined, 3).priority, 3);
+test('scenario priority uses the canonical integer contract', () => {
+  assert.equal(scenarios.parseScenarioSpec({ id: 'x', operations: [], priority: 3 }).priority, 3);
   assert.throws(
-    () => scenarios.buildScenarioSpec('x', [], undefined, undefined, 1.5),
-    invalidType('priority')
+    () => scenarios.parseScenarioSpec({ id: 'x', operations: [], priority: 1.5 }),
+    (error) => error.kind === 'validation'
   );
   assert.throws(
-    () => scenarios.buildScenarioSpec('x', [], undefined, undefined, 2 ** 31),
-    invalidType('priority')
+    () => scenarios.parseScenarioSpec({ id: 'x', operations: [], priority: 2 ** 31 }),
+    (error) => error.kind === 'validation'
   );
 });
 
@@ -225,10 +225,24 @@ test('string arrays must be arrays of strings (portfolio metrics)', () => {
     entities: {},
     positions: [],
   };
-  assert.equal(typeof portfolio.valuePortfolio(spec, golden.market.data, false, []), 'object');
+  assert.equal(
+    typeof portfolio.valuePortfolio(
+      portfolio.Portfolio.fromSpec(spec),
+      core.MarketContext.fromJson(golden.market.data),
+      false,
+      []
+    ),
+    'object'
+  );
   for (const bad of ['dv01', 5, {}, new Set(['theta'])]) {
     assert.throws(
-      () => portfolio.valuePortfolio(spec, golden.market.data, false, bad),
+      () =>
+        portfolio.valuePortfolio(
+          portfolio.Portfolio.fromSpec(spec),
+          core.MarketContext.fromJson(golden.market.data),
+          false,
+          bad
+        ),
       invalidType('metrics')
     );
   }

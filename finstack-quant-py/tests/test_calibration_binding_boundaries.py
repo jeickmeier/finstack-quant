@@ -45,7 +45,14 @@ def test_swap_quote_rejects_nonfinite_optional_spread(spread: float) -> None:
 def test_swap_quote_preserves_finite_or_absent_spread(spread: float | None) -> None:
     quote = RateQuote.swap("USD-SWAP-2Y", "USD-SOFR-OIS", "2Y", 0.04, spread_decimal=spread)
     assert json.loads(quote.to_json())["spread_decimal"] == spread
-    result = calibrate(CalibrationPlan([CalibrationStep.discount("USD-OIS", "USD", "2026-09-30", quotes=[quote])]))
+    result = calibrate(
+        CalibrationEnvelope(
+            CalibrationPlan(
+                [CalibrationStep.discount("USD-OIS", "USD", "2026-09-30")], quote_sets={"USD-OIS": [quote.id]}
+            ),
+            market_data=[quote],
+        )
+    )
     assert result.success
 
 
@@ -99,7 +106,7 @@ def test_solver_config_constructor_and_json_reject_invalid_settings(settings: di
 
 
 def test_result_loading_rejects_metadata_beyond_canonical_depth_limit() -> None:
-    payload = json.loads(calibrate(CalibrationPlan([])).to_json())
+    payload = json.loads(calibrate(CalibrationEnvelope(CalibrationPlan([]))).to_json())
     metadata: dict = {"leaf": 1}
     for _ in range(110):
         metadata = {"child": metadata}
@@ -128,7 +135,9 @@ def test_omitted_optional_fields_take_the_rust_authoring_defaults_and_accept_non
     assert option["option_vol"]["option_type"] == "call"
     hazard = CalibrationStep.hazard("ACME", "ACME", "USD", "2026-05-08", "USD-OIS", 0.4, seniority=None)
     assert hazard.params["seniority"] == "senior"
-    assert CalibrationStep.vol_surface("V", "2026-05-08", "AAPL", model=None).params["model"] == "sabr"
+    assert "model" not in CalibrationStep.vol_surface("V", "2026-05-08", "AAPL").params
+    with pytest.raises(ValueError, match=r"unknown field.*model"):
+        CalibrationStep.vol_surface("V", "2026-05-08", "AAPL", model="sabr")
     assert CalibrationStep.parametric("P", "2026-05-08", model=None).params["model"] == "ns"
 
 
@@ -152,7 +161,10 @@ def test_typed_market_data_feeds_the_envelope() -> None:
         RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.052),
         RateQuote.swap("USD-SWAP-2Y", "USD-SOFR-OIS", "2Y", 0.049),
     ]
-    plan = CalibrationPlan([CalibrationStep.discount("USD-OIS", "USD", "2026-05-08", quotes=quotes)])
+    plan = CalibrationPlan(
+        [CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")],
+        quote_sets={"USD-OIS": [quote.id for quote in quotes]},
+    )
     data = [
         InflationQuote.inflation_swap("ZC5Y", "2031-05-08", 0.025, "USA-CPI-U", "USD"),
         InflationQuote.yoy_inflation_swap("YOY5Y", "2031-05-08", 0.024, "USA-CPI-U", "1Y", "USD"),
@@ -163,7 +175,7 @@ def test_typed_market_data_feeds_the_envelope() -> None:
         DividendScheduleDatum({"id": "AAPL-DIVS", "underlying": "AAPL", "events": []}),
         CollateralEntry("EUR", "USD"),
     ]
-    envelope = CalibrationEnvelope(plan, market_data=data)
+    envelope = CalibrationEnvelope(plan, market_data=[*quotes, *data])
     kinds = [datum["kind"] for datum in envelope.market_data[2:]]
     assert kinds == [
         "inflation_quote",
@@ -248,3 +260,10 @@ def test_cds_quote_basis_points_come_from_rust_accessor(label: str, expected: fl
         recovery_rate=0.4,
     )
     assert json.loads(quote.to_json())["spread_bp"] == expected
+
+
+def test_partial_validation_config_json_uses_canonical_rust_defaults() -> None:
+    direct = ValidationConfig(max_hazard_rate=2.0)
+    loaded = ValidationConfig.from_json('{"max_hazard_rate": 2.0}')
+    assert loaded.to_dict() == direct.to_dict()
+    assert loaded.to_dict()["max_forward_rate"] == ValidationConfig().to_dict()["max_forward_rate"]

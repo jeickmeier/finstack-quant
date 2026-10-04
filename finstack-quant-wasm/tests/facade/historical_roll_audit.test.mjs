@@ -25,15 +25,11 @@ test('first-order credit spread shocks use recovery conversion and disclose appr
       { kind: 'curve_parallel_bp', curve_kind: 'par_cds', curve_id: original.id, bp: 10 },
     ],
   };
-  const result = scenarios.applyScenarioToMarket(
-    JSON.stringify(spec),
-    JSON.stringify(f.market),
-    f.as_of
-  );
+  const result = scenarios.applyScenario(JSON.stringify(spec), JSON.stringify(f.market), f.as_of);
   const actual = result.market.curves.find((curve) => curve.id === original.id).knot_points[0][1];
   const expected = original.knot_points[0][1] + 0.001 / (1 - original.recovery_rate);
   assert.ok(Math.abs(actual - expected) < 1e-12, `${actual} versus ${expected}`);
-  assert.ok(result.warnings.some((warning) => warning.kind.includes('first_order')));
+  assert.ok(result.report.warnings.some((warning) => warning.kind.includes('first_order')));
 });
 
 test('time roll preserves the raw crossed fixing and supports repeated rolls', () => {
@@ -81,25 +77,27 @@ test('time roll preserves the raw crossed fixing and supports repeated rolls', (
       { kind: 'time_roll_forward', period: '4D', apply_shocks: false, roll_mode: 'calendar_days' },
     ],
   };
-  const result = scenarios.applyScenarioToMarket(
+  const result = scenarios.applyScenario(
     JSON.stringify(spec),
     JSON.stringify(f.market),
     f.as_of,
+    undefined,
     JSON.stringify([instrument])
   );
-  assert.deepEqual(result.time_roll.failed_instruments, []);
+  assert.deepEqual(result.report.time_roll.failed_instruments, []);
   const observed = result.market.series.find((series) => series.id === 'FIXING:USD-SOFR-3M');
   assert.ok(observed, 'crossed reset must have a fixing series');
   const rate = observed.observations.find(([date]) => date === '2025-01-03')[1];
   assert.ok(Math.abs(rate - 0.03) < 1e-12, 'the 150bp spread must not enter the index fixing');
   spec.operations[0].period = '1D';
-  const next = scenarios.applyScenarioToMarket(
+  const next = scenarios.applyScenario(
     JSON.stringify(spec),
     JSON.stringify(result.market),
-    result.time_roll.new_date,
+    result.report.time_roll.new_date,
+    undefined,
     JSON.stringify(result.instruments)
   );
-  assert.deepEqual(next.time_roll.failed_instruments, []);
+  assert.deepEqual(next.report.time_roll.failed_instruments, []);
   assert.deepEqual(
     next.market.series.find((series) => series.id === observed.id).observations,
     observed.observations
@@ -136,13 +134,14 @@ test('overnight time roll records daily raw observations across a weekend', () =
       { kind: 'time_roll_forward', period: '5D', apply_shocks: false, roll_mode: 'calendar_days' },
     ],
   };
-  const result = scenarios.applyScenarioToMarket(
+  const result = scenarios.applyScenario(
     JSON.stringify(scenario),
     JSON.stringify(f.market),
     f.as_of,
+    undefined,
     JSON.stringify([instrument])
   );
-  assert.deepEqual(result.time_roll.failed_instruments, []);
+  assert.deepEqual(result.report.time_roll.failed_instruments, []);
   const observations = result.market.series.find(
     (series) => series.id === 'FIXING:USD-OIS'
   ).observations;
@@ -218,13 +217,14 @@ test('basis swap rolls both raw overnight indices without spread contamination',
       { kind: 'time_roll_forward', period: '4D', apply_shocks: false, roll_mode: 'calendar_days' },
     ],
   };
-  const result = scenarios.applyScenarioToMarket(
+  const result = scenarios.applyScenario(
     JSON.stringify(scenario),
     JSON.stringify(f.market),
     f.as_of,
+    undefined,
     JSON.stringify([instrument])
   );
-  assert.deepEqual(result.time_roll.failed_instruments, []);
+  assert.deepEqual(result.report.time_roll.failed_instruments, []);
   for (const [leg, rate] of [
     [spec.primary_leg, 0.03],
     [spec.reference_leg, 0.04],
@@ -256,10 +256,11 @@ test('crossed fixing projection reports a missing dependency before rolling the 
   };
   assert.throws(
     () =>
-      scenarios.applyScenarioToMarket(
+      scenarios.applyScenario(
         JSON.stringify(scenario),
         before,
         f.as_of,
+        undefined,
         JSON.stringify([instrument])
       ),
     /pre-roll fixing projection|missing pre-roll projection/i

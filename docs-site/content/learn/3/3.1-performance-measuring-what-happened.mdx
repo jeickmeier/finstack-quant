@@ -60,7 +60,7 @@ import pandas as pd
 from pytest import approx
 from _shared.analyst_history import performance_history, history_events, history_market, history_spec, history_quotes
 from finstack_quant.portfolio import (
-    Portfolio, aggregate_full_cashflows, value_portfolio, twrr_modified_dietz, twrr_linked_json, mwr_xirr,
+    Portfolio, aggregate_full_cashflows, value_portfolio, twrr_modified_dietz, twrr_linked, mwr_xirr,
 )
 history = performance_history()
 history_dates = (date.fromisoformat(history[0]['start']), *(date.fromisoformat(period['end']) for period in history))
@@ -146,7 +146,7 @@ for when in timeline:
         period_begin, segment_start, factor, period_flows = nav, nav, 1.0, []
 investor_flows.append({"date": end_date.isoformat(), "amount": nav})
 years = (date.fromisoformat(history[-1]["end"]) - date.fromisoformat(history[0]["start"])).days / 365.0
-linked = json.loads(twrr_linked_json(json.dumps(returns), years))
+linked = json.loads(twrr_linked(json.dumps(returns), years).to_json())
 # Keep the actual deposits and withdrawals: their sign pattern is nonconventional.
 xirr_error = None
 try:

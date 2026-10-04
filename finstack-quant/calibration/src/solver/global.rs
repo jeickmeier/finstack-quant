@@ -129,7 +129,8 @@ impl GlobalFitOptimizer {
     /// # Arguments
     /// * `target` - The domain-specific implementation of the [`GlobalSolveTarget`] trait.
     /// * `quotes` - The list of high-level market quotes to fit.
-    /// * `config` - Calibration settings specifying tolerances and methods.
+    /// * `config` - Numerical calibration and acceptance settings.
+    /// * `use_analytical_jacobian` - Use the target derivative when it supports one.
     /// * `success_tolerance` - Accept/reject threshold for the unweighted native residual
     ///   (`max_i |r_i|`). Distinct from the LM solver convergence tolerance in `config`.
     ///   Callers pass the target-specific validation tolerance (for example
@@ -148,6 +149,7 @@ impl GlobalFitOptimizer {
         quotes: &[T::Quote],
         config: &CalibrationConfig,
         success_tolerance: f64,
+        use_analytical_jacobian: bool,
     ) -> Result<(T::Curve, CalibrationReport)>
     where
         T: GlobalSolveTarget,
@@ -159,6 +161,7 @@ impl GlobalFitOptimizer {
             success_tolerance,
             None,
             no_restarts::<T>,
+            use_analytical_jacobian,
         )
     }
 
@@ -174,6 +177,7 @@ impl GlobalFitOptimizer {
         config: &CalibrationConfig,
         success_tolerance: f64,
         multi_start: Option<&MultiStartConfig>,
+        use_analytical_jacobian: bool,
     ) -> Result<(T::Curve, CalibrationReport)>
     where
         T: GlobalSolveTarget + Sync,
@@ -186,6 +190,7 @@ impl GlobalFitOptimizer {
             success_tolerance,
             multi_start,
             parallel_restarts::<T>,
+            use_analytical_jacobian,
         )
     }
 
@@ -196,6 +201,7 @@ impl GlobalFitOptimizer {
         success_tolerance: f64,
         multi_start: Option<&MultiStartConfig>,
         run_restarts: RestartRunner<T>,
+        use_analytical_jacobian: bool,
     ) -> Result<(T::Curve, CalibrationReport)>
     where
         T: GlobalSolveTarget,
@@ -256,6 +262,7 @@ impl GlobalFitOptimizer {
             lb: &lb,
             ub: &ub,
             config,
+            use_analytical_jacobian,
         };
         let mut best: Option<(SingleSolveResult, f64)> = match run_single_solve(&inputs, &initials)
         {
@@ -507,6 +514,7 @@ struct SolveInputs<'a, T: GlobalSolveTarget> {
     lb: &'a Option<Vec<f64>>,
     ub: &'a Option<Vec<f64>>,
     config: &'a CalibrationConfig,
+    use_analytical_jacobian: bool,
 }
 
 /// Runs the multi-start restarts for one fit and returns one outcome per restart,
@@ -578,15 +586,11 @@ where
         lb,
         ub,
         config,
+        use_analytical_jacobian,
     } = *inputs;
     let n_residuals = active_quotes.len();
 
-    let use_efficient = match config.calibration_method {
-        crate::config::CalibrationMethod::GlobalSolve {
-            use_analytical_jacobian,
-        } => use_analytical_jacobian && target.supports_efficient_jacobian(),
-        crate::config::CalibrationMethod::Bootstrap => false,
-    };
+    let use_efficient = use_analytical_jacobian && target.supports_efficient_jacobian();
 
     let solver = config.create_lm_solver()?;
 
@@ -1462,9 +1466,14 @@ mod tests {
     #[test]
     fn rejects_colliding_residual_keys_before_acceptance() {
         let target = TestTarget::from_len(2, vec![0.005, 0.0]);
-        let error =
-            GlobalFitOptimizer::optimize(&target, &[0, 0], &CalibrationConfig::default(), 1e-6)
-                .expect_err("a residual must never overwrite another observation");
+        let error = GlobalFitOptimizer::optimize(
+            &target,
+            &[0, 0],
+            &CalibrationConfig::default(),
+            1e-6,
+            true,
+        )
+        .expect_err("a residual must never overwrite another observation");
         assert!(error.to_string().contains("duplicate residual key"));
     }
 
@@ -1478,7 +1487,7 @@ mod tests {
         let target = TestTarget::from_len(4, vec![tol; 4]);
         let quotes = vec![0usize, 1usize, 2usize, 3usize];
         let config = CalibrationConfig::default().with_tolerance(1.0);
-        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, tol)
+        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, tol, true)
             .expect("optimization should complete");
 
         assert!(
@@ -1504,7 +1513,7 @@ mod tests {
         let target = TestTarget::from_len(2, vec![0.15, 0.0]).with_weights(vec![0.01, 0.01]);
         let quotes = vec![0usize, 1usize];
         let config = CalibrationConfig::default().with_tolerance(1e-12);
-        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 0.1)
+        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 0.1, true)
             .expect("optimization should complete");
         assert!(
             !report.success,
@@ -1528,7 +1537,7 @@ mod tests {
 
         // The 4th arg is the *validation/success* tolerance (distinct from the LM
         // solver tolerance set via `with_tolerance`).
-        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 0.1)
+        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 0.1, true)
             .expect("optimization should complete");
 
         assert!(
@@ -1645,6 +1654,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect("optimization succeeds");
 
@@ -1672,6 +1682,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect_err("should fail");
         let Error::Calibration { message, .. } = err else {
@@ -1695,6 +1706,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect_err("should fail");
         let Error::Calibration { message, .. } = err else {
@@ -1718,6 +1730,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect_err("should fail");
         let Error::Calibration { message, .. } = err else {
@@ -1744,6 +1757,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect("optimization succeeds");
 
@@ -1773,6 +1787,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect("should succeed");
 
@@ -1840,6 +1855,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect("should succeed");
 
@@ -1930,9 +1946,6 @@ mod tests {
         };
         let quotes: Vec<usize> = (0..10).collect();
         let config = CalibrationConfig::default()
-            .with_calibration_method(crate::CalibrationMethod::GlobalSolve {
-                use_analytical_jacobian: true,
-            })
             .with_tolerance(1e-12)
             .with_max_iterations(50);
 
@@ -1941,6 +1954,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect("should succeed");
 
@@ -1958,6 +1972,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect_err("empty active quotes should fail");
         assert!(matches!(
@@ -1977,6 +1992,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect_err("n_residuals < n_params should fail");
         let Error::Calibration { message, .. } = err else {
@@ -2000,6 +2016,7 @@ mod tests {
                 &quotes,
                 &config,
                 config.discount_curve.validation_tolerance,
+                true,
             )
             .expect_err("invalid weights should fail");
             let Error::Calibration { message, .. } = err else {
@@ -2017,6 +2034,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect_err("all-zero weights should fail");
         let Error::Calibration { message, .. } = zero_err else {
@@ -2034,17 +2052,14 @@ mod tests {
         let quotes = vec![0usize];
         let config = CalibrationConfig::default().with_tolerance(1.0);
 
-        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 0.1)
+        let (_curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 0.1, true)
             .expect("optimization should still complete");
 
         assert!(
             !report.success,
             "explicit success tolerance should be enforced"
         );
-        assert_eq!(
-            report.metadata.get("success_tolerance"),
-            Some(&format!("{:.2e}", 0.1))
-        );
+        assert_eq!(report.success_tolerance, Some(0.1));
         assert!(
             (report.objective_value - 0.15).abs() < 1e-12,
             "objective_value should be weighted L2 norm"
@@ -2064,6 +2079,7 @@ mod tests {
             &quotes,
             &config,
             config.discount_curve.validation_tolerance,
+            true,
         )
         .expect("should succeed");
 

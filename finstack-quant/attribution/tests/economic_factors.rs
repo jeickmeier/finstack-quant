@@ -156,7 +156,10 @@ fn scalar_convertible_vol_must_be_volatility_pnl() {
     let m0 = market(80.0, 0.25);
     let m1 = market(80.0, 0.26);
     let config = FinstackConfig::default();
-    for (method, full_cross) in repricing_methods() {
+    for (method, full_cross) in repricing_methods().into_iter().chain([(
+        AttributionMethod::Taylor(finstack_quant_attribution::TaylorAttributionConfig::default()),
+        false,
+    )]) {
         let request = AttributionRequest {
             full_cross_attribution: full_cross,
             ..AttributionRequest::new(&instrument, &m0, &m1, as_of, as_of, &config)

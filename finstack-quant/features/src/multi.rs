@@ -4,13 +4,13 @@
 //! neutralization / residualization, and signal-to-weight helpers that operate
 //! on more than one aligned column.
 
-use crate::cross_sectional::apply_cross_sectional_op;
+use crate::cross_sectional::ResolvedCrossSectionalOp;
 use crate::index::{sorted_indices, try_for_each_entity, try_for_each_trailing_window};
 use crate::types::{
     bool_param, finite, mean, op_from_str, reject_unknown_params, scaled_centered,
     validate_lengths, validate_output, window_params,
 };
-use crate::{transform_cross_sectional, transform_cross_sectional_with_op, CrossSectionalOp};
+use crate::{transform_cross_sectional, CrossSectionalOp};
 use finstack_quant_core::math::stats::{covariance, variance};
 use finstack_quant_core::{Error, Result};
 use nalgebra::{DMatrix, DVector};
@@ -43,7 +43,7 @@ impl PairwiseOp {
     /// Every operation, in declaration order.
     pub const ALL: &'static [Self] = &[Self::RollingCov, Self::RollingCorr, Self::RollingBeta];
 
-    /// Canonical snake_case name accepted by [`transform_timeseries_pairwise`].
+    /// Canonical snake_case name used by JSON and host-language APIs.
     #[must_use]
     pub fn name(self) -> String {
         crate::types::op_name(&self)
@@ -67,34 +67,6 @@ impl PairwiseOp {
 ///
 /// # Arguments
 ///
-/// * `values` - Row-aligned numeric input values; missing or non-finite values
-///   are handled by the selected cross-sectional operation.
-/// * `time_key` - Row-aligned time partition labels; each time/group pair is
-///   transformed independently.
-/// * `groups` - Row-aligned group labels that subdivide every time partition.
-/// * `op` - Canonical snake-case cross-sectional operation name.
-/// * `params` - Optional operation-specific JSON parameters; omitted keys use
-///   the operation's documented defaults.
-///
-/// # Errors
-///
-/// Returns a validation error when input lengths differ, `op` is unsupported,
-/// or operation parameters are malformed.
-pub fn transform_cross_sectional_grouped(
-    values: &[Option<f64>],
-    time_key: &[String],
-    groups: &[String],
-    op: &str,
-    params: Option<&Value>,
-) -> Result<Vec<Option<f64>>> {
-    let op = CrossSectionalOp::from_str(op)?;
-    transform_cross_sectional_grouped_with_op(values, time_key, groups, op, params)
-}
-
-/// Transform a cross-section within each `(time_key, group)` sub-partition.
-///
-/// # Arguments
-///
 /// * `values` - Row-aligned numeric input values; output preserves the input
 ///   row order after transforming each time/group sub-partition.
 /// * `time_key` - Row-aligned time partition labels; length must equal
@@ -108,7 +80,7 @@ pub fn transform_cross_sectional_grouped(
 ///
 /// Returns a validation error when input lengths differ or operation parameters
 /// are malformed.
-pub fn transform_cross_sectional_grouped_with_op(
+pub fn transform_cross_sectional_grouped(
     values: &[Option<f64>],
     time_key: &[String],
     groups: &[String],
@@ -119,13 +91,12 @@ pub fn transform_cross_sectional_grouped_with_op(
         values.len(),
         &[("time_key", time_key.len()), ("groups", groups.len())],
     )?;
-    reject_unknown_params(params, &op.name(), op.param_keys())?;
-    crate::cross_sectional::validate_params(op, params)?;
+    let op = ResolvedCrossSectionalOp::resolve(op, params)?;
     let partitions = crate::index::partition_by_pair(time_key, groups);
 
     let mut output = vec![None; values.len()];
     for indices in partitions.values() {
-        apply_cross_sectional_op(values, indices, op, params, &mut output)?;
+        op.apply(values, indices, &mut output)?;
     }
     validate_output(&output)?;
     Ok(output)
@@ -173,11 +144,12 @@ pub fn neutralize(
     Ok(output)
 }
 
-/// Transform two value columns per entity with a rolling pairwise operation.
+/// Transform two value columns per entity with a typed rolling pairwise op.
 ///
-/// `window` spans trailing entity rows, including missing rows; `min_periods`
-/// counts complete finite pairs within it. Aggregates may emit at a missing
-/// current row when enough pairs remain. Neither parameter counts calendar days.
+/// `window` spans trailing rows, including missing rows. `min_periods` counts
+/// finite pairs within that window and cannot exceed its length. Aggregates can
+/// emit at a missing current row when enough pairs remain. Neither parameter
+/// counts calendar days.
 ///
 /// # Arguments
 ///
@@ -189,48 +161,6 @@ pub fn neutralize(
 ///   independently.
 /// * `order` - Row-aligned sortable keys that establish order within entities.
 ///   Time order is lexicographic; use ISO-8601 for calendar chronology.
-/// * `op` - Canonical operation name: `"rolling_cov"`, `"rolling_corr"`, or
-///   `"rolling_beta"`.
-/// * `params` - Optional JSON parameters; `window` defaults to 1 and
-///   `min_periods` defaults to `window`. `window` counts rows; `min_periods`
-///   counts finite pairs and cannot exceed `window`.
-///
-/// # Errors
-///
-/// Returns a validation error when input lengths differ, `op` is unsupported,
-/// or operation parameters are malformed.
-pub fn transform_timeseries_pairwise(
-    values: &[Option<f64>],
-    other: &[Option<f64>],
-    entity: &[String],
-    order: &[String],
-    op: &str,
-    params: Option<&Value>,
-) -> Result<Vec<Option<f64>>> {
-    transform_timeseries_pairwise_with_op(
-        values,
-        other,
-        entity,
-        order,
-        PairwiseOp::from_str(op)?,
-        params,
-    )
-}
-
-/// Transform two value columns per entity with a typed rolling pairwise op.
-///
-/// `window` spans trailing rows, including missing rows. `min_periods` counts
-/// finite pairs within that window and cannot exceed its length.
-///
-/// # Arguments
-///
-/// * `values` - Row-aligned first series, treated as the dependent series for
-///   rolling beta.
-/// * `other` - Row-aligned second series; paired observations require finite
-///   values in both series.
-/// * `entity` - Row-aligned entity identifiers; each entity is rolled
-///   independently.
-/// * `order` - Row-aligned sortable keys that establish order within entities.
 /// * `op` - Typed pairwise rolling statistic to calculate.
 /// * `params` - Optional JSON parameters; `window` defaults to 1 and
 ///   `min_periods` defaults to `window`.
@@ -239,7 +169,7 @@ pub fn transform_timeseries_pairwise(
 ///
 /// Returns a validation error when input lengths differ or operation parameters
 /// are malformed.
-pub fn transform_timeseries_pairwise_with_op(
+pub fn transform_timeseries_pairwise(
     values: &[Option<f64>],
     other: &[Option<f64>],
     entity: &[String],
@@ -328,10 +258,13 @@ pub fn rolling_regression_residual(
     let indices = sorted_indices(entity, order);
     try_for_each_entity(entity, &indices, |entity_indices| {
         try_for_each_trailing_window(entity_indices, window, |idx, window_indices| {
-            if count_complete_rows(values, exposures, window_indices) < min_periods {
-                return Ok(());
-            }
-            if let Some(fit) = fit_ols(values, exposures, window_indices, fit_intercept)? {
+            if let Some(fit) = fit_ols(
+                values,
+                exposures,
+                window_indices,
+                fit_intercept,
+                min_periods,
+            )? {
                 output[idx] = residual_for_idx(values, exposures, idx, &fit);
             }
             Ok(())
@@ -388,7 +321,7 @@ pub fn risk_scaled_weights(
         })
         .collect::<Vec<_>>();
     validate_output(&scaled)?;
-    transform_cross_sectional_with_op(&scaled, time_key, CrossSectionalOp::LongShortWeights, None)
+    transform_cross_sectional(&scaled, time_key, CrossSectionalOp::LongShortWeights, None)
 }
 
 /// Convert cross-sectional ranks into gross-normalized long/short weights.
@@ -404,11 +337,14 @@ pub fn risk_scaled_weights(
 ///
 /// Returns a validation error when input lengths differ.
 pub fn rank_to_weights(values: &[Option<f64>], time_key: &[String]) -> Result<Vec<Option<f64>>> {
-    let ranks = transform_cross_sectional(values, time_key, "rank", None)?;
-    transform_cross_sectional_with_op(&ranks, time_key, CrossSectionalOp::LongShortWeights, None)
+    let ranks = transform_cross_sectional(values, time_key, CrossSectionalOp::Rank, None)?;
+    transform_cross_sectional(&ranks, time_key, CrossSectionalOp::LongShortWeights, None)
 }
 
 /// Neutralize a signal against exposures and z-score the residuals.
+///
+/// OLS always includes an intercept so demeaning the residuals preserves
+/// exposure neutrality.
 ///
 /// # Arguments
 ///
@@ -416,27 +352,20 @@ pub fn rank_to_weights(values: &[Option<f64>], time_key: &[String]) -> Result<Ve
 /// * `time_key` - Row-aligned labels defining independent cross-sectional
 ///   regressions and z-scores.
 /// * `exposures` - Explanatory-variable columns, each aligned to `values`.
-/// * `params` - Optional neutralization controls; `fit_intercept` defaults to
-///   `true` and must remain true to preserve exposure neutrality after demeaning.
+///   Missing or non-finite exposure values exclude that row from the fit and
+///   produce a missing residual.
 ///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ, exposure shapes are
-/// malformed, a partition is singular, `fit_intercept` is false, or arithmetic fails.
+/// malformed, a partition is singular, or arithmetic fails.
 pub fn neutralize_and_zscore(
     values: &[Option<f64>],
     time_key: &[String],
     exposures: &[Vec<Option<f64>>],
-    params: Option<&Value>,
 ) -> Result<Vec<Option<f64>>> {
-    if !bool_param(params, "fit_intercept", true)? {
-        return Err(Error::Validation(
-            "neutralize_and_zscore requires fit_intercept=true to preserve exposure neutrality"
-                .into(),
-        ));
-    }
-    let residual = neutralize(values, time_key, exposures, params)?;
-    transform_cross_sectional(&residual, time_key, "zscore", None)
+    let residual = neutralize(values, time_key, exposures, None)?;
+    transform_cross_sectional(&residual, time_key, CrossSectionalOp::Zscore, None)
 }
 
 fn validate_exposures(primary_len: usize, exposures: &[Vec<Option<f64>>]) -> Result<()> {
@@ -485,7 +414,7 @@ fn residualize_partition(
     fit_intercept: bool,
     output: &mut [Option<f64>],
 ) -> Result<()> {
-    let fit = fit_ols(values, exposures, indices, fit_intercept)?.ok_or_else(|| {
+    let fit = fit_ols(values, exposures, indices, fit_intercept, 0)?.ok_or_else(|| {
         Error::Validation(format!(
             "neutralize OLS failed for time_key '{time_key}': singular or underdetermined design"
         ))
@@ -494,22 +423,6 @@ fn residualize_partition(
         output[idx] = residual_for_idx(values, exposures, idx, &fit);
     }
     Ok(())
-}
-
-fn count_complete_rows(
-    values: &[Option<f64>],
-    exposures: &[Vec<Option<f64>>],
-    indices: &[usize],
-) -> usize {
-    indices
-        .iter()
-        .filter(|&&idx| {
-            finite(values[idx]).is_some()
-                && exposures
-                    .iter()
-                    .all(|exposure| finite(exposure[idx]).is_some())
-        })
-        .count()
 }
 
 /// A fitted model evaluated in the scaled coordinates used by the solver.
@@ -528,6 +441,7 @@ fn fit_ols(
     exposures: &[Vec<Option<f64>>],
     indices: &[usize],
     fit_intercept: bool,
+    min_rows: usize,
 ) -> Result<Option<OlsFit>> {
     let width = exposures.len() + usize::from(fit_intercept);
     let complete: Vec<_> = indices
@@ -537,7 +451,7 @@ fn fit_ols(
             finite(values[idx]).is_some() && exposures.iter().all(|col| finite(col[idx]).is_some())
         })
         .collect();
-    if width == 0 || complete.len() < width {
+    if width == 0 || complete.len() < width.max(min_rows) {
         return Ok(None);
     }
     let mut design = DMatrix::zeros(complete.len(), width);

@@ -174,7 +174,7 @@ impl std::fmt::Display for ValidationMode {
 /// for specific arbitrage and monotonicity checks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
+#[serde(default, deny_unknown_fields)]
 pub struct ValidationConfig {
     /// Enable forward rate positivity check
     pub check_forward_positivity: bool,

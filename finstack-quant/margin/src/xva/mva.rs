@@ -182,29 +182,13 @@ impl ImProfile {
     /// Returns an error if the profile is empty, lengths differ, times are not
     /// strictly increasing and positive, or IM values are negative/non-finite.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        if self.times.is_empty() {
-            return Err(finstack_quant_core::Error::Validation(
-                "ImProfile: times must not be empty".into(),
-            ));
-        }
+        validate_time_grid(&self.times, "ImProfile: times")?;
         if self.im_values.len() != self.times.len() {
             return Err(finstack_quant_core::Error::Validation(format!(
                 "ImProfile: vector lengths must be equal (times={}, im_values={})",
                 self.times.len(),
                 self.im_values.len()
             )));
-        }
-        for (i, &t) in self.times.iter().enumerate() {
-            if !t.is_finite() || t <= 0.0 {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "ImProfile: times[{i}] = {t} must be positive and finite"
-                )));
-            }
-            if i > 0 && t <= self.times[i - 1] {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "ImProfile: times must be strictly increasing at index {i}"
-                )));
-            }
         }
         for (i, &im) in self.im_values.iter().enumerate() {
             if !im.is_finite() || im < 0.0 {
@@ -221,7 +205,7 @@ impl ImProfile {
 /// `IM(t) = SIMM(sensitivities) × decay(t)`.
 ///
 /// The base IM is `calculator.calculate_from_sensitivities_parts(sensitivities,
-/// currency).expect("valid sensitivity fixture").0` — the full cross-risk-class ISDA SIMM aggregate.
+/// currency)?.0` — the full cross-risk-class ISDA SIMM aggregate.
 ///
 /// # Arguments
 ///
@@ -247,7 +231,7 @@ pub fn im_profile_from_simm(
     time_grid: &[f64],
 ) -> finstack_quant_core::Result<ImProfile> {
     decay.validate()?;
-    validate_time_grid(time_grid)?;
+    validate_time_grid(time_grid, "im_profile_from_simm: time_grid")?;
     let (base_im, _breakdown) =
         calculator.calculate_from_sensitivities_parts(sensitivities, currency)?;
     let profile = ImProfile {
@@ -261,21 +245,21 @@ pub fn im_profile_from_simm(
     Ok(profile)
 }
 
-fn validate_time_grid(time_grid: &[f64]) -> finstack_quant_core::Result<()> {
+fn validate_time_grid(time_grid: &[f64], label: &str) -> finstack_quant_core::Result<()> {
     if time_grid.is_empty() {
-        return Err(finstack_quant_core::Error::Validation(
-            "im_profile_from_simm: time_grid must not be empty".into(),
-        ));
+        return Err(finstack_quant_core::Error::Validation(format!(
+            "{label} must not be empty"
+        )));
     }
     for (i, &t) in time_grid.iter().enumerate() {
         if !t.is_finite() || t <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "im_profile_from_simm: time_grid[{i}] = {t} must be positive and finite"
+                "{label}[{i}] = {t} must be positive and finite"
             )));
         }
         if i > 0 && t <= time_grid[i - 1] {
             return Err(finstack_quant_core::Error::Validation(format!(
-                "im_profile_from_simm: time_grid must be strictly increasing at index {i}"
+                "{label} must be strictly increasing at index {i}"
             )));
         }
     }

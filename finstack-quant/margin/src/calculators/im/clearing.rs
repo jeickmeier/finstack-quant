@@ -43,13 +43,8 @@ pub enum CcpMethodology {
     Jscc,
     /// Eurex
     Eurex,
-    /// Generic VaR-based
-    GenericVar {
-        /// Confidence level (e.g., 0.99 for 99%)
-        confidence: f64,
-        /// Lookback period in days
-        lookback_days: u32,
-    },
+    /// Conservative exposure-times-rate fallback for an unknown CCP.
+    GenericProxy,
 }
 
 impl std::fmt::Display for CcpMethodology {
@@ -62,9 +57,7 @@ impl std::fmt::Display for CcpMethodology {
             CcpMethodology::IceClearUs => write!(f, "ICE Clear US"),
             CcpMethodology::Jscc => write!(f, "JSCC"),
             CcpMethodology::Eurex => write!(f, "Eurex"),
-            CcpMethodology::GenericVar { confidence, .. } => {
-                write!(f, "Generic VaR ({:.0}%)", confidence * 100.0)
-            }
+            CcpMethodology::GenericProxy => write!(f, "Generic proxy"),
         }
     }
 }
@@ -79,7 +72,7 @@ impl CcpMethodology {
             CcpMethodology::IceClearUs => "ice_clear_us",
             CcpMethodology::Jscc => "jscc",
             CcpMethodology::Eurex => "eurex",
-            CcpMethodology::GenericVar { .. } => "generic_var",
+            CcpMethodology::GenericProxy => "generic_proxy",
         }
     }
 
@@ -91,33 +84,31 @@ impl CcpMethodology {
         registry.ccp_default_params.clone()
     }
 
-    fn generic_var_from_registry(registry: &MarginRegistry) -> Self {
-        let defaults = &registry.ccp_generic_var_defaults;
-        CcpMethodology::GenericVar {
-            confidence: defaults.confidence,
-            lookback_days: defaults.lookback_days,
-        }
-    }
-
-    fn from_ccp_name_with_registry(ccp: &str, registry: &MarginRegistry) -> Self {
-        Self::from_ccp_name_with_fallback(ccp, || Self::generic_var_from_registry(registry))
-    }
-
-    fn from_ccp_name_with_fallback<F>(ccp: &str, fallback: F) -> Self
-    where
-        F: FnOnce() -> Self,
-    {
+    /// Choose a CCP methodology from a CCP display name.
+    ///
+    /// The mapping is heuristic and string-based. Unknown names fall back to
+    /// [`CcpMethodology::GenericProxy`].
+    ///
+    /// # Arguments
+    ///
+    /// * `ccp` - Human-readable CCP name such as `"LCH"` or `"ICE Clear Credit"`
+    ///
+    /// # Returns
+    ///
+    /// The closest built-in CCP methodology.
+    #[must_use]
+    pub fn from_ccp_name(ccp: &str) -> Self {
         let normalized = ccp.trim().to_ascii_lowercase();
         let is_credit = normalized.contains("credit") || normalized.contains("cds");
 
         if normalized.contains("lch") {
-            if is_credit || normalized.contains("cds") {
+            if is_credit {
                 CcpMethodology::LchCdsClear
             } else {
                 CcpMethodology::LchSwapClear
             }
         } else if normalized.contains("ice") {
-            if is_credit || normalized.contains("credit") || normalized.contains("cds") {
+            if is_credit {
                 CcpMethodology::IceClearCredit
             } else {
                 CcpMethodology::IceClearUs
@@ -129,25 +120,8 @@ impl CcpMethodology {
         } else if normalized.contains("eurex") {
             CcpMethodology::Eurex
         } else {
-            fallback()
+            CcpMethodology::GenericProxy
         }
-    }
-
-    /// Choose a CCP methodology from a CCP display name.
-    ///
-    /// The mapping is heuristic and string-based. Unknown names fall back to
-    /// registry-backed [`CcpMethodology::GenericVar`] defaults.
-    ///
-    /// # Arguments
-    ///
-    /// * `ccp` - Human-readable CCP name such as `"LCH"` or `"ICE Clear Credit"`
-    ///
-    /// # Returns
-    ///
-    /// The closest built-in CCP methodology.
-    #[must_use]
-    pub fn from_ccp_name(ccp: &str) -> Self {
-        Self::from_ccp_name_with_registry(ccp, embedded_registry_or_panic())
     }
 }
 
@@ -182,7 +156,7 @@ impl CcpMethodology {
 /// use time::macros::date;
 ///
 /// # fn main() -> finstack_quant_core::Result<()> {
-/// let calc = ClearingHouseImCalculator::lch_swapclear();
+/// let calc = ClearingHouseImCalculator::new(finstack_quant_margin::calculators::CcpMethodology::LchSwapClear);
 /// # let cleared_trade: &dyn Marginable = todo!("provide a cleared marginable instrument");
 /// # let context = MarketContext::new();
 /// # let as_of: Date = date!(2025-01-01);
@@ -271,42 +245,6 @@ impl ClearingHouseImCalculator {
         }
     }
 
-    /// Create calculator for LCH SwapClear (IRS).
-    #[must_use]
-    pub fn lch_swapclear() -> Self {
-        Self::new(CcpMethodology::LchSwapClear)
-    }
-
-    /// Create calculator for ICE Clear Credit (CDS/CDX).
-    #[must_use]
-    pub fn ice_clear_credit() -> Self {
-        Self::new(CcpMethodology::IceClearCredit)
-    }
-
-    /// Create calculator for CME.
-    #[must_use]
-    pub fn cme() -> Self {
-        Self::new(CcpMethodology::Cme)
-    }
-
-    /// Create a generic VaR-based fallback calculator.
-    ///
-    /// # Arguments
-    ///
-    /// * `confidence` - Confidence level in decimal form, such as `0.99`
-    /// * `lookback_days` - Historical lookback window in calendar days
-    ///
-    /// # Returns
-    ///
-    /// A calculator with generic VaR metadata and default conservative-rate lookup.
-    #[must_use]
-    pub fn generic_var(confidence: f64, lookback_days: u32) -> Self {
-        Self::new(CcpMethodology::GenericVar {
-            confidence,
-            lookback_days,
-        })
-    }
-
     /// Attach a CCP input source that provides external VaR or SPAN outputs.
     ///
     /// # Arguments
@@ -378,10 +316,6 @@ impl ImCalculator for ClearingHouseImCalculator {
         );
         result.approximation = approximation;
         Ok(result)
-    }
-
-    fn methodology(&self) -> ImMethodology {
-        ImMethodology::ClearingHouse
     }
 }
 
@@ -480,23 +414,24 @@ mod tests {
 
     #[test]
     fn conservative_rates() {
-        let lch = ClearingHouseImCalculator::lch_swapclear();
-        let ice = ClearingHouseImCalculator::ice_clear_credit();
+        let lch = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear);
+        let ice =
+            ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::IceClearCredit);
         assert_eq!(lch.params().conservative_rate, 0.02);
         assert_eq!(ice.params().conservative_rate, 0.10);
     }
 
     #[test]
     fn mpor_days() {
-        let lch = ClearingHouseImCalculator::lch_swapclear();
-        let cme = ClearingHouseImCalculator::cme();
+        let lch = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear);
+        let cme = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::Cme);
         assert_eq!(lch.params().mpor_days, 5);
         assert_eq!(cme.params().mpor_days, 5);
     }
 
     #[test]
     fn conservative_calculation() {
-        let calc = ClearingHouseImCalculator::lch_swapclear();
+        let calc = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear);
         let notional = Money::from((100_000_000_i64, Currency::USD));
         let im = calc.calculate_conservative(notional);
 
@@ -506,7 +441,8 @@ mod tests {
 
     #[test]
     fn ice_clear_credit_calculation() {
-        let calc = ClearingHouseImCalculator::ice_clear_credit();
+        let calc =
+            ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::IceClearCredit);
         let notional = Money::from((50_000_000_i64, Currency::USD));
         let im = calc.calculate_conservative(notional);
 
@@ -553,12 +489,11 @@ mod tests {
 
     #[test]
     fn uses_ccp_input_source_when_available() {
-        let calc = ClearingHouseImCalculator::lch_swapclear().with_input_source(Arc::new(
-            TestInputSource {
+        let calc = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear)
+            .with_input_source(Arc::new(TestInputSource {
                 amount: Money::from((3_000_000_i64, Currency::USD)),
                 mpor_days: 7,
-            },
-        ));
+            }));
         let notional = Money::from((100_000_000_i64, Currency::USD));
         let fallback = calc.calculate_conservative(notional);
 
@@ -574,7 +509,7 @@ mod tests {
 
     #[test]
     fn fails_closed_without_external_source_or_exposure_base() {
-        let calc = ClearingHouseImCalculator::lch_swapclear();
+        let calc = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear);
         let instrument = TestInstrument::new(Money::from((0_i64, Currency::USD)));
         let market = MarketContext::new();
         let as_of = Date::from_calendar_date(2024, time::Month::January, 1).expect("valid date");
@@ -595,7 +530,7 @@ mod tests {
         // No external source: the calculator scales the exposure base by the
         // conservative rate. That number is a proxy, not SPAN/VaR — the result
         // must say so.
-        let calc = ClearingHouseImCalculator::lch_swapclear();
+        let calc = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear);
         let notional = Money::from((100_000_000_i64, Currency::USD));
         let mut inst = TestInstrument::new(notional);
         inst.exposure_base = Some(notional);
@@ -612,12 +547,11 @@ mod tests {
 
     #[test]
     fn external_source_amount_is_not_marked_as_approximation() {
-        let calc = ClearingHouseImCalculator::lch_swapclear().with_input_source(Arc::new(
-            TestInputSource {
+        let calc = ClearingHouseImCalculator::new(crate::calculators::CcpMethodology::LchSwapClear)
+            .with_input_source(Arc::new(TestInputSource {
                 amount: Money::from((3_000_000_i64, Currency::USD)),
                 mpor_days: 7,
-            },
-        ));
+            }));
         let inst = TestInstrument::new(Money::from((100_000_000_i64, Currency::USD)));
         let market = MarketContext::new();
         let as_of = Date::from_calendar_date(2024, time::Month::January, 1).expect("valid date");

@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import init, { portfolio, valuations } from '../../index.js';
+import init, { core as portfolioCore, portfolio, valuations } from '../../index.js';
 
 await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
@@ -110,15 +110,20 @@ test('valuationResultToJson writes the canonical JSON with an exact seed', () =>
 });
 
 test('portfolio valuation keeps Monte Carlo seeds as bigint', () => {
-  const valuation = portfolio.valuePortfolio(portfolioSpec(), MARKET, false, []);
+  const valuation = portfolio.valuePortfolio(
+    portfolio.Portfolio.fromSpec(portfolioSpec()),
+    portfolioCore.MarketContext.fromJson(MARKET),
+    false,
+    []
+  );
   assertBigintsOnlyInValuations(valuation, 'valuePortfolio');
 });
 
 test('scenario revaluation keeps seeds as bigint and report counts as numbers', () => {
   const out = portfolio.applyScenarioAndRevalue(
-    portfolioSpec(),
+    portfolio.Portfolio.fromSpec(portfolioSpec()),
     JSON.stringify({ id: 's', operations: [] }),
-    MARKET
+    portfolioCore.MarketContext.fromJson(MARKET)
   );
   assertBigintsOnlyInValuations(out, 'applyScenarioAndRevalue');
   assert.equal(typeof out.report.operations_applied, 'number');

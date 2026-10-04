@@ -615,7 +615,7 @@ impl RevolvingCreditMcRun {
     /// Resolve sampling settings from a facility's model configuration.
     ///
     /// `mc_paths` and `mc_antithetic` fall back to the embedded registry's
-    /// `rust.revolving_credit` defaults. The seed is
+    /// `revolving_credit` defaults. The seed is
     /// `derive_seed(facility_id, mc_seed_scenario)`, with `"base"` when no
     /// label is set.
     ///
@@ -634,9 +634,7 @@ impl RevolvingCreditMcRun {
         facility_id: &finstack_quant_core::types::InstrumentId,
         model_config: &crate::instruments::pricing_overrides::ModelConfig,
     ) -> finstack_quant_core::Result<Self> {
-        let defaults = &finstack_quant_models::monte_carlo::registry::embedded_defaults()?
-            .rust
-            .revolving_credit;
+        let defaults = &crate::pricer::defaults::embedded_defaults()?.revolving_credit;
         Ok(Self {
             num_paths: crate::instruments::common_impl::helpers::resolve_mc_paths(
                 model_config.mc_paths,

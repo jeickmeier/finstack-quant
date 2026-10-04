@@ -2623,7 +2623,7 @@ export interface Exposure {
    * Undrawn commitment at the reporting date, in the same currency as
    * [`Self::ead`]. Constant across the horizon (no undrawn schedule).
    * Default `0.0` (fully drawn term loan). EAD is
-   * `drawn + undrawn × ccf` via core `ead_revolver`.
+   * `drawn + undrawn × ccf` via core `EadCalculator`.
    */
   undrawn?: number;
 }

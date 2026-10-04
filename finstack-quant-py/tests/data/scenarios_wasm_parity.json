@@ -117,7 +117,7 @@
    "mutates_instruments": false
   },
   {
-   "py": "curve_parallel_bp",
+   "py": "parallel_bp_many",
    "args": [
     "discount",
     [
@@ -1001,7 +1001,7 @@
   },
   "bad_factor_error": {
    "exception": "ValueError",
-   "message": "Unknown factor 'nope'. Expected one of: carry, rates_curves, credit_curves, inflation_curves, correlations, fx, volatility, market_scalars, model_parameters"
+   "message": "Validation error: invalid value \"nope\": unknown variant `nope`, expected one of `carry`, `rates_curves`, `credit_curves`, `inflation_curves`, `correlations`, `fx`, `volatility`, `market_scalars`, `model_parameters`"
   }
  },
  "scenario_spec": {

@@ -1,6 +1,7 @@
 {
   "$defs": {
     "CollateralPiece": {
+      "additionalProperties": false,
       "description": "A single piece of collateral in the recovery waterfall.",
       "properties": {
         "book_value": {
@@ -71,6 +72,7 @@
       ]
     },
     "WorkoutCosts": {
+      "additionalProperties": false,
       "description": "Workout and resolution costs.\n\nThese reduce the net recovery available to creditors.",
       "properties": {
         "direct_cost_rate": {
@@ -93,6 +95,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/models/1/workout_lgd.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Workout-based LGD model using a collateral-first recovery waterfall.",
   "properties": {
     "collateral": {

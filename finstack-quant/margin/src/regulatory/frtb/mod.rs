@@ -40,19 +40,19 @@
 //! computes `CVR`, not of the aggregation. Supply `CVR+` / `CVR-` already
 //! shocked and already net of the delta-hedged component, loss-positive.
 
-pub mod aggregation;
-pub mod curvature;
-pub mod delta;
-pub mod drc;
+pub(crate) mod aggregation;
+mod curvature;
+mod delta;
+mod drc;
 pub mod engine;
 pub mod params;
-pub mod rrao;
+mod rrao;
 pub mod types;
-pub mod vega;
+mod vega;
 mod wire;
 
 pub use engine::{frtb_sba_charge, FrtbSbaEngine};
 pub use types::{
-    CorrelationScenario, DrcAssetType, DrcPosition, DrcSector, DrcSeniority, FrtbRiskClass,
-    FrtbSbaResult, FrtbSensitivities, RraoPosition,
+    CorrelationScenario, DrcPosition, DrcSector, DrcSeniority, FrtbRiskClass, FrtbSbaResult,
+    FrtbSensitivities, RraoPosition,
 };

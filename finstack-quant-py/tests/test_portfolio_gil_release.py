@@ -21,14 +21,13 @@ from finstack_quant.models.liquidity import (
 from finstack_quant.portfolio import (
     FactorModel,
     Portfolio,
-    aggregate_metrics_json,
+    aggregate_metrics,
     attribute_portfolio_pnl,
-    build_portfolio_from_spec_json,
-    carino_link_from_sector_periods_json,
+    carino_link_from_sector_periods,
     compute_factor_sensitivities,
     decompose_factor_risk,
     replay_portfolio_json,
-    twrr_linked_json,
+    twrr_linked,
     value_portfolio,
 )
 
@@ -116,7 +115,6 @@ def _factor_model_config_json() -> str:
                 }
             ]
         },
-        "pricing_mode": "full_repricing",
         "risk_measure": "variance",
     })
 
@@ -209,7 +207,7 @@ def test_portfolio_from_spec_detached_parse_preserves_value_error_mapping() -> N
 
 def test_compatibility_build_spec_path_releases_gil() -> None:
     portfolio_json = _portfolio_spec_json(10_000)
-    round_tripped = _assert_releases_gil(lambda: build_portfolio_from_spec_json(portfolio_json))
+    round_tripped = _assert_releases_gil(lambda: Portfolio.from_spec(portfolio_json).to_json())
 
     assert len(json.loads(round_tripped)["positions"]) == 10_000
 
@@ -231,12 +229,12 @@ def test_raw_valuation_metric_aggregation_releases_gil() -> None:
     valuation = value_portfolio(portfolio, market, metrics=[])
 
     metrics_json = _assert_releases_gil(
-        lambda: aggregate_metrics_json(
+        lambda: aggregate_metrics(
             valuation,
             "USD",
             market,
             AS_OF.isoformat(),
-        )
+        ).to_json()
     )
 
     by_position = json.loads(metrics_json)["by_position"]
@@ -330,7 +328,7 @@ def test_position_what_if_rejects_unsupported_add() -> None:
 def test_large_twrr_parse_link_and_serialize_release_gil() -> None:
     returns_json = json.dumps([0.000001] * 200_000)
 
-    result_json = _assert_releases_gil(lambda: twrr_linked_json(returns_json, 2.0))
+    result_json = _assert_releases_gil(lambda: twrr_linked(returns_json, 2.0).to_json())
     assert result_json is not None
     result = json.loads(result_json)
 
@@ -357,7 +355,7 @@ def test_large_carino_parse_compute_and_serialize_release_gil() -> None:
     ]
     periods_json = json.dumps([period] * 10_000)
 
-    result_json = _assert_releases_gil(lambda: carino_link_from_sector_periods_json(periods_json))
+    result_json = _assert_releases_gil(lambda: carino_link_from_sector_periods(periods_json).to_json())
     result = json.loads(result_json)
 
     assert len(result["periods"]) == 10_000

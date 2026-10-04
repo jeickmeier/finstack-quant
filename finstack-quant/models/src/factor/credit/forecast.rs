@@ -334,9 +334,7 @@ mod tests {
         FactorCorrelationMatrix, FactorVolModel, GenericFactorSpec, HierarchyDimension,
         IssuerBetaPolicy, LevelsAtAnchor, VolState,
     };
-    use crate::factor::{
-        FactorDefinition, FactorId, FactorType, MarketMapping, MatchingConfig, PricingMode,
-    };
+    use crate::factor::{FactorDefinition, FactorId, FactorType, MarketMapping, MatchingConfig};
     use finstack_quant_core::dates::create_date;
     use finstack_quant_core::market_data::bumps::BumpUnits;
     use finstack_quant_core::types::CurveId;
@@ -402,7 +400,7 @@ mod tests {
                 factors,
                 covariance,
                 matching: MatchingConfig::MappingTable(vec![]),
-                pricing_mode: PricingMode::DeltaBased,
+
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
                 unmatched_policy: None,

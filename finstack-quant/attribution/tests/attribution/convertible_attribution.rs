@@ -317,6 +317,7 @@ fn conversion_change_spec(
         instrument: finstack_quant_valuations::instruments::InstrumentJson::ConvertibleBond(
             closing,
         ),
+        inputs: finstack_quant_attribution::AttributionInputs {
         market_t0: state.clone(),
         market_t1: state,
         as_of_t0: t0(),
@@ -331,13 +332,14 @@ fn conversion_change_spec(
         credit_factor_model: None,
         credit_factor_detail_options: Default::default(),
         full_cross_attribution: false,
+    },
     }
 }
 
 #[test]
 fn metrics_spec_restores_opening_conversion_and_rounding() {
     let mut spec = conversion_change_spec(AttributionMethod::MetricsBased);
-    spec.config = Some(
+    spec.inputs.config = Some(
         serde_json::from_value(serde_json::json!({"rounding_scale": 4, "metrics": ["delta"]}))
             .unwrap(),
     );
@@ -376,10 +378,11 @@ fn taylor_market_gamma_uses_opening_conversion_state() {
     // A rates move: the issuer hazard curve is entered directly (no
     // calibration recipe), so quote-space credit gamma is unavailable and the
     // gamma path is exercised on the risk-free curve.
-    changed.market_t1 = finstack_quant_core::market_data::context::MarketContextState::try_from(
-        &market_with_rate(150.0, 0.035),
-    )
-    .expect("coherent market snapshot");
+    changed.inputs.market_t1 =
+        finstack_quant_core::market_data::context::MarketContextState::try_from(&market_with_rate(
+            150.0, 0.035,
+        ))
+        .expect("coherent market snapshot");
     let mut fixed = changed.clone();
     fixed.instrument = finstack_quant_valuations::instruments::InstrumentJson::ConvertibleBond(
         convertible_with_credit()
@@ -388,7 +391,7 @@ fn taylor_market_gamma_uses_opening_conversion_state() {
             .unwrap()
             .clone(),
     );
-    fixed.model_params_t0 = None;
+    fixed.inputs.model_params_t0 = None;
     let changed_result = changed.execute().unwrap().attribution;
     let fixed_result = fixed.execute().unwrap().attribution;
     assert!(
@@ -409,7 +412,7 @@ fn taylor_market_gamma_uses_opening_conversion_state() {
 #[test]
 fn requested_reporting_currency_requires_fx() {
     let mut spec = conversion_change_spec(AttributionMethod::Parallel);
-    spec.config =
+    spec.inputs.config =
         Some(serde_json::from_value(serde_json::json!({"target_currency": "EUR"})).unwrap());
     let error = spec.execute().unwrap_err();
     assert!(error.to_string().contains("fx"), "{error}");

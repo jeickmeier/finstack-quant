@@ -36,9 +36,7 @@ use finstack_quant_models::factor::credit::hierarchy::{
     DateRange, FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
     IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
 };
-use finstack_quant_models::factor::{
-    FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
-};
+use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
@@ -337,7 +335,7 @@ fn build_credit_model_for_n(n: usize) -> CreditFactorModel {
         factors: vec![],
         covariance: FactorCovarianceMatrix::new(vec![], vec![]).unwrap(),
         matching: MatchingConfig::MappingTable(vec![]),
-        pricing_mode: PricingMode::DeltaBased,
+
         risk_measure: Default::default(),
         bump_config: None,
         unmatched_policy: None,
@@ -424,16 +422,18 @@ impl CreditFixture {
                 let bond = sample_bond_with_issuer(i);
                 let spec = AttributionSpec {
                     instrument: InstrumentJson::Bond(bond),
-                    market_t0: market_t0.clone(),
-                    market_t1: market_t1.clone(),
-                    as_of_t0,
-                    as_of_t1,
-                    method: AttributionMethod::Parallel,
-                    config: None,
-                    model_params_t0: None,
-                    credit_factor_model: Some(model_ref.clone()),
-                    credit_factor_detail_options: CreditFactorDetailOptions::default(),
-                    full_cross_attribution: false,
+                    inputs: finstack_quant_attribution::AttributionInputs {
+                        market_t0: market_t0.clone(),
+                        market_t1: market_t1.clone(),
+                        as_of_t0,
+                        as_of_t1,
+                        method: AttributionMethod::Parallel,
+                        config: None,
+                        model_params_t0: None,
+                        credit_factor_model: Some(model_ref.clone()),
+                        credit_factor_detail_options: CreditFactorDetailOptions::default(),
+                        full_cross_attribution: false,
+                    },
                 };
                 AttributionEnvelope::new(spec)
             })

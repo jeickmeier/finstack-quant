@@ -282,11 +282,11 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
             beta().variance,
             beta().mean_lgd,
             beta().quantile(0.05),
-            lgd.beta_recovery_quantile(0.4, 0.2, 0.95),
+            lgd.BetaRecovery(0.4, 0.2).quantile(0.95),
         ],
         "lgd.beta_recovery_samples": lambda: [
             list(beta().sample_seeded(4, 42)),
-            list(lgd.beta_recovery_sample(0.4, 0.2, 4, 42)),
+            list(lgd.BetaRecovery(0.4, 0.2).sample_seeded(4, 42)),
         ],
         "lgd.seniority_recovery_stats": lambda: [
             lgd.seniority_recovery_stats("senior_unsecured").mean,
@@ -304,8 +304,8 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
         "lgd.downturn": lambda: [
             lgd.DownturnLgd.stressed(0.15, 0.3, 0.999).adjust(0.35),
             lgd.DownturnLgd.regulatory_floor(0.08, 0.1).adjust(0.35),
-            lgd.downturn_lgd_stressed(0.35, 0.15, 0.3, 0.999),
-            lgd.downturn_lgd_regulatory_floor(0.35, 0.08, 0.1),
+            lgd.DownturnLgd.stressed(0.15, 0.3, 0.999).adjust(0.35),
+            lgd.DownturnLgd.regulatory_floor(0.08, 0.1).adjust(0.35),
             lgd.DownturnLgd.basel_secured().adjust(0.2),
             lgd.DownturnLgd.basel_unsecured().adjust(0.2),
         ],
@@ -316,8 +316,8 @@ def _credit_cases() -> dict[str, Callable[[], Any]]:
             lgd.EadCalculator(600.0, 400.0, 0.75).leq_from_observed_ead(800.0),
             lgd.EadCalculator.revolver(600.0, 400.0).ead,
             lgd.EadCalculator.term_loan(500.0).ead,
-            lgd.ead_term_loan(500.0),
-            lgd.ead_revolver(600.0, 400.0, 0.75),
+            lgd.EadCalculator.term_loan(500.0).ead,
+            lgd.EadCalculator(600.0, 400.0, 0.75).ead,
         ],
         "pd.cycle": lambda: [
             pd_models.pit_to_ttc(0.02, 0.15, -1.0),
@@ -524,7 +524,7 @@ def _monte_carlo_cases() -> dict[str, Callable[[], Any]]:
             monte_carlo.finite_diff_gamma_crn(*GBM, False, **fd).mean,
         ],
         "monte_carlo.simulate_gbm_paths": lambda: (
-            monte_carlo.simulate_gbm_paths(100.0, 0.05, 0.0, 0.2, 1.0, 4, 3, 42, False).paths
+            monte_carlo.simulate_gbm_paths(100.0, 0.05, 0.0, 0.2, 1.0, 4, 3, 42).paths
         ),
         "monte_carlo.heston_satisfies_feller": lambda: [
             monte_carlo.heston_satisfies_feller(2.0, 0.04, 0.3),

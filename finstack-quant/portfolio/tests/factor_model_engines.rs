@@ -12,7 +12,7 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::{InputError, Result};
 use finstack_quant_models::factor::{
     BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig,
-    FactorType, MarketMapping, PricingMode, RiskMeasure, UnmatchedPolicy,
+    FactorType, MarketMapping, RiskMeasure, UnmatchedPolicy,
 };
 use finstack_quant_portfolio::factor_model::FactorModel;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
@@ -135,7 +135,7 @@ fn full_repricing_engine_matches_bond_dv01_metric() -> Result<()> {
 
     let positions = vec![("bond-pos".to_string(), &bond as &dyn Instrument, 1.0)];
     let factors = vec![rates_factor()];
-    let matrix = FullRepricingEngine::new(BumpSizeConfig::default(), 5)?.compute_sensitivities(
+    let profiles = FullRepricingEngine::new(BumpSizeConfig::default(), 5)?.compute_pnl_profiles(
         &positions,
         &factors,
         &market,
@@ -143,7 +143,7 @@ fn full_repricing_engine_matches_bond_dv01_metric() -> Result<()> {
         Currency::USD,
     )?;
 
-    let actual_dv01 = matrix.delta(0, 0);
+    let actual_dv01 = (profiles[0].position_pnls[3][0] - profiles[0].position_pnls[1][0]) / 2.0;
     assert!(
         (actual_dv01 - expected_dv01).abs() < dv01_tolerance(expected_dv01),
         "full repricing DV01 {} should match bond metric {}",
@@ -243,7 +243,7 @@ fn full_repricing_engine_eur_in_usd_book_has_nonzero_fx_factor() -> Result<()> {
     let positions = vec![("eur-pos".to_string(), &eur_bond as &dyn Instrument, 1.0)];
     let factors = vec![fx_factor()];
 
-    let matrix = FullRepricingEngine::new(BumpSizeConfig::default(), 5)?.compute_sensitivities(
+    let profiles = FullRepricingEngine::new(BumpSizeConfig::default(), 5)?.compute_pnl_profiles(
         &positions,
         &factors,
         &market,
@@ -252,7 +252,7 @@ fn full_repricing_engine_eur_in_usd_book_has_nonzero_fx_factor() -> Result<()> {
     )?;
 
     assert!(
-        matrix.delta(0, 0).abs() > 1e-8,
+        ((profiles[0].position_pnls[3][0] - profiles[0].position_pnls[1][0]) / 2.0).abs() > 1e-8,
         "full reprice must convert grid PVs through bumped spot FX"
     );
     Ok(())
@@ -288,7 +288,7 @@ fn portfolio_wrap_uses_scale_factor_weight_for_eur_fx_factor() -> Result<()> {
         factors: vec![factor],
         covariance,
         matching: finstack_quant_models::factor::MatchingConfig::MappingTable(vec![]),
-        pricing_mode: PricingMode::DeltaBased,
+
         risk_measure: RiskMeasure::Variance,
         bump_config: None,
         unmatched_policy: Some(UnmatchedPolicy::Warn),
@@ -439,12 +439,16 @@ fn vol_factor_delta_matches_equity_option_vega() -> Result<()> {
         as_of,
         Currency::USD,
     )?;
-    let repricing_matrix = FullRepricingEngine::new(BumpSizeConfig::default(), 5)?
-        .compute_sensitivities(&positions, &factors, &market, as_of, Currency::USD)?;
+    let repricing_profiles = FullRepricingEngine::new(BumpSizeConfig::default(), 5)?
+        .compute_pnl_profiles(&positions, &factors, &market, as_of, Currency::USD)?;
 
     for (label, actual) in [
         ("delta engine", delta_matrix.delta(0, 0)),
-        ("full repricing", repricing_matrix.delta(0, 0)),
+        (
+            "full repricing",
+            (repricing_profiles[0].position_pnls[3][0] - repricing_profiles[0].position_pnls[1][0])
+                / 2.0,
+        ),
     ] {
         for (reference_label, reference) in [("Vega metric", vega), ("BS vega", bs_vega_per_point)]
         {

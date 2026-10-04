@@ -2287,18 +2287,21 @@ class LatentMultiFactor:
         Parameters
         ----------
         num_factors : int
-            Count of latent factors in this multi-factor specification.
+            Count of latent factors; zero resolves to one.
         volatilities : list[float]
-            Per-factor volatilities.
+            One finite, non-negative decimal volatility per factor; valid values
+            are clamped to ``[0.01, 10.0]``.
 
         Returns
         -------
         LatentMultiFactor
             Uncorrelated factor model.
 
-        Notes
-        -----
-        This method does not raise; it returns a fixed instance.
+        Raises
+        ------
+        ValueError
+            If the volatility count does not match the factor count, or a
+            volatility is negative or non-finite.
 
         Examples
         --------

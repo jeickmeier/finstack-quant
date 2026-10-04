@@ -20,8 +20,8 @@ use std::sync::OnceLock;
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.calibration import CalibrationPlan, calibrate
-/// >>> result = calibrate(CalibrationPlan([], id="smoke"))
+/// >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, calibrate
+/// >>> result = calibrate(CalibrationEnvelope(CalibrationPlan([], id="smoke")))
 /// >>> result.success
 /// True
 #[pyclass(

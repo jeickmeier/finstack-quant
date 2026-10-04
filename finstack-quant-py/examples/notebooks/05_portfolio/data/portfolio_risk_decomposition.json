@@ -33,7 +33,6 @@
         }
       ]
     },
-    "pricing_mode": "delta_based",
     "risk_measure": "variance"
   },
   "inv_vol_spec": {

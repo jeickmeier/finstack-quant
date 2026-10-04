@@ -6,33 +6,12 @@
 //! recalibration provider, so the bindings only thread the configuration.
 
 use finstack_quant_core::config::FinstackConfig;
-use finstack_quant_scenarios::ScenarioSpec;
 use finstack_quant_valuations::instruments::Instrument;
 use pyo3::prelude::*;
 
-use super::spec::PyScenarioSpec;
 use crate::bindings::core::config::PyFinstackConfig;
 use crate::bindings::extract::extract_instrument_json;
-use crate::errors::{core_to_py, scenarios_to_py, value_error};
-
-/// Extract a validated [`ScenarioSpec`] from a `ScenarioSpec` object or a
-/// JSON string.
-///
-/// JSON parse failures raise `ValueError` prefixed with
-/// `Failed to parse ScenarioSpec JSON:`; semantic failures raise exactly what
-/// `ScenarioSpec.validate()` raises.
-pub(crate) fn extract_scenario_spec(obj: &Bound<'_, PyAny>) -> PyResult<ScenarioSpec> {
-    if let Ok(spec) = obj.cast::<PyScenarioSpec>() {
-        return Ok(spec.borrow().inner.clone());
-    }
-    let json: String = obj.extract().map_err(|_| {
-        value_error(format!(
-            "scenario must be a ScenarioSpec or a JSON string, got {}",
-            obj.get_type()
-        ))
-    })?;
-    ScenarioSpec::from_json(&json).map_err(scenarios_to_py)
-}
+use crate::errors::{core_to_py, value_error};
 
 /// Extract a [`FinstackConfig`] from a `FinstackConfig` object, a JSON string,
 /// or `None` (library default).

@@ -322,21 +322,16 @@ test('namespace results match their published result types', () => {
       'utf8'
     )
   );
-  const params = new attribution.AttributionJsonInputs(
-    JSON.stringify(fixture.instrument),
-    JSON.stringify(fixture.market_t0),
-    JSON.stringify(fixture.market_t1),
-    fixture.as_of_t0,
-    fixture.as_of_t1,
-    JSON.stringify('metrics_based'),
-    null,
-    null
-  );
-  try {
-    declarations.push(['pnl_attribution', 'fq.PnlAttribution', attribution.attributePnl(params)]);
-  } finally {
-    params.free();
-  }
+  const params = {
+    instrument: fixture.instrument.instrument,
+    market_t0: fixture.market_t0,
+    market_t1: fixture.market_t1,
+    as_of_t0: fixture.as_of_t0,
+    as_of_t1: fixture.as_of_t1,
+    method: 'metrics_based',
+    config: null,
+  };
+  declarations.push(['pnl_attribution', 'fq.PnlAttribution', attribution.attributePnl(params)]);
 
   // covenants
   const specs = JSON.parse(covenants.lboStandardJson(5.0, 1.5, 1.2, 10_000_000.0));
@@ -446,7 +441,12 @@ test('namespace results match their published result types', () => {
     ],
   });
   const barrierMarket = JSON.stringify(golden.market.data);
-  const valuation = portfolio.valuePortfolio(book, barrierMarket, false, []);
+  const valuation = portfolio.valuePortfolio(
+    portfolio.Portfolio.fromSpec(book),
+    core.MarketContext.fromJson(barrierMarket),
+    false,
+    []
+  );
   assert.equal(
     typeof valuation.position_values.BARRIER.valuation_result.details.data.seed,
     'bigint'
@@ -456,9 +456,9 @@ test('namespace results match their published result types', () => {
     'scenario_revalue',
     'fq.ScenarioRevalueView',
     portfolio.applyScenarioAndRevalue(
-      book,
+      portfolio.Portfolio.fromSpec(book),
       JSON.stringify({ id: 's', operations: [] }),
-      barrierMarket
+      core.MarketContext.fromJson(barrierMarket)
     ),
   ]);
 
@@ -470,12 +470,15 @@ test('namespace results match their published result types', () => {
   declarations.push([
     'application',
     'fq.ApplicationEnvelope',
-    scenarios.applyScenarioToMarket(spec, OIS_MARKET, AS_OF, [DEPOSIT]),
+    scenarios.applyScenario(spec, OIS_MARKET, AS_OF, undefined, [DEPOSIT]),
   ]);
-  const hold = scenarios.buildScenarioSpec('hold_1m_up25', [
-    { kind: 'time_roll_forward', period: '1M', apply_shocks: true, roll_mode: 'calendar_days' },
-    up25,
-  ]);
+  const hold = scenarios.parseScenarioSpec({
+    id: 'hold_1m_up25',
+    operations: [
+      { kind: 'time_roll_forward', period: '1M', apply_shocks: true, roll_mode: 'calendar_days' },
+      up25,
+    ],
+  });
   declarations.push([
     'horizon',
     'fq.HorizonReport',

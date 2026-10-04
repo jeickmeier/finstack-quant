@@ -129,16 +129,18 @@ fn attribution_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>>
     let market = MarketContextState::try_from(&MarketContext::new())?;
     let spec = crate::spec::AttributionSpec {
         instrument: InstrumentJson::Deposit(deposit),
-        market_t0: market.clone(),
-        market_t1: market,
-        as_of_t0,
-        as_of_t1,
-        method: crate::AttributionMethod::default(),
-        model_params_t0: None,
-        config: None,
-        credit_factor_model: None,
-        credit_factor_detail_options: crate::CreditFactorDetailOptions::default(),
-        full_cross_attribution: false,
+        inputs: crate::AttributionInputs {
+            market_t0: market.clone(),
+            market_t1: market,
+            as_of_t0,
+            as_of_t1,
+            method: crate::AttributionMethod::default(),
+            model_params_t0: None,
+            config: None,
+            credit_factor_model: None,
+            credit_factor_detail_options: crate::CreditFactorDetailOptions::default(),
+            full_cross_attribution: false,
+        },
     };
 
     let value = serde_json::to_value(AttributionEnvelope::new(spec)).map_err(|error| {
@@ -158,6 +160,14 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
     .with_kind(SchemaKind::Input)
     .with_summary("One multi-period P&L attribution run: positions, markets and method.")
     .with_examples(attribution_examples),
+    SchemaArtifact::new::<crate::AttributionInputs>(
+        "schemas/attribution/1/attribution_inputs.schema.json",
+        "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
+        "Finstack Quant Shared Attribution Inputs",
+        "Shared market snapshots, dates, method and options for a batch of instruments",
+    )
+    .with_kind(SchemaKind::Input)
+    .with_summary("Shared attribution settings without an instrument payload."),
     SchemaArtifact::new::<AttributionResultEnvelope>(
         "schemas/attribution/1/attribution_result.schema.json",
         "https://finstack_quant.dev/schemas/attribution/1/attribution_result.schema.json",

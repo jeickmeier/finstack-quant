@@ -34,8 +34,9 @@ const validation = (text) => (error) =>
   error.kind === 'validation' && error.message.includes(core(text));
 
 for (const [index, { py, args, expected }] of GOLDEN.constructors.entries()) {
-  const name = `operationSpec${pascal(py)}`;
-  test(`${name} matches Python OperationSpec.${py} (case ${index})`, () => {
+  const name = py === 'parallel_bp_many' ? 'parallelBpMany' : `operationSpec${pascal(py)}`;
+  const pythonName = py === 'parallel_bp_many' ? py : `OperationSpec.${py}`;
+  test(`${name} matches Python ${pythonName} (case ${index})`, () => {
     const built = scenarios[name](...args);
     assert.deepEqual(built, expected);
     for (const operation of [built].flat()) {
@@ -88,6 +89,11 @@ test('operation constructors reject wrong types and unknown labels', () => {
     (error) => error.kind === 'validation' && /bogus/.test(error.message)
   );
   assert.throws(() => scenarios.operationSpecCurveParallelBp('discount', 5, 1), TypeError);
+  assert.throws(
+    () => scenarios.operationSpecCurveParallelBp('discount', ['USD-OIS'], 1),
+    TypeError
+  );
+  assert.deepEqual(scenarios.parallelBpMany('discount', [], 1), []);
   assert.throws(
     () => scenarios.operationSpecCurveNodeBp('discount', 'USD-OIS', [['2Y', 1]], 'nearest'),
     (error) => error.kind === 'validation'

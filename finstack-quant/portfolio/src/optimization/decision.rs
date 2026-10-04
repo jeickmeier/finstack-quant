@@ -51,8 +51,6 @@ pub(crate) struct DecisionItem {
 pub(crate) struct DecisionFeatures {
     /// Current base‑currency PV (scaled by quantity; 0 for candidates).
     pub pv_base: f64,
-    /// Current native-currency PV (scaled by quantity; 0 for candidates).
-    pub pv_native: f64,
     /// Base-currency PV per 1.0 of [`crate::position::Position::scale_factor`]
     /// (not raw `Position::quantity`). A `Percentage` holding of `50`
     /// therefore uses scale `0.5`. Used to reconstruct implied quantities
@@ -109,7 +107,7 @@ fn is_missing_required_metrics(
             filter
                 .as_ref()
                 .is_none_or(|filter| filter.matches(entity_id, position_id, attributes))
-                && metric.resolve(measures, attributes, 0.0, 0.0).is_none()
+                && metric.resolve(measures, attributes, 0.0).is_none()
         })
 }
 
@@ -197,7 +195,6 @@ pub(crate) fn build_decision_space(
             })?;
 
         let pv_base = pv_entry.value_base.amount();
-        let pv_native = pv_entry.value_native.amount();
         gross_pv_base += pv_base.abs();
         let deal_notional_abs = if matches!(problem.weighting, WeightingScheme::NotionalWeight) {
             let deal_abs = require_deal_notional_abs(
@@ -287,7 +284,6 @@ pub(crate) fn build_decision_space(
         };
         features.push(DecisionFeatures {
             pv_base,
-            pv_native,
             pv_per_unit,
             deal_notional_abs,
             measures,
@@ -421,7 +417,6 @@ pub(crate) fn build_decision_space(
 
         features.push(DecisionFeatures {
             pv_base: 0.0, // Currently held value is 0
-            pv_native: val_entry.value_native.amount(),
             pv_per_unit,
             deal_notional_abs,
             measures,

@@ -1346,11 +1346,6 @@
           "type": "string"
         },
         {
-          "const": "pv_native",
-          "description": "Use the native‑currency PV of the position (after scaling).\n\nValues are returned in each position's own currency and are therefore\n**not commensurable** across a mixed-currency portfolio. The LP\ncoefficient builder rejects `PvNative` inside aggregated objectives\n([`MetricExpr::WeightedSum`] or [`MetricExpr::ValueWeightedAverage`]) —\nuse [`PerPositionMetric::PvBase`] in those contexts so all positions\nare summed in a single numeraire.",
-          "type": "string"
-        },
-        {
           "additionalProperties": false,
           "description": "Numeric attribute value from position attributes.",
           "properties": {

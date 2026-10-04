@@ -5,7 +5,7 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::extract::{extract_market_ref, extract_portfolio_ref};
 use crate::bindings::module_utils::py_to_json_string;
 use crate::bindings::pandas_utils::{
-    dict_to_dataframe, serde_object_to_single_row_dataframe_with_schema, serde_to_py,
+    dict_to_dataframe, serde_object_to_single_row_dataframe_with_schema,
 };
 use crate::errors::{display_to_py, portfolio_to_py, serde_json_to_py};
 use pyo3::prelude::*;
@@ -222,78 +222,6 @@ impl PyPortfolioAttribution {
     fn explain(&self) -> String {
         self.inner.explain()
     }
-
-    /// Aggregate rates-curve detail (per-curve breakdown) as a JSON-shaped
-    /// ``dict``, or ``None`` when the method did not produce it.
-    #[getter]
-    fn rates_detail<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .rates_detail
-            .as_ref()
-            .map(|d| serde_to_py(py, d))
-            .transpose()
-    }
-
-    /// Aggregate credit-curve detail as a JSON-shaped ``dict`` or ``None``.
-    #[getter]
-    fn credit_detail<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .credit_detail
-            .as_ref()
-            .map(|d| serde_to_py(py, d))
-            .transpose()
-    }
-
-    /// Aggregate inflation-curve detail as a JSON-shaped ``dict`` or ``None``.
-    #[getter]
-    fn inflation_detail<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .inflation_detail
-            .as_ref()
-            .map(|d| serde_to_py(py, d))
-            .transpose()
-    }
-
-    /// Aggregate correlation detail as a JSON-shaped ``dict`` or ``None``.
-    #[getter]
-    fn correlations_detail<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .correlations_detail
-            .as_ref()
-            .map(|d| serde_to_py(py, d))
-            .transpose()
-    }
-
-    /// Aggregate FX detail as a JSON-shaped ``dict`` or ``None``.
-    #[getter]
-    fn fx_detail<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .fx_detail
-            .as_ref()
-            .map(|d| serde_to_py(py, d))
-            .transpose()
-    }
-
-    /// Aggregate volatility detail as a JSON-shaped ``dict`` or ``None``.
-    #[getter]
-    fn vol_detail<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .vol_detail
-            .as_ref()
-            .map(|d| serde_to_py(py, d))
-            .transpose()
-    }
-
-    /// Aggregate market-scalar detail as a JSON-shaped ``dict`` or ``None``.
-    #[getter]
-    fn scalars_detail<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
-        self.inner
-            .scalars_detail
-            .as_ref()
-            .map(|d| serde_to_py(py, d))
-            .transpose()
-    }
-
     /// Export the portfolio-level factor totals as a single-row pandas ``DataFrame``.
     ///
     /// Every ``Money`` aggregate is flattened to a float column plus one

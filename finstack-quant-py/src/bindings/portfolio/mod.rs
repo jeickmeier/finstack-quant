@@ -13,9 +13,7 @@ mod factor_brinson;
 pub(crate) mod factor_model;
 mod fi_attribution;
 mod grid_attribution;
-mod json_bridge;
 mod materialization;
-pub(crate) mod matrix_input;
 mod optimization_spec;
 mod performance;
 mod pipeline;
@@ -122,9 +120,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "ReplayResult",
         "WeightAllocationResult",
         "parse_portfolio_spec_json",
-        "build_portfolio_from_spec_json",
         "aggregate_metrics",
-        "aggregate_metrics_json",
         "value_portfolio",
         "aggregate_full_cashflows",
         "net_in_currency_by_date",
@@ -140,34 +136,20 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         "replay_portfolio",
         "replay_portfolio_json",
         "brinson_fachler",
-        "brinson_fachler_json",
         "carino_link",
-        "carino_link_json",
         "carino_link_from_sector_periods",
-        "carino_link_from_sector_periods_json",
         "campisi_attribution",
-        "campisi_attribution_json",
         "campisi_carino_link",
-        "campisi_carino_link_json",
         "campisi_carino_link_from_snapshots",
-        "campisi_carino_link_from_snapshots_json",
         "campisi_reconciliation_check",
-        "campisi_reconciliation_check_json",
         "cell_returns_from_curves",
-        "cell_returns_from_curves_json",
         "cell_returns_from_reference",
-        "cell_returns_from_reference_json",
         "excess_returns",
-        "excess_returns_json",
         "factor_brinson_attribution",
-        "factor_brinson_attribution_json",
         "grid_attribution",
-        "grid_attribution_json",
         "grid_carino_link",
-        "grid_carino_link_json",
         "twrr_modified_dietz",
         "twrr_linked",
-        "twrr_linked_json",
         "mwr_xirr",
         "SensitivityMatrix",
         "FactorPnlProfile",

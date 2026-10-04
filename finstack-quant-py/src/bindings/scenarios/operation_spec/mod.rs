@@ -22,6 +22,7 @@ mod kinds;
 mod rate_binding;
 mod spec;
 
+pub(crate) use helpers::extract_curve_kind;
 pub use hierarchy::PyHierarchyTarget;
 pub use kinds::{PyCompounding, PyCurveKind, PyTenorMatchMode, PyTimeRollMode};
 pub use rate_binding::PyRateBindingSpec;

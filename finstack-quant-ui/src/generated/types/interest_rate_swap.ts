@@ -1649,27 +1649,12 @@ export interface DD95A602Bcefda408Da7C {
       };
   csa: D_3033Bb5742989B033D53;
   /**
-   * Initial margin calculation methodology
-   *
-   * - Bilateral: SIMM or Schedule
-   * - Cleared: ClearingHouse (CCP-specific)
-   */
-  im_methodology: "haircut" | "simm" | "schedule" | "internal_model" | "clearing_house";
-  /**
-   * Settlement lag for margin transfers (business days)
-   */
-  settlement_lag: number;
-  /**
    * Explicit SIMM credit classification for credit-sensitive instruments.
    *
    * Required when a credit product uses `ImMethodology::Simm`; leave `None`
    * for non-credit instruments and non-SIMM margin methodologies.
    */
   simm_credit_classification?: DEf7214D0615400Cb5799 | null;
-  /**
-   * Variation margin exchange frequency
-   */
-  vm_frequency: "daily" | "weekly" | "monthly" | "on_demand";
 }
 /**
  * Full CSA specification (for bilateral trades)

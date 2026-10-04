@@ -49,14 +49,13 @@ impl PortfolioMarginAggregator {
     /// # Returns
     ///
     /// Empty aggregator with no positions or netting sets loaded.
-    #[must_use]
-    pub(crate) fn new(base_currency: Currency) -> Self {
-        Self {
+    pub(crate) fn new(base_currency: Currency) -> Result<Self> {
+        Ok(Self {
             netting_sets: HashMap::default(),
             positions: Vec::new(),
             base_currency,
-            simm_calculator: SimmCalculator::default(),
-        }
+            simm_calculator: SimmCalculator::new(finstack_quant_margin::SimmVersion::default())?,
+        })
     }
 
     /// Create an aggregator from a portfolio.
@@ -77,7 +76,7 @@ impl PortfolioMarginAggregator {
     /// Returns a validation error if positions in one netting set carry
     /// conflicting margin specifications.
     pub fn from_portfolio(portfolio: &Portfolio) -> Result<Self> {
-        let mut aggregator = Self::new(portfolio.base_currency);
+        let mut aggregator = Self::new(portfolio.base_currency)?;
 
         for position in &portfolio.positions {
             aggregator.add_position(position)?;
@@ -126,11 +125,8 @@ impl PortfolioMarginAggregator {
                 .or_insert_with(|| NettingSet::new(ns_id.clone()));
             if let Some(spec) = margin_spec {
                 if let Some(existing) = &netting_set.margin_spec {
-                    if existing.csa != spec.csa
-                        || existing.clearing_status != spec.clearing_status
-                        || existing.im_methodology != spec.im_methodology
-                        || existing.vm_frequency != spec.vm_frequency
-                        || existing.settlement_lag != spec.settlement_lag
+                    // Credit classification belongs to each instrument, not the shared CSA.
+                    if existing.csa != spec.csa || existing.clearing_status != spec.clearing_status
                     {
                         return Err(Error::validation(format!(
                             "Conflicting margin specifications for netting set '{}' at position '{}' (registered positions: {:?})",
@@ -340,7 +336,7 @@ impl PortfolioMarginAggregator {
     ) -> Result<SimmSensitivities> {
         if let Some(marginable) = position.instrument.as_marginable() {
             if let Some(spec) = marginable.margin_spec() {
-                if spec.im_methodology != ImMethodology::Simm || spec.csa.im_params.is_none() {
+                if spec.get_im_methodology() != Some(ImMethodology::Simm) {
                     return Ok(SimmSensitivities::new(self.base_currency));
                 }
             }
@@ -475,7 +471,7 @@ impl PortfolioMarginAggregator {
         let method = netting_set
             .margin_spec
             .as_ref()
-            .map(|s| s.im_methodology)
+            .and_then(|s| s.get_im_methodology())
             .unwrap_or(if netting_set.is_cleared() {
                 ImMethodology::ClearingHouse
             } else {
@@ -984,7 +980,7 @@ mod tests {
         );
         // One-year IRS grid is 1%, NGR = 1. Huge irrelevant SIMM input has no effect.
         assert_eq!(result.total_initial_margin.amount(), 10_000.0);
-        spec.im_methodology = ImMethodology::Simm;
+        spec.csa.im_params.as_mut().unwrap().methodology = ImMethodology::ClearingHouse;
         let instrument = Arc::new(
             TestMarginableInstrument::new(
                 "conflict",
@@ -1017,9 +1013,9 @@ mod tests {
     #[test]
     fn conflicting_csa_terms_are_rejected_in_either_order() {
         let mut first = OtcMarginSpec::usd_bilateral().expect("CSA");
-        first.settlement_lag = 1;
+        first.csa.vm_params.settlement_lag = 1;
         let mut second = first.clone();
-        second.settlement_lag = 2;
+        second.csa.vm_params.settlement_lag = 2;
         for specs in [[first.clone(), second.clone()], [second, first]] {
             let mut builder = Portfolio::builder("CONFLICT")
                 .base_currency(Currency::USD)
@@ -1057,14 +1053,62 @@ mod tests {
     }
 
     #[test]
+    fn different_credit_classifications_share_one_agreement() {
+        use finstack_quant_margin::{SimmCreditClassification, SimmCreditSector};
+        let first = OtcMarginSpec::usd_bilateral()
+            .expect("CSA")
+            .with_simm_credit_classification(SimmCreditClassification::Qualifying {
+                sector: SimmCreditSector::Financial,
+            });
+        let second =
+            first
+                .clone()
+                .with_simm_credit_classification(SimmCreditClassification::Qualifying {
+                    sector: SimmCreditSector::Sovereign,
+                });
+        for specs in [[first.clone(), second.clone()], [second, first]] {
+            let mut builder = Portfolio::builder("CONFLICT")
+                .base_currency(Currency::USD)
+                .as_of(date!(2024 - 01 - 01))
+                .entity(Entity::new(DUMMY_ENTITY_ID));
+            for (i, spec) in specs.into_iter().enumerate() {
+                let id = format!("position-{i}");
+                let instrument = Arc::new(
+                    TestMarginableInstrument::new(
+                        &id,
+                        NettingSetId::bilateral("BANK", "CSA"),
+                        0.0,
+                        Money::from((0_i64, Currency::USD)),
+                    )
+                    .with_margin_spec(spec),
+                );
+                builder = builder.position(
+                    Position::new(
+                        id.as_str(),
+                        DUMMY_ENTITY_ID,
+                        &id,
+                        instrument,
+                        1.0,
+                        PositionUnit::Units,
+                    )
+                    .unwrap(),
+                );
+            }
+            let aggregator = PortfolioMarginAggregator::from_portfolio(&builder.build().unwrap())
+                .expect("instrument classifications may differ within one CSA");
+            assert_eq!(aggregator.netting_sets.len(), 1);
+        }
+    }
+
+    #[test]
     fn test_aggregator_creation() {
-        let aggregator = PortfolioMarginAggregator::new(Currency::USD);
+        let aggregator = PortfolioMarginAggregator::new(Currency::USD).expect("embedded registry");
         assert!(aggregator.netting_sets.is_empty());
     }
 
     #[test]
     fn mo17_cross_currency_fx_delta_rebase_fails_fast() {
-        let aggregator = PortfolioMarginAggregator::new(Currency::USD);
+        let aggregator = PortfolioMarginAggregator::new(Currency::USD).expect("embedded registry");
         let mut sensitivities = SimmSensitivities::new(Currency::EUR);
         sensitivities.fx_delta.insert(Currency::USD, 1_000.0);
 

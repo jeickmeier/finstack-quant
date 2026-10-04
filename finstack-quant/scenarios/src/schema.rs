@@ -58,15 +58,17 @@ fn application_envelope_examples() -> finstack_quant_core::Result<Vec<serde_json
         market,
         model: None,
         instruments: None,
-        operations_applied: 1,
-        user_operations: 1,
-        expanded_operations: 1,
-        changes: Default::default(),
-        warnings: Vec::new(),
-        meta: Some(finstack_quant_core::config::results_meta(
-            &finstack_quant_core::config::FinstackConfig::default(),
-        )),
-        time_roll: None,
+        report: crate::ApplicationReport {
+            operations_applied: 1,
+            user_operations: 1,
+            expanded_operations: 1,
+            changes: Default::default(),
+            warnings: Vec::new(),
+            meta: Some(finstack_quant_core::config::results_meta(
+                &finstack_quant_core::config::FinstackConfig::default(),
+            )),
+            time_roll: None,
+        },
     })
 }
 

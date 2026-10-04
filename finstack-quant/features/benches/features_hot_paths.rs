@@ -15,9 +15,8 @@ use std::hint::black_box;
 use criterion::{criterion_group, criterion_main, Criterion};
 use finstack_quant_features::{
     neutralize, neutralize_and_zscore, rank_to_weights, risk_scaled_weights,
-    rolling_regression_residual, transform_cross_sectional,
-    transform_cross_sectional_grouped_with_op, transform_cross_sectional_with_op, transform_panel,
-    transform_panel_json, transform_timeseries_pairwise_with_op, transform_timeseries_with_op,
+    rolling_regression_residual, transform_cross_sectional, transform_cross_sectional_grouped,
+    transform_panel, transform_panel_json, transform_timeseries, transform_timeseries_pairwise,
     CrossSectionalOp, PairwiseOp, PanelOperation, PanelTransformSpec, TimeSeriesOp,
 };
 use fixtures::{hot_panel, span_params, window_params, FeaturePanel, HOT_WINDOW};
@@ -29,11 +28,11 @@ fn ts(
     op: TimeSeriesOp,
     params: Option<&Value>,
 ) -> Vec<Option<f64>> {
-    transform_timeseries_with_op(values, &panel.entity, &panel.order, op, params).expect("ts")
+    transform_timeseries(values, &panel.entity, &panel.order, op, params).expect("ts")
 }
 
 fn cs(panel: &FeaturePanel, op: CrossSectionalOp, params: Option<&Value>) -> Vec<Option<f64>> {
-    transform_cross_sectional_with_op(&panel.values, &panel.time_key, op, params).expect("cs")
+    transform_cross_sectional(&panel.values, &panel.time_key, op, params).expect("cs")
 }
 
 fn bench_timeseries_linear(c: &mut Criterion) {
@@ -246,7 +245,7 @@ fn bench_multi(c: &mut Criterion) {
     c.bench_function("pairwise::rolling_corr 100x252 w=63", |b| {
         b.iter(|| {
             black_box(
-                transform_timeseries_pairwise_with_op(
+                transform_timeseries_pairwise(
                     &panel.values,
                     &panel.other,
                     &panel.entity,
@@ -261,7 +260,7 @@ fn bench_multi(c: &mut Criterion) {
     c.bench_function("pairwise::rolling_beta 100x252 w=63", |b| {
         b.iter(|| {
             black_box(
-                transform_timeseries_pairwise_with_op(
+                transform_timeseries_pairwise(
                     &panel.values,
                     &panel.other,
                     &panel.entity,
@@ -276,7 +275,7 @@ fn bench_multi(c: &mut Criterion) {
     c.bench_function("grouped::zscore 100x252 g=10", |b| {
         b.iter(|| {
             black_box(
-                transform_cross_sectional_grouped_with_op(
+                transform_cross_sectional_grouped(
                     &panel.values,
                     &panel.time_key,
                     &panel.groups,
@@ -298,7 +297,7 @@ fn bench_multi(c: &mut Criterion) {
     c.bench_function("neutralize_and_zscore 100x252 k=3", |b| {
         b.iter(|| {
             black_box(
-                neutralize_and_zscore(&panel.values, &panel.time_key, &panel.exposures, None)
+                neutralize_and_zscore(&panel.values, &panel.time_key, &panel.exposures)
                     .expect("naz"),
             )
         });
@@ -331,16 +330,26 @@ fn bench_multi(c: &mut Criterion) {
     c.bench_function("cross_sectional winsorize 100x252", |b| {
         b.iter(|| {
             black_box(
-                transform_cross_sectional(&panel.values, &panel.time_key, "winsorize", None)
-                    .expect("clean"),
+                transform_cross_sectional(
+                    &panel.values,
+                    &panel.time_key,
+                    CrossSectionalOp::Winsorize,
+                    None,
+                )
+                .expect("clean"),
             )
         });
     });
     c.bench_function("cross_sectional zscore 100x252", |b| {
         b.iter(|| {
             black_box(
-                transform_cross_sectional(&panel.values, &panel.time_key, "zscore", None)
-                    .expect("norm"),
+                transform_cross_sectional(
+                    &panel.values,
+                    &panel.time_key,
+                    CrossSectionalOp::Zscore,
+                    None,
+                )
+                .expect("norm"),
             )
         });
     });

@@ -277,8 +277,8 @@ pub(crate) fn quote_quality_dataframe<'py>(
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.calibration import CalibrationPlan, calibrate
-/// >>> report = calibrate(CalibrationPlan([], id="smoke")).report
+/// >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, calibrate
+/// >>> report = calibrate(CalibrationEnvelope(CalibrationPlan([], id="smoke"))).report
 /// >>> report.success, report.iterations
 /// (True, 0)
 #[pyclass(
@@ -487,8 +487,8 @@ impl PyCalibrationReport {
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.calibration import CalibrationPlan, dry_run
-/// >>> report = dry_run(CalibrationPlan([], id="smoke"))
+/// >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, dry_run
+/// >>> report = dry_run(CalibrationEnvelope(CalibrationPlan([], id="smoke")))
 /// >>> report.is_valid, report.errors
 /// (True, [])
 #[pyclass(

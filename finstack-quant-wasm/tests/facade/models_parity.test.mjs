@@ -244,12 +244,12 @@ const CASES = {
       beta.variance,
       beta.meanLgd,
       beta.quantile(0.05),
-      credit.betaRecoveryQuantile(0.4, 0.2, 0.95),
+      new credit.BetaRecovery(0.4, 0.2).quantile(0.95),
     ];
   },
   'lgd.beta_recovery_samples': () => [
     list(new credit.BetaRecovery(0.4, 0.2).sampleSeeded(4, 42)),
-    list(credit.betaRecoverySample(0.4, 0.2, 4, 42)),
+    list(new credit.BetaRecovery(0.4, 0.2).sampleSeeded(4, 42)),
   ],
   'lgd.seniority_recovery_stats': () => [
     credit.seniorityRecoveryStats('senior_unsecured').mean,
@@ -276,8 +276,8 @@ const CASES = {
   'lgd.downturn': () => [
     credit.DownturnLgd.stressed(0.15, 0.3, 0.999).adjust(0.35),
     credit.DownturnLgd.regulatoryFloor(0.08, 0.1).adjust(0.35),
-    credit.downturnLgdStressed(0.35, 0.15, 0.3, 0.999),
-    credit.downturnLgdRegulatoryFloor(0.35, 0.08, 0.1),
+    credit.DownturnLgd.stressed(0.15, 0.3, 0.999).adjust(0.35),
+    credit.DownturnLgd.regulatoryFloor(0.08, 0.1).adjust(0.35),
     credit.DownturnLgd.baselSecured().adjust(0.2),
     credit.DownturnLgd.baselUnsecured().adjust(0.2),
   ],
@@ -290,8 +290,8 @@ const CASES = {
       ead.leqFromObservedEad(800.0),
       credit.EadCalculator.revolver(600.0, 400.0).ead,
       credit.EadCalculator.termLoan(500.0).ead,
-      credit.eadTermLoan(500.0),
-      credit.eadRevolver(600.0, 400.0, 0.75),
+      credit.EadCalculator.termLoan(500.0).ead,
+      new credit.EadCalculator(600.0, 400.0, 0.75).ead,
     ];
   },
   'pd.cycle': () => [
@@ -521,7 +521,7 @@ const CASES = {
     monteCarlo.finiteDiffGammaCrn(...GBM, false, 2000, 42).mean,
   ],
   'monte_carlo.simulate_gbm_paths': () =>
-    monteCarlo.simulateGbmPaths(100.0, 0.05, 0.0, 0.2, 1.0, 4, 3, 42, false).paths,
+    monteCarlo.simulateGbmPaths(100.0, 0.05, 0.0, 0.2, 1.0, 4, 3, 42).paths,
   'monte_carlo.heston_satisfies_feller': () => [
     monteCarlo.hestonSatisfiesFeller(2.0, 0.04, 0.3),
     monteCarlo.hestonSatisfiesFeller(0.5, 0.04, 0.5),

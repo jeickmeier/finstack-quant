@@ -12,209 +12,62 @@
 //! handful of factors (≤ 12) and a handful of repricings (≤ ~30), well under
 //! the safe-integer ceiling.
 
-use crate::utils::input::{js_opt_bool, js_string, json_text, opt_json_text};
+use crate::utils::input::{js_string, json_text};
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
-/// Owned JSON fragments for P&L attribution via [`attribute_pnl`].
-///
-/// Holds the fields of Rust `AttributionJsonInputs`, which `attributePnl`
-/// passes to `AttributionSpec::from_json_inputs`. JavaScript has no keyword
-/// arguments, so the inputs are bundled in this class; Python passes the same
-/// fields as keyword arguments of `attribute_pnl`.
-#[wasm_bindgen(js_name = AttributionJsonInputs)]
-#[derive(Default)]
-pub struct JsAttributionJsonInputs {
-    instrument_json: String,
-    market_t0_json: String,
-    market_t1_json: String,
-    as_of_t0: String,
-    as_of_t1: String,
-    method_json: String,
-    config_json: Option<String>,
-    full_cross_attribution: Option<bool>,
-    model_params_t0_json: Option<String>,
-    credit_factor_model_json: Option<String>,
-}
-
-#[wasm_bindgen(js_class = AttributionJsonInputs)]
-impl JsAttributionJsonInputs {
-    /// Bundle the attribution inputs (instrument / markets / dates / method
-    /// JSON strings plus optional config and full-cross flag) for
-    /// `attributePnl`. Attach a T₀ model-parameter snapshot or credit-factor
-    /// model with the optional setters after construction.
-    ///
-    /// # Arguments
-    ///
-    /// * `instrument_json` - Canonical v1 instrument envelope JSON.
-    /// * `market_t0_json` - Canonical MarketContext JSON at T₀.
-    /// * `market_t1_json` - Canonical MarketContext JSON at T₁.
-    /// * `as_of_t0` - ISO-8601 valuation date for the start snapshot.
-    /// * `as_of_t1` - ISO-8601 valuation date for the end snapshot.
-    /// * `method_json` - Snake-case serialized attribution method.
-    /// * `config_json` - Optional complete attribution configuration JSON.
-    /// * `full_cross_attribution` - When `Some(true)`, evaluate every pairwise
-    ///   cross-factor term.
-    #[wasm_bindgen(constructor)]
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        instrument_json: JsValue,
-        market_t0_json: JsValue,
-        market_t1_json: JsValue,
-        as_of_t0: JsValue,
-        as_of_t1: JsValue,
-        method_json: JsValue,
-        config_json: Option<JsValue>,
-        full_cross_attribution: Option<JsValue>,
-    ) -> Result<Self, JsValue> {
-        let instrument_json = json_text(&instrument_json, "instrumentJson")?;
-        let market_t0_json = json_text(&market_t0_json, "marketT0Json")?;
-        let market_t1_json = json_text(&market_t1_json, "marketT1Json")?;
-        let as_of_t0 = js_string(&as_of_t0, "asOfT0")?;
-        let as_of_t1 = js_string(&as_of_t1, "asOfT1")?;
-        // `js_wire`, not `json_text`: the unit variants are bare wire strings
-        // (`"parallel"`), which are not JSON text. Stored as canonical JSON.
-        let method: finstack_quant_attribution::AttributionMethod =
-            crate::utils::wire::js_wire(&method_json, "methodJson")?;
-        let method_json = serde_json::to_string(&method).map_err(to_js_err)?;
-        let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
-        let full_cross_attribution =
-            js_opt_bool(full_cross_attribution.as_ref(), "fullCrossAttribution")?;
-        Ok(Self {
-            instrument_json,
-            market_t0_json,
-            market_t1_json,
-            as_of_t0,
-            as_of_t1,
-            method_json,
-            config_json,
-            full_cross_attribution,
-            model_params_t0_json: None,
-            credit_factor_model_json: None,
-        })
-    }
-
-    /// Optional serialized opening `ModelParamsSnapshot`.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - JSON snapshot of T₀ model parameters, or omitted.
-    #[wasm_bindgen(setter, js_name = modelParamsT0Json)]
-    pub fn set_model_params_t0_json(&mut self, value: Option<JsValue>) -> Result<(), JsValue> {
-        self.model_params_t0_json = opt_json_text(value.as_ref(), "modelParamsT0Json")?;
-        Ok(())
-    }
-
-    /// Optional serialized opening `ModelParamsSnapshot`.
-    ///
-    /// # Returns
-    ///
-    /// The JSON snapshot attached after construction, or omitted.
-    #[wasm_bindgen(getter, js_name = modelParamsT0Json)]
-    pub fn model_params_t0_json(&self) -> Option<String> {
-        self.model_params_t0_json.clone()
-    }
-
-    /// Optional serialized `CreditFactorModel`.
-    ///
-    /// # Arguments
-    ///
-    /// * `value` - JSON credit-factor model, or omitted.
-    #[wasm_bindgen(setter, js_name = creditFactorModelJson)]
-    pub fn set_credit_factor_model_json(&mut self, value: Option<JsValue>) -> Result<(), JsValue> {
-        self.credit_factor_model_json = opt_json_text(value.as_ref(), "creditFactorModelJson")?;
-        Ok(())
-    }
-
-    /// Optional serialized `CreditFactorModel`.
-    ///
-    /// # Returns
-    ///
-    /// The JSON credit-factor model attached after construction, or omitted.
-    #[wasm_bindgen(getter, js_name = creditFactorModelJson)]
-    pub fn credit_factor_model_json(&self) -> Option<String> {
-        self.credit_factor_model_json.clone()
-    }
-}
-
-/// Parse and execute one attribution request.
-///
-/// Shared by [`attribute_pnl`] and [`attribute_pnl_json`], which differ only
-/// in how they hand the `PnlAttribution` back across the boundary. Execution
-/// goes through `execute_contained`, which turns a Rust panic into
-/// `Error::Internal`: an uncaught unwind at the wasm boundary would abort the
-/// module instance and kill every subsequent call from the JS host.
+/// Deserialize the canonical single-instrument spec and execute it once.
 fn run_attribute_pnl(
-    params: &JsAttributionJsonInputs,
+    spec: &JsValue,
 ) -> Result<finstack_quant_attribution::AttributionResult, JsValue> {
-    attribution_spec(params)?
-        .execute_contained()
-        .map_err(to_js_err)
+    let spec: finstack_quant_attribution::AttributionSpec =
+        crate::utils::input::from_js_json(spec, "spec")?;
+    spec.execute_contained().map_err(to_js_err)
 }
 
-/// Build the Rust `AttributionSpec` from the bundled JSON inputs.
-fn attribution_spec(
-    params: &JsAttributionJsonInputs,
-) -> Result<finstack_quant_attribution::AttributionSpec, JsValue> {
-    finstack_quant_attribution::AttributionSpec::from_json_inputs(
-        finstack_quant_attribution::AttributionJsonInputs {
-            instrument_json: &params.instrument_json,
-            market_t0_json: &params.market_t0_json,
-            market_t1_json: &params.market_t1_json,
-            as_of_t0: &params.as_of_t0,
-            as_of_t1: &params.as_of_t1,
-            method_json: &params.method_json,
-            config_json: params.config_json.as_deref(),
-            model_params_t0_json: params.model_params_t0_json.as_deref(),
-            credit_factor_model_json: params.credit_factor_model_json.as_deref(),
-            full_cross_attribution: params.full_cross_attribution.unwrap_or(false),
-        },
-    )
-    .map_err(to_js_err)
-}
-
-/// Run P&L attribution for a single instrument.
+/// Attribute one instrument from its canonical Rust specification.
 ///
-/// Accepts an `AttributionJsonInputs` object with the instrument JSON, two market
-/// snapshots, dates, and a method descriptor. Returns the `PnlAttribution`
-/// result as a structured JavaScript object whose fields carry the canonical
-/// Rust serde names (`total_pnl.amount`, `carry`, `meta`, ...); use
-/// [`attribute_pnl_json`] for the JSON wire string. `config_json` may include
-/// `"execution_policy": "parallel"`, which opts into inner Rayon on native
-/// hosts; WebAssembly builds have no Rayon, so the field is accepted but
-/// ignored here and attribution always runs serially (same result).
+/// Accepts an `AttributionSpec` plain object or its JSON text. All Money fields
+/// retain decimal-string amounts; dates are ISO calendar dates. The spec carries
+/// markets, method, model snapshots, credit detail options and execution config.
+///
+/// # Arguments
+///
+/// * `spec` - Canonical `AttributionSpec` object or JSON text with the instrument
+///   payload, market states, ISO calendar dates, method and optional config.
+///
+/// # Returns
+///
+/// The native-currency or configured reporting-currency `PnlAttribution` object.
 ///
 /// # Errors
 ///
-/// Throws a `FinstackError` whose `kind` is the Rust classification
-/// (`not_found` for missing market data, `computation` for a caught panic or
-/// solver failure, otherwise `validation`). Rejects malformed instrument,
-/// market, method, or configuration JSON;
-/// invalid ISO attribution dates; instrument or market reconstruction,
-/// pricing, FX, rounding, metric, or method-specific attribution failures; a
-/// caught attribution panic; or failure to convert the result to a
-/// JavaScript value.
-/// @param params - Fully specified AttributionJsonInputs object containing instrument, markets, dates, and method.
+/// Throws a classified `FinstackError` for malformed or unknown spec fields,
+/// invalid dates, unavailable market data, pricing, currency, configuration or
+/// method failures, or a contained Rust panic. Invalid host types throw `TypeError`.
 #[wasm_bindgen(js_name = attributePnl)]
-pub fn attribute_pnl(params: &JsAttributionJsonInputs) -> Result<JsValue, JsValue> {
-    let result = run_attribute_pnl(params)?;
+pub fn attribute_pnl(spec: JsValue) -> Result<JsValue, JsValue> {
+    let result = run_attribute_pnl(&spec)?;
     crate::utils::to_js_value(&result.attribution)
 }
 
-/// Run P&L attribution for a single instrument and return wire JSON.
+/// Attribute one instrument and return exact Rust wire JSON.
 ///
-/// Wire twin of [`attribute_pnl`]: same inputs, validation, and panic
-/// containment, returning the `PnlAttribution` as a JSON string instead of a
-/// structured object.
+/// # Arguments
+///
+/// * `spec` - Canonical `AttributionSpec` object or JSON text with the instrument
+///   payload, market states, ISO calendar dates, method and optional config.
+///
+/// # Returns
+///
+/// Compact canonical `PnlAttribution` JSON, preserving decimal amounts and map order.
 ///
 /// # Errors
 ///
-/// Rejects the same conditions as `attributePnl`, plus failure to
-/// serialize the result to JSON.
-/// @param params - Fully specified AttributionJsonInputs object containing instrument, markets, dates, and method.
+/// Throws the same classified errors as `attributePnl`, or a serialization error.
 #[wasm_bindgen(js_name = attributePnlJson)]
-pub fn attribute_pnl_json(params: &JsAttributionJsonInputs) -> Result<String, JsValue> {
-    let result = run_attribute_pnl(params)?;
+pub fn attribute_pnl_json(spec: JsValue) -> Result<String, JsValue> {
+    let result = run_attribute_pnl(&spec)?;
     serde_json::to_string(&result.attribution).map_err(to_js_err)
 }
 
@@ -374,43 +227,43 @@ fn parse_instrument(
     Ok(envelope.instrument)
 }
 
-/// Run one attribution configuration against many instruments.
+/// Attribute a batch using canonical shared inputs and instrument envelopes.
 ///
-/// Mirrors Python `attribute_pnl_many` (Rust `attribute_pnl_many`): every
-/// instrument is attributed with the markets, dates, method and configuration
-/// in `params` (whose own `instrumentJson` is replaced by each entry of
-/// `instruments`). Results come back in input order; the first failing
-/// instrument aborts the batch. Python returns the same attributions as a
-/// wide DataFrame.
-/// @param params - AttributionJsonInputs carrying the shared markets, dates, method and configuration.
-/// @param instruments - Array of canonical instrument envelopes (objects or JSON), in output order.
-/// @returns One `PnlAttribution` object per instrument, in input order.
+/// # Arguments
+///
+/// * `inputs` - `AttributionInputs` object or JSON containing markets, dates,
+///   method and execution options; no placeholder instrument is required.
+/// * `instruments` - Ordered array of canonical instrument envelopes, each an
+///   object or JSON string. The array itself may also be serialized JSON.
+///
+/// # Returns
+///
+/// One `PnlAttribution` object per instrument, in input order.
 ///
 /// # Errors
 ///
-/// Throws a `FinstackError` with the Rust classification for the first
-/// failing instrument (see `attributePnl`), or kind `validation` if an
-/// instrument envelope is malformed.
+/// Throws a classified `FinstackError` for malformed inputs or envelopes,
+/// or the first instrument's pricing, market-data, currency or validation error.
 #[wasm_bindgen(js_name = attributePnlMany)]
-pub fn attribute_pnl_many(
-    params: &JsAttributionJsonInputs,
-    instruments: JsValue,
-) -> Result<JsValue, JsValue> {
+pub fn attribute_pnl_many(inputs: JsValue, instruments: JsValue) -> Result<JsValue, JsValue> {
+    let inputs: finstack_quant_attribution::AttributionInputs =
+        crate::utils::input::from_js_json(&inputs, "inputs")?;
     let instruments: Vec<serde_json::Value> =
         crate::utils::input::from_js_json(&instruments, "instruments")?;
     let instruments = instruments
         .into_iter()
         .map(|value| {
-            serde_json::from_value::<finstack_quant_valuations::instruments::InstrumentEnvelope>(
-                value,
-            )
-            .map(|envelope| envelope.instrument)
-            .map_err(to_js_err)
+            let envelope: finstack_quant_valuations::instruments::InstrumentEnvelope =
+                match value {
+                    serde_json::Value::String(json) => serde_json::from_str(&json),
+                    object => serde_json::from_value(object),
+                }
+                .map_err(to_js_err)?;
+            Ok(envelope.instrument)
         })
         .collect::<Result<Vec<_>, JsValue>>()?;
-    let template = attribution_spec(params)?;
-    let attributions = finstack_quant_attribution::attribute_pnl_many(&template, instruments)
-        .map_err(to_js_err)?;
+    let attributions =
+        finstack_quant_attribution::attribute_pnl_many(&inputs, instruments).map_err(to_js_err)?;
     crate::utils::to_js_value(&attributions)
 }
 

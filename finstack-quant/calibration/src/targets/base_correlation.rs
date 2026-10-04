@@ -214,7 +214,7 @@ impl BaseCorrelationTarget {
 
         let prepared_quote = PreparedQuote::new(
             Arc::new(quote.clone()),
-            Arc::<dyn finstack_quant_valuations::instruments::Instrument>::from(instrument),
+            Arc::new(instrument),
             quote.maturity,
             pillar_time,
         );
@@ -278,7 +278,11 @@ impl BaseCorrelationTarget {
         quotes: &[MarketQuote],
         context: &MarketContext,
         global_config: &CalibrationConfig,
-    ) -> Result<(MarketContext, CalibrationReport)> {
+    ) -> Result<(
+        BaseCorrelationCurve,
+        Option<finstack_quant_core::market_data::term_structures::CreditIndexData>,
+        CalibrationReport,
+    )> {
         let tranche_quotes: Vec<CdsTrancheQuote> = quotes.extract_quotes();
         if tranche_quotes.is_empty() {
             return Err(finstack_quant_core::Error::Input(
@@ -313,14 +317,15 @@ impl BaseCorrelationTarget {
         report = report.with_metadata("residual_units", "discounted_upfront_fraction");
         report.update_solver_config(global_config.solver.clone());
 
-        let mut new_context = context.clone().insert(curve.clone());
-        if let Ok(idx) = new_context.get_credit_index(params.index_id.as_str()) {
-            let mut updated = idx.as_ref().clone();
-            updated.base_correlation_curve = Arc::new(curve);
-            new_context = new_context.insert_credit_index(params.index_id.as_str(), updated)?;
-        }
-
-        Ok((new_context, report))
+        let index_update = context
+            .get_credit_index(params.index_id.as_str())
+            .ok()
+            .map(|idx| {
+                let mut updated = idx.as_ref().clone();
+                updated.base_correlation_curve = Arc::new(curve.clone());
+                updated
+            });
+        Ok((curve, index_update, report))
     }
 }
 

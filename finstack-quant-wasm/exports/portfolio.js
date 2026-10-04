@@ -55,28 +55,20 @@ export const portfolio = {
   twrrModifiedDietz: wasm.twrrModifiedDietz,
   twrrLinked: wasm.twrrLinked,
   mwrXirr: wasm.mwrXirr,
-  buildPortfolioFromSpecJson: wasm.buildPortfolioFromSpecJson,
   aggregateMetrics: wasm.aggregateMetrics,
   portfolioMetricsSeries: wasm.portfolioMetricsSeries,
   valuePortfolio: wasm.valuePortfolio,
-  valuePortfolioBuilt: wasm.valuePortfolioBuilt,
   aggregateFullCashflows: wasm.aggregateFullCashflows,
-  aggregateFullCashflowsBuilt: wasm.aggregateFullCashflowsBuilt,
   netInCurrencyByDate: wasm.netInCurrencyByDate,
   collapseToBaseByDateKind: wasm.collapseToBaseByDateKind,
   applyScenarioAndRevalue: wasm.applyScenarioAndRevalue,
-  applyScenarioAndRevalueBuilt: wasm.applyScenarioAndRevalueBuilt,
   scenarioPnl: wasm.scenarioPnl,
-  scenarioPnlBuilt: wasm.scenarioPnlBuilt,
   optimizePortfolio: wasm.optimizePortfolio,
   rebalanceFromSpec: wasm.rebalanceFromSpec,
   replayPortfolio: wasm.replayPortfolio,
-  // ⚠️ BLOCKING: prefer computeFactorSensitivitiesWithMarket for repeated calls
   // so large MarketContext JSON is parsed once into a core.MarketContext handle.
   computeFactorSensitivities: wasm.computeFactorSensitivities,
-  computeFactorSensitivitiesWithMarket: wasm.computeFactorSensitivitiesWithMarket,
   computePnlProfiles: wasm.computePnlProfiles,
-  computePnlProfilesWithMarket: wasm.computePnlProfilesWithMarket,
   // Takes the computeFactorSensitivities wire object; malformed dimensions
   // throw a validation Error.
   decomposeFactorRisk: wasm.decomposeFactorRisk,

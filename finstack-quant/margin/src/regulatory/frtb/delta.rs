@@ -38,26 +38,6 @@ use std::collections::BTreeMap;
 ///
 /// The non-negative delta risk charge for `risk_class` under `scenario`.
 ///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::currency::Currency;
-/// use finstack_quant_margin::regulatory::frtb::delta::delta_charge;
-/// use finstack_quant_margin::regulatory::frtb::{
-///     CorrelationScenario, FrtbRiskClass, FrtbSensitivities,
-/// };
-///
-/// let mut sensitivities = FrtbSensitivities::new(Currency::USD);
-/// sensitivities.add_girr_delta(Currency::USD, "5Y", 1_000_000.0);
-///
-/// let charge = delta_charge(
-///     FrtbRiskClass::Girr,
-///     &sensitivities,
-///     CorrelationScenario::Medium,
-/// );
-/// assert!(charge >= 0.0);
-/// ```
-///
 /// # References
 ///
 /// - BCBS FRTB Minimum Capital Requirements: `docs/REFERENCES.md#bcbs-frtb-minimum-capital-requirements`
@@ -111,7 +91,7 @@ fn girr_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
     for ((ccy, tenor), delta) in &sens.girr_delta {
         let rw = girr_risk_weight(tenor);
         let ws = delta * rw;
-        let tenor_years = girr::tenor_to_years(tenor).unwrap_or(5.0);
+        let tenor_years = girr::tenor_to_years(tenor).unwrap_or(f64::NAN);
         by_currency
             .entry(*ccy)
             .or_default()
@@ -275,20 +255,11 @@ fn fx_delta(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
 
 /// GIRR risk weight lookup by tenor label.
 ///
-/// Falls back to `1.1` (the FRTB d457 default at the long end of the
-/// curve) for unknown tenors, with a single `tracing::warn!` so an
-/// upstream typo or registry mismatch is visible rather than silently
-/// producing the fallback.
+/// Unknown labels return NaN; engine validation rejects them first.
 fn girr_risk_weight(tenor: &str) -> f64 {
     static GIRR_RW_BY_TENOR: std::sync::LazyLock<finstack_quant_core::HashMap<&'static str, f64>> =
         std::sync::LazyLock::new(|| girr::GIRR_DELTA_RISK_WEIGHTS.iter().copied().collect());
-    GIRR_RW_BY_TENOR.get(tenor).copied().unwrap_or_else(|| {
-        tracing::warn!(
-            tenor,
-            "GIRR risk weight: unknown tenor label, falling back to 1.1"
-        );
-        1.1
-    })
+    GIRR_RW_BY_TENOR.get(tenor).copied().unwrap_or(f64::NAN)
 }
 
 /// CSR-specific delta aggregation with intra-bucket

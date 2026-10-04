@@ -323,6 +323,15 @@ class TestOptimizationAndResultsAudit:
             "constraint_slacks",
         ]
         wire = {
+            "meta": {
+                "numeric_mode": "f64",
+                "rounding": {
+                    "mode": "bankers",
+                    "ingest_scale_by_currency": {},
+                    "output_scale_by_currency": {},
+                    "version": 1,
+                },
+            },
             "schema_version": 1,
             "status": "optimal",
             "status_label": "optimal",
@@ -362,8 +371,15 @@ class TestOptimizationAndResultsAudit:
         assert math.isnan(result.turnover)
         wire = json.loads(result.to_json())
         assert (wire["objective_value"], wire["turnover"]) == ("nan", "nan")
+        assert wire["meta"] == result.meta
         rebuilt = PortfolioOptimizationResult.from_json(result.to_json())
+        assert rebuilt.meta == result.meta
         assert rebuilt.to_json() == result.to_json()
+        # Undefined constraint diagnostics use the same Rust sentinel as the objective.
+        wire["constraint_slacks"]["undefined"] = "nan"
+        with_slack = PortfolioOptimizationResult.from_json(json.dumps(wire))
+        assert math.isnan(with_slack.constraint_slacks["undefined"])
+        assert json.loads(with_slack.to_json())["constraint_slacks"]["undefined"] == "nan"
         assert math.isnan(rebuilt.objective_value)
         unpickled = pickle.loads(pickle.dumps(result))  # noqa: S301
         assert unpickled.to_json() == result.to_json()

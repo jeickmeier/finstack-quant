@@ -1,9 +1,7 @@
 use super::super::helpers::*;
 use super::super::types::*;
 use super::context::AttributionInputs;
-use super::shifts::{
-    average_over, measure_per_tenor_rate_shift, rate_curve_abs_shift_bp, twist_diagnostic_note,
-};
+use super::shifts::{average_over, rate_curve_abs_shift_bp, twist_diagnostic_note};
 use finstack_quant_core::config::{RoundingContext, ZeroKind};
 use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_valuations::metrics::MetricId;
@@ -70,16 +68,7 @@ pub(super) fn apply(
             let Some(buckets) = keyrate_dv01.get(curve_id) else {
                 continue;
             };
-            let tenors: Vec<f64> = buckets.iter().map(|(t, _)| *t).collect();
-            let Some(shifts) = measure_per_tenor_rate_shift(
-                curve_id.as_str(),
-                inputs.market_t0,
-                inputs.market_t1,
-                &tenors,
-            ) else {
-                continue;
-            };
-            for ((_, dv01), shift) in buckets.iter().zip(shifts.iter()) {
+            for (_, dv01, shift) in buckets {
                 rates_acc.add(dv01 * shift);
                 shift_acc.add(*shift);
                 weighted_shift_acc.add(dv01.abs() * shift);

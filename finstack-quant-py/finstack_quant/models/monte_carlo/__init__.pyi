@@ -768,14 +768,12 @@ def simulate_gbm_paths(
     num_steps: int,
     num_paths: int,
     seed: int | None = None,
-    antithetic: bool = False,
 ) -> GbmPathSummary:
     """
     Simulate compact GBM spot paths with Rust's exact GBM transitions.
 
     ``num_paths`` is the estimator and simulated-path count because captured
-    paths do not support antithetic pairing. Passing ``antithetic=True`` raises
-    ``ValueError``. The compact output and shared time grids must satisfy
+    paths are independently simulated. The compact output and shared time grids must satisfy
     ``(num_paths + 3) * (num_steps + 1) <= 64_000_000`` scalar values,
     including time zero in every path.
 
@@ -800,15 +798,13 @@ def simulate_gbm_paths(
     seed : int or None, default None
         Optional deterministic Philox seed; ``None`` uses the Rust
         ``GbmPathConfig`` default (``42``), so unseeded calls are repeatable.
-    antithetic : bool, default False
-        Antithetic-path request. This compact path API rejects ``True``.
 
     Returns
     -------
     GbmPathSummary
         Captured time grid and simulated spot paths. ``num_paths`` is the
         number of returned paths and ``num_simulated_paths`` records the same
-        count because antithetic capture is unsupported.
+        count.
 
     Raises
     ------
@@ -818,8 +814,7 @@ def simulate_gbm_paths(
         non-finite; ``expiry`` is non-finite or not strictly positive; ``num_steps`` is
         zero or cannot form a time grid; ``num_paths`` is zero or exceeds the
         ``100_000``-path capture limit; the compact output and shared time grids
-        exceed ``64_000_000`` scalar values; a simulated spot is non-finite;
-        or ``antithetic`` is ``True``.
+        exceed ``64_000_000`` scalar values; or a simulated spot is non-finite.
 
     Examples
     --------

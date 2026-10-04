@@ -21,7 +21,7 @@ use crate::factor::credit::hierarchy::{
 use crate::factor::matching::{CreditHierarchicalConfig, CREDIT_GENERIC_FACTOR_ID};
 use crate::factor::{
     FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
-    MarketMapping, MatchingConfig, PricingMode,
+    MarketMapping, MatchingConfig,
 };
 
 /// Anchor-step output: anchor levels + per-issuer adder values at as_of.
@@ -248,7 +248,7 @@ pub(crate) fn assemble_factor_model_config(
         factors,
         covariance,
         matching,
-        pricing_mode: PricingMode::DeltaBased,
+
         risk_measure: Default::default(),
         bump_config: None,
         // Calibrated artifacts explicitly select Warn: a runtime issuer

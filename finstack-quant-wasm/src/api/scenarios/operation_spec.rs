@@ -167,23 +167,16 @@ pub fn operation_spec_instrument_price_pct_by_attr(
     to_js_value(&OperationSpec::InstrumentPricePctByAttr { attrs, pct })
 }
 
-/// Build a parallel basis-point curve shift for one curve or several.
-///
-/// Free-function twin of Python `OperationSpec.curve_parallel_bp`. A single
-/// identifier builds Rust `OperationSpec::CurveParallelBp`; an array expands
-/// through Rust `ScenarioSpec::parallel_bp_many` to one operation per
-/// identifier, in the given order.
-/// @param curve_kind - Curve family label: `"discount"`, `"forward"`, `"par_cds"`, `"inflation"` or `"commodity"`.
-/// @param curve_id - One curve identifier, or an array of identifiers to shift by the same amount.
-/// @param bp - Additive shift in basis points (1 bp = 1e-4); for `"commodity"` curves, percent of the forward.
-/// @param discount_curve_id - Optional discount curve used when re-bootstrapping shocked ParCDS quotes.
-/// @returns One `curve_parallel_bp` operation object for a string `curveId`, an array of them for an array.
+/// Construct one parallel curve shift.
+/// @param curve_kind - Canonical discount, forward, par_cds, inflation or commodity family label.
+/// @param curve_id - Identifier of the single curve receiving the shift.
+/// @param bp - Additive basis points; percent of forward for commodity curves.
+/// @param discount_curve_id - Optional discount curve used to re-bootstrap ParCDS quotes.
+/// @returns One curve_parallel_bp operation object.
 ///
 /// # Errors
 ///
-/// Throws a `TypeError` when `curveId` is neither a string nor an array of
-/// strings or `bp` is not a number, and a `validation` error for an unknown
-/// `curveKind` label.
+/// Throws TypeError for non-string identifiers or non-numeric bp, and a validation error for an unknown curve family.
 #[wasm_bindgen(js_name = operationSpecCurveParallelBp)]
 pub fn operation_spec_curve_parallel_bp(
     curve_kind: JsValue,
@@ -191,23 +184,37 @@ pub fn operation_spec_curve_parallel_bp(
     bp: JsValue,
     discount_curve_id: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let curve_kind: CurveKind = label(&curve_kind, "curveKind")?;
-    let bp = js_f64(&bp, "bp")?;
-    let discount_curve_id = opt_curve_id(discount_curve_id.as_ref(), "discountCurveId")?;
-    if curve_id.is_string() {
-        return to_js_value(&OperationSpec::CurveParallelBp {
-            curve_kind,
-            curve_id: self::curve_id(&curve_id, "curveId")?,
-            discount_curve_id,
-            bp,
-        });
-    }
-    let ids = js_string_seq(&curve_id, "curveId")?;
+    to_js_value(&OperationSpec::CurveParallelBp {
+        curve_kind: label(&curve_kind, "curveKind")?,
+        curve_id: self::curve_id(&curve_id, "curveId")?,
+        bp: js_f64(&bp, "bp")?,
+        discount_curve_id: opt_curve_id(discount_curve_id.as_ref(), "discountCurveId")?,
+    })
+}
+
+/// Expand a parallel shift into one operation per curve identifier.
+/// @param curve_kind - Canonical discount, forward, par_cds, inflation or commodity family label.
+/// @param curve_ids - Ordered array of curve identifiers; empty input returns an empty array.
+/// @param bp - Additive basis points; percent of forward for commodity curves.
+/// @param discount_curve_id - Optional ParCDS discount curve copied onto every operation.
+/// @returns An array of operations preserving identifier order.
+///
+/// # Errors
+///
+/// Throws TypeError for malformed identifiers or non-numeric bp, and a validation error for an unknown curve family.
+#[wasm_bindgen(js_name = parallelBpMany)]
+pub fn parallel_bp_many(
+    curve_kind: JsValue,
+    curve_ids: JsValue,
+    bp: JsValue,
+    discount_curve_id: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    let ids = js_string_seq(&curve_ids, "curveIds")?;
     to_js_value(&ScenarioSpec::parallel_bp_many(
-        curve_kind,
-        ids.iter().map(String::as_str),
-        bp,
-        discount_curve_id,
+        label(&curve_kind, "curveKind")?,
+        ids,
+        js_f64(&bp, "bp")?,
+        opt_curve_id(discount_curve_id.as_ref(), "discountCurveId")?,
     ))
 }
 

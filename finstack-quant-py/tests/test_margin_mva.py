@@ -161,8 +161,7 @@ def test_xva_result_exposes_mva_and_total_xva() -> None:
         "total_xva": 105.0,
         "epe_profile": [[1.0, 10.0]],
         "ene_profile": [[1.0, 2.0]],
-        "pfe_profile": [[1.0, 10.0]],
-        "max_pfe": 10.0,
+        "max_epe": 10.0,
         "effective_epe_profile": [[1.0, 10.0]],
         "effective_epe": 10.0,
     })
@@ -179,8 +178,7 @@ def test_xva_result_funding_legs_are_optional_but_total_is_required() -> None:
         "total_xva": 100.0,
         "epe_profile": [[1.0, 10.0]],
         "ene_profile": [[1.0, 0.0]],
-        "pfe_profile": [[1.0, 10.0]],
-        "max_pfe": 10.0,
+        "max_epe": 10.0,
         "effective_epe_profile": [[1.0, 10.0]],
         "effective_epe": 10.0,
     })

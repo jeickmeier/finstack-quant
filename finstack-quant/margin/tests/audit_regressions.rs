@@ -8,8 +8,7 @@ use finstack_quant_margin::{
     metrics::MarginUtilization,
     regulatory::{
         frtb::{
-            curvature::curvature_charge, delta::delta_charge, drc::drc_charge, vega::vega_charge,
-            CorrelationScenario, DrcAssetType, DrcPosition, DrcSector, DrcSeniority, FrtbRiskClass,
+            CorrelationScenario, DrcPosition, DrcSector, DrcSeniority, FrtbRiskClass,
             FrtbSensitivities,
         },
         sa_ccr::{
@@ -200,7 +199,6 @@ fn drc_respects_subordination_maturity_and_direction_of_offsets() {
         rating_bucket: 4,
         sector: DrcSector::Corporate,
         seniority: DrcSeniority::Subordinated,
-        asset_type: DrcAssetType::Corporate,
         pnl_adjustment: 0.0,
     };
     assert_eq!(
@@ -300,14 +298,8 @@ fn repo_margin_call_settles_after_weekend_and_preserves_call_date() {
     let mut spec = RepoMarginSpec::mark_to_market(1.02, 0.0).expect("terms");
     spec.settlement_lag = 1;
     let calendar = finstack_quant_core::dates::calendar_by_id("usny").expect("calendar");
-    let flows = generate_margin_cashflows(
-        &spec,
-        usd(1e6),
-        &[(call_date, 900_000.0)],
-        Currency::USD,
-        calendar,
-    )
-    .expect("flows");
+    let flows = generate_margin_cashflows(&spec, usd(1e6), &[(call_date, 900_000.0)], calendar)
+        .expect("flows");
     assert_eq!(flows[0].date, settlement);
 }
 
@@ -324,4 +316,55 @@ fn schedule_rejects_invalid_maturity_at_every_entry_point() {
             .calculate_for_notional(usd(1e6), ScheduleAssetClass::InterestRate, maturity, date)
             .is_err());
     }
+}
+
+fn component_charge(
+    class: FrtbRiskClass,
+    sens: &FrtbSensitivities,
+    scenario: CorrelationScenario,
+    component: &str,
+) -> f64 {
+    let result =
+        finstack_quant_margin::regulatory::frtb::FrtbSbaEngine::new(vec![scenario], vec![class])
+            .expect("selection")
+            .calculate(sens)
+            .expect("validated sensitivity fixture");
+    let charges = match component {
+        "delta" => result.delta_by_risk_class,
+        "vega" => result.vega_by_risk_class,
+        _ => result.curvature_by_risk_class,
+    };
+    charges.get(&class).copied().unwrap_or(0.0)
+}
+fn delta_charge(
+    class: FrtbRiskClass,
+    sens: &FrtbSensitivities,
+    scenario: CorrelationScenario,
+) -> f64 {
+    component_charge(class, sens, scenario, "delta")
+}
+fn vega_charge(
+    class: FrtbRiskClass,
+    sens: &FrtbSensitivities,
+    scenario: CorrelationScenario,
+) -> f64 {
+    component_charge(class, sens, scenario, "vega")
+}
+fn curvature_charge(
+    class: FrtbRiskClass,
+    sens: &FrtbSensitivities,
+    scenario: CorrelationScenario,
+) -> f64 {
+    component_charge(class, sens, scenario, "curvature")
+}
+fn drc_charge(positions: &[DrcPosition]) -> finstack_quant_core::Result<f64> {
+    let mut sens = FrtbSensitivities::new(Currency::USD);
+    for position in positions {
+        sens.add_drc_position(position.clone());
+    }
+    Ok(
+        finstack_quant_margin::regulatory::frtb::FrtbSbaEngine::default()
+            .calculate(&sens)?
+            .drc,
+    )
 }

@@ -2,8 +2,7 @@
 //!
 //! Binds `finstack_quant_portfolio::grid_attribution` (Dynkin, Hyman &
 //! Vankudre 1998, Appendix A). The typed entry points return `Py*` wrappers;
-//! the paired `*_json` functions keep the exact JSON wire strings (same
-//! pattern as the Brinson bindings in `crate::bindings::portfolio::brinson`).
+//! Result wrappers serialize through the canonical Rust wire format.
 
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyModule};
@@ -29,13 +28,6 @@ const GRID_SECTOR_COLUMNS: &[ColumnSchema<'static>] = &[
     ("cell", "str"),
     ("sector", "str"),
     ("allocation_effect", "float64"),
-];
-
-/// Column schema for
-/// [`PyGridAttributionResult::to_selection_effects_dataframe`].
-const GRID_SELECTION_COLUMNS: &[ColumnSchema<'static>] = &[
-    ("cell", "str"),
-    ("sector", "str"),
     ("selection_effect", "float64"),
 ];
 
@@ -79,19 +71,11 @@ impl PyGridAttributionResult {
         serde_to_py(py, &self.inner.curve_effects)
     }
 
-    /// Per-(cell, sector) allocation effects as a list of dicts.
+    /// Per-(cell, sector) allocation and selection effects as a list of dicts.
     #[getter]
     fn sector_effects<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.sector_effects)
     }
-
-    /// Per-(cell, sector) selection effects as a list of dicts, in the same
-    /// order as ``sector_effects``.
-    #[getter]
-    fn selection_effects<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.selection_effects)
-    }
-
     /// Sum of the curve effects.
     #[getter]
     fn total_curve(&self) -> f64 {
@@ -113,8 +97,7 @@ impl PyGridAttributionResult {
     /// Per-cell curve effects as a :class:`pandas.DataFrame`.
     ///
     /// The primary frame is the duration-cell axis; the two (cell, sector)
-    /// tables are available from :meth:`to_sector_effects_dataframe` and
-    /// :meth:`to_selection_effects_dataframe`.
+    /// tables are available from :meth:`to_sector_effects_dataframe` .
     ///
     /// Columns: ``cell``, ``portfolio_weight``, ``benchmark_weight``,
     /// ``benchmark_cell_return``, ``curve_effect``.
@@ -122,24 +105,12 @@ impl PyGridAttributionResult {
         serde_rows_to_dataframe_with_schema(py, &self.inner.curve_effects, GRID_CURVE_COLUMNS)
     }
 
-    /// Per-(cell, sector) allocation effects as a :class:`pandas.DataFrame`.
+    /// Per-(cell, sector) allocation and selection effects as a :class:`pandas.DataFrame`.
     ///
-    /// Columns: ``cell``, ``sector``, ``allocation_effect``.
+    /// Columns: ``cell``, ``sector``, ``allocation_effect``, ``selection_effect``.
     fn to_sector_effects_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_rows_to_dataframe_with_schema(py, &self.inner.sector_effects, GRID_SECTOR_COLUMNS)
     }
-
-    /// Per-(cell, sector) selection effects as a :class:`pandas.DataFrame`.
-    ///
-    /// Columns: ``cell``, ``sector``, ``selection_effect``.
-    fn to_selection_effects_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_rows_to_dataframe_with_schema(
-            py,
-            &self.inner.selection_effects,
-            GRID_SELECTION_COLUMNS,
-        )
-    }
-
     /// Serialize to a compact JSON string.
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
@@ -338,7 +309,7 @@ fn run_grid_carino_link(
 ///     that clear the near-zero-net-weight check below), the reconciliation
 ///     residual grows the closer any bucket's net weight sits to that
 ///     check's own rejection boundary — see the Rust module docs' measured
-///     residuals for magnitudes. Use :func:`grid_attribution_json` for the
+///     residuals for magnitudes. Use :meth:`to_json` for the
 ///     raw wire string.
 ///
 /// Raises
@@ -383,33 +354,6 @@ fn grid_attribution(
         inner: run_grid_attribution(py, portfolio_json, benchmark_json)?,
     })
 }
-
-/// Compute a single-period grid attribution and return wire JSON.
-///
-/// Wire twin of :func:`grid_attribution`; same inputs, JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``GridAttributionResult``.
-#[pyfunction]
-#[pyo3(text_signature = "(portfolio_json, benchmark_json)")]
-fn grid_attribution_json(
-    py: Python<'_>,
-    portfolio_json: &Bound<'_, PyAny>,
-    benchmark_json: &Bound<'_, PyAny>,
-) -> PyResult<String> {
-    let portfolio_json =
-        crate::bindings::extract::extract_records_json(py, portfolio_json, "portfolio")?;
-    let portfolio_json: &str = &portfolio_json;
-    let benchmark_json =
-        crate::bindings::extract::extract_records_json(py, benchmark_json, "benchmark")?;
-    let benchmark_json: &str = &benchmark_json;
-    let result = run_grid_attribution(py, portfolio_json, benchmark_json)?;
-    serde_json::to_string(&result)
-        .map_err(|err| serde_json_to_py(err, "serialize GridAttributionResult"))
-}
-
 /// Carino-link multi-period hierarchical grid attribution results.
 ///
 /// Binds Rust `finstack_quant_portfolio::grid_carino_link` (Carino 1999):
@@ -424,14 +368,14 @@ fn grid_attribution_json(
 /// ----------
 /// periods_json : str | dict | list | pandas.DataFrame
 ///     JSON array of ``GridAttributionResult`` objects, in chronological
-///     order, each the wire output of :func:`grid_attribution_json` (or
+///     order, each the wire output of :meth:`to_json` (or
 ///     ``GridAttributionResult.to_json()``).
 ///
 /// Returns
 /// -------
 /// GridCarinoLinkedResult
 ///     Typed result with the three linked effects and compounded returns.
-///     Use :func:`grid_carino_link_json` for the raw wire string.
+///     Use :meth:`to_json` serialize with ``to_json()`` for the wire string.
 ///
 /// Raises
 /// ------
@@ -455,10 +399,10 @@ fn grid_attribution_json(
 /// Examples
 /// --------
 /// >>> import json
-/// >>> from finstack_quant.portfolio import grid_attribution_json, grid_carino_link
+/// >>> from finstack_quant.portfolio import grid_attribution, grid_carino_link
 /// >>> portfolio = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.02}]
 /// >>> benchmark = [{"cell": "0-3", "sector": "GOVT", "weight": 1.0, "total_return": 0.01}]
-/// >>> period = json.loads(grid_attribution_json(json.dumps(portfolio), json.dumps(benchmark)))
+/// >>> period = json.loads(grid_attribution(json.dumps(portfolio), json.dumps(benchmark)).to_json())
 /// >>> result = grid_carino_link(json.dumps([period, period]))
 /// >>> round(result.linked_selection, 4)
 /// 0.0203
@@ -474,32 +418,11 @@ fn grid_carino_link(
         inner: run_grid_carino_link(py, periods_json)?,
     })
 }
-
-/// Carino-link multi-period grid attribution results and return wire JSON.
-///
-/// Wire twin of :func:`grid_carino_link`; same inputs, JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``GridCarinoLinkedResult``.
-#[pyfunction]
-#[pyo3(text_signature = "(periods_json)")]
-fn grid_carino_link_json(py: Python<'_>, periods_json: &Bound<'_, PyAny>) -> PyResult<String> {
-    let periods_json = crate::bindings::extract::extract_records_json(py, periods_json, "periods")?;
-    let periods_json: &str = &periods_json;
-    let result = run_grid_carino_link(py, periods_json)?;
-    serde_json::to_string(&result)
-        .map_err(|err| serde_json_to_py(err, "serialize GridCarinoLinkedResult"))
-}
-
 /// Register grid attribution functions on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyGridAttributionResult>()?;
     m.add_class::<PyGridCarinoLinkedResult>()?;
     m.add_function(wrap_pyfunction!(grid_attribution, m)?)?;
-    m.add_function(wrap_pyfunction!(grid_attribution_json, m)?)?;
     m.add_function(wrap_pyfunction!(grid_carino_link, m)?)?;
-    m.add_function(wrap_pyfunction!(grid_carino_link_json, m)?)?;
     Ok(())
 }

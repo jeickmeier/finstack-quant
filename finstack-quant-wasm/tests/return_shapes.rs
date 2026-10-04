@@ -198,7 +198,6 @@ fn computation_results_are_structured_not_strings() {
         ("CalibrationNamespace", "dryRun"),
         ("AttributionNamespace", "attributePnl"),
         ("AttributionNamespace", "attributePnlEnvelope"),
-        ("MarginNamespace", "calculateVm"),
         (
             "ValuationInstrumentsNamespace",
             "structuredCreditTrancheOas",

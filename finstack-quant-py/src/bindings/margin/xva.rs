@@ -477,10 +477,10 @@ impl PyXvaResult {
         self.inner.total_xva
     }
 
-    /// Maximum PFE across the profile.
+    /// Maximum expected positive exposure across the profile, in reporting currency.
     #[getter]
-    fn max_pfe(&self) -> f64 {
-        self.inner.max_pfe
+    fn max_epe(&self) -> f64 {
+        self.inner.max_epe
     }
 
     /// Effective EPE (time-weighted average, regulatory metric).
@@ -501,12 +501,6 @@ impl PyXvaResult {
         self.inner.ene_profile.clone()
     }
 
-    /// PFE profile as list of (time, value) tuples.
-    #[getter]
-    fn pfe_profile(&self) -> Vec<(f64, f64)> {
-        self.inner.pfe_profile.clone()
-    }
-
     /// Effective EPE profile as list of (time, value) tuples.
     #[getter]
     fn effective_epe_profile(&self) -> Vec<(f64, f64)> {
@@ -524,7 +518,7 @@ impl PyXvaResult {
     /// Export the XVA components as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``cva``, ``dva``, ``fva``, ``mva``, ``total_xva``,
-    /// ``max_pfe``, ``effective_epe`` — all in the netting set's currency
+    /// ``max_epe``, ``effective_epe`` — all in the netting set's currency
     /// units, matching the getters of the same name. Uncomputed legs
     /// (``dva`` / ``fva`` / ``mva``) are ``NaN`` rather than absent, so the
     /// frame keeps its schema across netting sets.
@@ -544,7 +538,7 @@ impl PyXvaResult {
             "fva": self.inner.fva,
             "mva": self.inner.mva,
             "total_xva": self.inner.total_xva,
-            "max_pfe": self.inner.max_pfe,
+            "max_epe": self.inner.max_epe,
             "effective_epe": self.inner.effective_epe,
         });
         serde_object_to_single_row_dataframe_with_schema(
@@ -556,7 +550,7 @@ impl PyXvaResult {
                 "fva",
                 "mva",
                 "total_xva",
-                "max_pfe",
+                "max_epe",
                 "effective_epe",
             ],
         )
@@ -564,20 +558,18 @@ impl PyXvaResult {
 
     /// Export exposure profiles as a pandas ``DataFrame``.
     ///
-    /// Columns: ``epe``, ``ene``, ``pfe``, ``effective_epe`` — indexed by
+    /// Columns: ``epe``, ``ene``, ``effective_epe`` — indexed by
     /// time in years.  Time values are taken from the EPE profile.
     fn to_profiles_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         let (times, epe_vals): (Vec<f64>, Vec<f64>) =
             self.inner.epe_profile.iter().copied().unzip();
         let (_, ene_vals): (Vec<f64>, Vec<f64>) = self.inner.ene_profile.iter().copied().unzip();
-        let (_, pfe_vals): (Vec<f64>, Vec<f64>) = self.inner.pfe_profile.iter().copied().unzip();
         let (_, eff_epe_vals): (Vec<f64>, Vec<f64>) =
             self.inner.effective_epe_profile.iter().copied().unzip();
 
         data.set_item("epe", epe_vals)?;
         data.set_item("ene", ene_vals)?;
-        data.set_item("pfe", pfe_vals)?;
         data.set_item("effective_epe", eff_epe_vals)?;
         let idx = times.into_pyobject(py)?.into_any();
         dict_to_dataframe(py, &data, Some(idx))
@@ -588,13 +580,13 @@ impl PyXvaResult {
             value.map_or("None".to_string(), |v| format!("{v:.4}"))
         }
         format!(
-            "XvaResult(cva={:.4}, dva={}, fva={}, mva={}, total_xva={:.4}, max_pfe={:.2})",
+            "XvaResult(cva={:.4}, dva={}, fva={}, mva={}, total_xva={:.4}, max_epe={:.2})",
             self.inner.cva,
             opt(self.inner.dva),
             opt(self.inner.fva),
             opt(self.inner.mva),
             self.inner.total_xva,
-            self.inner.max_pfe
+            self.inner.max_epe
         )
     }
 

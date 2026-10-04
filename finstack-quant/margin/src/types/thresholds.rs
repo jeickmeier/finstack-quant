@@ -161,13 +161,6 @@ impl VmParameters {
     /// does not match the threshold currency.
     pub fn required_credit_support(&self, exposure: Money) -> Result<Money> {
         self.validate(exposure.currency())?;
-        if exposure.currency() != self.threshold.currency() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "VM exposure currency mismatch: expected {}, got {}",
-                self.threshold.currency(),
-                exposure.currency()
-            )));
-        }
         let currency = exposure.currency();
         let exp = exposure.amount();
         let threshold = self.threshold.amount();
@@ -181,17 +174,6 @@ impl VmParameters {
                 "VM exposure must be finite, got {exp}"
             )));
         }
-        if !threshold.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "VM threshold must be finite, got {threshold}"
-            )));
-        }
-        if !ia.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(format!(
-                "VM independent amount must be finite, got {ia}"
-            )));
-        }
-
         let abs_excess = (exp.abs() - threshold).max(0.0);
         let signed_excess = if abs_excess == 0.0 {
             0.0
@@ -514,7 +496,7 @@ impl ImParameters {
     /// [`ImMethodology::InternalModel`] reuses the SIMM defaults because the
     /// internal-model calculator is a stub — when a dedicated defaults block
     /// is added to the registry, update this match arm.
-    fn from_registry_defaults(
+    pub(crate) fn from_registry_defaults(
         methodology: ImMethodology,
         currency: Currency,
         registry: &crate::registry::MarginRegistry,

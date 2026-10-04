@@ -671,7 +671,12 @@ impl BermudanSwaptionPricer {
 
         let lsmc_pricer = SharedSwaptionLsmcPricer::with_config(lsmc_config, hw_process);
 
-        let basis = PolynomialBasis::new(self.config.mc.basis_degree);
+        let basis = PolynomialBasis::new(self.config.mc.basis_degree).map_err(|e| {
+            PricingError::from_core(
+                finstack_quant_core::Error::Validation(e),
+                PricingErrorContext::default(),
+            )
+        })?;
 
         let estimate = lsmc_pricer
             .price_bermudan_with_grid(

@@ -49,7 +49,7 @@ import json
 import math
 from _shared.analyst_book import build_book, build_market
 from finstack_quant.portfolio import value_portfolio
-from finstack_quant.scenarios import ScenarioSpec, OperationSpec, CurveKind, compose_scenarios, validate_scenario_spec, apply_scenario_to_market
+from finstack_quant.scenarios import ScenarioSpec, OperationSpec, CurveKind, compose_scenarios, validate_scenario_spec, apply_scenario
 AS_OF = date(2025, 1, 15)
 book, market = build_book("base"), build_market("base")
 unchanged = market.to_json()
@@ -57,14 +57,14 @@ base = value_portfolio(book, market, metrics=[]).total_value
 def rate_scenario(bp):
     return ScenarioSpec("usd-discount-shock", [OperationSpec.curve_parallel_bp(CurveKind.discount(),"USD-OIS",bp)], f"USD discount +{bp}bp")
 def reprice(bp):
-    applied = apply_scenario_to_market(rate_scenario(bp), market, AS_OF)
+    applied = apply_scenario(rate_scenario(bp), market, AS_OF)
     result = value_portfolio(book, applied.market, strict_risk=True, metrics=[])
     report = applied.report
     return result.total_value
 scenario = rate_scenario(100)
 print("Previewed operations:",json.loads(scenario.to_json())["operations"])
 composed = compose_scenarios([rate_scenario(40),rate_scenario(60)])
-compound_market = apply_scenario_to_market(composed, market, AS_OF)
+compound_market = apply_scenario(composed, market, AS_OF)
 compound_value = value_portfolio(book, compound_market.market, strict_risk=True, metrics=[])
 up, down = reprice(1), reprice(-1)
 signed_dv01 = (up-down)/2
@@ -112,7 +112,7 @@ calibrated=calibrate(quoted).market
 composite_market=build_market("base")
 composite_market.insert(calibrated.get_discount("USD-OIS"));composite_market.insert(calibrated.get_hazard("ACME-HZD"))
 equity_shock=ScenarioSpec("equity-down",[OperationSpec.equity_price_pct(["SPX-SPOT"],-15)])
-applied=apply_scenario_to_market(equity_shock,composite_market,AS_OF)
+applied=apply_scenario(equity_shock, composite_market, AS_OF)
 composite_value=value_portfolio(book,applied.market,metrics=[],strict_risk=True)
 print({"base_usd":base,"quoted_composite_usd":composite_value.total_value,"pnl_usd":composite_value.total_value-base})
 print("Available templates:",list_builtin_templates())
@@ -146,7 +146,7 @@ The replay table is observed within the teaching fixture, not a claim about mark
 from finstack_quant.scenarios import TenorMatchMode
 shape=ScenarioSpec("2s10s-steepener",[OperationSpec.curve_node_bp("discount","USD-OIS",[("2Y",-25.0),("10Y",25.0)],TenorMatchMode.interpolate())])
 print("Preview:",shape.to_json())
-shocked=apply_scenario_to_market(shape,market,AS_OF)
+shocked=apply_scenario(shape, market, AS_OF)
 v0=json.loads(value_portfolio(book,market,metrics=[]).to_json())
 v1=json.loads(value_portfolio(book,shocked.market,metrics=[]).to_json())
 rank=[]
@@ -172,9 +172,7 @@ from _shared.analyst_book import book_spec
 foundations_book = build_book("foundations")
 foundations_market = build_market("foundations")
 foundations_before = value_portfolio(foundations_book, foundations_market, metrics=[]).total_value
-foundations_shocked_market = apply_scenario_to_market(
-    rate_scenario(100), foundations_market, AS_OF
-).market
+foundations_shocked_market = apply_scenario(rate_scenario(100), foundations_market, AS_OF).market
 foundations_after = value_portfolio(
     foundations_book, foundations_shocked_market, strict_risk=True, metrics=[]
 ).total_value

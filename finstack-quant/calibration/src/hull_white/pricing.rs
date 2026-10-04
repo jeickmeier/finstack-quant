@@ -300,29 +300,15 @@ pub(super) fn normal_caplet_price(
     df: f64,
     is_cap: bool,
 ) -> f64 {
-    let annuity = accrual * df;
-    if vol <= 0.0 || expiry <= 0.0 {
-        let intrinsic = if is_cap {
-            (forward - strike).max(0.0)
-        } else {
-            (strike - forward).max(0.0)
-        };
-        return intrinsic * annuity;
-    }
-    let sqrt_t = expiry.sqrt();
-    let d = (forward - strike) / (vol * sqrt_t);
-    let undiscounted = if is_cap {
-        (forward - strike) * norm_cdf(d) + vol * sqrt_t * norm_pdf(d)
+    use finstack_quant_models::closed_form::volatility::{bachelier_call, bachelier_put};
+    let unit_price = if is_cap {
+        bachelier_call(forward, strike, vol, expiry)
     } else {
-        (strike - forward) * norm_cdf(-d) + vol * sqrt_t * norm_pdf(d)
+        bachelier_put(forward, strike, vol, expiry)
     };
-    undiscounted * annuity
+    unit_price * (accrual * df)
 }
 
 fn normal_caplet_vega(forward: f64, strike: f64, vol: f64, expiry: f64) -> f64 {
-    if vol <= 0.0 || expiry <= 0.0 {
-        return 0.0;
-    }
-    let d = (forward - strike) / (vol * expiry.sqrt());
-    expiry.sqrt() * norm_pdf(d)
+    finstack_quant_models::closed_form::volatility::bachelier_vega(forward, strike, vol, expiry)
 }

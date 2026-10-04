@@ -236,6 +236,11 @@ impl ScenarioEngine {
         &self.recalibration_provider
     }
 
+    /// Borrow the engine-owned configuration used for execution and reporting.
+    pub(crate) fn get_config(&self) -> &finstack_quant_core::config::FinstackConfig {
+        &self.config
+    }
+
     /// Apply a scenario specification to the execution context.
     ///
     /// Operations are applied in this order:

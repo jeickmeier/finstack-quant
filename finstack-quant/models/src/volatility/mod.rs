@@ -76,7 +76,6 @@ pub mod local_vol;
 pub mod normal;
 pub mod rough_heston;
 pub mod sabr;
-pub mod sabr_derivatives;
 mod source;
 pub mod svi;
 
@@ -90,7 +89,6 @@ pub use sabr::{
     vega_weight, SabrCalibrationOutcome, SabrCalibrator, SabrModel, SabrParameters, SabrShift,
     SabrSmile,
 };
-pub use sabr_derivatives::{SabrCalibrationDerivatives, SabrMarketData};
 pub use source::{
     get_cube_expiry_slice_vol, get_cube_expiry_slice_vol_clamped, get_cube_normal_vol,
     get_cube_normal_vol_clamped, get_cube_vol, get_cube_vol_clamped, get_surface_vol,

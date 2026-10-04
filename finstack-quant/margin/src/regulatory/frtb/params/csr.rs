@@ -166,39 +166,37 @@ static CSR_SEC_NONCTP_BY_BUCKET: LazyLock<HashMap<u8, f64>> =
 ///
 /// # Arguments
 ///
-/// * `bucket` - FRTB CSR non-securitisation bucket number; unmapped buckets
-///   use the fallback weight of 5.0. The fallback is a library convention,
-///   not a Basel-published value, and is pinned by `super::tests`.
+/// * `bucket` - Validated FRTB CSR non-securitisation bucket; unknown buckets return NaN.
 #[must_use]
 pub fn csr_nonsec_risk_weight(bucket: u8) -> f64 {
-    CSR_NONSEC_BY_BUCKET.get(&bucket).copied().unwrap_or(5.0)
+    CSR_NONSEC_BY_BUCKET
+        .get(&bucket)
+        .copied()
+        .unwrap_or(f64::NAN)
 }
 
 /// Look up a CSR sec CTP delta risk weight by bucket (MAR21.59, Table 6).
 ///
 /// # Arguments
 ///
-/// * `bucket` - FRTB CSR securitisation correlation-trading-portfolio bucket
-///   number; unmapped buckets use the fallback weight of 8.0. The fallback is
-///   a library convention, not a Basel-published value, and is pinned by
-///   `super::tests`.
+/// * `bucket` - Validated FRTB CSR correlation-trading-portfolio bucket; unknown buckets return NaN.
 #[must_use]
 pub fn csr_sec_ctp_risk_weight(bucket: u8) -> f64 {
-    CSR_SEC_CTP_BY_BUCKET.get(&bucket).copied().unwrap_or(8.0)
+    CSR_SEC_CTP_BY_BUCKET
+        .get(&bucket)
+        .copied()
+        .unwrap_or(f64::NAN)
 }
 
 /// Look up a CSR sec non-CTP delta risk weight by bucket.
 ///
 /// # Arguments
 ///
-/// * `bucket` - FRTB CSR non-CTP securitisation bucket number; unmapped
-///   buckets use the fallback weight of 5.0. The fallback is a library
-///   convention, not a Basel-published value, and is pinned by
-///   `super::tests`.
+/// * `bucket` - Validated FRTB CSR non-CTP securitisation bucket; unknown buckets return NaN.
 #[must_use]
 pub fn csr_sec_nonctp_risk_weight(bucket: u8) -> f64 {
     CSR_SEC_NONCTP_BY_BUCKET
         .get(&bucket)
         .copied()
-        .unwrap_or(5.0)
+        .unwrap_or(f64::NAN)
 }

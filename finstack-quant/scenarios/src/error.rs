@@ -46,24 +46,6 @@ pub enum Error {
         operation: String,
     },
 
-    /// Curve type mismatch.
-    #[error("Curve type mismatch: expected {expected}, got {actual}")]
-    CurveTypeMismatch {
-        /// Expected curve type.
-        expected: String,
-        /// Actual curve type encountered.
-        actual: String,
-    },
-
-    /// Unsupported operation for target.
-    #[error("Unsupported operation {operation} for target {target}")]
-    UnsupportedOperation {
-        /// Operation being attempted.
-        operation: String,
-        /// Target on which the operation is unsupported.
-        target: String,
-    },
-
     /// Core library error.
     #[error(transparent)]
     Core(#[from] finstack_quant_core::Error),
@@ -100,10 +82,6 @@ pub enum Error {
     /// Invalid time period.
     #[error("Invalid time period: {0}")]
     InvalidPeriod(String),
-
-    /// Instrument not found.
-    #[error("Instrument not found: {0}")]
-    InstrumentNotFound(String),
 }
 
 impl Error {
@@ -135,32 +113,6 @@ impl Error {
     pub fn missing_statement_model(operation: impl Into<String>) -> Self {
         Self::MissingStatementModel {
             operation: operation.into(),
-        }
-    }
-
-    /// Create a curve type mismatch error.
-    ///
-    /// # Arguments
-    ///
-    /// - `expected`: Curve type expected by the caller.
-    /// - `actual`: Curve type that was encountered.
-    pub fn curve_type_mismatch(expected: impl Into<String>, actual: impl Into<String>) -> Self {
-        Self::CurveTypeMismatch {
-            expected: expected.into(),
-            actual: actual.into(),
-        }
-    }
-
-    /// Create an unsupported operation error.
-    ///
-    /// # Arguments
-    ///
-    /// - `operation`: Operation that was attempted.
-    /// - `target`: Target object that rejected the operation.
-    pub fn unsupported_operation(operation: impl Into<String>, target: impl Into<String>) -> Self {
-        Self::UnsupportedOperation {
-            operation: operation.into(),
-            target: target.into(),
         }
     }
 
@@ -212,15 +164,6 @@ impl Error {
     pub fn invalid_period(period: impl Into<String>) -> Self {
         Self::InvalidPeriod(period.into())
     }
-
-    /// Create an instrument not found error.
-    ///
-    /// # Arguments
-    ///
-    /// - `instrument`: Instrument identifier that could not be found.
-    pub fn instrument_not_found(instrument: impl Into<String>) -> Self {
-        Self::InstrumentNotFound(instrument.into())
-    }
 }
 
 impl Error {
@@ -228,8 +171,7 @@ impl Error {
     /// the `From<Error> for finstack_quant_core::Error` fold.
     ///
     /// Wrapped `Core`, `Statements` and `Valuations` errors keep their own
-    /// kind. `MarketDataNotFound`, `NodeNotFound`, `TenorNotFound` and
-    /// `InstrumentNotFound` are not-found errors, `Internal` a computation
+    /// kind. `MarketDataNotFound`, `NodeNotFound`, `TenorNotFound` are not-found errors, `Internal` a computation
     /// error, and every other variant a validation error.
     #[must_use]
     pub fn kind(&self) -> finstack_quant_core::error::ErrorKind {
@@ -240,12 +182,9 @@ impl Error {
             Error::Valuations(error) => error.kind(),
             Error::MarketDataNotFound { .. }
             | Error::NodeNotFound { .. }
-            | Error::TenorNotFound { .. }
-            | Error::InstrumentNotFound(_) => ErrorKind::NotFound,
+            | Error::TenorNotFound { .. } => ErrorKind::NotFound,
             Error::Internal(_) => ErrorKind::Computation,
             Error::MissingStatementModel { .. }
-            | Error::CurveTypeMismatch { .. }
-            | Error::UnsupportedOperation { .. }
             | Error::Validation(_)
             | Error::InvalidTenor(_)
             | Error::InvalidPeriod(_) => ErrorKind::Validation,
@@ -254,8 +193,7 @@ impl Error {
 }
 
 impl From<Error> for finstack_quant_core::Error {
-    /// Lookup misses (`MarketDataNotFound`, `NodeNotFound`, `TenorNotFound`,
-    /// `InstrumentNotFound`) map to core's `InputError::NotFound` so they keep
+    /// Lookup misses (`MarketDataNotFound`, `NodeNotFound`, `TenorNotFound`) map to core's `InputError::NotFound` so they keep
     /// `ErrorKind::NotFound` (and therefore `KeyError` in Python); `Internal`
     /// stays `Internal`; everything else becomes a validation error.
     fn from(err: Error) -> Self {
@@ -265,7 +203,7 @@ impl From<Error> for finstack_quant_core::Error {
             Error::Statements(statements) => statements.into(),
             Error::Valuations(valuations) => valuations.into(),
             Error::Internal(message) => finstack_quant_core::Error::Internal(message),
-            Error::MarketDataNotFound { id } | Error::InstrumentNotFound(id) => {
+            Error::MarketDataNotFound { id } => {
                 finstack_quant_core::Error::Input(InputError::NotFound { id })
             }
             Error::NodeNotFound { node_id } => {
@@ -298,7 +236,6 @@ mod tests {
             Error::market_data_not_found("USD-OIS"),
             Error::node_not_found("Revenue"),
             Error::tenor_not_found("7Y", "USD-OIS"),
-            Error::instrument_not_found("BOND-1"),
         ] {
             let core: finstack_quant_core::Error = err.into();
             assert_eq!(core.kind(), ErrorKind::NotFound, "{core}");

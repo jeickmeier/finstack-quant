@@ -11,7 +11,6 @@ export default [
           "id": "usd_curves",
           "quote_sets": {},
           "settings": {
-            "calibration_method": "bootstrap",
             "compute_diagnostics": false,
             "discount_curve": {
               "allow_non_monotonic_final": null,
@@ -762,13 +761,6 @@ export default [
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/4/properties/kind",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/4/properties/kind",
     "const": "vol_surface"
-  },
-  {
-    "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/4/properties/model",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationStep/oneOf/4/properties/model",
-    "description": "Volatility model used for calibration.",
-    "ref": "#/$defs/VolSurfaceModel",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolSurfaceModel"
   },
   {
     "path": "#/$defs/d_08aea844abd10cb00e40/oneOf/4/properties/spot_override",
@@ -2201,16 +2193,19 @@ export default [
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/check_arbitrage",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/check_arbitrage",
+    "default": true,
     "description": "Enable arbitrage checks"
   },
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/check_forward_positivity",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/check_forward_positivity",
+    "default": true,
     "description": "Enable forward rate positivity check"
   },
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/check_monotonicity",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/check_monotonicity",
+    "default": true,
     "description": "Enable monotonicity checks"
   },
   {
@@ -2222,48 +2217,56 @@ export default [
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/max_cpi_growth",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/max_cpi_growth",
+    "default": 0.5,
     "description": "Maximum allowed annual CPI growth (default 0.50 = 50%)",
     "format": "double"
   },
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/max_forward_rate",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/max_forward_rate",
+    "default": 0.5,
     "description": "Maximum allowed forward rate",
     "format": "double"
   },
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/max_fwd_inflation",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/max_fwd_inflation",
+    "default": 0.5,
     "description": "Maximum allowed forward inflation (default 0.50 = 50%)",
     "format": "double"
   },
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/max_hazard_rate",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/max_hazard_rate",
+    "default": 0.5,
     "description": "Maximum allowed hazard rate (default 0.5 = 50%)",
     "format": "double"
   },
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/max_volatility",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/max_volatility",
+    "default": 5,
     "description": "Maximum allowed volatility (default 5.0 = 500%)",
     "format": "double"
   },
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/min_cpi_growth",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/min_cpi_growth",
+    "default": -0.1,
     "description": "Minimum allowed annual CPI growth (default -0.10 = -10%)",
     "format": "double"
   },
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/min_forward_rate",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/min_forward_rate",
+    "default": -0.01,
     "description": "Minimum allowed forward rate (can be slightly negative)",
     "format": "double"
   },
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/min_fwd_inflation",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/min_fwd_inflation",
+    "default": -0.2,
     "description": "Minimum allowed forward inflation (default -0.20 = -20%)",
     "format": "double"
   },
@@ -2284,6 +2287,7 @@ export default [
   {
     "path": "#/$defs/d_62f16222adf57cd5e917/properties/tolerance",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ValidationConfig/properties/tolerance",
+    "default": 1e-10,
     "description": "Numerical tolerance for comparisons",
     "format": "double"
   },
@@ -6322,23 +6326,9 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/ResidualWeightingScheme"
   },
   {
-    "path": "#/$defs/d_d8b71776b31e1ce46156",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/VolSurfaceModel",
-    "const": "sabr",
-    "description": "Parameters for volatility surface calibration step."
-  },
-  {
     "path": "#/$defs/d_e1605cebc97720bf2277",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationConfig",
     "description": "Global configuration for the calibration subsystem.\n\nThis struct consolidates all settings for solvers, validation, and market-regime\nspecific bounds. It is typically derived from a `FinstackConfig` extension section.\nPublic callers should treat it as the behavioral contract for calibration\nexecution policy: solver choice, convergence settings, validation thresholds,\nrate-bound policy, and curve-specific numerical guardrails.\n\n# Tolerance Semantics\n\nCalibration involves two distinct tolerance concepts:\n\n1. **Solver Tolerance** ([`solver.tolerance()`](SolverConfig::tolerance)):\n   Controls when the numerical solver (Brent/Newton) terminates. This is an\n   algorithmic convergence criterion in x-space (parameter space). The solver\n   stops when successive parameter estimates differ by less than this tolerance.\n\n2. **Validation Tolerance** (e.g., [`discount_curve.validation_tolerance`](DiscountCurveSolveConfig::validation_tolerance)\n   for PV-per-notional curve residuals, or [`vol_surface.validation_tolerance`](VolSurfaceSolveConfig::validation_tolerance)\n   for decimal implied-vol residuals):\n   Controls whether calibration is considered *successful*. After the solver\n   converges, the final residuals are compared against this tolerance. If any\n   residual exceeds `validation_tolerance`, the calibration is marked as failed\n   even if the solver converged.\n\n**Why two tolerances?**\n- Solver tolerance ensures numerical convergence but doesn't guarantee economic fit.\n- Validation tolerance ensures the calibrated curve actually prices instruments correctly.\n- For well-behaved problems, solver tolerance of `1e-12` with validation tolerance of\n  `1e-8` works well: the solver finds a precise root, and we verify it prices accurately.\n\n# Configuration Hierarchy\n\nSettings can be specified at multiple levels with the following precedence:\n\n1. **Step-level** (`CalibrationStep.params.method`): Per-instrument-type overrides\n2. **Plan-level** (`CalibrationPlan.settings`): Plan-wide defaults\n3. **Finstack config extensions** (`calibration.config.v1`): application defaults\n4. **Global defaults** (`CalibrationConfig::default()`): fallback values\n\nStep-level settings always take precedence over plan-level settings.\nIn other words, this struct provides default policy, but explicit plan steps\nremain authoritative when both are supplied.\n\n# Examples\n\n```rust\nuse finstack_quant_calibration::CalibrationConfig;\n\n// Create a default config\nlet config = CalibrationConfig::default();\n\n// Customize tolerance settings\nlet custom = CalibrationConfig::default()\n    .with_tolerance(1e-14)  // Solver convergence tolerance\n    .with_max_iterations(200);\n```\n\n# References\n\n- Multi-curve construction context: `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- Curve interpolation context: `docs/REFERENCES.md#hagan-west-monotone-convex`"
-  },
-  {
-    "path": "#/$defs/d_e1605cebc97720bf2277/properties/calibration_method",
-    "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationConfig/properties/calibration_method",
-    "default": "bootstrap",
-    "description": "High-level calibration method (bootstrap vs global solve).\n\n**Note**: When using the plan-driven API, this field is typically overwritten\nby the step-level `params.method` for each calibration step. The step-level\nmethod always takes precedence. This field serves as runtime state passed\nfrom calibration targets to the underlying solvers.",
-    "ref": "#/$defs/CalibrationMethod",
-    "resolvedRef": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationMethod"
   },
   {
     "path": "#/$defs/d_e1605cebc97720bf2277/properties/compute_diagnostics",
@@ -6583,7 +6573,6 @@ export default [
     "path": "#/$defs/d_e5cd95285d6c312c656e/properties/settings",
     "source": "https://finstack_quant.dev/schemas/calibration/1/calibration.schema.json#/$defs/CalibrationPlan/properties/settings",
     "default": {
-      "calibration_method": "bootstrap",
       "compute_diagnostics": false,
       "discount_curve": {
         "allow_non_monotonic_final": null,

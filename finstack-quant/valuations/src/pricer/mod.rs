@@ -26,6 +26,7 @@
 //! - `commodity`: CommodityFuture, CommodityFutureOption, CommodityForward, CommoditySwap, CommodityOption, CommoditySwaption, CommoditySpreadOption
 
 // Core submodules
+pub(crate) mod defaults;
 mod enrichment;
 mod errors;
 pub mod json;

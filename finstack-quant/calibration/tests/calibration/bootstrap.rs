@@ -277,9 +277,6 @@ fn discount_curve_global_solve_smoke() {
     quote_sets.insert("disc".to_string(), cal_utils::quote_set_ids(&quotes));
 
     let settings = CalibrationConfig {
-        calibration_method: CalibrationMethod::GlobalSolve {
-            use_analytical_jacobian: false,
-        },
         ..Default::default()
     };
 

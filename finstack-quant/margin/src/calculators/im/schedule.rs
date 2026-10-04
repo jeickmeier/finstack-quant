@@ -588,10 +588,6 @@ impl ImCalculator for ScheduleImCalculator {
             as_of,
         )
     }
-
-    fn methodology(&self) -> ImMethodology {
-        ImMethodology::Schedule
-    }
 }
 
 fn validate_maturity(years: f64) -> Result<()> {

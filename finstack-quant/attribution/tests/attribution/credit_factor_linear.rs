@@ -22,9 +22,7 @@ use finstack_quant_models::factor::credit::hierarchy::{
     DateRange, FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
     IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
 };
-use finstack_quant_models::factor::{
-    FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
-};
+use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::{Attributes, Bond};
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
@@ -45,7 +43,7 @@ fn empty_factor_config() -> FactorModelConfig {
         factors: vec![],
         covariance: FactorCovarianceMatrix::new(vec![], vec![]).unwrap(),
         matching: MatchingConfig::MappingTable(vec![]),
-        pricing_mode: PricingMode::DeltaBased,
+
         risk_measure: Default::default(),
         bump_config: None,
         unmatched_policy: None,
@@ -254,16 +252,18 @@ fn taylor_credit_detail_reconciles_to_credit_curves_pnl() {
     let model = make_model();
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: make_market_state(disc_t0, haz_t0, prices_t0),
-        market_t1: make_market_state(disc_t1, haz_t1, prices_t1),
-        as_of_t0,
-        as_of_t1,
-        method: AttributionMethod::Taylor(TaylorAttributionConfig::default()),
-        model_params_t0: None,
-        credit_factor_model: Some(Box::new(model)),
-        credit_factor_detail_options: CreditFactorDetailOptions::default(),
-        config: None,
-        full_cross_attribution: false,
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: make_market_state(disc_t0, haz_t0, prices_t0),
+            market_t1: make_market_state(disc_t1, haz_t1, prices_t1),
+            as_of_t0,
+            as_of_t1,
+            method: AttributionMethod::Taylor(TaylorAttributionConfig::default()),
+            model_params_t0: None,
+            credit_factor_model: Some(Box::new(model)),
+            credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            config: None,
+            full_cross_attribution: false,
+        },
     };
 
     let result = AttributionEnvelope::new(spec)
@@ -432,16 +432,18 @@ fn twisted_hazard_curve_does_not_omit_or_explode_credit_detail() {
     let model = make_model();
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: make_market_state(disc_t0, haz_t0, prices()),
-        market_t1: make_market_state(disc_t1, haz_t1, prices()),
-        as_of_t0,
-        as_of_t1,
-        method: AttributionMethod::Taylor(TaylorAttributionConfig::default()),
-        model_params_t0: None,
-        credit_factor_model: Some(Box::new(model)),
-        credit_factor_detail_options: CreditFactorDetailOptions::default(),
-        config: None,
-        full_cross_attribution: false,
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: make_market_state(disc_t0, haz_t0, prices()),
+            market_t1: make_market_state(disc_t1, haz_t1, prices()),
+            as_of_t0,
+            as_of_t1,
+            method: AttributionMethod::Taylor(TaylorAttributionConfig::default()),
+            model_params_t0: None,
+            credit_factor_model: Some(Box::new(model)),
+            credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            config: None,
+            full_cross_attribution: false,
+        },
     };
 
     let result = AttributionEnvelope::new(spec)

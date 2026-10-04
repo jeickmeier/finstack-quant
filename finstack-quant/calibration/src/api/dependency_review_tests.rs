@@ -171,7 +171,7 @@ fn xccy_dependencies_include_both_convention_projection_curves() -> TestResult {
 }
 
 fn equity_dependency_fixture(kind: &str) -> TestResult<CalibrationEnvelope> {
-    let mut step = serde_json::json!({
+    let step = serde_json::json!({
         "id": "equity-vol",
         "quote_set": "equity-quotes",
         "kind": kind,
@@ -182,9 +182,6 @@ fn equity_dependency_fixture(kind: &str) -> TestResult<CalibrationEnvelope> {
         "target_expiries": [1.0],
         "target_strikes": [80.0, 90.0, 100.0, 110.0, 120.0]
     });
-    if kind == "vol_surface" {
-        step["model"] = serde_json::json!("sabr");
-    }
     let mut envelope: CalibrationEnvelope = serde_json::from_value(serde_json::json!({
         "schema": "finstack_quant.calibration/1",
         "plan": {

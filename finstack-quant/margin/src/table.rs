@@ -6,7 +6,7 @@
 //! give a different schema for every portfolio, so both export the same long
 //! format instead: one [`SensitivityRow`] per populated bucket, with the
 //! columns `risk_class`, `bucket`, `tenor`, `issuer`, `kind`, `amount`. FRTB
-//! adds the default-risk (DRC) columns `sector`, `seniority`, `asset_type`,
+//! adds the default-risk (DRC) columns `sector`, `seniority`,
 //! `maturity_years` and `pnl_adjustment`; SIMM adds `expiry_tenor` for
 //! curvature rows.
 //!
@@ -74,9 +74,6 @@ pub struct SensitivityRow {
     pub sector: Option<String>,
     /// DRC seniority serde label (`"senior_unsecured"`, …); `None` on non-DRC rows.
     pub seniority: Option<String>,
-    /// DRC asset-type serde label (`"corporate"`, `"sovereign"`, …); `None` on
-    /// non-DRC rows.
-    pub asset_type: Option<String>,
     /// DRC residual maturity in years; `None` on non-DRC rows.
     pub maturity_years: Option<f64>,
     /// DRC mark-to-market adjustment in base currency (MAR22.9); `None` on
@@ -139,7 +136,6 @@ impl SensitivityRow {
             &self.expiry_tenor,
             &self.sector,
             &self.seniority,
-            &self.asset_type,
         )
             .cmp(&(
                 &other.risk_class,
@@ -150,7 +146,6 @@ impl SensitivityRow {
                 &other.expiry_tenor,
                 &other.sector,
                 &other.seniority,
-                &other.asset_type,
             ))
             .then_with(|| cmp_opt_f64(self.maturity_years, other.maturity_years))
             .then_with(|| cmp_opt_f64(self.pnl_adjustment, other.pnl_adjustment))
@@ -284,7 +279,6 @@ fn rows_to_table(rows: Vec<SensitivityRow>, layout: Layout) -> Result<TableEnvel
     let mut amount = Vec::with_capacity(n);
     let mut sector = Vec::with_capacity(n);
     let mut seniority = Vec::with_capacity(n);
-    let mut asset_type = Vec::with_capacity(n);
     let mut maturity_years = Vec::with_capacity(n);
     let mut pnl_adjustment = Vec::with_capacity(n);
     for row in rows {
@@ -297,7 +291,6 @@ fn rows_to_table(rows: Vec<SensitivityRow>, layout: Layout) -> Result<TableEnvel
         amount.push(row.amount);
         sector.push(row.sector);
         seniority.push(row.seniority);
-        asset_type.push(row.asset_type);
         maturity_years.push(row.maturity_years);
         pnl_adjustment.push(row.pnl_adjustment);
     }
@@ -319,10 +312,6 @@ fn rows_to_table(rows: Vec<SensitivityRow>, layout: Layout) -> Result<TableEnvel
             columns.push(dimension(
                 "seniority",
                 TableColumnData::NullableString(seniority),
-            ));
-            columns.push(dimension(
-                "asset_type",
-                TableColumnData::NullableString(asset_type),
             ));
             columns.push(
                 TableColumn::new(
@@ -365,7 +354,7 @@ impl FrtbSensitivities {
     /// where the risk class has one; `tenor` is the delta tenor
     /// (`"tenor/basis"` for CSR and commodity deltas), vega maturity
     /// (`"option_maturity/underlying_tenor"` for GIRR vega) or null. DRC rows
-    /// also carry `sector`, `seniority`, `asset_type`, `maturity_years` and
+    /// also carry `sector`, `seniority`, `maturity_years` and
     /// `pnl_adjustment`, so [`Self::from_rows`] rebuilds every position.
     ///
     /// Amounts are signed sensitivities in `base_currency` in the caller's
@@ -583,7 +572,6 @@ impl FrtbSensitivities {
             rows.push(SensitivityRow {
                 sector: Some(serde_label(&position.sector)?),
                 seniority: Some(serde_label(&position.seniority)?),
-                asset_type: Some(serde_label(&position.asset_type)?),
                 maturity_years: Some(position.maturity_years),
                 pnl_adjustment: Some(position.pnl_adjustment),
                 ..SensitivityRow::new(
@@ -750,7 +738,6 @@ impl FrtbSensitivities {
                     rating_bucket: row.bucket_index()?,
                     sector: serde_parse(row.need(&row.sector, "sector")?)?,
                     seniority: serde_parse(row.need(&row.seniority, "seniority")?)?,
-                    asset_type: serde_parse(row.need(&row.asset_type, "asset_type")?)?,
                     pnl_adjustment: row.pnl_adjustment.unwrap_or(0.0),
                 });
             }
@@ -770,7 +757,7 @@ impl FrtbSensitivities {
     /// Export every sensitivity as one long-format table.
     ///
     /// Columns: `risk_class`, `bucket`, `tenor`, `issuer`, `kind`, `amount`,
-    /// then the DRC columns `sector`, `seniority`, `asset_type`,
+    /// then the DRC columns `sector`, `seniority`,
     /// `maturity_years`, `pnl_adjustment` (null on non-DRC rows). The rows
     /// are [`Self::to_rows`]; an empty container still yields every column.
     ///
@@ -1053,7 +1040,7 @@ impl SimmSensitivities {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::regulatory::frtb::{DrcAssetType, DrcSector, DrcSeniority};
+    use crate::regulatory::frtb::{DrcSector, DrcSeniority};
     use crate::types::{SimmCreditSector, SimmRiskClass};
 
     #[test]
@@ -1072,7 +1059,6 @@ mod tests {
                 "amount",
                 "sector",
                 "seniority",
-                "asset_type",
                 "maturity_years",
                 "pnl_adjustment",
             ]
@@ -1141,7 +1127,6 @@ mod tests {
             rating_bucket: 3,
             sector: DrcSector::Corporate,
             seniority: DrcSeniority::SeniorUnsecured,
-            asset_type: DrcAssetType::Corporate,
             pnl_adjustment: -2_500.0,
         });
         sens.add_rrao_position("EXOTIC-1", 5_000_000.0, true);

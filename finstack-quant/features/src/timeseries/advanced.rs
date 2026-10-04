@@ -1,88 +1,8 @@
 //! Advanced rolling time-series helpers.
 
-use crate::types::{
-    f64_param, finite, mean, quantile_cont, required_f64_param, sample_std, scaled_centered,
-    usize_param, window_params,
-};
+use crate::types::{f64_param, finite, mean, quantile_cont, sample_std, scaled_centered};
 use finstack_quant_core::{Error, Result};
 use serde_json::Value;
-
-#[derive(Clone, Copy)]
-pub(super) enum AdvancedRollingOp {
-    Rank,
-    Quantile,
-    Skew,
-    Kurtosis,
-    Slope,
-    Sharpe,
-    Winsorize,
-    Hampel,
-}
-
-pub(super) fn rolling_advanced(
-    values: &[Option<f64>],
-    indices: &[usize],
-    params: Option<&Value>,
-    output: &mut [Option<f64>],
-    op: AdvancedRollingOp,
-) -> Result<()> {
-    let (window, min_periods) = window_params(params)?;
-    let required = match op {
-        AdvancedRollingOp::Skew => min_periods.max(3),
-        AdvancedRollingOp::Kurtosis => min_periods.max(4),
-        AdvancedRollingOp::Slope | AdvancedRollingOp::Sharpe => min_periods.max(2),
-        _ => min_periods,
-    };
-    crate::index::try_for_each_trailing_window(indices, window, |idx, window_indices| {
-        let mut finite_values = window_indices
-            .iter()
-            .filter_map(|window_idx| finite(values[*window_idx]))
-            .collect::<Vec<_>>();
-        if finite_values.len() < required {
-            return Ok(());
-        }
-        output[idx] = match op {
-            AdvancedRollingOp::Rank => rolling_rank_value(finite(values[idx]), &mut finite_values),
-            AdvancedRollingOp::Quantile => {
-                let q = probability_param(params, "quantile", 0.5)?;
-                finite_values.sort_by(f64::total_cmp);
-                quantile_cont(&finite_values, q)
-            }
-            AdvancedRollingOp::Skew => skewness(&finite_values),
-            AdvancedRollingOp::Kurtosis => excess_kurtosis(&finite_values),
-            AdvancedRollingOp::Slope => rolling_slope(values, window_indices),
-            AdvancedRollingOp::Sharpe => {
-                let risk_free = f64_param(params, "risk_free", 0.0)?;
-                rolling_sharpe(&finite_values, risk_free)
-            }
-            AdvancedRollingOp::Winsorize => {
-                let lower = probability_param(params, "lower", 0.01)?;
-                let upper = probability_param(params, "upper", 0.99)?;
-                if lower > upper {
-                    return Err(Error::Validation(
-                        "rolling_winsorize requires 0 <= lower <= upper <= 1".to_string(),
-                    ));
-                }
-                let current = finite(values[idx]);
-                finite_values.sort_by(f64::total_cmp);
-                match (
-                    current,
-                    quantile_cont(&finite_values, lower),
-                    quantile_cont(&finite_values, upper),
-                ) {
-                    (Some(current), Some(lower_bound), Some(upper_bound)) => {
-                        Some(current.clamp(lower_bound, upper_bound))
-                    }
-                    _ => None,
-                }
-            }
-            AdvancedRollingOp::Hampel => {
-                hampel_value(finite(values[idx]), &mut finite_values, params)?
-            }
-        };
-        Ok(())
-    })
-}
 
 pub(super) fn drawdown(
     values: &[Option<f64>],
@@ -107,17 +27,10 @@ pub(super) fn drawdown(
 pub(super) fn exponential_decay_weights(
     values: &[Option<f64>],
     indices: &[usize],
-    params: Option<&Value>,
+    window: usize,
+    decay: f64,
     output: &mut [Option<f64>],
 ) -> Result<()> {
-    let window = usize_param(params, "window", 1)?;
-    let half_life = required_f64_param(params, "half_life")?;
-    if half_life <= 0.0 {
-        return Err(Error::Validation(
-            "panel transform parameter 'half_life' must be positive".to_string(),
-        ));
-    }
-    let decay = (-std::f64::consts::LN_2 / half_life).exp();
     for (pos, &idx) in indices.iter().enumerate() {
         if finite(values[idx]).is_none() {
             continue;
@@ -145,7 +58,7 @@ pub(super) fn probability_param(params: Option<&Value>, key: &str, default: f64)
     Ok(value)
 }
 
-fn rolling_rank_value(current: Option<f64>, sample: &mut [f64]) -> Option<f64> {
+pub(super) fn rolling_rank_value(current: Option<f64>, sample: &mut [f64]) -> Option<f64> {
     let current = current?;
     sample.sort_by(f64::total_cmp);
     if sample.len() == 1 {
@@ -157,7 +70,7 @@ fn rolling_rank_value(current: Option<f64>, sample: &mut [f64]) -> Option<f64> {
     Some(pos as f64 / (sample.len() - 1) as f64)
 }
 
-fn skewness(values: &[f64]) -> Option<f64> {
+pub(super) fn skewness(values: &[f64]) -> Option<f64> {
     let n = values.len();
     if n < 3 {
         return None;
@@ -177,7 +90,7 @@ fn skewness(values: &[f64]) -> Option<f64> {
     Some((n / ((n - 1.0) * (n - 2.0))) * sum_cubed / sample_std.powi(3))
 }
 
-fn excess_kurtosis(values: &[f64]) -> Option<f64> {
+pub(super) fn excess_kurtosis(values: &[f64]) -> Option<f64> {
     let n = values.len();
     if n < 4 {
         return None;
@@ -199,7 +112,7 @@ fn excess_kurtosis(values: &[f64]) -> Option<f64> {
     Some(g2_leading * sum_fourth / sample_var.powi(2) - g2_correction)
 }
 
-fn rolling_slope(values: &[Option<f64>], indices: &[usize]) -> Option<f64> {
+pub(super) fn rolling_slope(values: &[Option<f64>], indices: &[usize]) -> Option<f64> {
     let pairs: Vec<_> = indices
         .iter()
         .enumerate()
@@ -226,7 +139,7 @@ fn rolling_slope(values: &[Option<f64>], indices: &[usize]) -> Option<f64> {
     }
 }
 
-fn rolling_sharpe(values: &[f64], risk_free: f64) -> Option<f64> {
+pub(super) fn rolling_sharpe(values: &[f64], risk_free: f64) -> Option<f64> {
     let mean = mean(values)?;
     match sample_std(values) {
         Some(std) if std > 0.0 => Some((mean - risk_free) / std),
@@ -235,40 +148,28 @@ fn rolling_sharpe(values: &[f64], risk_free: f64) -> Option<f64> {
     }
 }
 
-fn hampel_value(
+pub(super) fn hampel_value(
     current: Option<f64>,
     sample: &mut [f64],
-    params: Option<&Value>,
-) -> Result<Option<f64>> {
-    let Some(current) = current else {
-        return Ok(None);
-    };
-    let threshold = f64_param(params, "threshold", 3.0)?;
-    if threshold < 0.0 {
-        return Err(Error::Validation(
-            "hampel_filter requires threshold >= 0".to_string(),
-        ));
-    }
+    threshold: f64,
+) -> Option<f64> {
+    let current = current?;
     sample.sort_by(f64::total_cmp);
-    let Some(median) = quantile_cont(sample, 0.5) else {
-        return Ok(None);
-    };
+    let median = quantile_cont(sample, 0.5)?;
     let scale = sample.iter().copied().map(f64::abs).fold(0.0, f64::max);
     if scale <= 0.0 {
-        return Ok(Some(current));
+        return Some(current);
     }
     let mut deviations = sample
         .iter()
         .map(|value| (*value / scale - median / scale).abs())
         .collect::<Vec<_>>();
     deviations.sort_by(f64::total_cmp);
-    let Some(mad) = quantile_cont(&deviations, 0.5) else {
-        return Ok(None);
-    };
+    let mad = quantile_cont(&deviations, 0.5)?;
     let scaled_mad = crate::types::MAD_NORMAL_CONSISTENCY * mad;
     if (current / scale - median / scale).abs() > threshold * scaled_mad {
-        Ok(Some(median))
+        Some(median)
     } else {
-        Ok(Some(current))
+        Some(current)
     }
 }

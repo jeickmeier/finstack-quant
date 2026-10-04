@@ -1,7 +1,7 @@
 //! Shared runtime types and solver contracts for market calibration.
 //!
 use finstack_quant_calibration::{
-    CalibrationConfig, CalibrationMethod, RateBounds, RateBoundsPolicy, CALIBRATION_CONFIG_KEY,
+    CalibrationConfig, RateBounds, RateBoundsPolicy, CALIBRATION_CONFIG_KEY,
 };
 use finstack_quant_core::config::FinstackConfig;
 use serde_json::json;
@@ -19,8 +19,7 @@ fn calibration_config_applies_extension_overrides() {
                 },
                 "use_parallel": true,
                 "rate_bounds_policy": "explicit",
-                "rate_bounds": { "min_rate": -0.01, "max_rate": 0.10 },
-                "calibration_method": { "global_solve": { "use_analytical_jacobian": true } }
+                "rate_bounds": { "min_rate": -0.01, "max_rate": 0.10 }
             }),
         )
         .expect("valid extension key");
@@ -37,15 +36,6 @@ fn calibration_config_applies_extension_overrides() {
             min_rate: -0.01,
             max_rate: 0.10
         }
-    );
-    assert!(
-        matches!(
-            cfg_out.calibration_method,
-            CalibrationMethod::GlobalSolve {
-                use_analytical_jacobian: true
-            }
-        ),
-        "expected calibration method override to propagate"
     );
 }
 

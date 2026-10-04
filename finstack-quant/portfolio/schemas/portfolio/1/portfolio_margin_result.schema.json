@@ -957,6 +957,7 @@
       ]
     },
     "NettingSetMargin": {
+      "description": "Margin results for a single netting set.",
       "properties": {
         "as_of": {
           "$ref": "#/$defs/DateWire"

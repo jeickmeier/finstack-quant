@@ -38,7 +38,7 @@ pub(super) struct AttributionInputs<'a> {
     pub(super) ccy: Currency,
     pub(super) market_deps: MarketDependencies,
     pub(super) rates_curve_ids: Vec<CurveId>,
-    pub(super) rate_keyrates: finstack_quant_core::HashMap<CurveId, Vec<(f64, f64)>>,
+    pub(super) rate_keyrates: finstack_quant_core::HashMap<CurveId, Vec<(f64, f64, f64)>>,
     pub(super) credit_keyrates: finstack_quant_core::HashMap<CurveId, Vec<CreditKeyRateBucket>>,
     pub(super) shifts: MarketShifts,
 }
@@ -73,17 +73,27 @@ impl<'a> AttributionInputs<'a> {
         }
         let (avg_rate_shift_bp, rate_curves_measured) =
             average_rates(&rates_curve_ids, market_t0, market_t1);
-        let rate_keyrates =
+        let mut rate_keyrates =
             extract_keyrate_per_curve(&val_t0.measures, &rates_curve_ids, "bucketed_dv01")?;
-        for (curve_id, buckets) in &rate_keyrates {
+        let mut paired_rate_keyrates = finstack_quant_core::HashMap::default();
+        for (curve_id, buckets) in rate_keyrates.drain() {
             let tenors: Vec<_> = buckets.iter().map(|(tenor, _)| *tenor).collect();
-            if measure_per_tenor_rate_shift(curve_id.as_str(), market_t0, market_t1, &tenors)
-                .is_none_or(|moves| moves.iter().any(|movement| !movement.is_finite()))
-            {
-                return Err(finstack_quant_core::Error::Validation(format!(
+            let moves =
+                measure_per_tenor_rate_shift(curve_id.as_str(), market_t0, market_t1, &tenors)
+                    .filter(|moves| moves.iter().all(|movement| movement.is_finite()))
+                    .ok_or_else(|| {
+                        finstack_quant_core::Error::Validation(format!(
                     "bucketed_dv01 for '{curve_id}' has no complete measurable curve movement"
-                )));
-            }
+                ))
+                    })?;
+            paired_rate_keyrates.insert(
+                curve_id,
+                buckets
+                    .into_iter()
+                    .zip(moves)
+                    .map(|((tenor, sensitivity), movement)| (tenor, sensitivity, movement))
+                    .collect(),
+            );
         }
         let credit_keyrates = extract_credit_keyrates(
             &val_t0.measures,
@@ -128,7 +138,7 @@ impl<'a> AttributionInputs<'a> {
             ccy: val_t1.value.currency(),
             market_deps,
             rates_curve_ids,
-            rate_keyrates,
+            rate_keyrates: paired_rate_keyrates,
             credit_keyrates,
             shifts: MarketShifts {
                 avg_rate_shift_bp,

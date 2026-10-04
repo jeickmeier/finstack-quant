@@ -1250,7 +1250,7 @@ class FactorModelConfig:
     --------
     >>> from finstack_quant.models.factor.credit import FactorModelConfig
     >>> config = FactorModelConfig.from_json(
-    ...     '{"factors":[],"covariance":{"factor_ids":[],"n":0,"data":[]},"matching":{"mapping_table":[]},"pricing_mode":"delta_based","risk_measure":"variance"}'
+    ...     '{"factors":[],"covariance":{"factor_ids":[],"n":0,"data":[]},"matching":{"mapping_table":[]},"risk_measure":"variance"}'
     ... )
     >>> config.n_factors
     0
@@ -1278,7 +1278,7 @@ class FactorModelConfig:
         Examples
         --------
         >>> FactorModelConfig.from_json(
-        ...     '{"factors":[],"covariance":{"factor_ids":[],"n":0,"data":[]},"matching":{"mapping_table":[]},"pricing_mode":"delta_based","risk_measure":"variance"}'
+        ...     '{"factors":[],"covariance":{"factor_ids":[],"n":0,"data":[]},"matching":{"mapping_table":[]},"risk_measure":"variance"}'
         ... ).factor_ids
         []
         """
@@ -1386,22 +1386,6 @@ class FactorModelConfig:
         ------
         ValueError
             If conversion to Python values fails.
-        """
-        ...
-
-    @property
-    def pricing_mode(self) -> str:
-        """Return the sensitivity extraction strategy.
-
-        Returns
-        -------
-        str
-            ``"delta_based"`` or ``"full_repricing"``.
-
-        Raises
-        ------
-        None
-            This property does not raise.
         """
         ...
 

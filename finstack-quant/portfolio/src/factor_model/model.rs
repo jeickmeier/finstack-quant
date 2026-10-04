@@ -25,8 +25,7 @@ use super::dependencies::flatten as flatten_dependencies;
 use super::whatif::{StressPnl, StressResult, WhatIfEngine};
 use crate::error::{Error, Result};
 use crate::sensitivity::{
-    exact_factor_market_keys, DeltaBasedEngine, FactorSensitivityEngine, FullRepricingEngine,
-    SensitivityMatrix,
+    exact_factor_market_keys, DeltaBasedEngine, FactorSensitivityEngine, SensitivityMatrix,
 };
 use crate::{MarketFactorKey, Portfolio};
 use finstack_quant_calibration::api::schema::HazardCurveParams;
@@ -41,23 +40,12 @@ use finstack_quant_models::factor::risk::{
     ResidualContributionSource, RiskDecomposition,
 };
 use finstack_quant_models::factor::{
-    BumpSizeConfig, CurveType, FactorCovarianceMatrix, FactorDefinition, FactorModelConfig,
-    FactorType, MarketDependency, MatchingConfig, PricingMode, RiskMeasure, UnmatchedPolicy,
+    BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorModelConfig, FactorType,
+    MarketDependency, MatchingConfig, RiskMeasure, UnmatchedPolicy,
 };
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::recalibration::QuoteBump;
 use std::collections::{BTreeMap, HashMap};
-
-fn default_sensitivity_engine(
-    pricing_mode: PricingMode,
-    bump_config: &BumpSizeConfig,
-) -> Result<Box<dyn FactorSensitivityEngine>> {
-    Ok(match pricing_mode {
-        PricingMode::FullRepricing => Box::new(FullRepricingEngine::new(bump_config.clone(), 5)?),
-        _ => Box::new(DeltaBasedEngine::new(bump_config.clone())),
-    })
-}
-
 /// Portfolio-level factor-model orchestrator.
 ///
 /// A `FactorModel` owns the factor definitions, covariance matrix, and the
@@ -83,7 +71,7 @@ impl FactorModel {
     /// # Arguments
     ///
     /// * `config` - Factor definitions, covariance matrix (axes in factor
-    ///   order), dependency matching rules, pricing mode, bump sizes and risk
+    ///   order), dependency matching rules, bump sizes and risk
     ///   measure. Validated before the model is assembled.
     ///
     /// # Returns
@@ -102,7 +90,8 @@ impl FactorModel {
 
         let matcher = config.matching.build_matcher();
         let bump_config = config.bump_config.clone().unwrap_or_default();
-        let sensitivity_engine = default_sensitivity_engine(config.pricing_mode, &bump_config)?;
+        let sensitivity_engine = Box::new(DeltaBasedEngine::new(bump_config.clone()))
+            as Box<dyn FactorSensitivityEngine>;
         Ok(FactorModel {
             credit_idiosyncratic_variance: credit_idiosyncratic_variance(&config.matching),
             factors: config.factors,
@@ -292,9 +281,7 @@ impl FactorModel {
             .enumerate()
         {
             for (dependency, factor_id, beta) in &assignment.mappings {
-                let Some(curve_id) =
-                    credit_curve_id(dependency, credit_exposures.bump_contexts.base)?
-                else {
+                let Some(curve_id) = credit_curve_id(dependency) else {
                     continue;
                 };
                 let Some(factor_idx) = self
@@ -512,9 +499,7 @@ impl FactorModel {
             )?;
             let mut exposure = 0.0;
             for dependency in &dependencies {
-                if let Some(curve_id) =
-                    credit_curve_id(dependency, credit_exposures.bump_contexts.base)?
-                {
+                if let Some(curve_id) = credit_curve_id(dependency) {
                     exposure += credit_exposures.exposure(
                         position_idx,
                         position.instrument.as_ref(),
@@ -799,7 +784,7 @@ impl FactorModel {
             let dependencies =
                 flatten_dependencies(&position.instrument.market_dependencies()?, market)?;
             for dependency in &dependencies {
-                let Some(curve_id) = credit_curve_id(dependency, market)? else {
+                let Some(curve_id) = credit_curve_id(dependency) else {
                     continue;
                 };
                 let Some(entries) = self
@@ -857,20 +842,10 @@ fn uses_assignment_driven_credit_shock(factor: &FactorDefinition) -> bool {
         )
 }
 
-fn credit_curve_id(
-    dependency: &MarketDependency,
-    market: &MarketContext,
-) -> Result<Option<finstack_quant_core::types::CurveId>> {
+fn credit_curve_id(dependency: &MarketDependency) -> Option<finstack_quant_core::types::CurveId> {
     match dependency {
-        MarketDependency::CreditCurve { id }
-        | MarketDependency::Curve {
-            id,
-            curve_type: CurveType::Hazard,
-        } => Ok(Some(id.clone())),
-        MarketDependency::CreditIndex { id } => Ok(Some(
-            market.get_credit_index(id)?.index_credit_curve.id().clone(),
-        )),
-        _ => Ok(None),
+        MarketDependency::CreditCurve { id } => Some(id.clone()),
+        _ => None,
     }
 }
 
@@ -1068,8 +1043,7 @@ pub(super) mod tests {
     use finstack_quant_models::factor::matching::{DependencyFilter, MappingRule};
     use finstack_quant_models::factor::{
         BumpSizeConfig, CurveType, DependencyType, FactorCovarianceMatrix, FactorDefinition,
-        FactorId, FactorModelConfig, FactorType, MarketMapping, PricingMode, RiskMeasure,
-        UnmatchedPolicy,
+        FactorId, FactorModelConfig, FactorType, MarketMapping, RiskMeasure, UnmatchedPolicy,
     };
     use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::MarketDependencies;
@@ -1109,7 +1083,7 @@ pub(super) mod tests {
                 attribute_filter: finstack_quant_models::factor::AttributeFilter::default(),
                 factor_id: FactorId::new("Rates"),
             }]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: Some(BumpSizeConfig::default()),
             unmatched_policy: Some(UnmatchedPolicy::Warn),
@@ -1122,7 +1096,7 @@ pub(super) mod tests {
             covariance: FactorCovarianceMatrix::new(Vec::new(), Vec::new())
                 .expect("empty covariance matrix is valid"),
             matching: MatchingConfig::MappingTable(Vec::new()),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: None,
@@ -1175,7 +1149,7 @@ pub(super) mod tests {
             ],
             covariance,
             matching: MatchingConfig::MappingTable(vec![]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Warn),
@@ -1284,7 +1258,7 @@ pub(super) mod tests {
             }],
             covariance,
             matching: MatchingConfig::MappingTable(vec![]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Warn),
@@ -1345,7 +1319,7 @@ pub(super) mod tests {
             }],
             covariance,
             matching: MatchingConfig::MappingTable(vec![]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Strict),
@@ -1623,7 +1597,7 @@ pub(super) mod tests {
             }],
             covariance,
             matching: MatchingConfig::MappingTable(vec![]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Warn),
@@ -1712,7 +1686,7 @@ pub(super) mod tests {
             ],
             covariance,
             matching: MatchingConfig::MappingTable(vec![]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Warn),
@@ -2038,7 +2012,7 @@ pub(super) mod tests {
                 issuer_betas: vec![issuer_row],
                 require_issuer_id: false,
             }),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Warn),
@@ -2173,7 +2147,7 @@ pub(super) mod tests {
                         },
                     ]),
                 ]),
-                pricing_mode: PricingMode::DeltaBased,
+
                 risk_measure: RiskMeasure::Variance,
                 bump_config: None,
                 unmatched_policy: Some(policy),
@@ -2282,7 +2256,7 @@ pub(super) mod tests {
                 issuer_betas: vec![issuer_row],
                 require_issuer_id: false,
             }),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Warn),
@@ -2397,7 +2371,7 @@ pub(super) mod tests {
                 issuer_betas: vec![issuer_row],
                 require_issuer_id: false,
             }),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: Some(UnmatchedPolicy::Warn),
@@ -2610,7 +2584,7 @@ pub(super) mod tests {
                 .collect(),
             ),
             factors: factors.clone(),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: RiskMeasure::Variance,
             bump_config: None,
             unmatched_policy: None,
@@ -2640,7 +2614,7 @@ pub(super) mod tests {
         let matrix = model
             .compute_sensitivities(&portfolio, &market, as_of)
             .expect("sensitivities");
-        let engine = FullRepricingEngine::new(BumpSizeConfig::default(), 5).expect("engine");
+        let engine = DeltaBasedEngine::new(BumpSizeConfig::default());
         let positions = [("tranche".into(), &tranche as &dyn Instrument, 1.0)];
         let full_matrix = engine
             .compute_sensitivities(&positions, &factors, &market, as_of, Currency::USD)

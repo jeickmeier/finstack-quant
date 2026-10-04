@@ -682,12 +682,17 @@ impl PyLatentMultiFactor {
     }
 
     /// Create an uncorrelated (identity) multi-factor model.
+    /// Raises ``ValueError`` for mismatched, negative or non-finite volatilities.
     #[classmethod]
     #[pyo3(text_signature = "(cls, num_factors, volatilities)")]
-    fn uncorrelated(_cls: &Bound<'_, PyType>, num_factors: usize, volatilities: Vec<f64>) -> Self {
-        Self {
-            inner: LatentMultiFactor::uncorrelated(num_factors, volatilities),
-        }
+    fn uncorrelated(
+        _cls: &Bound<'_, PyType>,
+        num_factors: usize,
+        volatilities: Vec<f64>,
+    ) -> PyResult<Self> {
+        LatentMultiFactor::uncorrelated(num_factors, volatilities)
+            .map(|inner| Self { inner })
+            .map_err(correlation_to_py)
     }
 
     /// Number of factors.
@@ -715,7 +720,7 @@ impl PyLatentMultiFactor {
     #[pyo3(text_signature = "(self, independent_z)")]
     fn generate_correlated_factors(&self, independent_z: Vec<f64>) -> PyResult<Vec<f64>> {
         self.inner
-            .try_generate_correlated_factors(&independent_z)
+            .generate_correlated_factors(&independent_z)
             .map_err(correlation_to_py)
     }
 
@@ -1491,7 +1496,7 @@ fn extract_square_matrix(
     if let Ok(flat) = matrix.extract::<Vec<f64>>() {
         return Ok(flat);
     }
-    crate::bindings::portfolio::matrix_input::extract_square_matrix(py, matrix, n, "matrix")
+    crate::bindings::matrix_input::extract_square_matrix(py, matrix, n, "matrix")
 }
 
 /// Fréchet-Hoeffding correlation bounds for two Bernoulli marginals.

@@ -35,14 +35,10 @@ pub struct GbmPathConfig {
     pub num_paths: usize,
     /// Root seed for deterministic Philox streams.
     pub seed: u64,
-    /// Whether to use antithetic pairing.
-    ///
-    /// Path capture currently rejects this combination.
-    pub antithetic: bool,
 }
 
 impl GbmPathConfig {
-    /// Create GBM path inputs with seed 42 and antithetic pairing disabled.
+    /// Create GBM path inputs with seed 42.
     ///
     /// Inputs are validated when [`simulate_gbm_paths`] executes.
     ///
@@ -73,7 +69,6 @@ impl GbmPathConfig {
             num_steps,
             num_paths,
             seed: 42,
-            antithetic: false,
         }
     }
 
@@ -85,18 +80,6 @@ impl GbmPathConfig {
     #[must_use]
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.seed = seed;
-        self
-    }
-
-    /// Enable or disable antithetic path pairing.
-    ///
-    /// # Arguments
-    ///
-    /// * `antithetic` - `true` requests an unsupported captured-path combination,
-    ///   rejected by [`simulate_gbm_paths`]; `false` simulates each path once.
-    #[must_use]
-    pub fn with_antithetic(mut self, antithetic: bool) -> Self {
-        self.antithetic = antithetic;
         self
     }
 }
@@ -129,8 +112,7 @@ pub struct GbmPathSummary {
 ///
 /// Returns validation errors for invalid process/grid inputs, zero paths,
 /// more than 100,000 captured paths, non-finite simulated spots, or an output
-/// and time-grid footprint above 64 million scalar values. Antithetic pairing
-/// remains unsupported for captured-path output.
+/// and time-grid footprint above 64 million scalar values.
 pub fn simulate_gbm_paths(config: &GbmPathConfig) -> Result<GbmPathSummary> {
     if !config.spot.is_finite() || config.spot <= 0.0 {
         return Err(Error::Validation(format!(
@@ -140,11 +122,6 @@ pub fn simulate_gbm_paths(config: &GbmPathConfig) -> Result<GbmPathSummary> {
     }
 
     crate::monte_carlo::require_positive_vol(config.vol)?;
-    if config.antithetic {
-        return Err(Error::Validation(
-            "Path capture is currently unsupported with antithetic=true".to_string(),
-        ));
-    }
     if config.num_paths == 0 || config.num_paths > MAX_CAPTURED_PATHS {
         return Err(Error::Validation(format!(
             "GBM captured num_paths must be in 1..={MAX_CAPTURED_PATHS}, got {}",

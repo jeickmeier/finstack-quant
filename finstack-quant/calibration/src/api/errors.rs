@@ -223,13 +223,6 @@ pub enum EnvelopeError {
         /// The unresolved quote identifier.
         id: String,
     },
-    /// Two steps (or a step and an explicit quote set) define the same
-    /// quote-set name with different quote ids.
-    #[error("quote set '{quote_set}' is attached by more than one step with different quotes")]
-    QuoteSetConflict {
-        /// The conflicting quote-set name.
-        quote_set: String,
-    },
     /// One market-datum id of a kind is attached to steps, or merged into an
     /// envelope, with two different payloads.
     #[error("market datum id '{id}' has conflicting payloads")]
@@ -276,7 +269,6 @@ impl EnvelopeError {
             EnvelopeError::QuoteDataInvalid { .. } => "quote_data_invalid",
             EnvelopeError::DuplicateMarketDatumId { .. } => "duplicate_market_datum_id",
             EnvelopeError::QuoteIdNotInMarketData { .. } => "quote_id_not_in_market_data",
-            EnvelopeError::QuoteSetConflict { .. } => "quote_set_conflict",
             EnvelopeError::ConflictingMarketDatum { .. } => "conflicting_market_datum",
             EnvelopeError::JsonSerialize { .. } => "json_serialize",
             EnvelopeError::StrictLoad { .. } => "strict_load",
@@ -296,7 +288,6 @@ impl EnvelopeError {
             | EnvelopeError::QuoteDataInvalid { step_id, .. } => Some(step_id),
             EnvelopeError::DuplicateMarketDatumId { .. }
             | EnvelopeError::QuoteIdNotInMarketData { .. }
-            | EnvelopeError::QuoteSetConflict { .. }
             | EnvelopeError::ConflictingMarketDatum { .. }
             | EnvelopeError::JsonSerialize { .. }
             | EnvelopeError::StrictLoad { .. } => None,

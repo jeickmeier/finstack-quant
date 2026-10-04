@@ -105,7 +105,6 @@
   "attribution": {
     "kind": "namespace",
     "keys": [
-      "AttributionJsonInputs",
       "attributePnl",
       "attributePnlEnvelope",
       "attributePnlEnvelopeJson",
@@ -126,12 +125,6 @@
       "validateAttributionJson",
       "validateReturnContributionJson"
     ]
-  },
-  "attribution.AttributionJsonInputs": {
-    "kind": "class",
-    "statics": [],
-    "methods": ["free"],
-    "getters": ["creditFactorModelJson", "modelParamsT0Json"]
   },
   "attribution.attributePnl": {
     "kind": "function"
@@ -2192,7 +2185,6 @@
       "SimmCalculator",
       "SimmSensitivities",
       "VmCalculator",
-      "calculateVm",
       "clearingStatusCleared",
       "collateralAssetClassFromStr",
       "collateralAssetClassFxAddon",
@@ -2200,7 +2192,6 @@
       "computeBilateralXva",
       "computeMva",
       "constants",
-      "csaEurRegulatoryJson",
       "csaSpecApplyImTerms",
       "csaSpecEurRegulatory",
       "csaSpecRegulatory",
@@ -2209,7 +2200,6 @@
       "csaSpecValidate",
       "csaSpecWithIm",
       "csaSpecWithVmThreshold",
-      "csaUsdRegulatoryJson",
       "eligibleCollateralScheduleBcbsStandard",
       "eligibleCollateralScheduleCashOnly",
       "eligibleCollateralScheduleCheckConcentrationLimits",
@@ -2252,22 +2242,9 @@
       "saCcrNettingSetConfigValidate",
       "saccrEad",
       "schema",
-      "validateCsaJson",
       "vmResultNetMargin",
       "vmResultRequiresCall"
     ]
-  },
-  "margin.csaUsdRegulatoryJson": {
-    "kind": "function"
-  },
-  "margin.csaEurRegulatoryJson": {
-    "kind": "function"
-  },
-  "margin.validateCsaJson": {
-    "kind": "function"
-  },
-  "margin.calculateVm": {
-    "kind": "function"
   },
   "margin.computeBilateralXva": {
     "kind": "function"
@@ -2317,15 +2294,8 @@
   "margin.HaircutImCalculator": {
     "kind": "class",
     "statics": ["bcbsStandard", "fromSchedule", "usTreasuries"],
-    "methods": [
-      "calculateForCollateral",
-      "free",
-      "haircutFor",
-      "withCollateralTerms",
-      "withDefaultAssetClass",
-      "withPostedCollateralCurrency"
-    ],
-    "getters": ["defaultAssetClass", "eligibleCollateral", "mporDays", "postedCollateralCurrency"]
+    "methods": ["calculateForCollateral", "free", "haircutFor", "withCollateralTerms"],
+    "getters": ["eligibleCollateral", "mporDays"]
   },
   "margin.SaCcrEngine": {
     "kind": "class",
@@ -2336,15 +2306,8 @@
   "margin.ScheduleImCalculator": {
     "kind": "class",
     "statics": ["bcbsStandard", "fromFinstackConfig", "fromRegistryId"],
-    "methods": [
-      "calculateForNotional",
-      "calculateNettingSetWithNgr",
-      "free",
-      "rate",
-      "withAssetClass",
-      "withMaturity"
-    ],
-    "getters": ["defaultAssetClass", "defaultMaturityYears", "mporDays"]
+    "methods": ["calculateForNotional", "calculateNettingSetWithNgr", "free", "rate"],
+    "getters": ["mporDays"]
   },
   "margin.SimmCalculator": {
     "kind": "class",
@@ -2762,13 +2725,7 @@
       "analyzeLme",
       "applyBaselIrbPdFloor",
       "baselIrbPdFloor",
-      "betaRecoveryQuantile",
-      "betaRecoverySample",
       "centralTendency",
-      "downturnLgdRegulatoryFloor",
-      "downturnLgdStressed",
-      "eadRevolver",
-      "eadTermLoan",
       "moodysWarfFactor",
       "ohlsonOScore",
       "pitToTtc",
@@ -2931,25 +2888,7 @@
   "models.credit.seniorityRecoveryStats": {
     "kind": "function"
   },
-  "models.credit.betaRecoverySample": {
-    "kind": "function"
-  },
-  "models.credit.betaRecoveryQuantile": {
-    "kind": "function"
-  },
   "models.credit.workoutLgd": {
-    "kind": "function"
-  },
-  "models.credit.downturnLgdStressed": {
-    "kind": "function"
-  },
-  "models.credit.downturnLgdRegulatoryFloor": {
-    "kind": "function"
-  },
-  "models.credit.eadTermLoan": {
-    "kind": "function"
-  },
-  "models.credit.eadRevolver": {
     "kind": "function"
   },
   "models.credit.MasterScale": {
@@ -3682,16 +3621,13 @@
       "Portfolio",
       "PortfolioBuilder",
       "aggregateFullCashflows",
-      "aggregateFullCashflowsBuilt",
       "aggregateMetrics",
       "allocateWeights",
       "allocateWeightsJson",
       "applyScenarioAndRevalue",
-      "applyScenarioAndRevalueBuilt",
       "attributePortfolioPnl",
       "brinsonFachler",
       "buildCreditVolReport",
-      "buildPortfolioFromSpecJson",
       "campisiAttribution",
       "campisiCarinoLink",
       "campisiCarinoLinkFromSnapshots",
@@ -3702,9 +3638,7 @@
       "cellReturnsFromReference",
       "collapseToBaseByDateKind",
       "computeFactorSensitivities",
-      "computeFactorSensitivitiesWithMarket",
       "computePnlProfiles",
-      "computePnlProfilesWithMarket",
       "constraintBudget",
       "constraintExposureLimit",
       "constraintExposureMinimum",
@@ -3736,7 +3670,6 @@
       "replayPortfolio",
       "scenarioPnl",
       "scenarioPnlBatch",
-      "scenarioPnlBuilt",
       "schema",
       "sensitivityMatrixDelta",
       "sensitivityMatrixFactorDeltas",
@@ -3744,8 +3677,7 @@
       "twrrLinked",
       "twrrModifiedDietz",
       "validateAllocationJson",
-      "valuePortfolio",
-      "valuePortfolioBuilt"
+      "valuePortfolio"
     ]
   },
   "portfolio.InstrumentArtifactCache": {
@@ -3825,9 +3757,6 @@
   "portfolio.mwrXirr": {
     "kind": "function"
   },
-  "portfolio.buildPortfolioFromSpecJson": {
-    "kind": "function"
-  },
   "portfolio.aggregateMetrics": {
     "kind": "function"
   },
@@ -3837,13 +3766,7 @@
   "portfolio.valuePortfolio": {
     "kind": "function"
   },
-  "portfolio.valuePortfolioBuilt": {
-    "kind": "function"
-  },
   "portfolio.aggregateFullCashflows": {
-    "kind": "function"
-  },
-  "portfolio.aggregateFullCashflowsBuilt": {
     "kind": "function"
   },
   "portfolio.netInCurrencyByDate": {
@@ -3855,13 +3778,7 @@
   "portfolio.applyScenarioAndRevalue": {
     "kind": "function"
   },
-  "portfolio.applyScenarioAndRevalueBuilt": {
-    "kind": "function"
-  },
   "portfolio.scenarioPnl": {
-    "kind": "function"
-  },
-  "portfolio.scenarioPnlBuilt": {
     "kind": "function"
   },
   "portfolio.optimizePortfolio": {
@@ -3876,13 +3793,7 @@
   "portfolio.computeFactorSensitivities": {
     "kind": "function"
   },
-  "portfolio.computeFactorSensitivitiesWithMarket": {
-    "kind": "function"
-  },
   "portfolio.computePnlProfiles": {
-    "kind": "function"
-  },
-  "portfolio.computePnlProfilesWithMarket": {
     "kind": "function"
   },
   "portfolio.decomposeFactorRisk": {
@@ -3989,9 +3900,7 @@
     "kind": "namespace",
     "keys": [
       "applyScenario",
-      "applyScenarioToMarket",
       "buildFromTemplate",
-      "buildScenarioSpec",
       "buildTemplateComponent",
       "composeScenarios",
       "computeHorizonReturn",
@@ -4027,6 +3936,7 @@
       "operationSpecVolIndexParallelPts",
       "operationSpecVolSurfaceBucketPct",
       "operationSpecVolSurfaceParallelPct",
+      "parallelBpMany",
       "parseScenarioSpec",
       "rateBindingSpecValidate",
       "scenarioSpecMutatesInstruments",
@@ -4060,13 +3970,7 @@
   "scenarios.buildTemplateComponent": {
     "kind": "function"
   },
-  "scenarios.buildScenarioSpec": {
-    "kind": "function"
-  },
   "scenarios.applyScenario": {
-    "kind": "function"
-  },
-  "scenarios.applyScenarioToMarket": {
     "kind": "function"
   },
   "scenarios.computeHorizonReturn": {
@@ -4079,6 +3983,9 @@
     "kind": "function"
   },
   "scenarios.operationSpecInstrumentPricePctByAttr": {
+    "kind": "function"
+  },
+  "scenarios.parallelBpMany": {
     "kind": "function"
   },
   "scenarios.operationSpecCurveParallelBp": {

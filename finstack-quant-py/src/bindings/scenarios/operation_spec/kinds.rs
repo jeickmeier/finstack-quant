@@ -8,12 +8,10 @@ use finstack_quant_scenarios::spec::{Compounding, CurveKind, TenorMatchMode, Tim
 use pyo3::prelude::*;
 use pyo3::types::PyType;
 
-use super::helpers::{enum_to_label, label_to_enum};
-
 macro_rules! scenario_enum {
     (
         $(#[$meta:meta])*
-        $py_name:literal, $wrapper:ident, $inner:ident, $accepted:literal,
+        $py_name:literal, $wrapper:ident, $inner:ident,
         { $( $(#[$vmeta:meta])* $method:ident => $variant:ident ),+ $(,)? }
     ) => {
         $(#[$meta])*
@@ -35,7 +33,7 @@ macro_rules! scenario_enum {
             #[new]
             fn new(label: &str) -> PyResult<Self> {
                 Ok(Self {
-                    inner: label_to_enum::<$inner>($py_name, label, $accepted)?,
+                    inner: finstack_quant_core::wire::serde_parse::<$inner>(label).map_err(crate::errors::core_to_py)?,
                 })
             }
 
@@ -56,7 +54,7 @@ macro_rules! scenario_enum {
             /// Serialized wire label, e.g. ``"discount"`` or ``"par_cds"``.
             #[getter]
             fn value(&self) -> PyResult<String> {
-                enum_to_label(&self.inner)
+                finstack_quant_core::wire::serde_label(&self.inner).map_err(crate::errors::core_to_py)
             }
 
             fn __repr__(&self) -> String {
@@ -80,7 +78,7 @@ scenario_enum!(
     /// True
     /// >>> CurveKind.discount().value
     /// 'discount'
-    "CurveKind", PyCurveKind, CurveKind, "discount, forward, par_cds, inflation, commodity",
+    "CurveKind", PyCurveKind, CurveKind,
     {
         /// Discount factor curve.
         discount => Discount,
@@ -104,7 +102,7 @@ scenario_enum!(
     /// >>> from finstack_quant.scenarios import TenorMatchMode
     /// >>> TenorMatchMode("interpolate") == TenorMatchMode.interpolate()
     /// True
-    "TenorMatchMode", PyTenorMatchMode, TenorMatchMode, "exact, interpolate",
+    "TenorMatchMode", PyTenorMatchMode, TenorMatchMode,
     {
         /// Match the exact pillar only (errors if missing).
         exact => Exact,
@@ -121,7 +119,7 @@ scenario_enum!(
     /// >>> from finstack_quant.scenarios import TimeRollMode
     /// >>> TimeRollMode("calendar_days").value
     /// 'calendar_days'
-    "TimeRollMode", PyTimeRollMode, TimeRollMode, "business_days, calendar_days, approximate",
+    "TimeRollMode", PyTimeRollMode, TimeRollMode,
     {
         /// Business-day-aware roll (respects calendars when provided).
         business_days => BusinessDays,

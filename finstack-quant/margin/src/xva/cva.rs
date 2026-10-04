@@ -70,15 +70,6 @@ fn validate_exposure_profile_lengths(
     }
 
     let n = exposure_profile.times.len();
-    if exposure_profile.epe.len() != n || exposure_profile.ene.len() != n {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "{label}: exposure profile vector lengths must be equal \
-             (times={n}, epe={}, ene={})",
-            exposure_profile.epe.len(),
-            exposure_profile.ene.len()
-        )));
-    }
-
     Ok(n)
 }
 
@@ -123,9 +114,8 @@ fn compute_cva_internal(
     let mut cva = 0.0;
     let mut epe_profile = Vec::with_capacity(n);
     let mut ene_profile = Vec::with_capacity(n);
-    let mut pfe_profile = Vec::with_capacity(n);
     let mut effective_epe_profile = Vec::with_capacity(n);
-    let mut max_pfe: f64 = 0.0;
+    let mut max_epe: f64 = 0.0;
     let mut effective_epe_running: f64 = 0.0;
     let mut eff_epe_time_integral: f64 = 0.0;
     let maturity = exposure_profile.times[n - 1];
@@ -182,15 +172,10 @@ fn compute_cva_internal(
             eff_epe_time_integral += effective_epe_running * dt;
         }
 
-        // Deterministic single-scenario engine: the exposure
-        // distribution is a point mass at max(V(t), 0), so PFE at any
-        // quantile equals EPE. See doc on `XvaResult::pfe_profile`.
-        let pfe_t = epe_t;
-        max_pfe = max_pfe.max(pfe_t);
+        max_epe = max_epe.max(epe_t);
 
         epe_profile.push((t, epe_t));
         ene_profile.push((t, ene_t));
-        pfe_profile.push((t, pfe_t));
         effective_epe_profile.push((t, effective_epe_running));
 
         prev_survival = survival_t;
@@ -215,8 +200,7 @@ fn compute_cva_internal(
         total_xva: cva,
         epe_profile,
         ene_profile,
-        pfe_profile,
-        max_pfe,
+        max_epe,
         effective_epe_profile,
         effective_epe,
         meta: finstack_quant_core::config::results_meta(
@@ -907,7 +891,6 @@ mod tests {
 
         assert_eq!(result.epe_profile.len(), times.len());
         assert_eq!(result.ene_profile.len(), times.len());
-        assert_eq!(result.pfe_profile.len(), times.len());
     }
 
     #[test]
@@ -958,7 +941,7 @@ mod tests {
     }
 
     #[test]
-    fn max_pfe_equals_max_epe_in_deterministic_model() {
+    fn max_epe_equals_max_epe_in_deterministic_model() {
         let hazard = flat_hazard_curve(0.02);
         let discount = flat_discount_curve(0.03);
         let times = vec![1.0, 2.0, 3.0];
@@ -974,9 +957,9 @@ mod tests {
             compute_cva(&profile, &hazard, &discount, 0.40).expect("CVA computation should work");
 
         assert!(
-            (result.max_pfe - 300.0).abs() < 1e-12,
-            "Max PFE should equal max EPE in deterministic model, got {}",
-            result.max_pfe
+            (result.max_epe - 300.0).abs() < 1e-12,
+            "Peak expected positive exposure should be 300, got {}",
+            result.max_epe
         );
     }
 
@@ -1906,8 +1889,7 @@ mod tests {
             "total_xva": 100.0,
             "epe_profile": [[1.0, 10.0]],
             "ene_profile": [[1.0, 0.0]],
-            "pfe_profile": [[1.0, 10.0]],
-            "max_pfe": 10.0,
+            "max_epe": 10.0,
             "effective_epe_profile": [[1.0, 10.0]],
             "effective_epe": 10.0
         }"#;

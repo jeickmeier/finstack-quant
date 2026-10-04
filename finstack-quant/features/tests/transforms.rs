@@ -3,9 +3,8 @@
 use finstack_quant_features::{
     neutralize, neutralize_and_zscore, rank_to_weights, risk_scaled_weights,
     rolling_regression_residual, transform_cross_sectional, transform_cross_sectional_grouped,
-    transform_cross_sectional_with_op, transform_panel, transform_panel_json, transform_timeseries,
-    transform_timeseries_pairwise, transform_timeseries_with_op, CrossSectionalOp, PanelOperation,
-    PanelTransformSpec, TimeSeriesOp,
+    transform_panel, transform_panel_json, transform_timeseries, transform_timeseries_pairwise,
+    CrossSectionalOp, PairwiseOp, PanelOperation, PanelTransformSpec, TimeSeriesOp,
 };
 use serde_json::json;
 
@@ -29,7 +28,7 @@ fn transform_timeseries_aligns_unsorted_returns_lag_and_rolling_std() {
         &values,
         &entity,
         &order,
-        "returns",
+        TimeSeriesOp::Returns,
         Some(&json!({"periods": 1})),
     )
     .expect("returns");
@@ -42,7 +41,7 @@ fn transform_timeseries_aligns_unsorted_returns_lag_and_rolling_std() {
         &values,
         &entity,
         &order,
-        "lag",
+        TimeSeriesOp::Lag,
         Some(&json!({"periods": 1})),
     )
     .expect("lag");
@@ -52,7 +51,7 @@ fn transform_timeseries_aligns_unsorted_returns_lag_and_rolling_std() {
         &values,
         &entity,
         &order,
-        "rolling_std",
+        TimeSeriesOp::RollingStd,
         Some(&json!({"window": 2, "min_periods": 2})),
     )
     .expect("rolling std");
@@ -82,7 +81,7 @@ fn transform_timeseries_supports_mvp_rolling_and_ewma_ops() {
         &values,
         &entity,
         &order,
-        "diff",
+        TimeSeriesOp::Diff,
         Some(&json!({"periods": 2})),
     )
     .expect("diff");
@@ -94,7 +93,7 @@ fn transform_timeseries_supports_mvp_rolling_and_ewma_ops() {
         &values,
         &entity,
         &order,
-        "rolling_zscore",
+        TimeSeriesOp::RollingZscore,
         Some(&json!({"window": 3, "min_periods": 3})),
     )
     .expect("rolling zscore");
@@ -107,7 +106,7 @@ fn transform_timeseries_supports_mvp_rolling_and_ewma_ops() {
         &values,
         &entity,
         &order,
-        "ewma_mean",
+        TimeSeriesOp::EwmaMean,
         Some(&json!({"span": 3.0})),
     )
     .expect("ewma mean");
@@ -128,7 +127,7 @@ fn transform_timeseries_supports_mvp_rolling_and_ewma_ops() {
         &returns,
         &short_entity,
         &short_order,
-        "ewma_mean",
+        TimeSeriesOp::EwmaMean,
         ewma_params,
     )
     .expect("ewma mean on returns");
@@ -138,7 +137,7 @@ fn transform_timeseries_supports_mvp_rolling_and_ewma_ops() {
         &returns,
         &short_entity,
         &short_order,
-        "ewma_vol",
+        TimeSeriesOp::EwmaVol,
         ewma_params,
     )
     .expect("ewma vol");
@@ -148,7 +147,7 @@ fn transform_timeseries_supports_mvp_rolling_and_ewma_ops() {
         &returns,
         &short_entity,
         &short_order,
-        "ewma_zscore",
+        TimeSeriesOp::EwmaZscore,
         ewma_params,
     )
     .expect("ewma zscore");
@@ -177,14 +176,7 @@ fn transform_timeseries_supports_mvp_rolling_and_ewma_ops() {
         }
     }
 
-    let old_ewma_alias = transform_timeseries(
-        &returns,
-        &short_entity,
-        &short_order,
-        "ewma",
-        Some(&json!({"span": 3.0})),
-    );
-    assert!(old_ewma_alias.is_err());
+    assert!("ewma".parse::<TimeSeriesOp>().is_err());
 }
 
 #[test]
@@ -206,9 +198,14 @@ fn transform_timeseries_supports_advanced_rolling_signal_ops() {
     ];
     let rolling_params = Some(&json!({"window": 3, "min_periods": 3}));
 
-    let rolling_rank =
-        transform_timeseries(&values, &entity, &order, "rolling_rank", rolling_params)
-            .expect("rolling rank");
+    let rolling_rank = transform_timeseries(
+        &values,
+        &entity,
+        &order,
+        TimeSeriesOp::RollingRank,
+        rolling_params,
+    )
+    .expect("rolling rank");
     assert_close_options(
         &rolling_rank,
         &[None, None, Some(1.0), Some(1.0), Some(0.5)],
@@ -218,7 +215,7 @@ fn transform_timeseries_supports_advanced_rolling_signal_ops() {
         &values,
         &entity,
         &order,
-        "rolling_quantile",
+        TimeSeriesOp::RollingQuantile,
         Some(&json!({"window": 3, "min_periods": 3, "quantile": 0.5})),
     )
     .expect("rolling quantile");
@@ -227,14 +224,24 @@ fn transform_timeseries_supports_advanced_rolling_signal_ops() {
         &[None, None, Some(2.0), Some(3.0), Some(4.0)],
     );
 
-    let rolling_skew =
-        transform_timeseries(&values, &entity, &order, "rolling_skew", rolling_params)
-            .expect("rolling skew");
+    let rolling_skew = transform_timeseries(
+        &values,
+        &entity,
+        &order,
+        TimeSeriesOp::RollingSkew,
+        rolling_params,
+    )
+    .expect("rolling skew");
     assert_close_options(&rolling_skew[0..3], &[None, None, Some(0.0)]);
 
-    let rolling_kurtosis =
-        transform_timeseries(&values, &entity, &order, "rolling_kurtosis", rolling_params)
-            .expect("rolling kurtosis");
+    let rolling_kurtosis = transform_timeseries(
+        &values,
+        &entity,
+        &order,
+        TimeSeriesOp::RollingKurtosis,
+        rolling_params,
+    )
+    .expect("rolling kurtosis");
     assert_close_options(&rolling_kurtosis[0..3], &[None, None, None]);
 
     let four = vec![Some(1.0), Some(2.0), Some(3.0), Some(4.0)];
@@ -254,27 +261,37 @@ fn transform_timeseries_supports_advanced_rolling_signal_ops() {
         &four,
         &four_entity,
         &four_order,
-        "rolling_kurtosis",
+        TimeSeriesOp::RollingKurtosis,
         Some(&json!({"window": 4, "min_periods": 4})),
     )
     .expect("four-point kurtosis");
     assert_close_options(&four_kurtosis, &[None, None, None, Some(-1.2)]);
 
-    let rolling_slope =
-        transform_timeseries(&values, &entity, &order, "rolling_slope", rolling_params)
-            .expect("rolling slope");
+    let rolling_slope = transform_timeseries(
+        &values,
+        &entity,
+        &order,
+        TimeSeriesOp::RollingSlope,
+        rolling_params,
+    )
+    .expect("rolling slope");
     assert_close_options(&rolling_slope[0..3], &[None, None, Some(1.0)]);
 
-    let rolling_sharpe =
-        transform_timeseries(&values, &entity, &order, "rolling_sharpe", rolling_params)
-            .expect("rolling sharpe");
+    let rolling_sharpe = transform_timeseries(
+        &values,
+        &entity,
+        &order,
+        TimeSeriesOp::RollingSharpe,
+        rolling_params,
+    )
+    .expect("rolling sharpe");
     assert_close_options(&rolling_sharpe[0..3], &[None, None, Some(2.0)]);
 
     let excess_sharpe = transform_timeseries(
         &values,
         &entity,
         &order,
-        "rolling_sharpe",
+        TimeSeriesOp::RollingSharpe,
         Some(&json!({"window": 3, "min_periods": 3, "risk_free": 1.0})),
     )
     .expect("rolling sharpe with risk_free");
@@ -284,7 +301,7 @@ fn transform_timeseries_supports_advanced_rolling_signal_ops() {
         &values,
         &entity,
         &order,
-        "rolling_winsorize",
+        TimeSeriesOp::RollingWinsorize,
         Some(&json!({"window": 3, "min_periods": 3, "lower": 0.0, "upper": 0.5})),
     )
     .expect("rolling winsorize");
@@ -297,7 +314,7 @@ fn transform_timeseries_supports_advanced_rolling_signal_ops() {
         &values,
         &entity,
         &order,
-        "hampel_filter",
+        TimeSeriesOp::HampelFilter,
         Some(&json!({"window": 3, "min_periods": 3, "threshold": 3.0})),
     )
     .expect("hampel filter");
@@ -311,7 +328,7 @@ fn transform_timeseries_supports_advanced_rolling_signal_ops() {
             "2026-01-02".to_string(),
             "2026-01-03".to_string(),
         ],
-        "drawdown",
+        TimeSeriesOp::Drawdown,
         None,
     )
     .expect("drawdown");
@@ -325,7 +342,7 @@ fn transform_timeseries_supports_advanced_rolling_signal_ops() {
             "2026-01-02".to_string(),
             "2026-01-03".to_string(),
         ],
-        "exponential_decay_weights",
+        TimeSeriesOp::ExponentialDecayWeights,
         Some(&json!({"window": 3, "half_life": 1.0})),
     )
     .expect("decay weights");
@@ -342,19 +359,21 @@ fn transform_cross_sectional_matches_zscore_rank_and_winsorize() {
         "2026-01-02".to_string(),
     ];
 
-    let rank = transform_cross_sectional(&values, &time_key, "rank", None).expect("rank");
+    let rank =
+        transform_cross_sectional(&values, &time_key, CrossSectionalOp::Rank, None).expect("rank");
     assert_eq!(rank[0], Some(0.0));
     assert_eq!(rank[1], Some(0.5));
     assert_eq!(rank[2], Some(1.0));
     assert_eq!(rank[3], Some(0.0));
 
-    let zscore = transform_cross_sectional(&values, &time_key, "zscore", None).expect("zscore");
+    let zscore = transform_cross_sectional(&values, &time_key, CrossSectionalOp::Zscore, None)
+        .expect("zscore");
     assert_eq!(zscore[3], Some(0.0));
 
     let winsorized = transform_cross_sectional(
         &values,
         &time_key,
-        "winsorize",
+        CrossSectionalOp::Winsorize,
         Some(&json!({"lower": 0.0, "upper": 0.5})),
     )
     .expect("winsorize");
@@ -380,8 +399,9 @@ fn transform_cross_sectional_supports_mvp_signal_cleaning_ops() {
         "2026-01-01".to_string(),
     ];
 
-    let percentile_rank = transform_cross_sectional(&values, &time_key, "percentile_rank", None)
-        .expect("percentile rank");
+    let percentile_rank =
+        transform_cross_sectional(&values, &time_key, CrossSectionalOp::PercentileRank, None)
+            .expect("percentile rank");
     assert_close_options(
         &percentile_rank,
         &[Some(0.2), Some(0.5), Some(0.5), Some(0.8), None, None],
@@ -390,7 +410,7 @@ fn transform_cross_sectional_supports_mvp_signal_cleaning_ops() {
     let quantile_bucket = transform_cross_sectional(
         &values,
         &time_key,
-        "quantile_bucket",
+        CrossSectionalOp::QuantileBucket,
         Some(&json!({"buckets": 4})),
     )
     .expect("quantile bucket");
@@ -399,8 +419,9 @@ fn transform_cross_sectional_supports_mvp_signal_cleaning_ops() {
         vec![Some(0.0), Some(1.0), Some(1.0), Some(3.0), None, None]
     );
 
-    let robust_zscore = transform_cross_sectional(&values, &time_key, "robust_zscore", None)
-        .expect("robust zscore");
+    let robust_zscore =
+        transform_cross_sectional(&values, &time_key, CrossSectionalOp::RobustZscore, None)
+            .expect("robust zscore");
     assert_close_options(
         &robust_zscore,
         &[
@@ -414,7 +435,8 @@ fn transform_cross_sectional_supports_mvp_signal_cleaning_ops() {
     );
 
     let minmax_scale =
-        transform_cross_sectional(&values, &time_key, "minmax_scale", None).expect("minmax");
+        transform_cross_sectional(&values, &time_key, CrossSectionalOp::MinmaxScale, None)
+            .expect("minmax");
     assert_close_options(
         &minmax_scale,
         &[
@@ -430,7 +452,7 @@ fn transform_cross_sectional_supports_mvp_signal_cleaning_ops() {
     let clip = transform_cross_sectional(
         &values,
         &time_key,
-        "clip",
+        CrossSectionalOp::Clip,
         Some(&json!({"lower": 1.5, "upper": 3.0})),
     )
     .expect("clip");
@@ -442,7 +464,7 @@ fn transform_cross_sectional_supports_mvp_signal_cleaning_ops() {
     let clip_by_sigma = transform_cross_sectional(
         &values,
         &time_key,
-        "clip_by_sigma",
+        CrossSectionalOp::ClipBySigma,
         Some(&json!({"sigma": 0.5})),
     )
     .expect("clip by sigma");
@@ -461,7 +483,7 @@ fn transform_cross_sectional_supports_mvp_signal_cleaning_ops() {
     let winsorized = transform_cross_sectional(
         &values,
         &time_key,
-        "winsorize",
+        CrossSectionalOp::Winsorize,
         Some(&json!({"lower": 0.25, "upper": 0.75})),
     )
     .expect("winsorize");
@@ -473,11 +495,9 @@ fn transform_cross_sectional_supports_mvp_signal_cleaning_ops() {
 
 #[test]
 fn transform_cross_sectional_rejects_removed_aliases() {
-    let values = vec![Some(1.0), Some(2.0)];
-    let time_key = vec!["2026-01-01".to_string(), "2026-01-01".to_string()];
-
     for alias in ["clip_by_quantile", "dollar_neutral_weights"] {
-        let err = transform_cross_sectional(&values, &time_key, alias, None)
+        let err = alias
+            .parse::<CrossSectionalOp>()
             .expect_err("removed alias must be rejected");
         assert!(err.to_string().contains(alias));
 
@@ -503,9 +523,13 @@ fn transform_cross_sectional_supports_normal_score_transform() {
         "2026-01-01".to_string(),
         "2026-01-01".to_string(),
     ];
-    let normal_scores =
-        transform_cross_sectional(&values, &time_key, "normal_score_transform", None)
-            .expect("normal scores");
+    let normal_scores = transform_cross_sectional(
+        &values,
+        &time_key,
+        CrossSectionalOp::NormalScoreTransform,
+        None,
+    )
+    .expect("normal scores");
     assert_close_options(
         &normal_scores,
         &[
@@ -528,8 +552,9 @@ fn transform_cross_sectional_supports_weight_and_missing_ops() {
         "2026-01-01".to_string(),
     ];
 
-    let long_short = transform_cross_sectional(&values, &time_key, "long_short_weights", None)
-        .expect("long short weights");
+    let long_short =
+        transform_cross_sectional(&values, &time_key, CrossSectionalOp::LongShortWeights, None)
+            .expect("long short weights");
     assert_close_options(
         &long_short,
         &[
@@ -544,7 +569,7 @@ fn transform_cross_sectional_supports_weight_and_missing_ops() {
     let capped = transform_cross_sectional(
         &values,
         &time_key,
-        "cap_weights",
+        CrossSectionalOp::CapWeights,
         Some(&json!({"max_abs": 0.5})),
     )
     .expect("cap weights");
@@ -554,7 +579,7 @@ fn transform_cross_sectional_supports_weight_and_missing_ops() {
     let filled = transform_cross_sectional(
         &values,
         &time_key,
-        "fill_missing",
+        CrossSectionalOp::FillMissing,
         Some(&json!({"value": 42.0})),
     )
     .expect("fill missing");
@@ -563,15 +588,15 @@ fn transform_cross_sectional_supports_weight_and_missing_ops() {
         vec![Some(-1.0), Some(0.0), Some(3.0), Some(42.0), Some(42.0)]
     );
 
-    let is_finite =
-        transform_cross_sectional(&values, &time_key, "is_finite", None).expect("is finite");
+    let is_finite = transform_cross_sectional(&values, &time_key, CrossSectionalOp::IsFinite, None)
+        .expect("is finite");
     assert_eq!(
         is_finite,
         vec![Some(1.0), Some(1.0), Some(1.0), Some(0.0), Some(0.0)]
     );
 
-    let nan_mask =
-        transform_cross_sectional(&values, &time_key, "nan_mask", None).expect("nan mask");
+    let nan_mask = transform_cross_sectional(&values, &time_key, CrossSectionalOp::NanMask, None)
+        .expect("nan mask");
     assert_eq!(
         nan_mask,
         vec![Some(0.0), Some(0.0), Some(0.0), Some(1.0), Some(1.0)]
@@ -593,8 +618,14 @@ fn finance_specific_transforms_handle_grouping_neutralization_and_weights() {
         "fin".to_string(),
         "fin".to_string(),
     ];
-    let grouped = transform_cross_sectional_grouped(&values, &time_key, &groups, "zscore", None)
-        .expect("grouped zscore");
+    let grouped = transform_cross_sectional_grouped(
+        &values,
+        &time_key,
+        &groups,
+        CrossSectionalOp::Zscore,
+        None,
+    )
+    .expect("grouped zscore");
     assert_close_options(&grouped, &[Some(-1.0), Some(1.0), Some(-1.0), Some(1.0)]);
 
     let signal = vec![Some(1.0), Some(2.0), Some(2.0), Some(4.0)];
@@ -634,8 +665,14 @@ fn grouped_cross_sectional_transform_does_not_collide_composite_keys() {
     let time_key = vec!["a\u{1f}b".to_string(), "a".to_string()];
     let groups = vec!["c".to_string(), "b\u{1f}c".to_string()];
 
-    let grouped = transform_cross_sectional_grouped(&values, &time_key, &groups, "zscore", None)
-        .expect("grouped zscore");
+    let grouped = transform_cross_sectional_grouped(
+        &values,
+        &time_key,
+        &groups,
+        CrossSectionalOp::Zscore,
+        None,
+    )
+    .expect("grouped zscore");
     assert_eq!(grouped, vec![Some(0.0), Some(0.0)]);
 }
 
@@ -655,7 +692,7 @@ fn finance_specific_timeseries_transforms_handle_pairwise_and_regression_ops() {
         &x,
         &entity,
         &order,
-        "rolling_corr",
+        PairwiseOp::RollingCorr,
         Some(&json!({"window": 3, "min_periods": 3})),
     )
     .expect("rolling corr");
@@ -666,7 +703,7 @@ fn finance_specific_timeseries_transforms_handle_pairwise_and_regression_ops() {
         &x,
         &entity,
         &order,
-        "rolling_beta",
+        PairwiseOp::RollingBeta,
         Some(&json!({"window": 3, "min_periods": 3})),
     )
     .expect("rolling beta");
@@ -694,14 +731,14 @@ fn pipeline_helpers_compose_cleaning_normalization_and_neutralization() {
     let cleaned = transform_cross_sectional(
         &values,
         &time_key,
-        "winsorize",
+        CrossSectionalOp::Winsorize,
         Some(&json!({"lower": 0.0, "upper": 0.5})),
     )
     .expect("clean signal");
     assert_eq!(cleaned, vec![Some(1.0), Some(2.0), Some(2.0)]);
 
-    let normalized =
-        transform_cross_sectional(&values, &time_key, "rank", None).expect("normalize signal");
+    let normalized = transform_cross_sectional(&values, &time_key, CrossSectionalOp::Rank, None)
+        .expect("normalize signal");
     assert_eq!(normalized, vec![Some(0.0), Some(0.5), Some(1.0)]);
 
     let weights = rank_to_weights(&values, &time_key).expect("rank to weights");
@@ -722,7 +759,6 @@ fn pipeline_helpers_compose_cleaning_normalization_and_neutralization() {
             "2026-01-01".to_string(),
         ],
         &[beta],
-        None,
     )
     .expect("neutralize and zscore");
     assert_close_options(
@@ -752,7 +788,7 @@ fn typed_transform_entrypoints_avoid_string_dispatch() {
         "2026-01-01".to_string(),
     ];
 
-    let returns = transform_timeseries_with_op(
+    let returns = transform_timeseries(
         &values,
         &entity,
         &order,
@@ -762,7 +798,7 @@ fn typed_transform_entrypoints_avoid_string_dispatch() {
     .expect("typed returns");
     assert!((returns[0].expect("A return") - 0.2).abs() < 1e-12);
 
-    let ranks = transform_cross_sectional_with_op(
+    let ranks = transform_cross_sectional(
         &[Some(1.0), Some(2.0), Some(100.0)],
         &[
             "2026-01-01".to_string(),

@@ -153,7 +153,7 @@ can take the whole scenario or just one leg.
 use finstack_quant_scenarios::templates::TemplateRegistry;
 
 fn rates_leg() -> finstack_quant_scenarios::Result<()> {
-    let registry = TemplateRegistry::with_embedded_builtins()?;
+    let registry = TemplateRegistry::embedded_builtins()?;
     for metadata in registry.list() {
         println!("{} — {}", metadata.id, metadata.name);
     }
@@ -227,15 +227,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 + **Python:** `finstack_quant.scenarios` — `ScenarioSpec`, `TemplateMetadata`,
   `OperationSpec`, `CurveKind`, `TimeRollMode`, `TenorMatchMode`, `Compounding`, `RateBindingSpec`,
-  `apply_scenario`, `apply_scenario_to_market`, `compose_scenarios`,
+  `apply_scenario`, `parallel_bp_many`, `compose_scenarios`,
   `validate_scenario_spec` (build a spec with `ScenarioSpec(...)` or
   `ScenarioSpec.from_json(...)`),
   `compute_horizon_return`, the template helpers, and
   `finstack_quant.scenarios.schema`.
 + **WASM:** the `scenarios` namespace from `finstack-quant-wasm/index.js`
-  (`exports/scenarios.js`) — `parseScenarioSpec`, `buildScenarioSpec`,
+  (`exports/scenarios.js`) — `parseScenarioSpec`, `parallelBpMany`,
   `composeScenarios`, `validateScenarioSpec`, `applyScenario`,
-  `applyScenarioToMarket`, `computeHorizonReturn`, and the template helpers.
+  `computeHorizonReturn`, and the template helpers.
   Unsuffixed builders, composers, and template helpers return structured specs;
   JSON remains explicit through Python `to_json`/`from_json` or JSON-named inputs.
 

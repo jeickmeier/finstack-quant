@@ -13,7 +13,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_valuations::instruments::{
-    Attributes, Instrument, PayReceive, PremiumLegSpec, ProtectionLegSpec,
+    Attributes, PayReceive, PremiumLegSpec, ProtectionLegSpec,
 };
 use finstack_quant_valuations::market::conventions::ids::CdsConventionKey;
 use finstack_quant_valuations::market::conventions::{CdsConventionSpec, ConventionRegistry};
@@ -124,7 +124,7 @@ fn resolve_cds_dates(
 ///
 /// # Returns
 ///
-/// `Ok(Box<dyn Instrument>)` with the constructed CDS instrument, or `Err` if:
+/// `Ok(CreditDefaultSwap)` with the constructed CDS instrument, or `Err` if:
 /// - Convention lookup fails (missing CDS convention key)
 /// - Calendar resolution fails
 /// - Date calculations fail (invalid pillar, IMM roll date resolution)
@@ -219,7 +219,7 @@ fn resolve_cds_dates(
 ///
 /// - [`CdsQuote`] for supported quote types
 /// - [`BuildCtx`] for build context configuration
-pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn Instrument>> {
+pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<CreditDefaultSwap> {
     tracing::debug!(quote_id = %quote.id(), "building CDS instrument");
     quote.validate()?;
     let registry = ConventionRegistry::try_global()?;
@@ -313,7 +313,7 @@ pub fn build_cds_instrument(quote: &CdsQuote, ctx: &BuildCtx) -> Result<Box<dyn 
         attributes: Attributes::new().with_meta("entity", entity.as_str()),
     };
 
-    Ok(Box::new(cds))
+    Ok(cds)
 }
 
 #[cfg(test)]
@@ -324,7 +324,6 @@ mod tests {
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::Date;
     use finstack_quant_core::HashMap;
-    use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
     use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
     use time::Month;
 
@@ -364,10 +363,7 @@ mod tests {
 
         let instrument = build_cds_instrument(&quote, &ctx)?;
 
-        let cds = instrument
-            .as_any()
-            .downcast_ref::<CreditDefaultSwap>()
-            .expect("Expected CreditDefaultSwap");
+        let cds = instrument;
 
         // The maturity should be June 20, 2026 (the IMM date), NOT September 20, 2026
         // next_cds_date(June 19) returns June 20
@@ -405,10 +401,7 @@ mod tests {
 
         let instrument = build_cds_instrument(&quote, &ctx)?;
 
-        let cds = instrument
-            .as_any()
-            .downcast_ref::<CreditDefaultSwap>()
-            .expect("Expected CreditDefaultSwap");
+        let cds = instrument;
 
         assert_eq!(
             cds.premium_leg.end.day(),
@@ -458,10 +451,7 @@ mod tests {
             };
 
             let instrument = build_cds_instrument(&quote, &ctx)?;
-            let cds = instrument
-                .as_any()
-                .downcast_ref::<CreditDefaultSwap>()
-                .expect("Expected CreditDefaultSwap");
+            let cds = instrument;
 
             let expected =
                 Date::from_calendar_date(ey, em, ed).expect("valid expected CDS maturity");
@@ -497,11 +487,7 @@ mod tests {
         };
 
         let instrument = build_cds_instrument(&quote, &ctx)?;
-        use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
-        let cds = instrument
-            .as_any()
-            .downcast_ref::<CreditDefaultSwap>()
-            .expect("Expected CreditDefaultSwap");
+        let cds = instrument;
 
         assert_eq!(
             cds.premium_leg.end,

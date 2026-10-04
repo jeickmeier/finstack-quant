@@ -235,7 +235,7 @@ let cfg = LsmcConfig::new(50_000, vec![25, 50, 75, 100], 100)
 let pricer = LsmcPricer::new(cfg);
 let process = GbmProcess::with_params(0.05, 0.0, 0.3).expect("valid GBM parameters");
 let put = AmericanPut::new(100.0).expect("valid strike");
-let basis = PolynomialBasis::new(2);
+let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
 let unbiased = pricer
     .price_unbiased(

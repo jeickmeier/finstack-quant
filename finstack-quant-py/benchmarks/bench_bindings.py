@@ -72,7 +72,6 @@ from finstack_quant.portfolio import (
     aggregate_full_cashflows,
     aggregate_metrics,
     attribute_portfolio_pnl,
-    build_portfolio_from_spec_json,
     build_stress_attribution,
     historical_var_decomposition,
     parametric_var_decomposition,
@@ -936,7 +935,7 @@ class TestPortfolioBenchmarks:
     def test_parse_and_build(self, benchmark) -> None:
         def _parse_build():
             spec = parse_portfolio_spec_json(PORTFOLIO_SPEC_JSON)
-            return build_portfolio_from_spec_json(spec)
+            return Portfolio.from_spec(spec).to_json()
 
         benchmark.pedantic(_parse_build, rounds=10, warmup_rounds=1)
 

@@ -125,9 +125,9 @@ pub(crate) fn prepare_xccy_quote(
     curve_day_count: DayCount,
     base_date: Date,
 ) -> Result<PreparedQuote<XccyQuote>> {
-    let instrument: Box<dyn Instrument> = build_xccy_instrument(&quote, build_ctx)?;
-    let instrument_arc: Arc<dyn Instrument> = instrument.into();
-    let maturity_date = xccy_quote_pillar_date(&quote, instrument_arc.as_ref())?;
+    let instrument = build_xccy_instrument(&quote, build_ctx)?;
+    let maturity_date = instrument.leg1.leg.end;
+    let instrument_arc: Arc<dyn Instrument> = Arc::new(instrument);
     let pillar_time =
         curve_day_count.year_fraction(base_date, maturity_date, DayCountContext::default())?;
 
@@ -139,24 +139,6 @@ pub(crate) fn prepare_xccy_quote(
     ))
 }
 
-/// Resolve the maturity (far) date for an `XccyQuote`. The cleanest path is
-/// to call `build_xccy_instrument` (which already does all the date math + convention
-/// resolution) and read `leg1.end` off the constructed swap — both legs share the same
-/// end date by builder construction.
-fn xccy_quote_pillar_date(quote: &XccyQuote, instrument: &dyn Instrument) -> Result<Date> {
-    use finstack_quant_valuations::instruments::rates::xccy_swap::XccySwap;
-    let swap = instrument
-        .as_any()
-        .downcast_ref::<XccySwap>()
-        .ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "Built instrument for XccyQuote '{}' is not an XccySwap",
-                quote.id().as_str()
-            ))
-        })?;
-    Ok(swap.leg1.leg.end)
-}
-
 /// Prepare a CDS quote into an instrument + pillar time.
 pub(crate) fn prepare_cds_quote(
     quote: CdsQuote,
@@ -166,7 +148,7 @@ pub(crate) fn prepare_cds_quote(
 ) -> Result<PreparedQuote<CdsQuote>> {
     let maturity_date = resolve_cds_quote_dates(&quote, build_ctx)?.maturity;
     let instrument = build_cds_instrument(&quote, build_ctx)?;
-    let instrument: Arc<dyn Instrument> = instrument.into();
+    let instrument: Arc<dyn Instrument> = Arc::new(instrument);
 
     let pillar_time =
         day_count.year_fraction(base_date, maturity_date, DayCountContext::default())?;

@@ -184,7 +184,7 @@
     },
     "undrawn": {
       "default": 0.0,
-      "description": "Undrawn commitment at the reporting date, in the same currency as\n[`Self::ead`]. Constant across the horizon (no undrawn schedule).\nDefault `0.0` (fully drawn term loan). EAD is\n`drawn + undrawn × ccf` via core `ead_revolver`.",
+      "description": "Undrawn commitment at the reporting date, in the same currency as\n[`Self::ead`]. Constant across the horizon (no undrawn schedule).\nDefault `0.0` (fully drawn term loan). EAD is\n`drawn + undrawn × ccf` via core `EadCalculator`.",
       "format": "double",
       "type": "number"
     }

@@ -196,7 +196,7 @@ def test_sa_ccr_engine_calculate_ead_returns_typed_result() -> None:
 
 def sample_sensitivities() -> FrtbSensitivities:
     sens = FrtbSensitivities("USD")
-    sens.add_girr_delta("5Y", 25_000.0)
+    sens.add_girr_delta("USD", "5Y", 25_000.0)
     sens.add_equity_delta("ACME", 1, 12_000.0)
     sens.add_rrao_position("EXOTIC-1", 5_000_000.0, True)
     return sens
@@ -296,11 +296,11 @@ def test_frtb_engine_configuration_and_scenario_frame() -> None:
 
 def test_frtb_sensitivities_adders_and_dataframe_round_trip() -> None:
     sens = FrtbSensitivities("USD")
-    sens.add_girr_delta("5Y", 25_000.0)
-    sens.add_girr_inflation_delta(1_000.0)
-    sens.add_girr_xccy_basis_delta(500.0, "EUR")
-    sens.add_girr_vega("1Y", "5Y", 2_000.0)
-    sens.add_girr_curvature(300.0, -200.0)
+    sens.add_girr_delta("USD", "5Y", 25_000.0)
+    sens.add_girr_inflation_delta("USD", 1_000.0)
+    sens.add_girr_xccy_basis_delta("EUR", 500.0)
+    sens.add_girr_vega("USD", "1Y", "5Y", 2_000.0)
+    sens.add_girr_curvature("USD", 300.0, -200.0)
     sens.add_csr_nonsec_delta("ACME", 3, "5Y", "bond", 4_000.0)
     sens.add_csr_nonsec_vega("ACME", 3, "1Y", 400.0)
     sens.add_csr_nonsec_curvature("ACME", 3, 50.0, -40.0)
@@ -327,7 +327,15 @@ def test_frtb_sensitivities_adders_and_dataframe_round_trip() -> None:
     assert restored.to_json() == sens.to_json()
     assert "delta=9" in repr(sens)
 
-    sens.add_drc_position("ACME", 1_000_000.0, 3, "corporate", "senior_unsecured", "corporate", 1.0)
+    sens.add_drc_position({
+        "issuer": "ACME",
+        "jtd_amount": 1_000_000.0,
+        "rating_bucket": 3,
+        "sector": "corporate",
+        "seniority": "senior_unsecured",
+        "maturity_years": 1.0,
+        "pnl_adjustment": 0.0,
+    })
     charged = frtb_sba_charge(sens)
     assert charged.drc > 0.0
     with_drc = FrtbSensitivities.from_dataframe(sens.to_dataframe(), "USD")
@@ -370,11 +378,27 @@ def test_frtb_basis_repo_and_option_categories_round_trip() -> None:
 def test_frtb_dataframe_round_trips_drc_positions_and_base_currency() -> None:
     """MSAF-002: ``drc`` rows carry every position field, so the frame round-trips."""
     sens = FrtbSensitivities("EUR")
-    sens.add_girr_delta("5Y", 25_000.0)
-    sens.add_drc_position("ACME", 1_000_000.0, 3, "corporate", "senior_unsecured", "corporate", 0.5, -2_500.0)
-    sens.add_drc_position("STATE", -400_000.0, 2, "sovereign", "senior_unsecured", "sovereign", 3.0)
+    sens.add_girr_delta("EUR", "5Y", 25_000.0)
+    sens.add_drc_position({
+        "issuer": "ACME",
+        "jtd_amount": 1_000_000.0,
+        "rating_bucket": 3,
+        "sector": "corporate",
+        "seniority": "senior_unsecured",
+        "maturity_years": 0.5,
+        "pnl_adjustment": -2_500.0,
+    })
+    sens.add_drc_position({
+        "issuer": "STATE",
+        "jtd_amount": -400_000.0,
+        "rating_bucket": 2,
+        "sector": "sovereign",
+        "seniority": "senior_unsecured",
+        "maturity_years": 3.0,
+        "pnl_adjustment": 0.0,
+    })
     frame = sens.to_dataframe()
-    assert list(frame.columns)[6:] == ["sector", "seniority", "asset_type", "maturity_years", "pnl_adjustment"]
+    assert list(frame.columns)[6:] == ["sector", "seniority", "maturity_years", "pnl_adjustment"]
     drc = frame[frame["risk_class"] == "drc"]
     assert set(drc["sector"]) == {"corporate", "sovereign"}
 
@@ -406,3 +430,36 @@ def test_regulatory_inputs_have_no_binding_defaults() -> None:
     tape = SaCcrTrade.from_json(json.dumps(linear_trade_payload())).to_dataframe()
     with pytest.raises(ValueError, match="is_option"):
         SaCcrTrade.from_dataframe(tape.drop(columns=["is_option"]))
+
+
+def test_girr_requires_explicit_risk_currency() -> None:
+    """Reporting currency does not select the currency of a shocked curve."""
+    sens = FrtbSensitivities("USD")
+    with pytest.raises(TypeError):
+        sens.add_girr_delta("5Y", 100.0)  # type: ignore[call-arg,arg-type]
+    sens.add_girr_delta("EUR", "5Y", 100.0)
+    assert json.loads(sens.to_json())["girr_delta"] == [["EUR", "5Y", 100.0]]
+
+
+def test_structured_drc_input_uses_complete_rust_validation() -> None:
+    """The host conversion rejects invalid terms before populating the builder."""
+    sens = FrtbSensitivities("USD")
+    position = {
+        "issuer": "ACME",
+        "jtd_amount": 1_000_000.0,
+        "rating_bucket": 4,
+        "sector": "corporate",
+        "seniority": "senior_unsecured",
+        "maturity_years": 2.0,
+    }
+    for change in [
+        {"maturity_years": -1.0},
+        {"rating_bucket": 0},
+        {"seniority": "equity", "sector": "sovereign"},
+        {"asset_type": "corporate"},
+    ]:
+        with pytest.raises(ValueError, match=r"invalid DRC|unknown field"):
+            sens.add_drc_position(position | change)
+    assert json.loads(sens.to_json())["drc_positions"] == []
+    sens.add_drc_position(position)
+    assert frtb_sba_charge(sens).drc == 45_000.0

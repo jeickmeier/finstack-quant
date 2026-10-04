@@ -87,7 +87,7 @@ impl ForwardCurveTarget {
         quotes: &[MarketQuote],
         context: &MarketContext,
         global_config: &CalibrationConfig,
-    ) -> Result<(MarketContext, CalibrationReport)> {
+    ) -> Result<(ForwardCurve, CalibrationReport)> {
         // Forward-curve preflight: prepare quotes; both the discount curve (already in
         // `context`) and the forward curve being built are registered so projected legs
         // price against the right curves.
@@ -106,8 +106,7 @@ impl ForwardCurveTarget {
         let curve_day_count = prepared.curve_day_count;
         let rate_calibration = Self::rate_calibration(quotes, params, curve_day_count)?;
 
-        let mut config = global_config.clone();
-        config.calibration_method = params.method.clone();
+        let config = global_config.clone();
 
         let target = ForwardCurveTarget::new(ForwardCurveTargetParams {
             base_date: params.base_date,
@@ -135,8 +134,18 @@ impl ForwardCurveTarget {
         // DF-implied term rates couple adjacent reset-date forwards whenever a
         // contractual period has a calendar stub. Fit all reset-date rates
         // simultaneously against a dense grid of actual contractual intervals.
-        let (curve, mut report) =
-            GlobalFitOptimizer::optimize(&target, &prepared_quotes, &config, success_tolerance)?;
+        let (curve, mut report) = GlobalFitOptimizer::optimize(
+            &target,
+            &prepared_quotes,
+            &config,
+            success_tolerance,
+            matches!(
+                params.method,
+                CalibrationMethod::GlobalSolve {
+                    use_analytical_jacobian: true
+                }
+            ),
+        )?;
         let curve = curve
             .to_builder_with_id(curve.id().clone())
             .rate_calibration(rate_calibration)
@@ -148,8 +157,7 @@ impl ForwardCurveTarget {
 
         report.update_solver_config(config.solver);
 
-        let new_context = context.clone().insert(curve);
-        Ok((new_context, report))
+        Ok((curve, report))
     }
 
     fn rate_calibration(
@@ -880,6 +888,7 @@ mod tests {
             &quotes,
             &target.params.config,
             target.params.config.forward_curve.validation_tolerance,
+            true,
         )
         .expect("bounded global solve should return its best curve");
         assert!(
@@ -897,9 +906,6 @@ mod tests {
     fn multiple_forward_deposits_use_distinct_end_parameters_and_df_residuals() {
         let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let config = CalibrationConfig {
-            calibration_method: CalibrationMethod::GlobalSolve {
-                use_analytical_jacobian: false,
-            },
             ..CalibrationConfig::default()
         };
         let target = ForwardCurveTarget::new(ForwardCurveTargetParams {
@@ -951,7 +957,7 @@ mod tests {
             .expect("deposit parameter grid");
         assert_eq!(times, vec![0.0, 0.25]);
 
-        let (curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 1e-8)
+        let (curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 1e-8, true)
             .expect("multi-deposit global solve");
         assert!(report.success, "{}", report.convergence_reason);
         assert!((curve.rate_between(0.0, 0.25).expect("3M rate") - 0.04).abs() < 1e-8);
@@ -968,9 +974,6 @@ mod tests {
     fn deposit_residual_uses_index_day_count_for_accrual() {
         let base_date = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
         let config = CalibrationConfig {
-            calibration_method: CalibrationMethod::GlobalSolve {
-                use_analytical_jacobian: false,
-            },
             ..CalibrationConfig::default()
         };
         let target = ForwardCurveTarget::new(ForwardCurveTargetParams {
@@ -1020,7 +1023,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let (curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 1e-8)
+        let (curve, report) = GlobalFitOptimizer::optimize(&target, &quotes, &config, 1e-8, true)
             .expect("mixed day-count deposit global solve");
         assert!(report.success, "{}", report.convergence_reason);
 
@@ -1174,7 +1177,7 @@ mod tests {
                 },
             };
 
-            let (market, report) = ForwardCurveTarget::solve(
+            let (curve, report) = ForwardCurveTarget::solve(
                 &params,
                 &[quote],
                 &MarketContext::new().insert(discount),
@@ -1182,11 +1185,7 @@ mod tests {
             )
             .expect("forward calibration");
             assert!(report.success, "{}", report.convergence_reason);
-            market
-                .get_forward("USD-FWD")
-                .expect("calibrated forward")
-                .as_ref()
-                .clone()
+            curve
         }
 
         let act365f = calibrate(DayCount::Act365F);
@@ -1274,7 +1273,7 @@ mod tests {
                         ois_compounding: None,
                     },
                 };
-                let (market, report) = ForwardCurveTarget::solve(
+                let (curve, report) = ForwardCurveTarget::solve(
                     &params,
                     std::slice::from_ref(&quote),
                     &MarketContext::new().insert(discount.clone()),
@@ -1300,7 +1299,6 @@ mod tests {
                     .downcast_ref::<InterestRateFuture>()
                     .expect("future instrument");
                 let (_, start, end) = future.resolve_dates().expect("reference dates");
-                let curve = market.get_forward("USD-FWD").expect("delivered curve");
                 let accrual = future
                     .day_count
                     .year_fraction(start, end, DayCountContext::default())

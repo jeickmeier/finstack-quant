@@ -2,7 +2,7 @@
 //!
 //! The functions accept JSON inputs matching the Rust `serde` shapes and
 //! delegate all calculations to `finstack_quant_portfolio::performance`.
-//! `twrr_linked` returns a typed wrapper; `twrr_linked_json` keeps the exact
+//! `twrr_linked` returns a typed wrapper; `to_json` provides its canonical
 //! JSON wire string.
 
 use pyo3::prelude::*;
@@ -145,7 +145,7 @@ fn run_twrr_linked(
 /// -------
 /// LinkedReturn
 ///     Typed result with ``cumulative``, ``annualised`` and ``num_periods``.
-///     Use :func:`twrr_linked_json` for the raw wire string.
+///     Use :meth:`to_json` for the raw wire string.
 ///
 /// Raises
 /// ------
@@ -165,31 +165,9 @@ fn twrr_linked(
         inner: run_twrr_linked(py, returns_json, horizon_years)?,
     })
 }
-
-/// Geometrically link TWRR sub-period returns and return wire JSON.
-///
-/// Wire twin of :func:`twrr_linked`; same inputs, JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``LinkedReturn``.
-#[pyfunction]
-#[pyo3(text_signature = "(returns_json, horizon_years)")]
-fn twrr_linked_json(
-    py: Python<'_>,
-    returns_json: &Bound<'_, PyAny>,
-    horizon_years: f64,
-) -> PyResult<String> {
-    let returns_json = crate::bindings::extract::extract_records_json(py, returns_json, "returns")?;
-    let returns_json: &str = &returns_json;
-    let result = run_twrr_linked(py, returns_json, horizon_years)?;
-    serde_json::to_string(&result).map_err(|err| serde_json_to_py(err, "serialize linked return"))
-}
-
 /// Compute the money-weighted return (XIRR, Act/365F) from dated cashflows.
 ///
-/// Binds Rust ``mwr_xirr_from_cashflows``.
+/// Binds Rust ``mwr_xirr``.
 ///
 /// Parameters
 /// ----------
@@ -231,7 +209,7 @@ fn mwr_xirr(py: Python<'_>, cashflows: &Bound<'_, PyAny>) -> PyResult<f64> {
                 .map_err(|err| serde_json_to_py(err, "invalid MWR cashflows JSON"))?
         }
     };
-    py.detach(move || finstack_quant_portfolio::mwr_xirr_from_cashflows(&flows).map_err(core_to_py))
+    py.detach(move || finstack_quant_portfolio::mwr_xirr(&flows).map_err(core_to_py))
 }
 
 /// Interpret a sequence of ``(date, amount)`` 2-tuples; ``None`` when the
@@ -261,7 +239,6 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyLinkedReturn>()?;
     m.add_function(wrap_pyfunction!(twrr_modified_dietz, m)?)?;
     m.add_function(wrap_pyfunction!(twrr_linked, m)?)?;
-    m.add_function(wrap_pyfunction!(twrr_linked_json, m)?)?;
     m.add_function(wrap_pyfunction!(mwr_xirr, m)?)?;
     Ok(())
 }

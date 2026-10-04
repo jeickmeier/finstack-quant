@@ -691,11 +691,11 @@ fn portfolio_cashflow_api_uses_full_cashflow_name_everywhere() {
 
     assert!(contains_signature(
         &dts,
-        "aggregateFullCashflows(specJson: JsonInput, marketJson: JsonInput, allowPartial?: boolean): PortfolioCashflows;",
+        "aggregateFullCashflows(portfolio: Portfolio, market: MarketContext, allowPartial?: boolean): PortfolioCashflows;",
     ));
     assert!(contains_signature(
         &dts,
-        "aggregateFullCashflowsBuilt(portfolio: Portfolio, marketJson: JsonInput, allowPartial?: boolean): PortfolioCashflows;",
+        "aggregateFullCashflows(portfolio: Portfolio, market: MarketContext, allowPartial?: boolean): PortfolioCashflows;",
     ));
     assert!(!dts.contains("aggregateCashflows("));
     assert!(bench.contains("aggregateFullCashflows"));
@@ -727,7 +727,7 @@ fn scenarios_dts_matches_structured_surface() {
     assert!(declares_type(&dts, "ApplicationEnvelope"));
     assert!(
         interface_block(&generated_types("scenarios"), "ApplicationEnvelope")
-            .contains("warnings: Warning[];")
+            .contains("report: ApplicationReport;")
     );
     assert!(contains_ignoring_ws(
         &dts,
@@ -740,22 +740,13 @@ fn scenarios_dts_matches_structured_surface() {
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "applyScenario(scenarioJson: JsonInput, marketJson: JsonInput, modelJson: JsonInput, asOf: string, instrumentsJson?: JsonInput, configJson?: JsonInput): ApplicationEnvelope;",
+        "applyScenario(scenarioJson: JsonInput, marketJson: JsonInput, asOf: string, modelJson?: JsonInput, instrumentsJson?: JsonInput, configJson?: JsonInput): ApplicationEnvelope;",
     ));
-    assert!(contains_ignoring_ws(
-        &dts,
-        "applyScenarioToMarket(scenarioJson: JsonInput, marketJson: JsonInput, asOf: string, instrumentsJson?: JsonInput, configJson?: JsonInput): ApplicationEnvelope;",
-    ));
-    // `priority` mirrors the Rust serde default (0) and the Python keyword
-    // default, so it must stay optional.
-    assert!(contains_ignoring_ws(
-        &dts,
-        "buildScenarioSpec(id: string, operations: OperationSpec[], name?: string, description?: string, priority?: number, resolutionMode?: 'most_specific_wins' | 'cumulative', hazardBumpMode?: 'solve_to_par' | 'first_order_shift'): ScenarioSpec;",
-    ));
+    assert!(!dts.contains("buildScenarioSpec("));
     // Free-function twins of the Python OperationSpec / HorizonResult members:
     // the omitted trailing arguments resolve to the Rust defaults.
     for signature in [
-        "operationSpecCurveParallelBp(curveKind: CurveKind, curveId: string | string[], bp: number, discountCurveId?: string): OperationSpec | OperationSpec[];",
+        "operationSpecCurveParallelBp(curveKind: CurveKind, curveId: string, bp: number, discountCurveId?: string): OperationSpec;",
         "operationSpecTimeRollForward(period: string, applyShocks?: boolean, rollMode?: TimeRollMode): OperationSpec;",
         "scenarioSpecWithHazardBumpMode(spec: ScenarioSpec | string, mode: HazardBumpMode): ScenarioSpec;",
         "horizonResultExplainText(result: HorizonReport | HorizonResult | string): string;",
@@ -787,11 +778,11 @@ fn portfolio_dts_pins_python_parity_optional_parameters() {
 
     assert!(contains_ignoring_ws(
         &dts,
-        "valuePortfolio(specJson: JsonInput, marketJson: JsonInput, strictRisk?: boolean, metrics?: string[]): PortfolioValuation;",
+        "valuePortfolio(portfolio: Portfolio, market: MarketContext, strictRisk?: boolean, metrics?: string[]): PortfolioValuation;",
     ));
     assert!(contains_ignoring_ws(
         &dts,
-        "valuePortfolioBuilt(portfolio: Portfolio, marketJson: JsonInput, strictRisk?: boolean, metrics?: string[]): PortfolioValuation;",
+        "valuePortfolio(portfolio: Portfolio, market: MarketContext, strictRisk?: boolean, metrics?: string[]): PortfolioValuation;",
     ));
     // Python defaults `confidence` from the Rust 95% presets; WASM does too.
     assert!(contains_ignoring_ws(
@@ -1247,15 +1238,15 @@ fn features_dts_matches_transform_surface() {
     assert!(dts.contains("export type FeatureValue = number | null;"));
     assert!(contains_signature(
         features,
-        "transformTimeseries(values: FeatureValue[], entity: string[], order: string[], op: string, params?: FeatureParams | null): FeatureValue[];"
+        "transformTimeseries(values: FeatureValue[], entity: string[], order: string[], op: TimeSeriesOp, params?: FeatureParams | null): FeatureValue[];"
     ));
     assert!(contains_signature(
         features,
-        "transformCrossSectional(values: FeatureValue[], timeKey: string[], op: string, params?: FeatureParams | null): FeatureValue[];"
+        "transformCrossSectional(values: FeatureValue[], timeKey: string[], op: CrossSectionalOp, params?: FeatureParams | null): FeatureValue[];"
     ));
     assert!(contains_signature(
         features,
-        "transformCrossSectionalGrouped(values: FeatureValue[], timeKey: string[], groups: string[], op: string, params?: FeatureParams | null): FeatureValue[];"
+        "transformCrossSectionalGrouped(values: FeatureValue[], timeKey: string[], groups: string[], op: CrossSectionalOp, params?: FeatureParams | null): FeatureValue[];"
     ));
     assert!(contains_signature(
         features,
@@ -1263,7 +1254,7 @@ fn features_dts_matches_transform_surface() {
     ));
     assert!(contains_signature(
         features,
-        "transformTimeseriesPairwise(values: FeatureValue[], other: FeatureValue[], entity: string[], order: string[], op: string, params?: FeatureParams | null): FeatureValue[];"
+        "transformTimeseriesPairwise(values: FeatureValue[], other: FeatureValue[], entity: string[], order: string[], op: PairwiseOp, params?: FeatureParams | null): FeatureValue[];"
     ));
     assert!(contains_signature(
         features,
@@ -1279,7 +1270,7 @@ fn features_dts_matches_transform_surface() {
     ));
     assert!(contains_signature(
         features,
-        "neutralizeAndZscore(values: FeatureValue[], timeKey: string[], exposures: FeatureValue[][], params?: FeatureParams | null): FeatureValue[];"
+        "neutralizeAndZscore(values: FeatureValue[], timeKey: string[], exposures: FeatureValue[][]): FeatureValue[];"
     ));
     assert!(contains_signature(
         features,
@@ -1652,9 +1643,9 @@ fn attribution_dts_matches_json_pipeline_surface() {
 
     assert!(dts.contains("export interface AttributionNamespace"));
     assert!(declares_type(&dts, "PnlAttribution"));
-    assert!(dts.contains("attributePnl(params: AttributionJsonInputs): PnlAttribution;"));
-    assert!(dts.contains("attributePnlJson(params: AttributionJsonInputs): string;"));
-    assert!(dts.contains("AttributionJsonInputs: new ("));
+    assert!(dts.contains("attributePnl(spec: AttributionSpec | string): PnlAttribution;"));
+    assert!(dts.contains("attributePnlJson(spec: AttributionSpec | string): string;"));
+    assert!(!dts.contains("AttributionJsonInputs"));
     assert!(dts.contains("attributePnlEnvelope(specJson: JsonInput): AttributionResultEnvelope;"));
     assert!(declares_type(&dts, "AttributionResultEnvelope"));
     assert!(dts.contains("attributePnlEnvelopeJson(specJson: JsonInput): string;"));
@@ -1840,7 +1831,7 @@ fn rust_computation_twins_are_declared() {
         "valuationResultMetricSeries(result: ValuationResult | string, base: string): [string[], number][];",
         "calibrationEnvelopeContentHash(envelopeJson: CalibrationEnvelope | string): string;",
         "calibrationResultContentHash(resultJson: CalibrationResultEnvelope | string): string;",
-        "attributePnlMany(params: AttributionJsonInputs, instruments: JsonInput[]): PnlAttribution[];",
+        "attributePnlMany(inputs: AttributionInputs | string, instruments: JsonInput[] | string): PnlAttribution[];",
         "attributeReturnContribution(spec: JsonInput): ReturnContributionResult;",
         "pnlAttributionExplainText(pnl: PnlAttribution | string): string;",
         "financialModelContentHash(modelJson: JsonInput): string;",

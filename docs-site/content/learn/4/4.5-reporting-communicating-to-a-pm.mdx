@@ -110,7 +110,7 @@ At 15 October, the original deposits have matured and their proceeds are already
 ```python exec id=report-date-acquisition role=build
 from decimal import Decimal
 from finstack_quant.portfolio import Portfolio,value_portfolio,aggregate_metrics
-from finstack_quant.scenarios import ScenarioSpec,OperationSpec,CurveKind,apply_scenario_to_market
+from finstack_quant.scenarios import ScenarioSpec,OperationSpec,CurveKind,apply_scenario
 from finstack_quant.valuations.instruments import price_instrument
 report_date=history_dates[-1]
 report_market=history_market(report_date)
@@ -135,7 +135,7 @@ for pid,item in report_wire["position_values"].items():
  report_rows.append({"position":pid,"currency":item["value_native"]["currency"],"native_amount":item["value_native"]["amount"],"USD":item["value_base"]["amount"]})
 report_risk=aggregate_metrics(report_valuation,"USD",report_market,report_date)
 report_shock=ScenarioSpec(id="report-usd-zero-plus100",operations=[OperationSpec.curve_parallel_bp(CurveKind.discount(),"USD-OIS",100.)])
-shocked_market=apply_scenario_to_market(report_shock,report_market,report_date).market
+shocked_market=apply_scenario(report_shock, report_market, report_date).market
 shocked=value_portfolio(Portfolio.from_spec(json.dumps(report_spec)),shocked_market,metrics=[])
 stress_pnl=Decimal(json.loads(shocked.to_json())["total_base_currency"]["amount"])-native_total
 stress_nav=Decimal(json.loads(shocked.to_json())["total_base_currency"]["amount"])+settled_cash
@@ -304,7 +304,7 @@ The bad report omits dates, units and context, uses a decorative gradient and ce
 ```python exec id=exercise-add-stress-row role=exercise
 # Add a separately named downside equity scenario, not an unlabeled historical loss.
 equity_shock=ScenarioSpec(id="report-equity-minus20",operations=[OperationSpec.equity_price_pct(["SPX-SPOT"],-20.)])
-equity_market=apply_scenario_to_market(equity_shock,report_market,report_date).market
+equity_market=apply_scenario(equity_shock, report_market, report_date).market
 equity_value=value_portfolio(Portfolio.from_spec(json.dumps(report_spec)),equity_market,metrics=[])
 equity_pnl=Decimal(json.loads(equity_value.to_json())["total_base_currency"]["amount"])-native_total
 option_before=Decimal(report_wire["position_values"]["SPX-CALL"]["value_base"]["amount"])

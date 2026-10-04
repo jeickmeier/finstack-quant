@@ -423,121 +423,11 @@ impl CalibrationEnvelope {
         }
     }
 
-    /// Assemble an envelope from steps that carry their own quotes.
-    ///
-    /// Each step's attached quotes become the quote set named by the step's
-    /// `quote_set` (unless `quote_sets` already defines that name with the
-    /// same ids), and every distinct attached quote is appended once to
-    /// `market_data`, in first-seen order. Identical quotes (same kind, id and
-    /// payload) attached by more than one step are collected once. Steps without attached quotes keep
-    /// referencing `quote_sets` only. `prior_market` starts empty.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Plan identifier recorded in `plan.id`.
-    /// * `description` - Optional human-readable plan description.
-    /// * `settings` - Global calibration settings for the plan.
-    /// * `quote_sets` - Explicitly named quote sets whose ids must resolve in
-    ///   the envelope `market_data`; they take precedence and are merged with
-    ///   the sets derived from attached quotes.
-    /// * `steps` - Calibration steps in execution order, each carrying the
-    ///   quotes attached to it (possibly empty). [`Self::attached_steps`]
-    ///   recovers them from the assembled envelope.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`super::errors::EnvelopeError::QuoteSetConflict`] when a
-    /// quote-set name is defined (explicitly or by an earlier step) with
-    /// different ids than a step attaches, and
-    /// [`super::errors::EnvelopeError::ConflictingMarketDatum`] when one quote
-    /// id is attached with two different payloads.
-    pub fn from_attached_steps(
-        id: String,
-        description: Option<String>,
-        settings: CalibrationConfig,
-        mut quote_sets: IndexMap<String, Vec<QuoteId>>,
-        steps: Vec<AttachedStep>,
-    ) -> Result<Self, super::errors::EnvelopeError> {
-        use super::errors::EnvelopeError;
-        let mut market_data = Vec::new();
-        let mut payloads = DatumPayloads::new();
-        let mut plan_steps = Vec::with_capacity(steps.len());
-        for AttachedStep { step, quotes } in steps {
-            if !quotes.is_empty() {
-                let ids: Vec<QuoteId> = quotes.iter().map(|q| QuoteId::new(q.id())).collect();
-                match quote_sets.get(&step.quote_set) {
-                    Some(existing) if existing != &ids => {
-                        return Err(EnvelopeError::QuoteSetConflict {
-                            quote_set: step.quote_set.clone(),
-                        });
-                    }
-                    Some(_) => {}
-                    None => {
-                        quote_sets.insert(step.quote_set.clone(), ids);
-                    }
-                }
-                for quote in quotes {
-                    push_distinct_datum(&mut market_data, &mut payloads, quote)?;
-                }
-            }
-            plan_steps.push(step);
-        }
-        let plan = CalibrationPlan {
-            id,
-            description,
-            quote_sets,
-            steps: plan_steps,
-            settings,
-        };
-        Ok(Self::new(plan, market_data, Vec::new()))
-    }
-
-    /// Steps of this envelope's plan, each with the quotes its quote set resolves to.
-    ///
-    /// This is the inverse of [`Self::from_attached_steps`]: a step carries, in
-    /// quote-set order, the quote entries of `market_data` named by
-    /// `plan.quote_sets[step.quote_set]` (non-quote data such as prices never
-    /// resolve a quote id, as in validation). A step carries no quotes when
-    /// its quote set is undefined or names an id with no quote in
-    /// `market_data`, so feeding the result back to
-    /// [`Self::from_attached_steps`] together with `plan.quote_sets` rebuilds
-    /// the same plan and the quote-referenced market data.
-    #[must_use]
-    pub fn attached_steps(&self) -> Vec<AttachedStep> {
-        self.plan
-            .steps
-            .iter()
-            .map(|step| {
-                let quotes = self
-                    .plan
-                    .quote_sets
-                    .get(&step.quote_set)
-                    .and_then(|ids| {
-                        ids.iter()
-                            .map(|id| {
-                                self.market_data
-                                    .iter()
-                                    .find(|datum| datum.is_quote() && datum.id() == id.as_str())
-                                    .cloned()
-                            })
-                            .collect::<Option<Vec<_>>>()
-                    })
-                    .unwrap_or_default();
-                AttachedStep {
-                    step: step.clone(),
-                    quotes,
-                }
-            })
-            .collect()
-    }
-
-    /// Append market data to this envelope under the attached-quote rule.
+    /// Append market data, collecting identical repeats once.
     ///
     /// Each datum is appended in order unless a datum of the same kind and id
     /// with an identical payload is already present (in the envelope or
-    /// earlier in `market_data`), in which case it is collected once. This is
-    /// the rule [`Self::from_attached_steps`] applies to step-attached quotes,
-    /// so extra market data that repeats an attached quote merges cleanly.
+    /// earlier in `market_data`), in which case it is collected once. Extra data can therefore repeat an existing input without duplication.
     ///
     /// # Arguments
     ///
@@ -606,16 +496,19 @@ impl CalibrationEnvelope {
         bytes: &[u8],
         limits: &LoadLimits,
     ) -> Result<(Self, ContractValidationReport), ContractError> {
-        let value = parse_json_value(bytes, limits)?;
-        validate_schema_marker(&value, limits)?;
+        let envelope = Self::parse_shape(bytes, limits)?;
         let mut report = ContractValidationReport::default();
-        let envelope: Self = deserialize_json_value(value, limits)?;
         super::validate::append_contract_diagnostics(
             &mut report,
             super::validate::validate(&envelope).errors,
             limits,
         );
         Ok((envelope, report))
+    }
+    pub(crate) fn parse_shape(bytes: &[u8], limits: &LoadLimits) -> Result<Self, ContractError> {
+        let value = parse_json_value(bytes, limits)?;
+        validate_schema_marker(&value, limits)?;
+        deserialize_json_value(value, limits)
     }
 }
 
@@ -688,27 +581,6 @@ impl<'de> Deserialize<'de> for CalibrationStep {
     }
 }
 
-/// A calibration step together with the quotes attached to it.
-///
-/// Host builders let a caller attach quotes to a step instead of naming a
-/// quote set by hand; [`CalibrationEnvelope::from_attached_steps`] turns the
-/// attached quotes into `plan.quote_sets` and `market_data`, and
-/// [`CalibrationEnvelope::attached_steps`] recovers them.
-///
-/// On the wire the step fields are flattened and `quotes` is omitted when
-/// empty, so a step without attached quotes serializes exactly like a
-/// [`CalibrationStep`]:
-/// `{"id": ..., "quote_set": ..., "kind": ..., ..., "quotes": [...]}`.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AttachedStep {
-    /// The calibration step.
-    #[serde(flatten)]
-    pub step: CalibrationStep,
-    /// Quotes attached to the step, in quote-set order (possibly empty).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub quotes: Vec<MarketDatum>,
-}
-
 /// Polymorphic parameters for different calibration step types.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
@@ -754,17 +626,6 @@ pub enum StepParams {
     Parametric(ParametricCurveParams),
 }
 
-/// Primary output class used by runtime batching.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum StepPrimaryOutput {
-    /// Curve-like object in the market context.
-    Curve(CurveId),
-    /// Volatility surface/cube-like object in the market context.
-    Surface(CurveId),
-    /// Scalar value in the market context.
-    Scalar(String),
-}
-
 /// Static input/output metadata for a calibration step.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct StepIo {
@@ -774,8 +635,6 @@ pub(crate) struct StepIo {
     pub(crate) reads: Vec<String>,
     /// Curve / surface / scalar IDs the step writes.
     pub(crate) writes: Vec<String>,
-    /// Primary output used to detect parallel-batch conflicts.
-    pub(crate) primary_output: StepPrimaryOutput,
 }
 
 impl StepParams {
@@ -794,25 +653,21 @@ impl StepParams {
                 .map(ToString::to_string)
                 .collect(),
                 writes: vec![p.curve_id.to_string()],
-                primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
             },
             StepParams::Forward(p) => StepIo {
                 kind: "forward",
                 reads: vec![p.discount_curve_id.to_string()],
                 writes: vec![p.curve_id.to_string()],
-                primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
             },
             StepParams::Hazard(p) => StepIo {
                 kind: "hazard",
                 reads: vec![p.discount_curve_id.to_string()],
                 writes: vec![p.curve_id.to_string()],
-                primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
             },
             StepParams::Inflation(p) => StepIo {
                 kind: "inflation",
                 reads: vec![p.discount_curve_id.to_string()],
                 writes: vec![p.curve_id.to_string()],
-                primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
             },
             StepParams::VolSurface(p) => StepIo {
                 kind: "vol_surface",
@@ -828,9 +683,6 @@ impl StepParams {
                     )
                     .collect(),
                 writes: vec![p.vol_surface_id.clone()],
-                primary_output: StepPrimaryOutput::Surface(CurveId::from(
-                    p.vol_surface_id.as_str(),
-                )),
             },
             StepParams::SwaptionVol(p) => StepIo {
                 kind: "swaption_vol",
@@ -838,9 +690,6 @@ impl StepParams {
                     .chain(p.forward_id.clone())
                     .collect(),
                 writes: vec![p.vol_surface_id.clone()],
-                primary_output: StepPrimaryOutput::Surface(CurveId::from(
-                    p.vol_surface_id.as_str(),
-                )),
             },
             StepParams::BaseCorrelation(p) => {
                 let curve_id = CurveId::from(format!("{}_CORR", p.index_id));
@@ -848,7 +697,6 @@ impl StepParams {
                     kind: "base_correlation",
                     reads: vec![p.discount_curve_id.to_string(), p.index_id.clone()],
                     writes: vec![curve_id.to_string(), p.index_id.clone()],
-                    primary_output: StepPrimaryOutput::Curve(curve_id),
                 }
             }
             StepParams::StudentT(p) => {
@@ -860,8 +708,7 @@ impl StepParams {
                 StepIo {
                     kind: "student_t",
                     reads,
-                    writes: vec![scalar_key.clone()],
-                    primary_output: StepPrimaryOutput::Scalar(scalar_key),
+                    writes: vec![scalar_key],
                 }
             }
             StepParams::HullWhite(p) => {
@@ -870,8 +717,7 @@ impl StepParams {
                 StepIo {
                     kind: "hull_white",
                     reads: vec![p.curve_id.to_string()],
-                    writes: vec![kappa_key.clone(), sigma_key],
-                    primary_output: StepPrimaryOutput::Scalar(kappa_key),
+                    writes: vec![kappa_key, sigma_key],
                 }
             }
             StepParams::CapFloorHullWhite(p) => {
@@ -892,8 +738,7 @@ impl StepParams {
                 StepIo {
                     kind: "cap_floor_hull_white",
                     reads,
-                    writes: vec![kappa_key.clone(), volatility_key],
-                    primary_output: StepPrimaryOutput::Scalar(kappa_key),
+                    writes: vec![kappa_key, volatility_key],
                 }
             }
             StepParams::SviSurface(p) => StepIo {
@@ -910,9 +755,6 @@ impl StepParams {
                     )
                     .collect(),
                 writes: vec![p.vol_surface_id.clone()],
-                primary_output: StepPrimaryOutput::Surface(CurveId::from(
-                    p.vol_surface_id.as_str(),
-                )),
             },
             StepParams::XccyBasis(p) => {
                 let mut writes = vec![p.curve_id.to_string()];
@@ -923,14 +765,12 @@ impl StepParams {
                     kind: "xccy_basis",
                     reads: vec![p.domestic_discount_id.to_string()],
                     writes,
-                    primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
                 }
             }
             StepParams::Parametric(p) => StepIo {
                 kind: "parametric",
                 reads: Vec::new(),
                 writes: vec![p.curve_id.to_string()],
-                primary_output: StepPrimaryOutput::Curve(p.curve_id.clone()),
             },
         }
     }
@@ -1123,15 +963,6 @@ pub struct InflationCurveParams {
 }
 
 /// Parameters for volatility surface calibration step.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-pub enum VolSurfaceModel {
-    /// Stochastic alpha-beta-rho model.
-    Sabr,
-}
-
-/// Parameters for volatility surface calibration step.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -1147,8 +978,6 @@ pub struct VolSurfaceParams {
     pub base_date: Date,
     /// Identifier for the underlying instrument.
     pub underlying_ticker: String,
-    /// Volatility model used for calibration.
-    pub model: VolSurfaceModel,
     /// Discount curve ID.
     #[serde(default)]
     pub discount_curve_id: Option<CurveId>,

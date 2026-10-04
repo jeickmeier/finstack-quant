@@ -52,19 +52,45 @@ fn market_json(as_of: time::Date, rate: f64) -> String {
         .expect("market JSON")
 }
 
-fn params(method_json: &str) -> JsAttributionJsonInputs {
+fn spec_value(
+    instrument: JsValue,
+    market_t0: JsValue,
+    market_t1: JsValue,
+    as_of_t0: JsValue,
+    as_of_t1: JsValue,
+    method: JsValue,
+    options: (Option<JsValue>, Option<bool>),
+) -> JsValue {
+    let (config, full_cross_attribution) = options;
+    let parse = |value: JsValue| -> serde_json::Value {
+        serde_json::from_str(&value.as_string().expect("JSON fixture")).expect("valid JSON")
+    };
+    let mut spec = serde_json::json!({
+        "instrument": parse(instrument)["instrument"],
+        "market_t0": parse(market_t0), "market_t1": parse(market_t1),
+        "as_of_t0": as_of_t0.as_string(), "as_of_t1": as_of_t1.as_string(),
+        "method": parse(method),
+    });
+    if let Some(config) = config {
+        spec["config"] = parse(config);
+    }
+    if let Some(full_cross) = full_cross_attribution {
+        spec["full_cross_attribution"] = full_cross.into();
+    }
+    JsValue::from_str(&spec.to_string())
+}
+
+fn params(method_json: &str) -> JsValue {
     use time::macros::date;
-    JsAttributionJsonInputs::new(
+    spec_value(
         JsValue::from(bond_json()),
         JsValue::from(market_json(date!(2025 - 01 - 15), 0.04)),
         JsValue::from(market_json(date!(2025 - 01 - 16), 0.042)),
         JsValue::from("2025-01-15".to_string()),
         JsValue::from("2025-01-16".to_string()),
         JsValue::from(method_json.to_string()),
-        None,
-        None,
+        (None, None),
     )
-    .expect("valid attribution params")
 }
 
 #[wasm_bindgen_test]
@@ -101,19 +127,18 @@ fn principal_redemption_preserves_total_return_without_coupon_income() {
     let instrument = serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::Bond(bond)))
         .expect("instrument JSON");
     let market = market_json(date!(2025 - 01 - 14), 0.04);
-    let inputs = JsAttributionJsonInputs::new(
+    let inputs = spec_value(
         JsValue::from(instrument),
         JsValue::from(market.clone()),
         JsValue::from(market),
         JsValue::from("2025-01-14".to_string()),
         JsValue::from("2025-01-16".to_string()),
         JsValue::from("\"parallel\"".to_string()),
-        None,
-        None,
-    )
-    .expect("valid attribution params");
+        (None, None),
+    );
     let result: serde_json::Value =
-        serde_json::from_str(&attribute_pnl_json(&inputs).expect("attribution")).expect("result");
+        serde_json::from_str(&attribute_pnl_json(inputs.clone()).expect("attribution"))
+            .expect("result");
     let amount = |value: &serde_json::Value| {
         value["amount"]
             .as_str()
@@ -154,19 +179,18 @@ fn deposit_principal_redemption_preserves_total_return_after_maturity() {
         serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::Deposit(deposit)))
             .expect("instrument JSON");
     let market = market_json(date!(2025 - 01 - 14), 0.04);
-    let inputs = JsAttributionJsonInputs::new(
+    let inputs = spec_value(
         JsValue::from(instrument),
         JsValue::from(market.clone()),
         JsValue::from(market),
         JsValue::from("2025-01-14".to_string()),
         JsValue::from("2025-01-16".to_string()),
         JsValue::from("\"parallel\"".to_string()),
-        None,
-        None,
-    )
-    .expect("valid attribution params");
+        (None, None),
+    );
     let result: serde_json::Value =
-        serde_json::from_str(&attribute_pnl_json(&inputs).expect("attribution")).expect("result");
+        serde_json::from_str(&attribute_pnl_json(inputs.clone()).expect("attribution"))
+            .expect("result");
     let amount = |value: &serde_json::Value| {
         value["amount"]
             .as_str()
@@ -188,8 +212,7 @@ fn deposit_principal_redemption_preserves_total_return_after_maturity() {
 
 #[wasm_bindgen_test]
 fn attribute_pnl_end_to_end_parallel() {
-    let json =
-        attribute_pnl_json(&params("\"parallel\"")).expect("attributePnlJson should succeed");
+    let json = attribute_pnl_json(params("\"parallel\"")).expect("attributePnlJson should succeed");
     let attr: serde_json::Value = serde_json::from_str(&json).expect("PnlAttribution JSON");
     // +20bp rates move on a long bond: the rates factor must be a loss.
     let rates: f64 = attr["rates_curves_pnl"]["amount"]
@@ -205,7 +228,7 @@ fn attribute_pnl_end_to_end_parallel() {
 
 #[wasm_bindgen_test]
 fn attribute_pnl_returns_structured_object_matching_json_twin() {
-    let value = attribute_pnl(&params("\"parallel\"")).expect("attributePnl should succeed");
+    let value = attribute_pnl(params("\"parallel\"")).expect("attributePnl should succeed");
     assert!(
         value.as_string().is_none(),
         "attributePnl must not return a string"
@@ -215,7 +238,7 @@ fn attribute_pnl_returns_structured_object_matching_json_twin() {
         .as_string()
         .expect("stringify yields a string");
     let object: serde_json::Value = serde_json::from_str(&stringified).expect("object JSON");
-    let json = attribute_pnl_json(&params("\"parallel\"")).expect("attributePnlJson");
+    let json = attribute_pnl_json(params("\"parallel\"")).expect("attributePnlJson");
     let wire: serde_json::Value = serde_json::from_str(&json).expect("wire JSON");
     assert_eq!(
         canonicalize_numbers(object),
@@ -274,18 +297,16 @@ fn attribute_pnl_missing_market_data_yields_structured_error() {
         &MarketContextState::try_from(&MarketContext::new()).expect("coherent market snapshot"),
     )
     .unwrap();
-    let p = JsAttributionJsonInputs::new(
+    let p = spec_value(
         JsValue::from(bond_json()),
         JsValue::from(empty.clone()),
         JsValue::from(empty),
         JsValue::from("2025-01-15".to_string()),
         JsValue::from("2025-01-16".to_string()),
         JsValue::from("\"parallel\"".to_string()),
-        None,
-        None,
-    )
-    .expect("valid attribution params");
-    let err = attribute_pnl(&p).expect_err("missing curves must error");
+        (None, None),
+    );
+    let err = attribute_pnl(p.clone()).expect_err("missing curves must error");
     let get = |key: &str| {
         js_sys::Reflect::get(&err, &JsValue::from(key))
             .ok()
@@ -302,37 +323,36 @@ fn attribute_pnl_missing_market_data_yields_structured_error() {
 #[wasm_bindgen_test]
 fn requested_reporting_currency_requires_fx() {
     use time::macros::date;
-    let inputs = JsAttributionJsonInputs::new(
+    let inputs = spec_value(
         JsValue::from(bond_json()),
         JsValue::from(market_json(date!(2025 - 01 - 15), 0.04)),
         JsValue::from(market_json(date!(2025 - 01 - 16), 0.04)),
         "2025-01-15".into(),
         "2025-01-16".into(),
         "\"parallel\"".into(),
-        Some(r#"{"target_currency":"EUR"}"#.into()),
-        None,
-    )
-    .expect("valid attribution params");
-    assert!(attribute_pnl_json(&inputs).is_err());
+        (Some(r#"{"target_currency":"EUR"}"#.into()), None),
+    );
+    assert!(attribute_pnl_json(inputs.clone()).is_err());
 }
 
 #[wasm_bindgen_test]
 fn metrics_and_taylor_preserve_rounding() {
     use time::macros::date;
     for method in [r#""metrics_based""#, r#"{"taylor":{}}"#] {
-        let inputs = JsAttributionJsonInputs::new(
+        let inputs = spec_value(
             JsValue::from(bond_json()),
             JsValue::from(market_json(date!(2025 - 01 - 15), 0.04)),
             JsValue::from(market_json(date!(2025 - 01 - 16), 0.04)),
             "2025-01-15".into(),
             "2025-01-16".into(),
             method.into(),
-            Some(r#"{"rounding_scale":4,"metrics":["dv01"]}"#.into()),
-            None,
-        )
-        .expect("valid attribution params");
+            (
+                Some(r#"{"rounding_scale":4,"metrics":["dv01"]}"#.into()),
+                None,
+            ),
+        );
         let result: serde_json::Value =
-            serde_json::from_str(&attribute_pnl_json(&inputs).unwrap()).unwrap();
+            serde_json::from_str(&attribute_pnl_json(inputs.clone()).unwrap()).unwrap();
         assert_eq!(
             result["meta"]["rounding"]["output_scale_by_currency"]["USD"],
             4

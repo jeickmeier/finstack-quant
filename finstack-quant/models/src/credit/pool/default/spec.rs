@@ -5,18 +5,16 @@
 
 use super::super::clamped_cdr_to_mdr;
 use super::{
-    CopulaBasedDefault, FactorCorrelatedDefault, HazardCurveDefault, IntensityProcessDefault,
-    StochasticDefault,
+    CopulaBasedDefault, FactorCorrelatedDefault, IntensityProcessDefault, StochasticDefault,
 };
 use crate::correlation::copula::CopulaSpec;
 use finstack_quant_cashflows::builder::specs::DefaultModelSpec;
-use finstack_quant_core::market_data::term_structures::HazardCurve;
 
 /// Stochastic default model specification.
 ///
 /// Allows default model selection and configuration without
 /// constructing the full model.
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "model", rename_all = "snake_case", deny_unknown_fields)]
 #[non_exhaustive]
@@ -64,168 +62,10 @@ pub enum StochasticDefaultSpec {
         /// CDR volatility
         cdr_volatility: f64,
     },
-
-    /// Hazard curve-based default model.
-    ///
-    /// Uses a market-calibrated hazard curve (e.g., from CDS spreads)
-    /// with factor-based stochastic shocks.
-    ///
-    /// Note: This variant cannot be serialized/deserialized directly as it
-    /// contains a HazardCurve. Use `build_from_hazard_curve` for construction.
-    #[serde(skip)]
-    HazardCurveBased {
-        /// The calibrated hazard curve
-        hazard_curve: Box<HazardCurve>,
-        /// Factor loading (β) for systematic risk shocks
-        factor_loading: f64,
-        /// Volatility of intensity shocks (σ)
-        volatility: f64,
-        /// Asset correlation for default distribution
-        correlation: f64,
-    },
-}
-
-impl serde::Serialize for StochasticDefaultSpec {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        #[derive(serde::Serialize)]
-        #[serde(tag = "model", rename_all = "snake_case")]
-        enum PersistedStochasticDefaultSpec<'a> {
-            Deterministic(&'a DefaultModelSpec),
-            Copula {
-                base_cdr: f64,
-                copula_spec: &'a CopulaSpec,
-                correlation: f64,
-            },
-            IntensityProcess {
-                base_hazard: f64,
-                factor_loading: f64,
-                mean_reversion: f64,
-                volatility: f64,
-                correlation: f64,
-            },
-            FactorCorrelated {
-                base_spec: &'a DefaultModelSpec,
-                factor_loading: f64,
-                cdr_volatility: f64,
-            },
-        }
-
-        let persisted = match self {
-            Self::Deterministic(spec) => PersistedStochasticDefaultSpec::Deterministic(spec),
-            Self::Copula {
-                base_cdr,
-                copula_spec,
-                correlation,
-            } => PersistedStochasticDefaultSpec::Copula {
-                base_cdr: *base_cdr,
-                copula_spec,
-                correlation: *correlation,
-            },
-            Self::IntensityProcess {
-                base_hazard,
-                factor_loading,
-                mean_reversion,
-                volatility,
-                correlation,
-            } => PersistedStochasticDefaultSpec::IntensityProcess {
-                base_hazard: *base_hazard,
-                factor_loading: *factor_loading,
-                mean_reversion: *mean_reversion,
-                volatility: *volatility,
-                correlation: *correlation,
-            },
-            Self::FactorCorrelated {
-                base_spec,
-                factor_loading,
-                cdr_volatility,
-            } => PersistedStochasticDefaultSpec::FactorCorrelated {
-                base_spec,
-                factor_loading: *factor_loading,
-                cdr_volatility: *cdr_volatility,
-            },
-            Self::HazardCurveBased { .. } => {
-                return Err(serde::ser::Error::custom(
-                    "StochasticDefaultSpec::HazardCurveBased is a derived calibrated-curve \
-                     artifact and cannot be persisted; reconstruct it with \
-                     build_from_hazard_curve and persist calibration prior_market instead",
-                ));
-            }
-        };
-        serde::Serialize::serialize(&persisted, serializer)
-    }
 }
 
 fn default_correlation() -> f64 {
     0.20
-}
-
-impl PartialEq for StochasticDefaultSpec {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Deterministic(a), Self::Deterministic(b)) => a == b,
-            (
-                Self::Copula {
-                    base_cdr: a1,
-                    copula_spec: a2,
-                    correlation: a3,
-                },
-                Self::Copula {
-                    base_cdr: b1,
-                    copula_spec: b2,
-                    correlation: b3,
-                },
-            ) => a1 == b1 && a2 == b2 && a3 == b3,
-            (
-                Self::IntensityProcess {
-                    base_hazard: a1,
-                    factor_loading: a2,
-                    mean_reversion: a3,
-                    volatility: a4,
-                    correlation: a5,
-                },
-                Self::IntensityProcess {
-                    base_hazard: b1,
-                    factor_loading: b2,
-                    mean_reversion: b3,
-                    volatility: b4,
-                    correlation: b5,
-                },
-            ) => a1 == b1 && a2 == b2 && a3 == b3 && a4 == b4 && a5 == b5,
-            (
-                Self::FactorCorrelated {
-                    base_spec: a1,
-                    factor_loading: a2,
-                    cdr_volatility: a3,
-                },
-                Self::FactorCorrelated {
-                    base_spec: b1,
-                    factor_loading: b2,
-                    cdr_volatility: b3,
-                },
-            ) => a1 == b1 && a2 == b2 && a3 == b3,
-            (
-                Self::HazardCurveBased {
-                    hazard_curve: a1,
-                    factor_loading: a2,
-                    volatility: a3,
-                    correlation: a4,
-                },
-                Self::HazardCurveBased {
-                    hazard_curve: b1,
-                    factor_loading: b2,
-                    volatility: b3,
-                    correlation: b4,
-                },
-            ) => {
-                // Compare by curve ID since HazardCurve doesn't impl PartialEq
-                a1.id() == b1.id() && a2 == b2 && a3 == b3 && a4 == b4
-            }
-            _ => false,
-        }
-    }
 }
 
 impl Default for StochasticDefaultSpec {
@@ -287,23 +127,6 @@ impl StochasticDefaultSpec {
         }
     }
 
-    /// Create a hazard curve-based default spec.
-    ///
-    /// Uses a market-calibrated hazard curve with factor shocks.
-    ///
-    /// # Arguments
-    ///
-    /// * `hazard_curve` - Calibrated hazard curve (e.g., from CDS spreads)
-    /// * `factor_loading` - Loading (β) on the systematic factor, clamped to [-1, 1] (typical: 0.3-0.8)
-    pub fn from_hazard_curve(hazard_curve: HazardCurve, factor_loading: f64) -> Self {
-        StochasticDefaultSpec::HazardCurveBased {
-            hazard_curve: Box::new(hazard_curve),
-            factor_loading: factor_loading.clamp(-1.0, 1.0),
-            volatility: 0.30,
-            correlation: 0.20,
-        }
-    }
-
     /// Build the stochastic default model from this specification.
     ///
     /// Returns `Ok(None)` for deterministic specs.
@@ -314,28 +137,7 @@ impl StochasticDefaultSpec {
     /// `dof ≤ 2`) instead of silently falling back to a Gaussian copula
     /// against t-quantile thresholds.
     ///
-    /// Engines pricing a SEASONED pool should use
-    /// [`Self::build_with_seasoning_offset`] so hazard-curve-based models
-    /// index the curve by time-from-valuation instead of loan age.
     pub fn build(&self) -> finstack_quant_core::Result<Option<Box<dyn StochasticDefault>>> {
-        self.build_with_seasoning_offset(0)
-    }
-
-    /// Build the model with the pool's seasoning at valuation (months).
-    ///
-    /// Only `HazardCurveBased` consumes the offset: its curve is anchored at
-    /// the valuation date, so lookups must subtract the initial seasoning
-    /// from the loan-age `seasoning` the engines pass in. The other models
-    /// are seasoning-curve based (loan age is the correct index) and ignore
-    /// the offset.
-    ///
-    /// # Arguments
-    ///
-    /// * `seasoning_offset_months` - Seasoning offset months used by the algorithm, subject to the enclosing type invariants and documented units.
-    pub fn build_with_seasoning_offset(
-        &self,
-        seasoning_offset_months: u32,
-    ) -> finstack_quant_core::Result<Option<Box<dyn StochasticDefault>>> {
         Ok(match self {
             StochasticDefaultSpec::Deterministic(_) => None,
 
@@ -369,18 +171,6 @@ impl StochasticDefaultSpec {
                 *factor_loading,
                 *cdr_volatility,
             ))),
-
-            StochasticDefaultSpec::HazardCurveBased {
-                hazard_curve,
-                factor_loading,
-                volatility,
-                correlation,
-            } => Some(Box::new(
-                HazardCurveDefault::new((**hazard_curve).clone(), *factor_loading)
-                    .with_volatility(*volatility)
-                    .with_correlation(*correlation)
-                    .with_seasoning_offset(seasoning_offset_months),
-            )),
         })
     }
 
@@ -398,8 +188,7 @@ impl StochasticDefaultSpec {
         match self {
             StochasticDefaultSpec::Deterministic(_) => None,
             StochasticDefaultSpec::Copula { correlation, .. }
-            | StochasticDefaultSpec::IntensityProcess { correlation, .. }
-            | StochasticDefaultSpec::HazardCurveBased { correlation, .. } => Some(*correlation),
+            | StochasticDefaultSpec::IntensityProcess { correlation, .. } => Some(*correlation),
             StochasticDefaultSpec::FactorCorrelated { factor_loading, .. } => Some(*factor_loading),
         }
     }
@@ -411,10 +200,6 @@ impl StochasticDefaultSpec {
             StochasticDefaultSpec::Copula { base_cdr, .. } => *base_cdr,
             StochasticDefaultSpec::IntensityProcess { base_hazard, .. } => *base_hazard,
             StochasticDefaultSpec::FactorCorrelated { base_spec, .. } => base_spec.cdr,
-            StochasticDefaultSpec::HazardCurveBased { hazard_curve, .. } => {
-                // Approximate 1-year default probability as the base rate
-                1.0 - hazard_curve.sp(1.0)
-            }
         }
     }
 
@@ -429,30 +214,11 @@ impl StochasticDefaultSpec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use time::macros::date;
 
     #[test]
     fn test_spec_default() {
         let spec = StochasticDefaultSpec::default();
         assert!(!spec.is_stochastic());
-    }
-
-    #[test]
-    fn hazard_curve_variant_has_typed_persistence_error() {
-        let curve = HazardCurve::builder("ACME-HAZARD")
-            .base_date(date!(2026 - 01 - 01))
-            .knots([(1.0, 0.01), (5.0, 0.02)])
-            .recovery_rate(0.40)
-            .build()
-            .expect("valid hazard curve");
-        let spec = StochasticDefaultSpec::from_hazard_curve(curve, 0.5);
-
-        let error =
-            serde_json::to_string(&spec).expect_err("derived hazard curves are not persisted");
-        let message = error.to_string();
-        assert!(message.contains("build_from_hazard_curve"), "{message}");
-        assert!(message.contains("prior_market"), "{message}");
-        assert!(message.contains("derived"), "{message}");
     }
 
     #[test]

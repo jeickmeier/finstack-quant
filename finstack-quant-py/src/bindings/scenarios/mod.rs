@@ -22,6 +22,56 @@ fn builtin_registry() -> PyResult<&'static finstack_quant_scenarios::TemplateReg
     finstack_quant_scenarios::TemplateRegistry::embedded_builtins().map_err(scenarios_to_py)
 }
 
+/// Expand a parallel shift into one operation per curve identifier.
+///
+/// Parameters
+/// ----------
+/// curve_kind : CurveKind | str
+///     Canonical curve family: discount, forward, par_cds, inflation or commodity.
+/// curve_ids : list[str]
+///     Curve identifiers in execution order; empty input produces an empty list.
+/// bp : float
+///     Additive basis points, or percent of forward for commodity curves.
+/// discount_curve_id : str | None, default None
+///     Optional discount curve for ParCDS quote replay, copied onto each operation.
+///
+/// Returns
+/// -------
+/// list[OperationSpec]
+///     One operation per identifier in the original order.
+///
+/// Raises
+/// ------
+/// ValueError
+///     If curve_kind is not a canonical family label.
+/// TypeError
+///     If identifiers are not strings or bp is not numeric.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.scenarios import parallel_bp_many
+/// >>> len(parallel_bp_many("discount", ["USD-OIS", "EUR-OIS"], 25.0))
+/// 2
+#[pyfunction]
+#[pyo3(signature = (curve_kind, curve_ids, bp, discount_curve_id=None))]
+fn parallel_bp_many(
+    curve_kind: &Bound<'_, PyAny>,
+    curve_ids: Vec<String>,
+    bp: f64,
+    discount_curve_id: Option<String>,
+) -> PyResult<Vec<operation_spec::PyOperationSpec>> {
+    let kind = operation_spec::extract_curve_kind(curve_kind)?;
+    Ok(finstack_quant_scenarios::ScenarioSpec::parallel_bp_many(
+        kind,
+        curve_ids,
+        bp,
+        discount_curve_id.map(Into::into),
+    )
+    .into_iter()
+    .map(operation_spec::PyOperationSpec::from_inner)
+    .collect())
+}
+
 /// Compose several scenario specifications into one.
 ///
 /// Specs are stably sorted by ascending ``priority`` (equal priorities keep
@@ -87,8 +137,8 @@ fn compose_scenarios(specs: Vec<PyScenarioSpec>) -> PyResult<PyScenarioSpec> {
 /// >>> validate_scenario_spec(ScenarioSpec("ok", []).to_json()) is None
 /// True
 #[pyfunction]
-fn validate_scenario_spec(scenario: &Bound<'_, PyAny>) -> PyResult<()> {
-    extract::extract_scenario_spec(scenario).map(|_| ())
+fn validate_scenario_spec(py: Python<'_>, scenario: &Bound<'_, PyAny>) -> PyResult<()> {
+    crate::bindings::extract::extract_scenario_spec(py, scenario).map(|_| ())
 }
 
 /// List the identifiers of every built-in scenario template.
@@ -152,7 +202,7 @@ fn list_builtin_template_metadata() -> PyResult<Vec<PyTemplateMetadata>> {
 /// -------
 /// ScenarioSpec
 ///     Typed scenario specification, accepted directly by
-///     :func:`apply_scenario_to_market` and :func:`compute_horizon_return`.
+///     :func:`apply_scenario` and :func:`compute_horizon_return`.
 ///
 /// Raises
 /// ------
@@ -234,6 +284,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyScenarioSpec>()?;
     m.add_class::<PyTemplateMetadata>()?;
     m.add_function(wrap_pyfunction!(compose_scenarios, &m)?)?;
+    m.add_function(wrap_pyfunction!(parallel_bp_many, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_scenario_spec, &m)?)?;
     m.add_function(wrap_pyfunction!(list_builtin_templates, &m)?)?;
     m.add_function(wrap_pyfunction!(list_builtin_template_metadata, &m)?)?;
@@ -262,10 +313,10 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "TenorMatchMode",
             "TimeRollMode",
             "apply_scenario",
-            "apply_scenario_to_market",
             "build_from_template",
             "build_template_component",
             "compose_scenarios",
+            "parallel_bp_many",
             "compute_horizon_return",
             "list_builtin_template_metadata",
             "list_builtin_templates",

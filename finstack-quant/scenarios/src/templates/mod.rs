@@ -7,7 +7,7 @@
 //! get a concrete, validated scenario.
 //!
 //! Built-in templates are embedded JSON documents shipped with the crate and
-//! are loaded through [`TemplateRegistry::with_embedded_builtins`].
+//! are loaded through [`TemplateRegistry::embedded_builtins`].
 //!
 //! For template discovery metadata, see [`TemplateMetadata`]. For scenario
 //! execution, continue to [`crate::ScenarioEngine`].

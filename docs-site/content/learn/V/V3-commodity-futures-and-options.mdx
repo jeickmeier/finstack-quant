@@ -19,7 +19,7 @@ api:
 - finstack_quant.models.correlation.LatentMultiFactor
 - finstack_quant.scenarios.CurveKind
 - finstack_quant.scenarios.OperationSpec
-- finstack_quant.scenarios.apply_scenario_to_market
+- finstack_quant.scenarios.apply_scenario
 - finstack_quant.portfolio.value_portfolio
 status: published
 ---
@@ -237,7 +237,7 @@ The two native option prices use different stochastic models. Their difference i
 
 {/* notebook-block notebook="02_pricing/instruments/commodities.ipynb" cell="v3-factor-stress" role="build" */}
 ```python exec id=v3-factor-stress role=build
-from finstack_quant.scenarios import ScenarioSpec,OperationSpec,CurveKind,apply_scenario_to_market
+from finstack_quant.scenarios import ScenarioSpec,OperationSpec,CurveKind,apply_scenario
 from finstack_quant.portfolio import value_portfolio
 shape_rows=[]
 for t in [.25,1.,3.,5.]:
@@ -249,7 +249,7 @@ print(pd.DataFrame(shape_rows))
 shock=ScenarioSpec("energy_down_10pct",[
     OperationSpec.curve_parallel_bp(CurveKind.commodity(),"WTI-FORWARD",-10.),
     OperationSpec.curve_parallel_bp(CurveKind.commodity(),"BRENT-FORWARD",-10.)])
-shocked=apply_scenario_to_market(shock,market,AS_OF).market
+shocked=apply_scenario(shock, market, AS_OF).market
 vol_book=tracks.build_book("vol")
 base_book=value_portfolio(vol_book,market,metrics=[])
 stress_book=value_portfolio(vol_book,shocked,metrics=[])

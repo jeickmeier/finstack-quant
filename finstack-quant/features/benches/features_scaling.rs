@@ -19,9 +19,9 @@ use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use finstack_quant_features::{
-    neutralize, rolling_regression_residual, transform_cross_sectional_grouped_with_op,
-    transform_cross_sectional_with_op, transform_timeseries_pairwise_with_op,
-    transform_timeseries_with_op, CrossSectionalOp, PairwiseOp, TimeSeriesOp,
+    neutralize, rolling_regression_residual, transform_cross_sectional,
+    transform_cross_sectional_grouped, transform_timeseries, transform_timeseries_pairwise,
+    CrossSectionalOp, PairwiseOp, TimeSeriesOp,
 };
 use fixtures::{feature_panel, window_params, HOT_FACTORS, HOT_OBS, HOT_WINDOW};
 use serde_json::json;
@@ -37,7 +37,7 @@ fn scaling_returns(c: &mut Criterion) {
             |b, panel| {
                 b.iter(|| {
                     black_box(
-                        transform_timeseries_with_op(
+                        transform_timeseries(
                             &panel.values,
                             &panel.entity,
                             &panel.order,
@@ -65,7 +65,7 @@ fn scaling_rolling_mean_rows(c: &mut Criterion) {
             |b, panel| {
                 b.iter(|| {
                     black_box(
-                        transform_timeseries_with_op(
+                        transform_timeseries(
                             &panel.values,
                             &panel.entity,
                             &panel.order,
@@ -90,7 +90,7 @@ fn scaling_rolling_mean_window(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(window), &window, |b, _| {
             b.iter(|| {
                 black_box(
-                    transform_timeseries_with_op(
+                    transform_timeseries(
                         &panel.values,
                         &panel.entity,
                         &panel.order,
@@ -114,7 +114,7 @@ fn scaling_rolling_rank_window(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(window), &window, |b, _| {
             b.iter(|| {
                 black_box(
-                    transform_timeseries_with_op(
+                    transform_timeseries(
                         &panel.values,
                         &panel.entity,
                         &panel.order,
@@ -138,7 +138,7 @@ fn scaling_hampel_window(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(window), &window, |b, _| {
             b.iter(|| {
                 black_box(
-                    transform_timeseries_with_op(
+                    transform_timeseries(
                         &panel.values,
                         &panel.entity,
                         &panel.order,
@@ -164,7 +164,7 @@ fn scaling_zscore_names(c: &mut Criterion) {
             |b, panel| {
                 b.iter(|| {
                     black_box(
-                        transform_cross_sectional_with_op(
+                        transform_cross_sectional(
                             &panel.values,
                             &panel.time_key,
                             CrossSectionalOp::Zscore,
@@ -190,7 +190,7 @@ fn scaling_grouped_rows(c: &mut Criterion) {
             |b, panel| {
                 b.iter(|| {
                     black_box(
-                        transform_cross_sectional_grouped_with_op(
+                        transform_cross_sectional_grouped(
                             &panel.values,
                             &panel.time_key,
                             &panel.groups,
@@ -236,7 +236,7 @@ fn scaling_pairwise_window(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(window), &window, |b, _| {
             b.iter(|| {
                 black_box(
-                    transform_timeseries_pairwise_with_op(
+                    transform_timeseries_pairwise(
                         &panel.values,
                         &panel.other,
                         &panel.entity,
@@ -285,7 +285,7 @@ fn scaling_exp_decay_window(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(window), &window, |b, _| {
             b.iter(|| {
                 black_box(
-                    transform_timeseries_with_op(
+                    transform_timeseries(
                         &panel.values,
                         &panel.entity,
                         &panel.order,

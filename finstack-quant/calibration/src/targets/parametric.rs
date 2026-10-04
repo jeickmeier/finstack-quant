@@ -170,7 +170,7 @@ impl ParametricCurveTarget {
         quotes: &[MarketQuote],
         context: &MarketContext,
         global_config: &CalibrationConfig,
-    ) -> Result<(MarketContext, CalibrationReport)> {
+    ) -> Result<(ParametricCurve, CalibrationReport)> {
         let residual_notional: f64 = 1_000_000.0;
         let prepared = prepare_rate_calibration_quotes(
             quotes,
@@ -216,11 +216,15 @@ impl ParametricCurveTarget {
             Self::build_sample_times(schema_params.base_date, &prepared_quotes)?,
         );
         let success_tolerance = config.discount_curve.validation_tolerance;
-        let (curve, report) =
-            GlobalFitOptimizer::optimize(&target, &prepared_quotes, &config, success_tolerance)?;
+        let (curve, report) = GlobalFitOptimizer::optimize(
+            &target,
+            &prepared_quotes,
+            &config,
+            success_tolerance,
+            false,
+        )?;
 
-        let new_context = context.clone().insert(curve);
-        Ok((new_context, report))
+        Ok((curve, report))
     }
 
     fn default_guesses(&self) -> Vec<f64> {

@@ -999,24 +999,24 @@ impl JsLatentMultiFactor {
     }
 
     /// Model with independent factors (identity correlation).
-    /// @param num_factors - Number of systematic factors; a positive safe integer.
-    /// @param volatilities - Annualized factor volatilities, one per factor; a length mismatch falls back to unit volatilities.
+    /// @param num_factors - Number of systematic factors; a non-negative safe integer, with zero resolving to one.
+    /// @param volatilities - Annualized factor volatilities, one per factor; must be finite, non-negative and match the factor count.
     /// @returns The uncorrelated multi-factor model.
     ///
     /// # Errors
     ///
     /// Throws a `TypeError` if `numFactors` is not a safe non-negative integer
-    /// or `volatilities` is not an array of numbers.
+    /// or `volatilities` is not an array of numbers. Throws a validation error for a length mismatch, negative or non-finite volatility.
     pub fn uncorrelated(
         num_factors: JsValue,
         volatilities: JsValue,
     ) -> Result<JsLatentMultiFactor, JsValue> {
-        Ok(Self {
-            inner: LatentMultiFactor::uncorrelated(
-                js_uint(&num_factors, "numFactors")?,
-                js_f64_seq(&volatilities, "volatilities")?,
-            ),
-        })
+        LatentMultiFactor::uncorrelated(
+            js_uint(&num_factors, "numFactors")?,
+            js_f64_seq(&volatilities, "volatilities")?,
+        )
+        .map(|inner| Self { inner })
+        .map_err(to_js_err)
     }
 
     /// Number of systematic factors.
@@ -1051,7 +1051,7 @@ impl JsLatentMultiFactor {
         independent_z: JsValue,
     ) -> Result<Box<[f64]>, JsValue> {
         self.inner
-            .try_generate_correlated_factors(&js_f64_seq(&independent_z, "independentZ")?)
+            .generate_correlated_factors(&js_f64_seq(&independent_z, "independentZ")?)
             .map(Vec::into_boxed_slice)
             .map_err(to_js_err)
     }

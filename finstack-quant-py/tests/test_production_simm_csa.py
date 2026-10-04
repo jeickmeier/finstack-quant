@@ -32,8 +32,8 @@ def test_fx_percent_risk_and_raw_concentration() -> None:
 
 def test_girr_vega_underlying_decay() -> None:
     sensitivities = FrtbSensitivities("USD")
-    sensitivities.add_girr_vega("5Y", "1Y", 100.0)
-    sensitivities.add_girr_vega("5Y", "5Y", 100.0)
+    sensitivities.add_girr_vega("USD", "5Y", "1Y", 100.0)
+    sensitivities.add_girr_vega("USD", "5Y", "5Y", 100.0)
     result = FrtbSbaEngine(scenarios=["medium"], risk_classes=["girr"]).calculate(sensitivities)
     assert result.total == pytest.approx(math.sqrt(20_000.0 + 20_000.0 * math.exp(-0.04)))
 
@@ -91,3 +91,24 @@ def test_with_im_omitted_segregated_uses_registry_default(methodology: str, mpor
     assert CsaSpec.usd_regulatory().with_im(methodology, mpor_days, 0.0, 0.0, not expected).im_segregated is (
         not expected
     )
+
+
+def test_instrument_roundtrip_preserves_csa_owned_no_im_election() -> None:
+    """The public instrument wire carries one agreement without duplicate elections."""
+    from finstack_quant.valuations.instruments import InterestRateSwap
+
+    csa = json.loads(CsaSpec.usd_regulatory().to_json())
+    csa["im_params"] = None
+    csa["vm_params"]["frequency"] = "weekly"
+    csa["vm_params"]["settlement_lag"] = 3
+    spec = {"csa": csa, "clearing_status": "bilateral"}
+    payload = json.loads(InterestRateSwap.example().to_json())
+    payload["instrument"]["spec"]["margin_spec"] = spec
+    swap = InterestRateSwap.from_json(json.dumps(payload))
+    canonical = {"csa": {k: v for k, v in csa.items() if k != "im_params"}, "clearing_status": "bilateral"}
+    assert swap.margin_spec == canonical
+    assert json.loads(swap.to_json())["instrument"]["spec"]["margin_spec"] == canonical
+    for retired in ["im_methodology", "vm_frequency", "settlement_lag"]:
+        payload["instrument"]["spec"]["margin_spec"] = spec | {retired: "simm"}
+        with pytest.raises(ValueError, match="unknown field"):
+            InterestRateSwap.from_json(json.dumps(payload))

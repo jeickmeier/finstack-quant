@@ -9,7 +9,6 @@ use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_valuations::instruments::rates::xccy_swap::{XccySwap, XccySwapLeg};
 use finstack_quant_valuations::instruments::FloatLegSpec;
-use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::instruments::PayReceive;
 use finstack_quant_valuations::instruments::{adjust_joint_calendar, fx_spot_date_for_pair};
 use finstack_quant_valuations::market::conventions::ConventionRegistry;
@@ -23,7 +22,7 @@ use rust_decimal::Decimal;
 ///   maturity pillar, basis spread, and required FX spot input.
 /// * `ctx` - Build context with optional curve-ID overrides used to wire the
 ///   domestic and foreign discounting and forwarding dependencies.
-pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<Box<dyn Instrument>> {
+pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<XccySwap> {
     tracing::debug!(quote_id = %quote.id(), "building XCCY instrument");
     quote.validate()?;
     let registry = ConventionRegistry::try_global()?;
@@ -152,7 +151,7 @@ pub fn build_xccy_instrument(quote: &XccyQuote, ctx: &BuildCtx) -> Result<Box<dy
     let swap = XccySwap::new(id.as_str(), leg1, leg2, conv.quote_currency)
         .with_notional_exchange(conv.notional_exchange);
 
-    Ok(Box::new(swap))
+    Ok(swap)
 }
 
 /// Compounding follows the contractual rate index, not a curve-id override.

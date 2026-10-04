@@ -1,3 +1,4 @@
+import { core as portfolioCore } from '../../index.js';
 /**
  * Portfolio materialization browser-runtime API coverage.
  *
@@ -333,9 +334,17 @@ test('materialized portfolio handle supports repeated valuation without re-mater
   const loaded = portfolio.Portfolio.fromMaterialization(JSON.stringify(EMPTY_BUNDLE), cache);
   const decodeCount = cache.decodeCount;
 
-  // `valuePortfolioBuilt` hands back a structured object, not a JSON string.
-  const first = portfolio.valuePortfolioBuilt(loaded.portfolio, EMPTY_MARKET, false);
-  const second = portfolio.valuePortfolioBuilt(loaded.portfolio, EMPTY_MARKET, false);
+  // `valuePortfolio` hands back a structured object, not a JSON string.
+  const first = portfolio.valuePortfolio(
+    loaded.portfolio,
+    portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
+    false
+  );
+  const second = portfolio.valuePortfolio(
+    loaded.portfolio,
+    portfolioCore.MarketContext.fromJson(EMPTY_MARKET),
+    false
+  );
   assert.equal(typeof first, 'object');
   assert.ok(JSON.stringify(first).length > 2, 'valuation must stringify to a real payload');
 
