@@ -23,8 +23,7 @@ pub mod rough_bergomi;
 pub mod rough_heston;
 pub mod schwartz_smith;
 
-pub use brownian::{BrownianParams, BrownianProcess, MultiBrownianProcess};
-pub use gbm::{GbmParams, GbmProcess, MultiGbmProcess};
-pub use gbm_dividends::{Dividend, GbmWithDividends};
+pub use brownian::BrownianParams;
+pub use gbm::{GbmParams, GbmProcess};
 pub use metadata::ProcessMetadata;
-pub use multi_ou::{MultiOuParams, MultiOuProcess};
+pub use multi_ou::MultiOuParams;

@@ -75,7 +75,7 @@ impl std::str::FromStr for BasisKind {
 }
 
 /// Concrete LSMC basis selected from a user-facing [`BasisKind`].
-pub enum LsmcBasis {
+pub(crate) enum LsmcBasis {
     /// Laguerre basis.
     Laguerre(LaguerreBasis),
     /// Raw polynomial basis.
@@ -127,7 +127,11 @@ impl BasisFunctions for LsmcBasis {
 /// # Errors
 ///
 /// Returns validation errors from the selected concrete basis constructor.
-pub fn build_lsmc_basis(kind: BasisKind, degree: usize, strike: f64) -> Result<LsmcBasis, String> {
+pub(crate) fn build_lsmc_basis(
+    kind: BasisKind,
+    degree: usize,
+    strike: f64,
+) -> Result<LsmcBasis, String> {
     match kind {
         BasisKind::Laguerre => LaguerreBasis::new(degree, strike).map(LsmcBasis::Laguerre),
         BasisKind::Polynomial => PolynomialBasis::new(degree).map(LsmcBasis::Polynomial),
@@ -182,7 +186,7 @@ impl BasisFunctions for PolynomialBasis {
 /// Vandermonde-like regression matrix in LSMC, especially for higher degrees
 /// or wide spot ranges. Recommended over [`PolynomialBasis`] when degree > 2.
 #[derive(Debug, Clone)]
-pub struct NormalizedPolynomialBasis {
+pub(crate) struct NormalizedPolynomialBasis {
     degree: usize,
     center: f64,
     scale: f64,
@@ -249,7 +253,7 @@ impl BasisFunctions for NormalizedPolynomialBasis {
 ///
 /// If you need to reproduce published benchmark tables, apply the
 /// `exp(−x/2)` weight externally on the basis outputs or switch to
-/// [`NormalizedPolynomialBasis`].
+/// [`BasisKind::NormalizedPolynomial`].
 #[derive(Debug, Clone)]
 pub struct LaguerreBasis {
     degree: usize,

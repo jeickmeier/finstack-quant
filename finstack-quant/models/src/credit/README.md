@@ -160,7 +160,7 @@ attainable spread range or the competing brackets.
 ### `SimulatedPaths`
 
 Flat path storage with `values_per_path()`, `get(path_idx, time_idx)`,
-`path(path_idx)`, `iter_paths()`, and `to_nested()`. Seeded via the
+`path(path_idx)`, and `to_nested()`. Seeded via the
 `RandomNumberGenerator` the caller passes to `simulate_paths`, or via the PCG64
 seed given to `simulate_paths_seeded`, so the same seed reproduces the same
 paths. `num_steps == 0` or `horizon <= 0` is a validation
@@ -286,8 +286,7 @@ level relation.
 | Item | Notes |
 |------|-------|
 | `CreditVolatilityConversion::from_survival_window(σ_frac, sp_start, sp_end, horizon, recovery)` | Anchors on a survival ratio from the target curve |
-| `CreditVolatilityConversion::from_reference_hazard(σ_frac, λ_ref, horizon, recovery)` | Anchors on a quoted flat hazard |
-| `conditional_average_hazard`, `reference_spread`, `absolute_spread_volatility`, `additive_hazard_volatility`, `cir_diffusion_coefficient` | The individual mappings |
+| `conditional_average_hazard`, `reference_spread`, `cir_diffusion_coefficient` | The individual mappings |
 | `MIN_REFERENCE_LEVEL = 1e-8` | Below this the fractional vol of a vanishing spread carries no absolute information and conversion is an error |
 
 The returned struct reports every quantity it used and produced

@@ -29,7 +29,7 @@ use super::matchers::{FactorMatchEntry, FactorMatchError, FactorMatcher};
 use crate::factor::credit::hierarchy::{
     dimension_key, CreditHierarchySpec, HierarchyDimension, IssuerBetaRow, IssuerTags,
 };
-use crate::factor::primitives::dependency::MarketDependency;
+use crate::factor::primitives::dependency::{DependencyType, MarketDependency};
 use crate::factor::primitives::factor_types::FactorId;
 use finstack_quant_core::types::{Attributes, IssuerId};
 use serde::{Deserialize, Serialize};
@@ -216,7 +216,9 @@ impl FactorMatcher for CreditHierarchicalMatcher {
         if !self.config.dependency_filter.matches(dependency) {
             return Ok(None);
         }
-        if !is_credit_dependency(dependency) {
+        // The matcher only emits factors for credit-side dependencies
+        // regardless of how the user configured `dependency_filter`.
+        if !dependency.matches_dependency_type(DependencyType::Credit) {
             return Ok(None);
         }
 
@@ -393,18 +395,6 @@ pub fn bucket_factor_id(
         return None;
     }
     Some(format_bucket_factor_id(level_idx, &dim_path, &val_path))
-}
-
-/// Whether a [`MarketDependency`] is a credit/hazard one. The matcher only
-/// emits factors for credit-side dependencies regardless of how the user
-/// configured `dependency_filter`.
-fn is_credit_dependency(dep: &MarketDependency) -> bool {
-    use crate::factor::primitives::dependency::CurveType;
-    match dep {
-        MarketDependency::CreditCurve { .. } | MarketDependency::CreditIndex { .. } => true,
-        MarketDependency::Curve { curve_type, .. } => *curve_type == CurveType::Hazard,
-        _ => false,
-    }
 }
 
 /// Meta key under which a runtime credit-hierarchy tag is read from

@@ -10,6 +10,6 @@ mod forecast;
 pub mod hierarchy;
 mod peel;
 /// Decimal-spread input convention and bp conversion.
-pub mod units;
+pub(crate) mod units;
 
 pub use forecast::{FactorCovarianceForecast, VolHorizon};

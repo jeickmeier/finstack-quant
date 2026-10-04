@@ -235,9 +235,10 @@ impl FullRepricingEngine {
         let repricing_plan = FactorRepricingPlan::build(positions, factors, market);
 
         let compute_profile = |(factor_index, factor): (usize, &FactorDefinition)| {
-            let (bump_size, bump_units) = self
+            let bump_size = self
                 .bump_config
-                .bump_size_with_unit_for_factor(&factor.id, &factor.factor_type);
+                .bump_size_for_factor(&factor.id, &factor.factor_type);
+            let bump_units = factor.factor_type.bump_units();
             Self::validate_bump_size(factor, bump_size)?;
             let affected_positions = repricing_plan.affected(factor_index);
             let reconvert_all = mapping_bumps_fx(&factor.market_mapping);

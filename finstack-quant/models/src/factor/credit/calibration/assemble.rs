@@ -5,13 +5,12 @@ use finstack_quant_analytics::correlation::{
 };
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::bumps::BumpUnits;
+use finstack_quant_core::math::linalg::unflatten_square;
 use finstack_quant_core::types::IssuerId;
 use finstack_quant_core::Result;
 
 use super::config::{CovarianceStrategy, PanelSpace, VolModelChoice};
-use super::statistics::{
-    d_rho_d, flat_to_row_major, ledoit_wolf_cov_and_corr, sample_correlation_flat,
-};
+use super::statistics::{d_rho_d, ledoit_wolf_cov_and_corr, sample_correlation_flat};
 use super::validation::validation_err;
 use crate::factor::credit::hierarchy::{
     CreditCalibrationDiagnostics, CreditHierarchySpec, FactorCorrelationMatrix, FactorHistories,
@@ -176,7 +175,7 @@ pub(crate) fn assemble_factor_model_config(
                         validation_err(format!("Ridge: nearest_correlation_matrix failed: {e}"))
                     })?
             };
-            let corr_data = flat_to_row_major(&rho_flat, n);
+            let corr_data = unflatten_square(&rho_flat, n);
             let corr =
                 FactorCorrelationMatrix::new(factor_id_order.to_vec(), corr_data).map_err(|e| {
                     validation_err(format!(
@@ -203,7 +202,7 @@ pub(crate) fn assemble_factor_model_config(
                         ))
                     })?
             };
-            let corr_data = flat_to_row_major(&rho_repaired, n);
+            let corr_data = unflatten_square(&rho_repaired, n);
             let corr =
                 FactorCorrelationMatrix::new(factor_id_order.to_vec(), corr_data).map_err(|e| {
                     validation_err(format!(

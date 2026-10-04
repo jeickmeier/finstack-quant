@@ -57,20 +57,15 @@ pub mod types;
 pub mod volatility;
 
 pub use closed_form::{
-    bachelier_greeks, bachelier_price, black76_greeks, black76_implied_vol, black76_price,
-    black_shifted_price, black_shifted_vega, bs_greeks, bs_implied_vol, bs_price,
-    heston_call_price_fourier, heston_price, heston_put_price_fourier, vanilla_expiry_payoff,
-    BsGreeks, ForwardGreeks, HestonPricingParams, ONE_PERCENT,
+    bs_implied_vol, bs_price, vanilla_expiry_payoff, BsGreeks, ForwardGreeks, HestonPricingParams,
 };
 pub use trees::{
-    short_rate_keys, single_factor_equity_state, state_keys, BinomialTree, EvolutionParams,
-    HullWhiteTree, HullWhiteTreeConfig, NodeState, ShortRateTree, ShortRateTreeConfig,
-    TreeDiscounting, TreeGreeks, TreeModel, TreeValuator,
+    short_rate_keys, state_keys, EvolutionParams, HullWhiteTree, HullWhiteTreeConfig, NodeState,
+    ShortRateTree, ShortRateTreeConfig, TreeDiscounting, TreeGreeks, TreeModel, TreeValuator,
 };
-pub use types::{ExerciseStyle, OptionMarketParams, OptionType};
+pub use types::{ExerciseStyle, OptionType};
 pub use volatility::{
-    d1, d1_black76, d1_d2_black76, vega_weight, SabrCalibrator, SabrModel, SabrParameters,
-    SabrShift, SabrSmile,
+    d1, d1_black76, d1_d2_black76, SabrCalibrator, SabrModel, SabrParameters, SabrShift,
 };
 
 /// Compiles the crate `README.md` Rust samples as doctests.

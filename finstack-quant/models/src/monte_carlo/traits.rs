@@ -737,7 +737,7 @@ pub trait StochasticProcess: Send + Sync {
 /// A correct implementation guarantees that the diffusion coefficient is
 /// strictly proportional to the state variable in each dimension, so
 /// `∂σ/∂X = σ/X` holds exactly. Under that contract the
-/// [`crate::monte_carlo::discretization::Milstein`] correction term
+/// [`crate::monte_carlo::discretization::milstein::Milstein`] correction term
 /// `½ σ σ' (Z² − 1) Δt` reduces to its exact GBM form using `σ' ≈ σ/X`.
 ///
 /// **Implementing this trait on a process where the diffusion is *not*

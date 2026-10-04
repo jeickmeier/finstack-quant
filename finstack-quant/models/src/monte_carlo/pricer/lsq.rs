@@ -93,7 +93,11 @@ pub fn solve_least_squares(design: &[f64], y: &[f64], n: usize, k: usize) -> Res
 /// Propagates the least-squares error when there are fewer observations than
 /// basis functions or the SVD solve fails. A response vector with an
 /// incompatible length is rejected by the underlying solver.
-pub fn regression_coefficients_with_basis<B>(x: &[f64], y: &[f64], basis: &B) -> Result<Vec<f64>>
+pub(crate) fn regression_coefficients_with_basis<B>(
+    x: &[f64],
+    y: &[f64],
+    basis: &B,
+) -> Result<Vec<f64>>
 where
     B: BasisFunctions + ?Sized,
 {

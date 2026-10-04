@@ -768,7 +768,7 @@ run = [
     -p finstack-quant-attribution --bin gen_attribution_schemas \
     -p finstack-quant-calibration --bin gen_calibration_schemas \
     -p finstack-quant-cashflows --bin gen_cashflow_schemas \
-    -p finstack-quant-models --bin gen_factor_model_schemas \
+    -p finstack-quant-models --bin gen_models_schemas \
     -p finstack-quant-margin --bin gen_margin_schema \
     -p finstack-quant-scenarios --bin gen_scenario_schemas \
     -p finstack-quant-statements --bin gen_statement_schemas \
@@ -784,7 +784,7 @@ run = [
     gen_attribution_schemas \
     gen_calibration_schemas \
     gen_cashflow_schemas \
-    gen_factor_model_schemas \
+    gen_models_schemas \
     gen_margin_schema \
     gen_scenario_schemas \
     gen_statement_schemas \
@@ -829,7 +829,7 @@ cargo build \
   -p finstack-quant-attribution --bin gen_attribution_schemas \
   -p finstack-quant-calibration --bin gen_calibration_schemas \
   -p finstack-quant-cashflows --bin gen_cashflow_schemas \
-  -p finstack-quant-models --bin gen_factor_model_schemas \
+  -p finstack-quant-models --bin gen_models_schemas \
   -p finstack-quant-margin --bin gen_margin_schema \
   -p finstack-quant-scenarios --bin gen_scenario_schemas \
   -p finstack-quant-statements --bin gen_statement_schemas \
@@ -845,7 +845,7 @@ for bin in \
   gen_attribution_schemas \
   gen_calibration_schemas \
   gen_cashflow_schemas \
-  gen_factor_model_schemas \
+  gen_models_schemas \
   gen_margin_schema \
   gen_scenario_schemas \
   gen_statement_schemas \

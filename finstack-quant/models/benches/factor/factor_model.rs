@@ -23,8 +23,8 @@ use finstack_quant_core::types::Attributes;
 use finstack_quant_models::factor::credit::calibration::CovarianceStrategy;
 use finstack_quant_models::factor::credit::decomposition::{decompose_levels, decompose_period};
 use finstack_quant_models::factor::matching::{
-    CascadeMatcher, CreditHierarchicalMatcher, FactorMatcher, FactorNode, HierarchicalMatcher,
-    MappingTableMatcher,
+    CascadeMatcher, CreditHierarchicalMatcher, DependencyFilter, FactorMatcher, FactorNode,
+    HierarchicalMatcher, MappingTableMatcher,
 };
 use finstack_quant_models::factor::{
     CurveType, FactorCovarianceMatrix, FactorId, MarketDependency, SensitivityMatrix,
@@ -195,7 +195,7 @@ fn bench_hierarchical_matcher(c: &mut Criterion) {
 
     for (name, depth, branching) in configs {
         let root = build_tree(depth, branching);
-        let matcher = HierarchicalMatcher::new(root);
+        let matcher = HierarchicalMatcher::new(DependencyFilter::default(), root);
 
         let attrs_hit = Attributes::default().with_tag("sector-0");
 

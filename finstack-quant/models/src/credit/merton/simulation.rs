@@ -47,7 +47,7 @@ impl SimulatedPaths {
     }
 
     /// Iterate over path rows.
-    pub fn iter_paths(&self) -> impl Iterator<Item = &[f64]> {
+    pub(crate) fn iter_paths(&self) -> impl Iterator<Item = &[f64]> {
         self.asset_values.chunks_exact(self.values_per_path())
     }
 

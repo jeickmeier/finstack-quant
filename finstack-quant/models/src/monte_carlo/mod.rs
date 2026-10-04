@@ -104,13 +104,10 @@ pub mod variance_reduction;
 #[cfg(test)]
 mod mc_process_params_serialization;
 
-pub use finstack_quant_core::math::stats::{required_samples, OnlineCovariance, OnlineStats};
+pub use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats};
 pub use finstack_quant_core::math::time_grid::TimeGrid;
 pub use gbm_paths::{simulate_gbm_paths, GbmPathConfig, GbmPathSummary};
-pub use traits::{
-    state_keys, Discretization, PathState, Payoff, ProportionalDiffusion, RandomStream, StateKey,
-    StochasticProcess,
-};
+pub use traits::RandomStream;
 
 /// Reject a non-finite or non-positive volatility before a convenience pricer runs.
 ///

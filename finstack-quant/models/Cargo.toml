@@ -85,8 +85,8 @@ name = "liquidity"
 harness = false
 
 [[bin]]
-name = "gen_factor_model_schemas"
-path = "src/bin/gen_factor_model_schemas.rs"
+name = "gen_models_schemas"
+path = "src/bin/gen_models_schemas.rs"
 required-features = ["json-schema"]
 
 [lints]

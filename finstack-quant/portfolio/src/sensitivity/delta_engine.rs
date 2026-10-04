@@ -43,8 +43,8 @@ impl DeltaBasedEngine {
         as_of: Date,
         base_currency: Currency,
     ) -> Result<Vec<f64>> {
-        let (bump_size, bump_units) =
-            bump_config.bump_size_with_unit_for_factor(&factor.id, &factor.factor_type);
+        let bump_size = bump_config.bump_size_for_factor(&factor.id, &factor.factor_type);
+        let bump_units = factor.factor_type.bump_units();
         if !bump_size.is_finite() || bump_size.abs() < f64::EPSILON {
             return Err(InputError::Invalid.into());
         }

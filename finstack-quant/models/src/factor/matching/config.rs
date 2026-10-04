@@ -51,7 +51,7 @@ impl MatchingConfig {
             Self::Cascade(configs) => Box::new(CascadeMatcher::new(
                 configs.iter().map(Self::build_matcher).collect(),
             )),
-            Self::Hierarchical(config) => Box::new(HierarchicalMatcher::new_scoped(
+            Self::Hierarchical(config) => Box::new(HierarchicalMatcher::new(
                 config.dependency_filter.clone(),
                 config.root.clone(),
             )),

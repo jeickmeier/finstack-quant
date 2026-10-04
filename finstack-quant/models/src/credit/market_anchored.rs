@@ -153,7 +153,7 @@ pub fn reference_spread(hazard: f64, recovery: f64) -> Result<f64> {
 ///
 /// Returns [`Error::Validation`] for a non-finite or negative volatility or
 /// reference spread.
-pub fn absolute_spread_volatility(fractional_vol: f64, reference_spread: f64) -> Result<f64> {
+fn absolute_spread_volatility(fractional_vol: f64, reference_spread: f64) -> Result<f64> {
     validate_volatility(fractional_vol)?;
     validate_level("reference spread", reference_spread)?;
     Ok(fractional_vol * reference_spread)
@@ -178,7 +178,7 @@ pub fn absolute_spread_volatility(fractional_vol: f64, reference_spread: f64) ->
 ///
 /// Returns [`Error::Validation`] for a non-finite or negative volatility or
 /// reference hazard.
-pub fn additive_hazard_volatility(fractional_vol: f64, reference_hazard: f64) -> Result<f64> {
+fn additive_hazard_volatility(fractional_vol: f64, reference_hazard: f64) -> Result<f64> {
     validate_volatility(fractional_vol)?;
     validate_level("reference hazard", reference_hazard)?;
     Ok(fractional_vol * reference_hazard)
@@ -297,7 +297,7 @@ impl CreditVolatilityConversion {
     /// # Errors
     ///
     /// As [`Self::from_survival_window`].
-    pub fn from_reference_hazard(
+    fn from_reference_hazard(
         fractional_spread_volatility: f64,
         reference_hazard: f64,
         horizon_years: f64,

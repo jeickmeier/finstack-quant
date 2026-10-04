@@ -10,7 +10,6 @@ use super::covariance::FactorCovarianceMatrix;
 use super::matching::MatchingConfig;
 use super::primitives::definition::FactorDefinition;
 use super::primitives::factor_types::{FactorId, FactorType};
-use finstack_quant_core::market_data::bumps::BumpUnits;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
@@ -206,9 +205,9 @@ impl BumpSizeConfig {
     /// The returned `f64` is in the *canonical* units for the factor type:
     /// basis points for rates/credit/inflation, percent for equity/commodity/FX,
     /// vol points for volatility. Callers that cannot statically
-    /// know the unit should use [`Self::bump_size_with_unit_for_factor`]
-    /// instead — same numeric, but the unit flows through as a
-    /// [`BumpUnits`] tag.
+    /// know the unit pair this with [`FactorType::bump_units`], which
+    /// carries the unit as a `BumpUnits` tag. Per-factor `overrides`
+    /// inherit the factor type's canonical unit.
     #[must_use]
     pub fn bump_size_for_factor(&self, factor_id: &FactorId, factor_type: &FactorType) -> f64 {
         if let Some(&size) = self.overrides.get(factor_id) {
@@ -222,35 +221,6 @@ impl BumpSizeConfig {
             FactorType::Fx => self.fx_pct,
             FactorType::Volatility => self.vol_points,
         }
-    }
-
-    /// Return the configured bump size along with its canonical [`BumpUnits`]
-    /// (see [`FactorType::bump_units`]).
-    ///
-    /// A bare-`f64` return would obscure that the unit depends on
-    /// `factor_type` — a numeric value of `1.0` is 1 bp for a rates
-    /// factor but 1 % for an equity factor, and mixing the two up
-    /// silently produces a 100× error. This method carries the unit
-    /// alongside the magnitude so downstream bump-construction code
-    /// can validate or convert explicitly.
-    ///
-    /// Per-factor `overrides` inherit the factor-type's canonical unit —
-    /// if a user wants a non-canonical interpretation (e.g. an absolute
-    /// shift on a rates factor), introduce a new factor with a different
-    /// type or a `MarketMapping` that encodes the desired `BumpUnits`.
-    ///
-    /// # Arguments
-    ///
-    /// * `factor_id` - Stable identifier of the market or statistical factor.
-    /// * `factor_type` - Factor classification controlling shock and aggregation semantics.
-    #[must_use]
-    pub fn bump_size_with_unit_for_factor(
-        &self,
-        factor_id: &FactorId,
-        factor_type: &FactorType,
-    ) -> (f64, BumpUnits) {
-        let size = self.bump_size_for_factor(factor_id, factor_type);
-        (size, factor_type.bump_units())
     }
 }
 
@@ -647,8 +617,9 @@ mod tests {
     fn vol_point_resolves_to_one_percent_additive() {
         use finstack_quant_core::market_data::bumps::{BumpMode, BumpSpec, BumpType};
 
-        let (size, units) = BumpSizeConfig::default()
-            .bump_size_with_unit_for_factor(&FactorId::new("VOL-1"), &FactorType::Volatility);
+        let size = BumpSizeConfig::default()
+            .bump_size_for_factor(&FactorId::new("VOL-1"), &FactorType::Volatility);
+        let units = FactorType::Volatility.bump_units();
         assert!((size - 1.0).abs() < 1e-12);
         assert_eq!(units, BumpUnits::Percent);
         let spec = BumpSpec {
