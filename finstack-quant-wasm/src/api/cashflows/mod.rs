@@ -157,5 +157,5 @@ pub fn mdr_to_cdr(mdr: JsValue) -> Result<f64, JsValue> {
 pub fn abs_to_smm(speed: JsValue, month: JsValue) -> Result<f64, JsValue> {
     let speed = js_f64(&speed, "speed")?;
     let month: u32 = js_uint(&month, "month")?;
-    finstack_quant_cashflows::abs_to_smm(speed, month).map_err(to_js_err)
+    finstack_quant_cashflows::builder::abs_to_smm(speed, month).map_err(to_js_err)
 }

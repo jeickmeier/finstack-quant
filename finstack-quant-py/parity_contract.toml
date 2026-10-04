@@ -349,7 +349,7 @@ python_package = "finstack_quant.cashflows.builder"
 # schedule JSON); evaluate_fee_tiers / FeeTier / DefaultCurve /
 # PrepaymentCurve (spec internals reachable through the spec types); and the
 # credit-rate helpers psa_cpr / PSA_RAMP_MONTHS / PSA_TERMINAL_CPR.
-note = "abs_to_smm/cdr_to_mdr/cpr_to_smm/mdr_to_cdr/smm_to_cpr are also re-exported at the Rust crate root and bound flat on finstack_quant.cashflows (their WASM twins are accounted in the [parity] ledger). Typed CashFlowBuilder matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM binds CashFlowSchedule / CashFlowBuilder as classes, and the spec types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
+note = "Typed CashFlowBuilder matches the Rust coupon-program methods (including fixed_to_float and float_margin_steps); WASM binds CashFlowSchedule / CashFlowBuilder as classes, and the spec types cross as plain objects whose constructors and methods are free functions (see the [parity] ledger)."
 public = [
     "AmortizationSpec", "CashFlowBuilder", "CashFlowMeta", "CashFlowSchedule", "CouponType",
     "DefaultModelSpec", "FeeAccrualBasis", "FeeBase",

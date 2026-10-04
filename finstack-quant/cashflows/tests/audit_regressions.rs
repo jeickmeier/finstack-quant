@@ -672,10 +672,10 @@ fn accrued_interest_preserves_february_termination_on_roundtrip() {
 }
 
 #[test]
-fn abs_to_smm_is_reexported_at_the_crate_root() {
-    close(cf::abs_to_smm(0.015, 1).expect("month 1"), 0.015);
+fn abs_to_smm_follows_the_absolute_prepayment_ramp() {
+    close(cf::builder::abs_to_smm(0.015, 1).expect("month 1"), 0.015);
     close(
-        cf::abs_to_smm(0.015, 11).expect("month 11"),
+        cf::builder::abs_to_smm(0.015, 11).expect("month 11"),
         0.015 / (1.0 - 0.015 * 10.0),
     );
 }

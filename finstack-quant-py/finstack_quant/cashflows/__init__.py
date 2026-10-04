@@ -27,30 +27,19 @@ schedule_from_dated_flows = _cashflows.schedule_from_dated_flows
 validate_cashflow_schedule_json = _cashflows.validate_cashflow_schedule_json
 dated_flows_json = _cashflows.dated_flows_json
 
-abs_to_smm = _cashflows.abs_to_smm
-cpr_to_smm = _cashflows.cpr_to_smm
-smm_to_cpr = _cashflows.smm_to_cpr
-cdr_to_mdr = _cashflows.cdr_to_mdr
-mdr_to_cdr = _cashflows.mdr_to_cdr
-
 __all__: list[str] = [
     "ScheduleBuildOpts",
-    "abs_to_smm",
     "accrual",
     "aggregation",
     "build_cashflow_schedule",
     "build_cashflow_schedule_json",
     "builder",
-    "cdr_to_mdr",
-    "cpr_to_smm",
     "dated_flows",
     "dated_flows_json",
     "fixings",
-    "mdr_to_cdr",
     "primitives",
     "schedule_from_classified_flows",
     "schedule_from_dated_flows",
     "schema",
-    "smm_to_cpr",
     "validate_cashflow_schedule_json",
 ]

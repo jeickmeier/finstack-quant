@@ -421,37 +421,23 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(schedule_from_classified_flows, &m)?)?;
     m.add_function(wrap_pyfunction!(schedule_from_dated_flows, &m)?)?;
     m.add_function(wrap_pyfunction!(validate_cashflow_schedule_json, &m)?)?;
-    // Prepayment/default rate-convention conversions. The Rust crate root
-    // re-exports these from `builder::credit_rates`, so they are exposed both
-    // flat here (mirroring the crate root, and the WASM facade) and on the
-    // typed `builder` submodule (mirroring `builder::`).
-    m.add_function(wrap_pyfunction!(builder::abs_to_smm, &m)?)?;
-    m.add_function(wrap_pyfunction!(builder::cdr_to_mdr, &m)?)?;
-    m.add_function(wrap_pyfunction!(builder::cpr_to_smm, &m)?)?;
-    m.add_function(wrap_pyfunction!(builder::mdr_to_cdr, &m)?)?;
-    m.add_function(wrap_pyfunction!(builder::smm_to_cpr, &m)?)?;
 
     let all = PyList::new(
         py,
         [
             "ScheduleBuildOpts",
-            "abs_to_smm",
             "accrual",
             "aggregation",
             "build_cashflow_schedule",
             "build_cashflow_schedule_json",
             "builder",
-            "cdr_to_mdr",
-            "cpr_to_smm",
             "dated_flows",
             "dated_flows_json",
             "fixings",
-            "mdr_to_cdr",
             "primitives",
             "schedule_from_classified_flows",
             "schedule_from_dated_flows",
             "schema",
-            "smm_to_cpr",
             "validate_cashflow_schedule_json",
         ],
     )?;

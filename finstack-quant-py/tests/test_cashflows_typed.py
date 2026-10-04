@@ -1484,7 +1484,7 @@ class TestTypedTwinsAndWire:
         assert str(FixedCouponSpec("0.05", params).rate) == "0.05"
 
     def test_credit_rate_error_text(self) -> None:
-        from finstack_quant.cashflows import cpr_to_smm
+        from finstack_quant.cashflows.builder import cpr_to_smm
 
         with pytest.raises(ValueError, match=r"must be a decimal in \[0,1\]"):
             cpr_to_smm(-0.05)
