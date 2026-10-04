@@ -19,7 +19,7 @@ export function adaptValuation(result: ValuationResult): ValuationResult {
 /**
  * Export an actual facade result as Rust-validated JSON with integer seed tokens.
  * @param result - Structured facade result; uint64 fields must be bigint.
- * @param canonicalize - Existing valuations.validateValuationResultJson export.
+ * @param canonicalize - Existing valuations.valuationResultToJson export.
  * @returns Canonical JSON returned by Rust.
  * @throws TypeError or ZodError for unsafe/invalid host values; propagates Rust errors.
  */

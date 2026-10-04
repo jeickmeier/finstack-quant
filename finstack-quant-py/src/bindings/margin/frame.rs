@@ -121,7 +121,6 @@ pub(super) fn sensitivity_rows(frame: &Bound<'_, PyAny>) -> PyResult<Vec<Sensiti
                 kind: req_str(row, "kind")?,
                 sector: opt_str(row, "sector")?,
                 seniority: opt_str(row, "seniority")?,
-                asset_type: opt_str(row, "asset_type")?,
                 maturity_years: opt_f64(row, "maturity_years")?,
                 pnl_adjustment: opt_f64(row, "pnl_adjustment")?,
                 amount: req_f64(row, "amount")?,

@@ -39,6 +39,8 @@ mod production_inflation_audit;
 mod production_risk_audit;
 #[path = "production_simm_sensitivity_audit.rs"]
 mod production_simm_sensitivity_audit;
+#[path = "production_simplicity_regressions.rs"]
+mod production_simplicity_regressions;
 #[path = "production_structured_audit.rs"]
 mod production_structured_audit;
 #[path = "production_structured_metrics_audit.rs"]

@@ -138,7 +138,7 @@ handle_setters!(JsInterestRateSwapBuilder, "InterestRateSwapBuilder", {
 });
 
 instrument_class!(
-    /// Typed wrapper for the Rust `Swaption` instrument (European, American or Bermudan option on a swap).
+    /// Typed wrapper for the Rust `Swaption` instrument (European option on a swap).
     JsSwaption,
     "Swaption",
     finstack_quant_valuations::instruments::Swaption
@@ -162,9 +162,6 @@ getters!(JsSwaption, "Swaption", |i| {
         /// Option expiry date.
         /// @returns The expiry date.
         expiry as expiry => date(i.expiry),
-        /// Exercise style of the swaption.
-        /// @returns `"european"`, `"bermudan"` or `"american"`.
-        exercise_style as exerciseStyle => json(i.exercise_style),
         /// Settlement method.
         /// @returns `"physical"` or `"cash"`.
         settlement as settlement => json(i.settlement),
@@ -220,7 +217,6 @@ factories!(JsSwaption, "Swaption", finstack_quant_valuations::instruments::Swapt
         /// @returns The example swaption.
         /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
         example as example,
-
 });
 
 market_metrics!(JsSwaption, "Swaption", {
@@ -260,11 +256,6 @@ setters!(JsSwaptionBuilder, "SwaptionBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         expiry as expiry => date,
-        /// Set the exercise style.
-        /// @param value - Exercise style (serde string). Default `"european"`.
-        /// @returns The builder, for chaining.
-        /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        exercise_style as exerciseStyle => en,
         /// Set the settlement method.
         /// @param value - Settlement method (serde string).
         /// @returns The builder, for chaining.

@@ -675,8 +675,7 @@
             "reference": "scripts/golden/normal_swaption_reference.py"
           }
         },
-        "settlement": "cash",
-        "exercise_style": "european"
+        "settlement": "cash"
       }
     }
   },

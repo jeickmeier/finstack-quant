@@ -76,7 +76,10 @@ fn apply_and_revalue_succeeds() {
         hazard_bump_mode: Default::default(),
     };
 
-    let (shocked_valuation, report) = finstack_quant_portfolio::scenarios::apply_and_revalue(
+    let finstack_quant_portfolio::scenarios::ScenarioRevalueView {
+        valuation: shocked_valuation,
+        report,
+    } = finstack_quant_portfolio::scenarios::apply_and_revalue(
         &portfolio, &scenario, &market, &config,
     )
     .unwrap();
@@ -166,7 +169,7 @@ fn scenario_pnl_reconciles_end_to_end() {
         hazard_bump_mode: Default::default(),
     };
 
-    let (pnl, report) =
+    let finstack_quant_portfolio::scenarios::ScenarioPnlView { pnl, report } =
         finstack_quant_portfolio::scenarios::scenario_pnl(&portfolio, &scenario, &market, &config)
             .unwrap();
 
@@ -190,7 +193,10 @@ fn scenario_pnl_reconciles_end_to_end() {
         &Default::default(),
     )
     .unwrap();
-    let (stressed, _) = finstack_quant_portfolio::scenarios::apply_and_revalue(
+    let finstack_quant_portfolio::scenarios::ScenarioRevalueView {
+        valuation: stressed,
+        report: _,
+    } = finstack_quant_portfolio::scenarios::apply_and_revalue(
         &portfolio, &scenario, &market, &config,
     )
     .unwrap();
@@ -243,7 +249,10 @@ fn scenario_pnl_no_op_scenario_is_flat() {
         hazard_bump_mode: Default::default(),
     };
 
-    let (pnl, _report) = finstack_quant_portfolio::scenarios::scenario_pnl(
+    let finstack_quant_portfolio::scenarios::ScenarioPnlView {
+        pnl,
+        report: _report,
+    } = finstack_quant_portfolio::scenarios::scenario_pnl(
         &portfolio,
         &scenario,
         &market_with_usd(),
@@ -279,9 +288,11 @@ fn scenario_pnl_no_op_scenario_is_flat() {
         &config,
     )
     .expect("scenario batch");
-    let (standalone, _) =
-        finstack_quant_portfolio::scenarios::scenario_pnl(&portfolio, &shock, &market, &config)
-            .expect("standalone scenario");
+    let finstack_quant_portfolio::scenarios::ScenarioPnlView {
+        pnl: standalone,
+        report: _,
+    } = finstack_quant_portfolio::scenarios::scenario_pnl(&portfolio, &shock, &market, &config)
+        .expect("standalone scenario");
 
     assert_eq!(
         batch

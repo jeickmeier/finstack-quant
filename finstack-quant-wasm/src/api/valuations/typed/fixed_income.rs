@@ -591,7 +591,7 @@ setters!(JsRevolvingCreditBuilder, "RevolvingCreditBuilder", {
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         margin_steps as marginSteps => json,
         /// Set the draw/repay specification from its serde shape.
-        /// @param value - `DrawRepaySpec` as a plain object or JSON string: `{"deterministic": [{"date": ..., "amount": Money, "is_draw": boolean}, ...]}` or `{"stochastic": {"utilization_process": {...}, "use_sobol_qmc": ..., "mc_config": ...}}`. The estimator count, antithetic flag and seed label come from `instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`, `mc_seed_scenario`).
+        /// @param value - `DrawRepaySpec` as a plain object or JSON string: `{"deterministic": [{"date": ..., "amount": Money, "is_draw": boolean}, ...]}` or `{"stochastic": {"utilization_process": {...}, "mc_config": ...}}`. The estimator count, antithetic flag and seed label come from `instrument_pricing_overrides.model_config` (`mc_paths`, `mc_antithetic`, `mc_seed_scenario`).
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         draw_repay_spec as drawRepaySpec => json,
@@ -798,7 +798,7 @@ builder_class!(
     "AssetBackedFacilityBuilder",
     finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AssetBackedFacilityBuilder,
     JsAssetBackedFacility,
-    |b| b.build().and_then(|facility| facility.validate().map(|()| facility))
+    |b| b.build()
 );
 
 setters!(JsAssetBackedFacilityBuilder, "AssetBackedFacilityBuilder", {

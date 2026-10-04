@@ -1,9 +1,9 @@
 //! Commodity option instrument definition and pricing logic.
 
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::{
     CommodityConvention, CommodityUnderlyingParams, OptionMarketParams,
 };
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::{ExerciseStyle, OptionType, SettlementType};
 use finstack_quant_core::currency::Currency;
@@ -17,14 +17,14 @@ use finstack_quant_models::trees::binomial_tree::BinomialTree;
 
 /// Monte Carlo configuration for commodity option pricing.
 ///
-/// When provided, enables simulation-based pricing using the specified
-/// stochastic model instead of the default Black-76 analytical formula.
+/// When provided, enables simulation-based pricing using the Schwartz-Smith
+/// two-factor model instead of the default Black-76 analytical formula.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CommodityMcParams {
-    /// Pricing model to use for simulation.
-    pub model: CommodityPricingModel,
+    /// Risk-neutral Schwartz-Smith two-factor process parameters.
+    pub params: SchwartzSmithParams,
     /// Number of independent Monte Carlo paths (estimators).
     pub num_paths: usize,
     /// Number of time steps per path.
@@ -32,27 +32,6 @@ pub struct CommodityMcParams {
     /// Optional random seed for reproducibility.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seed: Option<u64>,
-}
-
-/// Commodity option pricing model selection.
-///
-/// Determines the stochastic dynamics used for Monte Carlo simulation.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case", deny_unknown_fields)]
-pub enum CommodityPricingModel {
-    /// Analytical Black-76 (no MC needed; included for completeness).
-    Black76,
-    /// Schwartz-Smith two-factor model.
-    ///
-    /// Models commodity prices as S(t) = exp(X(t) + Y(t)) where:
-    /// - X(t): short-term mean-reverting deviation (OU process)
-    /// - Y(t): long-term equilibrium trend (arithmetic Brownian motion)
-    ///
-    /// Parameters use the Schwartz & Smith (2000) notation: `kappa`,
-    /// `sigma_x`, `mu_y`, `sigma_y`, `rho_xy` and the risk-neutral drift shift
-    /// `lambda_x` (dX = (-kappa·X - lambda_x) dt + sigma_x dW*_X).
-    SchwartzSmith(SchwartzSmithParams),
 }
 
 /// Commodity option (option on commodity forward or spot).
@@ -119,7 +98,6 @@ pub struct CommodityOption {
     /// Optional Bermudan exercise schedule.
     ///
     /// Required when `exercise_style == ExerciseStyle::Bermudan`.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_dates")]
     #[cfg_attr(
@@ -167,11 +145,9 @@ pub struct CommodityOption {
     /// Volatility surface ID for implied vol.
     pub vol_surface_id: CurveId,
     /// Optional spot price ID (for spot-based pricing and American options).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spot_id: Option<PriceId>,
     /// Optional quoted forward price (overrides curve lookup).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quoted_forward: Option<f64>,
     /// Day count convention for time to expiry.
@@ -202,7 +178,6 @@ pub struct CommodityOption {
     /// Optional market convention for this commodity.
     ///
     /// When set, provides default premium settlement days and calendar.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub convention: Option<CommodityConvention>,
     /// Premium settlement lag in business days after trade date.
@@ -210,7 +185,6 @@ pub struct CommodityOption {
     /// Standard: T+1 for most exchange-traded options, T+2 for OTC.
     /// If not set and `convention` is provided, uses convention default.
     /// Otherwise defaults to 1 (T+1).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub premium_settlement_days: Option<u32>,
     /// Attributes for tagging and selection.
@@ -459,134 +433,111 @@ impl CommodityOption {
             ));
         }
 
-        match &mc_params.model {
-            CommodityPricingModel::Black76 => {
-                // Fall back to analytical Black-76
-                let inputs = self.collect_inputs(market, as_of)?;
-                let unit_price = black76_unit_price(
-                    inputs.forward,
-                    self.strike,
-                    inputs.sigma,
-                    inputs.t,
-                    inputs.df,
-                    self.option_type,
-                );
-                Ok((
-                    Money::new(
-                        unit_price * self.quantity * self.multiplier,
-                        self.underlying.currency,
-                    )?,
-                    None,
-                ))
-            }
-            CommodityPricingModel::SchwartzSmith(p) => {
-                // Build risk-neutral Schwartz-Smith process. Schwartz & Smith
-                // (2000) risk-neutralize the short-term factor with a
-                // CONSTANT drift shift at unchanged mean-reversion speed:
-                //   dX = (-kappa·X - lambda_x) dt + sigma_x dW*_X
-                // (inflating kappa by lambda_x would distort the futures
-                // volatility term structure e^{-kappa·tau}).
-                let ss_params =
-                    SchwartzSmithParams::new(p.kappa, p.sigma_x, p.mu_y, p.sigma_y, p.rho_xy)?
-                        .with_lambda_x(p.lambda_x)?;
+        let p = &mc_params.params;
 
-                let initial_spot = if let Some(spot) = self.spot_price(market)? {
-                    spot
-                } else {
-                    self.forward_price(market, as_of)?
-                };
+        // Build risk-neutral Schwartz-Smith process. Schwartz & Smith
+        // (2000) risk-neutralize the short-term factor with a
+        // CONSTANT drift shift at unchanged mean-reversion speed:
+        //   dX = (-kappa·X - lambda_x) dt + sigma_x dW*_X
+        // (inflating kappa by lambda_x would distort the futures
+        // volatility term structure e^{-kappa·tau}).
+        let ss_params = SchwartzSmithParams::new(p.kappa, p.sigma_x, p.mu_y, p.sigma_y, p.rho_xy)?
+            .with_lambda_x(p.lambda_x)?;
 
-                let mut process = SchwartzSmithProcess::from_spot(ss_params, initial_spot, None);
+        let initial_spot = if let Some(spot) = self.spot_price(market)? {
+            spot
+        } else {
+            self.forward_price(market, as_of)?
+        };
 
-                // Pin the simulated forward to the market: the closed-form
-                // futures curve F_model(0,T) (Schwartz-Smith 2000, eq. 9) is
-                // calibrated to the market forward by shifting the long-term
-                // drift — A(T) is linear in mu_y with coefficient T, so
-                //   mu_y* = mu_y + ln(F_mkt / F_model) / T
-                // makes E^Q[S_T] equal the same forward the Black-76 branch
-                // discounts. Without this, the SS-MC price embeds an
-                // arbitrary carry inconsistent with the price curve.
-                let market_forward = self.forward_price(market, as_of)?;
-                if market_forward > 0.0 && t > 0.0 {
-                    let model_forward = process.futures_price(t);
-                    let mu_adjustment = (market_forward / model_forward).ln() / t;
-                    let pinned_params = SchwartzSmithParams::new(
-                        p.kappa,
-                        p.sigma_x,
-                        p.mu_y + mu_adjustment,
-                        p.sigma_y,
-                        p.rho_xy,
-                    )?
-                    .with_lambda_x(p.lambda_x)?;
-                    process = SchwartzSmithProcess::from_spot(pinned_params, initial_spot, None);
-                }
-                let disc_scheme = ExactSchwartzSmith::from_process(&process)?;
+        let mut process = SchwartzSmithProcess::from_spot(ss_params, initial_spot, None);
 
-                // Discount factor
-                let disc_curve = market.get_discount(self.discount_curve_id.as_str())?;
-                let df = disc_curve.df_between_dates(as_of, self.expiry)?;
-
-                let seed = mc_params.seed.unwrap_or(42);
-                let time_grid = TimeGrid::uniform(t, mc_params.num_steps)?;
-                let time_grid_values = time_grid.times().to_vec();
-                let engine_config =
-                    McEngineConfig::new(mc_params.num_paths, time_grid).parallel(true);
-                let engine = McEngine::new(engine_config);
-
-                let rng = PhiloxRng::new(seed);
-                let initial_state = process.initial_state().to_vec();
-                let maturity_step = mc_params.num_steps;
-
-                // Dispatch on option type (EuropeanCall / EuropeanPut are
-                // distinct concrete types, so we branch here).
-                let estimate = match self.option_type {
-                    OptionType::Call => {
-                        let payoff = EuropeanCall::new(self.strike, 1.0, maturity_step);
-                        engine.price(
-                            &rng,
-                            &process,
-                            &disc_scheme,
-                            &initial_state,
-                            &payoff,
-                            self.underlying.currency,
-                            df,
-                        )?
-                    }
-                    OptionType::Put => {
-                        let payoff = EuropeanPut::new(self.strike, 1.0, maturity_step);
-                        engine.price(
-                            &rng,
-                            &process,
-                            &disc_scheme,
-                            &initial_state,
-                            &payoff,
-                            self.underlying.currency,
-                            df,
-                        )?
-                    }
-                };
-
-                let scale = self.quantity * self.multiplier;
-                Ok((
-                    Money::new(estimate.mean.amount() * scale, self.underlying.currency)?,
-                    Some(crate::results::MonteCarloValuationDetails {
-                        model_key: crate::pricer::ModelKey::MonteCarloSchwartzSmith,
-                        standard_error: estimate.stderr * scale.abs(),
-                        training_paths: 0,
-                        training_simulated_paths: 0,
-                        make_whole_training_paths: 0,
-                        make_whole_training_simulated_paths: 0,
-                        estimator_paths: estimate.num_paths,
-                        simulated_paths: estimate.num_simulated_paths,
-                        seed,
-                        time_grid: time_grid_values,
-                        antithetic: false,
-                        sobol: false,
-                        brownian_bridge: false,
-                    }),
-                ))
-            }
+        // Pin the simulated forward to the market: the closed-form
+        // futures curve F_model(0,T) (Schwartz-Smith 2000, eq. 9) is
+        // calibrated to the market forward by shifting the long-term
+        // drift — A(T) is linear in mu_y with coefficient T, so
+        //   mu_y* = mu_y + ln(F_mkt / F_model) / T
+        // makes E^Q[S_T] equal the same forward the Black-76 branch
+        // discounts. Without this, the SS-MC price embeds an
+        // arbitrary carry inconsistent with the price curve.
+        let market_forward = self.forward_price(market, as_of)?;
+        if market_forward > 0.0 && t > 0.0 {
+            let model_forward = process.futures_price(t);
+            let mu_adjustment = (market_forward / model_forward).ln() / t;
+            let pinned_params = SchwartzSmithParams::new(
+                p.kappa,
+                p.sigma_x,
+                p.mu_y + mu_adjustment,
+                p.sigma_y,
+                p.rho_xy,
+            )?
+            .with_lambda_x(p.lambda_x)?;
+            process = SchwartzSmithProcess::from_spot(pinned_params, initial_spot, None);
         }
+        let disc_scheme = ExactSchwartzSmith::from_process(&process)?;
+
+        // Discount factor
+        let disc_curve = market.get_discount(self.discount_curve_id.as_str())?;
+        let df = disc_curve.df_between_dates(as_of, self.expiry)?;
+
+        let seed = mc_params.seed.unwrap_or(42);
+        let time_grid = TimeGrid::uniform(t, mc_params.num_steps)?;
+        let time_grid_values = time_grid.times().to_vec();
+        let engine_config = McEngineConfig::new(mc_params.num_paths, time_grid).parallel(true);
+        let engine = McEngine::new(engine_config);
+
+        let rng = PhiloxRng::new(seed);
+        let initial_state = process.initial_state().to_vec();
+        let maturity_step = mc_params.num_steps;
+
+        // Dispatch on option type (EuropeanCall / EuropeanPut are
+        // distinct concrete types, so we branch here).
+        let estimate = match self.option_type {
+            OptionType::Call => {
+                let payoff = EuropeanCall::new(self.strike, 1.0, maturity_step);
+                engine.price(
+                    &rng,
+                    &process,
+                    &disc_scheme,
+                    &initial_state,
+                    &payoff,
+                    self.underlying.currency,
+                    df,
+                )?
+            }
+            OptionType::Put => {
+                let payoff = EuropeanPut::new(self.strike, 1.0, maturity_step);
+                engine.price(
+                    &rng,
+                    &process,
+                    &disc_scheme,
+                    &initial_state,
+                    &payoff,
+                    self.underlying.currency,
+                    df,
+                )?
+            }
+        };
+
+        let scale = self.quantity * self.multiplier;
+        Ok((
+            Money::new(estimate.mean.amount() * scale, self.underlying.currency)?,
+            Some(crate::results::MonteCarloValuationDetails {
+                model_key: crate::pricer::ModelKey::MonteCarloSchwartzSmith,
+                standard_error: estimate.stderr * scale.abs(),
+                training_paths: 0,
+                training_simulated_paths: 0,
+                make_whole_training_paths: 0,
+                make_whole_training_simulated_paths: 0,
+                estimator_paths: estimate.num_paths,
+                simulated_paths: estimate.num_simulated_paths,
+                seed,
+                time_grid: time_grid_values,
+                antithetic: false,
+                sobol: false,
+                brownian_bridge: false,
+            }),
+        ))
     }
 }
 
@@ -798,7 +749,7 @@ impl Instrument for CommodityOption {
         Some(self.expiry)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for CommodityOption {

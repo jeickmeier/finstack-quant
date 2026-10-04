@@ -16,7 +16,7 @@ Consumed by [`models::closed_form`](../closed_form/) and
 [`models::trees`](../trees/) (both use `black::d1_d2`), by
 `calibration::hull_white` (`normal::bachelier_price_with_annuity`), by
 `calibration::targets::vol` (`SabrCalibrator::calibrate`, the
-SABR slice fitter behind `VolSurfaceModel::Sabr`), and by the rates/FX/vol
+SABR slice fitter used by calibration's volatility surface step), and by the rates/FX/vol
 instrument pricers — `rates/{swaption, cap_floor, cms_option, cms_swap}`,
 the asset-owned futures-option instruments, `fx/fx_digital_option`,
 `exotics/range_accrual` — which reach for `normal::{bachelier_price_with_annuity,
@@ -31,7 +31,6 @@ d_bachelier}`, `black::{d1_d2, d1_black76, d2_black76, d1_d2_black76}`, and
 | [`black.rs`](black.rs) | `d1`, `d2`, `d1_d2`, `d1_black76`, `d2_black76`, `d1_d2_black76` |
 | [`normal.rs`](normal.rs) | `d_bachelier`, `bachelier_price_with_annuity` |
 | [`sabr/`](sabr/) | `SabrParameters`, `SabrModel`, `SabrVolType`, `SabrCalibrator`, `SabrSmile` |
-| [`sabr_derivatives.rs`](sabr_derivatives.rs) | `SabrMarketData`, `SabrCalibrationDerivatives` — finite-difference gradients for the LM solver |
 | [`source.rs`](source.rs) | `VolSource` plus surface, cube, and FX delta-volatility evaluation/materialization |
 | [`arbitrage/`](arbitrage/) | Model-dependent volatility arbitrage checks |
 | [`heston.rs`](heston.rs), [`rough_heston.rs`](rough_heston.rs), [`local_vol.rs`](local_vol.rs), [`svi.rs`](svi.rs) | Stochastic/local volatility engines and fitting |
@@ -191,24 +190,6 @@ forward-based call prices; carry is already in the smile's forward.
 `SabrShift` parses the host keyword `"auto"` (`FromStr`) and displays as
 `none` / the fixed value / `auto`.
 
-### `sabr_derivatives.rs`
-
-Despite the name, these are **central finite-difference** gradients, not
-hand-derived analytical ones. `SABRCalibrationDerivatives` implements
-`finstack_quant_core::math::solver_multi::AnalyticalDerivatives` by evaluating
-`SABRModel::implied_volatility` — the same function the calibration objective
-uses — so gradient and objective are exactly consistent and the accuracy
-pitfalls of hand-derived Hagan-expansion gradients are avoided. Finite
-differences are the only path; the module offers no analytical alternative to
-fall back from.
-
-`SABRMarketData` (`forward`, `time_to_expiry`, `strikes`, `market_vols`,
-`beta`, `shift`) is `Serialize`/`Deserialize`/`JsonSchema`; use
-`SABRMarketData::new(...)` or `new_with_shift(...)` for the validated
-constructors.
-
-References: Hagan, Kumar, Lesniewski & Woodward (2002); Obloj (2008).
-
 ## Model ownership
 
 | Model | Home |
@@ -330,12 +311,10 @@ mise run rust-bench
 ```
 
 Every test in this module is a SABR test: [`sabr/tests.rs`](sabr/tests.rs) plus
-`#[cfg(test)]` blocks in [`sabr/parameters.rs`](sabr/parameters.rs) and
-[`sabr_derivatives.rs`](sabr_derivatives.rs). They cover parameter validation,
+`#[cfg(test)]` blocks in [`sabr/parameters.rs`](sabr/parameters.rs). They cover parameter validation,
 SABR ATM vol recovery, smile monotonicity, calibration round-trips, shifted
 SABR on negative rates, arbitrage detection and repair, χ(z) series/exact
-blending continuity, extreme ρ, the β ∈ {0, 0.5, 1} branches, and
-finite-difference gradient consistency.
+blending continuity, extreme ρ, the β ∈ {0, 0.5, 1} branches.
 
 `black.rs` and `normal.rs` carry **no tests of their own** — no `d₁`/`d₂`
 textbook check, no `t = 0` / `σ = 0` / ATM limit, no Bachelier reference value.

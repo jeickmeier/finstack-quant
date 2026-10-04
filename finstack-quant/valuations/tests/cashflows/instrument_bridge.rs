@@ -149,7 +149,7 @@ fn basis_swap_exposes_cashflow_provider_bridge() {
         frequency: Tenor::quarterly(),
         day_count: DayCount::Act360,
         business_day_convention: BusinessDayConvention::ModifiedFollowing,
-        calendar_id: None,
+        calendar_id: Some("weekends_only".into()),
         stub: StubKind::ShortFront,
         spread_bp: Decimal::ZERO,
         payment_lag_days: 0,

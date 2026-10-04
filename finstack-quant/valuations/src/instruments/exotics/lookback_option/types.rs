@@ -43,7 +43,7 @@
 //! - Broadie, M., Glasserman, P., & Kou, S. G. (1997). "A Continuity Correction
 //!   for Discrete Barrier Options." `docs/REFERENCES.md#glasserman-2004-monte-carlo` `docs/REFERENCES.md#broadie-glasserman-kou-1997`
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::{Monitoring, OptionType};
 use finstack_quant_core::currency::Currency;
@@ -136,7 +136,6 @@ pub struct LookbackOption {
     /// Required when valuing after expiry so the realized payoff cannot move
     /// with a later market spot snapshot. At expiry itself, the current market
     /// spot is treated as the terminal fixing when this field is absent.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expiry_fixing: Option<f64>,
     /// Number of underlying units the option is written on; PV and Greeks scale linearly with it.
@@ -326,7 +325,7 @@ impl crate::instruments::common_impl::traits::Instrument for LookbackOption {
         None
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

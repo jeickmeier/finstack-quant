@@ -77,7 +77,7 @@ pub use waterfall::{
     WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier,
 };
 
-pub use results::{TrancheAccrualPeriod, TrancheCashflowRow, TrancheCashflows, TrancheValuation};
+pub use results::{TrancheAccrualPeriod, TrancheCashflows, TrancheValuation};
 pub use tranche_view::StructuredCreditTranche;
 
 use finstack_quant_models::credit::pool::{

@@ -14,10 +14,10 @@
 
 use crate::cashflow::builder::{schedule::merge_cashflow_schedules, CashFlowSchedule, Notional};
 use crate::cashflow::primitives::CFKind;
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::legs::FloatLegSpec;
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::PayReceive;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
@@ -1038,7 +1038,7 @@ impl crate::instruments::common_impl::traits::Instrument for XccySwap {
         Some(self.leg1.leg.start)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for XccySwap {

@@ -47,8 +47,6 @@
 //! - [`crate::instruments::equity::equity_option`] for options on equities
 
 pub(crate) mod metrics;
-pub(crate) mod pricer;
 mod types;
 
-pub use pricer::EquityPricer;
 pub use types::Equity;

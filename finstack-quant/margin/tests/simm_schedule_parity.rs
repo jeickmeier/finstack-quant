@@ -11,7 +11,7 @@ use finstack_quant_margin::{SimmCalculator, SimmRiskClass, SimmVersion, SIMM_TEN
 #[test]
 fn published_ir_weights_and_correlations() {
     let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry");
-    let p = &calc.params;
+    let p = calc.get_params();
     // D.1 tables 1-3, printed page 14.
     for (table, expected) in [
         (
@@ -69,8 +69,9 @@ fn published_ir_weights_and_correlations() {
 
 #[test]
 fn published_non_ir_weights_and_historical_ratios() {
-    let calc = SimmCalculator::default();
-    let p = &calc.params;
+    let calc = SimmCalculator::new(finstack_quant_margin::SimmVersion::default())
+        .expect("embedded registry");
+    let p = calc.get_params();
     // E through I: selected supported residual classes and every commodity bucket.
     assert_eq!(p.cnq_delta_weight, 1300.0);
     assert_eq!(p.equity_delta_weight, 50.0);
@@ -108,8 +109,9 @@ fn published_non_ir_weights_and_historical_ratios() {
 
 #[test]
 fn published_raw_concentration_thresholds() {
-    let calc = SimmCalculator::default();
-    let p = &calc.params;
+    let calc = SimmCalculator::new(finstack_quant_margin::SimmVersion::default())
+        .expect("embedded registry");
+    let p = calc.get_params();
     // J, printed pages 26-28. Table units USD millions, per bp/% for delta.
     for (key, delta, vega) in [
         ("high", 30., 74.),
@@ -168,8 +170,9 @@ fn published_raw_concentration_thresholds() {
 #[test]
 fn published_cross_risk_class_correlations() {
     use SimmRiskClass::*;
-    let calc = SimmCalculator::default();
-    let p = &calc.params;
+    let calc = SimmCalculator::new(finstack_quant_margin::SimmVersion::default())
+        .expect("embedded registry");
+    let p = calc.get_params();
     let classes = [
         InterestRate,
         CreditQualifying,

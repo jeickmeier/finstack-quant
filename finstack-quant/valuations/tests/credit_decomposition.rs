@@ -15,9 +15,7 @@ use finstack_quant_models::factor::credit::hierarchy::{
     IssuerBetaMode, IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor,
     VolState,
 };
-use finstack_quant_models::factor::{
-    FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
-};
+use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
 use time::Month;
 
 // Test helpers
@@ -29,7 +27,7 @@ fn empty_factor_model_config() -> FactorModelConfig {
         factors: vec![],
         covariance: FactorCovarianceMatrix::new(vec![], vec![]).unwrap(),
         matching: MatchingConfig::MappingTable(vec![]),
-        pricing_mode: PricingMode::DeltaBased,
+
         risk_measure: Default::default(),
         bump_config: None,
         unmatched_policy: None,

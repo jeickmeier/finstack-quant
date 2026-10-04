@@ -140,7 +140,7 @@ pub(super) struct PortfolioMarginResultWire {
     total_segregated_im: Money,
     total_variation_margin: Money,
     total_margin: Money,
-    netting_sets: Vec<NettingSetMarginWire>,
+    netting_sets: Vec<NettingSetMargin>,
     total_positions: usize,
     positions_without_margin: usize,
     degraded_positions: Vec<DegradedPositionWire>,
@@ -148,11 +148,7 @@ pub(super) struct PortfolioMarginResultWire {
 
 impl From<&PortfolioMarginResult> for PortfolioMarginResultWire {
     fn from(r: &PortfolioMarginResult) -> Self {
-        let mut netting_sets: Vec<NettingSetMarginWire> = r
-            .by_netting_set
-            .values()
-            .map(NettingSetMarginWire::from)
-            .collect();
+        let mut netting_sets: Vec<NettingSetMargin> = r.by_netting_set.values().cloned().collect();
         netting_sets.sort_by(|a, b| {
             a.netting_set_id
                 .to_string()
@@ -199,7 +195,7 @@ impl From<PortfolioMarginResultWire> for PortfolioMarginResult {
             .netting_sets
             .into_iter()
             .map(|wire| {
-                let ns = NettingSetMargin::from(wire);
+                let ns = wire;
                 (ns.netting_set_id.clone(), ns)
             })
             .collect();
@@ -321,7 +317,11 @@ impl<'de> serde::Deserialize<'de> for PortfolioMarginResult {
         let mut sum_vm = 0.0;
         let mut sum_total = 0.0;
         let mut sum_positions = 0usize;
+        let mut netting_ids = std::collections::HashSet::new();
         for netting_set in &wire.netting_sets {
+            if !netting_ids.insert(&netting_set.netting_set_id) {
+                return Err(serde::de::Error::custom("duplicate netting-set identifier"));
+            }
             if netting_set.initial_margin.currency() != base
                 || netting_set.variation_margin.currency() != base
                 || netting_set.total_margin.currency() != base
@@ -329,15 +329,6 @@ impl<'de> serde::Deserialize<'de> for PortfolioMarginResult {
                 return Err(serde::de::Error::custom(format!(
                     "minor 17: netting set {:?} is not stored in base currency {base}",
                     netting_set.netting_set_id
-                )));
-            }
-            let expected_total = netting_set.initial_margin.amount()
-                + netting_set.variation_margin.amount().max(0.0);
-            if !amounts_close(netting_set.total_margin.amount(), expected_total) {
-                return Err(serde::de::Error::custom(format!(
-                    "minor 17: netting-set total_margin {} does not equal initial_margin + max(variation_margin, 0) {}",
-                    netting_set.total_margin.amount(),
-                    expected_total
                 )));
             }
             sum_im += netting_set.initial_margin.amount();

@@ -372,23 +372,27 @@ impl CsaSpec {
         id: &str,
         collateral_curve: &str,
     ) -> Result<Self> {
-        let (vm_params, im_params, eligible_collateral, call_timing) = match cfg {
+        let configured;
+        let registry = match cfg {
             Some(cfg) => {
-                let registry = margin_registry_from_config(cfg)?;
-                (
-                    VmParameters::from_finstack_config(cfg, currency)?,
-                    ImParameters::from_finstack_config(cfg, ImMethodology::Simm, currency)?,
-                    EligibleCollateralSchedule::from_finstack_config(cfg, "bcbs_standard")?,
-                    registry.defaults.timing.regulatory_vm,
-                )
+                configured = margin_registry_from_config(cfg)?;
+                &configured
             }
-            None => (
-                VmParameters::regulatory_standard(currency)?,
-                ImParameters::simm_standard(currency)?,
-                EligibleCollateralSchedule::bcbs_standard()?,
-                MarginCallTiming::regulatory_standard()?,
-            ),
+            None => embedded_registry()?,
         };
+        let vm_params = registry.defaults.vm.to_vm_params(currency)?;
+        let im_params =
+            ImParameters::from_registry_defaults(ImMethodology::Simm, currency, registry)?;
+        let eligible_collateral = registry
+            .collateral_schedules
+            .get("bcbs_standard")
+            .cloned()
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "collateral schedule 'bcbs_standard' not found".into(),
+                )
+            })?;
+        let call_timing = registry.defaults.timing.regulatory_vm.clone();
         let spec = Self {
             id: id.to_string(),
             base_currency: currency,

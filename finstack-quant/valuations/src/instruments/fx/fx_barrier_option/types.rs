@@ -4,7 +4,7 @@
 //! with all other FX option modules (`fx_option`, `fx_digital_option`,
 //! `fx_touch_option`).
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::{Monitoring, OptionType};
 use finstack_quant_core::currency::Currency;
@@ -59,7 +59,6 @@ pub struct FxBarrierOption {
     pub expiry: Date,
     /// First date on which barrier monitoring is active. When set, a live
     /// valuation after this date requires `observed_barrier_breached`.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -104,7 +103,6 @@ pub struct FxBarrierOption {
     /// Optional FX spot scalar identifier.
     ///
     /// If omitted, pricing falls back to `FxMatrix(base_currency, quote_currency)`.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fx_spot_id: Option<PriceId>,
     /// FX volatility surface ID
@@ -643,7 +641,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxBarrierOption {
         Ok(Some(Box::new(observed)))
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

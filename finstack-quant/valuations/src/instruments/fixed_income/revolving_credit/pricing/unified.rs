@@ -416,65 +416,6 @@ mod tests {
         );
     }
 
-    /// A single Sobol net contains dependent paths, so pricing must reject
-    /// its use for uncertainty estimates without independent randomizations.
-    #[test]
-    fn sobol_qmc_without_independent_replicates_is_rejected() {
-        let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
-        let end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
-
-        let facility = RevolvingCredit::builder()
-            .id("RC-SOBOL".into())
-            .commitment(Money::from((1_000_000_i64, Currency::USD)))
-            .drawn(Money::from((400_000_i64, Currency::USD)))
-            .issue_date(start)
-            .maturity(end)
-            .rate(RateSpec::Fixed { rate: 0.05 })
-            .day_count(DayCount::Act360)
-            .frequency(Tenor::quarterly())
-            .fees(RevolvingCreditFees::default())
-            .draw_repay_spec(DrawRepaySpec::Stochastic(Box::new(
-                StochasticUtilizationSpec {
-                    utilization_process: UtilizationProcess::MeanReverting {
-                        theta: 0.5,
-                        kappa: 0.75,
-                        sigma: 0.05,
-                        spread_sensitivity: 0.0,
-                    },
-                    use_sobol_qmc: true,
-                    mc_config: Some(McConfig {
-                        credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
-                        interest_rate_process: None,
-                        correlation_matrix: None,
-                        util_credit_corr: None,
-                    }),
-                },
-            )))
-            .instrument_pricing_overrides(
-                crate::instruments::InstrumentPricingOverrides::default().with_mc_paths(8),
-            )
-            .discount_curve_id("USD-OIS".into())
-            .recovery_rate(0.4)
-            .build()
-            .expect("facility");
-
-        let disc = DiscountCurve::builder("USD-OIS")
-            .base_date(start)
-            .day_count(DayCount::Act365F)
-            .knots([(0.0, 1.0), (5.0, 1.0)])
-            .build()
-            .expect("curve");
-        let market = MarketContext::new().insert(disc);
-
-        let err = RevolvingCreditPricer::price_with_paths(&facility, &market, start)
-            .expect_err("Sobol pricing without independent replicates must error");
-        assert!(
-            err.to_string()
-                .contains("independent randomized replicates"),
-            "error should explain the Sobol independence requirement, got: {err}"
-        );
-    }
-
     #[test]
     fn test_compute_dynamic_survival() {
         let spreads = vec![0.01, 0.02, 0.015, 0.018];
@@ -628,7 +569,6 @@ mod tests {
                         sigma: 0.05,
                         spread_sensitivity: 0.0,
                     },
-                    use_sobol_qmc: false,
                     mc_config: Some(McConfig {
                         credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
                         interest_rate_process: None,
@@ -695,7 +635,6 @@ mod tests {
                         sigma: 0.05,
                         spread_sensitivity: 0.0,
                     },
-                    use_sobol_qmc: false,
                     mc_config: None,
                 },
             )))
@@ -740,7 +679,6 @@ mod tests {
                         sigma: 0.0, // zero utilization vol
                         spread_sensitivity: 0.0,
                     },
-                    use_sobol_qmc: false,
                     mc_config: Some(McConfig {
                         // Genuinely stochastic credit spread.
                         credit_spread_process: CreditSpreadProcessSpec::Cir {
@@ -861,7 +799,6 @@ mod tests {
                             sigma: 0.05,
                             spread_sensitivity: 0.0,
                         },
-                        use_sobol_qmc: false,
                         mc_config: Some(McConfig {
                             credit_spread_process: CreditSpreadProcessSpec::Constant(0.0),
                             interest_rate_process: None,
@@ -960,7 +897,6 @@ mod tests {
                             sigma: 0.25,
                             spread_sensitivity: 0.0,
                         },
-                        use_sobol_qmc: false,
                         mc_config,
                     },
                 )))
@@ -1036,7 +972,6 @@ mod tests {
 
     fn seed_test_facility(
         model_config: crate::instruments::InstrumentPricingOverrides,
-        use_sobol_qmc: bool,
     ) -> finstack_quant_core::Result<RevolvingCredit> {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let end = Date::from_calendar_date(2026, Month::January, 1).expect("date");
@@ -1058,7 +993,6 @@ mod tests {
                         sigma: 0.25,
                         spread_sensitivity: 0.0,
                     },
-                    use_sobol_qmc,
                     mc_config: Some(McConfig {
                         credit_spread_process: CreditSpreadProcessSpec::Constant(0.02),
                         interest_rate_process: None,
@@ -1098,8 +1032,8 @@ mod tests {
         let start = Date::from_calendar_date(2025, Month::January, 1).expect("date");
         let market = seed_test_market();
         let overrides = InstrumentPricingOverrides::default().with_mc_paths(2_000);
-        let base_facility = seed_test_facility(overrides.clone(), false).expect("facility");
-        let alt_facility = seed_test_facility(overrides.with_mc_seed_scenario("alt"), false)
+        let base_facility = seed_test_facility(overrides.clone()).expect("facility");
+        let alt_facility = seed_test_facility(overrides.with_mc_seed_scenario("alt"))
             .expect("relabelled facility");
 
         let base = RevolvingCreditPricer::price_with_paths(&base_facility, &market, start)
@@ -1154,29 +1088,12 @@ mod tests {
             InstrumentPricingOverrides::default()
                 .with_mc_paths(16)
                 .with_mc_antithetic(true),
-            false,
         )
         .expect("facility");
         let result = RevolvingCreditPricer::price_with_paths(&facility, &seed_test_market(), start)
             .expect("antithetic price");
         assert_eq!(result.path_results.len(), 32);
         assert_eq!(result.mc_result.estimate.num_paths, 16);
-    }
-
-    /// Antithetic pairing through `model_config.mc_antithetic` is rejected for
-    /// Sobol facilities.
-    #[test]
-    fn mc_antithetic_with_sobol_is_rejected() {
-        use crate::instruments::InstrumentPricingOverrides;
-
-        let err = seed_test_facility(
-            InstrumentPricingOverrides::default()
-                .with_mc_paths(8)
-                .with_mc_antithetic(true),
-            true,
-        )
-        .expect_err("antithetic Sobol must be rejected");
-        assert!(err.to_string().contains("mc_antithetic"), "{err}");
     }
 
     #[test]
@@ -1188,7 +1105,6 @@ mod tests {
                 sigma: 0.25,
                 spread_sensitivity: 0.0,
             },
-            use_sobol_qmc: false,
             mc_config: None,
         };
         let canonical = serde_json::to_value(&spec).expect("serialize");

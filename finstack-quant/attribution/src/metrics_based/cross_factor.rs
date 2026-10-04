@@ -73,149 +73,66 @@ pub(super) fn apply(
     let mut cross_by_pair = IndexMap::new();
     let currency = inputs.val_t1.value.currency();
 
-    if let (Some(cross_gamma), Some(rate_shift), Some(credit_shift)) = (
-        inputs
-            .val_t0
-            .measures
-            .get(MetricId::CrossGammaRatesCredit.as_str())
-            .copied(),
-        inputs.shifts.avg_rate_shift_bp,
-        inputs.shifts.avg_credit_shift_bp,
-    ) {
-        add_cross_factor_term(
-            &mut cross_by_pair,
-            &mut cross_total,
+    let pairs = [
+        (
+            MetricId::CrossGammaRatesCredit,
             "Rates×Credit",
-            cross_gamma * rate_shift * credit_shift,
-            currency,
-            &mut attribution.meta.notes,
-            non_finite_detected,
-        );
-    }
-
-    if let (Some(cross_gamma), Some(rate_shift), Some(vol_shift)) = (
-        inputs
-            .val_t0
-            .measures
-            .get(MetricId::CrossGammaRatesVol.as_str())
-            .copied(),
-        inputs.shifts.avg_rate_shift_bp,
-        inputs.shifts.avg_vol_shift_abs,
-    ) {
-        add_cross_factor_term(
-            &mut cross_by_pair,
-            &mut cross_total,
+            inputs.shifts.avg_rate_shift_bp,
+            inputs.shifts.avg_credit_shift_bp,
+        ),
+        (
+            MetricId::CrossGammaRatesVol,
             "Rates×Vol",
-            cross_gamma * rate_shift * vol_shift,
-            currency,
-            &mut attribution.meta.notes,
-            non_finite_detected,
-        );
-    }
-
-    if let (Some(cross_gamma), Some(spot_shift), Some(vol_shift)) = (
-        inputs
-            .val_t0
-            .measures
-            .get(MetricId::CrossGammaSpotVol.as_str())
-            .copied(),
-        inputs.shifts.avg_spot_shift_pct,
-        inputs.shifts.avg_vol_shift_abs,
-    ) {
-        add_cross_factor_term(
-            &mut cross_by_pair,
-            &mut cross_total,
+            inputs.shifts.avg_rate_shift_bp,
+            inputs.shifts.avg_vol_shift_abs,
+        ),
+        (
+            MetricId::CrossGammaSpotVol,
             "Spot×Vol",
-            cross_gamma * spot_shift * vol_shift,
-            currency,
-            &mut attribution.meta.notes,
-            non_finite_detected,
-        );
-    }
-
-    if let (Some(cross_gamma), Some(spot_shift), Some(credit_shift)) = (
-        inputs
-            .val_t0
-            .measures
-            .get(MetricId::CrossGammaSpotCredit.as_str())
-            .copied(),
-        inputs.shifts.avg_spot_shift_pct,
-        inputs.shifts.avg_credit_shift_bp,
-    ) {
-        add_cross_factor_term(
-            &mut cross_by_pair,
-            &mut cross_total,
+            inputs.shifts.avg_spot_shift_pct,
+            inputs.shifts.avg_vol_shift_abs,
+        ),
+        (
+            MetricId::CrossGammaSpotCredit,
             "Spot×Credit",
-            cross_gamma * spot_shift * credit_shift,
-            currency,
-            &mut attribution.meta.notes,
-            non_finite_detected,
-        );
-    }
-
-    if let (Some(cross_gamma), Some(fx_shift), Some(vol_shift)) = (
-        inputs
-            .val_t0
-            .measures
-            .get(MetricId::CrossGammaFxVol.as_str())
-            .copied(),
-        inputs.shifts.fx_shift_pct,
-        inputs.shifts.avg_vol_shift_abs,
-    ) {
-        add_cross_factor_term(
-            &mut cross_by_pair,
-            &mut cross_total,
+            inputs.shifts.avg_spot_shift_pct,
+            inputs.shifts.avg_credit_shift_bp,
+        ),
+        (
+            MetricId::CrossGammaFxVol,
             "FX×Vol",
-            cross_gamma * fx_shift * vol_shift,
-            currency,
-            &mut attribution.meta.notes,
-            non_finite_detected,
-        );
-    }
-
-    if let (Some(cross_gamma), Some(fx_shift), Some(rate_shift)) = (
-        inputs
-            .val_t0
-            .measures
-            .get(MetricId::CrossGammaFxRates.as_str())
-            .copied(),
-        inputs.shifts.fx_shift_pct,
-        inputs.shifts.avg_rate_shift_bp,
-    ) {
-        add_cross_factor_term(
-            &mut cross_by_pair,
-            &mut cross_total,
+            inputs.shifts.fx_shift_pct,
+            inputs.shifts.avg_vol_shift_abs,
+        ),
+        (
+            MetricId::CrossGammaFxRates,
             "FX×Rates",
-            cross_gamma * fx_shift * rate_shift,
-            currency,
-            &mut attribution.meta.notes,
-            non_finite_detected,
-        );
-    }
-
-    // Credit×Vol: material for convertibles, whose equity vol
-    // feeds the conversion option while the credit curve discounts the
-    // bond floor. `CrossGammaCreditVol` is $ per bp-credit per vol-point,
-    // pairing with `avg_credit_shift_bp` (bp) × `avg_vol_shift_abs`
-    // (vol points).
-    if let (Some(cross_gamma), Some(credit_shift), Some(vol_shift)) = (
-        inputs
-            .val_t0
-            .measures
-            .get(MetricId::CrossGammaCreditVol.as_str())
-            .copied(),
-        inputs.shifts.avg_credit_shift_bp,
-        inputs.shifts.avg_vol_shift_abs,
-    ) {
-        add_cross_factor_term(
-            &mut cross_by_pair,
-            &mut cross_total,
+            inputs.shifts.fx_shift_pct,
+            inputs.shifts.avg_rate_shift_bp,
+        ),
+        (
+            MetricId::CrossGammaCreditVol,
             "Credit×Vol",
-            cross_gamma * credit_shift * vol_shift,
-            currency,
-            &mut attribution.meta.notes,
-            non_finite_detected,
-        );
+            inputs.shifts.avg_credit_shift_bp,
+            inputs.shifts.avg_vol_shift_abs,
+        ),
+    ];
+    for (metric, label, first_move, second_move) in pairs {
+        if let (Some(cross_gamma), Some(first_move), Some(second_move)) = (
+            inputs.val_t0.measures.get(metric.as_str()).copied(),
+            first_move,
+            second_move,
+        ) {
+            add_cross_factor_term(
+                &mut cross_by_pair,
+                &mut cross_total,
+                label,
+                cross_gamma * first_move * second_move,
+                currency,
+                &mut attribution.meta.notes,
+                non_finite_detected,
+            );
+        }
     }
 
     if !cross_by_pair.is_empty() {

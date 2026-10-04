@@ -9,32 +9,6 @@ use pyo3::types::{PyDict, PyList, PyModule};
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use crate::errors::{migration_to_py, serde_json_to_py, value_error};
 
-/// Flatten a matrix argument into row-major data.
-///
-/// Accepts a flat row-major list, a nested list of rows, or anything with a
-/// `tolist()` method (2-D `numpy.ndarray`, `pandas.DataFrame.values`).
-fn extract_matrix_data(data: &Bound<'_, PyAny>) -> PyResult<Vec<f64>> {
-    let data = if data.hasattr("tolist")? {
-        data.call_method0("tolist")?
-    } else {
-        data.clone()
-    };
-    if let Ok(flat) = data.extract::<Vec<f64>>() {
-        return Ok(flat);
-    }
-    let rows: Vec<Vec<f64>> = data.extract().map_err(|_| {
-        value_error(
-            "matrix data must be a flat row-major list of floats, a nested list of rows, \
-             or a 2-D numpy array",
-        )
-    })?;
-    let width = rows.first().map_or(0, Vec::len);
-    if rows.iter().any(|row| row.len() != width) {
-        return Err(value_error("matrix rows must all have the same length"));
-    }
-    Ok(rows.into_iter().flatten().collect())
-}
-
 /// Build a labelled square `pd.DataFrame` (`index` = origin, `columns` = destination).
 fn labelled_square_frame<'py>(
     py: Python<'py>,
@@ -271,7 +245,12 @@ impl PyTransitionMatrix {
     #[new]
     #[pyo3(text_signature = "(scale, data, horizon)")]
     fn new(scale: &PyRatingScale, data: &Bound<'_, PyAny>, horizon: f64) -> PyResult<Self> {
-        let data = extract_matrix_data(data)?;
+        let data = crate::bindings::matrix_input::extract_square_matrix(
+            data.py(),
+            data,
+            scale.inner.n_states(),
+            "data",
+        )?;
         TransitionMatrix::new(scale.inner.clone(), &data, horizon)
             .map(Self::from_inner)
             .map_err(migration_to_py)
@@ -311,7 +290,12 @@ impl PyTransitionMatrix {
             Some(scale) => scale.inner.clone(),
             None => RatingScale::custom(index).map_err(migration_to_py)?,
         };
-        let data = extract_matrix_data(&df.getattr("values")?)?;
+        let data = crate::bindings::matrix_input::extract_square_matrix(
+            df.py(),
+            &df.getattr("values")?,
+            scale.n_states(),
+            "data",
+        )?;
         TransitionMatrix::new(scale, &data, horizon)
             .map(Self::from_inner)
             .map_err(migration_to_py)
@@ -466,7 +450,12 @@ impl PyGeneratorMatrix {
     #[new]
     #[pyo3(text_signature = "(scale, data)")]
     fn new(scale: &PyRatingScale, data: &Bound<'_, PyAny>) -> PyResult<Self> {
-        let data = extract_matrix_data(data)?;
+        let data = crate::bindings::matrix_input::extract_square_matrix(
+            data.py(),
+            data,
+            scale.inner.n_states(),
+            "data",
+        )?;
         GeneratorMatrix::new(scale.inner.clone(), &data)
             .map(Self::from_inner)
             .map_err(migration_to_py)

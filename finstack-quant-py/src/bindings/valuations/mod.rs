@@ -294,13 +294,7 @@ impl PyValuationResult {
         py: Python<'py>,
         base: &str,
     ) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<finstack_quant_valuations::results::ValuationLongRow> = self
-            .inner
-            .to_long_rows()
-            .into_iter()
-            .filter(|row| row.metric == base && row.curve.is_some())
-            .collect();
-        Self::long_rows_dataframe(py, &rows)
+        Self::long_rows_dataframe(py, &self.inner.to_series_rows(base))
     }
 
     /// Every measure as one tidy row.
@@ -736,52 +730,11 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     var::register(&m)?;
     structured_credit::register(&m)?;
     let mut exports = vec![
-        "AssetPool",
-        "BarrierCrossing",
-        "Bond",
-        "CapFloor",
-        "CapFloorBuilder",
-        "CdsIndex",
-        "CdsIndexBuilder",
-        "CdsTranche",
-        "CdsTrancheBuilder",
-        "ConvertibleBond",
-        "ConvertibleBondBuilder",
-        "CreditDefaultSwap",
-        "CreditDefaultSwapBuilder",
-        "EquityOption",
-        "EquityOptionBuilder",
-        "FixedLegSpec",
-        "FloatLegSpec",
-        "FxForward",
-        "FxForwardBuilder",
-        "FxOption",
-        "FxOptionBuilder",
-        "InterestRateSwap",
-        "InterestRateSwapBuilder",
-        "PremiumLegSpec",
-        "ProtectionLegSpec",
-        "RepLine",
-        "StructuredCredit",
-        "StructuredCreditBuilder",
-        "Swaption",
-        "SwaptionBuilder",
-        "TermLoan",
-        "Tranche",
-        "TrancheBuilder",
-        "TrancheStructure",
-        "bond_from_cashflows_json",
-        "instrument_cashflows",
-        "instrument_envelope_from_spec",
-        "list_models",
-        "list_models_grouped",
-        "list_standard_metrics",
-        "list_standard_metrics_grouped",
-        "metric_metadata",
-        "pretty_instrument_json",
-        "price_instrument",
         "validate_instrument_json",
         "validate_typed_instrument_json",
+        "instrument_envelope_from_spec",
+        "pretty_instrument_json",
+        "bond_from_cashflows_json",
     ];
     exports.extend_from_slice(merton_mc::EXPORTS);
     exports.extend_from_slice(structured_credit::EXPORTS);
@@ -797,7 +750,6 @@ fn register_instruments(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResul
     exports.extend_from_slice(pricing::EXPORTS);
     exports.extend_from_slice(var::EXPORTS);
     exports.sort_unstable();
-    exports.dedup();
     let all = PyList::new(py, exports)?;
     m.setattr("__all__", all)?;
     crate::bindings::module_utils::attach_submodule(
@@ -820,7 +772,6 @@ fn register_market(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()>
     let mut exports = vec!["listed_product_catalog"];
     exports.extend_from_slice(market::EXPORTS);
     exports.sort_unstable();
-    exports.dedup();
     let all = PyList::new(py, exports)?;
     m.setattr("__all__", all)?;
     crate::bindings::module_utils::attach_submodule(

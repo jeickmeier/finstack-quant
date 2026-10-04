@@ -186,10 +186,6 @@ pub(super) struct CcpRecord {
     pub(super) mpor_days: u32,
     pub(super) conservative_rate: f64,
     #[serde(default)]
-    pub(super) generic_var_confidence: Option<f64>,
-    #[serde(default)]
-    pub(super) generic_var_lookback_days: Option<u32>,
-    #[serde(default)]
     pub(super) is_default: bool,
 }
 

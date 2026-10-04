@@ -20,7 +20,6 @@
 //! as indicative.
 
 use crate::cashflow::builder::DefaultModelSpec;
-use crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows;
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::instruments::Instrument;
 use finstack_quant_core::dates::Date;
@@ -93,11 +92,10 @@ pub fn calculate_tranche_breakeven_cdr(
     let writedown = |cdr: f64| -> Result<f64> {
         let mut bumped = deal.clone();
         bumped.credit_model.default_spec = DefaultModelSpec::constant_cdr(cdr);
-        Ok(
-            generate_tranche_cashflows(&bumped, tranche_id, market, as_of)?
-                .total_writedown
-                .amount(),
-        )
+        Ok((bumped)
+            .tranche_cashflows(tranche_id, market, as_of)?
+            .total_writedown
+            .amount())
     };
 
     // Loss-remote within the search range: report the upper bound.

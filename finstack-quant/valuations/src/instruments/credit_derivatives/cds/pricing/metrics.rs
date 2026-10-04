@@ -5,7 +5,7 @@ use super::helpers::sp_cond_to;
 use crate::cashflow::builder::specs::RollRule;
 use crate::constants::{credit, numerical, BASIS_POINTS_PER_UNIT, ONE_BASIS_POINT};
 use crate::instruments::common_impl::helpers::year_fraction;
-use crate::instruments::credit_derivatives::cds::{CreditDefaultSwap, PayReceive};
+use crate::instruments::credit_derivatives::cds::CreditDefaultSwap;
 use finstack_quant_core::dates::{
     Date, DayCountContext, Schedule, ScheduleBuilder, StubKind, Tenor,
 };
@@ -553,24 +553,22 @@ impl CdsPricer {
             _ => 0.0,
         };
 
-        let mut npv_amount = match cds.side {
-            PayReceive::Pay => protection_pv - premium_pv - upfront_pv,
-            PayReceive::Receive => premium_pv - protection_pv + upfront_pv,
-        };
-
-        if cds.uses_clean_price() {
+        let clean_accrued = if cds.uses_clean_price() {
             let accrual_fraction =
                 self.coupon_accrued_fraction(cds, as_of, AccrualDayCountPolicy::CdswInclusive)?;
             let spread = cds.premium_leg.coupon_bp.to_f64().ok_or_else(|| {
                 Error::Validation("premium.coupon_bp cannot be represented as f64".into())
             })? / BASIS_POINTS_PER_UNIT;
-            let accrued = cds.notional.amount() * spread * accrual_fraction;
-            npv_amount = match cds.side {
-                PayReceive::Pay => npv_amount + accrued,
-                PayReceive::Receive => npv_amount - accrued,
-            };
-        }
-
-        Ok(npv_amount)
+            cds.notional.amount() * spread * accrual_fraction
+        } else {
+            0.0
+        };
+        Ok(super::engine::signed_npv(
+            cds,
+            protection_pv,
+            premium_pv,
+            upfront_pv,
+            clean_accrued,
+        ))
     }
 }

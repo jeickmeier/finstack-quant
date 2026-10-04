@@ -246,19 +246,20 @@ op_enum!(
      ['rolling_cov', 'rolling_corr', 'rolling_beta']"
 );
 
-/// Extract an operation name from a ``str`` or op wrapper.
-fn extract_op_name<T: pyo3::PyClass + Clone>(
-    obj: &Bound<'_, PyAny>,
-    name_of: impl Fn(&T) -> String,
-) -> PyResult<String> {
+/// Extract the canonical Rust operation from a ``str`` or its Python wrapper.
+fn extract_op<T, R>(obj: &Bound<'_, PyAny>, inner_of: impl Fn(&T) -> R) -> PyResult<R>
+where
+    T: pyo3::PyClass,
+    R: std::str::FromStr<Err = finstack_quant_core::Error>,
+{
     if let Ok(text) = obj.extract::<String>() {
-        return Ok(text);
+        return text.parse().map_err(core_to_py);
     }
     if let Ok(op) = obj.extract::<PyRef<'_, T>>() {
-        return Ok(name_of(&op));
+        return Ok(inner_of(&op));
     }
     Err(pyo3::exceptions::PyTypeError::new_err(
-        "op must be a str or an operation enum value",
+        "op must be a str or the corresponding operation enum value",
     ))
 }
 
@@ -320,16 +321,10 @@ fn transform_timeseries(
 ) -> PyResult<Vec<Option<f64>>> {
     let entity = extract_keys(entity, "entity")?;
     let order = extract_keys(order, "order")?;
-    let op = extract_op_name::<PyTimeSeriesOp>(op, |o| o.inner.name())?;
+    let op = extract_op::<PyTimeSeriesOp, TimeSeriesOp>(op, |o| o.inner)?;
     let params = parse_params(py, params, "time-series transform params")?;
     py.detach(move || {
-        finstack_quant_features::transform_timeseries(
-            &values,
-            &entity,
-            &order,
-            &op,
-            params.as_ref(),
-        )
+        finstack_quant_features::transform_timeseries(&values, &entity, &order, op, params.as_ref())
     })
     .map_err(core_to_py)
 }
@@ -381,10 +376,10 @@ fn transform_cross_sectional(
     params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Vec<Option<f64>>> {
     let time_key = extract_keys(time_key, "time_key")?;
-    let op = extract_op_name::<PyCrossSectionalOp>(op, |o| o.inner.name())?;
+    let op = extract_op::<PyCrossSectionalOp, CrossSectionalOp>(op, |o| o.inner)?;
     let params = parse_params(py, params, "cross-sectional transform params")?;
     py.detach(move || {
-        finstack_quant_features::transform_cross_sectional(&values, &time_key, &op, params.as_ref())
+        finstack_quant_features::transform_cross_sectional(&values, &time_key, op, params.as_ref())
     })
     .map_err(core_to_py)
 }
@@ -434,14 +429,14 @@ fn transform_cross_sectional_grouped(
 ) -> PyResult<Vec<Option<f64>>> {
     let time_key = extract_keys(time_key, "time_key")?;
     let groups = extract_keys(groups, "groups")?;
-    let op = extract_op_name::<PyCrossSectionalOp>(op, |o| o.inner.name())?;
+    let op = extract_op::<PyCrossSectionalOp, CrossSectionalOp>(op, |o| o.inner)?;
     let params = parse_params(py, params, "grouped cross-sectional transform params")?;
     py.detach(move || {
         finstack_quant_features::transform_cross_sectional_grouped(
             &values,
             &time_key,
             &groups,
-            &op,
+            op,
             params.as_ref(),
         )
     })
@@ -548,7 +543,7 @@ fn transform_timeseries_pairwise(
 ) -> PyResult<Vec<Option<f64>>> {
     let entity = extract_keys(entity, "entity")?;
     let order = extract_keys(order, "order")?;
-    let op = extract_op_name::<PyPairwiseOp>(op, |o| o.inner.name())?;
+    let op = extract_op::<PyPairwiseOp, PairwiseOp>(op, |o| o.inner)?;
     let params = parse_params(py, params, "pairwise time-series transform params")?;
     py.detach(move || {
         finstack_quant_features::transform_timeseries_pairwise(
@@ -556,7 +551,7 @@ fn transform_timeseries_pairwise(
             &other,
             &entity,
             &order,
-            &op,
+            op,
             params.as_ref(),
         )
     })
@@ -705,8 +700,8 @@ fn rank_to_weights(
 
 /// Neutralize a signal with an intercept and z-score residuals.
 ///
-/// ``fit_intercept=False`` raises ``ValueError`` because subsequent demeaning
-/// would reintroduce factor exposure. Exact-fit roundoff residuals become zero.
+/// The intercept is always fitted to preserve factor neutrality after
+/// standardization. Exact-fit roundoff residuals become zero.
 ///
 /// Parameters
 /// ----------
@@ -716,9 +711,6 @@ fn rank_to_weights(
 ///     Row-aligned partition keys (aware datetimes normalize to UTC; strings stay opaque).
 /// exposures : list[list[float | None]]
 ///     One row-aligned exposure column each.
-/// params : dict, optional
-///     ``fit_intercept`` must be True (default); False or unknown keys raise
-///     ``ValueError`` to preserve neutrality after standardization.
 ///
 /// Returns
 /// -------
@@ -728,8 +720,8 @@ fn rank_to_weights(
 /// Raises
 /// ------
 /// ValueError
-///     If lengths differ, a partition cannot be fitted, ``fit_intercept`` is
-///     False, datetime keys mix awareness, or arithmetic is non-finite.
+///     If lengths differ, a partition cannot be fitted, datetime keys mix
+///     awareness, or arithmetic is non-finite.
 ///
 /// Examples
 /// --------
@@ -738,25 +730,18 @@ fn rank_to_weights(
 /// 3
 #[pyfunction]
 #[pyo3(
-    signature = (values, time_key, exposures, params=None),
-    text_signature = "(values, time_key, exposures, params=None)"
+    signature = (values, time_key, exposures),
+    text_signature = "(values, time_key, exposures)"
 )]
 fn neutralize_and_zscore(
     py: Python<'_>,
     values: Vec<Option<f64>>,
     time_key: &Bound<'_, PyAny>,
     exposures: Vec<Vec<Option<f64>>>,
-    params: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Vec<Option<f64>>> {
     let time_key = extract_keys(time_key, "time_key")?;
-    let params = parse_params(py, params, "neutralize and zscore params")?;
     py.detach(move || {
-        finstack_quant_features::neutralize_and_zscore(
-            &values,
-            &time_key,
-            &exposures,
-            params.as_ref(),
-        )
+        finstack_quant_features::neutralize_and_zscore(&values, &time_key, &exposures)
     })
     .map_err(core_to_py)
 }

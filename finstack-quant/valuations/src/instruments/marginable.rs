@@ -48,7 +48,7 @@ fn repriced_metric(
 }
 
 /// Reprice an instrument and return the per-tenor `BucketedDv01` series for the
-/// given curve as `(tenor_years, dv01)` pairs.
+/// unique curves as `(tenor_years, dv01)` pairs.
 ///
 /// The `BucketedDv01` calculator flattens its per-tenor series into `measures`
 /// under composite keys `bucketed_dv01::{curve}::{tenor_label}`. Returns an
@@ -57,13 +57,8 @@ fn repriced_bucketed_dv01(
     instrument: &dyn Instrument,
     market: &MarketContext,
     as_of: Date,
-    curve_id: &str,
+    curve_ids: &[finstack_quant_core::types::CurveId],
 ) -> Vec<(f64, f64)> {
-    // Standard DV01 bucket grid and labels (mirrors the sensitivities config).
-    const TENORS: [f64; 11] = [0.25, 0.5, 1.0, 2.0, 3.0, 5.0, 7.0, 10.0, 15.0, 20.0, 30.0];
-    const LABELS: [&str; 11] = [
-        "3m", "6m", "1y", "2y", "3y", "5y", "7y", "10y", "15y", "20y", "30y",
-    ];
     let Ok(result) = instrument.price_with_metrics(
         market,
         as_of,
@@ -73,13 +68,18 @@ fn repriced_bucketed_dv01(
         return Vec::new();
     };
     let mut out = Vec::new();
-    for (&tenor, label) in TENORS.iter().zip(LABELS.iter()) {
-        let key = crate::metrics::MetricId::composite(
-            &crate::metrics::MetricId::BucketedDv01,
-            &[curve_id, label],
-        );
-        if let Some(&dv01) = result.measures.get(key.as_str()) {
-            out.push((tenor, dv01));
+    for curve_id in curve_ids {
+        for (&tenor, label) in crate::metrics::STANDARD_BUCKETS_YEARS
+            .iter()
+            .zip(crate::metrics::STANDARD_BUCKET_LABELS.iter())
+        {
+            let key = crate::metrics::MetricId::composite(
+                &crate::metrics::MetricId::BucketedDv01,
+                &[curve_id.as_str(), label],
+            );
+            if let Some(&dv01) = result.measures.get(key.as_str()) {
+                out.push((tenor, dv01));
+            }
         }
     }
     out
@@ -235,7 +235,7 @@ impl Marginable for InterestRateSwap {
         // coupon schedule and curve shape rather than a flat
         // `duration ≈ maturity` proxy. The repriced DV01 sign already reflects
         // the swap's `side` (the pricer prices the actual swap).
-        let rate_curves: Vec<finstack_quant_core::types::CurveId> = self
+        let mut rate_curves: Vec<finstack_quant_core::types::CurveId> = self
             .market_dependencies()
             .map(|deps| {
                 deps.curves
@@ -247,16 +247,17 @@ impl Marginable for InterestRateSwap {
             })
             .unwrap_or_default();
 
+        rate_curves.sort();
+        rate_curves.dedup();
+
         let mut bucket_totals: std::collections::BTreeMap<&'static str, f64> =
             std::collections::BTreeMap::new();
         let mut any_repriced = false;
-        for curve_id in &rate_curves {
-            for (tenor, dv01) in repriced_bucketed_dv01(self, market, as_of, curve_id.as_str()) {
-                any_repriced = true;
-                *bucket_totals
-                    .entry(assign_ir_tenor_bucket(tenor))
-                    .or_insert(0.0) += dv01;
-            }
+        for (tenor, dv01) in repriced_bucketed_dv01(self, market, as_of, &rate_curves) {
+            any_repriced = true;
+            *bucket_totals
+                .entry(assign_ir_tenor_bucket(tenor))
+                .or_insert(0.0) += dv01;
         }
 
         if any_repriced {
@@ -321,8 +322,7 @@ impl Marginable for InterestRateSwap {
     }
 
     fn mtm_for_vm(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
-        use crate::instruments::rates::irs::pricer::compute_pv;
-        compute_pv(self, market, as_of)
+        Instrument::value(self, market, as_of)
     }
 }
 
@@ -395,26 +395,7 @@ impl Marginable for CreditDefaultSwap {
     }
 
     fn mtm_for_vm(&self, market: &MarketContext, as_of: Date) -> Result<Money> {
-        use crate::instruments::credit_derivatives::cds::pricing::CdsPricer;
-
-        let disc = market.get_discount(self.premium_leg.discount_curve_id.as_str())?;
-        let surv = market.get_hazard(self.protection_leg.credit_curve_id.as_str())?;
-
-        let pricer = CdsPricer::new();
-        let pv_prot = pricer.pv_protection_leg(self, disc.as_ref(), surv.as_ref(), as_of)?;
-        let pv_prem = pricer.pv_premium_leg(self, disc.as_ref(), surv.as_ref(), as_of)?;
-
-        // NPV from protection buyer perspective (Pay)
-        let npv = match self.side {
-            crate::instruments::common_impl::parameters::legs::PayReceive::Pay => {
-                pv_prot.checked_sub(pv_prem)?
-            }
-            crate::instruments::common_impl::parameters::legs::PayReceive::Receive => {
-                pv_prem.checked_sub(pv_prot)?
-            }
-        };
-
-        Ok(npv)
+        Instrument::value(self, market, as_of)
     }
 }
 
@@ -778,7 +759,7 @@ mod tests {
 
     #[test]
     fn test_netting_set_from_cleared_spec() {
-        use finstack_quant_margin::types::{CsaSpec, ImMethodology, MarginTenor};
+        use finstack_quant_margin::types::CsaSpec;
 
         let start = test_date();
         let end = Date::from_calendar_date(2029, Month::June, 15).expect("valid date");
@@ -799,10 +780,7 @@ mod tests {
             clearing_status: ClearingStatus::Cleared {
                 ccp: "LCH".to_string(),
             },
-            im_methodology: ImMethodology::ClearingHouse,
             simm_credit_classification: None,
-            vm_frequency: MarginTenor::Daily,
-            settlement_lag: 0,
         });
 
         let netting_set = swap.netting_set_id().expect("netting set");
@@ -896,5 +874,98 @@ mod tests {
 
         assert!(error.to_string().contains("simm_credit_classification"));
         assert!(sensitivities.is_empty());
+    }
+
+    #[test]
+    fn same_curve_simm_matches_one_bucketed_risk_result() {
+        let start = test_date();
+        let end = Date::from_calendar_date(2034, Month::June, 15).expect("end");
+        let mut swap = rates_support::usd_irs_swap(
+            "SHARED",
+            Money::from((100_000_000_i64, Currency::USD)),
+            0.035,
+            start,
+            end,
+            crate::instruments::rates::irs::PayReceive::Pay,
+        )
+        .expect("swap");
+        swap.float_leg.forward_curve_id = swap.fixed_leg.discount_curve_id.clone();
+        swap.float_leg.compounding =
+            crate::instruments::rates::irs::FloatingLegCompounding::CompoundedInArrears {
+                lookback_days: 0,
+            };
+        let market = MarketContext::new().insert(
+            discount_forward_curve_support::flat_discount_with_tenor("USD-OIS", start, 0.03, 30.0),
+        );
+        let result = swap
+            .price_with_metrics(
+                &market,
+                start,
+                &[crate::metrics::MetricId::BucketedDv01],
+                crate::instruments::PricingOptions::default(),
+            )
+            .expect("risk");
+        let expected: f64 = crate::metrics::STANDARD_BUCKET_LABELS
+            .iter()
+            .map(|label| {
+                let key = crate::metrics::MetricId::composite(
+                    &crate::metrics::MetricId::BucketedDv01,
+                    &["USD-OIS", label],
+                );
+                result.measures[key.as_str()]
+            })
+            .sum();
+        assert!(expected.abs() > 0.0);
+        let actual = swap
+            .simm_sensitivities(&market, start)
+            .expect("SIMM")
+            .total_ir_delta();
+        assert!((actual - expected).abs() < expected.abs() * 1e-12);
+    }
+
+    #[test]
+    fn variation_margin_inherits_clean_upfront_side_and_scenario_policy() {
+        use crate::instruments::credit_derivatives::cds::{CdsValuationConvention, PayReceive};
+        use finstack_quant_core::market_data::term_structures::HazardCurve;
+        let as_of = time::macros::date!(2027 - 02 - 15);
+        let mut cds = CreditDefaultSwap::example().expect("CDS");
+        let market = MarketContext::new()
+            .insert(discount_forward_curve_support::flat_discount_with_tenor(
+                cds.premium_leg.discount_curve_id.as_str(),
+                as_of,
+                0.03,
+                30.0,
+            ))
+            .insert(
+                HazardCurve::builder(cds.protection_leg.credit_curve_id.as_str())
+                    .base_date(as_of)
+                    .recovery_rate(cds.protection_leg.recovery_rate)
+                    .knots([(1.0, 0.02), (10.0, 0.03)])
+                    .build()
+                    .expect("hazard"),
+            );
+        cds.upfront = Some((
+            as_of + time::Duration::days(2),
+            Money::new(12_345.678_9, Currency::USD).expect("upfront"),
+        ));
+        for side in [PayReceive::Pay, PayReceive::Receive] {
+            for convention in [
+                CdsValuationConvention::IsdaDirty,
+                CdsValuationConvention::BloombergCdswClean,
+            ] {
+                for shock in [None, Some(-0.05)] {
+                    cds.side = side;
+                    cds.valuation_convention = convention;
+                    cds.scenario_pricing_overrides.scenario_price_shock_decimal = shock;
+                    assert_eq!(
+                        cds.mtm_for_vm(&market, as_of).expect("VM"),
+                        cds.value(&market, as_of).expect("value")
+                    );
+                }
+            }
+        }
+        cds.upfront = Some((as_of, Money::from((1_i64, Currency::EUR))));
+        assert!(cds.value(&market, as_of).is_err());
+        assert!(cds.mtm_for_vm(&market, as_of).is_err());
     }
 }

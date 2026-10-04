@@ -7,16 +7,17 @@ use crate::quotes::cds::CdsQuote;
 use crate::quotes::ids::Pillar;
 use crate::quotes::market_quote::MarketQuote;
 use crate::step_runtime;
+use crate::targets::hazard::ReplayQuote;
 use crate::CalibrationConfig;
 use finstack_quant_core::dates::DayCountContext;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::market_data::term_structures::{
-    HazardCalibrationInput, HazardCalibrationRecipe, HazardCurve,
-};
+use finstack_quant_core::market_data::term_structures::{HazardCalibrationRecipe, HazardCurve};
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::instruments::credit_derivatives::cds::CdsValuationConvention;
 use finstack_quant_valuations::market::conventions::ids::CdsDocClause;
-use finstack_quant_valuations::recalibration::{DealCdsQuoteOverride, QuoteBump};
+use finstack_quant_valuations::recalibration::{
+    DealCdsQuoteOverride, HazardSpreadRiskBucket, QuoteBump,
+};
 #[cfg(test)]
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -72,83 +73,18 @@ fn hazard_bump_key(request: &HazardParRecalibration<'_>) -> HazardBumpKey {
 struct HazardRecalibrationKey {
     hazard_id: String,
     discount_id: String,
-    discount_fingerprint: u64,
-    identity_discount_fingerprint: Option<u64>,
+    discount_fingerprint: String,
+    identity_discount_fingerprint: Option<String>,
     recovery_rate: u64,
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
     bump: HazardBumpKey,
-    /// Fingerprint of the source curve's par spreads and hazard knots.
-    source_fingerprint: u64,
+    /// Canonical hash of the complete source curve, including replay and FX policy.
+    source_fingerprint: String,
 }
 
-fn hazard_source_fingerprint(hazard: &HazardCurve) -> u64 {
-    let mut hash = hazard.recovery_rate().to_bits();
-    for (tenor, value) in hazard.par_spread_points() {
-        hash = hash
-            .wrapping_mul(0x0000_013B)
-            .wrapping_add(tenor.to_bits())
-            .wrapping_mul(0x0000_013B)
-            .wrapping_add(value.to_bits());
-    }
-    hash = hash.wrapping_mul(0x9E37_79B9_7F4A_7C15);
-    for (tenor, value) in hazard.knot_points() {
-        hash = hash
-            .wrapping_mul(0x0000_013B)
-            .wrapping_add(tenor.to_bits())
-            .wrapping_mul(0x0000_013B)
-            .wrapping_add(value.to_bits());
-    }
-    hash = stable_hash_bytes(hash, b"hazard-calibration-recipe");
-    match hazard.hazard_calibration() {
-        Some(recipe) => {
-            if let Ok(value) = serde_json::to_value(recipe) {
-                hash = stable_hash_json(hash, &value);
-            }
-        }
-        None => {
-            hash = stable_hash_bytes(hash, b"none");
-        }
-    }
-    hash
-}
-
-fn stable_hash_bytes(mut hash: u64, bytes: &[u8]) -> u64 {
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x0000_0100_0000_01B3);
-    }
-    hash
-}
-
-fn stable_hash_json(mut hash: u64, value: &serde_json::Value) -> u64 {
-    match value {
-        serde_json::Value::Null => stable_hash_bytes(hash, b"null"),
-        serde_json::Value::Bool(value) => {
-            stable_hash_bytes(hash, if *value { b"true" } else { b"false" })
-        }
-        serde_json::Value::Number(value) => stable_hash_bytes(hash, value.to_string().as_bytes()),
-        serde_json::Value::String(value) => stable_hash_bytes(hash, value.as_bytes()),
-        serde_json::Value::Array(values) => {
-            hash = stable_hash_bytes(hash, b"[");
-            for value in values {
-                hash = stable_hash_json(hash, value);
-                hash = stable_hash_bytes(hash, b",");
-            }
-            stable_hash_bytes(hash, b"]")
-        }
-        serde_json::Value::Object(values) => {
-            hash = stable_hash_bytes(hash, b"{");
-            let mut keys: Vec<_> = values.keys().collect();
-            keys.sort_unstable();
-            for key in keys {
-                hash = stable_hash_bytes(hash, key.as_bytes());
-                hash = stable_hash_json(hash, &values[key]);
-                hash = stable_hash_bytes(hash, b",");
-            }
-            stable_hash_bytes(hash, b"}")
-        }
-    }
+fn hazard_source_fingerprint(hazard: &HazardCurve) -> finstack_quant_core::Result<String> {
+    finstack_quant_core::canonical::content_hash(hazard)
 }
 
 /// Batch-local cache for hazard-curve recalibrations used by spread risk and
@@ -160,9 +96,8 @@ fn stable_hash_json(mut hash: u64, value: &serde_json::Value) -> u64 {
 /// calibration while different bumps can proceed in parallel. Failed
 /// calibrations are not cached, preserving the original error.
 ///
-/// Keys include a fingerprint of the source curve's par spreads and hazard
-/// knots, so a second bump of an already-recalibrated curve does not reuse
-/// the first result.
+/// Keys include the complete source curve's canonical hash, so changed quotes,
+/// knots, conventions, or FX policy cannot reuse a stale result.
 #[derive(Default)]
 pub(crate) struct HazardRecalibrationCache {
     entries: KeyedOnceCache<HazardRecalibrationKey, HazardCurve>,
@@ -176,19 +111,16 @@ impl std::fmt::Debug for HazardRecalibrationCache {
     }
 }
 
-fn discount_fingerprint(context: &MarketContext, id: &CurveId) -> finstack_quant_core::Result<u64> {
-    let curve = context.get_discount(id)?;
-    let value = serde_json::to_value(curve.as_ref()).map_err(|error| {
-        finstack_quant_core::Error::Validation(format!(
-            "cannot fingerprint discount curve '{id}': {error}"
-        ))
-    })?;
-    Ok(stable_hash_json(0, &value))
+fn discount_fingerprint(
+    context: &MarketContext,
+    id: &CurveId,
+) -> finstack_quant_core::Result<String> {
+    finstack_quant_core::canonical::content_hash(context.get_discount(id)?.as_ref())
 }
 
-/// Recalibrate `request`, memoising through `cache` when one is supplied.
+/// Recalibrate `request`, memoising through its batch-local cache.
 fn recalibrate_from_par_spreads_cached(
-    cache: Option<&HazardRecalibrationCache>,
+    cache: &HazardRecalibrationCache,
     request: HazardParRecalibration<'_>,
 ) -> finstack_quant_core::Result<Arc<HazardCurve>> {
     let key = HazardRecalibrationKey {
@@ -203,11 +135,11 @@ fn recalibrate_from_par_spreads_cached(
         doc_clause: request.doc_clause,
         cds_valuation_convention: request.cds_valuation_convention,
         bump: hazard_bump_key(&request),
-        source_fingerprint: hazard_source_fingerprint(request.hazard),
+        source_fingerprint: hazard_source_fingerprint(request.hazard)?,
     };
-    KeyedOnceCache::get_or_compute(cache.map(|c| &c.entries), key, || {
-        recalibrate_from_par_spreads(request)
-    })
+    cache
+        .entries
+        .get_or_compute(key, || recalibrate_from_par_spreads(request))
 }
 
 fn require_discount_id(discount_id: Option<&CurveId>) -> finstack_quant_core::Result<&CurveId> {
@@ -245,11 +177,8 @@ fn recipe_inputs(
         ))
     })?;
     recipe.validate()?;
-    crate::targets::hazard::validate_hazard_recipe_bindings(&params, recipe)?;
-    let calibration_inputs =
-        decode_recipe_inputs(&recipe.calibration_inputs, hazard, "calibration")?;
-    let spread_risk_inputs =
-        decode_recipe_inputs(&recipe.spread_risk_inputs, hazard, "spread-risk")?;
+    let (calibration_inputs, spread_risk_inputs) =
+        crate::targets::hazard::validate_hazard_recipe_bindings(&params, recipe)?;
     let config = serde_json::from_value(recipe.calibration_config.clone()).map_err(|error| {
         finstack_quant_core::Error::Validation(format!(
             "hazard curve '{}' contains an invalid replay policy: {error}",
@@ -257,22 +186,6 @@ fn recipe_inputs(
         ))
     })?;
     Ok((params, calibration_inputs, spread_risk_inputs, config))
-}
-
-#[derive(Clone)]
-struct ReplayQuote {
-    quote: CdsQuote,
-    pillar_date: finstack_quant_core::dates::Date,
-    pillar_time: f64,
-}
-
-/// Exact spread-risk quote binding used by bucketed CS01.
-#[derive(Clone, Debug)]
-pub(crate) struct HazardSpreadRiskBucket {
-    pub(super) index: usize,
-    pub(super) quote_id: String,
-    pub(super) pillar_date: finstack_quant_core::dates::Date,
-    pub(super) pillar_time: f64,
 }
 
 pub(crate) fn hazard_with_deal_quote_override(
@@ -420,29 +333,6 @@ pub(crate) fn hazard_with_deal_quote_override(
         .build()
 }
 
-fn decode_recipe_inputs(
-    inputs: &[HazardCalibrationInput],
-    hazard: &HazardCurve,
-    input_kind: &str,
-) -> finstack_quant_core::Result<Vec<ReplayQuote>> {
-    inputs
-        .iter()
-        .map(|input| {
-            let quote: CdsQuote = serde_json::from_value(input.quote.clone()).map_err(|error| {
-                finstack_quant_core::Error::Validation(format!(
-                    "hazard curve '{}' contains an invalid {input_kind} replay quote: {error}",
-                    hazard.id(),
-                ))
-            })?;
-            Ok(ReplayQuote {
-                quote,
-                pillar_date: input.pillar_date,
-                pillar_time: input.pillar_time,
-            })
-        })
-        .collect()
-}
-
 /// Return the exact, deterministically ordered spread-risk replay bindings.
 pub(crate) fn hazard_spread_risk_buckets(
     hazard: &HazardCurve,
@@ -452,7 +342,7 @@ pub(crate) fn hazard_spread_risk_buckets(
         .into_iter()
         .enumerate()
         .map(|(index, input)| HazardSpreadRiskBucket {
-            index,
+            quote_index: index,
             quote_id: input.quote.id().as_str().to_string(),
             pillar_date: input.pillar_date,
             pillar_time: input.pillar_time,
@@ -667,48 +557,6 @@ fn recalibrate_from_par_spreads(
     )
 }
 
-/// Bump hazard par spreads and re-calibrate, optionally reusing a batch cache.
-///
-/// # Arguments
-///
-/// * `cache` - Optional batch-local cache. When `Some`, identical bumps of
-///   the same source curve (same identifier, discounting, recovery, and
-///   source par/hazard fingerprint) reuse the bootstrapped result. `None`
-///   always re-bootstraps.
-/// * `hazard` - Existing hazard curve carrying its lossless calibration recipe.
-/// * `context` - Market context supplying the original calibration dependencies.
-/// * `bump` - Parallel or tenor-specific CDS spread shock in [`QuoteBump`]
-///   basis point units.
-/// * `discount_id` - Discount curve ID, which must match the stored recipe.
-/// * `doc_clause` - Optional documentation-clause assertion. When supplied, it
-///   must match the stored recipe; `None` uses the stored value.
-/// * `cds_valuation_convention` - Optional valuation-convention assertion.
-///   When supplied, it must match the stored recipe; `None` uses the stored value.
-pub(crate) fn bump_hazard_spreads_cached(
-    cache: Option<&HazardRecalibrationCache>,
-    hazard: &HazardCurve,
-    context: &MarketContext,
-    bump: &QuoteBump,
-    discount_id: Option<&CurveId>,
-    doc_clause: Option<CdsDocClause>,
-    cds_valuation_convention: Option<CdsValuationConvention>,
-) -> finstack_quant_core::Result<Arc<HazardCurve>> {
-    let discount_id = require_discount_id(discount_id)?;
-    let request = HazardParRecalibration {
-        hazard,
-        context,
-        identity_context: None,
-        discount_id,
-        recovery_rate: hazard.recovery_rate(),
-        doc_clause,
-        cds_valuation_convention,
-        spread_bump: Some(bump),
-        exact_spread_bump: None,
-        replay_spread_risk_center: false,
-    };
-    recalibrate_from_par_spreads_cached(cache, request)
-}
-
 /// Replay a scenario spread shock while verifying against its source dependencies.
 pub(crate) fn bump_hazard_on_target_market(
     cache: &HazardRecalibrationCache,
@@ -725,7 +573,7 @@ pub(crate) fn bump_hazard_on_target_market(
     let identity_context = (!Arc::ptr_eq(&source_discount, &target_discount))
         .then_some(request.source_market.as_ref());
     recalibrate_from_par_spreads_cached(
-        Some(cache),
+        cache,
         HazardParRecalibration {
             hazard,
             context: &request.target_market,
@@ -745,7 +593,7 @@ pub(crate) fn bump_hazard_on_target_market(
 ///
 /// # Arguments
 ///
-/// * `cache` - Optional batch-local recalibration cache.
+/// * `cache` - Batch-local recalibration cache.
 /// * `hazard` - Existing hazard curve carrying its lossless replay recipe.
 /// * `context` - Market context supplying calibration dependencies.
 /// * `quote_bump` - Exact ordered `spread_risk_inputs` index and additive
@@ -754,7 +602,7 @@ pub(crate) fn bump_hazard_on_target_market(
 /// * `doc_clause` - Optional documentation-clause assertion.
 /// * `cds_valuation_convention` - Optional valuation-convention assertion.
 pub(crate) fn bump_hazard_spread_risk_input_cached(
-    cache: Option<&HazardRecalibrationCache>,
+    cache: &HazardRecalibrationCache,
     hazard: &HazardCurve,
     context: &MarketContext,
     quote_bump: (usize, f64),
@@ -803,16 +651,20 @@ pub fn bump_hazard_spreads(
     doc_clause: Option<CdsDocClause>,
     cds_valuation_convention: Option<CdsValuationConvention>,
 ) -> finstack_quant_core::Result<HazardCurve> {
-    bump_hazard_spreads_cached(
-        None,
+    let discount_id = require_discount_id(discount_id)?;
+    let request = HazardParRecalibration {
         hazard,
         context,
-        bump,
+        identity_context: None,
         discount_id,
+        recovery_rate: hazard.recovery_rate(),
         doc_clause,
         cds_valuation_convention,
-    )
-    .map(|curve| curve.as_ref().clone())
+        spread_bump: Some(bump),
+        exact_spread_bump: None,
+        replay_spread_risk_center: false,
+    };
+    recalibrate_from_par_spreads(request)
 }
 
 /// Replay the curve from its quote-space spread-risk center.
@@ -912,9 +764,7 @@ pub(crate) fn replay_hazard_at_horizon(
             }
         };
         let instrument = crate::build::cds::build_cds_instrument(&quote, &build_ctx)?;
-        let cds = instrument.as_any().downcast_ref::<
-            finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap>()
-            .ok_or_else(|| finstack_quant_core::Error::Validation("expected CDS quote instrument".to_string()))?;
+        let cds = instrument;
         let par = cds.par_spread(&request.target_market, params.base_date)?;
         if let CdsQuote::CdsParSpread { spread_bp, .. } = &mut quote {
             *spread_bp = par;
@@ -1052,7 +902,9 @@ mod tests {
     use super::*;
     use crate::quotes::ids::{Pillar, QuoteId};
     use crate::CalibrationReport;
-    use finstack_quant_core::market_data::term_structures::HazardCalibrationRecipe;
+    use finstack_quant_core::market_data::term_structures::{
+        HazardCalibrationInput, HazardCalibrationRecipe,
+    };
     use finstack_quant_valuations::instruments::credit_derivatives::cds::CreditDefaultSwap;
     use finstack_quant_valuations::market::conventions::ids::CdsConventionKey;
     use std::collections::BTreeMap;
@@ -1132,6 +984,67 @@ mod tests {
     }
 
     #[test]
+    fn hazard_cache_preserves_distinct_source_fx_policies() {
+        let envelope = crate::api::validate::parse_envelope(include_str!(
+            "../../examples/market_bootstrap/03_single_name_hazard.json"
+        ))
+        .expect("source envelope");
+        let params = envelope
+            .plan
+            .steps
+            .iter()
+            .find_map(|step| {
+                if let StepParams::Hazard(params) = &step.params {
+                    Some(params)
+                } else {
+                    None
+                }
+            })
+            .expect("hazard step");
+        let result = crate::api::engine::calibrate(&envelope).expect("source calibration");
+        let market = MarketContext::try_from(result.result.final_market).expect("source market");
+        let source = market.get_hazard(&params.curve_id).expect("source hazard");
+        let recipe = source.hazard_calibration().expect("source recipe");
+        let first = source
+            .to_builder_with_id(source.id().clone())
+            .hazard_calibration(recipe.clone())
+            .fx_policy("policy-a")
+            .build()
+            .expect("first policy");
+        let second = source
+            .to_builder_with_id(source.id().clone())
+            .hazard_calibration(recipe.clone())
+            .fx_policy("policy-b")
+            .build()
+            .expect("second policy");
+        let cache = HazardRecalibrationCache::default();
+        let replay = |hazard| {
+            recalibrate_from_par_spreads_cached(
+                &cache,
+                HazardParRecalibration {
+                    hazard,
+                    context: &market,
+                    identity_context: None,
+                    discount_id: &params.discount_curve_id,
+                    recovery_rate: params.recovery_rate,
+                    doc_clause: None,
+                    cds_valuation_convention: None,
+                    spread_bump: None,
+                    exact_spread_bump: None,
+                    replay_spread_risk_center: false,
+                },
+            )
+            .expect("cached replay")
+        };
+        let a = replay(&first);
+        let b = replay(&second);
+        assert_eq!(a.fx_policy(), Some("policy-a"));
+        assert_eq!(b.fx_policy(), Some("policy-b"));
+        assert!(!Arc::ptr_eq(&a, &b));
+        assert!(Arc::ptr_eq(&a, &replay(&first)));
+    }
+
+    #[test]
     fn hazard_cache_identity_distinguishes_deal_quote_replay_inputs() {
         let mut low_deal = CreditDefaultSwap::example().expect("example");
         low_deal
@@ -1161,13 +1074,16 @@ mod tests {
         )
         .expect("high deal quote override");
 
-        let low_fingerprint = hazard_source_fingerprint(&low_quote);
-        let high_fingerprint = hazard_source_fingerprint(&high_quote);
+        let low_fingerprint = hazard_source_fingerprint(&low_quote).expect("source hash");
+        let high_fingerprint = hazard_source_fingerprint(&high_quote).expect("source hash");
         assert_ne!(
             low_fingerprint, high_fingerprint,
             "deal curves with distinct replay quotes must not alias in the batch cache"
         );
-        let low_then_high = HashMap::from([(low_fingerprint, 100.0), (high_fingerprint, 300.0)]);
+        let low_then_high = HashMap::from([
+            (low_fingerprint.clone(), 100.0),
+            (high_fingerprint.clone(), 300.0),
+        ]);
         let high_then_low = HashMap::from([(high_fingerprint, 300.0), (low_fingerprint, 100.0)]);
         assert_eq!(
             low_then_high, high_then_low,

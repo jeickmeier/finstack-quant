@@ -2,7 +2,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_margin::regulatory::frtb::{
-    DrcAssetType, DrcPosition, DrcSector, DrcSeniority, FrtbSensitivities, RraoPosition,
+    DrcPosition, DrcSector, DrcSeniority, FrtbSensitivities, RraoPosition,
 };
 use std::hash::Hash;
 
@@ -265,7 +265,6 @@ fn sample_sensitivities(reverse: bool) -> FrtbSensitivities {
         rating_bucket: 4,
         sector: DrcSector::Corporate,
         seniority: DrcSeniority::SeniorUnsecured,
-        asset_type: DrcAssetType::Corporate,
         pnl_adjustment: -10_000.0,
     });
     sensitivities.rrao_exotic_notionals.push(RraoPosition {

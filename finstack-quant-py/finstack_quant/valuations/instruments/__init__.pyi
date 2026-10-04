@@ -6483,7 +6483,7 @@ class Swaption:
     Typed wrapper for the canonical Rust ``Swaption`` instrument.
 
     Construct via :meth:`Swaption.builder`, :meth:`Swaption.example` /
-    :meth:`Swaption.from_json`. Every
+    :meth:`Swaption.example` or :meth:`Swaption.from_json`. Every
     public Rust field is readable as a property; ``get_strike`` /
     ``get_underlying_start_date`` / ``get_underlying_maturity`` / ``forward_swap_rate`` mirror the
     Rust accessors and :meth:`Swaption.price` / :meth:`Swaption.metric` run
@@ -6835,21 +6835,6 @@ class Swaption:
         """
         ...
     @property
-    def exercise_style(self) -> str:
-        """
-        Exercise style of the swaption.
-
-        Returns
-        -------
-        str
-            ``"european"``, ``"bermudan"`` or ``"american"``.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-    @property
     def settlement(self) -> str:
         """
         Settlement method.
@@ -7045,8 +7030,8 @@ class SwaptionBuilder:
     Builders are consumed by ``build()``; create a new builder per
     instrument. Required fields: ``id``, ``option_type``, ``notional``,
     ``expiry``, ``settlement``, ``cash_settlement_method``, ``vol_model``,
-    ``vol_surface_id``, ``underlying_fixed_leg``, ``underlying_float_leg``
-    (``exercise_style`` defaults to ``"european"``).
+    ``vol_surface_id``, ``underlying_fixed_leg``, ``underlying_float_leg``.
+    European exercise is the contract supported by this type.
 
     Examples
     --------
@@ -7168,26 +7153,6 @@ class SwaptionBuilder:
         ------
         ValueError
             If the builder was already consumed by ``build()`` or the date cannot be interpreted.
-        """
-        ...
-    def exercise_style(self, value: Literal["european", "bermudan", "american"]) -> SwaptionBuilder:
-        """
-        Set the exercise style.
-
-        Parameters
-        ----------
-        value : Literal["european", "bermudan", "american"]
-            Exercise style (serde string). Default ``"european"``.
-
-        Returns
-        -------
-        SwaptionBuilder
-            ``self``, for chaining.
-
-        Raises
-        ------
-        ValueError
-            If the builder was already consumed by ``build()`` or ``value`` is not a recognized name.
         """
         ...
     def settlement(self, value: Literal["physical", "cash"]) -> SwaptionBuilder:
@@ -22147,7 +22112,8 @@ class BalloonSpec:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or carries unknown fields.
+            If ``json`` is malformed, carries unknown fields, or fails the same
+            canonical Rust validation as construction (invalid ranges, dates or rules).
 
         Examples
         --------
@@ -22488,7 +22454,8 @@ class PrepaymentPenalty:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or carries unknown fields.
+            If ``json`` is malformed, carries unknown fields, or fails the same
+            canonical Rust validation as construction (invalid ranges, dates or rules).
 
         Examples
         --------
@@ -22726,7 +22693,8 @@ class SpecialServicingSpec:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or carries unknown fields.
+            If ``json`` is malformed, carries unknown fields, or fails the same
+            canonical Rust validation as construction (invalid ranges, dates or rules).
 
         Examples
         --------
@@ -22885,7 +22853,8 @@ class LiquidationSpec:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or carries unknown fields.
+            If ``json`` is malformed, carries unknown fields, or fails the same
+            canonical Rust validation as construction (invalid ranges, dates or rules).
 
         Examples
         --------
@@ -23306,7 +23275,8 @@ class AdvanceRate:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or carries unknown fields.
+            If ``json`` is malformed, carries unknown fields, or fails the same
+            canonical Rust validation as construction (invalid ranges, dates or rules).
 
         Examples
         --------
@@ -23477,7 +23447,8 @@ class ConcentrationLimit:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or carries unknown fields.
+            If ``json`` is malformed, carries unknown fields, or fails the same
+            canonical Rust validation as construction (invalid ranges, dates or rules).
 
         Examples
         --------
@@ -23638,7 +23609,8 @@ class BorrowingBaseRules:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or carries unknown fields.
+            If ``json`` is malformed, carries unknown fields, or fails the same
+            canonical Rust validation as construction (invalid ranges, dates or rules).
 
         Examples
         --------
@@ -23846,7 +23818,8 @@ class CoverageRules:
         Raises
         ------
         ValueError
-            If ``json`` is malformed or carries unknown fields.
+            If ``json`` is malformed, carries unknown fields, or fails the same
+            canonical Rust validation as construction (invalid ranges, dates or rules).
 
         Examples
         --------
@@ -24529,7 +24502,8 @@ class TrancheCashflows:
         Raises
         ------
         ValueError
-            If a component carries a different currency from the tranche, or the rows cannot be serialized.
+            If component amounts have different currencies. Empty results
+            preserve column order and numeric dtypes.
         """
         ...
 
@@ -30427,8 +30401,8 @@ class FacilityProjection:
         Raises
         ------
         ValueError
-            If a component carries a different currency from the facility, or the
-            rows cannot be serialized.
+            If any facility, residual, fee or draw amount has a different
+            currency from the facility. Empty results preserve all columns.
         """
         ...
 
@@ -31599,7 +31573,7 @@ class RevolvingCreditBuilder:
         value : dict[str, Any] | str
             ``DrawRepaySpec`` as a ``dict`` or JSON ``str``:
             ``{"deterministic": [{"date": ..., "amount": Money, "is_draw": bool}, ...]}``
-            or ``{"stochastic": {"utilization_process": {...}, "use_sobol_qmc": ..., "mc_config": ...}}``.
+            or ``{"stochastic": {"utilization_process": {...}, "mc_config": ...}}``.
             The estimator count, antithetic flag and seed label come from
             ``instrument_pricing_overrides.model_config`` (``mc_paths``,
             ``mc_antithetic``, ``mc_seed_scenario``).
@@ -32055,7 +32029,8 @@ class EnhancedMonteCarloResult:
         Raises
         ------
         ValueError
-            If the rows cannot be serialized.
+            If component amounts have different currencies. Empty results
+            preserve column order and numeric dtypes.
         """
         ...
     @property

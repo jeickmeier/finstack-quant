@@ -1,20 +1,19 @@
 //! Credit-factor attribution detail and carry decomposition helpers.
 
 use super::credit_cascade::{
-    apply_curve_shape_residual, build_credit_factor_attribution, hierarchy_level_name,
-    optional_single_issuer_adder, plan_credit_cascade, shift_credit_curves_par_spread,
-    single_issuer_by_bucket, CreditStepKind,
+    apply_curve_shape_residual, build_credit_factor_attribution, optional_single_issuer_adder,
+    plan_credit_cascade, shift_credit_curves_par_spread, single_issuer_by_bucket, CreditStepKind,
 };
 use super::factors::{MarketRestoreFlags, MarketSnapshot};
-use super::spec::AttributionSpec;
+use super::spec::AttributionInputs;
 use super::types::PnlAttribution;
 use finstack_quant_calibration::recalibration::CachedRecalibrationProvider;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Result;
-use finstack_quant_models::factor::credit::hierarchy::CreditFactorModel;
+use finstack_quant_models::factor::credit::hierarchy::{dimension_key, CreditFactorModel};
 use finstack_quant_valuations::instruments::Instrument;
 
-impl AttributionSpec {
+impl AttributionInputs {
     /// Compute the optional `credit_factor_detail` field for a finished
     /// per-instrument attribution. The instrument's issuer (from
     /// `instrument.attributes().meta["credit::issuer_id"]`) is matched against
@@ -134,7 +133,7 @@ impl AttributionSpec {
     }
 }
 
-impl AttributionSpec {
+impl AttributionInputs {
     /// Split `carry_detail.coupon_income`, `carry_detail.pull_to_par` and
     /// `carry_detail.roll_down` into rates / credit parts and emit the
     /// per-factor `credit_carry_decomposition`.
@@ -354,7 +353,7 @@ impl AttributionSpec {
         let mut levels_out: Vec<LevelCarry> = Vec::with_capacity(num_levels);
         for (k, level_share) in level_share_of_s.iter().enumerate() {
             let dim = &model.hierarchy.levels[k];
-            let level_name = hierarchy_level_name(dim);
+            let level_name = dimension_key(dim).to_owned();
             let share = *level_share * scale_credit;
             let total_money = Money::new(share, ccy)?;
             let by_bucket = single_issuer_by_bucket(
@@ -431,7 +430,7 @@ mod tests {
     };
     use finstack_quant_models::factor::matching::ISSUER_ID_META_KEY;
     use finstack_quant_models::factor::{
-        FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
+        FactorCovarianceMatrix, FactorModelConfig, MatchingConfig,
     };
     use finstack_quant_valuations::instruments::{Attributes, Bond, Instrument, InstrumentJson};
     use std::sync::Arc;
@@ -442,7 +441,7 @@ mod tests {
             factors: vec![],
             covariance: FactorCovarianceMatrix::new(vec![], vec![]).unwrap(),
             matching: MatchingConfig::MappingTable(vec![]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: Default::default(),
             bump_config: None,
             unmatched_policy: None,
@@ -554,20 +553,22 @@ mod tests {
     fn spec(t0: Date, t1: Date, bond: Bond) -> AttributionSpec {
         AttributionSpec {
             instrument: InstrumentJson::Bond(bond),
-            market_t0: (&MarketContext::new())
-                .try_into()
-                .expect("coherent market snapshot"),
-            market_t1: (&MarketContext::new())
-                .try_into()
-                .expect("coherent market snapshot"),
-            as_of_t0: t0,
-            as_of_t1: t1,
-            method: AttributionMethod::MetricsBased,
-            model_params_t0: None,
-            config: None,
-            credit_factor_model: None,
-            credit_factor_detail_options: Default::default(),
-            full_cross_attribution: false,
+            inputs: crate::AttributionInputs {
+                market_t0: (&MarketContext::new())
+                    .try_into()
+                    .expect("coherent market snapshot"),
+                market_t1: (&MarketContext::new())
+                    .try_into()
+                    .expect("coherent market snapshot"),
+                as_of_t0: t0,
+                as_of_t1: t1,
+                method: AttributionMethod::MetricsBased,
+                model_params_t0: None,
+                config: None,
+                credit_factor_model: None,
+                credit_factor_detail_options: Default::default(),
+                full_cross_attribution: false,
+            },
         }
     }
 
@@ -604,6 +605,7 @@ mod tests {
         attribution.carry_detail = Some(four_component_carry_detail(Currency::USD));
 
         spec(t0, t1, bond)
+            .inputs
             .compute_carry_credit_split_and_decomposition(
                 &model,
                 &instrument,

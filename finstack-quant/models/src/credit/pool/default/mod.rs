@@ -4,13 +4,11 @@
 //! - Default correlation through copula models
 //! - Intensity process dynamics (Cox process)
 //! - Factor-correlated CDR
-//! - Hazard curve-based defaults using market-calibrated curves
 //!
 //! # Models
 //!
 //! - **CopulaBasedDefault**: Default correlation via copula (Gaussian, Student-t)
 //! - **IntensityProcessDefault**: Cox process with mean-reverting intensity
-//! - **HazardCurveDefault**: Wraps HazardCurve from core for market-calibrated defaults
 //!
 //! # References
 //!
@@ -20,7 +18,6 @@
 
 mod copula_based;
 mod factor_correlated;
-mod hazard_curve_adapter;
 mod intensity_process;
 mod per_name;
 mod spec;
@@ -28,7 +25,6 @@ mod traits;
 
 pub(crate) use copula_based::CopulaBasedDefault;
 pub(crate) use factor_correlated::FactorCorrelatedDefault;
-pub(crate) use hazard_curve_adapter::HazardCurveDefault;
 pub(crate) use intensity_process::IntensityProcessDefault;
 pub use per_name::PerNameCopulaDefault;
 pub use per_name::PoolGranularity;

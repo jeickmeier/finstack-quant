@@ -22,7 +22,7 @@ Examples:
 >>> import pandas as pd
 >>> from finstack_quant.features.dataframe import cross_sectional
 >>> frame = pd.DataFrame({"date": ["2026-01-01"] * 2, "signal": [1.0, 3.0]})
->>> cross_sectional(frame, "signal", "date", "rank").tolist()
+>>> cross_sectional(frame, "signal", "date", op="rank").tolist()
 [0.0, 1.0]
 """
 
@@ -31,6 +31,9 @@ from importlib import import_module as _import_module
 from typing import Any
 
 from . import (
+    CrossSectionalOp as _CrossSectionalOp,
+    PairwiseOp as _PairwiseOp,
+    TimeSeriesOp as _TimeSeriesOp,
     neutralize as _neutralize,
     neutralize_and_zscore as _neutralize_and_zscore,
     rank_to_weights as _rank_to_weights,
@@ -149,24 +152,6 @@ def _key_column(
     return values.tolist()
 
 
-def _require_operation(op: str | None) -> str:
-    if op is None:
-        raise TypeError("op is required")
-    return op
-
-
-def _require_sequence(value: Sequence[str] | None, role: str) -> Sequence[str]:
-    if value is None:
-        raise TypeError(f"{role} is required")
-    return value
-
-
-def _require_column_name(value: str | None, role: str) -> str:
-    if value is None:
-        raise TypeError(f"{role} is required")
-    return value
-
-
 def _exposure_columns(df: Any, columns: Sequence[str]) -> list[list[float | None]]:
     _require_columns(df, columns)
     return [_numeric_column(df, column) for column in columns]
@@ -181,7 +166,8 @@ def cross_sectional(
     df: Any,
     value: str,
     time_key: KeySelector | None = None,
-    op: str | None = None,
+    *,
+    op: str | _CrossSectionalOp,
     params: TransformParams | None = None,
 ) -> Any:
     """Transform a value column across entities within each timestamp partition.
@@ -195,7 +181,7 @@ def cross_sectional(
             are treated as missing.
         time_key: Column name, index level name, or integer index level
             position that partitions the cross-section. Aware datetimes normalize to UTC; strings remain opaque. Omit when ``df.index`` is a ``DatetimeIndex``.
-        op: Cross-sectional operation name (e.g. ``"zscore"``, ``"rank"``,
+        op: Required keyword-only cross-sectional operation name or matching enum value (e.g. ``"zscore"``, ``"rank"``,
             ``"winsorize"``). See ``transform_cross_sectional`` for the full set.
         params: Optional operation parameters.
 
@@ -205,6 +191,7 @@ def cross_sectional(
 
     Raises:
         ImportError: If pandas is not installed.
+        TypeError: If ``op`` is omitted or is an enum value from another operation family.
         KeyError: If ``value`` is missing, or ``time_key`` is not a column or
             index level (and no ``DatetimeIndex`` default applies).
         ValueError: If ``time_key`` is ambiguous (both a column and an index
@@ -215,10 +202,9 @@ def cross_sectional(
     >>> import pandas as pd
     >>> from finstack_quant.features.dataframe import cross_sectional
     >>> frame = pd.DataFrame({"date": ["2026-01-01"] * 2, "signal": [1.0, 3.0]})
-    >>> cross_sectional(frame, "signal", "date", "rank").tolist()
+    >>> cross_sectional(frame, "signal", "date", op="rank").tolist()
     [0.0, 1.0]
     """
-    op = _require_operation(op)
     out = _transform_cross_sectional(
         _numeric_column(df, value),
         _key_column(
@@ -238,7 +224,8 @@ def timeseries(
     value: str,
     entity: KeySelector,
     order: KeySelector | None = None,
-    op: str | None = None,
+    *,
+    op: str | _TimeSeriesOp,
     params: TransformParams | None = None,
 ) -> Any:
     """Transform a value column within each entity over time.
@@ -255,7 +242,7 @@ def timeseries(
         order: Column name, index level name, or integer index level position
             used to sort within each entity. Aware datetimes normalize to UTC.
             Omit when ``df.index`` is a ``DatetimeIndex``.
-        op: Time-series operation name (e.g. ``"returns"``, ``"rolling_mean"``,
+        op: Required keyword-only time-series operation name or matching enum value (e.g. ``"returns"``, ``"rolling_mean"``,
             ``"ewma_mean"``). See ``transform_timeseries`` for the full set.
         params: Optional operation parameters.
 
@@ -265,6 +252,7 @@ def timeseries(
 
     Raises:
         ImportError: If pandas is not installed.
+        TypeError: If ``op`` is omitted or is an enum value from another operation family.
         KeyError: If ``value`` is missing, or ``entity``/``order`` is not a
             column or index level (and no ``DatetimeIndex`` default applies for
             ``order``).
@@ -276,10 +264,9 @@ def timeseries(
     >>> import pandas as pd
     >>> from finstack_quant.features.dataframe import timeseries
     >>> frame = pd.DataFrame({"date": ["1", "2", "3"], "asset": ["A"] * 3, "signal": [1.0, 3.0, 6.0]})
-    >>> timeseries(frame, "signal", "asset", "date", "diff").iloc[1:].tolist()
+    >>> timeseries(frame, "signal", "asset", "date", op="diff").iloc[1:].tolist()
     [2.0, 3.0]
     """
-    op = _require_operation(op)
     out = _transform_timeseries(
         _numeric_column(df, value),
         _key_column(df, entity, role="entity"),
@@ -364,16 +351,16 @@ def panel(
         elif _is_datetime_index(df):
             spec[role] = df.index.tolist()
     result = _transform_panel(spec)
-    frame = result.to_dataframe(index=df.index)
-    return frame[[operation["name"] for operation in operations]]
+    return result.to_dataframe(index=df.index)
 
 
 def grouped(
     df: Any,
     value: str,
     time_key: KeySelector | None = None,
-    groups: KeySelector | None = None,
-    op: str | None = None,
+    *,
+    groups: KeySelector,
+    op: str | _CrossSectionalOp,
     params: TransformParams | None = None,
 ) -> Any:
     """Transform a value column within each timestamp/group sub-partition.
@@ -389,10 +376,10 @@ def grouped(
         time_key: Column name, index level name, or integer index level
             position for the primary partition. Aware datetimes normalize to UTC; strings remain opaque.
             Omit when ``df.index`` is a ``DatetimeIndex``.
-        groups: Column name, index level name, or integer index level position
+        groups: Required keyword-only column name, index level name, or integer index level position
             for the secondary partition combined with ``time_key``. Entries
             must be strings or date-like.
-        op: Cross-sectional operation name. See ``transform_cross_sectional``
+        op: Required keyword-only cross-sectional operation name or matching enum value. See ``transform_cross_sectional``
             for the full set.
         params: Optional operation parameters.
 
@@ -402,7 +389,8 @@ def grouped(
 
     Raises:
         ImportError: If pandas is not installed.
-        TypeError: If ``groups`` is omitted.
+        TypeError: If ``groups`` or ``op`` is omitted, or ``op`` is an enum value
+            from another operation family.
         KeyError: If ``value`` is missing, or a key selector is not a column or
             index level (and no ``DatetimeIndex`` default applies for
             ``time_key``).
@@ -418,10 +406,9 @@ def grouped(
     ...     "group": ["x", "x", "y", "y"],
     ...     "signal": [1.0, 3.0, 10.0, 14.0],
     ... })
-    >>> [round(value, 3) for value in grouped(frame, "signal", "date", "group", "zscore").tolist()]
+    >>> [round(value, 3) for value in grouped(frame, "signal", "date", groups="group", op="zscore").tolist()]
     [-1.0, 1.0, -1.0, 1.0]
     """
-    op = _require_operation(op)
     out = _transform_cross_sectional_grouped(
         _numeric_column(df, value),
         _key_column(
@@ -441,7 +428,8 @@ def neutralize(
     df: Any,
     value: str,
     time_key: KeySelector | None = None,
-    exposures: Sequence[str] | None = None,
+    *,
+    exposures: Sequence[str],
     params: TransformParams | None = None,
 ) -> Any:
     """Return cross-sectional OLS residuals for a DataFrame signal column.
@@ -455,7 +443,7 @@ def neutralize(
             are treated as missing.
         time_key: Column name, index level name, or integer index level
             position that partitions the cross-section. Aware datetimes normalize to UTC; strings remain opaque. Omit when ``df.index`` is a ``DatetimeIndex``.
-        exposures: Names of the exposure columns regressed against ``value``.
+        exposures: Required keyword-only names of the exposure columns regressed against ``value``.
         params: Optional parameters. ``fit_intercept`` (default ``True``) adds an
             intercept term.
 
@@ -480,7 +468,7 @@ def neutralize(
     ...     "signal": [1.0, 2.0, 2.0, 4.0],
     ...     "factor": [0.0, 1.0, 0.0, 1.0],
     ... })
-    >>> [round(value, 3) for value in neutralize(frame, "signal", "date", ["factor"]).tolist()]
+    >>> [round(value, 3) for value in neutralize(frame, "signal", "date", exposures=["factor"]).tolist()]
     [-0.5, -1.0, 0.5, 1.0]
     """
     out = _neutralize(
@@ -491,7 +479,7 @@ def neutralize(
             role="time_key",
             default_datetime_index=True,
         ),
-        _exposure_columns(df, _require_sequence(exposures, "exposures")),
+        _exposure_columns(df, exposures),
         params,
     )
     return _series(df, out, f"{value}_neutralized")
@@ -503,7 +491,8 @@ def pairwise(
     other: str,
     entity: KeySelector,
     order: KeySelector | None = None,
-    op: str | None = None,
+    *,
+    op: str | _PairwiseOp,
     params: TransformParams | None = None,
 ) -> Any:
     """Transform two value columns per entity with a rolling pairwise operation.
@@ -522,7 +511,7 @@ def pairwise(
         order: Column name, index level name, or integer index level position
             used to sort within each entity. Aware datetimes normalize to UTC.
             Omit when ``df.index`` is a ``DatetimeIndex``.
-        op: Pairwise operation name: ``"rolling_cov"``, ``"rolling_corr"``, or
+        op: Required keyword-only pairwise operation name or matching enum value: ``"rolling_cov"``, ``"rolling_corr"``, or
             ``"rolling_beta"``.
         params: ``window`` spans rows, including gaps; ``min_periods <= window``
             counts complete pairs within that window.
@@ -533,6 +522,7 @@ def pairwise(
 
     Raises:
         ImportError: If pandas is not installed.
+        TypeError: If ``op`` is omitted or is an enum value from another operation family.
         KeyError: If ``value`` or ``other`` is missing, or ``entity``/``order``
             is not a column or index level (and no ``DatetimeIndex`` default
             applies for ``order``).
@@ -555,13 +545,12 @@ def pairwise(
     ...     "other",
     ...     "asset",
     ...     "date",
-    ...     "rolling_beta",
-    ...     {"window": 3, "min_periods": 3},
+    ...     op="rolling_beta",
+    ...     params={"window": 3, "min_periods": 3},
     ... )
     >>> round(float(beta.iloc[-1]), 3)
     0.643
     """
-    op = _require_operation(op)
     out = _transform_timeseries_pairwise(
         _numeric_column(df, value),
         _numeric_column(df, other),
@@ -641,7 +630,8 @@ def risk_scaled_weights(
     df: Any,
     value: str,
     time_key: KeySelector | None = None,
-    volatility: str | None = None,
+    *,
+    volatility: str,
 ) -> Any:
     """Convert a DataFrame signal column to dollar-neutral inverse-vol weights.
 
@@ -655,7 +645,7 @@ def risk_scaled_weights(
             missing.
         time_key: Column name, index level name, or integer index level
             position that partitions the cross-section. Aware datetimes normalize to UTC; strings remain opaque. Omit when ``df.index`` is a ``DatetimeIndex``.
-        volatility: Name of the risk-estimate column aligned to ``value``.
+        volatility: Required keyword-only name of the risk-estimate column aligned to ``value``.
             Values are used as ``signal / volatility``; non-positive magnitudes
             map to missing weights.
 
@@ -681,7 +671,7 @@ def risk_scaled_weights(
     ...     "signal": [1.0, 2.0, 2.0, 4.0],
     ...     "vol": [1.0, 2.0, 1.0, 2.0],
     ... })
-    >>> risk_scaled_weights(frame, "signal", "date", "vol").tolist()
+    >>> risk_scaled_weights(frame, "signal", "date", volatility="vol").tolist()
     [-0.25, -0.25, 0.25, 0.25]
     """
     out = _risk_scaled_weights(
@@ -692,7 +682,7 @@ def risk_scaled_weights(
             role="time_key",
             default_datetime_index=True,
         ),
-        _numeric_column(df, _require_column_name(volatility, "volatility")),
+        _numeric_column(df, volatility),
     )
     return _series(df, out, f"{value}_risk_scaled_weight")
 
@@ -748,14 +738,14 @@ def neutralize_and_zscore(
     df: Any,
     value: str,
     time_key: KeySelector | None = None,
-    exposures: Sequence[str] | None = None,
-    params: TransformParams | None = None,
+    *,
+    exposures: Sequence[str],
 ) -> Any:
     """Neutralize a DataFrame signal column against exposures, then z-score.
 
     Forwards to :func:`finstack_quant.features.neutralize_and_zscore`,
-    residualizing ``value`` on the exposure columns within each ``time_key``
-    partition and z-scoring the residuals.
+    residualizing ``value`` on the exposure columns with an intercept within
+    each ``time_key`` partition and z-scoring the residuals.
 
     Args:
         df: Source DataFrame.
@@ -763,9 +753,7 @@ def neutralize_and_zscore(
             missing.
         time_key: Column name, index level name, or integer index level
             position that partitions the cross-section. Aware datetimes normalize to UTC; strings remain opaque. Omit when ``df.index`` is a ``DatetimeIndex``.
-        exposures: Names of the exposure columns regressed against ``value``.
-        params: Optional parameters forwarded to ``neutralize``;
-            ``fit_intercept`` (default ``True``).
+        exposures: Required keyword-only names of the exposure columns regressed against ``value``.
 
     Returns:
         pandas.Series: Z-scored residuals aligned to ``df.index`` and named
@@ -777,8 +765,8 @@ def neutralize_and_zscore(
         KeyError: If ``value`` or any exposure column is missing, or ``time_key``
             is not a column or index level (and no ``DatetimeIndex`` default
             applies).
-        ValueError: If ``fit_intercept=False``, arithmetic is non-finite,
-            ``time_key`` is ambiguous, or ``params`` are malformed.
+        ValueError: If arithmetic is non-finite, ``time_key`` is ambiguous,
+            or an exposure partition cannot be fitted.
 
     Examples:
     --------
@@ -789,7 +777,7 @@ def neutralize_and_zscore(
     ...     "signal": [1.0, 2.0, 2.0, 4.0],
     ...     "factor": [0.0, 1.0, 0.0, 1.0],
     ... })
-    >>> scores = neutralize_and_zscore(frame, "signal", "date", ["factor"])
+    >>> scores = neutralize_and_zscore(frame, "signal", "date", exposures=["factor"])
     >>> [round(value, 3) for value in scores.tolist()]
     [-0.632, -1.265, 0.632, 1.265]
     """
@@ -801,7 +789,6 @@ def neutralize_and_zscore(
             role="time_key",
             default_datetime_index=True,
         ),
-        _exposure_columns(df, _require_sequence(exposures, "exposures")),
-        params,
+        _exposure_columns(df, exposures),
     )
     return _series(df, out, f"{value}_neutralized_zscore")

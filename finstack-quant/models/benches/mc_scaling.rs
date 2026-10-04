@@ -115,7 +115,7 @@ fn scaling_lsmc_paths(c: &mut Criterion) {
     let mut group = c.benchmark_group("scaling_lsmc_paths");
     let process = gbm();
     let exercise = AmericanPut::new(STRIKE).expect("valid strike");
-    let basis = PolynomialBasis::new(2);
+    let basis = PolynomialBasis::new(2).expect("valid regression basis");
     let num_steps = 12;
     let exercise_dates: Vec<usize> = (1..=num_steps).collect();
 

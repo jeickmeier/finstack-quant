@@ -593,12 +593,13 @@ test('instrument data-type constructors match Python', () => {
     'reserve'
   );
   same(
-    plain(
-      instruments.assetPoolWithAccounts(data.pool, {
+    plain({
+      ...data.pool,
+      ...{
         collection_account: usd(125_000),
         original_balance: usd(3_000_000),
-      })
-    ),
+      },
+    }),
     data.pool_with_accounts,
     'accounts'
   );

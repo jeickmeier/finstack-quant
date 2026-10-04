@@ -37,28 +37,14 @@ impl JumpToDefaultResult {
 }
 
 /// Registry pricer for CDS Tranche using Gaussian Copula model
-pub(crate) struct SimpleCdsTrancheHazardPricer {
-    model_key: crate::pricer::ModelKey,
-}
-
-impl SimpleCdsTrancheHazardPricer {
-    /// Create new CDS tranche pricer with default hazard rate model
-    pub(crate) fn new() -> Self {
-        Self {
-            model_key: crate::pricer::ModelKey::HazardRate,
-        }
-    }
-}
-
-impl Default for SimpleCdsTrancheHazardPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub(crate) struct SimpleCdsTrancheHazardPricer;
 
 impl crate::pricer::Pricer for SimpleCdsTrancheHazardPricer {
     fn key(&self) -> crate::pricer::PricerKey {
-        crate::pricer::PricerKey::new(crate::pricer::InstrumentType::CdsTranche, self.model_key)
+        crate::pricer::PricerKey::new(
+            crate::pricer::InstrumentType::CdsTranche,
+            crate::pricer::ModelKey::HazardRate,
+        )
     }
 
     fn price_dyn(
@@ -89,7 +75,7 @@ impl crate::pricer::Pricer for SimpleCdsTrancheHazardPricer {
             crate::results::ValuationResult::stamped(cds_tranche.id(), as_of, pv).with_details(
                 crate::results::ValuationDetails::CreditDerivative(
                     crate::results::CreditDerivativeValuationDetails {
-                        model_key: self.model_key,
+                        model_key: crate::pricer::ModelKey::HazardRate,
                         integration_method: Some("isda_standard_model".to_string()),
                     },
                 ),

@@ -3,7 +3,6 @@ use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::structured_credit::metrics::{
     calculate_tranche_cs01, calculate_tranche_duration, calculate_tranche_z_spread,
 };
-use crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows;
 use crate::instruments::fixed_income::structured_credit::pricing::stochastic::calibrations::{
     abs_auto_correlation_structure, clo_correlation_structure, cmbs_correlation_structure,
     rmbs_correlation_structure,
@@ -254,7 +253,7 @@ impl StructuredCredit {
         let months_to_maturity = as_of.months_until(self.maturity).max(1) as usize;
         let mut tree_config = ScenarioTreeConfig::new(months_to_maturity, 3);
 
-        let (prepay, default, _correlation) = self.effective_stochastic_specs()?;
+        let (prepay, default) = self.effective_stochastic_specs()?;
         tree_config.prepay_spec = prepay;
         tree_config.default_spec = default;
         tree_config.recovery_spec = match &self.credit_model.stochastic_recovery_spec {
@@ -364,13 +363,7 @@ impl StructuredCredit {
         seed
     }
 
-    fn effective_stochastic_specs(
-        &self,
-    ) -> Result<(
-        StochasticPrepaySpec,
-        StochasticDefaultSpec,
-        CorrelationStructure,
-    )> {
+    fn effective_stochastic_specs(&self) -> Result<(StochasticPrepaySpec, StochasticDefaultSpec)> {
         let model = self.validated_credit_model()?;
         // The stochastic engines size defaults from a per-month rate on the
         // surviving balance; curves stated against the original balance and
@@ -416,6 +409,12 @@ impl StructuredCredit {
             .clone()
             .unwrap_or_else(|| StochasticDefaultSpec::deterministic(model.default_spec.clone()));
 
+        Ok((prepay, default))
+    }
+
+    /// Effective asset correlation of the deal's correlation structure (the
+    /// explicit structure, else the deal-type default), as a decimal.
+    pub(crate) fn effective_asset_correlation(&self) -> Result<f64> {
         let correlation = match &self.credit_model.correlation_structure {
             Some(correlation) => correlation.clone(),
             None => match self.deal_type {
@@ -425,14 +424,6 @@ impl StructuredCredit {
                 _ => abs_auto_correlation_structure()?,
             },
         };
-
-        Ok((prepay, default, correlation))
-    }
-
-    /// Effective asset correlation of the deal's correlation structure (the
-    /// explicit structure, else the deal-type default), as a decimal.
-    pub(crate) fn effective_asset_correlation(&self) -> Result<f64> {
-        let (_, _, correlation) = self.effective_stochastic_specs()?;
         Ok(correlation.asset_correlation())
     }
 
@@ -449,7 +440,7 @@ impl StructuredCredit {
         market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
-        let cashflows = generate_tranche_cashflows(self, tranche_id, market, as_of)?;
+        let cashflows = (self).tranche_cashflows(tranche_id, market, as_of)?;
         let effective_as_of = self.resolve_pricing_as_of(market, as_of);
         self.value_tranche_cashflows(&cashflows, market, effective_as_of)
     }
@@ -515,7 +506,7 @@ impl StructuredCredit {
                     id: format!("tranche:{tranche_id}"),
                 })
             })?;
-        let cashflow_result = generate_tranche_cashflows(self, tranche_id, market, as_of)?;
+        let cashflow_result = (self).tranche_cashflows(tranche_id, market, as_of)?;
         let pv = self.value_tranche_cashflows(&cashflow_result, market, effective_as_of)?;
         // Prices are per CURRENT face (the factor-adjusted quote basis).
         let quote = super::super::metrics::quote::SettlementQuote::for_tranche(

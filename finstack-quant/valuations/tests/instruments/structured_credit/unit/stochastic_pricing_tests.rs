@@ -12,9 +12,9 @@ use finstack_quant_models::credit::pool::{
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
-    calculate_tranche_oas, generate_cashflows, generate_tranche_cashflows, run_simulation,
-    scenario_table, AssetPool, DealType, HedgeSwap, OasConfig, PoolAsset, ScenarioGrid,
-    StructuredCredit, StructuredCreditPricingMode, Tranche, TrancheSeniority, TrancheStructure,
+    calculate_tranche_oas, generate_cashflows, run_simulation, scenario_table, AssetPool, DealType,
+    HedgeSwap, OasConfig, PoolAsset, ScenarioGrid, StructuredCredit, StructuredCreditPricingMode,
+    Tranche, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::{Instrument, ScenarioPricingOverrides};
 use time::Month;
@@ -382,10 +382,10 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         generate_cashflows(&sc, &market, closing_date())
             .expect_err("invalid aggregate cashflows")
             .to_string(),
-        generate_tranche_cashflows(&sc, "missing", &market, closing_date())
+        (sc).tranche_cashflows("missing", &market, closing_date())
             .expect_err("invalid tranche cashflows")
             .to_string(),
-        generate_tranche_cashflows(&sc, "missing", &market, closing_date())
+        (sc).tranche_cashflows("missing", &market, closing_date())
             .expect_err("invalid tranche helper")
             .to_string(),
         sc.value_tranche("missing", &market, closing_date())

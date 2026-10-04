@@ -392,7 +392,7 @@ export interface DF1833508D6D553B1B454 {
   type: "swaption";
 }
 /**
- * Swaption instrument
+ * European swaption instrument
  *
  * # Exercise lifecycle boundary
  *
@@ -414,10 +414,6 @@ export interface D_818134538Ec82F6D27C9 {
    * - `ZeroCoupon`: Single discount to swap maturity
    */
   cash_settlement_method: "collateralized_cash_price" | "par_yield" | "isda_par_par" | "zero_coupon";
-  /**
-   * Exercise style (European, Bermudan, American). Defaults to European.
-   */
-  exercise_style: "european" | "american" | "bermudan";
   expiry: Date;
   id: Id;
   instrument_pricing_overrides?: InstrumentPricingOverrides;

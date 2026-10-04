@@ -130,14 +130,8 @@ pub struct DurationCellTable {
 /// * `lower` - Cell lower bound, in years.
 /// * `upper` - Cell upper bound, in years.
 ///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_portfolio::excess_return::duration_cell_label;
-///
-/// assert_eq!(duration_cell_label(5.0, 5.5), "5.0-5.5");
-/// ```
-pub fn duration_cell_label(lower: f64, upper: f64) -> String {
+/// For example, bounds `5.0` and `5.5` yield `"5.0-5.5"`.
+fn duration_cell_label(lower: f64, upper: f64) -> String {
     format!("{lower:.1}-{upper:.1}")
 }
 
@@ -592,21 +586,11 @@ fn check_label_collisions(cells: &[CellReturn], width: f64) -> Result<()> {
 /// `observed` is `true`, since every reference instrument is bucketed into
 /// some cell.
 fn fill_gaps(base_return: &mut [f64], observed: &[bool]) {
-    let n = base_return.len();
-
     // Leading flat extrapolation: fill cells before the first observed one.
     if let Some(first) = observed.iter().position(|&o| o) {
         let first_value = base_return[first];
         for value in &mut base_return[..first] {
             *value = first_value;
-        }
-    }
-
-    // Trailing flat extrapolation: fill cells after the last observed one.
-    if let Some(last) = observed.iter().rposition(|&o| o) {
-        let last_value = base_return[last];
-        for value in &mut base_return[last + 1..n] {
-            *value = last_value;
         }
     }
 
@@ -1175,15 +1159,6 @@ mod tests {
     /// reference duration lands strictly above cell 0, so cells before it
     /// have no members and must flat-equal the first observed cell.
     ///
-    /// Note there is no equivalent trailing case reachable through this
-    /// function: `num_cells` is derived from the *largest* reference
-    /// duration (`ceil(max_duration / width)`), so the top cell always
-    /// contains that duration and is therefore always observed by
-    /// construction. Trailing extrapolation is still real code, reachable
-    /// once a future stage adds an explicit upper-bound parameter that can
-    /// exceed the observed maximum; the
-    /// `fill_gaps_extrapolates_leading_and_trailing_flat` test below
-    /// exercises it directly against the internal `fill_gaps` helper.
     #[test]
     fn cell_table_extrapolates_leading_cells_flat() {
         let reference = vec![
@@ -1212,35 +1187,6 @@ mod tests {
         assert!(!table.cells[1].observed);
         assert!(table.cells[2].observed);
     }
-
-    /// Directly exercises both flat-extrapolation branches of the internal
-    /// `fill_gaps` helper (leading *and* trailing), which
-    /// `cell_table_extrapolates_leading_cells_flat` above cannot reach on the
-    /// trailing side alone (see that test's doc comment for why). Mirrors
-    /// the reviewer's "cells 2 and 4 of a 6-cell grid" construction: with
-    /// observed cells at index 2 and 4, cells 0-1 must flat-equal cell 2's
-    /// value and cell 5 must flat-equal cell 4's value.
-    #[test]
-    fn fill_gaps_extrapolates_leading_and_trailing_flat() {
-        let mut base_return = vec![0.0, 0.0, 0.03, 0.0, 0.07, 0.0];
-        let observed = [false, false, true, false, true, false];
-        fill_gaps(&mut base_return, &observed);
-        assert_eq!(
-            base_return[0], 0.03,
-            "leading cell 0 must flat-equal cell 2"
-        );
-        assert_eq!(
-            base_return[1], 0.03,
-            "leading cell 1 must flat-equal cell 2"
-        );
-        assert_eq!(base_return[2], 0.03, "observed cell 2 must be unchanged");
-        assert_eq!(base_return[4], 0.07, "observed cell 4 must be unchanged");
-        assert_eq!(
-            base_return[5], 0.07,
-            "trailing cell 5 must flat-equal cell 4"
-        );
-    }
-
     #[test]
     fn cell_table_averages_multiple_instruments_per_cell() {
         let reference = vec![

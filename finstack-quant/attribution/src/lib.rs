@@ -31,7 +31,7 @@
 //! | [`attribute_pnl`] with [`AttributionMethod::Parallel`] | Independent factor effects and an interaction residual are required |
 //! | [`attribute_pnl`] with [`AttributionMethod::Waterfall`] | An ordered full-revaluation decomposition is required |
 //! | [`attribute_pnl`] with [`AttributionMethod::Taylor`] | A bump-and-reprice first- or second-order decomposition is required |
-//! | [`attribute_pnl_many`] | One [`AttributionSpec`] template applied to a list of instruments (order-preserving batch) |
+//! | [`attribute_pnl_many`] | Shared [`AttributionInputs`] applied to an ordered instrument batch |
 //!
 //! Repricing methods take one [`AttributionRequest`] carrying the instrument,
 //! both market states and dates, the Finstack configuration, and the optional
@@ -174,7 +174,7 @@ pub use return_contribution::{
 };
 pub use spec::{
     attribute_pnl_many, default_attribution_metrics, validate_attribution_json, AttributionConfig,
-    AttributionEnvelope, AttributionJsonInputs, AttributionResult, AttributionResultEnvelope,
+    AttributionEnvelope, AttributionInputs, AttributionResult, AttributionResultEnvelope,
     AttributionSchema, AttributionSpec, ATTRIBUTION_SCHEMA,
 };
 pub use target_currency::translate_to_target_currency;
@@ -393,8 +393,8 @@ pub fn pnl_bridge(
     as_of_t1: Date,
     target_currency: Currency,
 ) -> finstack_quant_core::Result<Money> {
-    let v_t0 = helpers::reprice_instrument(instrument, market_t0, as_of_t0)?;
-    let v_t1 = helpers::reprice_instrument(instrument, market_t1, as_of_t1)?;
+    let v_t0 = instrument.value(market_t0, as_of_t0)?;
+    let v_t1 = instrument.value(market_t1, as_of_t1)?;
     helpers::compute_pnl_with_fx(
         v_t0,
         v_t1,

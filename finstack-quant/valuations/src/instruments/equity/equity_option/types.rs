@@ -72,7 +72,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
 use time::macros::date;
 
 use super::parameters::{EquityOptionMarketData, EquityOptionParams};
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::validation;
 
 /// Observed exercise or expiry state for an equity option.
@@ -172,7 +172,6 @@ pub struct EquityOption {
     ///
     /// Required from expiry onward. It fixes cash-settled intrinsic value or
     /// identifies a physical-delivery obligation through its settlement date.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exercise: Option<EquityOptionExercise>,
     /// Discount curve ID for present value calculations
@@ -235,7 +234,6 @@ pub struct EquityOption {
     /// Required when `exercise_style` is `Bermudan`. Each date represents a time
     /// at which early exercise is permitted. Dates before as_of or after expiry
     /// are filtered out automatically.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_dates")]
     #[cfg_attr(
@@ -871,7 +869,7 @@ impl crate::instruments::common_impl::traits::Instrument for EquityOption {
         None
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

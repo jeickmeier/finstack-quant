@@ -37,7 +37,6 @@ FRTB_SENSITIVITY_COLUMNS = [
     *SENSITIVITY_COLUMNS,
     "sector",
     "seniority",
-    "asset_type",
     "maturity_years",
     "pnl_adjustment",
 ]
@@ -310,12 +309,12 @@ def test_frtb_sensitivities_to_dataframe_keeps_schema_when_empty() -> None:
 
 def test_frtb_sensitivities_to_dataframe_is_long_and_sorted() -> None:
     sens = FrtbSensitivities("USD")
-    sens.add_girr_delta("5Y", 12_000.0)
-    sens.add_girr_delta("2Y", 8_000.0)
+    sens.add_girr_delta("USD", "5Y", 12_000.0)
+    sens.add_girr_delta("USD", "2Y", 8_000.0)
     sens.add_csr_nonsec_delta("ACME", 3, "5Y", "bond", 4_000.0)
     sens.add_equity_delta("AAPL", 1, 25_000.0)
     sens.add_fx_delta("EUR", "USD", 9_000.0)
-    sens.add_girr_curvature(500.0, -400.0)
+    sens.add_girr_curvature("USD", 500.0, -400.0)
     sens.add_rrao_position("EXOTIC-1", 5_000_000.0, True)
 
     df = sens.to_dataframe()
@@ -363,7 +362,7 @@ def test_frtb_sensitivities_row_order_ignores_the_insertion_order() -> None:
     def build(order: tuple[str, ...]) -> FrtbSensitivities:
         sens = FrtbSensitivities("USD")
         for tenor in order:
-            sens.add_girr_delta(tenor, amounts[tenor])
+            sens.add_girr_delta("USD", tenor, amounts[tenor])
             sens.add_equity_delta(f"NAME_{tenor}", 1, 2.0 * amounts[tenor])
         return sens
 

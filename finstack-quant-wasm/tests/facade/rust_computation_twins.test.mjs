@@ -471,7 +471,10 @@ test('Portfolio getters project the Rust fields', () => {
 });
 
 test('portfolio cashflow readers net and collapse the Rust ladder', () => {
-  const ladder = portfolio.aggregateFullCashflows(BOOK, FLAT_USD_MARKET);
+  const ladder = portfolio.aggregateFullCashflows(
+    portfolio.Portfolio.fromSpec(BOOK),
+    core.MarketContext.fromJson(FLAT_USD_MARKET)
+  );
   assert.deepEqual(portfolio.netInCurrencyByDate(ladder, 'USD'), [
     ['2024-01-15', -1500000],
     ['2025-01-15', 0],
@@ -499,7 +502,12 @@ test('portfolio cashflow readers net and collapse the Rust ladder', () => {
 });
 
 test('portfolioMetricsSeries decodes bucketed metrics', () => {
-  const valuation = portfolio.valuePortfolio(BOOK, FLAT_USD_MARKET, false, ['bucketed_dv01']);
+  const valuation = portfolio.valuePortfolio(
+    portfolio.Portfolio.fromSpec(BOOK),
+    core.MarketContext.fromJson(FLAT_USD_MARKET),
+    false,
+    ['bucketed_dv01']
+  );
   const metrics = portfolio.aggregateMetrics(
     JSON.stringify(valuation, (_, v) => (typeof v === 'bigint' ? Number(v) : v)),
     'USD',
@@ -671,7 +679,7 @@ test('calibration content hashes match the Python/Rust hashes', () => {
   );
   assert.equal(
     calibration.calibrationEnvelopeContentHash(envelope),
-    'sha256:17433701c1eb8fbea59159c679c47bce1bd6bff4d691d2e569bf9b50c424355d'
+    'sha256:0959605bc2b4005f3b8d809eb78c431fe4c6abac03443161fc3a64f35f08843a'
   );
   // The solved residuals differ from the native build in the last bits
   // (wasm32 libm), so the result hash is pinned against its own JSON text:
@@ -700,22 +708,25 @@ test('pnlBridge and attributePnlMany run the Rust attribution entry points', () 
   );
   assert.equal(bridge.toString(), 'USD -61.80');
 
-  const params = new attribution.AttributionJsonInputs(
-    JSON.stringify(CONVERTIBLE.instrument),
-    JSON.stringify(CONVERTIBLE.market_t0),
-    JSON.stringify(CONVERTIBLE.market_t1),
-    CONVERTIBLE.as_of_t0,
-    CONVERTIBLE.as_of_t1,
-    '"parallel"',
-    undefined,
-    false
-  );
+  const params = {
+    instrument: CONVERTIBLE.instrument.instrument,
+    market_t0: CONVERTIBLE.market_t0,
+    market_t1: CONVERTIBLE.market_t1,
+    as_of_t0: CONVERTIBLE.as_of_t0,
+    as_of_t1: CONVERTIBLE.as_of_t1,
+    method: 'parallel',
+    full_cross_attribution: false,
+  };
   const single = attribution.attributePnl(params);
-  const many = attribution.attributePnlMany(params, [
+  const sharedInputs = { ...params };
+  delete sharedInputs.instrument;
+  const many = attribution.attributePnlMany(sharedInputs, [
     CONVERTIBLE.instrument,
-    CONVERTIBLE.instrument,
+    JSON.stringify(CONVERTIBLE.instrument),
   ]);
   assert.equal(many.length, 2);
+  assert.deepEqual(many[1].total_pnl, single.total_pnl);
+  assert.deepEqual(attribution.attributePnlMany(sharedInputs, []), []);
   assert.deepEqual(many[0].total_pnl, single.total_pnl);
 
   assert.match(attribution.pnlAttributionExplainText(single), /Total P&L/);

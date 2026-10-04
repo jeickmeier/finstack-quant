@@ -36,7 +36,6 @@ use finstack_quant_core::market_data::bumps::BumpSpec;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::math::neumaier_sum;
 use finstack_quant_core::types::CurveId;
-use std::borrow::Cow;
 use std::marker::PhantomData;
 
 /// Reprice for a rate scenario. Instruments whose projected cashflows respond
@@ -90,8 +89,6 @@ pub(crate) enum RateCurveSelection {
 pub(crate) struct Dv01CalculatorConfig {
     /// Computation mode (parallel vs bucketed, triangular vs par-rate).
     pub(crate) mode: Dv01ComputationMode,
-    /// Bucket times for key-rate DV01 (in years).
-    pub(crate) buckets: Cow<'static, [f64]>,
     /// MetricId under which to store per-curve or per-bucket series.
     /// Defaults to `BucketedDv01`. Set to e.g. `Pv01` when using
     /// `ParallelPerCurve` mode for PV01 so keys read `pv01::USD-OIS`.
@@ -104,7 +101,6 @@ impl Default for Dv01CalculatorConfig {
     fn default() -> Self {
         Self {
             mode: Dv01ComputationMode::KeyRateTriangular,
-            buckets: Cow::Borrowed(&sens_config::STANDARD_BUCKETS_YEARS),
             series_id: MetricId::BucketedDv01,
             curve_selection: RateCurveSelection::All,
         }
@@ -116,7 +112,6 @@ impl Dv01CalculatorConfig {
     pub(crate) fn parallel_combined() -> Self {
         Self {
             mode: Dv01ComputationMode::ParallelCombined,
-            buckets: Cow::Borrowed(&[]),
             series_id: MetricId::BucketedDv01,
             curve_selection: RateCurveSelection::All,
         }
@@ -132,7 +127,6 @@ impl Dv01CalculatorConfig {
     pub(crate) fn parallel_discount_only() -> Self {
         Self {
             mode: Dv01ComputationMode::ParallelCombined,
-            buckets: Cow::Borrowed(&[]),
             series_id: MetricId::BucketedDv01,
             curve_selection: RateCurveSelection::DiscountOnly,
         }
@@ -142,7 +136,6 @@ impl Dv01CalculatorConfig {
     pub(crate) fn parallel_forward_only() -> Self {
         Self {
             mode: Dv01ComputationMode::ParallelCombined,
-            buckets: Cow::Borrowed(&[]),
             series_id: MetricId::BucketedDv01,
             curve_selection: RateCurveSelection::ForwardOnly,
         }
@@ -152,7 +145,6 @@ impl Dv01CalculatorConfig {
     pub(crate) fn parallel_per_curve() -> Self {
         Self {
             mode: Dv01ComputationMode::ParallelPerCurve,
-            buckets: Cow::Borrowed(&[]),
             series_id: MetricId::BucketedDv01,
             curve_selection: RateCurveSelection::All,
         }
@@ -211,17 +203,6 @@ impl<I> UnifiedDv01Calculator<I> {
             _phantom: PhantomData,
         }
     }
-
-    fn effective_key_rate_buckets<'a>(
-        &'a self,
-        defaults: &'a sens_config::SensitivitiesConfig,
-    ) -> &'a [f64] {
-        if self.config.buckets.as_ref() == sens_config::STANDARD_BUCKETS_YEARS {
-            defaults.dv01_buckets_years.as_slice()
-        } else {
-            self.config.buckets.as_ref()
-        }
-    }
 }
 
 impl<I> MetricCalculator for UnifiedDv01Calculator<I>
@@ -248,7 +229,7 @@ where
                 self.compute_parallel_per_curve(context, &curves, bump_bp)
             }
             Dv01ComputationMode::KeyRateTriangular => {
-                let buckets = self.effective_key_rate_buckets(&defaults);
+                let buckets = &defaults.dv01_buckets_years;
                 self.compute_key_rate_triangular(context, &curves, bump_bp, buckets)
             }
         }

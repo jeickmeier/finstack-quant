@@ -6,7 +6,7 @@
 use super::calculators::{money_from_amount, PyImResult};
 use super::frame::sensitivity_rows;
 use super::im_curvature::PySimmCurvatureSensitivity;
-use super::types::{extract_asset_class, PyCollateralAssetClass, PyEligibleCollateralSchedule};
+use super::types::{extract_asset_class, PyEligibleCollateralSchedule};
 use crate::bindings::core::config::PyFinstackConfig;
 use crate::bindings::date_utils::extract_date;
 use crate::bindings::module_utils::parse_currency;
@@ -562,44 +562,6 @@ impl PyScheduleImCalculator {
         })
     }
 
-    /// Return a copy whose default asset class is ``asset_class`` (a
-    /// lower-case label such as ``"interest_rate"``, ``"credit"``,
-    /// ``"equity"``, ``"commodity"``, ``"fx"``, ``"other"``, or
-    /// ``"custom_<name>"`` for a registry-defined class). Raises
-    /// ``ValueError`` for an unknown label.
-    fn with_asset_class(&self, asset_class: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: self
-                .inner
-                .clone()
-                .with_asset_class(parse_schedule_asset_class(asset_class)?),
-        })
-    }
-
-    /// Return a copy whose default maturity is finite nonnegative ``years``.
-    /// Raises ValueError for invalid maturity.
-    fn with_maturity(&self, years: f64) -> PyResult<Self> {
-        Ok(Self {
-            inner: self
-                .inner
-                .clone()
-                .with_maturity(years)
-                .map_err(core_to_py)?,
-        })
-    }
-
-    /// Default asset class label used by trait-based calculations.
-    #[getter]
-    fn default_asset_class(&self) -> String {
-        self.inner.default_asset_class.as_str().into_owned()
-    }
-
-    /// Default remaining maturity in years used by trait-based calculations.
-    #[getter]
-    fn default_maturity_years(&self) -> f64 {
-        self.inner.default_maturity_years
-    }
-
     /// Margin period of risk in business days stamped on results.
     #[getter]
     fn mpor_days(&self) -> u32 {
@@ -753,52 +715,12 @@ impl PyHaircutImCalculator {
         }
     }
 
-    /// Return a copy configured with a default asset class (a
-    /// ``CollateralAssetClass`` or its wire label). Raises ``ValueError``
-    /// for an unknown label.
-    fn with_default_asset_class(&self, asset_class: &Bound<'_, PyAny>) -> PyResult<Self> {
-        Ok(Self {
-            inner: self
-                .inner
-                .clone()
-                .with_default_asset_class(extract_asset_class(asset_class)?),
-        })
-    }
-
-    /// Return a copy declaring the posted-collateral currency; the FX add-on
-    /// applies when it differs from the exposure currency. Raises
-    /// ``ValueError`` for an unknown currency.
-    fn with_posted_collateral_currency(&self, currency: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: self
-                .inner
-                .clone()
-                .with_posted_collateral_currency(parse_currency(currency)?),
-        })
-    }
-
     /// Eligible-collateral schedule the haircuts are read from.
     #[getter]
     fn eligible_collateral(&self) -> PyEligibleCollateralSchedule {
         PyEligibleCollateralSchedule {
             inner: self.inner.eligible_collateral().clone(),
         }
-    }
-
-    /// Default collateral asset class assumed by trait-based calculations.
-    #[getter]
-    fn default_asset_class(&self) -> PyCollateralAssetClass {
-        PyCollateralAssetClass {
-            inner: self.inner.default_asset_class().clone(),
-        }
-    }
-
-    /// Declared posted-collateral currency code, or ``None``.
-    #[getter]
-    fn posted_collateral_currency(&self) -> Option<String> {
-        self.inner
-            .posted_collateral_currency()
-            .map(|c| c.to_string())
     }
 
     /// Margin period of risk in business days stamped on every result

@@ -9,9 +9,8 @@ use pyo3::prelude::*;
 /// Versioned attribution result: the ``PnlAttribution`` plus its
 /// result-policy audit stamp (Rust ``AttributionResultEnvelope``).
 ///
-/// Returned by ``attribute_pnl_envelope``; ``to_json`` is byte-identical to
-/// ``attribute_pnl_envelope_json`` and to the WASM
-/// ``attributePnlEnvelopeJson``.
+/// Returned by ``attribute_pnl_envelope``; ``to_json`` uses the same exact
+/// Rust wire serialization as WASM ``attributePnlEnvelopeJson``.
 ///
 /// Examples
 /// --------
@@ -48,7 +47,7 @@ impl PyAttributionResultEnvelope {
         serde_to_py(py, &self.inner.result.results_meta)
     }
 
-    /// Serialize to compact JSON (the ``attribute_pnl_envelope_json`` wire).
+    /// Serialize the result envelope to compact canonical Rust JSON.
     fn to_json(&self) -> PyResult<String> {
         serde_json::to_string(&self.inner).map_err(display_to_py)
     }

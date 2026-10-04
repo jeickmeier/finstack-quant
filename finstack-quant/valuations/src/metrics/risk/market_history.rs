@@ -400,6 +400,63 @@ impl MarketHistory {
     }
 }
 
+impl MarketHistory {
+    /// Project one row per risk-factor shift in scenario and shift order.
+    ///
+    /// Dates are ISO strings, shifts retain each factor's native units, and
+    /// coordinates absent for a factor are nullable. Empty histories keep all columns.
+    pub fn to_table(&self) -> Result<finstack_quant_core::table::TableEnvelope> {
+        use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
+        let mut rows = Vec::new();
+        let mut dates = Vec::new();
+        let mut shifts = Vec::new();
+        for scenario in &self.scenarios {
+            for shift in &scenario.shifts {
+                rows.push(
+                    serde_json::to_value(&shift.factor).map_err(|error| {
+                        finstack_quant_core::Error::Validation(error.to_string())
+                    })?,
+                );
+                dates.push(scenario.date.to_string());
+                shifts.push(shift.shift);
+            }
+        }
+        let mut columns = vec![TableColumn::new("date", TableColumnData::String(dates))];
+        for name in [
+            "type",
+            "curve_id",
+            "tenor_years",
+            "ticker",
+            "base",
+            "quote",
+            "vol_surface_id",
+            "expiry_years",
+            "strike",
+        ] {
+            let data = if matches!(name, "tenor_years" | "expiry_years" | "strike") {
+                TableColumnData::NullableFloat64(
+                    rows.iter()
+                        .map(|row| row.get(name).and_then(serde_json::Value::as_f64))
+                        .collect(),
+                )
+            } else {
+                TableColumnData::NullableString(
+                    rows.iter()
+                        .map(|row| {
+                            row.get(name)
+                                .and_then(serde_json::Value::as_str)
+                                .map(str::to_owned)
+                        })
+                        .collect(),
+                )
+            };
+            columns.push(TableColumn::new(name, data));
+        }
+        columns.push(TableColumn::new("shift", TableColumnData::Float64(shifts)));
+        TableEnvelope::new(columns)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -48,7 +48,7 @@
 
 use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
-use finstack_quant_core::math::special_functions::{norm_cdf, norm_pdf};
+use finstack_quant_core::math::special_functions::norm_cdf;
 use std::collections::BTreeMap;
 
 use crate::config::CalibrationConfig;

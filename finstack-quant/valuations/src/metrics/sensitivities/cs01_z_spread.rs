@@ -42,7 +42,7 @@
 //!
 //! [canonical]: crate::metrics::sensitivities::cs01
 //! [`bond::metrics::cs01`]: crate::instruments::fixed_income::bond::metrics::cs01
-//! [`z_spread_discount_factor`]: crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::z_spread_discount_factor
+//! [`z_spread_discount_factor`]: crate::instruments::common_impl::pricing::time::z_spread_discount_factor
 
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -54,8 +54,8 @@ use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::CurveId;
 
+use crate::instruments::common_impl::pricing::time::z_spread_discount_factor;
 use crate::instruments::common_impl::traits::Instrument;
-use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::z_spread_discount_factor;
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::sensitivities::cs01::{
     sensitivity_central_diff, validate_buckets_strictly_increasing,

@@ -7,7 +7,7 @@ use finstack_quant_calibration::api::schema::{
     BaseCorrelationParams, CalibrationEnvelope, CalibrationPlan, CalibrationStep,
     ForwardCurveParams, HazardCurveParams, InflationCurveParams, SabrInterpolationMethod,
     StepParams, SurfaceExtrapolationPolicy, SwaptionVolConvention, SwaptionVolParams,
-    VolSurfaceModel, VolSurfaceParams,
+    VolSurfaceParams,
 };
 use finstack_quant_calibration::quotes::cds::CdsQuote;
 use finstack_quant_calibration::quotes::cds_tranche::CdsTrancheQuote;
@@ -178,7 +178,6 @@ fn vol_surface_deserialization_rejects_unknown_model() {
             vol_surface_id: "USD-SWAPTION-SABR".to_string(),
             base_date,
             underlying_ticker: "USD-SWAPTION".to_string(),
-            model: VolSurfaceModel::Sabr,
             discount_curve_id: Some("USD-OIS".into()),
             beta: 0.5,
             target_expiries: Vec::new(),
@@ -194,7 +193,7 @@ fn vol_surface_deserialization_rejects_unknown_model() {
     let err = serde_json::from_value::<CalibrationStep>(encoded)
         .expect_err("unknown model must fail at the serde boundary");
     let msg = err.to_string();
-    assert!(msg.contains("unknown variant"), "unexpected error: {msg}");
+    assert!(msg.contains("unknown field"), "unexpected error: {msg}");
 }
 
 #[test]
@@ -538,7 +537,6 @@ fn vol_surface_requires_quotes_even_when_params_valid() {
             vol_surface_id: "EQ-VOL".to_string(),
             base_date,
             underlying_ticker: "SPX".to_string(),
-            model: VolSurfaceModel::Sabr,
             discount_curve_id: Some("USD-OIS".into()),
             beta: 0.5,
             target_expiries: vec![1.0], // year fraction (validated by VolSurfaceTarget)

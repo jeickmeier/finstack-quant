@@ -112,6 +112,19 @@ pub(crate) fn variance_observation_dates(
     Ok(dates)
 }
 
+/// Contractual annualization for a variance observation tenor.
+pub(crate) fn annualization_factor(frequency: Tenor, trading_days_per_year: f64) -> f64 {
+    if let Some(months) = frequency.months() {
+        12.0 / months as f64
+    } else if frequency.unit() == TenorUnit::Weeks {
+        52.0 / f64::from(frequency.count())
+    } else if frequency.unit() == TenorUnit::Days {
+        trading_days_per_year / f64::from(frequency.count())
+    } else {
+        trading_days_per_year
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

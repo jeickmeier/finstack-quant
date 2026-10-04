@@ -29,9 +29,9 @@
 //! or implied from listed options.
 use crate::constants::ONE_BASIS_POINT;
 // Params-based constructor removed; build via builder instead.
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
 use crate::instruments::common_impl::listed::ListedFutureTerms;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::dates::{Date, DateExt, DayCount, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
@@ -88,7 +88,6 @@ pub struct InterestRateFuture {
     /// Underlying rate fixing date.
     ///
     /// Defaults to `terms.last_trading_date` when omitted.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -99,7 +98,6 @@ pub struct InterestRateFuture {
     /// Rate period start date.
     ///
     /// Defaults to 2 calendar days after fixing date when omitted.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -110,7 +108,6 @@ pub struct InterestRateFuture {
     /// Rate period end date.
     ///
     /// Defaults to `period_start + contract_specs.delivery_months` months when omitted.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -137,14 +134,12 @@ pub struct InterestRateFuture {
     ///
     /// When omitted, historical fixings use `forward_curve_id`. Fixing series
     /// are looked up strictly as `FIXING:{id}` without alias fallback.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub index_id: Option<IndexId>,
     /// Optional overnight fixing calendar identifier.
     ///
     /// Required only when the contract currency has no registered standard
     /// overnight calendar. Otherwise the currency standard is used.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixing_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Optional volatility surface identifier for convexity adjustment
@@ -867,7 +862,7 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateFuture 
             .or_else(|| self.fixing_date.map(|d| d + time::Duration::days(2)))
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for InterestRateFuture {

@@ -207,7 +207,7 @@ mod tests {
         let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let y = vec![3.0, 5.0, 7.0, 9.0, 11.0];
 
-        let basis = PolynomialBasis::new(1);
+        let basis = PolynomialBasis::new(1).expect("valid regression basis");
 
         let predictions = regression_with_basis(&x, &y, &basis).expect("should succeed");
 
@@ -228,7 +228,7 @@ mod tests {
         let x = vec![0.0, 1.0, 2.0, 3.0, 4.0];
         let y = vec![1.0, 6.0, 17.0, 34.0, 57.0];
 
-        let basis = PolynomialBasis::new(2);
+        let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
         let predictions = regression_with_basis(&x, &y, &basis).expect("should succeed");
 
@@ -249,7 +249,7 @@ mod tests {
         let x = vec![10.0, 50.0, 100.0, 200.0, 500.0, 1000.0];
         let y = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
 
-        let basis = PolynomialBasis::new(3);
+        let basis = PolynomialBasis::new(3).expect("valid regression basis");
 
         let result = regression_with_basis(&x, &y, &basis);
 

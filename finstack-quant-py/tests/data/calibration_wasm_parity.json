@@ -253,7 +253,6 @@
       "vol_surface_id": "AAPL-VOL",
       "base_date": "2026-05-08",
       "underlying_ticker": "AAPL",
-      "model": "sabr",
       "discount_curve_id": null,
       "beta": 0.5,
       "target_expiries": [],

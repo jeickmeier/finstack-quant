@@ -382,36 +382,9 @@ impl PyMarketHistory {
     /// where the factor type has no such coordinate) and ``shift``.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut rows: Vec<serde_json::Value> = Vec::new();
-        for scenario in &self.inner.scenarios {
-            for shift in &scenario.shifts {
-                let mut row = serde_json::to_value(&shift.factor).map_err(display_to_py)?;
-                if let serde_json::Value::Object(map) = &mut row {
-                    map.insert(
-                        "date".to_string(),
-                        serde_json::Value::String(scenario.date.to_string()),
-                    );
-                    map.insert("shift".to_string(), serde_json::json!(shift.shift));
-                }
-                rows.push(row);
-            }
-        }
-        serde_rows_to_dataframe_with_schema(
+        crate::bindings::pandas_utils::table_to_dataframe(
             py,
-            &rows,
-            &[
-                ("date", "str"),
-                ("type", "str"),
-                ("curve_id", "str"),
-                ("tenor_years", "float64"),
-                ("ticker", "str"),
-                ("base", "str"),
-                ("quote", "str"),
-                ("vol_surface_id", "str"),
-                ("expiry_years", "float64"),
-                ("strike", "float64"),
-                ("shift", "float64"),
-            ],
+            &self.inner.to_table().map_err(crate::errors::core_to_py)?,
         )
     }
 
@@ -615,9 +588,7 @@ macro_rules! pricing_override_methods {
                         value,
                         "instrument_pricing_overrides",
                     )?;
-                let builder = slf.inner.take().ok_or_else(|| {
-                    $crate::errors::value_error("builder already consumed by build()")
-                })?;
+                let builder = $crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
                 slf.inner = Some(builder.instrument_pricing_overrides(overrides));
                 $crate::bindings::valuations::pricing::pricing_override_methods!(
                     @record $record, slf, "instrument_pricing_overrides"
@@ -653,9 +624,7 @@ macro_rules! pricing_override_methods {
                     $crate::bindings::valuations::pricing::metric_pricing_overrides_from_py(
                         py, value,
                     )?;
-                let builder = slf.inner.take().ok_or_else(|| {
-                    $crate::errors::value_error("builder already consumed by build()")
-                })?;
+                let builder = $crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
                 slf.inner = Some(builder.metric_pricing_overrides(overrides));
                 $crate::bindings::valuations::pricing::pricing_override_methods!(
                     @record $record, slf, "metric_pricing_overrides"
@@ -693,9 +662,7 @@ macro_rules! pricing_override_methods {
                         value,
                         "scenario_pricing_overrides",
                     )?;
-                let builder = slf.inner.take().ok_or_else(|| {
-                    $crate::errors::value_error("builder already consumed by build()")
-                })?;
+                let builder = $crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
                 slf.inner = Some(builder.scenario_pricing_overrides(overrides));
                 $crate::bindings::valuations::pricing::pricing_override_methods!(
                     @record $record, slf, "scenario_pricing_overrides"
@@ -1306,4 +1273,11 @@ pub(crate) const EXPORTS: &[&str] = &[
     "InstrumentCashflowEnvelope",
     "MarketHistory",
     "MetricPricingOverrides",
+    "instrument_cashflows",
+    "list_models",
+    "list_models_grouped",
+    "list_standard_metrics",
+    "list_standard_metrics_grouped",
+    "metric_metadata",
+    "price_instrument",
 ];

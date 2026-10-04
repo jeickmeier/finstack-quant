@@ -449,3 +449,74 @@ fn compose_rejects_invalid_inputs_naming_the_scenario() {
         .to_string();
     assert!(error.contains("Cannot compose scenario 'nan'"), "{error}");
 }
+
+#[test]
+fn correlation_shocks_update_inventory_and_report_clamping() {
+    use finstack_quant_models::credit::pool::CorrelationStructure;
+    use finstack_quant_valuations::instruments::{
+        fixed_income::structured_credit::StructuredCredit, Instrument,
+    };
+    for (operation, expected_asset, expected_prepay, clamped) in [
+        (
+            OperationSpec::AssetCorrelationPts { delta_pts: 0.05 },
+            0.25,
+            -0.30,
+            false,
+        ),
+        (
+            OperationSpec::AssetCorrelationPts { delta_pts: 0.90 },
+            0.99,
+            -0.30,
+            true,
+        ),
+        (
+            OperationSpec::PrepayDefaultCorrelationPts { delta_pts: 0.10 },
+            0.20,
+            -0.20,
+            false,
+        ),
+        (
+            OperationSpec::PrepayDefaultCorrelationPts { delta_pts: -0.90 },
+            0.20,
+            -0.99,
+            true,
+        ),
+    ] {
+        let mut instrument = StructuredCredit::example().expect("example");
+        instrument.credit_model.correlation_structure =
+            Some(CorrelationStructure::flat(0.20, -0.30).expect("valid correlations"));
+        let mut inventory: Vec<Box<dyn Instrument>> = vec![Box::new(instrument)];
+        let mut market = MarketContext::new();
+        let mut ctx = ExecutionContext {
+            market: &mut market,
+            model: None,
+            instruments: Some(&mut inventory),
+            rate_bindings: None,
+            calendar: None,
+            as_of: date!(2025 - 01 - 01),
+        };
+        let report = ScenarioEngine::default()
+            .apply(&single_op_spec("correlation", operation), &mut ctx)
+            .expect("apply");
+        assert_eq!(report.operations_applied, 1);
+        assert_eq!(report.changes.changed_instrument_indices, vec![0]);
+        assert_eq!(
+            report
+                .warnings
+                .iter()
+                .any(|w| matches!(w, Warning::CorrelationClamped { .. })),
+            clamped
+        );
+        let instrument = inventory[0]
+            .as_any()
+            .downcast_ref::<StructuredCredit>()
+            .expect("structured credit");
+        let correlations = instrument
+            .credit_model
+            .correlation_structure
+            .as_ref()
+            .expect("correlations");
+        assert!((correlations.asset_correlation() - expected_asset).abs() < 1e-12);
+        assert!((correlations.prepay_default_correlation() - expected_prepay).abs() < 1e-12);
+    }
+}

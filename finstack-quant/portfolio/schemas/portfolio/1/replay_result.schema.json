@@ -1713,17 +1713,6 @@
           "$ref": "#/$defs/Money",
           "description": "Carry P&L (theta + accruals) in base currency."
         },
-        "correlations_detail": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/CorrelationsAttribution"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Aggregate correlations detail (optional)."
-        },
         "correlations_pnl": {
           "$ref": "#/$defs/Money",
           "description": "Base correlation curves P&L in base currency."
@@ -1732,31 +1721,9 @@
           "$ref": "#/$defs/Money",
           "description": "Credit hazard curves P&L in base currency."
         },
-        "credit_detail": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/CreditCurvesAttribution"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Aggregate credit curves detail (optional)."
-        },
         "cross_factor_pnl": {
           "$ref": "#/$defs/Money",
           "description": "Cross-factor interaction P&L in base currency.\n\nAggregated from each position's native-currency `cross_factor_pnl`\nafter conversion to portfolio base currency."
-        },
-        "fx_detail": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/FxAttribution"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Aggregate FX detail (optional)."
         },
         "fx_pnl": {
           "$ref": "#/$defs/Money",
@@ -1770,17 +1737,6 @@
           "$ref": "#/$defs/Money",
           "description": "Inflation curves P&L in base currency."
         },
-        "inflation_detail": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/InflationCurvesAttribution"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Aggregate inflation curves detail (optional)."
-        },
         "market_scalars_pnl": {
           "$ref": "#/$defs/Money",
           "description": "Market scalars P&L in base currency."
@@ -1793,17 +1749,6 @@
           "$ref": "#/$defs/Money",
           "description": "Interest rate curves P&L in base currency."
         },
-        "rates_detail": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/RatesCurvesAttribution"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Aggregate rates curves detail (optional)."
-        },
         "residual": {
           "$ref": "#/$defs/Money",
           "description": "Residual P&L (unexplained) in base currency."
@@ -1812,31 +1757,9 @@
           "description": "True if any constituent position's attribution was flagged invalid\n(for example, a non-finite factor sensitivity — see\n[`PnlAttribution::result_invalid`]). When `true`, the portfolio\naggregates and [`PortfolioAttribution::reconciliation_check`] are not\ntrustworthy and must not be relied on for reporting.",
           "type": "boolean"
         },
-        "scalars_detail": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/ScalarsAttribution"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Aggregate scalars detail (optional)."
-        },
         "total_pnl": {
           "$ref": "#/$defs/Money",
           "description": "Total portfolio P&L in base currency.\n\nThis is the **all-in P&L** that includes:\n- All factor attributions converted to base currency at T₁ rates\n- FX translation effects from opening principal revaluation\n\nNote: This differs from a simple sum of factor attributions because\ncross-currency positions include FX translation P&L on the principal."
-        },
-        "vol_detail": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/VolAttribution"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Aggregate volatility detail (optional)."
         },
         "vol_pnl": {
           "$ref": "#/$defs/Money",

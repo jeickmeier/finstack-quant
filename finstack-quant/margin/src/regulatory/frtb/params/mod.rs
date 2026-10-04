@@ -3,8 +3,7 @@
 //! The per-risk-class submodules ([`commodity`], [`csr`], [`equity`], [`fx`],
 //! [`girr`]) expose `pub const` tables transcribed from the Basel
 //! standardised approach, and are read directly by the charge-calculation
-//! helpers in [`delta`](super::delta), [`vega`](super::vega) and
-//! [`curvature`](super::curvature).
+//! private delta, vega and curvature calculation stages.
 //!
 //! # Provenance
 //!
@@ -632,36 +631,20 @@ mod tests {
     }
 
     // -----------------------------------------------------------------
-    // Lookup fallbacks - library conventions, not Basel-published values
-    // -----------------------------------------------------------------
-
     #[test]
-    fn unmapped_bucket_lookups_use_the_documented_fallback_weights() {
-        // These fallbacks multiply a capital charge whenever a caller
-        // supplies an out-of-range bucket, so they are pinned even though
-        // MAR21 publishes no such value. Note that
-        // `FrtbSensitivities::validate` rejects unknown buckets before the
-        // engine reaches these lookups; the fallbacks only apply to direct
-        // callers of the `params` helpers.
-        const UNMAPPED: u8 = 200;
-        assert_exact(
-            csr::csr_nonsec_risk_weight(UNMAPPED),
-            5.0,
-            "CSR non-sec fallback risk weight",
-        );
-        assert_exact(
-            csr::csr_sec_ctp_risk_weight(UNMAPPED),
-            8.0,
-            "CSR sec CTP fallback risk weight",
-        );
-        assert_exact(
-            csr::csr_sec_nonctp_risk_weight(UNMAPPED),
-            5.0,
-            "CSR sec non-CTP fallback risk weight",
-        );
-        assert!(equity::equity_risk_weight(UNMAPPED).is_nan());
-        assert!(commodity::commodity_risk_weight(UNMAPPED).is_nan());
+    fn unknown_buckets_do_not_manufacture_risk_weights() {
+        for bucket in [0, 200] {
+            assert!(csr::csr_nonsec_risk_weight(bucket).is_nan());
+            assert!(csr::csr_sec_ctp_risk_weight(bucket).is_nan());
+            assert!(csr::csr_sec_nonctp_risk_weight(bucket).is_nan());
+            assert!(equity::equity_risk_weight(bucket).is_nan());
+            assert!(equity::equity_vega_risk_weight(bucket).is_nan());
+            assert!(commodity::commodity_risk_weight(bucket).is_nan());
+        }
     }
+
+    // Unsupported buckets cannot produce a numerical risk weight
+    // -----------------------------------------------------------------
 
     #[test]
     fn every_mapped_bucket_lookup_returns_its_table_entry() {

@@ -9,7 +9,6 @@ use super::ids::{
     SwaptionConventionId, XccyConventionId,
 };
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Tenor};
 use finstack_quant_core::types::IndexId;
 use finstack_quant_core::HashMap;
 use finstack_quant_core::{Error, Result};
@@ -282,19 +281,16 @@ impl ConventionRegistry {
 }
 
 impl CdsConvention {
-    #[allow(clippy::panic, clippy::unwrap_used)]
-    fn family_spec(self) -> &'static CdsConventionSpec {
-        match ConventionRegistry::try_global() {
-            Ok(registry) => registry.cds_any.get(&self),
-            Err(_) => None,
-        }
-        .unwrap_or_else(|| {
-            panic!(
-                "Missing CDS conventions registry entry for '{self}'. \
-                 The embedded cds_conventions.json file is corrupted; \
-                 this is a build/packaging error and cannot be recovered at runtime."
-            )
-        })
+    /// Resolve the regional CDS conventions from the embedded registry.
+    ///
+    /// # Errors
+    /// Propagates registry initialization failures and returns NotFound when
+    /// this family has no fallback entry.
+    pub fn get_spec(self) -> Result<&'static CdsConventionSpec> {
+        ConventionRegistry::try_global()?
+            .cds_any
+            .get(&self)
+            .ok_or_else(|| ConventionRegistry::not_found(self.to_string()))
     }
 
     /// Detect the appropriate CDS convention based on the currency's registry family.
@@ -304,48 +300,13 @@ impl CdsConvention {
     /// * `currency` - ISO-4217 currency whose explicit CDS registry entry selects
     ///   the regional family. Currencies without an explicit regional row fall
     ///   back to North America.
-    #[must_use]
-    pub fn detect_from_currency(currency: Currency) -> Self {
-        ConventionRegistry::try_global()
-            .ok()
-            .and_then(|registry| registry.primary_cds_family(currency))
-            .unwrap_or(Self::IsdaNa)
-    }
-
-    /// Standard premium-leg day count for this regional family.
-    #[must_use]
-    pub fn day_count(self) -> DayCount {
-        self.family_spec().day_count
-    }
-
-    /// Standard premium-leg payment frequency for this regional family.
-    #[must_use]
-    pub fn frequency(self) -> Tenor {
-        self.family_spec().frequency
-    }
-
-    /// Standard business-day convention for this regional family.
-    #[must_use]
-    pub fn business_day_convention(self) -> BusinessDayConvention {
-        self.family_spec().business_day_convention
-    }
-
-    /// Standard premium-schedule stub for this regional family.
-    #[must_use]
-    pub fn stub_convention(self) -> StubKind {
-        self.family_spec().stub
-    }
-
-    /// Standard settlement delay in business days for this regional family.
-    #[must_use]
-    pub fn settlement_delay(self) -> u16 {
-        self.family_spec().settlement_days
-    }
-
-    /// Default holiday calendar identifier for this regional family.
-    #[must_use]
-    pub fn default_calendar(self) -> &'static str {
-        self.family_spec().calendar_id.as_str()
+    ///
+    /// # Errors
+    /// Propagates failures to initialize the embedded registry.
+    pub fn detect_from_currency(currency: Currency) -> Result<Self> {
+        Ok(ConventionRegistry::try_global()?
+            .primary_cds_family(currency)
+            .unwrap_or(Self::IsdaNa))
     }
 }
 
@@ -398,6 +359,7 @@ mod tests {
     }
 
     use super::*;
+    use finstack_quant_core::dates::StubKind;
 
     #[test]
     fn resolve_cds_maps_meta_and_exact_clauses() {

@@ -580,7 +580,6 @@ def test_swaption_examples_getters_and_accessors() -> None:
     assert swpn.get_underlying_maturity() == datetime.date(2032, 1, 17)
     assert isinstance(swpn.underlying_fixed_leg, FixedLegSpec)
     assert swpn.sabr_params is None
-    assert swpn.exercise_style == "european"
     assert isinstance(swpn.expiry, datetime.date)
     rate = swpn.forward_swap_rate(_market(), AS_OF)
     assert 0.0 < rate < 0.2

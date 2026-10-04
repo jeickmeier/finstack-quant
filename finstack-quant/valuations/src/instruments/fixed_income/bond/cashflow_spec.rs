@@ -104,6 +104,82 @@ pub enum CashflowSpec {
 }
 
 impl CashflowSpec {
+    fn floating_spec(
+        forward_curve_id: CurveId,
+        spread_bp: Decimal,
+        frequency: Tenor,
+        day_count: DayCount,
+        reset_lag_days: Option<i32>,
+    ) -> Self {
+        let defaults = rate_index_defaults(&forward_curve_id);
+        let reset_lag_days = reset_lag_days.unwrap_or_else(|| {
+            defaults
+                .as_ref()
+                .map(|conv| conv.default_reset_lag_days)
+                .unwrap_or(2)
+        });
+        let calendar_id = defaults
+            .map(|conv| conv.market_calendar_id)
+            .unwrap_or_else(|| "weekends_only".to_string());
+        Self::Floating(FloatingCouponSpec {
+            rate_spec: FloatingRateSpec {
+                forward_curve_id,
+                spread_bp,
+                gearing: Decimal::ONE,
+                gearing_includes_spread: true,
+                index_floor_bp: None,
+                all_in_cap_bp: None,
+                all_in_floor_bp: None,
+                index_cap_bp: None,
+                overnight_index_constraints: Default::default(),
+                reset_frequency: frequency,
+                index_tenor: None,
+                reset_lag_days,
+                fixing_calendar_id: None,
+                compounding: None,
+                overnight_basis: None,
+                fallback: Default::default(),
+            },
+            coupon_type: CouponType::Cash,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                frequency,
+                day_count,
+                business_day_convention: BusinessDayConvention::Following,
+                calendar_id: calendar_id.into(),
+                stub: StubKind::ShortFront,
+                end_of_month: false,
+                payment_lag_days: 0,
+                adjust_accrual_dates: false,
+                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            },
+        })
+    }
+
+    fn fixed_spec(rate: Decimal, frequency: Tenor, day_count: DayCount) -> FixedCouponSpec {
+        FixedCouponSpec {
+            coupon_type: CouponType::Cash,
+            rate,
+            schedule: finstack_quant_cashflows::builder::ScheduleParams {
+                frequency,
+
+                day_count,
+
+                business_day_convention: BusinessDayConvention::Following,
+
+                calendar_id: "weekends_only".into(),
+
+                stub: StubKind::ShortFront,
+
+                end_of_month: false,
+
+                payment_lag_days: 0,
+
+                adjust_accrual_dates: false,
+                roll_rule: crate::cashflow::builder::specs::RollRule::None,
+            },
+        }
+    }
+
     /// Create a fixed-rate specification with sensible defaults.
     ///
     /// # Arguments
@@ -154,28 +230,7 @@ impl CashflowSpec {
         day_count: DayCount,
     ) -> finstack_quant_core::Result<Self> {
         let rate = decimal_from_finite_f64(coupon, "CashflowSpec::fixed coupon")?;
-        Ok(Self::Fixed(FixedCouponSpec {
-            coupon_type: CouponType::Cash,
-            rate,
-            schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                frequency,
-
-                day_count,
-
-                business_day_convention: BusinessDayConvention::Following,
-
-                calendar_id: "weekends_only".into(),
-
-                stub: StubKind::ShortFront,
-
-                end_of_month: false,
-
-                payment_lag_days: 0,
-
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        }))
+        Ok(Self::Fixed(Self::fixed_spec(rate, frequency, day_count)))
     }
 
     /// Create a fixed-rate specification using a typed rate.
@@ -190,28 +245,7 @@ impl CashflowSpec {
         day_count: DayCount,
     ) -> finstack_quant_core::Result<Self> {
         let rate = decimal_from_finite_f64(coupon.as_decimal(), "CashflowSpec::fixed_rate coupon")?;
-        Ok(Self::Fixed(FixedCouponSpec {
-            coupon_type: CouponType::Cash,
-            rate,
-            schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                frequency,
-
-                day_count,
-
-                business_day_convention: BusinessDayConvention::Following,
-
-                calendar_id: "weekends_only".into(),
-
-                stub: StubKind::ShortFront,
-
-                end_of_month: false,
-
-                payment_lag_days: 0,
-
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        }))
+        Ok(Self::Fixed(Self::fixed_spec(rate, frequency, day_count)))
     }
 
     /// Create a floating-rate specification with sensible defaults.
@@ -282,11 +316,14 @@ impl CashflowSpec {
         frequency: Tenor,
         day_count: DayCount,
     ) -> finstack_quant_core::Result<Self> {
-        let forward_curve_id: CurveId = forward_curve_id.into();
-        let reset_lag = rate_index_defaults(&forward_curve_id)
-            .map(|conv| conv.default_reset_lag_days)
-            .unwrap_or(2);
-        Self::floating_with_reset_lag(forward_curve_id, spread_bp, frequency, day_count, reset_lag)
+        let spread_bp = decimal_from_finite_f64(spread_bp, "CashflowSpec::floating spread_bp")?;
+        Ok(Self::floating_spec(
+            forward_curve_id.into(),
+            spread_bp,
+            frequency,
+            day_count,
+            None,
+        ))
     }
 
     /// Create a floating-rate specification using a typed margin in basis points.
@@ -296,48 +333,13 @@ impl CashflowSpec {
         frequency: Tenor,
         day_count: DayCount,
     ) -> Self {
-        let forward_curve_id: CurveId = forward_curve_id.into();
-        let spread_bp = Decimal::from(spread_bp.as_bp());
-        let defaults = rate_index_defaults(&forward_curve_id);
-        let reset_lag_days = defaults
-            .as_ref()
-            .map(|conv| conv.default_reset_lag_days)
-            .unwrap_or(2);
-        let calendar_id = defaults
-            .map(|conv| conv.market_calendar_id)
-            .unwrap_or_else(|| "weekends_only".to_string());
-        Self::Floating(FloatingCouponSpec {
-            rate_spec: FloatingRateSpec {
-                forward_curve_id,
-                spread_bp,
-                gearing: Decimal::ONE,
-                gearing_includes_spread: true,
-                index_floor_bp: None,
-                all_in_cap_bp: None,
-                all_in_floor_bp: None,
-                index_cap_bp: None,
-                overnight_index_constraints: Default::default(),
-                reset_frequency: frequency,
-                index_tenor: None,
-                reset_lag_days,
-                fixing_calendar_id: None,
-                compounding: None,
-                overnight_basis: None,
-                fallback: Default::default(),
-            },
-            coupon_type: CouponType::Cash,
-            schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                frequency,
-                day_count,
-                business_day_convention: BusinessDayConvention::Following,
-                calendar_id: calendar_id.into(),
-                stub: StubKind::ShortFront,
-                end_of_month: false,
-                payment_lag_days: 0,
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        })
+        Self::floating_spec(
+            forward_curve_id.into(),
+            Decimal::from(spread_bp.as_bp()),
+            frequency,
+            day_count,
+            None,
+        )
     }
 
     /// Create a floating-rate specification with explicit reset lag.
@@ -410,44 +412,15 @@ impl CashflowSpec {
         day_count: DayCount,
         reset_lag_days: i32,
     ) -> finstack_quant_core::Result<Self> {
-        let forward_curve_id: CurveId = forward_curve_id.into();
         let spread_bp =
             decimal_from_finite_f64(spread_bp, "CashflowSpec::floating_with_reset_lag spread_bp")?;
-        let calendar_id = rate_index_defaults(&forward_curve_id)
-            .map(|conv| conv.market_calendar_id)
-            .unwrap_or_else(|| "weekends_only".to_string());
-        Ok(Self::Floating(FloatingCouponSpec {
-            rate_spec: FloatingRateSpec {
-                forward_curve_id,
-                spread_bp,
-                gearing: Decimal::ONE,
-                gearing_includes_spread: true,
-                index_floor_bp: None,
-                all_in_cap_bp: None,
-                all_in_floor_bp: None,
-                index_cap_bp: None,
-                overnight_index_constraints: Default::default(),
-                reset_frequency: frequency,
-                index_tenor: None,
-                reset_lag_days,
-                fixing_calendar_id: None,
-                compounding: None,
-                overnight_basis: None,
-                fallback: Default::default(),
-            },
-            coupon_type: CouponType::Cash,
-            schedule: finstack_quant_cashflows::builder::ScheduleParams {
-                frequency,
-                day_count,
-                business_day_convention: BusinessDayConvention::Following,
-                calendar_id: calendar_id.into(),
-                stub: StubKind::ShortFront,
-                end_of_month: false,
-                payment_lag_days: 0,
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        }))
+        Ok(Self::floating_spec(
+            forward_curve_id.into(),
+            spread_bp,
+            frequency,
+            day_count,
+            Some(reset_lag_days),
+        ))
     }
 
     /// Create a step-up coupon specification with sensible defaults.

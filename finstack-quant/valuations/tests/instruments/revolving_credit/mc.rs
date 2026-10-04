@@ -49,7 +49,6 @@ fn test_mc_pricer_stochastic_utilization() {
                     sigma: 0.15, // 15% sigma
                     spread_sensitivity: 0.0,
                 },
-                use_sobol_qmc: false,
                 mc_config: None,
             },
         )))
@@ -130,7 +129,6 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
                     sigma: 1e-8, // near-zero, but positive to satisfy model constraints
                     spread_sensitivity: 0.0,
                 },
-                use_sobol_qmc: false,
                 mc_config: Some(McConfig {
                     correlation_matrix: None,
                     credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
@@ -175,7 +173,6 @@ fn test_mc_pricer_market_anchored_zero_vol_and_vol_sensitivity() {
                     sigma: 0.20,
                     spread_sensitivity: 0.0,
                 },
-                use_sobol_qmc: false,
                 mc_config: Some(McConfig {
                     correlation_matrix: None,
                     credit_spread_process: CreditSpreadProcessSpec::MarketAnchored {
@@ -229,7 +226,6 @@ fn test_mc_pricer_deterministic_reproducibility() {
                     sigma: 0.10,
                     spread_sensitivity: 0.0,
                 },
-                use_sobol_qmc: false,
                 mc_config: None,
             },
         )))
@@ -290,7 +286,6 @@ fn test_mc_pricer_convergence() {
                         sigma: 0.20,
                         spread_sensitivity: 0.0,
                     },
-                    use_sobol_qmc: false,
                     mc_config: None,
                 },
             )))
@@ -347,7 +342,6 @@ fn test_mc_utilization_mean_reversion() {
                     sigma: 0.05, // Low sigma
                     spread_sensitivity: 0.0,
                 },
-                use_sobol_qmc: false,
                 mc_config: None,
             },
         )))
@@ -388,7 +382,6 @@ fn test_mc_utilization_mean_reversion() {
                     sigma: 0.05,
                     spread_sensitivity: 0.0,
                 },
-                use_sobol_qmc: false,
                 mc_config: None,
             },
         )))
@@ -497,7 +490,6 @@ fn test_mc_stochastic_floating_rate_index_cap() {
                         sigma: 1e-8, // near-zero to keep utilization deterministic
                         spread_sensitivity: 0.0,
                     },
-                    use_sobol_qmc: false,
                     mc_config: None,
                 },
             )))
@@ -614,7 +606,6 @@ fn overnight_rfr_rejects_stochastic_hull_white_and_prices_when_sigma_is_zero() {
                         sigma: 1e-8,
                         spread_sensitivity: 0.0,
                     },
-                    use_sobol_qmc: false,
                     mc_config: Some(McConfig {
                         correlation_matrix: None,
                         credit_spread_process: CreditSpreadProcessSpec::Constant(0.01),

@@ -27,16 +27,9 @@
           "type": "number"
         },
         "sector_effects": {
-          "description": "Per-(cell, sector) allocation effects, in first-appearance order\n(cells, then sectors within each cell).",
+          "description": "Per-(cell, sector) allocation and selection effects, in first-appearance order\n(cells, then sectors within each cell).",
           "items": {
             "$ref": "#/$defs/GridSectorEffect"
-          },
-          "type": "array"
-        },
-        "selection_effects": {
-          "description": "Per-(cell, sector) selection effects, in the same order as\n`sector_effects`.",
-          "items": {
-            "$ref": "#/$defs/GridSelectionEffect"
           },
           "type": "array"
         },
@@ -62,7 +55,6 @@
         "active_return",
         "curve_effects",
         "sector_effects",
-        "selection_effects",
         "total_curve",
         "total_sector",
         "total_selection"
@@ -109,33 +101,13 @@
     },
     "GridSectorEffect": {
       "additionalProperties": false,
-      "description": "Per-(cell, sector) within-cell sector-allocation effect.",
+      "description": "Allocation and selection effects for one (cell, sector).",
       "properties": {
         "allocation_effect": {
           "description": "Allocation effect `x_t^P (z_st^P − z_st^B)(r_st^B − r_t^B)`.",
           "format": "double",
           "type": "number"
         },
-        "cell": {
-          "description": "Duration-cell label.",
-          "type": "string"
-        },
-        "sector": {
-          "description": "Sector label within the cell.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "cell",
-        "sector",
-        "allocation_effect"
-      ],
-      "type": "object"
-    },
-    "GridSelectionEffect": {
-      "additionalProperties": false,
-      "description": "Per-(cell, sector) security-selection effect.",
-      "properties": {
         "cell": {
           "description": "Duration-cell label.",
           "type": "string"
@@ -153,6 +125,7 @@
       "required": [
         "cell",
         "sector",
+        "allocation_effect",
         "selection_effect"
       ],
       "type": "object"
@@ -192,31 +165,17 @@
             {
               "allocation_effect": 0.0,
               "cell": "0-5y",
-              "sector": "Industrials"
-            },
-            {
-              "allocation_effect": -0.000048,
-              "cell": "5-10y",
-              "sector": "Industrials"
-            },
-            {
-              "allocation_effect": -0.000032,
-              "cell": "5-10y",
-              "sector": "Financials"
-            }
-          ],
-          "selection_effects": [
-            {
-              "cell": "0-5y",
               "sector": "Industrials",
               "selection_effect": 0.0006
             },
             {
+              "allocation_effect": -0.000048,
               "cell": "5-10y",
               "sector": "Industrials",
               "selection_effect": 0.0
             },
             {
+              "allocation_effect": -0.000032,
               "cell": "5-10y",
               "sector": "Financials",
               "selection_effect": 0.0
@@ -250,31 +209,17 @@
             {
               "allocation_effect": 0.0,
               "cell": "0-5y",
-              "sector": "Industrials"
-            },
-            {
-              "allocation_effect": -0.000048,
-              "cell": "5-10y",
-              "sector": "Industrials"
-            },
-            {
-              "allocation_effect": -0.000032,
-              "cell": "5-10y",
-              "sector": "Financials"
-            }
-          ],
-          "selection_effects": [
-            {
-              "cell": "0-5y",
               "sector": "Industrials",
               "selection_effect": 0.0006
             },
             {
+              "allocation_effect": -0.000048,
               "cell": "5-10y",
               "sector": "Industrials",
               "selection_effect": 0.0
             },
             {
+              "allocation_effect": -0.000032,
               "cell": "5-10y",
               "sector": "Financials",
               "selection_effect": 0.0

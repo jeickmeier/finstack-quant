@@ -1,6 +1,8 @@
 //! Attribution spec execution dispatch.
 
-use super::spec::{default_attribution_metrics, AttributionResult, AttributionSpec};
+use super::spec::{
+    default_attribution_metrics, AttributionInputs, AttributionResult, AttributionSpec,
+};
 use super::{attribute_pnl_metrics_based, AttributionMethod};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{currency::Currency, dates::Date, money::Money, Error, Result};
@@ -126,20 +128,29 @@ impl AttributionSpec {
     /// metrics-based method, unknown configured metric names are rejected
     /// before valuation.
     pub fn execute(&self) -> Result<AttributionResult> {
-        crate::helpers::validate_attribution_period(self.as_of_t0, self.as_of_t1)?;
-        let instrument = self.instrument.clone().into_boxed()?;
-        let instrument_arc: Arc<dyn Instrument> = Arc::from(instrument);
+        crate::helpers::validate_attribution_period(self.inputs.as_of_t0, self.inputs.as_of_t1)?;
+        let market_t0 = MarketContext::try_from(self.inputs.market_t0.clone())?;
+        let market_t1 = MarketContext::try_from(self.inputs.market_t1.clone())?;
+        self.inputs
+            .execute_instrument(&self.instrument, &market_t0, &market_t1)
+    }
+}
 
-        let market_t0 = MarketContext::try_from(self.market_t0.clone())?;
-        let market_t1 = MarketContext::try_from(self.market_t1.clone())?;
-
+impl AttributionInputs {
+    pub(crate) fn execute_instrument(
+        &self,
+        instrument: &finstack_quant_valuations::instruments::InstrumentJson,
+        market_t0: &MarketContext,
+        market_t1: &MarketContext,
+    ) -> Result<AttributionResult> {
+        let instrument_arc: Arc<dyn Instrument> = Arc::from(instrument.clone().into_boxed()?);
         let rounding_scale = self
             .config
             .as_ref()
             .and_then(|config| config.rounding_scale);
         let rounding_probe = probe_rounding_currency(
             instrument_arc.as_ref(),
-            &market_t0,
+            market_t0,
             self.as_of_t0,
             rounding_scale,
         )?;
@@ -165,8 +176,8 @@ impl AttributionSpec {
             credit_factor_detail_options: &self.credit_factor_detail_options,
             ..crate::AttributionRequest::new(
                 &instrument_arc,
-                &market_t0,
-                &market_t1,
+                market_t0,
+                market_t1,
                 self.as_of_t0,
                 self.as_of_t1,
                 &config,
@@ -241,13 +252,13 @@ impl AttributionSpec {
                 let pricing_options = finstack_quant_calibration::recalibration::pricing_options()
                     .with_config(&config);
                 let val_t0 = metrics_instrument.price_with_metrics(
-                    &market_t0,
+                    market_t0,
                     self.as_of_t0,
                     &metrics,
                     pricing_options.clone(),
                 )?;
                 let val_t1 = instrument_arc.price_with_metrics(
-                    &market_t1,
+                    market_t1,
                     self.as_of_t1,
                     &[],
                     pricing_options,
@@ -255,8 +266,8 @@ impl AttributionSpec {
 
                 let mut result = attribute_pnl_metrics_based(
                     &metrics_instrument,
-                    &market_t0,
-                    &market_t1,
+                    market_t0,
+                    market_t1,
                     &val_t0,
                     &val_t1,
                     self.as_of_t0,
@@ -265,7 +276,7 @@ impl AttributionSpec {
                 result.meta.num_repricings = 2;
                 if self.model_params_t0.is_some() {
                     let closing_value_opening_params =
-                        instrument_t0.value(&market_t1, self.as_of_t1)?;
+                        instrument_t0.value(market_t1, self.as_of_t1)?;
                     result.model_params_pnl =
                         val_t1.value.checked_sub(closing_value_opening_params)?;
                     result.meta.num_repricings += 1;
@@ -298,8 +309,8 @@ impl AttributionSpec {
                 match self.compute_credit_factor_detail(
                     model_ref,
                     &instrument_arc,
-                    &market_t0,
-                    &market_t1,
+                    market_t0,
+                    market_t1,
                     &attribution,
                     &mut detail_notes,
                 ) {
@@ -329,7 +340,7 @@ impl AttributionSpec {
             if let Err(e) = self.compute_carry_credit_split_and_decomposition(
                 model_ref,
                 &instrument_arc,
-                &market_t0,
+                market_t0,
                 &mut attribution,
             ) {
                 attribution.meta.notes.push(format!(
@@ -347,7 +358,7 @@ impl AttributionSpec {
         {
             let val_t0_native = translation_t0_value(
                 &instrument_arc,
-                &market_t0,
+                market_t0,
                 self.as_of_t0,
                 self.model_params_t0.as_ref(),
                 rounding_probe.value,
@@ -357,8 +368,8 @@ impl AttributionSpec {
                 &mut attribution,
                 val_t0_native,
                 target_currency,
-                &market_t0,
-                &market_t1,
+                market_t0,
+                market_t1,
                 self.as_of_t0,
                 self.as_of_t1,
             )?;
@@ -508,16 +519,18 @@ mod tests {
         .expect("coherent market snapshot");
         AttributionSpec {
             instrument: InstrumentJson::Bond(bond),
-            market_t0: market.clone(),
-            market_t1: market,
-            as_of_t0: date!(2025 - 01 - 01),
-            as_of_t1: date!(2025 - 01 - 02),
-            method: AttributionMethod::Parallel,
-            model_params_t0: None,
-            config: Some(config),
-            credit_factor_model: None,
-            credit_factor_detail_options: Default::default(),
-            full_cross_attribution: false,
+            inputs: crate::AttributionInputs {
+                market_t0: market.clone(),
+                market_t1: market,
+                as_of_t0: date!(2025 - 01 - 01),
+                as_of_t1: date!(2025 - 01 - 02),
+                method: AttributionMethod::Parallel,
+                model_params_t0: None,
+                config: Some(config),
+                credit_factor_model: None,
+                credit_factor_detail_options: Default::default(),
+                full_cross_attribution: false,
+            },
         }
     }
 
@@ -542,6 +555,7 @@ mod tests {
         let probe = probe_rounding_currency(&instrument, &market, date!(2025 - 01 - 01), Some(6))
             .expect("valid probe_rounding_currency fixture");
         let finstack_config = spec_with_config(config(Some(6), None))
+            .inputs
             .build_finstack_config(probe.currency)
             .expect("rounding config should build");
 

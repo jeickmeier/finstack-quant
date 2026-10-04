@@ -11,10 +11,7 @@
 //!
 //! This module is only available when the `scenarios` feature is enabled.
 
-use crate::attribution::{
-    attribution_endpoint_profile, reduce_method_owned_prepared, reduce_metrics_based_prepared,
-    PortfolioAttribution,
-};
+use crate::attribution::{attribution_endpoint_profile, reduce_prepared, PortfolioAttribution};
 use crate::error::{Error, Result};
 use crate::evaluation::{EvaluationMetricProfile, EvaluationProfile, PortfolioEvaluationPlan};
 use crate::valuation::{PortfolioValuation, RequestedMetrics};
@@ -624,28 +621,15 @@ pub fn replay_portfolio(
                 let prev_endpoint =
                     endpoint_or_fallback(previous_endpoint.as_ref(), &prev_step.valuation)?;
                 let endpoint = endpoint_or_fallback(endpoint_batch.get(&index), &val_i)?;
-                let attr = if metrics_attribution {
-                    reduce_metrics_based_prepared(
-                        portfolio,
-                        (prev_market, market),
-                        (prev_step.date, date),
-                        finstack_config,
-                        prev_endpoint,
-                        endpoint,
-                    )?
-                } else {
-                    reduce_method_owned_prepared(
-                        portfolio,
-                        prev_market,
-                        market,
-                        prev_step.date,
-                        date,
-                        finstack_config,
-                        &config.attribution_method,
-                        prev_endpoint,
-                        endpoint,
-                    )?
-                };
+                let attr = reduce_prepared(
+                    portfolio,
+                    (prev_market, market),
+                    (prev_step.date, date),
+                    finstack_config,
+                    &config.attribution_method,
+                    prev_endpoint,
+                    endpoint,
+                )?;
                 Some(attr)
             } else {
                 None

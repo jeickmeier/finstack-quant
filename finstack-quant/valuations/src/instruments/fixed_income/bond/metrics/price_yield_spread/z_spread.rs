@@ -1,5 +1,8 @@
 //! Bond price, yield, spread, duration, and risk metric calculations.
 //!
+use crate::instruments::common_impl::pricing::time::{
+    compounding_frequency, z_spread_discount_factor,
+};
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -88,55 +91,6 @@ pub(crate) fn maturity_scaled_bracket(
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ZSpreadCalculator;
 
-pub(crate) fn bond_z_spread_compounding_frequency(bond: &Bond) -> f64 {
-    let years = bond.cashflow_spec.frequency().to_years();
-    if years > 0.0 && years.is_finite() {
-        (1.0 / years).round().max(1.0)
-    } else {
-        1.0
-    }
-}
-
-/// Compute the z-spread discount factor for a single cashflow.
-///
-/// Returns `Err` in two degenerate cases that must not silently propagate
-/// non-finite values into PV accumulators:
-///
-/// - `df_base <= 0` or non-finite: the base discount curve has produced an
-///   invalid discount factor (curve-data error, not a solvable point).
-/// - `denom = 1 + (base_rate + z) / m <= 0`: the total spread-adjusted rate
-///   produces a non-positive compounding base. This can only happen for
-///   extremely negative spreads that are outside any realistic range; returning
-///   `INFINITY` (the old behaviour) would silently corrupt PV sums and confuse
-///   the Brent bracket search with non-finite residuals.
-pub(crate) fn z_spread_discount_factor(
-    df_base: f64,
-    t: f64,
-    z: f64,
-    compounds_per_year: f64,
-) -> finstack_quant_core::Result<f64> {
-    if t <= 0.0 {
-        return Ok(df_base);
-    }
-    if !df_base.is_finite() || df_base <= 0.0 {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "z_spread_discount_factor: non-positive or non-finite base discount factor ({df_base}); \
-             this is a curve-data error"
-        )));
-    }
-    let m = compounds_per_year.max(1.0);
-    let base_rate = m * (df_base.powf(-1.0 / (m * t)) - 1.0);
-    let denom = 1.0 + (base_rate + z) / m;
-    if denom <= 0.0 || !denom.is_finite() {
-        return Err(finstack_quant_core::Error::Validation(format!(
-            "z_spread_discount_factor: non-positive compounding denominator ({denom}) \
-             for z={z:.6e}, base_rate={base_rate:.6e}, m={m}; \
-             spread is too negative for this cashflow"
-        )));
-    }
-    Ok(denom.powf(-m * t))
-}
-
 pub(crate) struct BondZSpreadPricingKernel {
     pub(crate) quote_date: Date,
     cached_flows: Vec<(f64, f64, f64)>,
@@ -205,7 +159,7 @@ impl BondZSpreadPricingKernel {
         Ok(Self {
             quote_date,
             cached_flows,
-            compounds_per_year: bond_z_spread_compounding_frequency(bond),
+            compounds_per_year: compounding_frequency(bond.cashflow_spec.frequency()),
         })
     }
 

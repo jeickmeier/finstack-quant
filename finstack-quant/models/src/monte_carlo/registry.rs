@@ -36,18 +36,6 @@ pub struct RustDefaults {
     pub path_dependent_pricer: PathDependentPricerDefaults,
     /// LSMC configuration defaults.
     pub lsmc: LsmcRuntimeDefaults,
-    /// Shared rate-exotic Monte Carlo defaults.
-    pub rate_exotics: RateExoticDefaults,
-    /// Swaption LSMC defaults.
-    pub swaption_lsmc: SwaptionLsmcDefaults,
-    /// LMM Bermudan swaption defaults.
-    pub lmm_bermudan: LmmBermudanDefaults,
-    /// Cheyette rough-vol Bermudan swaption defaults.
-    pub cheyette_rough: CheyetteRoughDefaults,
-    /// Merton PIK-bond Monte Carlo defaults.
-    pub merton_pik_bond: MertonPikBondDefaults,
-    /// Stochastic revolving-credit Monte Carlo defaults.
-    pub revolving_credit: RevolvingCreditDefaults,
 }
 
 /// Defaults shared by the host bindings and the Rust convenience pricers.
@@ -121,92 +109,6 @@ pub struct LsmcRuntimeDefaults {
     /// Whether parallel execution is requested by default.
     pub use_parallel: bool,
     /// Whether antithetic variance reduction is enabled by default.
-    pub antithetic: bool,
-}
-
-/// Shared rate-exotic Monte Carlo defaults.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RateExoticDefaults {
-    /// Number of Monte Carlo paths.
-    pub num_paths: usize,
-    /// Root RNG seed.
-    pub seed: u64,
-    /// Whether antithetic variance reduction is enabled by default.
-    pub antithetic: bool,
-    /// Minimum number of simulation sub-steps between events.
-    pub min_steps_between_events: usize,
-    /// Polynomial basis degree for LSMC regression.
-    pub basis_degree: usize,
-}
-
-/// Swaption LSMC defaults.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct SwaptionLsmcDefaults {
-    /// Number of Monte Carlo paths.
-    pub num_paths: usize,
-    /// Root RNG seed.
-    pub seed: u64,
-    /// Polynomial basis degree for LSMC regression.
-    pub basis_degree: usize,
-    /// Whether antithetic variance reduction is enabled by default.
-    pub antithetic: bool,
-}
-
-/// LMM Bermudan swaption defaults.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct LmmBermudanDefaults {
-    /// Number of Monte Carlo paths.
-    pub num_paths: usize,
-    /// Root RNG seed.
-    pub seed: u64,
-    /// Polynomial basis degree for LSMC regression.
-    pub basis_degree: usize,
-    /// Whether antithetic variance reduction is enabled by default.
-    pub antithetic: bool,
-    /// Minimum simulation steps between exercise dates.
-    pub min_steps_between_exercises: usize,
-}
-
-/// Cheyette rough-vol Bermudan swaption defaults.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct CheyetteRoughDefaults {
-    /// Number of Monte Carlo paths.
-    pub num_paths: usize,
-    /// Number of simulation time steps.
-    pub num_steps: usize,
-    /// Polynomial basis degree for LSMC regression.
-    pub basis_degree: usize,
-}
-
-/// Merton PIK-bond Monte Carlo defaults.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct MertonPikBondDefaults {
-    /// Number of independent Monte Carlo estimators (antithetic sampling
-    /// simulates two paths per estimator). The seed is derived per instrument
-    /// from `model_config.mc_seed_scenario`.
-    pub num_paths: usize,
-    /// Whether antithetic variance reduction is enabled by default.
-    pub antithetic: bool,
-    /// Simulation time steps per year.
-    pub steps_per_year: usize,
-}
-
-/// Stochastic revolving-credit Monte Carlo defaults.
-#[derive(Debug, Clone, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct RevolvingCreditDefaults {
-    /// Number of independent Monte Carlo estimators (antithetic sampling
-    /// simulates two paths per estimator). The seed is derived per facility
-    /// from `model_config.mc_seed_scenario`.
-    pub num_paths: usize,
-    /// Whether antithetic variance reduction is enabled by default. Must stay
-    /// `false` while Sobol facilities (`use_sobol_qmc`) rely on the default,
-    /// because the two are mutually exclusive.
     pub antithetic: bool,
 }
 
@@ -351,12 +253,6 @@ fn validate_file(file: &DefaultsFile) -> Result<()> {
         "convenience.path_dependent_pricer",
         &file.convenience.path_dependent_pricer,
     )?;
-    validate_rate_exotics("rust.rate_exotics", &file.rust.rate_exotics)?;
-    validate_swaption_lsmc("rust.swaption_lsmc", &file.rust.swaption_lsmc)?;
-    validate_lmm_bermudan("rust.lmm_bermudan", &file.rust.lmm_bermudan)?;
-    validate_cheyette_rough("rust.cheyette_rough", &file.rust.cheyette_rough)?;
-    validate_merton_pik_bond("rust.merton_pik_bond", &file.rust.merton_pik_bond)?;
-    validate_revolving_credit("rust.revolving_credit", &file.rust.revolving_credit)?;
     validate_python_lsmc("convenience.lsmc", &file.convenience.lsmc)?;
     validate_python_greeks("convenience.greeks", &file.convenience.greeks)?;
     Ok(())
@@ -405,62 +301,6 @@ fn validate_python_greeks(label: &str, defaults: &ConvenienceGreekDefaults) -> R
     validate_positive_usize(&format!("{label}.chunk_size"), defaults.chunk_size)?;
     let _seed = defaults.seed;
     let _parallel = defaults.use_parallel;
-    let _antithetic = defaults.antithetic;
-    Ok(())
-}
-
-fn validate_rate_exotics(label: &str, defaults: &RateExoticDefaults) -> Result<()> {
-    validate_positive_usize(&format!("{label}.num_paths"), defaults.num_paths)?;
-    validate_positive_usize(
-        &format!("{label}.min_steps_between_events"),
-        defaults.min_steps_between_events,
-    )?;
-    validate_positive_usize(&format!("{label}.basis_degree"), defaults.basis_degree)?;
-    let _seed = defaults.seed;
-    let _antithetic = defaults.antithetic;
-    Ok(())
-}
-
-fn validate_swaption_lsmc(label: &str, defaults: &SwaptionLsmcDefaults) -> Result<()> {
-    validate_positive_usize(&format!("{label}.num_paths"), defaults.num_paths)?;
-    validate_positive_usize(&format!("{label}.basis_degree"), defaults.basis_degree)?;
-    let _seed = defaults.seed;
-    let _antithetic = defaults.antithetic;
-    Ok(())
-}
-
-fn validate_lmm_bermudan(label: &str, defaults: &LmmBermudanDefaults) -> Result<()> {
-    validate_positive_usize(&format!("{label}.num_paths"), defaults.num_paths)?;
-    validate_positive_usize(&format!("{label}.basis_degree"), defaults.basis_degree)?;
-    validate_positive_usize(
-        &format!("{label}.min_steps_between_exercises"),
-        defaults.min_steps_between_exercises,
-    )?;
-    let _seed = defaults.seed;
-    let _antithetic = defaults.antithetic;
-    Ok(())
-}
-
-fn validate_cheyette_rough(label: &str, defaults: &CheyetteRoughDefaults) -> Result<()> {
-    validate_positive_usize(&format!("{label}.num_paths"), defaults.num_paths)?;
-    validate_positive_usize(&format!("{label}.num_steps"), defaults.num_steps)?;
-    validate_positive_usize(&format!("{label}.basis_degree"), defaults.basis_degree)
-}
-
-fn validate_merton_pik_bond(label: &str, defaults: &MertonPikBondDefaults) -> Result<()> {
-    validate_positive_usize(&format!("{label}.num_paths"), defaults.num_paths)?;
-    validate_positive_usize(&format!("{label}.steps_per_year"), defaults.steps_per_year)?;
-    let _antithetic = defaults.antithetic;
-    Ok(())
-}
-
-fn validate_revolving_credit(label: &str, defaults: &RevolvingCreditDefaults) -> Result<()> {
-    if defaults.num_paths < 2 {
-        return Err(Error::Validation(format!(
-            "{label}.num_paths must be at least 2, got {}",
-            defaults.num_paths
-        )));
-    }
     let _antithetic = defaults.antithetic;
     Ok(())
 }

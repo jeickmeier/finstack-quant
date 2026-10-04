@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import init, { portfolio } from '../../index.js';
+import init, { core as portfolioCore, portfolio } from '../../index.js';
 
 await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
@@ -18,8 +18,7 @@ const PORTFOLIO = {
   entities: {},
   positions: [],
 };
-// The scenario is parsed before the market, so the market is never read here.
-const MARKET = {};
+const MARKET = new portfolioCore.MarketContext();
 const BLANK_ID = { id: '', operations: [] };
 
 const invalidSpec = (error) => {
@@ -29,5 +28,9 @@ const invalidSpec = (error) => {
 };
 
 test('applyScenarioAndRevalue rejects an invalid scenario spec', () => {
-  assert.throws(() => portfolio.applyScenarioAndRevalue(PORTFOLIO, BLANK_ID, MARKET), invalidSpec);
+  assert.throws(
+    () =>
+      portfolio.applyScenarioAndRevalue(portfolio.Portfolio.fromSpec(PORTFOLIO), BLANK_ID, MARKET),
+    invalidSpec
+  );
 });

@@ -1460,6 +1460,13 @@ mod tests {
             InstrumentJson::Bond(_)
         ));
 
+        let mut invalid: Value = serde_json::from_str(&json).expect("fixture");
+        invalid["instrument"]["spec"]["retired_field"] = Value::Bool(false);
+        let error = parse_instrument_from_json(&invalid.to_string()).expect_err("unknown field");
+        assert!(error.to_string().contains("retired_field"), "{error}");
+        let syntax = parse_instrument_from_json("{").expect_err("invalid JSON");
+        assert!(syntax.to_string().contains("EOF"), "{syntax}");
+
         let oversized = " ".repeat(MAX_JSON_BYTES + 1);
         let error = parse_instrument_from_json(&oversized).expect_err("oversized payload fails");
         assert!(

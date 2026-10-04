@@ -46,9 +46,9 @@ pub use types::{
     RoundingConvention, ShiftMode, ShiftingInterestSpec, ShiftingInterestStep,
     SpecialServicingSpec, StepDownSpec, StepDownTrigger, StructuredCredit, StructuredCreditBuilder,
     SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche, TrancheAccrualPeriod,
-    TrancheBuilder, TrancheCashflowRow, TrancheCashflows, TrancheDraw, TrancheReadvance,
-    TrancheSeniority, TrancheStructure, TrancheValuation, TriggerConsequence, Waterfall,
-    WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier,
+    TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance, TrancheSeniority,
+    TrancheStructure, TrancheValuation, TriggerConsequence, Waterfall, WaterfallBuilder,
+    WaterfallDistribution, WaterfallRules, WaterfallTier,
 };
 pub use types::{
     DefaultModelSpec, MarketConditions, PrepaymentModelSpec, RecoveryModelSpec,
@@ -60,9 +60,7 @@ pub use utils::{
     validate_tiers, ValidationError,
 };
 
-pub use pricing::{
-    execute_waterfall, generate_cashflows, generate_tranche_cashflows, run_simulation,
-};
+pub use pricing::{execute_waterfall, generate_cashflows, run_simulation};
 
 pub use pricing::coverage_tests::{TestContext, TestResult};
 pub use pricing::stochastic::StructuredCreditPricingMode;

@@ -17,9 +17,7 @@ use finstack_quant_models::factor::credit::hierarchy::{
     IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelAnchor, LevelsAtAnchor,
     VolState,
 };
-use finstack_quant_models::factor::{
-    FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
-};
+use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::{Attributes, Bond};
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
@@ -42,7 +40,7 @@ fn empty_factor_config() -> FactorModelConfig {
         factors: vec![],
         covariance: FactorCovarianceMatrix::new(vec![], vec![]).unwrap(),
         matching: MatchingConfig::MappingTable(vec![]),
-        pricing_mode: PricingMode::DeltaBased,
+
         risk_measure: Default::default(),
         bump_config: None,
         unmatched_policy: None,
@@ -239,25 +237,27 @@ fn run_metrics_based_with_model(model: Option<CreditFactorModel>) -> PnlAttribut
     ];
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: make_market_state(disc_t0, haz_t0),
-        market_t1: make_market_state(disc_t1, haz_t1),
-        as_of_t0,
-        as_of_t1,
-        method: AttributionMethod::MetricsBased,
-        model_params_t0: None,
-        credit_factor_model,
-        credit_factor_detail_options: CreditFactorDetailOptions::default(),
-        config: Some(AttributionConfig {
-            tolerance_abs: None,
-            tolerance_pct: None,
-            metrics: Some(metrics),
-            strict_validation: None,
-            rounding_scale: None,
-            rate_bump_bp: None,
-            target_currency: None,
-            execution_policy: None,
-        }),
-        full_cross_attribution: false,
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: make_market_state(disc_t0, haz_t0),
+            market_t1: make_market_state(disc_t1, haz_t1),
+            as_of_t0,
+            as_of_t1,
+            method: AttributionMethod::MetricsBased,
+            model_params_t0: None,
+            credit_factor_model,
+            credit_factor_detail_options: CreditFactorDetailOptions::default(),
+            config: Some(AttributionConfig {
+                tolerance_abs: None,
+                tolerance_pct: None,
+                metrics: Some(metrics),
+                strict_validation: None,
+                rounding_scale: None,
+                rate_bump_bp: None,
+                target_currency: None,
+                execution_policy: None,
+            }),
+            full_cross_attribution: false,
+        },
     };
     AttributionEnvelope::new(spec)
         .execute()

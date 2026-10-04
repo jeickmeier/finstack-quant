@@ -373,6 +373,7 @@ fn rebuild_forward_curve(base: &ForwardCurve, bumped: Vec<(f64, f64)>) -> Result
     Ok(ForwardCurve::builder(base.id().as_str(), base.tenor())
         .base_date(base.base_date())
         .reset_lag(base.reset_lag())
+        .projection_grid_opt(base.projection_grid().map(<[f64]>::to_vec))
         .day_count(base.day_count())
         .interp(base.interp_style())
         .extrapolation(base.extrapolation())
@@ -1231,6 +1232,7 @@ mod tests {
         let forward = ForwardCurve::builder("USD-SOFR", 0.25)
             .base_date(as_of)
             .reset_lag(5)
+            .projection_grid([0.0, 0.253, 0.506])
             .day_count(DayCount::Act365F)
             .interp(InterpStyle::CubicHermite)
             .extrapolation(ExtrapolationPolicy::None)
@@ -1285,6 +1287,10 @@ mod tests {
 
         let updated_forward = market.get_forward("USD-SOFR").expect("forward exists");
         assert_eq!(updated_forward.reset_lag(), 5);
+        assert_eq!(
+            updated_forward.projection_grid(),
+            Some([0.0, 0.253, 0.506].as_slice())
+        );
         assert_eq!(updated_forward.day_count(), DayCount::Act365F);
         assert_eq!(updated_forward.interp_style(), InterpStyle::CubicHermite);
         assert_eq!(updated_forward.extrapolation(), ExtrapolationPolicy::None);

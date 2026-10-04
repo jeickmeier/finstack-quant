@@ -267,7 +267,6 @@ fn bench_revolving_credit_mc(c: &mut Criterion) {
             sigma: 0.2,
             spread_sensitivity: 0.0,
         },
-        use_sobol_qmc: false,
         mc_config: None,
     }));
     // 256 antithetic estimators simulate 512 paths.

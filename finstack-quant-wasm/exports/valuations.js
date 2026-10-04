@@ -11,7 +11,6 @@ export const valuations = {
   instruments,
   market,
   schema,
-  validateValuationResultJson: wasm.validateValuationResultJson,
   valuationResultToJson: wasm.valuationResultToJson,
   valuationResultMetricSeries: wasm.valuationResultMetricSeries,
   tarnCouponProfile: wasm.tarnCouponProfile,

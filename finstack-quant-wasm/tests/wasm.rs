@@ -25,8 +25,6 @@ mod wasm_features;
 mod wasm_fixed_income;
 #[path = "wasm_implied_vol.rs"]
 mod wasm_implied_vol;
-#[path = "wasm_margin.rs"]
-mod wasm_margin;
 #[path = "wasm_math.rs"]
 mod wasm_math;
 #[path = "wasm_metric_keys.rs"]

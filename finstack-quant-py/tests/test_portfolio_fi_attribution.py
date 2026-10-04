@@ -67,10 +67,10 @@ def test_campisi_attribution_documents_z_spread_basis_contract() -> None:
 
 def test_campisi_attribution_matches_hand_worked_golden() -> None:
     """The binding reproduces the hand-worked golden decomposition."""
-    from finstack_quant.portfolio import campisi_attribution_json
+    from finstack_quant.portfolio import campisi_attribution
 
     result = json.loads(
-        campisi_attribution_json(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
+        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
     )
 
     assert result["portfolio_return"] == pytest.approx(0.01441, abs=1e-12)
@@ -115,14 +115,14 @@ def test_campisi_attribution_matches_hand_worked_golden() -> None:
 
 def test_campisi_attribution_accepts_keyword_arguments() -> None:
     """The advertised ``text_signature`` names are the real keyword names."""
-    from finstack_quant.portfolio import campisi_attribution_json
+    from finstack_quant.portfolio import campisi_attribution
 
     result = json.loads(
-        campisi_attribution_json(
+        campisi_attribution(
             portfolio_json=json.dumps(_portfolio()),
             benchmark_json=json.dumps(_benchmark()),
             config_json=json.dumps(_CONFIG),
-        )
+        ).to_json()
     )
     assert result["active_return"] == pytest.approx(0.00076, abs=1e-12)
 
@@ -135,22 +135,22 @@ def test_campisi_attribution_rejects_unknown_and_missing_config_fields() -> None
     still sending the key must be told rather than silently served a result
     computed without it.
     """
-    from finstack_quant.portfolio import campisi_attribution_json
+    from finstack_quant.portfolio import campisi_attribution
 
     with pytest.raises(ValueError, match="config JSON"):
-        campisi_attribution_json(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps({}))
+        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps({})).to_json()
 
     stale = {"period_years": 0.25, "spread_mode": "dts"}
     with pytest.raises(ValueError, match="config JSON"):
-        campisi_attribution_json(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(stale))
+        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(stale)).to_json()
 
 
 def test_campisi_carino_link_from_snapshots_reconstructs_compounded_active_return() -> None:
     """Linked effects reconstruct the geometric active return."""
-    from finstack_quant.portfolio import campisi_carino_link_from_snapshots_json
+    from finstack_quant.portfolio import campisi_carino_link_from_snapshots
 
     period = {"portfolio": _portfolio(), "benchmark": _benchmark()}
-    result = json.loads(campisi_carino_link_from_snapshots_json(json.dumps([period, period]), json.dumps(_CONFIG)))
+    result = json.loads(campisi_carino_link_from_snapshots(json.dumps([period, period]), json.dumps(_CONFIG)).to_json())
 
     geometric_active = result["portfolio_return_compounded"] - result["benchmark_return_compounded"]
     reconstructed = (
@@ -188,14 +188,14 @@ def test_campisi_carino_link_from_snapshots_reconstructs_compounded_active_retur
 
 def test_campisi_carino_link_from_snapshots_accepts_keyword_arguments() -> None:
     """The advertised ``text_signature`` names are the real keyword names."""
-    from finstack_quant.portfolio import campisi_carino_link_from_snapshots_json
+    from finstack_quant.portfolio import campisi_carino_link_from_snapshots
 
     period = {"portfolio": _portfolio(), "benchmark": _benchmark()}
     result = json.loads(
-        campisi_carino_link_from_snapshots_json(
+        campisi_carino_link_from_snapshots(
             periods_json=json.dumps([period, period]),
             config_json=json.dumps(_CONFIG),
-        )
+        ).to_json()
     )
     assert len(result["linked_sectors"]) == 2
 
@@ -209,7 +209,7 @@ def test_campisi_accepts_zero_and_negative_spread_levels() -> None:
     quote-reproducing Z-spreads (including negative levels on rich bonds) are
     ordinary inputs and must not perturb any effect.
     """
-    from finstack_quant.portfolio import campisi_carino_link_from_snapshots_json
+    from finstack_quant.portfolio import campisi_carino_link_from_snapshots
 
     def _period(p_spread: float, b_spread: float) -> dict[str, object]:
         return {
@@ -219,7 +219,9 @@ def test_campisi_accepts_zero_and_negative_spread_levels() -> None:
 
     def _link(p_spread: float, b_spread: float) -> dict[str, object]:
         period = _period(p_spread, b_spread)
-        return json.loads(campisi_carino_link_from_snapshots_json(json.dumps([period, period]), json.dumps(_CONFIG)))
+        return json.loads(
+            campisi_carino_link_from_snapshots(json.dumps([period, period]), json.dumps(_CONFIG)).to_json()
+        )
 
     baseline = _link(0.0150, 0.0120)
     # w_p (-SD_p ds - (-SD_b ds)) = 1.0 x (-3.8 + 4.8) x 0.0020 per period.
@@ -234,24 +236,24 @@ def test_campisi_accepts_zero_and_negative_spread_levels() -> None:
 
 def test_campisi_carino_link_links_precomputed_results_of_mixed_lengths() -> None:
     """Results-based linking accepts periods of different lengths (act/365)."""
-    from finstack_quant.portfolio import campisi_attribution_json, campisi_carino_link_json
+    from finstack_quant.portfolio import campisi_attribution, campisi_carino_link
 
     # Real calendar months on act/365: January and February 2025. A single
     # shared ``period_years`` cannot express this; only the results-based
     # entry point can.
     january = json.loads(
-        campisi_attribution_json(
+        campisi_attribution(
             json.dumps(_portfolio()),
             json.dumps(_benchmark()),
             json.dumps({"period_years": 31.0 / 365.0}),
-        )
+        ).to_json()
     )
     february = json.loads(
-        campisi_attribution_json(
+        campisi_attribution(
             json.dumps(_portfolio()),
             json.dumps(_benchmark()),
             json.dumps({"period_years": 28.0 / 365.0}),
-        )
+        ).to_json()
     )
 
     # The two periods really are different lengths: carry differs, and the
@@ -260,7 +262,7 @@ def test_campisi_carino_link_links_precomputed_results_of_mixed_lengths() -> Non
     assert january["total_active_carry"] == pytest.approx(0.004125 * (31.0 / 365.0), abs=1e-15)
     assert february["total_active_carry"] == pytest.approx(0.004125 * (28.0 / 365.0), abs=1e-15)
 
-    result = json.loads(campisi_carino_link_json(json.dumps([january, february])))
+    result = json.loads(campisi_carino_link(json.dumps([january, february])).to_json())
 
     geometric_active = result["portfolio_return_compounded"] - result["benchmark_return_compounded"]
     reconstructed = (
@@ -289,29 +291,29 @@ def test_campisi_carino_link_links_precomputed_results_of_mixed_lengths() -> Non
 
 def test_campisi_carino_link_accepts_keyword_arguments() -> None:
     """The advertised ``text_signature`` name is the real keyword name."""
-    from finstack_quant.portfolio import campisi_attribution_json, campisi_carino_link_json
+    from finstack_quant.portfolio import campisi_attribution, campisi_carino_link
 
     period = json.loads(
-        campisi_attribution_json(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
+        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
     )
-    result = json.loads(campisi_carino_link_json(periods_json=json.dumps([period, period])))
+    result = json.loads(campisi_carino_link(periods_json=json.dumps([period, period])).to_json())
     assert len(result["linked_sectors"]) == 2
     assert result["linked_active_carry"] == pytest.approx(0.002091436875, abs=1e-12)
 
 
 def test_campisi_attribution_rejects_bad_json_and_bad_weights() -> None:
     """Malformed JSON raises ValueError; domain errors raise PortfolioError."""
-    from finstack_quant.portfolio import PortfolioError, campisi_attribution_json
+    from finstack_quant.portfolio import PortfolioError, campisi_attribution
 
     with pytest.raises(ValueError, match="portfolio JSON"):
-        campisi_attribution_json("not json", json.dumps(_benchmark()), json.dumps(_CONFIG))
+        campisi_attribution("not json", json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
     with pytest.raises(ValueError, match="benchmark JSON"):
-        campisi_attribution_json(json.dumps(_portfolio()), "not json", json.dumps(_CONFIG))
+        campisi_attribution(json.dumps(_portfolio()), "not json", json.dumps(_CONFIG)).to_json()
 
     bad = _portfolio()
     bad[0]["weight"] = 0.10  # sums to 0.80
     with pytest.raises(PortfolioError, match="Portfolio weights"):
-        campisi_attribution_json(json.dumps(bad), json.dumps(_benchmark()), json.dumps(_CONFIG))
+        campisi_attribution(json.dumps(bad), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
 
 
 def test_campisi_attribution_rejects_zero_net_weight_sector() -> None:
@@ -322,7 +324,7 @@ def test_campisi_attribution_rejects_zero_net_weight_sector() -> None:
     would be forced to zero, so the decomposition must fail closed with the
     offending sector named rather than silently reporting a broken split.
     """
-    from finstack_quant.portfolio import PortfolioError, campisi_attribution_json
+    from finstack_quant.portfolio import PortfolioError, campisi_attribution
 
     core = _snap("CORE", 1.00, 0.0150, 0.048, 5.0, 0.0, 0.0, -0.0010, 0.0)
     hedged_portfolio = [
@@ -333,7 +335,7 @@ def test_campisi_attribution_rejects_zero_net_weight_sector() -> None:
     clean_benchmark = [_snap("CORE", 1.00, 0.0140, 0.044, 5.5, 0.0, 0.0, -0.0010, 0.0)]
 
     with pytest.raises(PortfolioError, match="HEDGE") as portfolio_side:
-        campisi_attribution_json(json.dumps(hedged_portfolio), json.dumps(clean_benchmark), json.dumps(_CONFIG))
+        campisi_attribution(json.dumps(hedged_portfolio), json.dumps(clean_benchmark), json.dumps(_CONFIG)).to_json()
     assert "Portfolio" in str(portfolio_side.value)
 
     hedged_benchmark = [
@@ -342,7 +344,7 @@ def test_campisi_attribution_rejects_zero_net_weight_sector() -> None:
         _snap("HEDGE", -0.40, 0.0050, 0.015, 1.0, 0.0, 0.0, -0.0010, 0.0),
     ]
     with pytest.raises(PortfolioError, match="HEDGE") as benchmark_side:
-        campisi_attribution_json(json.dumps([core]), json.dumps(hedged_benchmark), json.dumps(_CONFIG))
+        campisi_attribution(json.dumps([core]), json.dumps(hedged_benchmark), json.dumps(_CONFIG)).to_json()
     assert "Benchmark" in str(benchmark_side.value)
 
     # A sector genuinely absent from one side stays legal — that is the
@@ -352,7 +354,7 @@ def test_campisi_attribution_rejects_zero_net_weight_sector() -> None:
         _snap("EXTRA", 0.20, 0.0210, 0.070, 3.0, 4.0, 0.0300, -0.0010, -0.0010),
     ]
     result = json.loads(
-        campisi_attribution_json(json.dumps(one_sided), json.dumps(clean_benchmark), json.dumps(_CONFIG))
+        campisi_attribution(json.dumps(one_sided), json.dumps(clean_benchmark), json.dumps(_CONFIG)).to_json()
     )
     assert [s["sector"] for s in result["sectors"]] == ["CORE", "EXTRA"]
     assert result["sectors"][1]["benchmark_weight"] == pytest.approx(0.0, abs=1e-15)
@@ -368,72 +370,68 @@ def test_campisi_attribution_rejects_zero_net_weight_sector() -> None:
 
 def test_campisi_carino_link_from_snapshots_rejects_bad_json_and_domain_errors() -> None:
     """The snapshot-based linked entry point maps parse and domain failures."""
-    from finstack_quant.portfolio import PortfolioError, campisi_carino_link_from_snapshots_json
+    from finstack_quant.portfolio import PortfolioError, campisi_carino_link_from_snapshots
 
     with pytest.raises(ValueError, match="periods JSON"):
-        campisi_carino_link_from_snapshots_json("not json", json.dumps(_CONFIG))
+        campisi_carino_link_from_snapshots("not json", json.dumps(_CONFIG)).to_json()
     with pytest.raises(ValueError, match="config JSON"):
-        campisi_carino_link_from_snapshots_json(json.dumps([]), "not json")
+        campisi_carino_link_from_snapshots(json.dumps([]), "not json").to_json()
     with pytest.raises(PortfolioError, match="at least one period"):
-        campisi_carino_link_from_snapshots_json(json.dumps([]), json.dumps(_CONFIG))
+        campisi_carino_link_from_snapshots(json.dumps([]), json.dumps(_CONFIG)).to_json()
 
 
 def test_campisi_carino_link_rejects_bad_json_and_domain_errors() -> None:
     """The results-based linked entry point maps parse and domain failures."""
-    from finstack_quant.portfolio import PortfolioError, campisi_attribution_json, campisi_carino_link_json
+    from finstack_quant.portfolio import PortfolioError, campisi_attribution, campisi_carino_link
 
     with pytest.raises(ValueError, match="period results JSON"):
-        campisi_carino_link_json("not json")
+        campisi_carino_link("not json").to_json()
     # A period *input* is not a period *result*: the schemas are distinct.
     with pytest.raises(ValueError, match="period results JSON"):
-        campisi_carino_link_json(json.dumps([{"portfolio": _portfolio(), "benchmark": _benchmark()}]))
+        campisi_carino_link(json.dumps([{"portfolio": _portfolio(), "benchmark": _benchmark()}])).to_json()
     with pytest.raises(PortfolioError, match="at least one period"):
-        campisi_carino_link_json(json.dumps([]))
+        campisi_carino_link(json.dumps([])).to_json()
 
     period = json.loads(
-        campisi_attribution_json(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
+        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
     )
     renamed = json.loads(json.dumps(period))
     renamed["sectors"][0]["sector"] = "DIFFERENT"
     with pytest.raises(PortfolioError, match="sector ordering"):
-        campisi_carino_link_json(json.dumps([period, renamed]))
+        campisi_carino_link(json.dumps([period, renamed])).to_json()
 
 
 def test_campisi_carino_link_rejects_inconsistent_result_contract() -> None:
     """Finite tampering of top-level and sector effects fails closed."""
-    from finstack_quant.portfolio import (
-        PortfolioError,
-        campisi_attribution_json,
-        campisi_carino_link_json,
-    )
+    from finstack_quant.portfolio import PortfolioError, campisi_attribution, campisi_carino_link
 
     period = json.loads(
-        campisi_attribution_json(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
+        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
     )
 
     bad_active = json.loads(json.dumps(period))
     bad_active["active_return"] += 0.001
     with pytest.raises(PortfolioError, match="active_return"):
-        campisi_carino_link_json(json.dumps([bad_active]))
+        campisi_carino_link(json.dumps([bad_active])).to_json()
 
     bad_sector = json.loads(json.dumps(period))
     bad_sector["sectors"][0]["selection"] += 0.001
     bad_sector["sectors"][0]["total_active"] += 0.001
     with pytest.raises(PortfolioError, match="total_selection"):
-        campisi_carino_link_json(json.dumps([bad_sector]))
+        campisi_carino_link(json.dumps([bad_sector])).to_json()
 
     bad_sector_total = json.loads(json.dumps(period))
     bad_sector_total["sectors"][0]["total_active"] += 0.001
     with pytest.raises(PortfolioError, match="total_active"):
-        campisi_carino_link_json(json.dumps([bad_sector_total]))
+        campisi_carino_link(json.dumps([bad_sector_total])).to_json()
 
 
 def test_campisi_carino_link_accepts_huge_finite_cancelling_effects() -> None:
     """Scaled L1 validation does not overflow when finite effects cancel."""
-    from finstack_quant.portfolio import campisi_attribution_json, campisi_carino_link_json
+    from finstack_quant.portfolio import campisi_attribution, campisi_carino_link
 
     period = json.loads(
-        campisi_attribution_json(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
+        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
     )
     period["portfolio_return"] = 0.01
     period["benchmark_return"] = 0.01
@@ -454,7 +452,7 @@ def test_campisi_carino_link_accepts_huge_finite_cancelling_effects() -> None:
     period["sectors"][0]["allocation"] = 1e308
     period["sectors"][0]["active_carry"] = -1e308
 
-    linked = json.loads(campisi_carino_link_json(json.dumps([period])))
+    linked = json.loads(campisi_carino_link(json.dumps([period])).to_json())
     assert linked["linked_allocation"] == pytest.approx(1e308)
     assert linked["linked_active_carry"] == pytest.approx(-1e308)
 
@@ -462,49 +460,45 @@ def test_campisi_carino_link_accepts_huge_finite_cancelling_effects() -> None:
 def test_campisi_result_denies_unknown_fields_on_every_input_path() -> None:
     """A stale or misspelled key must fail closed, not be silently dropped.
 
-    ``FiAttributionResult`` is an *input* type: :func:`campisi_carino_link_json` and
-    :func:`campisi_reconciliation_check_json` both deserialize it. Silently ignoring
+    ``FiAttributionResult`` is an *input* type: :func:`campisi_carino_link` and
+    :func:`campisi_reconciliation_check` both deserialize it. Silently ignoring
     an unknown key would let a hand-assembled or stale payload flow through and
     still "reconcile", because linking reads the period returns rather than the
     supplied ``active_return``.
     """
-    from finstack_quant.portfolio import (
-        campisi_attribution_json,
-        campisi_carino_link_json,
-        campisi_reconciliation_check_json,
-    )
+    from finstack_quant.portfolio import campisi_attribution, campisi_carino_link, campisi_reconciliation_check
 
     result = json.loads(
-        campisi_attribution_json(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
+        campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
     )
 
     # Our own output round-trips: deny_unknown_fields must not reject it.
-    campisi_carino_link_json(json.dumps([result]))
-    campisi_reconciliation_check_json(json.dumps(result), 1e-10)
+    campisi_carino_link(json.dumps([result])).to_json()
+    campisi_reconciliation_check(json.dumps(result), 1e-10).to_json()
 
     top_level = {**result, "bogus_field": 1.0}
     with pytest.raises(ValueError, match="period results JSON"):
-        campisi_carino_link_json(json.dumps([top_level]))
+        campisi_carino_link(json.dumps([top_level])).to_json()
     with pytest.raises(ValueError, match="result JSON"):
-        campisi_reconciliation_check_json(json.dumps(top_level), 1e-10)
+        campisi_reconciliation_check(json.dumps(top_level), 1e-10).to_json()
 
     nested_sector = json.loads(json.dumps(result))
     nested_sector["sectors"][0]["bogus_field"] = 1.0
     with pytest.raises(ValueError, match="result JSON"):
-        campisi_reconciliation_check_json(json.dumps(nested_sector), 1e-10)
+        campisi_reconciliation_check(json.dumps(nested_sector), 1e-10).to_json()
 
     nested_components = json.loads(json.dumps(result))
     nested_components["portfolio_components"]["bogus_field"] = 1.0
     with pytest.raises(ValueError, match="result JSON"):
-        campisi_reconciliation_check_json(json.dumps(nested_components), 1e-10)
+        campisi_reconciliation_check(json.dumps(nested_components), 1e-10).to_json()
 
 
 def test_campisi_reconciliation_check_reports_residual_and_honours_tolerance() -> None:
     """The reconciliation gate is reachable from Python and its tolerance bites."""
-    from finstack_quant.portfolio import campisi_attribution_json, campisi_reconciliation_check_json
+    from finstack_quant.portfolio import campisi_attribution, campisi_reconciliation_check
 
-    result_json = campisi_attribution_json(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
-    report = json.loads(campisi_reconciliation_check_json(result_json, 1e-10))
+    result_json = campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
+    report = json.loads(campisi_reconciliation_check(result_json, 1e-10).to_json())
 
     assert report["is_reconciled"] is True
     assert report["tolerance"] == pytest.approx(1e-10)
@@ -523,14 +517,14 @@ def test_campisi_reconciliation_check_reports_residual_and_honours_tolerance() -
 
     # Tolerance is load-bearing: a tampered active_return breaks the identity.
     tampered = {**result, "active_return": result["active_return"] + 0.01}
-    assert json.loads(campisi_reconciliation_check_json(json.dumps(tampered), 1e-10))["is_reconciled"] is False
-    assert json.loads(campisi_reconciliation_check_json(json.dumps(tampered), 1.0))["is_reconciled"] is True
+    assert json.loads(campisi_reconciliation_check(json.dumps(tampered), 1e-10).to_json())["is_reconciled"] is False
+    assert json.loads(campisi_reconciliation_check(json.dumps(tampered), 1.0).to_json())["is_reconciled"] is True
 
 
 def test_campisi_reconciliation_check_accepts_keyword_arguments() -> None:
     """Keyword names match the documented ``text_signature``."""
-    from finstack_quant.portfolio import campisi_attribution_json, campisi_reconciliation_check_json
+    from finstack_quant.portfolio import campisi_attribution, campisi_reconciliation_check
 
-    result_json = campisi_attribution_json(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG))
-    report = json.loads(campisi_reconciliation_check_json(result_json=result_json, tolerance=1e-10))
+    result_json = campisi_attribution(json.dumps(_portfolio()), json.dumps(_benchmark()), json.dumps(_CONFIG)).to_json()
+    report = json.loads(campisi_reconciliation_check(result_json=result_json, tolerance=1e-10).to_json())
     assert report["is_reconciled"] is True

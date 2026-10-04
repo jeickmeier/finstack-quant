@@ -334,6 +334,17 @@ impl CompositeInstrument {
         metrics: &[MetricId],
         options: PricingOptions,
     ) -> Result<CompositeExposureReport> {
+        self.primitive_exposures_with_cache(market, as_of, metrics, options, &mut BTreeMap::new())
+    }
+
+    fn primitive_exposures_with_cache(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        metrics: &[MetricId],
+        options: PricingOptions,
+        price_cache: &mut BTreeMap<String, crate::results::ValuationResult>,
+    ) -> Result<CompositeExposureReport> {
         if let Some(metric) = metrics.iter().find(|metric| !is_additive_metric(metric)) {
             return Err(Error::Validation(format!(
                 "metric '{}' is not additive and cannot be aggregated for composite '{}'",
@@ -343,7 +354,6 @@ impl CompositeInstrument {
         let flattened = self.flatten_primitives()?;
         let mut paths = Vec::with_capacity(flattened.len());
         let mut supported = BTreeMap::<String, usize>::new();
-        let mut price_cache = BTreeMap::<String, crate::results::ValuationResult>::new();
         for mut exposure in flattened {
             let instrument_json = exposure.instrument.as_ref().ok_or_else(|| {
                 Error::Internal("primitive exposure lost its runtime instrument".to_string())
@@ -422,8 +432,16 @@ impl CompositeInstrument {
         metrics: &[MetricId],
         options: PricingOptions,
     ) -> Result<(IndexMap<MetricId, f64>, CompositeValuationDetails)> {
-        let report = self.primitive_exposures(market, as_of, metrics, options.clone())?;
-        let leg_results = self.top_level_leg_results(market, as_of, metrics, options)?;
+        let mut price_cache = BTreeMap::new();
+        let report = self.primitive_exposures_with_cache(
+            market,
+            as_of,
+            metrics,
+            options.clone(),
+            &mut price_cache,
+        )?;
+        let leg_results =
+            self.top_level_leg_results(market, as_of, metrics, options, &mut price_cache)?;
         let mut measures = IndexMap::<MetricId, f64>::new();
         for path in &report.paths {
             for (metric, value) in &path.measures {
@@ -449,6 +467,7 @@ impl CompositeInstrument {
         as_of: Date,
         metrics: &[MetricId],
         options: PricingOptions,
+        price_cache: &mut BTreeMap<String, crate::results::ValuationResult>,
     ) -> Result<Vec<CompositeLegValuation>> {
         self.boxed_legs()?
             .iter()
@@ -458,8 +477,27 @@ impl CompositeInstrument {
                 let defaulted = self.leg_with_metric_defaults(leg_instrument.as_ref());
                 let instrument = defaulted.as_ref().unwrap_or(leg_instrument);
                 let leg_metrics = metrics_supported_by_leg(instrument.as_ref(), metrics, &options);
-                let valuation =
-                    instrument.price_with_metrics(market, as_of, &leg_metrics, options.clone())?;
+                // The request owns the cache: market/date/options and requested metrics
+                // are identical to the primitive pass. Definition and inherited defaults
+                // distinguish only results that can safely be reused.
+                let mut cache_key =
+                    InstrumentEnvelope::new(leg.instrument.as_ref().clone()).content_hash()?;
+                if !self.metric_pricing_overrides.is_empty() {
+                    cache_key.push_str(&format!("{:?}", self.metric_pricing_overrides));
+                }
+                let valuation = match price_cache.get(&cache_key) {
+                    Some(cached) => cached.clone(),
+                    None => {
+                        let priced = instrument.price_with_metrics(
+                            market,
+                            as_of,
+                            &leg_metrics,
+                            options.clone(),
+                        )?;
+                        price_cache.insert(cache_key, priced.clone());
+                        priced
+                    }
+                };
                 let native_value = Money::new(
                     valuation.value.amount() * resolved.quantity,
                     valuation.value.currency(),
@@ -627,26 +665,12 @@ impl Instrument for CompositeInstrument {
         market: &MarketContext,
         as_of: Date,
     ) -> Option<crate::results::ValuationDetails> {
-        self.primitive_exposures(market, as_of, &[], PricingOptions::default())
+        self.valuation_details_with_metrics(market, as_of, &[], PricingOptions::default())
             .ok()
-            .and_then(|exposures| {
-                let leg_results = self
-                    .top_level_leg_results(market, as_of, &[], PricingOptions::default())
-                    .ok()?;
-                Some(crate::results::ValuationDetails::Composite(
-                    CompositeValuationDetails {
-                        state_effective_date: self.state.effective_date,
-                        reporting_currency: self.spec.reporting_currency,
-                        resolved_legs: self.state.resolved_legs.clone(),
-                        weighting_inputs: self.state.weighting_inputs.clone(),
-                        leg_results,
-                        exposures,
-                    },
-                ))
-            })
+            .map(|(_, details)| crate::results::ValuationDetails::Composite(details))
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

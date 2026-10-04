@@ -12,7 +12,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
 
 use crate::cashflow::builder::{evaluate_fee_tiers, FeeTier, FloatingRateSpec};
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::instruments::fixed_income::loan_terms::{
@@ -587,12 +587,6 @@ pub struct StochasticUtilizationSpec {
     /// Utilization process specification.
     pub utilization_process: UtilizationProcess,
 
-    /// Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).
-    /// Mutually exclusive with `model_config.mc_antithetic = true`; validation
-    /// rejects the combination.
-    #[serde(default)]
-    pub use_sobol_qmc: bool,
-
     /// Advanced Monte Carlo configuration (optional).
     ///
     /// When present, enables multi-factor modeling with credit spread
@@ -621,7 +615,7 @@ impl RevolvingCreditMcRun {
     /// Resolve sampling settings from a facility's model configuration.
     ///
     /// `mc_paths` and `mc_antithetic` fall back to the embedded registry's
-    /// `rust.revolving_credit` defaults. The seed is
+    /// `revolving_credit` defaults. The seed is
     /// `derive_seed(facility_id, mc_seed_scenario)`, with `"base"` when no
     /// label is set.
     ///
@@ -640,9 +634,7 @@ impl RevolvingCreditMcRun {
         facility_id: &finstack_quant_core::types::InstrumentId,
         model_config: &crate::instruments::pricing_overrides::ModelConfig,
     ) -> finstack_quant_core::Result<Self> {
-        let defaults = &finstack_quant_models::monte_carlo::registry::embedded_defaults()?
-            .rust
-            .revolving_credit;
+        let defaults = &crate::pricer::defaults::embedded_defaults()?.revolving_credit;
         Ok(Self {
             num_paths: crate::instruments::common_impl::helpers::resolve_mc_paths(
                 model_config.mc_paths,
@@ -1278,7 +1270,7 @@ impl crate::instruments::common_impl::traits::Instrument for RevolvingCredit {
         Some(self.issue_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 // Implement CashflowProvider for standard cashflow interface

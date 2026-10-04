@@ -14,7 +14,7 @@ use super::types::{AmortizationEvent, AssetBackedFacility};
 use crate::cashflow::traits::{
     schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
 };
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::fixed_income::structured_credit::{
@@ -504,63 +504,79 @@ impl Instrument for AssetBackedFacility {
         Some(self.closing_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
-}
-
-/// One date of projected cashflows, with absent components filled by zero.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct FacilityCashflowRow {
-    /// Payment date as an ISO-8601 string.
-    pub date: String,
-    /// Interest in the result currency, as a decimal amount.
-    pub interest: f64,
-    /// Principal in the result currency, as a decimal amount.
-    pub principal: f64,
-    /// Commitment fee in the result currency, as a decimal amount.
-    pub commitment_fee: f64,
-    /// Draw in the result currency, as a decimal amount.
-    pub draw: f64,
-    /// Lender total in the result currency, as a decimal amount.
-    pub lender_total: f64,
-    /// Residual in the result currency, as a decimal amount.
-    pub residual: f64,
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl FacilityProjection {
-    /// Project cashflows into date-ordered rows for tabular presentation.
+    /// Project lender and residual flows in date order, summing duplicate dates and filling absent components with zero.
     ///
-    /// Amounts use the result currency; missing components are zero. Facility
-    /// draws are positive advances, while lender totals subtract those advances.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Error::CurrencyMismatch` if any component has a different currency.
-    pub fn get_cashflow_rows(&self) -> finstack_quant_core::Result<Vec<FacilityCashflowRow>> {
-        let lender = self.lender_cashflows()?;
-        let rows = crate::instruments::common_impl::cashflow_export::cashflow_columns(
-            [
-                &self.facility.interest_flows,
-                &self.facility.principal_flows,
-                &self.commitment_fees,
-                &self.draws,
-                &lender,
-                &self.residual.cashflows,
-            ],
-            self.facility.final_balance.currency(),
-        )?;
-        Ok(rows
+    /// Columns are date, interest, principal, commitment_fee, draw, lender_total
+    /// and residual, in the facility currency. Empty projections retain all columns.
+    /// Mixed component, residual or draw currencies return an error before scalar export.
+    pub fn to_table(
+        &self,
+    ) -> finstack_quant_core::Result<finstack_quant_core::table::TableEnvelope> {
+        use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
+        let currency = self.facility.total_interest.currency();
+        self.facility.validate_currency(currency)?;
+        self.residual.validate_currency(currency)?;
+        for (_, amount) in self.commitment_fees.iter().chain(&self.draws) {
+            if amount.currency() != currency {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: currency,
+                    actual: amount.currency(),
+                });
+            }
+        }
+        let lender_total: std::collections::BTreeMap<Date, f64> = self
+            .lender_cashflows()?
             .into_iter()
-            .map(|(date, values)| FacilityCashflowRow {
-                date: date.to_string(),
-                interest: values[0].amount(),
-                principal: values[1].amount(),
-                commitment_fee: values[2].amount(),
-                draw: values[3].amount(),
-                lender_total: values[4].amount(),
-                residual: values[5].amount(),
-            })
-            .collect())
+            .map(|(date, amount)| (date, amount.amount()))
+            .collect();
+        let mut by_date: std::collections::BTreeMap<Date, [f64; 5]> =
+            lender_total.keys().map(|date| (*date, [0.0; 5])).collect();
+        for (index, flows) in [
+            &self.facility.interest_flows,
+            &self.facility.principal_flows,
+            &self.commitment_fees,
+            &self.residual.cashflows,
+            &self.draws,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            for (date, amount) in flows {
+                by_date.entry(*date).or_default()[index] += amount.amount();
+            }
+        }
+        let mut columns = vec![TableColumn::new(
+            "date",
+            TableColumnData::String(by_date.keys().map(ToString::to_string).collect()),
+        )];
+        for (name, index) in [
+            ("interest", 0),
+            ("principal", 1),
+            ("commitment_fee", 2),
+            ("draw", 4),
+        ] {
+            columns.push(TableColumn::new(
+                name,
+                TableColumnData::Float64(by_date.values().map(|row| row[index]).collect()),
+            ));
+        }
+        columns.push(TableColumn::new(
+            "lender_total",
+            TableColumnData::Float64(
+                by_date
+                    .keys()
+                    .map(|date| lender_total.get(date).copied().unwrap_or(0.0))
+                    .collect(),
+            ),
+        ));
+        columns.push(TableColumn::new(
+            "residual",
+            TableColumnData::Float64(by_date.values().map(|row| row[3]).collect()),
+        ));
+        TableEnvelope::new(columns)
     }
 }

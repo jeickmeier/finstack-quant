@@ -908,74 +908,6 @@ export type AmortizationSpec =
  */
 export type AntiDilutionPolicy = "none" | "full_ratchet" | "weighted_average";
 /**
- * A concrete market-data target changed while applying a scenario.
- *
- * Targets are recorded from hierarchy-expanded operations together with the
- * effects that were actually accepted by the engine. Consequently, every
- * identifier is a resolved market identifier rather than an unresolved
- * hierarchy path or a best-effort reconstruction of the original spec.
- */
-export type ScenarioMarketTarget =
-  | {
-      /**
-       * Concrete identifier changed in that collection.
-       */
-      curve_id: Id;
-      /**
-       * Curve family used to select the market-data collection.
-       */
-      curve_kind: CurveKind;
-      kind: "curve";
-    }
-  | {
-      /**
-       * Concrete volatility-index curve identifier.
-       */
-      curve_id: Id;
-      kind: "volatility_index";
-    }
-  | {
-      kind: "base_correlation";
-      /**
-       * Concrete base-correlation surface identifier.
-       */
-      surface_id: Id;
-    }
-  | {
-      kind: "vol_surface";
-      /**
-       * Concrete volatility-surface identifier.
-       */
-      vol_surface_id: Id;
-    }
-  | {
-      kind: "equity_price";
-      /**
-       * Concrete `MarketContext::get_price` scalar identifier.
-       */
-      spot_id: Id;
-    }
-  | {
-      /**
-       * Base currency strengthened or weakened by the operation.
-       */
-      base: Currency;
-      kind: "fx";
-      /**
-       * Quote currency used for the shocked rate.
-       */
-      quote: Currency;
-    };
-/**
- * Identifies which family of curve an operation targets.
- *
- * These variants map to the market data collections exposed by
- * `finstack_quant_core::market_data::context::MarketContext`.
- * They also determine which quoting and interpolation conventions apply when
- * downstream helpers extract rates or apply node shocks.
- */
-export type CurveKind = "discount" | "forward" | "par_cds" | "inflation" | "commodity";
-/**
  * Canonical tagged union of all supported instrument serde types.
  */
 export type InstrumentJson =
@@ -2082,10 +2014,6 @@ export type InflationVolatilityExpiry = "reference_date" | "publication_date";
  */
 export type CashSettlementMethod = "collateralized_cash_price" | "par_yield" | "isda_par_par" | "zero_coupon";
 /**
- * Exercise schedule convention for option models.
- */
-export type ExerciseStyle = "european" | "american" | "bermudan";
-/**
  * Option payoff direction used by analytical and numerical model engines.
  */
 export type OptionType = "call" | "put";
@@ -2147,6 +2075,10 @@ export type ListedFutureSettlement =
       quantity_per_contract: number;
       type: "physical";
     };
+/**
+ * Exercise schedule convention for option models.
+ */
+export type ExerciseStyle = "european" | "american" | "bermudan";
 /**
  * Quotation model used for an option on a futures price.
  */
@@ -3942,6 +3874,74 @@ export type UnaryOp = "neg" | "not";
  * Canonical schema marker for persisted instrument envelopes.
  */
 export type InstrumentSchema = "finstack_quant.instrument/1";
+/**
+ * A concrete market-data target changed while applying a scenario.
+ *
+ * Targets are recorded from hierarchy-expanded operations together with the
+ * effects that were actually accepted by the engine. Consequently, every
+ * identifier is a resolved market identifier rather than an unresolved
+ * hierarchy path or a best-effort reconstruction of the original spec.
+ */
+export type ScenarioMarketTarget =
+  | {
+      /**
+       * Concrete identifier changed in that collection.
+       */
+      curve_id: Id;
+      /**
+       * Curve family used to select the market-data collection.
+       */
+      curve_kind: CurveKind;
+      kind: "curve";
+    }
+  | {
+      /**
+       * Concrete volatility-index curve identifier.
+       */
+      curve_id: Id;
+      kind: "volatility_index";
+    }
+  | {
+      kind: "base_correlation";
+      /**
+       * Concrete base-correlation surface identifier.
+       */
+      surface_id: Id;
+    }
+  | {
+      kind: "vol_surface";
+      /**
+       * Concrete volatility-surface identifier.
+       */
+      vol_surface_id: Id;
+    }
+  | {
+      kind: "equity_price";
+      /**
+       * Concrete `MarketContext::get_price` scalar identifier.
+       */
+      spot_id: Id;
+    }
+  | {
+      /**
+       * Base currency strengthened or weakened by the operation.
+       */
+      base: Currency;
+      kind: "fx";
+      /**
+       * Quote currency used for the shocked rate.
+       */
+      quote: Currency;
+    };
+/**
+ * Identifies which family of curve an operation targets.
+ *
+ * These variants map to the market data collections exposed by
+ * `finstack_quant_core::market_data::context::MarketContext`.
+ * They also determine which quoting and interpolation conventions apply when
+ * downstream helpers extract rates or apply node shocks.
+ */
+export type CurveKind = "discount" | "forward" | "par_cds" | "inflation" | "commodity";
 /**
  * Rounding modes supported by the library.
  *
@@ -6191,14 +6191,6 @@ export interface AgencyTba {
  */
 export interface ApplicationEnvelope {
   /**
-   * Authoritative metadata describing the state changed by applied effects.
-   */
-  changes: ScenarioChangeManifest;
-  /**
-   * Number of expanded operations the engine attempted.
-   */
-  expanded_operations: number;
-  /**
    * Mutated instruments in input order, encoded as canonical envelopes.
    * Absent when no inventory was supplied; an empty inventory stays empty.
    */
@@ -6210,65 +6202,15 @@ export interface ApplicationEnvelope {
     [k: string]: unknown;
   };
   /**
-   * Audit stamp copied from the report.
-   */
-  meta?: ResultsMeta | null;
-  /**
    * Mutated financial model, when a model was supplied.
    */
   model?: {
     [k: string]: unknown;
   };
   /**
-   * Number of effects successfully applied.
+   * Canonical application counters, change manifest, warnings and policy stamp.
    */
-  operations_applied: number;
-  /**
-   * Roll-forward report, when the scenario contained a time-roll operation.
-   */
-  time_roll?: RollForwardReport | null;
-  /**
-   * Number of user-provided operations before expansion.
-   */
-  user_operations: number;
-  /**
-   * Structured warnings produced while applying the scenario.
-   */
-  warnings: Warning[];
-}
-/**
- * Authoritative change manifest produced while applying a scenario.
- *
- * Readers use the manifest to invalidate only the market factors and
- * instruments that actually changed, while `all_dirty` provides a
- * conservative escape hatch for changes that cannot be represented precisely.
- */
-export interface ScenarioChangeManifest {
-  /**
-   * Whether callers must conservatively treat every dependency as dirty.
-   *
-   * This is set for effective time rolls because date-sensitive values can
-   * change even when no explicit market or instrument target was mutated.
-   */
-  all_dirty: boolean;
-  /**
-   * Whether the execution context's effective valuation date changed.
-   */
-  as_of_changed: boolean;
-  /**
-   * Zero-based indices of portfolio instruments mutated in place.
-   */
-  changed_instrument_indices: number[];
-  /**
-   * Concrete market-data targets changed by applied effects.
-   */
-  market_targets: ScenarioMarketTarget[];
-  /**
-   * Whether instruments were inserted, removed, or reordered.
-   *
-   * Scenario operations do not change portfolio shape, so this stays `false`.
-   */
-  portfolio_shape_changed: boolean;
+  report: ApplicationReport;
 }
 /**
  * Versioned envelope for JSON instrument definitions.
@@ -8171,12 +8113,6 @@ export interface StochasticUtilizationSpec {
    */
   mc_config?: McConfig | null;
   /**
-   * Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).
-   * Mutually exclusive with `model_config.mc_antithetic = true`; validation
-   * rejects the combination.
-   */
-  use_sobol_qmc?: boolean;
-  /**
    * Utilization process specification.
    */
   utilization_process: UtilizationProcess;
@@ -8865,27 +8801,12 @@ export interface OtcMarginSpec {
    */
   csa: CsaSpec;
   /**
-   * Initial margin calculation methodology
-   *
-   * - Bilateral: SIMM or Schedule
-   * - Cleared: ClearingHouse (CCP-specific)
-   */
-  im_methodology: ImMethodology;
-  /**
-   * Settlement lag for margin transfers (business days)
-   */
-  settlement_lag: number;
-  /**
    * Explicit SIMM credit classification for credit-sensitive instruments.
    *
    * Required when a credit product uses `ImMethodology::Simm`; leave `None`
    * for non-credit instruments and non-SIMM margin methodologies.
    */
   simm_credit_classification?: SimmCreditClassification | null;
-  /**
-   * Variation margin exchange frequency
-   */
-  vm_frequency: MarginTenor;
 }
 /**
  * Credit Support Annex specification (ISDA standard).
@@ -9669,7 +9590,7 @@ export interface ForwardRateAgreement {
   start_date: DateWire;
 }
 /**
- * Swaption instrument
+ * European swaption instrument
  *
  * # Exercise lifecycle boundary
  *
@@ -9694,10 +9615,6 @@ export interface Swaption {
    * - `ZeroCoupon`: Single discount to swap maturity
    */
   cash_settlement_method: CashSettlementMethod;
-  /**
-   * Exercise style (European, Bermudan, American). Defaults to European.
-   */
-  exercise_style: ExerciseStyle;
   /**
    * Option expiry date
    */
@@ -18511,6 +18428,88 @@ export interface ResolvedCompositeLeg {
   quantity: number;
 }
 /**
+ * Report describing what happened during [`super::ScenarioEngine::apply`].
+ */
+export interface ApplicationReport {
+  /**
+   * Authoritative metadata describing the state changed by applied effects.
+   */
+  changes: ScenarioChangeManifest;
+  /**
+   * Number of direct (non-hierarchy) operations produced after hierarchy
+   * expansion and resolution-mode deduplication. No-match expansion and
+   * deduplication can make this smaller than `user_operations`. Because
+   * `operations_applied` counts effects rather than operations, the two
+   * counters are not directly comparable.
+   */
+  expanded_operations: number;
+  /**
+   * Audit stamp describing the numeric mode, rounding context, and FX
+   * policy under which the scenario was applied.
+   */
+  meta?: ResultsMeta | null;
+  /**
+   * Number of effects successfully applied to the execution context.
+   *
+   * One user-level operation can produce zero, one, or many effects after
+   * hierarchy expansion and target resolution. This low-level effect count
+   * is therefore not an operation-coverage ratio; inspect `changes` and
+   * `warnings` to determine which targets changed or were skipped.
+   */
+  operations_applied: number;
+  /**
+   * Roll-forward report from the Phase 0 `TimeRollForward` operation,
+   * when the scenario contained one. Carries the per-instrument carry
+   * decomposition and the new valuation date; instruments whose valuation
+   * failed during the roll are also surfaced as
+   * [`Warning::TimeRollInstrumentFailed`] entries in `warnings`.
+   */
+  time_roll?: RollForwardReport | null;
+  /**
+   * Number of user-provided `OperationSpec` entries in the scenario
+   * (before hierarchy expansion and deduplication).
+   */
+  user_operations: number;
+  /**
+   * Structured warnings generated during application (non-fatal).
+   */
+  warnings: Warning[];
+}
+/**
+ * Authoritative change manifest produced while applying a scenario.
+ *
+ * Readers use the manifest to invalidate only the market factors and
+ * instruments that actually changed, while `all_dirty` provides a
+ * conservative escape hatch for changes that cannot be represented precisely.
+ */
+export interface ScenarioChangeManifest {
+  /**
+   * Whether callers must conservatively treat every dependency as dirty.
+   *
+   * This is set for effective time rolls because date-sensitive values can
+   * change even when no explicit market or instrument target was mutated.
+   */
+  all_dirty: boolean;
+  /**
+   * Whether the execution context's effective valuation date changed.
+   */
+  as_of_changed: boolean;
+  /**
+   * Zero-based indices of portfolio instruments mutated in place.
+   */
+  changed_instrument_indices: number[];
+  /**
+   * Concrete market-data targets changed by applied effects.
+   */
+  market_targets: ScenarioMarketTarget[];
+  /**
+   * Whether instruments were inserted, removed, or reordered.
+   *
+   * Scenario operations do not change portfolio shape, so this stays `false`.
+   */
+  portfolio_shape_changed: boolean;
+}
+/**
  * Metadata bundle that accompanies valuation outputs.
  *
  * The metadata is intentionally small so it can be attached to reports and
@@ -18641,54 +18640,6 @@ export interface RollForwardReport {
     [k: string]: Money;
   };
   [k: string]: unknown;
-}
-/**
- * Report describing what happened during [`super::ScenarioEngine::apply`].
- */
-export interface ApplicationReport {
-  /**
-   * Authoritative metadata describing the state changed by applied effects.
-   */
-  changes: ScenarioChangeManifest;
-  /**
-   * Number of direct (non-hierarchy) operations produced after hierarchy
-   * expansion and resolution-mode deduplication. No-match expansion and
-   * deduplication can make this smaller than `user_operations`. Because
-   * `operations_applied` counts effects rather than operations, the two
-   * counters are not directly comparable.
-   */
-  expanded_operations: number;
-  /**
-   * Audit stamp describing the numeric mode, rounding context, and FX
-   * policy under which the scenario was applied.
-   */
-  meta?: ResultsMeta | null;
-  /**
-   * Number of effects successfully applied to the execution context.
-   *
-   * One user-level operation can produce zero, one, or many effects after
-   * hierarchy expansion and target resolution. This low-level effect count
-   * is therefore not an operation-coverage ratio; inspect `changes` and
-   * `warnings` to determine which targets changed or were skipped.
-   */
-  operations_applied: number;
-  /**
-   * Roll-forward report from the Phase 0 `TimeRollForward` operation,
-   * when the scenario contained one. Carries the per-instrument carry
-   * decomposition and the new valuation date; instruments whose valuation
-   * failed during the roll are also surfaced as
-   * [`Warning::TimeRollInstrumentFailed`] entries in `warnings`.
-   */
-  time_roll?: RollForwardReport | null;
-  /**
-   * Number of user-provided `OperationSpec` entries in the scenario
-   * (before hierarchy expansion and deduplication).
-   */
-  user_operations: number;
-  /**
-   * Structured warnings generated during application (non-fatal).
-   */
-  warnings: Warning[];
 }
 /**
  * Attribution metadata.

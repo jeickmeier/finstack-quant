@@ -526,7 +526,7 @@ fn scenario_pnl() -> Value {
     json!({"total": usd("-425.25"), "by_position": {"POS_001": usd("-425.25")}})
 }
 
-pub(super) fn scenario_pnl_view() -> Result<Vec<Value>> {
+pub(super) fn scenario_pnl_view_example() -> Result<Vec<Value>> {
     example_from_json::<crate::scenarios::ScenarioPnlView>(json!({
         "pnl": scenario_pnl(),
         "report": application_report()
@@ -608,7 +608,7 @@ pub(super) fn factor_pnl_profile() -> Result<Vec<Value>> {
         "factor_id": "USD-RATES",
         "position_ids": ["POS_001", "POS_002"],
         "shifts": [-1.0, 0.0, 1.0],
-        "position_pnls": [[4_612.0, 0.0, -4_588.0], [7_431.0, 0.0, -7_369.0]]
+        "position_pnls": [[4_612.0, 7_431.0], [0.0, 0.0], [-4_588.0, -7_369.0]]
     }))
 }
 

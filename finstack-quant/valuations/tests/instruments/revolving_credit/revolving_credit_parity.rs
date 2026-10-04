@@ -98,7 +98,6 @@ mod tests {
                 sigma: 0.0,   // Zero sigma
                 spread_sensitivity: 0.0,
             },
-            use_sobol_qmc: false,
             mc_config: None,
         })
     }

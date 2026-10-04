@@ -16,7 +16,7 @@ use crate::errors::{core_to_py, serde_json_to_py, value_error};
 use finstack_quant_calibration::api::market_datum::MarketDatum;
 use finstack_quant_calibration::api::prior_market::PriorMarketObject;
 use finstack_quant_calibration::api::schema::{
-    AttachedStep, CalibrationEnvelope, CalibrationPlan, CalibrationStep,
+    CalibrationEnvelope, CalibrationPlan, CalibrationStep,
 };
 use finstack_quant_calibration::api::validate as validate_api;
 use finstack_quant_calibration::quotes::cds::CdsQuote;
@@ -911,17 +911,16 @@ fn extract_prior_market(
 /// Every constructor takes the step ``id`` and the kind's required fields;
 /// remaining optional fields are keyword overrides named exactly as in the
 /// Rust ``StepParams`` wire schema (see ``schema.get("calibration.schema.json")``).
-/// Quotes may be attached directly (``quotes=[...]``): the plan then derives
-/// the quote set from them. Attached quotes are part of the step value (Rust
-/// ``AttachedStep``) and travel with its JSON and pickle forms.
+/// Quote payloads live in ``CalibrationEnvelope.market_data``. The plan
+/// names their IDs in ``quote_sets``; a step references the set by name.
 ///
 /// Examples
 /// --------
 /// >>> from finstack_quant.calibration import CalibrationStep, RateQuote
 /// >>> quotes = [RateQuote.deposit("D3M", "USD-SOFR-OIS", "3M", 0.052)]
-/// >>> step = CalibrationStep.discount("USD-OIS", "USD", "2026-05-08", quotes=quotes)
-/// >>> step.kind, step.quote_set, step.quote_ids
-/// ('discount', 'USD-OIS', ['D3M'])
+/// >>> step = CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")
+/// >>> step.kind, step.quote_set
+/// ('discount', 'USD-OIS')
 #[pyclass(
     name = "CalibrationStep",
     module = "finstack_quant.calibration",
@@ -930,11 +929,11 @@ fn extract_prior_market(
 )]
 #[derive(Clone)]
 pub struct PyCalibrationStep {
-    pub(crate) inner: AttachedStep,
+    pub(crate) inner: CalibrationStep,
 }
 
 impl PyCalibrationStep {
-    pub(crate) fn from_inner(inner: AttachedStep) -> Self {
+    pub(crate) fn from_inner(inner: CalibrationStep) -> Self {
         Self { inner }
     }
 
@@ -946,7 +945,6 @@ impl PyCalibrationStep {
         py: Python<'_>,
         kind: &str,
         id: &str,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         mut fields: Map<String, Value>,
         params: Option<&Bound<'_, PyDict>>,
@@ -954,10 +952,7 @@ impl PyCalibrationStep {
         merge_kwargs(py, &mut fields, params, kind)?;
         let step = CalibrationStep::from_wire_fields(kind, id, quote_set.as_deref(), fields)
             .map_err(core_to_py)?;
-        Ok(Self::from_inner(AttachedStep {
-            step,
-            quotes: extract_market_data(py, quotes)?,
-        }))
+        Ok(Self::from_inner(step))
     }
 }
 
@@ -979,8 +974,6 @@ impl PyCalibrationStep {
     ///     Curve currency.
     /// base_date : datetime.date | str
     ///     Curve base (valuation) date.
-    /// quotes : list[RateQuote | dict] | None, default None
-    ///     Quotes to attach; the plan builds the quote set from their ids.
     /// quote_set : str | None, default None
     ///     Quote-set name in ``plan.quote_sets``; defaults to ``id``.
     /// curve_id : str | None, default None
@@ -996,17 +989,14 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, currency, base_date, quotes = None, quote_set = None, curve_id = None, **params))]
-    #[pyo3(
-        text_signature = "(id, currency, base_date, quotes=None, quote_set=None, curve_id=None, **params)"
-    )]
+    #[pyo3(signature = (id, currency, base_date, quote_set = None, curve_id = None, **params))]
+    #[pyo3(text_signature = "(id, currency, base_date, quote_set=None, curve_id=None, **params)")]
     #[allow(clippy::too_many_arguments)]
     fn discount(
         py: Python<'_>,
         id: &str,
         currency: &Bound<'_, PyAny>,
         base_date: &Bound<'_, PyAny>,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         curve_id: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
@@ -1016,7 +1006,7 @@ impl PyCalibrationStep {
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
         ]);
-        Self::build(py, "discount", id, quotes, quote_set, f, params)
+        Self::build(py, "discount", id, quote_set, f, params)
     }
 
     /// Forward (index projection) curve step discounted on an existing curve.
@@ -1033,7 +1023,7 @@ impl PyCalibrationStep {
     ///     Index accrual tenor in years (``0.25`` for 3M).
     /// discount_curve_id : str
     ///     Identifier of the discount curve used to price the quotes.
-    /// quotes, quote_set, curve_id
+    /// quote_set, curve_id
     ///     As in ``discount``.
     /// **params
     ///     Optional wire fields: ``method``, ``interpolation``
@@ -1044,9 +1034,9 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, currency, base_date, tenor_years, discount_curve_id, quotes = None, quote_set = None, curve_id = None, **params))]
+    #[pyo3(signature = (id, currency, base_date, tenor_years, discount_curve_id, quote_set = None, curve_id = None, **params))]
     #[pyo3(
-        text_signature = "(id, currency, base_date, tenor_years, discount_curve_id, quotes=None, quote_set=None, curve_id=None, **params)"
+        text_signature = "(id, currency, base_date, tenor_years, discount_curve_id, quote_set=None, curve_id=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn forward(
@@ -1056,7 +1046,6 @@ impl PyCalibrationStep {
         base_date: &Bound<'_, PyAny>,
         tenor_years: f64,
         discount_curve_id: &str,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         curve_id: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
@@ -1068,7 +1057,7 @@ impl PyCalibrationStep {
             ("tenor_years", Value::from(tenor_years)),
             ("discount_curve_id", Value::String(discount_curve_id.into())),
         ]);
-        Self::build(py, "forward", id, quotes, quote_set, f, params)
+        Self::build(py, "forward", id, quote_set, f, params)
     }
 
     /// Hazard-curve bootstrap step from CDS quotes.
@@ -1091,7 +1080,7 @@ impl PyCalibrationStep {
     ///     Debt seniority (``"senior"``, ``"subordinated"``, ...). ``None`` uses
     ///     the Rust authoring default
     ///     ``CalibrationStep::DEFAULT_HAZARD_SENIORITY`` (``"senior"``).
-    /// quotes, quote_set, curve_id
+    /// quote_set, curve_id
     ///     As in ``discount``.
     /// **params
     ///     Optional wire fields: ``notional``, ``method``,
@@ -1102,9 +1091,9 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, entity, currency, base_date, discount_curve_id, recovery_rate, seniority = None, quotes = None, quote_set = None, curve_id = None, **params))]
+    #[pyo3(signature = (id, entity, currency, base_date, discount_curve_id, recovery_rate, seniority = None, quote_set = None, curve_id = None, **params))]
     #[pyo3(
-        text_signature = "(id, entity, currency, base_date, discount_curve_id, recovery_rate, seniority=None, quotes=None, quote_set=None, curve_id=None, **params)"
+        text_signature = "(id, entity, currency, base_date, discount_curve_id, recovery_rate, seniority=None, quote_set=None, curve_id=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn hazard(
@@ -1116,7 +1105,6 @@ impl PyCalibrationStep {
         discount_curve_id: &str,
         recovery_rate: f64,
         seniority: Option<&str>,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         curve_id: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
@@ -1130,7 +1118,7 @@ impl PyCalibrationStep {
             ("discount_curve_id", Value::String(discount_curve_id.into())),
             ("recovery_rate", Value::from(recovery_rate)),
         ]);
-        Self::build(py, "hazard", id, quotes, quote_set, f, params)
+        Self::build(py, "hazard", id, quote_set, f, params)
     }
 
     /// Inflation (CPI projection) curve step from inflation-swap quotes.
@@ -1155,7 +1143,7 @@ impl PyCalibrationStep {
     /// base_cpi : float
     ///     Contractual reference CPI at the start date after observation lag and
     ///     monthly interpolation. Supplied index fixings must reproduce this level.
-    /// quotes, quote_set, curve_id
+    /// quote_set, curve_id
     ///     As in ``discount``.
     /// **params
     ///     Optional wire fields: ``notional``, ``method``, ``interpolation``.
@@ -1165,9 +1153,9 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, currency, base_date, discount_curve_id, index, observation_lag, base_cpi, quotes = None, quote_set = None, curve_id = None, **params))]
+    #[pyo3(signature = (id, currency, base_date, discount_curve_id, index, observation_lag, base_cpi, quote_set = None, curve_id = None, **params))]
     #[pyo3(
-        text_signature = "(id, currency, base_date, discount_curve_id, index, observation_lag, base_cpi, quotes=None, quote_set=None, curve_id=None, **params)"
+        text_signature = "(id, currency, base_date, discount_curve_id, index, observation_lag, base_cpi, quote_set=None, curve_id=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn inflation(
@@ -1179,7 +1167,6 @@ impl PyCalibrationStep {
         index: &str,
         observation_lag: &str,
         base_cpi: f64,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         curve_id: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
@@ -1193,7 +1180,7 @@ impl PyCalibrationStep {
             ("observation_lag", Value::String(observation_lag.into())),
             ("base_cpi", Value::from(base_cpi)),
         ]);
-        Self::build(py, "inflation", id, quotes, quote_set, f, params)
+        Self::build(py, "inflation", id, quote_set, f, params)
     }
 
     /// Equity/FX volatility-surface (SABR) step from option vol quotes.
@@ -1206,10 +1193,7 @@ impl PyCalibrationStep {
     ///     Surface base date.
     /// underlying_ticker : str
     ///     Underlying identifier the quotes reference.
-    /// model : str, optional
-    ///     Surface model (``"sabr"``). ``None`` uses the Rust authoring default
-    ///     ``CalibrationStep::DEFAULT_VOL_SURFACE_MODEL`` (``"sabr"``).
-    /// quotes, quote_set
+    /// quote_set
     ///     As in ``discount``.
     /// vol_surface_id : str | None, default None
     ///     Identifier of the produced surface; defaults to ``id``.
@@ -1223,9 +1207,9 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, base_date, underlying_ticker, model = None, quotes = None, quote_set = None, vol_surface_id = None, **params))]
+    #[pyo3(signature = (id, base_date, underlying_ticker, quote_set = None, vol_surface_id = None, **params))]
     #[pyo3(
-        text_signature = "(id, base_date, underlying_ticker, model=None, quotes=None, quote_set=None, vol_surface_id=None, **params)"
+        text_signature = "(id, base_date, underlying_ticker,  quote_set=None, vol_surface_id=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn vol_surface(
@@ -1233,8 +1217,6 @@ impl PyCalibrationStep {
         id: &str,
         base_date: &Bound<'_, PyAny>,
         underlying_ticker: &str,
-        model: Option<&str>,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         vol_surface_id: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
@@ -1246,9 +1228,8 @@ impl PyCalibrationStep {
             ),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("underlying_ticker", Value::String(underlying_ticker.into())),
-            ("model", model.map_or(Value::Null, Value::from)),
         ]);
-        Self::build(py, "vol_surface", id, quotes, quote_set, f, params)
+        Self::build(py, "vol_surface", id, quote_set, f, params)
     }
 
     /// Swaption volatility cube step from swaption vol quotes.
@@ -1263,7 +1244,7 @@ impl PyCalibrationStep {
     ///     Discount curve for forward-swap-rate construction.
     /// currency : str | Currency
     ///     Surface currency.
-    /// quotes, quote_set, vol_surface_id
+    /// quote_set, vol_surface_id
     ///     As in ``vol_surface``.
     /// **params
     ///     Optional wire fields: ``forward_id``, ``vol_convention``,
@@ -1279,9 +1260,9 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, base_date, discount_curve_id, currency, quotes = None, quote_set = None, vol_surface_id = None, **params))]
+    #[pyo3(signature = (id, base_date, discount_curve_id, currency, quote_set = None, vol_surface_id = None, **params))]
     #[pyo3(
-        text_signature = "(id, base_date, discount_curve_id, currency, quotes=None, quote_set=None, vol_surface_id=None, **params)"
+        text_signature = "(id, base_date, discount_curve_id, currency, quote_set=None, vol_surface_id=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn swaption_vol(
@@ -1290,7 +1271,6 @@ impl PyCalibrationStep {
         base_date: &Bound<'_, PyAny>,
         discount_curve_id: &str,
         currency: &Bound<'_, PyAny>,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         vol_surface_id: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
@@ -1304,7 +1284,7 @@ impl PyCalibrationStep {
             ("discount_curve_id", Value::String(discount_curve_id.into())),
             ("currency", Value::String(currency_code(currency)?)),
         ]);
-        Self::build(py, "swaption_vol", id, quotes, quote_set, f, params)
+        Self::build(py, "swaption_vol", id, quote_set, f, params)
     }
 
     /// Index-tranche base-correlation step.
@@ -1325,7 +1305,7 @@ impl PyCalibrationStep {
     ///     Discount curve for tranche present values.
     /// currency : str | Currency
     ///     Index currency.
-    /// quotes, quote_set
+    /// quote_set
     ///     As in ``discount``.
     /// **params
     ///     Optional wire fields: ``notional``, ``frequency``, ``day_count``,
@@ -1337,9 +1317,9 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, index_id, series, maturity_years, base_date, discount_curve_id, currency, quotes = None, quote_set = None, **params))]
+    #[pyo3(signature = (id, index_id, series, maturity_years, base_date, discount_curve_id, currency, quote_set = None, **params))]
     #[pyo3(
-        text_signature = "(id, index_id, series, maturity_years, base_date, discount_curve_id, currency, quotes=None, quote_set=None, **params)"
+        text_signature = "(id, index_id, series, maturity_years, base_date, discount_curve_id, currency, quote_set=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn base_correlation(
@@ -1351,7 +1331,6 @@ impl PyCalibrationStep {
         base_date: &Bound<'_, PyAny>,
         discount_curve_id: &str,
         currency: &Bound<'_, PyAny>,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
@@ -1363,7 +1342,7 @@ impl PyCalibrationStep {
             ("discount_curve_id", Value::String(discount_curve_id.into())),
             ("currency", Value::String(currency_code(currency)?)),
         ]);
-        Self::build(py, "base_correlation", id, quotes, quote_set, f, params)
+        Self::build(py, "base_correlation", id, quote_set, f, params)
     }
 
     /// Student-t copula degrees-of-freedom step for one tranche.
@@ -1376,7 +1355,7 @@ impl PyCalibrationStep {
     ///     Tranche instrument whose ``"{id}_STUDENT_T_DF"`` scalar is written.
     /// base_correlation_curve_id : str
     ///     Base-correlation curve the tranche is priced on.
-    /// quotes, quote_set
+    /// quote_set
     ///     As in ``discount``.
     /// **params
     ///     Optional wire fields: ``discount_curve_id``, ``initial_df``,
@@ -1387,16 +1366,15 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, tranche_instrument_id, base_correlation_curve_id, quotes = None, quote_set = None, **params))]
+    #[pyo3(signature = (id, tranche_instrument_id, base_correlation_curve_id, quote_set = None, **params))]
     #[pyo3(
-        text_signature = "(id, tranche_instrument_id, base_correlation_curve_id, quotes=None, quote_set=None, **params)"
+        text_signature = "(id, tranche_instrument_id, base_correlation_curve_id, quote_set=None, **params)"
     )]
     fn student_t(
         py: Python<'_>,
         id: &str,
         tranche_instrument_id: &str,
         base_correlation_curve_id: &str,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
@@ -1410,7 +1388,7 @@ impl PyCalibrationStep {
                 Value::String(base_correlation_curve_id.into()),
             ),
         ]);
-        Self::build(py, "student_t", id, quotes, quote_set, f, params)
+        Self::build(py, "student_t", id, quote_set, f, params)
     }
 
     /// Hull-White one-factor calibration to swaption quotes.
@@ -1426,7 +1404,7 @@ impl PyCalibrationStep {
     ///     Model currency.
     /// base_date : datetime.date | str
     ///     Valuation date.
-    /// quotes, quote_set
+    /// quote_set
     ///     ATM swaption quotes; calibration rejects strikes differing from the
     ///     contractual forward by more than 1e-8 in decimal rate units.
     /// **params
@@ -1437,10 +1415,8 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, curve_id, currency, base_date, quotes = None, quote_set = None, **params))]
-    #[pyo3(
-        text_signature = "(id, curve_id, currency, base_date, quotes=None, quote_set=None, **params)"
-    )]
+    #[pyo3(signature = (id, curve_id, currency, base_date, quote_set = None, **params))]
+    #[pyo3(text_signature = "(id, curve_id, currency, base_date, quote_set=None, **params)")]
     #[allow(clippy::too_many_arguments)]
     fn hull_white(
         py: Python<'_>,
@@ -1448,7 +1424,6 @@ impl PyCalibrationStep {
         curve_id: &str,
         currency: &Bound<'_, PyAny>,
         base_date: &Bound<'_, PyAny>,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
@@ -1457,7 +1432,7 @@ impl PyCalibrationStep {
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
         ]);
-        Self::build(py, "hull_white", id, quotes, quote_set, f, params)
+        Self::build(py, "hull_white", id, quote_set, f, params)
     }
 
     /// Hull-White one-factor calibration to cap/floor quotes.
@@ -1482,7 +1457,7 @@ impl PyCalibrationStep {
     ///     Model currency, which must match the index conventions.
     /// base_date : datetime.date | str
     ///     Valuation date.
-    /// quotes, quote_set
+    /// quote_set
     ///     As in ``discount``.
     /// **params
     ///     Optional wire fields: ``fixed_kappa``, ``initial_kappa``,
@@ -1493,9 +1468,9 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, discount_curve_id, forward_curve_id, index_id, currency, base_date, quotes = None, quote_set = None, **params))]
+    #[pyo3(signature = (id, discount_curve_id, forward_curve_id, index_id, currency, base_date, quote_set = None, **params))]
     #[pyo3(
-        text_signature = "(id, discount_curve_id, forward_curve_id, index_id, currency, base_date, quotes=None, quote_set=None, **params)"
+        text_signature = "(id, discount_curve_id, forward_curve_id, index_id, currency, base_date, quote_set=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn cap_floor_hull_white(
@@ -1506,7 +1481,6 @@ impl PyCalibrationStep {
         index_id: &str,
         currency: &Bound<'_, PyAny>,
         base_date: &Bound<'_, PyAny>,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
     ) -> PyResult<Self> {
@@ -1517,7 +1491,7 @@ impl PyCalibrationStep {
             ("currency", Value::String(currency_code(currency)?)),
             ("base_date", Value::String(extract_date_iso(base_date)?)),
         ]);
-        Self::build(py, "cap_floor_hull_white", id, quotes, quote_set, f, params)
+        Self::build(py, "cap_floor_hull_white", id, quote_set, f, params)
     }
 
     /// SVI volatility-surface step from option vol quotes.
@@ -1530,7 +1504,7 @@ impl PyCalibrationStep {
     ///     Surface base date.
     /// underlying_ticker : str
     ///     Underlying identifier the quotes reference.
-    /// quotes, quote_set, vol_surface_id
+    /// quote_set, vol_surface_id
     ///     As in ``vol_surface``.
     /// **params
     ///     Optional wire fields: ``discount_curve_id``, ``target_expiries``,
@@ -1541,9 +1515,9 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, base_date, underlying_ticker, quotes = None, quote_set = None, vol_surface_id = None, **params))]
+    #[pyo3(signature = (id, base_date, underlying_ticker, quote_set = None, vol_surface_id = None, **params))]
     #[pyo3(
-        text_signature = "(id, base_date, underlying_ticker, quotes=None, quote_set=None, vol_surface_id=None, **params)"
+        text_signature = "(id, base_date, underlying_ticker, quote_set=None, vol_surface_id=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn svi_surface(
@@ -1551,7 +1525,6 @@ impl PyCalibrationStep {
         id: &str,
         base_date: &Bound<'_, PyAny>,
         underlying_ticker: &str,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         vol_surface_id: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
@@ -1564,7 +1537,7 @@ impl PyCalibrationStep {
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("underlying_ticker", Value::String(underlying_ticker.into())),
         ]);
-        Self::build(py, "svi_surface", id, quotes, quote_set, f, params)
+        Self::build(py, "svi_surface", id, quote_set, f, params)
     }
 
     /// Cross-currency basis curve step.
@@ -1581,7 +1554,7 @@ impl PyCalibrationStep {
     ///     Spot FX rate used to translate the basis quotes.
     /// domestic_discount_id : str
     ///     Domestic discount curve the basis is measured against.
-    /// quotes, quote_set, curve_id
+    /// quote_set, curve_id
     ///     As in ``discount``.
     /// **params
     ///     Optional wire fields: ``method``, ``interpolation``,
@@ -1592,9 +1565,9 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, currency, base_date, fx_spot, domestic_discount_id, quotes = None, quote_set = None, curve_id = None, **params))]
+    #[pyo3(signature = (id, currency, base_date, fx_spot, domestic_discount_id, quote_set = None, curve_id = None, **params))]
     #[pyo3(
-        text_signature = "(id, currency, base_date, fx_spot, domestic_discount_id, quotes=None, quote_set=None, curve_id=None, **params)"
+        text_signature = "(id, currency, base_date, fx_spot, domestic_discount_id, quote_set=None, curve_id=None, **params)"
     )]
     #[allow(clippy::too_many_arguments)]
     fn xccy_basis(
@@ -1604,7 +1577,6 @@ impl PyCalibrationStep {
         base_date: &Bound<'_, PyAny>,
         fx_spot: f64,
         domestic_discount_id: &str,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         curve_id: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
@@ -1619,7 +1591,7 @@ impl PyCalibrationStep {
                 Value::String(domestic_discount_id.into()),
             ),
         ]);
-        Self::build(py, "xccy_basis", id, quotes, quote_set, f, params)
+        Self::build(py, "xccy_basis", id, quote_set, f, params)
     }
 
     /// Parametric (Nelson-Siegel / Svensson) curve fit step.
@@ -1634,7 +1606,7 @@ impl PyCalibrationStep {
     ///     Parametric family (``"ns"`` Nelson-Siegel or ``"nss"`` Svensson).
     ///     ``None`` uses the Rust authoring default
     ///     ``CalibrationStep::DEFAULT_PARAMETRIC_MODEL`` (``"ns"``).
-    /// quotes, quote_set, curve_id
+    /// quote_set, curve_id
     ///     As in ``discount``.
     /// **params
     ///     Optional wire field: ``initial_params``. Only single-curve discount
@@ -1646,17 +1618,14 @@ impl PyCalibrationStep {
     /// ValueError
     ///     If a field is unknown or has the wrong shape.
     #[staticmethod]
-    #[pyo3(signature = (id, base_date, model = None, quotes = None, quote_set = None, curve_id = None, **params))]
-    #[pyo3(
-        text_signature = "(id, base_date, model=None, quotes=None, quote_set=None, curve_id=None, **params)"
-    )]
+    #[pyo3(signature = (id, base_date, model = None, quote_set = None, curve_id = None, **params))]
+    #[pyo3(text_signature = "(id, base_date, model=None, quote_set=None, curve_id=None, **params)")]
     #[allow(clippy::too_many_arguments)]
     fn parametric(
         py: Python<'_>,
         id: &str,
         base_date: &Bound<'_, PyAny>,
         model: Option<&str>,
-        quotes: Option<&Bound<'_, PyAny>>,
         quote_set: Option<String>,
         curve_id: Option<String>,
         params: Option<&Bound<'_, PyDict>>,
@@ -1666,25 +1635,25 @@ impl PyCalibrationStep {
             ("base_date", Value::String(extract_date_iso(base_date)?)),
             ("model", model.map_or(Value::Null, Value::from)),
         ]);
-        Self::build(py, "parametric", id, quotes, quote_set, f, params)
+        Self::build(py, "parametric", id, quote_set, f, params)
     }
 
     /// Step identifier.
     #[getter]
     fn id(&self) -> String {
-        self.inner.step.id.clone()
+        self.inner.id.clone()
     }
 
     /// Name of the quote set this step reads from ``plan.quote_sets``.
     #[getter]
     fn quote_set(&self) -> String {
-        self.inner.step.quote_set.clone()
+        self.inner.quote_set.clone()
     }
 
     /// Step kind (``"discount"``, ``"forward"``, ``"hazard"``, ...).
     #[getter]
     fn kind(&self) -> PyResult<String> {
-        let value = serde_json::to_value(&self.inner.step.params)
+        let value = serde_json::to_value(&self.inner.params)
             .map_err(|e| serde_json_to_py(e, "failed to serialize step params"))?;
         Ok(value
             .get("kind")
@@ -1696,29 +1665,10 @@ impl PyCalibrationStep {
     /// Kind-specific parameters as a dict (including ``kind``).
     #[getter]
     fn params<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.step.params)
-    }
-
-    /// Identifiers of the quotes attached to this step.
-    #[getter]
-    fn quote_ids(&self) -> Vec<String> {
-        self.inner
-            .quotes
-            .iter()
-            .map(|q| q.id().to_string())
-            .collect()
-    }
-
-    /// Quotes attached to this step as ``market_data`` dicts.
-    #[getter]
-    fn quotes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.quotes)
+        serde_to_py(py, &self.inner.params)
     }
 
     /// Serialize the step to compact JSON.
-    ///
-    /// The step fields are followed by a ``quotes`` array holding the attached
-    /// quotes; the key is omitted when no quotes are attached.
     ///
     /// Raises
     /// ------
@@ -1729,7 +1679,7 @@ impl PyCalibrationStep {
             .map_err(|e| serde_json_to_py(e, "failed to serialize CalibrationStep"))
     }
 
-    /// Rebuild a step from its wire JSON (``{"id", "quote_set", "kind", ..., "quotes"}``).
+    /// Rebuild a step from its wire JSON (``{"id", "quote_set", "kind"}``).
     ///
     /// Raises
     /// ------
@@ -1750,34 +1700,30 @@ impl PyCalibrationStep {
 
     fn __repr__(&self) -> String {
         format!(
-            "CalibrationStep(id={:?}, kind={:?}, quote_set={:?}, quotes={})",
-            self.inner.step.id,
+            "CalibrationStep(id={:?}, kind={:?}, quote_set={:?})",
+            self.inner.id,
             self.kind().unwrap_or_default(),
-            self.inner.step.quote_set,
-            self.inner.quotes.len()
+            self.inner.quote_set,
         )
     }
 }
 
 /// Ordered calibration plan: steps, named quote sets, and solver settings.
 ///
-/// Quotes attached to steps are collected into ``quote_sets`` (keyed by each
-/// step's ``quote_set`` name) and carried along as ``market_data`` when the
-/// plan is calibrated or wrapped in a ``CalibrationEnvelope``. The plan is held
-/// as a Rust ``CalibrationEnvelope`` without prior market, so the attached
-/// market data is part of its JSON and pickle forms.
+/// Quote IDs are supplied explicitly in ``quote_sets`` and resolve against
+/// the enclosing ``CalibrationEnvelope.market_data``.
 ///
 /// Examples
 /// --------
-/// >>> from finstack_quant.calibration import CalibrationPlan, CalibrationStep, RateQuote, calibrate
+/// >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, CalibrationStep, RateQuote, calibrate
 /// >>> quotes = [
 /// ...     RateQuote.deposit("USD-DEP-3M", "USD-SOFR-OIS", "3M", 0.052),
 /// ...     RateQuote.swap("USD-SWAP-2Y", "USD-SOFR-OIS", "2Y", 0.049),
 /// ... ]
-/// >>> plan = CalibrationPlan([CalibrationStep.discount("USD-OIS", "USD", "2026-05-08", quotes=quotes)])
+/// >>> plan = CalibrationPlan([CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")], quote_sets={"USD-OIS": [q.id for q in quotes]})
 /// >>> plan.quote_sets
 /// {'USD-OIS': ['USD-DEP-3M', 'USD-SWAP-2Y']}
-/// >>> calibrate(plan).success
+/// >>> calibrate(CalibrationEnvelope(plan, market_data=quotes)).success
 /// True
 #[pyclass(
     name = "CalibrationPlan",
@@ -1787,36 +1733,12 @@ impl PyCalibrationStep {
 )]
 #[derive(Clone)]
 pub struct PyCalibrationPlan {
-    /// The plan together with its attached market data; `prior_market` is empty.
-    pub(crate) inner: CalibrationEnvelope,
+    pub(crate) inner: CalibrationPlan,
 }
 
 impl PyCalibrationPlan {
-    /// Wrap an envelope as a plan, dropping its prior market.
-    pub(crate) fn from_inner(mut inner: CalibrationEnvelope) -> Self {
-        inner.prior_market.clear();
+    pub(crate) fn from_inner(inner: CalibrationPlan) -> Self {
         Self { inner }
-    }
-
-    /// Wrap this plan (plus attached quotes) into a request envelope.
-    ///
-    /// Rust `CalibrationEnvelope::with_market_data` merges the extra market
-    /// data onto the attached quotes: identical repeats are collected once and
-    /// a repeated id with a different payload is a `conflicting_market_datum`
-    /// error.
-    pub(crate) fn to_envelope(
-        &self,
-        py: Python<'_>,
-        extra_market_data: Vec<MarketDatum>,
-        prior_market: Vec<PriorMarketObject>,
-    ) -> PyResult<CalibrationEnvelope> {
-        let mut envelope = self
-            .inner
-            .clone()
-            .with_market_data(extra_market_data)
-            .map_err(|error| super::envelope_error_to_py(py, error))?;
-        envelope.prior_market = prior_market;
-        Ok(envelope)
     }
 }
 
@@ -1827,7 +1749,7 @@ impl PyCalibrationPlan {
     /// Parameters
     /// ----------
     /// steps : list[CalibrationStep]
-    ///     Steps in execution order; attached quotes populate ``quote_sets``.
+    ///     Plain steps in execution order.
     /// id : str, default "plan"
     ///     Plan identifier (Rust ``CalibrationPlan::DEFAULT_ID`` when omitted).
     /// description : str | None, default None
@@ -1836,18 +1758,12 @@ impl PyCalibrationPlan {
     ///     Solver settings; a dict is overlaid onto the Rust defaults.
     /// quote_sets : dict[str, list[str]] | None, default None
     ///     Explicit quote sets (ids must exist in the envelope
-    ///     ``market_data``); merged with the sets derived from attached quotes.
+    ///     ``market_data``).
     ///
     /// Raises
     /// ------
     /// ValueError
     ///     If ``settings`` is invalid.
-    /// CalibrationEnvelopeError
-    ///     If two steps attach quotes under the same set name with different
-    ///     ids (``kind == "quote_set_conflict"``), or reuse a quote id with a
-    ///     different payload (``kind == "conflicting_market_datum"``).
-    ///     Identical attached quotes are collected once, including when their
-    ///     set is supplied explicitly.
     #[new]
     #[pyo3(signature = (steps, id = CalibrationPlan::DEFAULT_ID, description = None, settings = None, quote_sets = None))]
     #[pyo3(text_signature = "(steps, id='plan', description=None, settings=None, quote_sets=None)")]
@@ -1875,45 +1791,40 @@ impl PyCalibrationPlan {
             }
         }
         let steps = steps.iter().map(|step| step.inner.clone()).collect();
-        let envelope = CalibrationEnvelope::from_attached_steps(
-            id.to_string(),
+        Ok(Self::from_inner(CalibrationPlan {
+            id: id.to_string(),
             description,
             settings,
-            sets,
+            quote_sets: sets,
             steps,
-        )
-        .map_err(|error| super::envelope_error_to_py(py, error))?;
-        Ok(Self::from_inner(envelope))
+        }))
     }
 
     /// Plan identifier.
     #[getter]
     fn id(&self) -> String {
-        self.inner.plan.id.clone()
+        self.inner.id.clone()
     }
 
     /// Plan description, when set.
     #[getter]
     fn description(&self) -> Option<String> {
-        self.inner.plan.description.clone()
+        self.inner.description.clone()
     }
 
     /// Step identifiers in execution order.
     #[getter]
     fn step_ids(&self) -> Vec<String> {
-        self.inner.plan.steps.iter().map(|s| s.id.clone()).collect()
+        self.inner.steps.iter().map(|s| s.id.clone()).collect()
     }
 
-    /// Typed steps in execution order, each with its attached quotes.
-    ///
-    /// Rust ``CalibrationEnvelope::attached_steps`` resolves a step's quote set
-    /// against the plan's market data; a step whose set names an id that is
-    /// not in ``market_data`` carries no quotes.
+    /// Plain typed steps in execution order.
     #[getter]
     fn steps(&self) -> Vec<PyCalibrationStep> {
         self.inner
-            .attached_steps()
-            .into_iter()
+            .steps
+            .iter()
+            .cloned()
             .map(PyCalibrationStep::from_inner)
             .collect()
     }
@@ -1922,7 +1833,7 @@ impl PyCalibrationPlan {
     #[getter]
     fn quote_sets<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let dict = PyDict::new(py);
-        for (name, ids) in &self.inner.plan.quote_sets {
+        for (name, ids) in &self.inner.quote_sets {
             let list: Vec<&str> = ids.iter().map(|id| id.as_str()).collect();
             dict.set_item(name, PyList::new(py, list)?)?;
         }
@@ -1932,20 +1843,10 @@ impl PyCalibrationPlan {
     /// Solver settings.
     #[getter]
     fn settings(&self) -> super::config::PyCalibrationConfig {
-        super::config::PyCalibrationConfig::from_inner(self.inner.plan.settings.clone())
+        super::config::PyCalibrationConfig::from_inner(self.inner.settings.clone())
     }
 
-    /// Market data attached to the plan, as ``market_data`` dicts.
-    #[getter]
-    fn market_data<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.market_data)
-    }
-
-    /// Serialize the plan and its attached market data to compact JSON.
-    ///
-    /// The wire form is the calibration envelope without prior market:
-    /// ``{"schema": ..., "plan": {...}, "market_data": [...]}``
-    /// (``market_data`` is omitted when empty).
+    /// Serialize the plain plan to compact JSON.
     ///
     /// Raises
     /// ------
@@ -1960,7 +1861,6 @@ impl PyCalibrationPlan {
     ///
     /// Only the shape is checked; quote-set ids that are absent from
     /// ``market_data`` are reported when the plan is calibrated or validated.
-    /// A ``prior_market`` entry in the JSON is dropped.
     ///
     /// Raises
     /// ------
@@ -1982,11 +1882,10 @@ impl PyCalibrationPlan {
 
     fn __repr__(&self) -> String {
         format!(
-            "CalibrationPlan(id={:?}, steps={:?}, quote_sets={}, market_data={})",
-            self.inner.plan.id,
+            "CalibrationPlan(id={:?}, steps={:?}, quote_sets={})",
+            self.inner.id,
             self.step_ids(),
-            self.inner.plan.quote_sets.len(),
-            self.inner.market_data.len()
+            self.inner.quote_sets.len(),
         )
     }
 }
@@ -2025,12 +1924,10 @@ impl PyCalibrationEnvelope {
     /// Parameters
     /// ----------
     /// plan : CalibrationPlan
-    ///     Plan to execute; quotes attached to its steps are included.
-    /// market_data : list[RateQuote | CdsQuote | VolQuote | InflationQuote | XccyQuote | CdsTrancheQuote | FxSpotDatum | PriceDatum | DividendScheduleDatum | CollateralEntry | dict] | None, default None
-    ///     Additional flat market data (typed quotes and datums or
-    ///     ``{"kind": ...}`` dicts such as ``fixing_series``). It is merged onto
-    ///     the plan's attached quotes: an entry identical to one already
-    ///     present (same kind, id and payload) is collected once.
+    ///     Plain plan to execute; its quote IDs resolve in ``market_data``.
+    /// market_data : list[MarketDatum | dict] | None, default None
+    ///     Flat market data: typed quotes and datums or ``{"kind": ...}`` dicts.
+    ///     Duplicate kind-and-ID inputs are rejected during validation.
     /// prior_market : list[dict] | None, default None
     ///     Pre-built calibrated objects as ``{"kind": ..., ...}`` dicts.
     ///
@@ -2038,9 +1935,6 @@ impl PyCalibrationEnvelope {
     /// ------
     /// ValueError
     ///     If a market-data or prior-market entry has an invalid shape.
-    /// CalibrationEnvelopeError
-    ///     If an entry repeats the kind and id of a market datum already present
-    ///     with a different payload (``kind == "conflicting_market_datum"``).
     #[new]
     #[pyo3(signature = (plan, market_data = None, prior_market = None))]
     #[pyo3(text_signature = "(plan, market_data=None, prior_market=None)")]
@@ -2052,8 +1946,11 @@ impl PyCalibrationEnvelope {
     ) -> PyResult<Self> {
         let market_data = extract_market_data(py, market_data)?;
         let prior_market = extract_prior_market(py, prior_market)?;
-        plan.to_envelope(py, market_data, prior_market)
-            .map(Self::from_inner)
+        Ok(Self::from_inner(CalibrationEnvelope::new(
+            plan.inner.clone(),
+            market_data,
+            prior_market,
+        )))
     }
 
     /// Schema marker (``"finstack_quant.calibration/1"``).
@@ -2064,10 +1961,10 @@ impl PyCalibrationEnvelope {
         Ok(value.as_str().unwrap_or_default().to_string())
     }
 
-    /// The calibration plan together with this envelope's market data.
+    /// The plain calibration plan.
     #[getter]
     fn plan(&self) -> PyCalibrationPlan {
-        PyCalibrationPlan::from_inner(self.inner.clone())
+        PyCalibrationPlan::from_inner(self.inner.plan.clone())
     }
 
     /// Flat market data as ``{"kind": ..., ...}`` dicts.

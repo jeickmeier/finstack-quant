@@ -10,7 +10,7 @@ Where things live:
 - Results: :class:`ValuationResult` (here); per-flow cashflow tables come from
   :func:`~finstack_quant.valuations.instruments.instrument_cashflows`.
 - Composites, credit-derivative examples, listed-market catalog and JSON
-  schemas: ``.composite``, ``.credit_derivatives``, ``.market``, ``.schema``.
+  schemas: ``.composite``, ``.market``, ``.schema``.
 
 Examples
 --------
@@ -31,14 +31,12 @@ from finstack_quant.core.dates import StubKind
 from finstack_quant.core.market_data import MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.valuations import composite as composite
-from finstack_quant.valuations import credit_derivatives as credit_derivatives
 from finstack_quant.valuations import instruments as instruments
 from finstack_quant.valuations import market as market
 from finstack_quant.valuations import schema as schema
 
 __all__ = [
     "composite",
-    "credit_derivatives",
     "instruments",
     "market",
     "schema",

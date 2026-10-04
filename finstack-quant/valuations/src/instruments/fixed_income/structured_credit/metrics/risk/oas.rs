@@ -22,8 +22,6 @@
 //! - Hull-White short-rate model: Hull & White (1990). `docs/REFERENCES.md#hull-white-1990-pricing-ird`
 //! - Templated on the agency-MBS Monte-Carlo OAS
 //!   ([`crate::instruments::fixed_income::mbs_passthrough`]).
-
-use crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows;
 use crate::instruments::fixed_income::structured_credit::pricing::simulation_engine::{
     prepare_deal_simulation, simulate_prepared, InstrumentPathFlowSource, OasPathFlowSource,
     PreparedInstrumentSchedules,
@@ -151,7 +149,7 @@ pub fn calculate_tranche_oas(
         })?;
     // Prices are per CURRENT face (the factor-adjusted quote basis).
     let current_balance = tranche.current_balance.amount();
-    let base_cashflows = generate_tranche_cashflows(deal, tranche_id, market, as_of)?;
+    let base_cashflows = (deal).tranche_cashflows(tranche_id, market, as_of)?;
     let quote = super::super::quote::SettlementQuote::for_tranche(
         deal,
         as_of,

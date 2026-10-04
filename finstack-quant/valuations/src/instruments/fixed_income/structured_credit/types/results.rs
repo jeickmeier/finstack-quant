@@ -169,6 +169,94 @@ pub struct TrancheValuation {
     pub metrics: BTreeMap<MetricId, f64>,
 }
 
+impl TrancheCashflows {
+    pub(crate) fn validate_currency(
+        &self,
+        currency: finstack_quant_core::currency::Currency,
+    ) -> finstack_quant_core::Result<()> {
+        for amount in [
+            &self.final_balance,
+            &self.total_interest,
+            &self.total_principal,
+            &self.total_pik,
+            &self.total_deferred,
+            &self.total_writedown,
+        ]
+        .into_iter()
+        .chain(
+            [
+                &self.cashflows,
+                &self.interest_flows,
+                &self.principal_flows,
+                &self.pik_flows,
+                &self.deferred_flows,
+                &self.writedown_flows,
+            ]
+            .into_iter()
+            .flatten()
+            .map(|(_, amount)| amount)
+            .chain(self.detailed_flows.iter().map(|flow| &flow.amount)),
+        ) {
+            if amount.currency() != currency {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: currency,
+                    actual: amount.currency(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Project payment dates and paid, interest, principal, PIK, deferred and write-down amounts into a table.
+    ///
+    /// Duplicate dates are summed in component order; absent components are zero.
+    /// Empty results retain the date and six numeric columns. All amounts use the
+    /// total-interest currency; mixed currencies return an error before scalar export.
+    pub fn to_table(
+        &self,
+    ) -> finstack_quant_core::Result<finstack_quant_core::table::TableEnvelope> {
+        use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
+        self.validate_currency(self.total_interest.currency())?;
+        let mut by_date: BTreeMap<Date, [f64; 6]> = BTreeMap::new();
+        for (index, flows) in [
+            &self.cashflows,
+            &self.interest_flows,
+            &self.principal_flows,
+            &self.pik_flows,
+            &self.deferred_flows,
+            &self.writedown_flows,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            for (date, amount) in flows {
+                by_date.entry(*date).or_default()[index] += amount.amount();
+            }
+        }
+        let mut columns = vec![TableColumn::new(
+            "date",
+            TableColumnData::String(by_date.keys().map(ToString::to_string).collect()),
+        )];
+        for (index, name) in [
+            "cashflow",
+            "interest",
+            "principal",
+            "pik",
+            "deferred",
+            "writedown",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            columns.push(TableColumn::new(
+                name,
+                TableColumnData::Float64(by_date.values().map(|row| row[index]).collect()),
+            ));
+        }
+        TableEnvelope::new(columns)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,62 +295,5 @@ mod tests {
         assert_eq!(cashflows.tranche_id, "AAA");
         assert_eq!(cashflows.principal_flows.len(), 2);
         assert_eq!(cashflows.total_principal.amount(), 200_000.0);
-    }
-}
-
-/// One date of projected cashflows, with absent components filled by zero.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct TrancheCashflowRow {
-    /// Payment date as an ISO-8601 string.
-    pub date: String,
-    /// Cashflow in the result currency, as a decimal amount.
-    pub cashflow: f64,
-    /// Interest in the result currency, as a decimal amount.
-    pub interest: f64,
-    /// Principal in the result currency, as a decimal amount.
-    pub principal: f64,
-    /// Pik in the result currency, as a decimal amount.
-    pub pik: f64,
-    /// Deferred in the result currency, as a decimal amount.
-    pub deferred: f64,
-    /// Writedown in the result currency, as a decimal amount.
-    pub writedown: f64,
-}
-
-impl TrancheCashflows {
-    /// Project cashflows into date-ordered rows for tabular presentation.
-    ///
-    /// Amounts use the result currency; missing components are zero. Total
-    /// cashflows retain the recorded payments rather than recomputing component sums.
-    ///
-    /// # Errors
-    ///
-    /// Returns `Error::CurrencyMismatch` if any component has a different currency.
-    pub fn get_cashflow_rows(&self) -> finstack_quant_core::Result<Vec<TrancheCashflowRow>> {
-        let rows = crate::instruments::common_impl::cashflow_export::cashflow_columns(
-            [
-                &self.cashflows,
-                &self.interest_flows,
-                &self.principal_flows,
-                &self.pik_flows,
-                &self.deferred_flows,
-                &self.writedown_flows,
-            ],
-            self.final_balance.currency(),
-        )?;
-        Ok(rows
-            .into_iter()
-            .map(|(date, values)| TrancheCashflowRow {
-                date: date.to_string(),
-                cashflow: values[0].amount(),
-                interest: values[1].amount(),
-                principal: values[2].amount(),
-                pik: values[3].amount(),
-                deferred: values[4].amount(),
-                writedown: values[5].amount(),
-            })
-            .collect())
     }
 }

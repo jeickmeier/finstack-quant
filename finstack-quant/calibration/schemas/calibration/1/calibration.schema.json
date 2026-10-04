@@ -4,11 +4,6 @@
       "additionalProperties": false,
       "description": "Global configuration for the calibration subsystem.\n\nThis struct consolidates all settings for solvers, validation, and market-regime\nspecific bounds. It is typically derived from a `FinstackConfig` extension section.\nPublic callers should treat it as the behavioral contract for calibration\nexecution policy: solver choice, convergence settings, validation thresholds,\nrate-bound policy, and curve-specific numerical guardrails.\n\n# Tolerance Semantics\n\nCalibration involves two distinct tolerance concepts:\n\n1. **Solver Tolerance** ([`solver.tolerance()`](SolverConfig::tolerance)):\n   Controls when the numerical solver (Brent/Newton) terminates. This is an\n   algorithmic convergence criterion in x-space (parameter space). The solver\n   stops when successive parameter estimates differ by less than this tolerance.\n\n2. **Validation Tolerance** (e.g., [`discount_curve.validation_tolerance`](DiscountCurveSolveConfig::validation_tolerance)\n   for PV-per-notional curve residuals, or [`vol_surface.validation_tolerance`](VolSurfaceSolveConfig::validation_tolerance)\n   for decimal implied-vol residuals):\n   Controls whether calibration is considered *successful*. After the solver\n   converges, the final residuals are compared against this tolerance. If any\n   residual exceeds `validation_tolerance`, the calibration is marked as failed\n   even if the solver converged.\n\n**Why two tolerances?**\n- Solver tolerance ensures numerical convergence but doesn't guarantee economic fit.\n- Validation tolerance ensures the calibrated curve actually prices instruments correctly.\n- For well-behaved problems, solver tolerance of `1e-12` with validation tolerance of\n  `1e-8` works well: the solver finds a precise root, and we verify it prices accurately.\n\n# Configuration Hierarchy\n\nSettings can be specified at multiple levels with the following precedence:\n\n1. **Step-level** (`CalibrationStep.params.method`): Per-instrument-type overrides\n2. **Plan-level** (`CalibrationPlan.settings`): Plan-wide defaults\n3. **Finstack config extensions** (`calibration.config.v1`): application defaults\n4. **Global defaults** (`CalibrationConfig::default()`): fallback values\n\nStep-level settings always take precedence over plan-level settings.\nIn other words, this struct provides default policy, but explicit plan steps\nremain authoritative when both are supplied.\n\n# Examples\n\n```rust\nuse finstack_quant_calibration::CalibrationConfig;\n\n// Create a default config\nlet config = CalibrationConfig::default();\n\n// Customize tolerance settings\nlet custom = CalibrationConfig::default()\n    .with_tolerance(1e-14)  // Solver convergence tolerance\n    .with_max_iterations(200);\n```\n\n# References\n\n- Multi-curve construction context: `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`\n- Curve interpolation context: `docs/REFERENCES.md#hagan-west-monotone-convex`",
       "properties": {
-        "calibration_method": {
-          "$ref": "#/$defs/CalibrationMethod",
-          "default": "bootstrap",
-          "description": "High-level calibration method (bootstrap vs global solve).\n\n**Note**: When using the plan-driven API, this field is typically overwritten\nby the step-level `params.method` for each calibration step. The step-level\nmethod always takes precedence. This field serves as runtime state passed\nfrom calibration targets to the underlying solvers."
-        },
         "compute_diagnostics": {
           "default": false,
           "description": "Whether to compute detailed calibration diagnostics (condition number,\nper-quote quality metrics, singular values, R-squared, etc.).\n\nWhen `true`, the solver will perform additional post-solve analysis\nincluding Jacobian-based condition number estimation. This adds\ncomputational overhead and should typically be disabled in production\nhot paths but enabled for calibration debugging, auditing, or\nquality monitoring.\n\nDefault: `false`.",
@@ -220,7 +215,6 @@
         "settings": {
           "$ref": "#/$defs/CalibrationConfig",
           "default": {
-            "calibration_method": "bootstrap",
             "compute_diagnostics": false,
             "discount_curve": {
               "allow_non_monotonic_final": null,
@@ -640,10 +634,6 @@
               "const": "vol_surface",
               "type": "string"
             },
-            "model": {
-              "$ref": "#/$defs/VolSurfaceModel",
-              "description": "Volatility model used for calibration."
-            },
             "spot_override": {
               "default": null,
               "description": "Optional spot price override.",
@@ -684,8 +674,7 @@
             "kind",
             "vol_surface_id",
             "base_date",
-            "underlying_ticker",
-            "model"
+            "underlying_ticker"
           ],
           "type": "object"
         },
@@ -5071,14 +5060,17 @@
           "type": "number"
         },
         "check_arbitrage": {
+          "default": true,
           "description": "Enable arbitrage checks",
           "type": "boolean"
         },
         "check_forward_positivity": {
+          "default": true,
           "description": "Enable forward rate positivity check",
           "type": "boolean"
         },
         "check_monotonicity": {
+          "default": true,
           "description": "Enable monotonicity checks",
           "type": "boolean"
         },
@@ -5088,41 +5080,49 @@
           "type": "boolean"
         },
         "max_cpi_growth": {
+          "default": 0.5,
           "description": "Maximum allowed annual CPI growth (default 0.50 = 50%)",
           "format": "double",
           "type": "number"
         },
         "max_forward_rate": {
+          "default": 0.5,
           "description": "Maximum allowed forward rate",
           "format": "double",
           "type": "number"
         },
         "max_fwd_inflation": {
+          "default": 0.5,
           "description": "Maximum allowed forward inflation (default 0.50 = 50%)",
           "format": "double",
           "type": "number"
         },
         "max_hazard_rate": {
+          "default": 0.5,
           "description": "Maximum allowed hazard rate (default 0.5 = 50%)",
           "format": "double",
           "type": "number"
         },
         "max_volatility": {
+          "default": 5.0,
           "description": "Maximum allowed volatility (default 5.0 = 500%)",
           "format": "double",
           "type": "number"
         },
         "min_cpi_growth": {
+          "default": -0.1,
           "description": "Minimum allowed annual CPI growth (default -0.10 = -10%)",
           "format": "double",
           "type": "number"
         },
         "min_forward_rate": {
+          "default": -0.01,
           "description": "Minimum allowed forward rate (can be slightly negative)",
           "format": "double",
           "type": "number"
         },
         "min_fwd_inflation": {
+          "default": -0.2,
           "description": "Minimum allowed forward inflation (default -0.20 = -20%)",
           "format": "double",
           "type": "number"
@@ -5140,25 +5140,12 @@
           "type": "number"
         },
         "tolerance": {
+          "default": 1e-10,
           "description": "Numerical tolerance for comparisons",
           "format": "double",
           "type": "number"
         }
       },
-      "required": [
-        "check_forward_positivity",
-        "min_forward_rate",
-        "max_forward_rate",
-        "check_monotonicity",
-        "check_arbitrage",
-        "tolerance",
-        "max_hazard_rate",
-        "min_cpi_growth",
-        "max_cpi_growth",
-        "min_fwd_inflation",
-        "max_fwd_inflation",
-        "max_volatility"
-      ],
       "type": "object"
     },
     "ValidationMode": {
@@ -5226,11 +5213,6 @@
         }
       ]
     },
-    "VolSurfaceModel": {
-      "const": "sabr",
-      "description": "Parameters for volatility surface calibration step.",
-      "type": "string"
-    },
     "VolSurfaceSolveConfig": {
       "additionalProperties": false,
       "description": "Volatility-surface specific numerical solver configuration.\n\nControls the success criterion for SABR and SVI surface calibration.\nResiduals are in **decimal implied-vol units** (for example `0.001` is\n0.10 vol points), not PV-per-notional.\n\n# Examples\n```\nuse finstack_quant_calibration::VolSurfaceSolveConfig;\n\nlet config = VolSurfaceSolveConfig {\n    validation_tolerance: 2e-3, // 0.20 vol points\n};\n```",
@@ -5260,7 +5242,6 @@
         "id": "usd_curves",
         "quote_sets": {},
         "settings": {
-          "calibration_method": "bootstrap",
           "compute_diagnostics": false,
           "discount_curve": {
             "allow_non_monotonic_final": null,

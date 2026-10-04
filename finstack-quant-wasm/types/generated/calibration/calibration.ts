@@ -2,30 +2,6 @@
 import type * as valuations from '../valuations/index.js';
 
 /**
- * Calibration method selection (bootstrap vs global solve).
- *
- * Defines the numerical approach used to solve for curve/surface parameters.
- * Bootstrap is the traditional sequential approach, while GlobalSolve
- * solves all parameters simultaneously.
- *
- * # Variants
- * - `Bootstrap`: Traditional sequential bootstrap where each knot is solved
- *   independently based on the previous knots.
- * - `GlobalSolve`: Simultaneous optimization of all knots using Levenberg-Marquardt
- *   or Newton-Raphson.
- */
-export type CalibrationMethod =
-  | "bootstrap"
-  | {
-      global_solve: {
-        /**
-         * Use analytical Jacobian if available (otherwise finite-difference).
-         */
-        use_analytical_jacobian: boolean;
-        [k: string]: unknown;
-      };
-    };
-/**
  * Policy for weighting residuals in global solve calibration.
  *
  * Determines how the objective function weights individual instrument fitting
@@ -1128,10 +1104,6 @@ export type CalibrationStep =
       expiry_extrapolation?: SurfaceExtrapolationPolicy;
       kind: "vol_surface";
       /**
-       * Volatility model used for calibration.
-       */
-      model: VolSurfaceModel;
-      /**
        * Optional spot price override.
        */
       spot_override?: number | null;
@@ -1662,6 +1634,30 @@ export type ExtrapolationPolicy = "flat_zero" | "flat_forward" | "none";
  */
 export type InterpStyle = "linear" | "log_linear" | "monotone_convex" | "cubic_hermite" | "piecewise_quadratic_forward";
 /**
+ * Calibration method selection (bootstrap vs global solve).
+ *
+ * Defines the numerical approach used to solve for curve/surface parameters.
+ * Bootstrap is the traditional sequential approach, while GlobalSolve
+ * solves all parameters simultaneously.
+ *
+ * # Variants
+ * - `Bootstrap`: Traditional sequential bootstrap where each knot is solved
+ *   independently based on the previous knots.
+ * - `GlobalSolve`: Simultaneous optimization of all knots using Levenberg-Marquardt
+ *   or Newton-Raphson.
+ */
+export type CalibrationMethod =
+  | "bootstrap"
+  | {
+      global_solve: {
+        /**
+         * Use analytical Jacobian if available (otherwise finite-difference).
+         */
+        use_analytical_jacobian: boolean;
+        [k: string]: unknown;
+      };
+    };
+/**
  * Valuation presentation and pricing policy for CDS marks.
  *
  * Each variant bundles a coherent set of choices (premium-leg accrual schedule,
@@ -1699,10 +1695,6 @@ export type Seniority = "senior_secured" | "senior" | "subordinated" | "junior";
  * Extrapolation policy for volatility surface construction.
  */
 export type SurfaceExtrapolationPolicy = "error" | "clamp";
-/**
- * Parameters for volatility surface calibration step.
- */
-export type VolSurfaceModel = "sabr";
 /**
  * Interpolation method for SABR parameters across the expiry–tenor grid.
  */
@@ -2962,14 +2954,6 @@ export type EnvelopeError =
       [k: string]: unknown;
     }
   | {
-      kind: "quote_set_conflict";
-      /**
-       * The conflicting quote-set name.
-       */
-      quote_set: string;
-      [k: string]: unknown;
-    }
-  | {
       /**
        * The datum identifier supplied with conflicting payloads.
        */
@@ -3887,10 +3871,6 @@ export type StepParams =
       expiry_extrapolation?: SurfaceExtrapolationPolicy;
       kind: "vol_surface";
       /**
-       * Volatility model used for calibration.
-       */
-      model: VolSurfaceModel;
-      /**
        * Optional spot price override.
        */
       spot_override?: number | null;
@@ -4431,15 +4411,6 @@ export type VolQuote =
  */
 export interface CalibrationConfig {
   /**
-   * High-level calibration method (bootstrap vs global solve).
-   *
-   * **Note**: When using the plan-driven API, this field is typically overwritten
-   * by the step-level `params.method` for each calibration step. The step-level
-   * method always takes precedence. This field serves as runtime state passed
-   * from calibration targets to the underlying solvers.
-   */
-  calibration_method?: CalibrationMethod;
-  /**
    * Whether to compute detailed calibration diagnostics (condition number,
    * per-quote quality metrics, singular values, R-squared, etc.).
    *
@@ -4848,15 +4819,15 @@ export interface ValidationConfig {
   /**
    * Enable arbitrage checks
    */
-  check_arbitrage: boolean;
+  check_arbitrage?: boolean;
   /**
    * Enable forward rate positivity check
    */
-  check_forward_positivity: boolean;
+  check_forward_positivity?: boolean;
   /**
    * Enable monotonicity checks
    */
-  check_monotonicity: boolean;
+  check_monotonicity?: boolean;
   /**
    * When true, arbitrage violations (calendar/butterfly) produce warnings instead of errors.
    * Default is false - arbitrage violations fail validation.
@@ -4866,35 +4837,35 @@ export interface ValidationConfig {
   /**
    * Maximum allowed annual CPI growth (default 0.50 = 50%)
    */
-  max_cpi_growth: number;
+  max_cpi_growth?: number;
   /**
    * Maximum allowed forward rate
    */
-  max_forward_rate: number;
+  max_forward_rate?: number;
   /**
    * Maximum allowed forward inflation (default 0.50 = 50%)
    */
-  max_fwd_inflation: number;
+  max_fwd_inflation?: number;
   /**
    * Maximum allowed hazard rate (default 0.5 = 50%)
    */
-  max_hazard_rate: number;
+  max_hazard_rate?: number;
   /**
    * Maximum allowed volatility (default 5.0 = 500%)
    */
-  max_volatility: number;
+  max_volatility?: number;
   /**
    * Minimum allowed annual CPI growth (default -0.10 = -10%)
    */
-  min_cpi_growth: number;
+  min_cpi_growth?: number;
   /**
    * Minimum allowed forward rate (can be slightly negative)
    */
-  min_forward_rate: number;
+  min_forward_rate?: number;
   /**
    * Minimum allowed forward inflation (default -0.20 = -20%)
    */
-  min_fwd_inflation: number;
+  min_fwd_inflation?: number;
   /**
    * Minimum LGD denominator used for hazard-rate initial guesses.
    */
@@ -4906,7 +4877,7 @@ export interface ValidationConfig {
   /**
    * Numerical tolerance for comparisons
    */
-  tolerance: number;
+  tolerance?: number;
 }
 /**
  * Volatility-surface specific numerical solver configuration.

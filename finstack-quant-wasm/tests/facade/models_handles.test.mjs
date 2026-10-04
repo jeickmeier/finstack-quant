@@ -201,7 +201,7 @@ test('LGD, EAD and PD handles expose their accessors and reject bad input', () =
 
   assert.equal(new credit.EadCalculator(600, 0, 0.75).leqFromObservedEad(600), undefined);
   assert.throws(() => new credit.EadCalculator(600, 400, 1.5), kind('validation'));
-  assert.throws(() => credit.eadRevolver(-1, 0, 0.5), kind('validation'));
+  assert.throws(() => new credit.EadCalculator(-1, 0, 0.5), kind('validation'));
 
   const scaleHandle = credit.MasterScale.moodysAssumptions();
   assert.equal(scaleHandle.grades.length, scaleHandle.nGrades);
@@ -525,4 +525,17 @@ test('volatility helpers take a VolSurface in its canonical wire form', () => {
     models.bsGreeksIsValid({ ...models.bsGreeks(100, 100, 0.05, 0, 0.2, 1, true), gamma: -1 }),
     false
   );
+});
+
+test('LGD replay and uncorrelated factors use checked Rust construction', () => {
+  assert.throws(() =>
+    credit.WorkoutCosts.fromJson({ direct_cost_rate: -1, indirect_cost_rate: 0 })
+  );
+  const model = credit.WorkoutLgd.builder().build();
+  const wire = JSON.parse(model.toJson());
+  wire.costs.direct_cost_rate = -1;
+  assert.throws(() => credit.WorkoutLgd.fromJson(wire));
+  for (const vols of [[0.2], [0.2, -0.1], [0.2, NaN]]) {
+    assert.throws(() => correlation.LatentMultiFactor.uncorrelated(2, vols));
+  }
 });

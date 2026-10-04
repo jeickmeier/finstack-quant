@@ -111,9 +111,7 @@ try {
       );
       assert.deepEqual(exported, {
         ok: true,
-        value: valuations.validateValuationResultJson(
-          serializeHost(actual.value),
-        ),
+        value: valuations.valuationResultToJson(serializeHost(actual.value)),
       });
     }
     assert.deepEqual(actual, reference, name);

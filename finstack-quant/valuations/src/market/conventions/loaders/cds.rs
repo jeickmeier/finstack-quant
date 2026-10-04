@@ -14,7 +14,7 @@ use std::str::FromStr;
 pub(crate) struct CdsRegistryTables {
     /// Explicit `{currency}:{clause}` rows.
     pub entries: HashMap<CdsConventionKey, CdsConventionSpec>,
-    /// Loader-only `ANY:{family}` fallback rows.
+    /// `ANY:{family}` fallback rows resolved by the registry.
     pub any: HashMap<CdsConvention, CdsConventionSpec>,
     /// Explicit regional family per currency (`isda_na` / `isda_eu` / `isda_as`).
     pub primary_family: HashMap<Currency, CdsConvention>,
@@ -65,10 +65,10 @@ fn parse_doc_clause(clause_str: &str) -> Result<CdsDocClause, Error> {
 
 /// Load the CDS conventions from the embedded JSON registry.
 ///
-/// This loader retains `ANY:<Clause>` defaults by family, allowing the embedded
+/// This loader stores `ANY:<Clause>` fallbacks separately, allowing the embedded
 /// registry to define catch-all conventions that apply to any currency not explicitly
-/// overridden. Explicit currency IDs (e.g., `USD:isda_na`) take precedence over family
-/// `ANY` fallback entries and become that currency's primary schedule family.
+/// overridden. Explicit currency IDs (e.g., `USD:isda_na`) take precedence over resolved
+/// `ANY` entries and become that currency's primary schedule family.
 pub(crate) fn load_registry() -> Result<CdsRegistryTables, Error> {
     let json = include_str!("../../../../data/conventions/cds_conventions.json");
     load_registry_from_str(json)

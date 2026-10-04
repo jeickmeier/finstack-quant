@@ -13,6 +13,7 @@
 //! `settlement_days = 0` the model discount margin of a par facility on a
 //! flat consistent curve is exactly its contractual margin.
 
+use crate::instruments::common_impl::pricing::time::compounding_frequency;
 use std::sync::Arc;
 
 use finstack_quant_core::cashflow::CFKind;
@@ -24,8 +25,7 @@ use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::is_cash_settlement_kind;
 use crate::cashflow::traits::CashflowScheduleSource;
 use crate::instruments::fixed_income::loan_quotes::{
-    all_in_rate_from_schedule, compounding_frequency, pv_with_discount_margin,
-    solve_discount_margin,
+    all_in_rate_from_schedule, pv_with_discount_margin, solve_discount_margin,
 };
 use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::RevolvingCredit;

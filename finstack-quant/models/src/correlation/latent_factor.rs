@@ -629,35 +629,20 @@ impl LatentMultiFactor {
     /// # Returns
     ///
     /// A multi-factor model with an identity correlation matrix.
-    #[must_use]
-    pub fn uncorrelated(num_factors: usize, volatilities: Vec<f64>) -> Self {
+    /// # Arguments
+    /// * `num_factors` - Number of factors; zero resolves to one as in `new`.
+    /// * `volatilities` - One finite, non-negative decimal volatility per factor;
+    ///   validated values are clamped to `[0.01, 10.0]`.
+    ///
+    /// # Errors
+    /// Returns the same volatility-validation errors as [`Self::new`].
+    pub fn uncorrelated(num_factors: usize, volatilities: Vec<f64>) -> Result<Self> {
         let n = num_factors.max(1);
-
-        let vols = if volatilities.len() == n {
-            volatilities.iter().map(|v| v.clamp(0.01, 10.0)).collect()
-        } else {
-            tracing::warn!(
-                expected = n,
-                actual = volatilities.len(),
-                "LatentMultiFactor::uncorrelated: volatility length mismatch; falling back to unit volatilities"
-            );
-            vec![1.0; n]
-        };
-
-        let mut corrs = vec![0.0; n * n];
+        let mut correlations = vec![0.0; n * n];
         for i in 0..n {
-            corrs[i * n + i] = 1.0;
+            correlations[i * n + i] = 1.0;
         }
-
-        // Identity is its own Cholesky factor (already in original order, full rank)
-        let cholesky = CorrelationFactor::from_parts(corrs.clone(), n, n);
-
-        Self {
-            num_factors: n,
-            volatilities: vols,
-            correlation_matrix: corrs,
-            cholesky_factor: cholesky,
-        }
+        Self::new(num_factors, volatilities, correlations)
     }
 
     /// Number of factors in the model.
@@ -722,73 +707,19 @@ impl LatentMultiFactor {
     ///
     /// Returns [`Error::FactorDrawLengthMismatch`] if `independent_z` does not
     /// hold exactly [`Self::num_factors`] entries.
-    pub fn try_generate_correlated_factors(&self, independent_z: &[f64]) -> Result<Vec<f64>> {
+    pub fn generate_correlated_factors(&self, independent_z: &[f64]) -> Result<Vec<f64>> {
         if independent_z.len() != self.num_factors {
             return Err(Error::FactorDrawLengthMismatch {
                 expected: self.num_factors,
                 actual: independent_z.len(),
             });
         }
-        Ok(self.generate_correlated_factors(independent_z))
-    }
-
-    /// Generate correlated factor values from independent standard normal draws.
-    ///
-    /// # Arguments
-    /// * `independent_z` - Vector of n independent standard normal values
-    ///
-    /// # Returns
-    /// Vector of n correlated factor values (scaled by volatilities).
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use finstack_quant_models::correlation::LatentMultiFactor;
-    ///
-    /// let model = LatentMultiFactor::uncorrelated(2, vec![0.2, 0.3]);
-    /// let factors = model.generate_correlated_factors(&[1.0, -1.0]);
-    ///
-    /// assert_eq!(factors, vec![0.2, -0.3]);
-    /// ```
-    #[must_use]
-    pub fn generate_correlated_factors(&self, independent_z: &[f64]) -> Vec<f64> {
-        let mut factors = vec![0.0; self.num_factors];
-        self.generate_correlated_factors_into(independent_z, &mut factors);
-        factors
-    }
-
-    /// Generate correlated factor values into a caller-provided buffer.
-    ///
-    /// The input slice and output buffer must both have length `num_factors()`.
-    ///
-    /// # Arguments
-    ///
-    /// * `independent_z` - Independent standard-normal draws, one per factor.
-    /// * `out` - Output buffer that receives the correlated factor values.
-    ///
-    /// # Panics
-    ///
-    /// Panics if either slice length differs from `self.num_factors()`.
-    pub fn generate_correlated_factors_into(&self, independent_z: &[f64], out: &mut [f64]) {
-        assert_eq!(
-            independent_z.len(),
-            self.num_factors,
-            "expected {} independent factors, got {}",
-            self.num_factors,
-            independent_z.len()
-        );
-        assert_eq!(
-            out.len(),
-            self.num_factors,
-            "expected output buffer of length {}, got {}",
-            self.num_factors,
-            out.len()
-        );
-
-        let _ = self.cholesky_factor.apply(independent_z, out);
+        let mut out = vec![0.0; self.num_factors];
+        let _ = self.cholesky_factor.apply(independent_z, &mut out);
         for (value, vol) in out.iter_mut().zip(self.volatilities.iter()) {
             *value *= *vol;
         }
+        Ok(out)
     }
 }
 
@@ -1129,8 +1060,9 @@ mod tests {
 
     #[test]
     fn test_multi_factor_uncorrelated() {
-        let model =
-            LatentFactorKind::Multi(LatentMultiFactor::uncorrelated(3, vec![0.1, 0.2, 0.3]));
+        let model = LatentFactorKind::Multi(
+            LatentMultiFactor::uncorrelated(3, vec![0.1, 0.2, 0.3]).expect("valid factors"),
+        );
 
         assert_eq!(model.num_factors(), 3);
 
@@ -1168,7 +1100,9 @@ mod tests {
         }
 
         // generate_correlated_factors with z=[0,0] must return zeros.
-        let zeros = model.generate_correlated_factors(&[0.0, 0.0]);
+        let zeros = model
+            .generate_correlated_factors(&[0.0, 0.0])
+            .expect("valid draws");
         assert!(zeros[0].abs() < 1e-15);
         assert!(zeros[1].abs() < 1e-15);
     }
@@ -1180,7 +1114,9 @@ mod tests {
         let model = LatentMultiFactor::new(2, vols, corr)
             .expect("identity correlation model should create successfully");
 
-        let factors = model.generate_correlated_factors(&[1.0, 1.0]);
+        let factors = model
+            .generate_correlated_factors(&[1.0, 1.0])
+            .expect("valid draws");
 
         // With identity correlation: factors = z * vol
         assert!((factors[0] - 0.2).abs() < 1e-10);
@@ -1188,26 +1124,19 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_correlated_factors_into_matches_allocating_api() {
-        let corr = vec![1.0, 0.6, 0.6, 1.0];
-        let model = LatentMultiFactor::new(2, vec![0.2, 0.3], corr)
-            .expect("correlated model should create successfully");
-
-        let mut out = vec![0.0; 2];
-        model.generate_correlated_factors_into(&[1.0, 0.5], &mut out);
-
-        assert_eq!(out, model.generate_correlated_factors(&[1.0, 0.5]));
-    }
-
-    #[test]
-    #[should_panic(expected = "expected 2 independent factors, got 1")]
-    fn test_generate_correlated_factors_into_rejects_wrong_input_length() {
-        let corr = vec![1.0, 0.6, 0.6, 1.0];
-        let model = LatentMultiFactor::new(2, vec![0.2, 0.3], corr)
-            .expect("correlated model should create successfully");
-
-        let mut out = vec![0.0; 2];
-        model.generate_correlated_factors_into(&[1.0], &mut out);
+    fn checked_multi_factor_inputs() {
+        assert!(LatentMultiFactor::uncorrelated(2, vec![0.2]).is_err());
+        for bad in [-0.1, f64::NAN, f64::INFINITY] {
+            assert!(LatentMultiFactor::uncorrelated(2, vec![0.2, bad]).is_err());
+        }
+        let model = LatentMultiFactor::uncorrelated(2, vec![0.2, 0.3]).expect("valid factors");
+        assert!(model.generate_correlated_factors(&[1.0]).is_err());
+        assert_eq!(
+            model
+                .generate_correlated_factors(&[1.0, -1.0])
+                .expect("valid draws"),
+            vec![0.2, -0.3]
+        );
     }
 
     #[test]

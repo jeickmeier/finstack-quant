@@ -8,7 +8,7 @@ use crate::bindings::valuations::convert::{
     attributes_from_py, attributes_to_py, bool_repr, enum_to_py_string, money_to_py, opt_repr,
     rate_decimal_from_py,
 };
-use crate::errors::{core_to_py, value_error};
+use crate::errors::core_to_py;
 use finstack_quant_core::types::CreditRating;
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
@@ -261,13 +261,6 @@ pub struct PyTrancheBuilder {
     detach_pct: Option<f64>,
 }
 
-/// Take the wrapped Rust builder or fail if `build()` already consumed it.
-fn take_tranche(b: &mut PyTrancheBuilder) -> PyResult<TrancheBuilderInner> {
-    b.inner
-        .take()
-        .ok_or_else(|| value_error("builder already consumed by build()"))
-}
-
 #[pymethods]
 impl PyTrancheBuilder {
     /// Set the tranche identifier.
@@ -289,7 +282,7 @@ impl PyTrancheBuilder {
     ///     :meth:`TrancheBuilder.build`.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.id(value));
         Ok(slf)
     }
@@ -314,7 +307,7 @@ impl PyTrancheBuilder {
     ///     :meth:`TrancheBuilder.build`.
     #[pyo3(text_signature = "($self, value)")]
     fn attach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.attach_pct(value));
         slf.attach_pct = Some(value);
         Ok(slf)
@@ -340,7 +333,7 @@ impl PyTrancheBuilder {
     ///     :meth:`TrancheBuilder.build`.
     #[pyo3(text_signature = "($self, value)")]
     fn detach_pct<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.detach_pct(value));
         slf.detach_pct = Some(value);
         Ok(slf)
@@ -365,7 +358,7 @@ impl PyTrancheBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn seniority<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let seniority: TrancheSeniority = enum_from_str(value, "seniority")?;
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.seniority(seniority));
         Ok(slf)
     }
@@ -396,7 +389,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.balance(value.inner));
         Ok(slf)
     }
@@ -424,7 +417,7 @@ impl PyTrancheBuilder {
         rate: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let rate = rate_decimal_from_py(rate, "rate")?;
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.coupon(RateSpec::Fixed { rate }));
         Ok(slf)
     }
@@ -457,7 +450,7 @@ impl PyTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let coupon: RateSpec = crate::bindings::module_utils::py_to_serde(py, value, "coupon")?;
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.coupon(coupon));
         Ok(slf)
     }
@@ -485,7 +478,7 @@ impl PyTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let maturity = extract_date(value)?;
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.maturity(maturity));
         Ok(slf)
     }
@@ -513,7 +506,7 @@ impl PyTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let frequency = crate::bindings::valuations::convert::tenor_from_py(value, "frequency")?;
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.frequency(frequency));
         Ok(slf)
     }
@@ -542,7 +535,7 @@ impl PyTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let day_count =
             crate::bindings::valuations::convert::day_count_from_py(value, "day_count")?;
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.day_count(day_count));
         Ok(slf)
     }
@@ -570,7 +563,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.current_balance(value.inner));
         Ok(slf)
     }
@@ -598,7 +591,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyMoney>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.deferred_interest(value.inner));
         Ok(slf)
     }
@@ -626,7 +619,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: bool,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.pik_enabled(value));
         Ok(slf)
     }
@@ -656,7 +649,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: bool,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.non_deferrable(value));
         Ok(slf)
     }
@@ -680,7 +673,7 @@ impl PyTrancheBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn rating<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let rating: CreditRating = enum_from_str(value, "rating")?;
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.rating(rating));
         Ok(slf)
     }
@@ -711,7 +704,7 @@ impl PyTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let trigger: CoverageTrigger =
             crate::bindings::module_utils::py_to_serde(py, value, "oc_trigger")?;
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.oc_trigger(trigger));
         Ok(slf)
     }
@@ -740,7 +733,7 @@ impl PyTrancheBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let trigger: CoverageTrigger =
             crate::bindings::module_utils::py_to_serde(py, value, "ic_trigger")?;
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.ic_trigger(trigger));
         Ok(slf)
     }
@@ -771,7 +764,7 @@ impl PyTrancheBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attributes = attributes_from_py(value)?;
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.attributes(attributes));
         Ok(slf)
     }
@@ -791,7 +784,7 @@ impl PyTrancheBuilder {
     ///     detachment not strictly above attachment).
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyTranche> {
-        let b = take_tranche(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         let inner = b.build().map_err(core_to_py)?;
         Ok(PyTranche { inner })
     }

@@ -61,7 +61,7 @@ through its module path. See the rustdoc for detail
 | `grid_attribution` | `grid_attribution`, `grid_carino_link` |
 | `factor_brinson` | `factor_brinson_attribution` |
 | `excess_return` | `excess_returns`, `cell_returns_from_curves`, `cell_returns_from_reference` |
-| `performance` | `twrr_modified_dietz`, `twrr_linked`, `mwr_xirr`, `mwr_xirr_from_cashflows` |
+| `performance` | `twrr_modified_dietz`, `twrr_linked`, `mwr_xirr` |
 | `factor_model` | `FactorModel` (`assign_factors` / `compute_sensitivities` / `analyze`), `ParametricDecomposer`, `allocate_weights` |
 | `sensitivity` | `DeltaBasedEngine`, `FullRepricingEngine` + `ScenarioGrid`, `FactorSensitivityEngine` |
 | `optimization` | `PortfolioOptimizationProblem`, `DefaultLpOptimizer`, `optimize_from_spec`, `PortfolioOptimizationResult` |

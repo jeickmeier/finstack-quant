@@ -637,18 +637,21 @@ pub fn create_institutional_portfolio(num_positions: usize) -> Portfolio {
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
             start: base,
             end: maturity_5y(),
-            frequency: convention.frequency(),
-            stub: convention.stub_convention(),
-            business_day_convention: convention.business_day_convention(),
+            frequency: convention.get_spec().expect("CDS registry").frequency,
+            stub: convention.get_spec().expect("CDS registry").stub,
+            business_day_convention: convention
+                .get_spec()
+                .expect("CDS registry")
+                .business_day_convention,
             calendar_id: None,
-            day_count: convention.day_count(),
+            day_count: convention.get_spec().expect("CDS registry").day_count,
             coupon_bp: rust_decimal::Decimal::from(100),
             discount_curve_id: "USD-OIS".into(),
         };
         let protection = ProtectionLegSpec {
             credit_curve_id: "CORP-HAZARD".into(),
             recovery_rate: 0.40,
-            settlement_delay: convention.settlement_delay(),
+            settlement_delay: convention.get_spec().expect("CDS registry").settlement_days,
         };
         let cds = CreditDefaultSwap {
             id: cds_id.clone().into(),

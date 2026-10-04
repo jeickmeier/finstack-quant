@@ -206,10 +206,13 @@ pub fn cds_buy_protection(
     credit_curve_id: impl Into<CurveId>,
 ) -> finstack_quant_core::Result<CreditDefaultSwap> {
     let convention = CdsConvention::IsdaNa;
-    let day_count = convention.day_count();
-    let frequency = convention.frequency();
-    let business_day_convention = convention.business_day_convention();
-    let stub = convention.stub_convention();
+    let day_count = convention.get_spec().expect("CDS registry").day_count;
+    let frequency = convention.get_spec().expect("CDS registry").frequency;
+    let business_day_convention = convention
+        .get_spec()
+        .expect("CDS registry")
+        .business_day_convention;
+    let stub = convention.get_spec().expect("CDS registry").stub;
 
     let spread_bp_decimal = Decimal::try_from(spread_bp).map_err(|e| {
         finstack_quant_core::Error::Validation(format!(
@@ -230,7 +233,14 @@ pub fn cds_buy_protection(
             frequency,
             stub,
             business_day_convention,
-            calendar_id: Some(convention.default_calendar().into()),
+            calendar_id: Some(
+                convention
+                    .get_spec()
+                    .expect("CDS registry")
+                    .calendar_id
+                    .as_str()
+                    .into(),
+            ),
             day_count,
             coupon_bp: spread_bp_decimal,
             discount_curve_id: discount_curve_id.into(),
@@ -238,7 +248,7 @@ pub fn cds_buy_protection(
         .protection_leg(ProtectionLegSpec {
             credit_curve_id: credit_curve_id.into(),
             recovery_rate: STANDARD_RECOVERY_SENIOR,
-            settlement_delay: convention.settlement_delay(),
+            settlement_delay: convention.get_spec().expect("CDS registry").settlement_days,
         })
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())
@@ -260,10 +270,13 @@ pub fn cds_sell_protection(
     credit_curve_id: impl Into<CurveId>,
 ) -> finstack_quant_core::Result<CreditDefaultSwap> {
     let convention = CdsConvention::IsdaNa;
-    let day_count = convention.day_count();
-    let frequency = convention.frequency();
-    let business_day_convention = convention.business_day_convention();
-    let stub = convention.stub_convention();
+    let day_count = convention.get_spec().expect("CDS registry").day_count;
+    let frequency = convention.get_spec().expect("CDS registry").frequency;
+    let business_day_convention = convention
+        .get_spec()
+        .expect("CDS registry")
+        .business_day_convention;
+    let stub = convention.get_spec().expect("CDS registry").stub;
 
     let spread_bp_decimal = Decimal::try_from(spread_bp).map_err(|e| {
         finstack_quant_core::Error::Validation(format!(
@@ -284,7 +297,14 @@ pub fn cds_sell_protection(
             frequency,
             stub,
             business_day_convention,
-            calendar_id: Some(convention.default_calendar().into()),
+            calendar_id: Some(
+                convention
+                    .get_spec()
+                    .expect("CDS registry")
+                    .calendar_id
+                    .as_str()
+                    .into(),
+            ),
             day_count,
             coupon_bp: spread_bp_decimal,
             discount_curve_id: discount_curve_id.into(),
@@ -292,7 +312,7 @@ pub fn cds_sell_protection(
         .protection_leg(ProtectionLegSpec {
             credit_curve_id: credit_curve_id.into(),
             recovery_rate: STANDARD_RECOVERY_SENIOR,
-            settlement_delay: convention.settlement_delay(),
+            settlement_delay: convention.get_spec().expect("CDS registry").settlement_days,
         })
         .instrument_pricing_overrides(InstrumentPricingOverrides::default())
         .attributes(Attributes::new())

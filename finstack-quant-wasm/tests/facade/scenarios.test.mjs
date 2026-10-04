@@ -65,7 +65,7 @@ function depositFixture() {
 }
 
 test('scenario metadata uses nullable serialized names and descriptions', () => {
-  const built = scenarios.buildScenarioSpec('metadata', []);
+  const built = scenarios.parseScenarioSpec({ id: 'metadata', operations: [] });
   assert.equal(built.name, null);
   assert.equal(built.description, null);
   const parsed = scenarios.parseScenarioSpec(JSON.stringify(built));
@@ -81,14 +81,14 @@ test('date-range overflow is a validation error in engine and horizon APIs', () 
     /supported date range/.test(error.message);
   for (const mode of ['approximate', 'calendar_days', 'business_days']) {
     const spec = JSON.stringify(
-      scenarios.buildScenarioSpec(`date-range-${mode}`, [
-        { kind: 'time_roll_forward', period: '1D', apply_shocks: false, roll_mode: mode },
-      ])
+      scenarios.parseScenarioSpec({
+        id: `date-range-${mode}`,
+        operations: [
+          { kind: 'time_roll_forward', period: '1D', apply_shocks: false, roll_mode: mode },
+        ],
+      })
     );
-    assert.throws(
-      () => scenarios.applyScenarioToMarket(spec, market, '9999-12-31'),
-      isDateRangeError
-    );
+    assert.throws(() => scenarios.applyScenario(spec, market, '9999-12-31'), isDateRangeError);
     assert.throws(
       () => scenarios.computeHorizonReturn(instrument, market, '9999-12-31', spec),
       isDateRangeError
@@ -99,14 +99,17 @@ test('date-range overflow is a validation error in engine and horizon APIs', () 
 test('horizon facade includes Rust-computed returns and factor contributions', () => {
   const { instrument, market } = depositFixture();
   const spec = JSON.stringify(
-    scenarios.buildScenarioSpec('hold-one-month', [
-      {
-        kind: 'time_roll_forward',
-        period: '1M',
-        apply_shocks: true,
-        roll_mode: 'calendar_days',
-      },
-    ])
+    scenarios.parseScenarioSpec({
+      id: 'hold-one-month',
+      operations: [
+        {
+          kind: 'time_roll_forward',
+          period: '1M',
+          apply_shocks: true,
+          roll_mode: 'calendar_days',
+        },
+      ],
+    })
   );
   const result = scenarios.computeHorizonReturn(instrument, market, '2025-01-15', spec);
   const initial = Number(result.initial_value.amount);
@@ -141,7 +144,7 @@ test('horizon facade includes Rust-computed returns and factor contributions', (
 
 test('horizon facade uses null for undefined returns', () => {
   const { instrument, market } = depositFixture();
-  const spec = JSON.stringify(scenarios.buildScenarioSpec('no-roll', []));
+  const spec = JSON.stringify(scenarios.parseScenarioSpec({ id: 'no-roll', operations: [] }));
   const live = scenarios.computeHorizonReturn(instrument, market, '2025-01-15', spec);
   assert.equal(live.horizon_days, null);
   assert.equal(live.summary.total_return, 0);
@@ -166,9 +169,12 @@ for (const method of ['parallel', 'waterfall', 'metrics_based', 'taylor']) {
       'USD-OIS'
     );
     const spec = JSON.stringify(
-      scenarios.buildScenarioSpec('rates-up', [
-        { kind: 'curve_parallel_bp', curve_kind: 'discount', curve_id: 'USD-OIS', bp: 25 },
-      ])
+      scenarios.parseScenarioSpec({
+        id: 'rates-up',
+        operations: [
+          { kind: 'curve_parallel_bp', curve_kind: 'discount', curve_id: 'USD-OIS', bp: 25 },
+        ],
+      })
     );
     for (const input of [instrument, bond.toJson()]) {
       const result = scenarios.computeHorizonReturn(input, market, '2025-01-15', spec, method);
@@ -214,14 +220,17 @@ test('floating horizons preserve opening-day and crossed fixings for every metho
   });
   const market = JSON.stringify(state);
   const spec = JSON.stringify(
-    scenarios.buildScenarioSpec('crossed-reset', [
-      {
-        kind: 'time_roll_forward',
-        period: '4D',
-        apply_shocks: false,
-        roll_mode: 'calendar_days',
-      },
-    ])
+    scenarios.parseScenarioSpec({
+      id: 'crossed-reset',
+      operations: [
+        {
+          kind: 'time_roll_forward',
+          period: '4D',
+          apply_shocks: false,
+          roll_mode: 'calendar_days',
+        },
+      ],
+    })
   );
   for (const issueDate of [origin, '2025-01-03']) {
     const bond = valuations.instruments.Bond.floating(
@@ -240,16 +249,17 @@ test('floating horizons preserve opening-day and crossed fixings for every metho
     envelope.instrument.spec.cashflow_spec.floating.rate_spec.reset_lag_days = 0;
     const instrument = JSON.stringify(envelope);
     const opening = valuations.instruments.priceInstrument(instrument, market, origin).value;
-    const rolled = scenarios.applyScenarioToMarket(
+    const rolled = scenarios.applyScenario(
       spec,
       market,
       origin,
+      undefined,
       JSON.stringify([envelope])
     );
     const closing = valuations.instruments.priceInstrument(
       JSON.stringify(rolled.instruments[0]),
       JSON.stringify(rolled.market),
-      rolled.time_roll.new_date
+      rolled.report.time_roll.new_date
     ).value;
     for (const method of ['parallel', 'waterfall', 'metrics_based', 'taylor']) {
       const result = scenarios.computeHorizonReturn(instrument, market, origin, spec, method);
@@ -295,12 +305,12 @@ test('scenario facade returns reusable shocked instrument copies', () => {
     hierarchy: null,
   });
   const op = { kind: 'instrument_price_pct_by_type', instrument_types: ['bond'], pct: -60 };
-  const spec = JSON.stringify(scenarios.buildScenarioSpec('losses', [op, op]));
+  const spec = JSON.stringify(scenarios.parseScenarioSpec({ id: 'losses', operations: [op, op] }));
   assert.throws(
-    () => scenarios.applyScenarioToMarket(spec, market, '2025-01-15'),
+    () => scenarios.applyScenario(spec, market, '2025-01-15'),
     (error) => error.kind === 'validation' && /no instruments were supplied/.test(error.message)
   );
-  const result = scenarios.applyScenarioToMarket(spec, market, '2025-01-15', inventory);
+  const result = scenarios.applyScenario(spec, market, '2025-01-15', undefined, inventory);
   assert.equal(bond.toJson(), original);
   assert.equal(result.instruments.length, 1);
   const shock =
@@ -308,11 +318,14 @@ test('scenario facade returns reusable shocked instrument copies', () => {
   assert.ok(Math.abs(100 * (1 + shock) - 16) < 1e-12);
   const restored = valuations.instruments.Bond.fromJson(JSON.stringify(result.instruments[0]));
   assert.equal(restored.id, 'BOND');
-  const half = JSON.stringify(scenarios.buildScenarioSpec('half', [{ ...op, pct: -50 }]));
-  const next = scenarios.applyScenarioToMarket(
+  const half = JSON.stringify(
+    scenarios.parseScenarioSpec({ id: 'half', operations: [{ ...op, pct: -50 }] })
+  );
+  const next = scenarios.applyScenario(
     half,
     market,
     '2025-01-15',
+    undefined,
     JSON.stringify(result.instruments)
   );
   const nextShock =
@@ -375,10 +388,13 @@ const DEPOSIT = {
   },
 };
 const UP_25 = { kind: 'curve_parallel_bp', curve_kind: 'discount', curve_id: 'USD-OIS', bp: 25 };
-const HOLD_1M_UP_25 = scenarios.buildScenarioSpec('hold_1m_up25', [
-  { kind: 'time_roll_forward', period: '1M', apply_shocks: true, roll_mode: 'calendar_days' },
-  UP_25,
-]);
+const HOLD_1M_UP_25 = scenarios.parseScenarioSpec({
+  id: 'hold_1m_up25',
+  operations: [
+    { kind: 'time_roll_forward', period: '1M', apply_shocks: true, roll_mode: 'calendar_days' },
+    UP_25,
+  ],
+});
 
 function withRounding(mode) {
   return JSON.stringify({
@@ -386,18 +402,19 @@ function withRounding(mode) {
   });
 }
 
-test('applyScenario and applyScenarioToMarket stamp the caller configuration into meta', () => {
-  const spec = scenarios.buildScenarioSpec('up25', [UP_25]);
-  const fallback = scenarios.applyScenarioToMarket(spec, OIS_MARKET, AS_OF);
-  assert.equal(fallback.meta.rounding.mode, 'bankers');
-  const floor = scenarios.applyScenarioToMarket(
+test('applyScenario stamps the caller configuration into meta', () => {
+  const spec = scenarios.parseScenarioSpec({ id: 'up25', operations: [UP_25] });
+  const fallback = scenarios.applyScenario(spec, OIS_MARKET, AS_OF);
+  assert.equal(fallback.report.meta.rounding.mode, 'bankers');
+  const floor = scenarios.applyScenario(
     spec,
     OIS_MARKET,
     AS_OF,
     undefined,
+    undefined,
     withRounding('floor')
   );
-  assert.equal(floor.meta.rounding.mode, 'floor');
+  assert.equal(floor.report.meta.rounding.mode, 'floor');
   const model = {
     schema_version: 1,
     id: 'm',
@@ -407,21 +424,21 @@ test('applyScenario and applyScenarioToMarket stamp the caller configuration int
   const withModel = scenarios.applyScenario(
     spec,
     OIS_MARKET,
-    model,
     AS_OF,
+    model,
     undefined,
     withRounding('away_from_zero')
   );
-  assert.equal(withModel.meta.rounding.mode, 'away_from_zero');
+  assert.equal(withModel.report.meta.rounding.mode, 'away_from_zero');
   assert.throws(
-    () => scenarios.applyScenarioToMarket(spec, OIS_MARKET, AS_OF, undefined, '{not json'),
+    () => scenarios.applyScenario(spec, OIS_MARKET, AS_OF, undefined, undefined, '{not json'),
     (error) => error.kind === 'validation'
   );
 });
 
 test('scenario errors surface before market errors and match Python text', () => {
   assert.throws(
-    () => scenarios.applyScenarioToMarket({ id: '', operations: [] }, { curves: 5 }, AS_OF),
+    () => scenarios.applyScenario({ id: '', operations: [] }, { curves: 5 }, AS_OF),
     /Scenario ID cannot be empty/
   );
   for (const call of [
@@ -438,18 +455,18 @@ test('scenario errors surface before market errors and match Python text', () =>
 });
 
 test('applyScenario rejects a statement model that fails semantic validation', () => {
-  const spec = scenarios.buildScenarioSpec('up25', [UP_25]);
+  const spec = scenarios.parseScenarioSpec({ id: 'up25', operations: [UP_25] });
   const model = { schema_version: 1, id: 'm', periods: [], nodes: {} };
   assert.throws(
-    () => scenarios.applyScenario(spec, OIS_MARKET, model, AS_OF),
+    () => scenarios.applyScenario(spec, OIS_MARKET, AS_OF, model),
     /at least one period/
   );
 });
 
 test('instrument inventories use the shared Rust envelope loader', () => {
-  const spec = scenarios.buildScenarioSpec('up25', [UP_25]);
+  const spec = scenarios.parseScenarioSpec({ id: 'up25', operations: [UP_25] });
   assert.throws(
-    () => scenarios.applyScenarioToMarket(spec, OIS_MARKET, AS_OF, [DEPOSIT.instrument]),
+    () => scenarios.applyScenario(spec, OIS_MARKET, AS_OF, undefined, [DEPOSIT.instrument]),
     /invalid instrument envelope JSON/
   );
   assert.throws(
@@ -459,7 +476,7 @@ test('instrument inventories use the shared Rust envelope loader', () => {
 });
 
 test('composeScenarios validates every input spec in Rust', () => {
-  const valid = scenarios.buildScenarioSpec('a', [UP_25]);
+  const valid = scenarios.parseScenarioSpec({ id: 'a', operations: [UP_25] });
   assert.throws(
     () => scenarios.composeScenarios([valid, { id: '', operations: [] }]),
     (error) =>
@@ -540,9 +557,10 @@ test('computeHorizonReturn returns the Rust summary and matches Python', () => {
       ),
     (error) => error.kind === 'not_found'
   );
-  const shock = scenarios.buildScenarioSpec('px', [
-    { kind: 'instrument_price_pct_by_type', instrument_types: ['bond'], pct: -5 },
-  ]);
+  const shock = scenarios.parseScenarioSpec({
+    id: 'px',
+    operations: [{ kind: 'instrument_price_pct_by_type', instrument_types: ['bond'], pct: -5 }],
+  });
   assert.throws(
     () => scenarios.computeHorizonReturn(DEPOSIT, OIS_MARKET, AS_OF, shock),
     /HorizonAnalysis/

@@ -54,7 +54,6 @@ export const instruments = {
   poolAssetFixedRateBond: wasm.poolAssetFixedRateBond,
   poolAssetFloatingRateLoan: wasm.poolAssetFloatingRateLoan,
   assetPoolWithReserve: wasm.assetPoolWithReserve,
-  assetPoolWithAccounts: wasm.assetPoolWithAccounts,
   assetPoolTotalBalance: wasm.assetPoolTotalBalance,
   assetPoolPerformingBalance: wasm.assetPoolPerformingBalance,
   assetPoolWac: wasm.assetPoolWac,

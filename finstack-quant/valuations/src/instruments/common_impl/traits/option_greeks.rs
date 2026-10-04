@@ -136,14 +136,13 @@ pub trait OptionGreeksProvider: Send + Sync {
 ///
 /// For types with custom `HasExpiry`, use the internal `@mc_daycount` arm
 /// directly and implement `HasExpiry` manually.
-#[macro_export]
 macro_rules! impl_equity_exotic_traits {
     ($ty:ty) => {
-        $crate::impl_equity_exotic_traits!(@inner $ty);
+        $crate::instruments::common_impl::traits::impl_equity_exotic_traits!(@inner $ty);
     };
 
     (@inner $ty:ty) => {
-        $crate::impl_equity_exotic_traits!(@mc_daycount $ty);
+        $crate::instruments::common_impl::traits::impl_equity_exotic_traits!(@mc_daycount $ty);
 
         impl $crate::metrics::HasExpiry for $ty {
             fn expiry(&self) -> finstack_quant_core::dates::Date {
@@ -160,6 +159,8 @@ macro_rules! impl_equity_exotic_traits {
         }
     };
 }
+
+pub(crate) use impl_equity_exotic_traits;
 
 #[cfg(test)]
 mod tests {

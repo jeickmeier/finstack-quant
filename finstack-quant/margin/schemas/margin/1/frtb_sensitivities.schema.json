@@ -800,49 +800,16 @@
         }
       ]
     },
-    "DrcAssetType": {
-      "description": "DRC asset type.",
-      "oneOf": [
-        {
-          "const": "corporate",
-          "description": "Corporate bonds and loans.",
-          "type": "string"
-        },
-        {
-          "const": "sovereign",
-          "description": "Sovereign bonds.",
-          "type": "string"
-        },
-        {
-          "const": "local_government",
-          "description": "Local-government and municipal bonds.",
-          "type": "string"
-        },
-        {
-          "const": "securitization",
-          "description": "Securitization tranches.",
-          "type": "string"
-        },
-        {
-          "const": "equity",
-          "description": "Equity instruments.",
-          "type": "string"
-        }
-      ]
-    },
     "DrcPosition": {
-      "description": "A position subject to the Default Risk Charge.\n\nPer MAR22.9, gross JTD for a position is:\n\n```text\nlong:  gross = max(LGD * notional + P&L, 0)\nshort: gross = min(LGD * notional + P&L, 0)\n```\n\nwhere the `P&L` term captures any mark-to-market adjustment already\nreflected in the trading-book valuation (e.g. an underwater long bond\nhas a small negative `P&L` that reduces the exposed JTD). `jtd_amount`\nrepresents the signed *notional* (positive = long, negative = short);\n[`drc_charge`](super::drc::drc_charge) multiplies by [`DrcSeniority`]\nLGD and then applies the `pnl_adjustment` and the sign-preserving floor.",
+      "additionalProperties": false,
+      "description": "A position subject to the Default Risk Charge.\n\nPer MAR22.9, gross JTD for a position is:\n\n```text\nlong:  gross = max(LGD * notional + P&L, 0)\nshort: gross = min(LGD * notional + P&L, 0)\n```\n\nwhere the `P&L` term captures any mark-to-market adjustment already\nreflected in the trading-book valuation (e.g. an underwater long bond\nhas a small negative `P&L` that reduces the exposed JTD). `jtd_amount`\nrepresents the signed *notional* (positive = long, negative = short);\n`FrtbSbaEngine` multiplies by [`DrcSeniority`]\nLGD and then applies the `pnl_adjustment` and the sign-preserving floor.",
       "properties": {
-        "asset_type": {
-          "$ref": "#/$defs/DrcAssetType",
-          "description": "Asset sub-type: corporate, sovereign, local government, or equity.\nSecuritizations are rejected because they require a separate DRC model."
-        },
         "issuer": {
           "description": "Issuer identifier.",
           "type": "string"
         },
         "jtd_amount": {
-          "description": "Signed JTD *notional* (positive = long, negative = short). Does\n**not** include the LGD multiplier — [`super::drc::drc_charge`] applies LGD.",
+          "description": "Signed JTD *notional* (positive = long, negative = short). Does\n**not** include the LGD multiplier — `FrtbSbaEngine` applies LGD.",
           "format": "double",
           "type": "number"
         },
@@ -879,8 +846,7 @@
         "jtd_amount",
         "rating_bucket",
         "sector",
-        "seniority",
-        "asset_type"
+        "seniority"
       ],
       "type": "object"
     },
@@ -925,11 +891,6 @@
         {
           "const": "equity",
           "description": "Equity instruments.",
-          "type": "string"
-        },
-        {
-          "const": "securitization",
-          "description": "Securitization tranches.",
           "type": "string"
         }
       ]

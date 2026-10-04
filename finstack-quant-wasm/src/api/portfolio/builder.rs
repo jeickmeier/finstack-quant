@@ -1,7 +1,5 @@
 //! WASM binding for the fluent [`finstack_quant_portfolio::PortfolioBuilder`].
 
-use std::sync::Arc;
-
 use super::JsPortfolio;
 use crate::utils::date::parse_iso_date;
 use crate::utils::input::{from_js_json, js_string};
@@ -138,8 +136,6 @@ impl JsPortfolioBuilder {
     /// invariant fails.
     pub fn build(self) -> Result<JsPortfolio, JsValue> {
         let portfolio = self.inner.build().map_err(to_js_err)?;
-        Ok(JsPortfolio {
-            inner: Arc::new(portfolio),
-        })
+        Ok(JsPortfolio { inner: portfolio })
     }
 }

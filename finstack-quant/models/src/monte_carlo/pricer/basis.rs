@@ -129,12 +129,10 @@ impl BasisFunctions for LsmcBasis {
 /// Returns validation errors from the selected concrete basis constructor.
 pub fn build_lsmc_basis(kind: BasisKind, degree: usize, strike: f64) -> Result<LsmcBasis, String> {
     match kind {
-        BasisKind::Laguerre => LaguerreBasis::try_new(degree, strike).map(LsmcBasis::Laguerre),
-        BasisKind::Polynomial => PolynomialBasis::try_new(degree).map(LsmcBasis::Polynomial),
-        BasisKind::NormalizedPolynomial => {
-            NormalizedPolynomialBasis::try_new(degree, strike, strike)
-                .map(LsmcBasis::NormalizedPolynomial)
-        }
+        BasisKind::Laguerre => LaguerreBasis::new(degree, strike).map(LsmcBasis::Laguerre),
+        BasisKind::Polynomial => PolynomialBasis::new(degree).map(LsmcBasis::Polynomial),
+        BasisKind::NormalizedPolynomial => NormalizedPolynomialBasis::new(degree, strike, strike)
+            .map(LsmcBasis::NormalizedPolynomial),
     }
 }
 
@@ -145,14 +143,11 @@ pub struct PolynomialBasis {
 }
 
 impl PolynomialBasis {
-    /// Create polynomial basis of given degree (panics if `degree == 0`).
-    pub fn new(degree: usize) -> Self {
-        assert!(degree > 0, "Degree must be positive");
-        Self { degree }
-    }
-
     /// Create a validated polynomial basis, returning an error if `degree == 0`.
-    pub fn try_new(degree: usize) -> Result<Self, String> {
+    ///
+    /// # Arguments
+    /// * `degree` - Maximum polynomial degree, strictly positive.
+    pub fn new(degree: usize) -> Result<Self, String> {
         if degree == 0 {
             return Err("degree must be positive".to_string());
         }
@@ -194,30 +189,18 @@ pub struct NormalizedPolynomialBasis {
 }
 
 impl NormalizedPolynomialBasis {
-    /// Create a normalized polynomial basis.
+    /// Create a validated normalized polynomial basis.
     ///
     /// # Arguments
-    ///
-    /// * `degree` - Polynomial degree (must be > 0)
-    /// * `center` - Centering value (typically the mean or ATM spot)
-    /// * `scale` - Scaling value (typically the standard deviation or strike)
-    pub fn new(degree: usize, center: f64, scale: f64) -> Self {
-        assert!(degree > 0, "Degree must be positive");
-        assert!(scale.abs() > 1e-14, "Scale must be non-zero");
-        Self {
-            degree,
-            center,
-            scale,
-        }
-    }
-
-    /// Create a validated normalized polynomial basis.
-    pub fn try_new(degree: usize, center: f64, scale: f64) -> Result<Self, String> {
+    /// * `degree` - Maximum polynomial degree, strictly positive.
+    /// * `center` - Finite reference state subtracted before scaling.
+    /// * `scale` - Finite normalization scale with absolute value greater than `1e-14`.
+    pub fn new(degree: usize, center: f64, scale: f64) -> Result<Self, String> {
         if degree == 0 {
             return Err("degree must be positive".to_string());
         }
-        if scale.abs() <= 1e-14 {
-            return Err("scale must be non-zero".to_string());
+        if !center.is_finite() || !scale.is_finite() || scale.abs() <= 1e-14 {
+            return Err("center and scale must be finite, and scale must be non-zero".to_string());
         }
         Ok(Self {
             degree,
@@ -274,23 +257,17 @@ pub struct LaguerreBasis {
 }
 
 impl LaguerreBasis {
-    /// Create Laguerre basis of given degree with strike normalization
-    /// (panics on invalid inputs).
-    ///
-    /// `degree` must be in [1, 4] and `strike` must be positive.
-    pub fn new(degree: usize, strike: f64) -> Self {
-        assert!(degree > 0 && degree <= 4, "Degree must be 1-4");
-        assert!(strike > 0.0, "Strike must be positive");
-        Self { degree, strike }
-    }
-
     /// Create a validated Laguerre basis, returning an error on invalid inputs.
-    pub fn try_new(degree: usize, strike: f64) -> Result<Self, String> {
+    ///
+    /// # Arguments
+    /// * `degree` - Maximum Laguerre degree, from one through four.
+    /// * `strike` - Finite, strictly positive exercise-price normalization scale.
+    pub fn new(degree: usize, strike: f64) -> Result<Self, String> {
         if degree == 0 || degree > 4 {
             return Err("degree must be 1-4".to_string());
         }
-        if strike <= 0.0 {
-            return Err("strike must be positive".to_string());
+        if !strike.is_finite() || strike <= 0.0 {
+            return Err("strike must be finite and positive".to_string());
         }
         Ok(Self { degree, strike })
     }
@@ -348,5 +325,20 @@ mod tests {
         for retired in ["Laguerre", "poly", "normalized", "centered_polynomial"] {
             assert!(BasisKind::parse(retired).is_err());
         }
+    }
+}
+
+#[cfg(test)]
+mod validation_tests {
+    use super::*;
+    #[test]
+    fn normalization_rejects_nonfinite_inputs() {
+        for invalid in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert!(LaguerreBasis::new(2, invalid).is_err());
+            assert!(NormalizedPolynomialBasis::new(2, invalid, 1.0).is_err());
+            assert!(NormalizedPolynomialBasis::new(2, 0.0, invalid).is_err());
+        }
+        assert!(PolynomialBasis::new(0).is_err());
+        assert!(NormalizedPolynomialBasis::new(2, 0.0, 0.0).is_err());
     }
 }

@@ -8,8 +8,8 @@ functions run the vol-surface no-arbitrage checks on a standalone surface.
 
 Examples:
 --------
->>> from finstack_quant.calibration import CalibrationPlan, calibrate
->>> calibrate(CalibrationPlan([], id="smoke")).success
+>>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, calibrate
+>>> calibrate(CalibrationEnvelope(CalibrationPlan([], id="smoke"))).success
 True
 """
 

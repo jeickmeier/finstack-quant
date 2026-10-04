@@ -95,6 +95,12 @@ pub struct VmCalculator {
 }
 
 impl VmCalculator {
+    /// Borrow the agreement applied to every calculation and generated margin call.
+    #[must_use]
+    pub fn get_csa(&self) -> &CsaSpec {
+        &self.csa
+    }
+
     fn calendar_for_csa(&self) -> Result<&'static dyn finstack_quant_core::dates::HolidayCalendar> {
         calendar_by_id(&self.csa.calendar_id).ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(

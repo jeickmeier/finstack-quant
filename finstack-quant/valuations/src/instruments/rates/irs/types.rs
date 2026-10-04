@@ -14,9 +14,9 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use rust_decimal::Decimal;
 
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::pricing::overnight_conventions;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::market::conventions::ConventionRegistry;
@@ -627,7 +627,7 @@ impl crate::instruments::common_impl::traits::Instrument for InterestRateSwap {
         Some(self.fixed_leg.start)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 
     fn market_dependencies(
         &self,

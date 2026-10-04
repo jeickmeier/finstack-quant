@@ -6,7 +6,6 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::equity::spot::EquityPricer;
 use finstack_quant_valuations::instruments::equity::Equity;
 use finstack_quant_valuations::instruments::pricing::GenericInstrumentPricer;
 use finstack_quant_valuations::instruments::Instrument;
@@ -45,16 +44,15 @@ fn test_equity_pricer_with_quoted_spot() {
         .with_quoted_spot(150.0);
 
     let market = MarketContext::new();
-    let pricer = EquityPricer;
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
 
     // Price per share should return the quote
-    let price_per_share = pricer.price_per_share(&equity, &market, as_of).unwrap();
+    let price_per_share = equity.price_per_share(&market, as_of).unwrap();
     assert_eq!(price_per_share.amount(), 150.0);
     assert_eq!(price_per_share.currency(), Currency::USD);
 
     // PV should be shares * price
-    let pv = pricer.pv(&equity, &market, as_of).unwrap();
+    let pv = equity.base_value(&market, as_of).unwrap();
     assert_eq!(pv.amount(), 15_000.0);
     assert_eq!(pv.currency(), Currency::USD);
 }
@@ -70,14 +68,13 @@ fn test_equity_pricer_from_market_data() {
         MarketScalar::Price(Money::new(200.0, Currency::USD).expect("valid money fixture")),
     );
 
-    let pricer = EquityPricer;
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
 
     // Should resolve from market data
-    let price_per_share = pricer.price_per_share(&equity, &market, as_of).unwrap();
+    let price_per_share = equity.price_per_share(&market, as_of).unwrap();
     assert_eq!(price_per_share.amount(), 200.0);
 
-    let pv = pricer.pv(&equity, &market, as_of).unwrap();
+    let pv = equity.base_value(&market, as_of).unwrap();
     assert_eq!(pv.amount(), 10_000.0);
 }
 
@@ -92,13 +89,12 @@ fn test_equity_pricer_with_custom_price_id() {
         MarketScalar::Price(Money::new(180.0, Currency::USD).expect("valid money fixture")),
     );
 
-    let pricer = EquityPricer;
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
 
-    let price_per_share = pricer.price_per_share(&equity, &market, as_of).unwrap();
+    let price_per_share = equity.price_per_share(&market, as_of).unwrap();
     assert_eq!(price_per_share.amount(), 180.0);
 
-    let pv = pricer.pv(&equity, &market, as_of).unwrap();
+    let pv = equity.base_value(&market, as_of).unwrap();
     assert_eq!(pv.amount(), 4_500.0);
 }
 
@@ -106,10 +102,9 @@ fn test_equity_pricer_with_custom_price_id() {
 fn test_equity_dividend_yield_default() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD);
     let market = MarketContext::new();
-    let pricer = EquityPricer;
 
     // Should default to 0.0 when not present
-    let div_yield = pricer.dividend_yield(&equity, &market).unwrap();
+    let div_yield = equity.dividend_yield(&market).unwrap();
     assert_eq!(div_yield, 0.0);
 }
 
@@ -118,8 +113,7 @@ fn test_equity_dividend_yield_from_market() {
     let equity = Equity::new("AAPL", "AAPL", Currency::USD).with_div_yield_id("AAPL-DIVYIELD");
     let market = MarketContext::new().insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.025)); // 2.5% dividend yield
 
-    let pricer = EquityPricer;
-    let div_yield = pricer.dividend_yield(&equity, &market).unwrap();
+    let div_yield = equity.dividend_yield(&market).unwrap();
     assert_eq!(div_yield, 0.025);
 }
 
@@ -131,8 +125,7 @@ fn test_equity_dividend_yield_with_custom_id() {
     let market =
         MarketContext::new().insert_price("CUSTOM_DIV_YIELD", MarketScalar::Unitless(0.03)); // 3% dividend yield
 
-    let pricer = EquityPricer;
-    let div_yield = pricer.dividend_yield(&equity, &market).unwrap();
+    let div_yield = equity.dividend_yield(&market).unwrap();
     assert_eq!(div_yield, 0.03);
 }
 
@@ -150,11 +143,9 @@ fn test_equity_forward_price() {
         .insert(curve)
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
-    let pricer = EquityPricer;
-
     // Forward price at t=1 year: S0 * exp((r - q) * t) = 100 * exp((0.05 - 0.02) * 1)
-    let forward_price = pricer
-        .forward_price_per_share(&equity, &market, base_date, 1.0)
+    let forward_price = equity
+        .forward_price_per_share(&market, base_date, 1.0)
         .unwrap();
     let expected = 100.0 * (0.03_f64).exp(); // ~103.05
     assert!((forward_price.amount() - expected).abs() < 0.01);
@@ -170,12 +161,8 @@ fn test_equity_forward_value() {
     let curve = build_flat_curve(0.04, base_date, "USD");
     let market = MarketContext::new().insert(curve);
 
-    let pricer = EquityPricer;
-
     // Forward value should be forward_price_per_share * shares
-    let forward_value = pricer
-        .forward_value(&equity, &market, base_date, 1.0)
-        .unwrap();
+    let forward_value = equity.forward_value(&market, base_date, 1.0).unwrap();
     let expected = 100.0 * (0.04_f64).exp() * 10.0; // ~104.08 * 10 = 1040.8
     assert!((forward_value.amount() - expected).abs() < 0.1);
 }
@@ -260,10 +247,9 @@ fn test_equity_pricer_zero_shares() {
         .with_quoted_spot(150.0);
 
     let market = MarketContext::new();
-    let pricer = EquityPricer;
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
 
-    let pv = pricer.pv(&equity, &market, as_of).unwrap();
+    let pv = equity.base_value(&market, as_of).unwrap();
     assert_eq!(pv.amount(), 0.0);
 }
 
@@ -275,10 +261,9 @@ fn test_equity_pricer_negative_shares() {
         .with_quoted_spot(150.0);
 
     let market = MarketContext::new();
-    let pricer = EquityPricer;
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
 
-    let pv = pricer.pv(&equity, &market, as_of).unwrap();
+    let pv = equity.base_value(&market, as_of).unwrap();
     assert_eq!(pv.amount(), -1_500.0);
 }
 
@@ -290,10 +275,9 @@ fn test_equity_pricer_different_currencies() {
         .with_quoted_spot(120.0);
 
     let market = MarketContext::new();
-    let pricer = EquityPricer;
     let as_of = Date::from_calendar_date(2024, time::Month::January, 1).unwrap();
 
-    let pv = pricer.pv(&equity, &market, as_of).unwrap();
+    let pv = equity.base_value(&market, as_of).unwrap();
     assert_eq!(pv.amount(), 2_400.0);
     assert_eq!(pv.currency(), Currency::EUR);
 }
@@ -306,11 +290,9 @@ fn test_equity_forward_price_zero_rates() {
     let curve = build_flat_curve(0.0, base_date, "USD");
     let market = MarketContext::new().insert(curve);
 
-    let pricer = EquityPricer;
-
     // With zero rates and no dividend, forward = spot
-    let forward_price = pricer
-        .forward_price_per_share(&equity, &market, base_date, 1.0)
+    let forward_price = equity
+        .forward_price_per_share(&market, base_date, 1.0)
         .unwrap();
     assert!((forward_price.amount() - 100.0).abs() < 0.01);
 }
@@ -329,11 +311,9 @@ fn test_equity_forward_price_high_dividend() {
         .insert(curve)
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.10));
 
-    let pricer = EquityPricer;
-
     // Forward should be lower than spot when div yield > r
-    let forward_price = pricer
-        .forward_price_per_share(&equity, &market, base_date, 1.0)
+    let forward_price = equity
+        .forward_price_per_share(&market, base_date, 1.0)
         .unwrap();
     assert!(forward_price.amount() < 100.0);
 
@@ -352,10 +332,9 @@ fn test_equity_forward_price_with_discrete_dividend() {
 
     let curve = build_flat_curve(0.05, base_date, "USD");
     let market = MarketContext::new().insert(curve);
-    let pricer = EquityPricer;
 
-    let forward_price = pricer
-        .forward_price_per_share(&equity, &market, base_date, 1.0)
+    let forward_price = equity
+        .forward_price_per_share(&market, base_date, 1.0)
         .unwrap();
 
     let expected = (100.0 - 2.50 * (-0.05_f64 * 0.25).exp()) * (0.05_f64).exp();

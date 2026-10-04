@@ -6,8 +6,8 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::{CommodityConvention, CommodityUnderlyingParams};
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::Position;
 use finstack_quant_core::currency::Currency;
@@ -147,14 +147,12 @@ pub struct CommodityForward {
     ///
     /// If `Some(K)`, the forward is **off-market** and NPV reflects the
     /// mark-to-market difference: sign × (F - K) × Q × M × DF.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contract_price: Option<f64>,
     /// Optional quoted forward price (overrides curve lookup for F).
     ///
     /// This is a market price override, not the contract entry price.
     /// Use `contract_price` for the trade entry price K.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quoted_forward: Option<f64>,
     /// Forward/futures price curve ID for price interpolation.
@@ -162,24 +160,20 @@ pub struct CommodityForward {
     /// Should reference a `PriceCurve` in the `MarketContext`.
     pub forward_curve_id: CurveId,
     /// Optional spot price ID (for delta calculations).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub spot_id: Option<PriceId>,
     /// Discount curve ID.
     pub discount_curve_id: CurveId,
     /// Optional exchange identifier (e.g., "NYMEX", "ICE").
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exchange: Option<String>,
     /// Optional contract month (e.g., "2025M03" for March 2025).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contract_month: Option<String>,
     /// Optional market convention for this commodity.
     ///
     /// When set, provides default settlement days and calendar if not
     /// explicitly specified. See `CommodityConvention` for available options.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub convention: Option<CommodityConvention>,
     /// Settlement lag in business days (T+N).
@@ -195,21 +189,18 @@ pub struct CommodityForward {
     /// | Precious metals | T+2 |
     /// | Base metals (LME) | T+2 |
     /// | Power | T+1 |
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settlement_days: Option<u32>,
     /// Calendar ID for settlement date adjustments.
     ///
     /// Used for business day adjustment of the settlement date. If `convention`
     /// is set, uses the convention's calendar unless explicitly overridden.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settlement_calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Business day convention for settlement date adjustment.
     ///
     /// Defaults to `Following` for energy commodities, `ModifiedFollowing`
     /// for precious metals.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settlement_business_day_convention: Option<BusinessDayConvention>,
     /// Instrument-owned pricing inputs.
@@ -482,7 +473,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommodityForward {
         Some(self.maturity)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CommodityForward {

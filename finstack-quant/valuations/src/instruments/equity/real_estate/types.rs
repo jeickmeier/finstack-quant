@@ -1,7 +1,7 @@
 //! Real estate asset valuation types.
 
 use super::pricer;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::pricer::InstrumentType;
 use finstack_quant_core::currency::Currency;
@@ -63,7 +63,6 @@ pub struct RealEstateAsset {
     /// Valuation method (DCF or DirectCap).
     pub valuation_method: RealEstateValuationMethod,
     /// Optional property type classification (for reporting).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub property_type: Option<RealEstatePropertyType>,
     /// Net operating income schedule (date, amount).
@@ -82,7 +81,6 @@ pub struct RealEstateAsset {
     /// Capital expenditure schedule (date, amount). Values are treated as **positive outflows**.
     ///
     /// When present, cashflows are valued as `NOI - CapEx` (unlevered net cash flow).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_dated_f64_values")]
     #[cfg_attr(
@@ -91,19 +89,15 @@ pub struct RealEstateAsset {
     )]
     pub capex_schedule: Option<Vec<(Date, f64)>>,
     /// Discount rate for DCF (annualized).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub discount_rate: Option<f64>,
     /// Capitalization rate for direct cap (annualized).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cap_rate: Option<f64>,
     /// Optional stabilized NOI override for direct cap.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stabilized_noi: Option<f64>,
     /// Optional terminal cap rate for DCF (uses last NOI).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terminal_cap_rate: Option<f64>,
     /// Optional terminal growth rate used to project `NOI_{N+1}` for exit valuation.
@@ -114,14 +108,12 @@ pub struct RealEstateAsset {
     /// NOI on/before the exit date — it is not compounded over any gap between
     /// the last scheduled NOI and a later `sale_date`.
     /// Validation range is \([-100\%, 20\%]\) to guard against configuration errors.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terminal_growth_rate: Option<f64>,
     /// Optional sale/exit date that truncates the DCF horizon.
     ///
     /// When set, DCF only values unlevered flows up to and including `sale_date`.
     /// Terminal proceeds (if configured) are realized on `sale_date`.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -132,11 +124,9 @@ pub struct RealEstateAsset {
     /// Optional explicit gross sale price (terminal proceeds), before disposition costs.
     ///
     /// When set, this takes precedence over `terminal_cap_rate` for terminal proceeds.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sale_price: Option<Money>,
     /// Optional purchase price (useful for IRR / cap rate metrics).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub purchase_price: Option<Money>,
     /// Acquisition (closing) cost line items in instrument currency, as
@@ -147,7 +137,6 @@ pub struct RealEstateAsset {
     /// Optional disposition cost percentage applied to terminal value.
     ///
     /// A value of `0.02` represents 2% selling costs. Must be in \([0, 1)\).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub disposition_cost_decimal: Option<f64>,
     /// Optional detailed disposition cost line items (positive outflows) deducted from terminal proceeds.
@@ -155,7 +144,6 @@ pub struct RealEstateAsset {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub disposition_costs: Vec<Money>,
     /// Optional appraisal override value.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub appraisal_value: Option<Money>,
     /// Day count convention for year fractions.
@@ -610,18 +598,18 @@ impl Instrument for RealEstateAsset {
 
     fn base_value(
         &self,
-        market: &MarketContext,
+        _market: &MarketContext,
         as_of: Date,
     ) -> finstack_quant_core::Result<Money> {
         self.validate()?;
-        pricer::compute_pv(self, market, as_of)
+        pricer::compute_pv(self, as_of)
     }
 
     fn effective_start_date(&self) -> Option<Date> {
         None
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 impl crate::cashflow::traits::CashflowScheduleSource for RealEstateAsset {
     fn raw_cashflow_schedule(

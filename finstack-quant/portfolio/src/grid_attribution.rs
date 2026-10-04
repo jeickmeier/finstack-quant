@@ -265,7 +265,7 @@ pub struct GridCellEffect {
     pub curve_effect: f64,
 }
 
-/// Per-(cell, sector) within-cell sector-allocation effect.
+/// Allocation and selection effects for one (cell, sector).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
@@ -276,21 +276,9 @@ pub struct GridSectorEffect {
     pub sector: String,
     /// Allocation effect `x_t^P (z_st^P − z_st^B)(r_st^B − r_t^B)`.
     pub allocation_effect: f64,
-}
-
-/// Per-(cell, sector) security-selection effect.
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct GridSelectionEffect {
-    /// Duration-cell label.
-    pub cell: String,
-    /// Sector label within the cell.
-    pub sector: String,
     /// Selection effect `y_st^P (r_st^P − r_st^B)`.
     pub selection_effect: f64,
 }
-
 /// Single-period hierarchical grid attribution result.
 ///
 /// This type is *input-reachable*: multi-period linking (Task 5) consumes a
@@ -310,12 +298,9 @@ pub struct GridAttributionResult {
     pub active_return: f64,
     /// Per-cell curve effects, in first-appearance order.
     pub curve_effects: Vec<GridCellEffect>,
-    /// Per-(cell, sector) allocation effects, in first-appearance order
+    /// Per-(cell, sector) allocation and selection effects, in first-appearance order
     /// (cells, then sectors within each cell).
     pub sector_effects: Vec<GridSectorEffect>,
-    /// Per-(cell, sector) selection effects, in the same order as
-    /// `sector_effects`.
-    pub selection_effects: Vec<GridSelectionEffect>,
     /// Sum of the curve effects.
     pub total_curve: f64,
     /// Sum of the sector allocation effects.
@@ -562,7 +547,6 @@ pub fn grid_attribution(
     let mut total_selection = NeumaierAccumulator::new();
     let mut curve_effects = Vec::with_capacity(cell_totals.len());
     let mut sector_effects = Vec::new();
-    let mut selection_effects = Vec::new();
 
     for ((cell, sector_map), (_, (p, b))) in cells.iter().zip(cell_totals.iter()) {
         let x_p = p.weight;
@@ -615,10 +599,6 @@ pub fn grid_attribution(
                 cell: cell.clone(),
                 sector: sector.clone(),
                 allocation_effect,
-            });
-            selection_effects.push(GridSelectionEffect {
-                cell: cell.clone(),
-                sector: sector.clone(),
                 selection_effect,
             });
         }
@@ -630,7 +610,6 @@ pub fn grid_attribution(
         active_return,
         curve_effects,
         sector_effects,
-        selection_effects,
         total_curve: total_curve.total(),
         total_sector: total_sector.total(),
         total_selection: total_selection.total(),
@@ -645,7 +624,7 @@ pub fn grid_attribution(
 /// scope decision: per-cell / per-(cell, sector) multi-period linking is
 /// deferred. Because the Carino scale `k_t / K` (see `carino_coefficient`)
 /// is a single per-period scalar multiplier, extending this to link
-/// `curve_effects`, `sector_effects`, and `selection_effects` element-wise —
+/// `curve_effects` and `sector_effects` element-wise —
 /// the way [`crate::fi_attribution::campisi_carino_link`] links its five
 /// per-sector effects — is a mechanical extension if ever needed: it would
 /// only require validating consistent cell/sector ordering across periods,
@@ -919,7 +898,7 @@ mod tests {
         // own emitted `Vec`, not to the cross-total identity.
         let sum_curve: f64 = r.curve_effects.iter().map(|e| e.curve_effect).sum();
         let sum_sector: f64 = r.sector_effects.iter().map(|e| e.allocation_effect).sum();
-        let sum_selection: f64 = r.selection_effects.iter().map(|e| e.selection_effect).sum();
+        let sum_selection: f64 = r.sector_effects.iter().map(|e| e.selection_effect).sum();
         assert_eq!(
             r.total_curve, sum_curve,
             "total_curve must equal the sum of curve_effects, not a value back-solved from \
@@ -931,7 +910,7 @@ mod tests {
         );
         assert_eq!(
             r.total_selection, sum_selection,
-            "total_selection must equal the sum of selection_effects"
+            "total_selection must equal the sum of sector selection effects"
         );
     }
 
@@ -988,7 +967,7 @@ mod tests {
 
         for sector in ["IG", "HY"] {
             let sel = r
-                .selection_effects
+                .sector_effects
                 .iter()
                 .find(|e| e.cell == "B" && e.sector == sector)
                 .unwrap_or_else(|| panic!("selection entry for B/{sector}"));
@@ -1049,7 +1028,7 @@ mod tests {
             .find(|e| e.cell == "A" && e.sector == "HY")
             .expect("allocation entry for A/HY");
         let sel_hy = r
-            .selection_effects
+            .sector_effects
             .iter()
             .find(|e| e.cell == "A" && e.sector == "HY")
             .expect("selection entry for A/HY");
@@ -1114,16 +1093,6 @@ mod tests {
                 ("Z", "S3"),
             ],
             "sectors must be first-appearance within each cell, portfolio before benchmark-only"
-        );
-
-        let selection_labels: Vec<(&str, &str)> = r
-            .selection_effects
-            .iter()
-            .map(|e| (e.cell.as_str(), e.sector.as_str()))
-            .collect();
-        assert_eq!(
-            selection_labels, sector_labels,
-            "selection_effects must share sector_effects' ordering"
         );
     }
 
@@ -1274,7 +1243,7 @@ mod tests {
             .find(|e| e.cell == "A" && e.sector == "SHORT")
             .expect("SHORT allocation entry");
         let sel_short = r
-            .selection_effects
+            .sector_effects
             .iter()
             .find(|e| e.cell == "A" && e.sector == "SHORT")
             .expect("SHORT selection entry");
@@ -1416,10 +1385,6 @@ mod tests {
         );
         assert_eq!(round_tripped.curve_effects.len(), r.curve_effects.len());
         assert_eq!(round_tripped.sector_effects.len(), r.sector_effects.len());
-        assert_eq!(
-            round_tripped.selection_effects.len(),
-            r.selection_effects.len()
-        );
         assert_eq!(round_tripped.curve_effects[0].cell, r.curve_effects[0].cell);
     }
 
@@ -1512,7 +1477,7 @@ mod tests {
             active_return: 0.03,
             curve_effects: Vec::new(),
             sector_effects: Vec::new(),
-            selection_effects: Vec::new(),
+
             total_curve: 0.01,
             total_sector: 0.01,
             total_selection: 0.005,
@@ -1563,7 +1528,7 @@ mod tests {
             active_return,
             curve_effects: Vec::new(),
             sector_effects: Vec::new(),
-            selection_effects: Vec::new(),
+
             total_curve: effects[0],
             total_sector: effects[1],
             total_selection: effects[2],

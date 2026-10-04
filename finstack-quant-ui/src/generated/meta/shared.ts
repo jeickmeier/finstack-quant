@@ -2404,7 +2404,7 @@ export default [
   {
     "path": "#/$defs/BasisSwap",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/BasisSwap",
-    "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;\nuse finstack_quant_valuations::instruments::FloatLegSpec;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::new(\n    \"BASIS_SWAP_001\",\n    Money::from((1_000_000_i64, Currency::USD)),\n    primary_leg,\n    reference_leg,\n);\n```"
+    "description": "Basis swap instrument that exchanges two floating rate payments with different tenors.\n\nA basis swap allows parties to exchange floating rate payments based on different\nreference rates (e.g., 3M SOFR vs 6M SOFR) plus an optional spread on one leg.\nThe primary leg typically receives the spread, while the reference leg pays flat.\n\nEach leg owns its own dates, discount curve, calendar, and stub conventions,\nfollowing the IRS leg-centric pattern.\n\n# Cross-Currency (XCCY) Basis Swaps\n\n**Important**: This implementation supports **single-currency** basis swaps only.\nFor cross-currency basis swaps, use `XccySwap` instead.\n\n# Examples\n```rust\nuse finstack_quant_core::{dates::*, money::Money, currency::Currency, types::CurveId};\nuse finstack_quant_valuations::instruments::rates::basis_swap::BasisSwap;\nuse finstack_quant_valuations::instruments::FloatLegSpec;\nuse time::Month;\n\nlet start = Date::from_calendar_date(2024, Month::January, 3).expect(\"valid date\");\nlet end = Date::from_calendar_date(2025, Month::January, 3).expect(\"valid date\");\n\nlet primary_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"3M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::quarterly(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::from(5),\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet reference_leg = FloatLegSpec {\n    forward_curve_id: CurveId::new(\"6M-SOFR\"),\n    discount_curve_id: CurveId::new(\"OIS\"),\n    start,\n    end,\n    frequency: Tenor::semi_annual(),\n    day_count: DayCount::Act360,\n    business_day_convention: BusinessDayConvention::ModifiedFollowing,\n    calendar_id: None,\n    fixing_calendar_id: None,\n    end_of_month: false,\n    stub: StubKind::ShortFront,\n    spread_bp: rust_decimal::Decimal::ZERO,\n    payment_lag_days: 0,\n    reset_lag_days: 0,\n    compounding: Default::default(),\n};\n\nlet swap = BasisSwap::builder()\n    .id(\"BASIS_SWAP_001\".into())\n    .notional(Money::from((1_000_000_i64, Currency::USD)))\n    .primary_leg(primary_leg)\n    .reference_leg(reference_leg)\n    .allow_calendar_fallback(true)\n    .attributes(Default::default())\n    .build().expect(\"valid basis swap\");\n```"
   },
   {
     "path": "#/$defs/BasisSwap/properties/allow_calendar_fallback",
@@ -23832,20 +23832,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CsaSpec"
   },
   {
-    "path": "#/$defs/OtcMarginSpec/properties/im_methodology",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OtcMarginSpec/properties/im_methodology",
-    "description": "Initial margin calculation methodology\n\n- Bilateral: SIMM or Schedule\n- Cleared: ClearingHouse (CCP-specific)",
-    "ref": "#/$defs/ImMethodology",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ImMethodology"
-  },
-  {
-    "path": "#/$defs/OtcMarginSpec/properties/settlement_lag",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OtcMarginSpec/properties/settlement_lag",
-    "description": "Settlement lag for margin transfers (business days)",
-    "format": "uint32",
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/OtcMarginSpec/properties/simm_credit_classification",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OtcMarginSpec/properties/simm_credit_classification",
     "description": "Explicit SIMM credit classification for credit-sensitive instruments.\n\nRequired when a credit product uses `ImMethodology::Simm`; leave `None`\nfor non-credit instruments and non-SIMM margin methodologies."
@@ -23859,13 +23845,6 @@ export default [
   {
     "path": "#/$defs/OtcMarginSpec/properties/simm_credit_classification/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OtcMarginSpec/properties/simm_credit_classification/anyOf/1"
-  },
-  {
-    "path": "#/$defs/OtcMarginSpec/properties/vm_frequency",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/OtcMarginSpec/properties/vm_frequency",
-    "description": "Variation margin exchange frequency",
-    "ref": "#/$defs/MarginTenor",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/MarginTenor"
   },
   {
     "path": "#/$defs/OvernightCouponConvention",
@@ -28902,12 +28881,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticUtilizationSpec/properties/mc_config/anyOf/1"
   },
   {
-    "path": "#/$defs/StochasticUtilizationSpec/properties/use_sobol_qmc",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticUtilizationSpec/properties/use_sobol_qmc",
-    "default": false,
-    "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `model_config.mc_antithetic = true`; validation\nrejects the combination."
-  },
-  {
     "path": "#/$defs/StochasticUtilizationSpec/properties/utilization_process",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticUtilizationSpec/properties/utilization_process",
     "description": "Utilization process specification.",
@@ -29451,7 +29424,7 @@ export default [
   {
     "path": "#/$defs/Swaption",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Swaption",
-    "description": "Swaption instrument\n\n# Exercise lifecycle boundary\n\n`Instrument::value` prices the option claim through expiry. At expiry it\nreturns model-free intrinsic value; after expiry it returns zero. For\nphysical settlement, trade lifecycle infrastructure must materialize the\ndelivered [`InterestRateSwap`] from `underlying_fixed_leg`,\n`underlying_float_leg`, `notional`, and `option_type`. This instrument does\nnot retain an exercised swap position after expiry."
+    "description": "European swaption instrument\n\n# Exercise lifecycle boundary\n\n`Instrument::value` prices the option claim through expiry. At expiry it\nreturns model-free intrinsic value; after expiry it returns zero. For\nphysical settlement, trade lifecycle infrastructure must materialize the\ndelivered [`InterestRateSwap`] from `underlying_fixed_leg`,\n`underlying_float_leg`, `notional`, and `option_type`. This instrument does\nnot retain an exercised swap position after expiry."
   },
   {
     "path": "#/$defs/Swaption/properties/attributes",
@@ -29466,13 +29439,6 @@ export default [
     "description": "Cash settlement annuity method (only used when settlement = Cash).\n\n- `CollateralizedCashPrice` (default): Actual collateral-discounted fixed-leg annuity\n- `ParYield`: Legacy flat-yield cash annuity\n- `IsdaParPar`: Legacy par-par annuity from the discount curve\n- `ZeroCoupon`: Single discount to swap maturity",
     "ref": "#/$defs/CashSettlementMethod",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CashSettlementMethod"
-  },
-  {
-    "path": "#/$defs/Swaption/properties/exercise_style",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/Swaption/properties/exercise_style",
-    "description": "Exercise style (European, Bermudan, American). Defaults to European.",
-    "ref": "#/$defs/ExerciseStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/ExerciseStyle"
   },
   {
     "path": "#/$defs/Swaption/properties/expiry",

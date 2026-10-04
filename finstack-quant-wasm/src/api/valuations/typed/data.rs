@@ -66,7 +66,7 @@ impl JsMertonMcConfig {
     }
 
     /// Return a copy with a different PIK schedule.
-    /// @param s - `PikSchedule` plain object or JSON string, e.g. from `valuations.instruments.pikScheduleUniform`.
+    /// @param s - `PikSchedule` plain object or JSON string, e.g. `{ uniform: "cash" }`.
     /// @returns A new configuration; the receiver is not modified.
     /// @throws Error - Throws with kind `validation` if `s` does not match the `PikSchedule` schema.
     #[wasm_bindgen(js_name = pikSchedule)]
@@ -326,59 +326,6 @@ pub fn asset_pool_with_reserve(
         .map(|value| arg::json(value, "reserveInterestDestination"))
         .transpose()?
         .unwrap_or_default();
-    to_js_value(&pool)
-}
-
-/// Account balances accepted by `assetPoolWithAccounts`; absent fields are left unchanged.
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PoolAccounts {
-    #[serde(default)]
-    cumulative_defaults: Option<finstack_quant_core::money::Money>,
-    #[serde(default)]
-    cumulative_recoveries: Option<finstack_quant_core::money::Money>,
-    #[serde(default)]
-    cumulative_prepayments: Option<finstack_quant_core::money::Money>,
-    #[serde(default)]
-    cumulative_scheduled_amortization: Option<finstack_quant_core::money::Money>,
-    #[serde(default)]
-    collection_account: Option<finstack_quant_core::money::Money>,
-    #[serde(default)]
-    excess_spread_account: Option<finstack_quant_core::money::Money>,
-    #[serde(default)]
-    original_balance: Option<finstack_quant_core::money::Money>,
-}
-
-/// Return a copy of a pool with seasoned account balances.
-/// @param pool - `AssetPool` plain object or JSON string.
-/// @param accounts - Plain object with any of `cumulative_defaults`, `cumulative_recoveries`, `cumulative_prepayments`, `cumulative_scheduled_amortization`, `collection_account`, `excess_spread_account` and `original_balance`, each a `Money` plain object; absent fields keep the pool's value.
-/// @returns A new `AssetPool` plain object with the given balances.
-/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema or `accounts` has an unknown field or a malformed amount.
-#[wasm_bindgen(js_name = assetPoolWithAccounts)]
-pub fn asset_pool_with_accounts(pool: JsValue, accounts: JsValue) -> Result<JsValue, JsValue> {
-    let mut pool: AssetPool = arg::json(&pool, "pool")?;
-    let accounts: PoolAccounts = arg::json(&accounts, "accounts")?;
-    if let Some(value) = accounts.original_balance {
-        pool.original_balance = Some(value);
-    }
-    if let Some(value) = accounts.cumulative_defaults {
-        pool.cumulative_defaults = value;
-    }
-    if let Some(value) = accounts.cumulative_recoveries {
-        pool.cumulative_recoveries = value;
-    }
-    if let Some(value) = accounts.cumulative_prepayments {
-        pool.cumulative_prepayments = value;
-    }
-    if let Some(value) = accounts.cumulative_scheduled_amortization {
-        pool.cumulative_scheduled_amortization = value;
-    }
-    if let Some(value) = accounts.collection_account {
-        pool.collection_account = value;
-    }
-    if let Some(value) = accounts.excess_spread_account {
-        pool.excess_spread_account = value;
-    }
     to_js_value(&pool)
 }
 

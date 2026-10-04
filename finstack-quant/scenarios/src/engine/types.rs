@@ -339,22 +339,8 @@ pub struct ApplicationEnvelope {
     /// Absent when no inventory was supplied; an empty inventory stays empty.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instruments: Option<Vec<InstrumentEnvelope>>,
-    /// Number of effects successfully applied.
-    pub operations_applied: usize,
-    /// Number of user-provided operations before expansion.
-    pub user_operations: usize,
-    /// Number of expanded operations the engine attempted.
-    pub expanded_operations: usize,
-    /// Authoritative metadata describing the state changed by applied effects.
-    pub changes: ScenarioChangeManifest,
-    /// Structured warnings produced while applying the scenario.
-    pub warnings: Vec<Warning>,
-    /// Audit stamp copied from the report.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta: Option<finstack_quant_core::config::ResultsMeta>,
-    /// Roll-forward report, when the scenario contained a time-roll operation.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub time_roll: Option<RollForwardReport>,
+    /// Canonical application counters, change manifest, warnings and policy stamp.
+    pub report: ApplicationReport,
 }
 
 impl ApplicationEnvelope {
@@ -384,13 +370,7 @@ impl ApplicationEnvelope {
             market: serde_json::to_value(market)?,
             model: model.map(serde_json::to_value).transpose()?,
             instruments: instruments.map(instrument_envelopes).transpose()?,
-            operations_applied: report.operations_applied,
-            user_operations: report.user_operations,
-            expanded_operations: report.expanded_operations,
-            changes: report.changes,
-            warnings: report.warnings,
-            meta: report.meta,
-            time_roll: report.time_roll,
+            report,
         })
     }
 
@@ -405,16 +385,7 @@ impl ApplicationEnvelope {
         Option<Vec<InstrumentEnvelope>>,
         ApplicationReport,
     ) {
-        let report = ApplicationReport {
-            operations_applied: self.operations_applied,
-            user_operations: self.user_operations,
-            expanded_operations: self.expanded_operations,
-            changes: self.changes,
-            warnings: self.warnings,
-            meta: self.meta,
-            time_roll: self.time_roll,
-        };
-        (self.market, self.model, self.instruments, report)
+        (self.market, self.model, self.instruments, self.report)
     }
 }
 

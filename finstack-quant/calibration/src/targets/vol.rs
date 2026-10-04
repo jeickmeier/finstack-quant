@@ -363,7 +363,6 @@ impl VolSurfaceTarget {
 mod tests {
     use super::*;
 
-    use crate::api::schema::VolSurfaceModel;
     use crate::quotes::ids::QuoteId;
     use finstack_quant_core::dates::{Date, DateExt};
     use finstack_quant_core::market_data::context::MarketContext;
@@ -566,7 +565,6 @@ mod tests {
             vol_surface_id: "SPX-VOL".to_string(),
             base_date,
             underlying_ticker: "SPX".to_string(),
-            model: VolSurfaceModel::Sabr,
             discount_curve_id: None,
             beta: 0.5,
             target_expiries: vec![0.5],
@@ -596,7 +594,6 @@ mod tests {
             vol_surface_id: "SPX-VOL".to_string(),
             base_date,
             underlying_ticker: "SPX".to_string(),
-            model: VolSurfaceModel::Sabr,
             discount_curve_id: Some("USD-OIS".into()),
             beta: 0.5,
             target_expiries: vec![1.0, 2.0],

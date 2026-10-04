@@ -4,8 +4,8 @@
 //! It does not include forward/futures convexity from stochastic domestic
 //! rates, foreign rates, or their correlations with FX.
 
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::listed::ListedFutureTerms;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fx::shared::{covered_interest_parity_forward, FxForwardRateRequest};
 use finstack_quant_core::currency::Currency;
@@ -48,7 +48,6 @@ pub struct FxFuture {
     /// Base-currency discount curve.
     pub foreign_discount_curve_id: CurveId,
     /// Optional spot override in quote currency per base currency.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quoted_spot: Option<f64>,
     /// Instrument-owned pricing inputs.
@@ -228,7 +227,7 @@ impl crate::instruments::Instrument for FxFuture {
         Some(self.terms.settlement_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

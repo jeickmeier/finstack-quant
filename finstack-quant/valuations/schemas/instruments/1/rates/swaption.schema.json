@@ -39,26 +39,6 @@
       "minimum": -1.0,
       "type": "number"
     },
-    "ExerciseStyle": {
-      "description": "Exercise schedule convention for option models.",
-      "oneOf": [
-        {
-          "const": "european",
-          "description": "Exercise only at expiry.",
-          "type": "string"
-        },
-        {
-          "const": "american",
-          "description": "Exercise at any eligible time through expiry.",
-          "type": "string"
-        },
-        {
-          "const": "bermudan",
-          "description": "Exercise on a finite schedule of eligible dates.",
-          "type": "string"
-        }
-      ]
-    },
     "FixedLegSpec": {
       "additionalProperties": false,
       "description": "Specification for fixed rate legs in interest rate swaps",
@@ -467,7 +447,7 @@
     },
     "Swaption": {
       "additionalProperties": false,
-      "description": "Swaption instrument\n\n# Exercise lifecycle boundary\n\n`Instrument::value` prices the option claim through expiry. At expiry it\nreturns model-free intrinsic value; after expiry it returns zero. For\nphysical settlement, trade lifecycle infrastructure must materialize the\ndelivered [`InterestRateSwap`] from `underlying_fixed_leg`,\n`underlying_float_leg`, `notional`, and `option_type`. This instrument does\nnot retain an exercised swap position after expiry.",
+      "description": "European swaption instrument\n\n# Exercise lifecycle boundary\n\n`Instrument::value` prices the option claim through expiry. At expiry it\nreturns model-free intrinsic value; after expiry it returns zero. For\nphysical settlement, trade lifecycle infrastructure must materialize the\ndelivered [`InterestRateSwap`] from `underlying_fixed_leg`,\n`underlying_float_leg`, `notional`, and `option_type`. This instrument does\nnot retain an exercised swap position after expiry.",
       "properties": {
         "attributes": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/attributes.schema.json",
@@ -476,10 +456,6 @@
         "cash_settlement_method": {
           "$ref": "#/$defs/CashSettlementMethod",
           "description": "Cash settlement annuity method (only used when settlement = Cash).\n\n- `CollateralizedCashPrice` (default): Actual collateral-discounted fixed-leg annuity\n- `ParYield`: Legacy flat-yield cash annuity\n- `IsdaParPar`: Legacy par-par annuity from the discount curve\n- `ZeroCoupon`: Single discount to swap maturity"
-        },
-        "exercise_style": {
-          "$ref": "#/$defs/ExerciseStyle",
-          "description": "Exercise style (European, Bermudan, American). Defaults to European."
         },
         "expiry": {
           "$ref": "https://finstack_quant.dev/schemas/common/1/date.schema.json",
@@ -546,7 +522,6 @@
         "option_type",
         "notional",
         "expiry",
-        "exercise_style",
         "settlement",
         "cash_settlement_method",
         "vol_model",
@@ -600,7 +575,6 @@
         "spec": {
           "attributes": {},
           "cash_settlement_method": "collateralized_cash_price",
-          "exercise_style": "european",
           "expiry": "2027-01-15",
           "id": "SWPN-1Yx5Y-USD",
           "notional": {

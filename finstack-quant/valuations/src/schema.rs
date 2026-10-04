@@ -503,17 +503,37 @@ fn validate_with(
     instance: &Value,
     context: &str,
 ) -> finstack_quant_core::Result<()> {
-    let errors: Vec<String> = validator
-        .iter_errors(instance)
-        .map(|e| {
-            let path = e.instance_path.to_string();
-            if path.is_empty() {
-                e.to_string()
-            } else {
-                format!("{path}: {e}")
-            }
-        })
-        .collect();
+    if validator.is_valid(instance) {
+        return Ok(());
+    }
+    let schema = if context == "instrument envelope" {
+        instrument_envelope_schema()?.clone()
+    } else {
+        instrument_schema(context)?
+    };
+    let resources = external_schema_resources()?;
+    let resolve = |id: &str| {
+        resources
+            .iter()
+            .find(|(uri, _)| uri == id)
+            .map(|(_, resource)| resource.contents().clone())
+    };
+    let errors: Vec<String> = finstack_quant_core::schema::diagnostics::collect_failures(
+        validator,
+        &schema,
+        instance,
+        &resolve,
+        &|branch| build_validator(branch, context),
+    )
+    .into_iter()
+    .map(|failure| {
+        if failure.pointer.is_empty() {
+            failure.message
+        } else {
+            format!("{}: {}", failure.pointer, failure.message)
+        }
+    })
+    .collect();
 
     if errors.is_empty() {
         Ok(())

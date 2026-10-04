@@ -17,7 +17,7 @@ use crate::bindings::core::types::PyAttributes;
 use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
-use crate::errors::{core_to_py, value_error};
+use crate::errors::core_to_py;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::InstrumentJson;
 
@@ -25,14 +25,14 @@ use super::convert::{
     attributes_from_py, attributes_to_py, enum_to_py_string, money_from_py, money_to_py,
     rate_decimal_from_py,
 };
-use super::instruments::{
-    builder_repr, decimal_from_f64, enum_from_str, instrument_default_model, instrument_expiry,
-    instrument_market_dependencies, metric_typed, money_repr, opt_serde_to_py,
-    parse_typed_instrument_json, price_typed, serialize_typed_instrument_json, spec_from_py,
-    stub_kind_from_py,
-};
 use super::typed_legs::{PyFixedLegSpec, PyFloatLegSpec};
 use super::PyValuationResult;
+use crate::bindings::valuations::convert::{builder_repr, money_repr};
+use crate::bindings::valuations::instruments::{
+    decimal_from_f64, enum_from_str, instrument_default_model, instrument_expiry,
+    instrument_market_dependencies, metric_typed, opt_serde_to_py, parse_typed_instrument_json,
+    price_typed, serialize_typed_instrument_json, spec_from_py, stub_kind_from_py,
+};
 
 type IrsBuilder = finstack_quant_valuations::instruments::rates::irs::InterestRateSwapBuilder;
 type SwaptionBuilderInner =
@@ -494,13 +494,6 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
     fields
 );
 
-/// Take the wrapped Rust builder or fail if `build()` already consumed it.
-fn take_irs(b: &mut PyInterestRateSwapBuilder) -> PyResult<IrsBuilder> {
-    b.inner
-        .take()
-        .ok_or_else(|| value_error("builder already consumed by build()"))
-}
-
 #[pymethods]
 impl PyInterestRateSwapBuilder {
     /// Set the instrument identifier.
@@ -516,7 +509,7 @@ impl PyInterestRateSwapBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_irs(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.id(InstrumentId::new(value.to_string())));
         slf.fields.push(("id", format!("{value:?}")));
         Ok(slf)
@@ -548,7 +541,7 @@ impl PyInterestRateSwapBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        let b = take_irs(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.notional(money));
         slf.fields.push(("notional", money_repr(money)));
         Ok(slf)
@@ -574,7 +567,7 @@ impl PyInterestRateSwapBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn side<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let side = enum_from_str(value, "side")?;
-        let b = take_irs(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.side(side));
         slf.fields.push(("side", format!("{value:?}")));
         Ok(slf)
@@ -596,7 +589,7 @@ impl PyInterestRateSwapBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFixedLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_irs(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.fixed_leg(value.inner.clone()));
         slf.fields.push(("fixed_leg", value.__repr__()));
         Ok(slf)
@@ -618,7 +611,7 @@ impl PyInterestRateSwapBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFloatLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_irs(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.float_leg(value.inner.clone()));
         slf.fields.push(("float_leg", value.__repr__()));
         Ok(slf)
@@ -647,7 +640,7 @@ impl PyInterestRateSwapBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: OtcMarginSpec = spec_from_py(py, value, "margin_spec")?;
-        let b = take_irs(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.margin_spec(spec));
         slf.fields.push(("margin_spec", "{...}".to_string()));
         Ok(slf)
@@ -679,7 +672,7 @@ impl PyInterestRateSwapBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
-        let b = take_irs(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.attributes(attrs));
         slf.fields
             .push(("attributes", "Attributes(...)".to_string()));
@@ -704,7 +697,7 @@ impl PyInterestRateSwapBuilder {
     ///     validation.
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyInterestRateSwap> {
-        let b = take_irs(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         let inner = b.build().map_err(core_to_py)?;
         Ok(PyInterestRateSwap { inner })
     }
@@ -718,7 +711,7 @@ impl PyInterestRateSwapBuilder {
 /// Typed wrapper for the Rust `Swaption` instrument.
 ///
 /// Construct via ``Swaption.builder()``, ``Swaption.example()`` /
-/// ``Swaption.from_json``. Every public
+/// ``Swaption.example()`` or ``Swaption.from_json``. Every public
 /// Rust field is readable as a property; ``get_strike`` / ``get_underlying_start_date``
 /// / ``get_underlying_maturity`` / ``forward_swap_rate`` mirror the Rust accessors and
 /// ``price`` / ``metric`` run the same pricer as ``price_instrument``.
@@ -1037,12 +1030,6 @@ impl PySwaption {
         date_to_py(py, self.inner.expiry)
     }
 
-    /// Exercise style: ``"european"``, ``"bermudan"`` or ``"american"``.
-    #[getter]
-    fn exercise_style(&self) -> PyResult<String> {
-        enum_to_py_string(&self.inner.exercise_style)
-    }
-
     /// Settlement method: ``"physical"`` or ``"cash"``.
     #[getter]
     fn settlement(&self) -> PyResult<String> {
@@ -1150,13 +1137,6 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
     fields
 );
 
-/// Take the wrapped Rust builder or fail if `build()` already consumed it.
-fn take_swaption(b: &mut PySwaptionBuilder) -> PyResult<SwaptionBuilderInner> {
-    b.inner
-        .take()
-        .ok_or_else(|| value_error("builder already consumed by build()"))
-}
-
 #[pymethods]
 impl PySwaptionBuilder {
     /// Set the instrument identifier.
@@ -1172,7 +1152,7 @@ impl PySwaptionBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.id(InstrumentId::new(value.to_string())));
         slf.fields.push(("id", format!("{value:?}")));
         Ok(slf)
@@ -1200,7 +1180,7 @@ impl PySwaptionBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let option_type = enum_from_str(value, "option_type")?;
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.option_type(option_type));
         slf.fields.push(("option_type", format!("{value:?}")));
         Ok(slf)
@@ -1232,7 +1212,7 @@ impl PySwaptionBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.notional(money));
         slf.fields.push(("notional", money_repr(money)));
         Ok(slf)
@@ -1255,37 +1235,9 @@ impl PySwaptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let expiry = extract_date(value)?;
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.expiry(expiry));
         slf.fields.push(("expiry", expiry.to_string()));
-        Ok(slf)
-    }
-
-    /// Set the exercise style.
-    ///
-    /// Parameters
-    /// ----------
-    /// value : {"european", "bermudan", "american"}
-    ///     Exercise style of the swaption.
-    ///
-    /// Returns
-    /// -------
-    /// SwaptionBuilder
-    ///     ``self``, for chaining.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If ``value`` is not a recognized exercise style.
-    #[pyo3(text_signature = "($self, value)")]
-    fn exercise_style<'py>(
-        mut slf: PyRefMut<'py, Self>,
-        value: &str,
-    ) -> PyResult<PyRefMut<'py, Self>> {
-        let exercise_style = enum_from_str(value, "exercise_style")?;
-        let b = take_swaption(&mut slf)?;
-        slf.inner = Some(b.exercise_style(exercise_style));
-        slf.fields.push(("exercise_style", format!("{value:?}")));
         Ok(slf)
     }
 
@@ -1308,7 +1260,7 @@ impl PySwaptionBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let settlement = enum_from_str(value, "settlement")?;
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.settlement(settlement));
         slf.fields.push(("settlement", format!("{value:?}")));
         Ok(slf)
@@ -1339,7 +1291,7 @@ impl PySwaptionBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let method = enum_from_str(value, "cash_settlement_method")?;
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.cash_settlement_method(method));
         slf.fields
             .push(("cash_settlement_method", format!("{value:?}")));
@@ -1365,7 +1317,7 @@ impl PySwaptionBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn vol_model<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let vol_model = enum_from_str(value, "vol_model")?;
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.vol_model(vol_model));
         slf.fields.push(("vol_model", format!("{value:?}")));
         Ok(slf)
@@ -1387,7 +1339,7 @@ impl PySwaptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.vol_surface_id(CurveId::new(value.to_string())));
         slf.fields.push(("vol_surface_id", format!("{value:?}")));
         Ok(slf)
@@ -1409,7 +1361,7 @@ impl PySwaptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFixedLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.underlying_fixed_leg(value.inner.clone()));
         slf.fields.push(("underlying_fixed_leg", value.__repr__()));
         Ok(slf)
@@ -1431,7 +1383,7 @@ impl PySwaptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: PyRef<'_, PyFloatLegSpec>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.underlying_float_leg(value.inner.clone()));
         slf.fields.push(("underlying_float_leg", value.__repr__()));
         Ok(slf)
@@ -1462,7 +1414,7 @@ impl PySwaptionBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let sabr_params: finstack_quant_models::volatility::SabrParameters =
             spec_from_py(py, value, "sabr_params")?;
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.sabr_params(sabr_params));
         slf.fields.push(("sabr_params", "{...}".to_string()));
         Ok(slf)
@@ -1494,7 +1446,7 @@ impl PySwaptionBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.attributes(attrs));
         slf.fields
             .push(("attributes", "Attributes(...)".to_string()));
@@ -1519,7 +1471,7 @@ impl PySwaptionBuilder {
     ///     validation.
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PySwaption> {
-        let b = take_swaption(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         let inner = b.build().map_err(core_to_py)?;
         Ok(PySwaption { inner })
     }
@@ -1982,13 +1934,6 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
     fields
 );
 
-/// Take the wrapped Rust builder or fail if `build()` already consumed it.
-fn take_cap_floor(b: &mut PyCapFloorBuilder) -> PyResult<CapFloorBuilderInner> {
-    b.inner
-        .take()
-        .ok_or_else(|| value_error("builder already consumed by build()"))
-}
-
 #[pymethods]
 impl PyCapFloorBuilder {
     /// Set the instrument identifier.
@@ -2004,7 +1949,7 @@ impl PyCapFloorBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.id(InstrumentId::new(value.to_string())));
         slf.fields.push(("id", format!("{value:?}")));
         Ok(slf)
@@ -2034,7 +1979,7 @@ impl PyCapFloorBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let rate_option_type = enum_from_str(value, "rate_option_type")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.rate_option_type(rate_option_type));
         slf.fields.push(("rate_option_type", format!("{value:?}")));
         Ok(slf)
@@ -2066,7 +2011,7 @@ impl PyCapFloorBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.notional(money));
         slf.fields.push(("notional", money_repr(money)));
         Ok(slf)
@@ -2097,7 +2042,7 @@ impl PyCapFloorBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let strike = rate_decimal_from_py(value, "strike")?;
         let strike = decimal_from_f64(strike, "strike")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.strike(strike));
         slf.fields.push(("strike", strike.to_string()));
         Ok(slf)
@@ -2129,7 +2074,7 @@ impl PyCapFloorBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spread_bp = crate::bindings::valuations::convert::bps_from_py(value, "spread_bp")?;
         let spread_bp = decimal_from_f64(spread_bp, "spread_bp")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.spread_bp(spread_bp));
         slf.fields.push(("spread_bp", spread_bp.to_string()));
         Ok(slf)
@@ -2169,7 +2114,7 @@ impl PyCapFloorBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let payment_date = extract_date(payment_date)?;
         let amount = money_from_py(amount, currency, "amount")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.premium((payment_date, amount)));
         slf.fields.push((
             "premium",
@@ -2195,7 +2140,7 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let start_date = extract_date(value)?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.start_date(start_date));
         slf.fields.push(("start_date", start_date.to_string()));
         Ok(slf)
@@ -2218,7 +2163,7 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let maturity = extract_date(value)?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.maturity(maturity));
         slf.fields.push(("maturity", maturity.to_string()));
         Ok(slf)
@@ -2246,7 +2191,7 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let tenor = crate::bindings::valuations::convert::tenor_from_py(value, "frequency")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.frequency(tenor));
         slf.fields.push(("frequency", tenor.to_string()));
         Ok(slf)
@@ -2275,7 +2220,7 @@ impl PyCapFloorBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let day_count =
             crate::bindings::valuations::convert::day_count_from_py(value, "day_count")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.day_count(day_count));
         slf.fields.push(("day_count", day_count.to_string()));
         Ok(slf)
@@ -2303,7 +2248,7 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let stub = stub_kind_from_py(Some(value), "stub")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.stub(stub));
         slf.fields.push((
             "stub",
@@ -2334,7 +2279,7 @@ impl PyCapFloorBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention = super::convert::bdc_from_str(value, "business_day_convention")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.business_day_convention(convention));
         slf.fields
             .push(("business_day_convention", format!("{value:?}")));
@@ -2357,7 +2302,7 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.calendar_id(CalendarId::new(value.to_string())));
         slf.fields.push(("calendar_id", format!("{value:?}")));
         Ok(slf)
@@ -2385,7 +2330,7 @@ impl PyCapFloorBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let style = enum_from_str(value, "exercise_style")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.exercise_style(style));
         slf.fields.push(("exercise_style", format!("{value:?}")));
         Ok(slf)
@@ -2410,7 +2355,7 @@ impl PyCapFloorBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn settlement<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let settlement = enum_from_str(value, "settlement")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.settlement(settlement));
         slf.fields.push(("settlement", format!("{value:?}")));
         Ok(slf)
@@ -2432,7 +2377,7 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.discount_curve_id(CurveId::new(value.to_string())));
         slf.fields.push(("discount_curve_id", format!("{value:?}")));
         Ok(slf)
@@ -2454,7 +2399,7 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.forward_curve_id(CurveId::new(value.to_string())));
         slf.fields.push(("forward_curve_id", format!("{value:?}")));
         Ok(slf)
@@ -2476,7 +2421,7 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.vol_surface_id(CurveId::new(value.to_string())));
         slf.fields.push(("vol_surface_id", format!("{value:?}")));
         Ok(slf)
@@ -2506,7 +2451,7 @@ impl PyCapFloorBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn vol_type<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let vol_type = enum_from_str(value, "vol_type")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.vol_type(vol_type));
         slf.fields.push(("vol_type", format!("{value:?}")));
         Ok(slf)
@@ -2525,7 +2470,7 @@ impl PyCapFloorBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn vol_shift<'py>(mut slf: PyRefMut<'py, Self>, value: f64) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.vol_shift(value));
         slf.fields.push(("vol_shift", value.to_string()));
         Ok(slf)
@@ -2557,7 +2502,7 @@ impl PyCapFloorBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention: finstack_quant_valuations::instruments::rates::cap_floor::OvernightCouponConvention =
             spec_from_py(py, value, "overnight_coupon")?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.overnight_coupon(convention));
         slf.fields.push(("overnight_coupon", "{...}".to_string()));
         Ok(slf)
@@ -2589,7 +2534,7 @@ impl PyCapFloorBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.attributes(attrs));
         slf.fields
             .push(("attributes", "Attributes(...)".to_string()));
@@ -2614,7 +2559,7 @@ impl PyCapFloorBuilder {
     ///     validation.
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyCapFloor> {
-        let b = take_cap_floor(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         let inner = b.build().map_err(core_to_py)?;
         Ok(PyCapFloor { inner })
     }
@@ -2640,4 +2585,11 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 ///
 /// Extend this list (sorted) when adding a class or function here; `mod.rs`
 /// merges every submodule list so registration stays in one place per file.
-pub(crate) const EXPORTS: &[&str] = &[];
+pub(crate) const EXPORTS: &[&str] = &[
+    "CapFloor",
+    "CapFloorBuilder",
+    "InterestRateSwap",
+    "InterestRateSwapBuilder",
+    "Swaption",
+    "SwaptionBuilder",
+];

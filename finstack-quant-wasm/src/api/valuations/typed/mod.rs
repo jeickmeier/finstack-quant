@@ -15,7 +15,7 @@
 //!   with the strict `utils::input` checks.
 
 #[macro_use]
-mod macros;
+pub(crate) mod macros;
 
 pub mod cds_option;
 pub mod credit;

@@ -162,7 +162,7 @@ portfolio aggregation paths plus a `ProvisionWaterfall`. Stage 2/3 DPD
 backstops fire at `days_past_due >= 30` / `>= 90` (bank / CECL alignment);
 the display contract is `dpd_stage2 (dpd=30 >= 30)` /
 `dpd_stage3 (dpd=90 >= 90)`. `Exposure` priced EAD is
-`drawn + undrawn × ccf` via core `ead_revolver` (`undrawn` default `0.0`,
+`drawn + undrawn × ccf` via models `EadCalculator::new` (`undrawn` default `0.0`,
 `ccf` default `0.75` / `DEFAULT_REVOLVER_CCF`). `RatingPdMap` is a
 rating-keyed map of `RawPdCurve` values; a supplied rating missing from its PD source is an error. If either exposure
 rating is `None`, the PD-delta test is explicitly skipped. `EclConfig`, `StagingConfig` and

@@ -68,7 +68,7 @@ impl RecalibrationProvider for CachedRecalibrationProvider {
                 forward_curve_id,
                 bump,
             } => bump_market_via_rate_quote_shock_cached(
-                Some(&self.rate),
+                &self.rate,
                 market,
                 discount_curve_id,
                 forward_curve_id,
@@ -79,10 +79,7 @@ impl RecalibrationProvider for CachedRecalibrationProvider {
                 curve_id,
                 bump,
             } => bump_single_ois_market_via_rate_quote_shock_cached(
-                Some(&self.rate),
-                market,
-                curve_id,
-                bump,
+                &self.rate, market, curve_id, bump,
             ),
         }
     }
@@ -93,7 +90,7 @@ impl RecalibrationProvider for CachedRecalibrationProvider {
     ) -> finstack_quant_core::Result<Arc<DiscountCurve>> {
         request.bump.validate()?;
         bump_discount_curve_from_rate_calibration_cached(
-            Some(&self.rate),
+            &self.rate,
             request.curve.as_ref(),
             &request.recipe,
             request.market.as_ref(),
@@ -138,7 +135,7 @@ impl RecalibrationProvider for CachedRecalibrationProvider {
                     ));
                 }
                 bump_hazard_spread_risk_input_cached(
-                    Some(&self.hazard),
+                    &self.hazard,
                     hazard.as_ref(),
                     request.target_market.as_ref(),
                     (*quote_index, *bump_bp),
@@ -197,16 +194,6 @@ impl RecalibrationProvider for CachedRecalibrationProvider {
         &self,
         hazard: &HazardCurve,
     ) -> finstack_quant_core::Result<Vec<HazardSpreadRiskBucket>> {
-        hazard_spread_risk_buckets(hazard).map(|buckets| {
-            buckets
-                .into_iter()
-                .map(|bucket| HazardSpreadRiskBucket {
-                    quote_index: bucket.index,
-                    quote_id: bucket.quote_id,
-                    pillar_date: bucket.pillar_date,
-                    pillar_time: bucket.pillar_time,
-                })
-                .collect()
-        })
+        hazard_spread_risk_buckets(hazard)
     }
 }

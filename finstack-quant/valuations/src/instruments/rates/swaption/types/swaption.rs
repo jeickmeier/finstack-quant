@@ -1,8 +1,8 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::common_impl::parameters::OptionType;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::instruments::common_impl::vol_resolution::{
@@ -27,9 +27,9 @@ use rust_decimal::Decimal;
 
 use super::super::parameters::SwaptionParams;
 use super::definitions::CashSettlementMethod;
-use crate::instruments::{ExerciseStyle, SettlementType, VolatilityModel};
+use crate::instruments::{SettlementType, VolatilityModel};
 
-/// Swaption instrument
+/// European swaption instrument
 ///
 /// # Exercise lifecycle boundary
 ///
@@ -62,9 +62,6 @@ pub struct Swaption {
         schemars(with = "finstack_quant_core::wire::DateWire")
     )]
     pub expiry: Date,
-    /// Exercise style (European, Bermudan, American). Defaults to European.
-    #[builder(default)]
-    pub exercise_style: ExerciseStyle,
     /// Settlement method (physical or cash)
     pub settlement: SettlementType,
     /// Cash settlement annuity method (only used when settlement = Cash).
@@ -310,7 +307,6 @@ impl Swaption {
             option_type: OptionType::Call,
             notional: Money::from((10_000_000_i64, Currency::USD)),
             expiry: time::macros::date!(2027 - 01 - 15),
-            exercise_style: ExerciseStyle::European,
             settlement: SettlementType::Cash,
             cash_settlement_method: CashSettlementMethod::default(),
             vol_model: VolatilityModel::Black,
@@ -370,7 +366,6 @@ impl Swaption {
             },
             notional: params.notional,
             expiry: params.expiry,
-            exercise_style: ExerciseStyle::European,
             settlement: SettlementType::Physical,
             cash_settlement_method: CashSettlementMethod::default(),
             vol_surface_id: vol_surface_id.into(),
@@ -388,12 +383,6 @@ impl Swaption {
     /// Attach SABR parameters to enable SABR-implied volatility pricing.
     pub fn with_sabr_params(mut self, params: SabrParameters) -> Self {
         self.sabr_params = Some(params);
-        self
-    }
-
-    /// Override the exercise style (default: European).
-    pub fn with_exercise_style(mut self, style: ExerciseStyle) -> Self {
-        self.exercise_style = style;
         self
     }
 
@@ -488,18 +477,6 @@ impl Swaption {
         year_fraction(DayCount::Act365F, as_of, self.expiry)
     }
 
-    fn validate_european_exercise(&self) -> Result<()> {
-        match self.exercise_style {
-            ExerciseStyle::European => Ok(()),
-            ExerciseStyle::Bermudan | ExerciseStyle::American => Err(Error::Validation(format!(
-                "Swaption '{}' has exercise_style={}; the generic Swaption pricer only \
-                     supports European exercise. Use the LMM or Hull-White early-exercise \
-                     pricer for Bermudan/American swaptions.",
-                self.id, self.exercise_style
-            ))),
-        }
-    }
-
     /// Return the model-independent terminal value at or after expiry.
     ///
     /// Exactly at expiry this is the exercise-date intrinsic value. After
@@ -518,15 +495,13 @@ impl Swaption {
     ///
     /// # Errors
     ///
-    /// Returns an error for unsupported non-European exercise styles or when
+    /// Returns an error when
     /// the forward rate or annuity required at exact expiry cannot be resolved.
     pub(crate) fn terminal_value(
         &self,
         curves: &MarketContext,
         as_of: Date,
     ) -> Result<Option<Money>> {
-        self.validate_european_exercise()?;
-
         if as_of < self.expiry {
             return Ok(None);
         }
@@ -758,25 +733,7 @@ impl Swaption {
         &self,
     ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
         let fixed = &self.underlying_fixed_leg;
-        crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: fixed.start,
-                end: fixed.end,
-                frequency: fixed.frequency,
-                stub: fixed.stub,
-                business_day_convention: fixed.business_day_convention,
-                calendar_id: fixed
-                    .calendar_id
-                    .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
-                end_of_month: fixed.end_of_month,
-                day_count: fixed.day_count,
-                payment_lag_days: fixed.payment_lag_days,
-                reset_lag_days: None,
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        )
+        crate::cashflow::builder::periods::build_periods(fixed.schedule_params(false))
     }
 
     /// Cash settlement annuity using the par-yield method.
@@ -1203,7 +1160,7 @@ impl crate::instruments::common_impl::traits::Instrument for Swaption {
         Some(self.get_underlying_start_date())
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.

@@ -135,3 +135,6 @@ pub use pricing_options::PricingOptions;
 /// assert!(!attrs.matches_selector("tag:high-yield"));
 /// ```
 pub use finstack_quant_core::types::Attributes;
+
+pub(crate) use macros::{impl_focused_pricing_overrides, impl_instrument_base};
+pub(crate) use option_greeks::impl_equity_exotic_traits;

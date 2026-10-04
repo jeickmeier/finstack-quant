@@ -6,13 +6,12 @@
 
 use super::js_currency;
 use crate::utils::input::{
-    from_js_json, js_bool, js_f64, js_opt_f64, js_opt_string, js_opt_string_seq, js_string, js_uint,
+    from_js_json, js_bool, js_f64, js_opt_string, js_opt_string_seq, js_string, js_uint,
 };
 use crate::utils::{to_js_err, to_js_value};
-use finstack_quant_core::currency::Currency;
 use finstack_quant_margin::regulatory::frtb::{
-    frtb_sba_charge as frtb_sba_charge_rs, CorrelationScenario, DrcAssetType, DrcPosition,
-    DrcSector, DrcSeniority, FrtbRiskClass, FrtbSbaEngine, FrtbSensitivities,
+    frtb_sba_charge as frtb_sba_charge_rs, CorrelationScenario, DrcPosition, FrtbRiskClass,
+    FrtbSbaEngine, FrtbSensitivities,
 };
 use wasm_bindgen::prelude::*;
 
@@ -40,26 +39,13 @@ fn serde_label<T: serde::de::DeserializeOwned>(label: &str) -> Result<T, JsValue
 /// import init, { margin } from "finstack-quant-wasm";
 /// await init();
 /// const sens = new margin.FrtbSensitivities("USD");
-/// sens.addGirrDelta("5Y", 100_000);
+/// sens.addGirrDelta("USD", "5Y", 100_000);
 /// margin.frtbSbaCharge(sens).total; // capital charge in USD
 /// ```
 #[wasm_bindgen(js_name = FrtbSensitivities)]
 #[derive(Clone)]
 pub struct JsFrtbSensitivities {
     inner: FrtbSensitivities,
-}
-
-impl JsFrtbSensitivities {
-    fn currency_or_base(
-        &self,
-        currency: Option<&JsValue>,
-        label: &str,
-    ) -> Result<Currency, JsValue> {
-        match js_opt_string(currency, label)? {
-            Some(code) => code.parse().map_err(to_js_err),
-            None => Ok(self.inner.base_currency),
-        }
-    }
 }
 
 #[wasm_bindgen(js_class = FrtbSensitivities)]
@@ -119,59 +105,59 @@ impl JsFrtbSensitivities {
     /// Add a GIRR delta sensitivity.
     /// @param tenor - GIRR tenor bucket, such as `"5Y"`.
     /// @param amount - Signed base-currency P&L per 1 percentage point of curve shift (`100 * DV01`).
-    /// @param currency - ISO-4217 currency of the curve; omitted uses the base currency.
+    /// @param currency - ISO-4217 currency of the curve of the shocked risk factor.
     ///
     /// # Errors
     ///
-    /// Throws if a supplied currency is not a known ISO-4217 code.
+    /// Throws if the currency is not a known ISO-4217 code.
     #[wasm_bindgen(js_name = addGirrDelta)]
     pub fn add_girr_delta(
         &mut self,
+        currency: JsValue,
         tenor: JsValue,
         amount: JsValue,
-        currency: Option<JsValue>,
     ) -> Result<(), JsValue> {
         let tenor = js_string(&tenor, "tenor")?;
         let amount = js_f64(&amount, "amount")?;
-        let currency = self.currency_or_base(currency.as_ref(), "currency")?;
+        let currency = js_currency(&currency, "currency")?;
         self.inner.add_girr_delta(currency, &tenor, amount);
         Ok(())
     }
 
     /// Add a GIRR inflation delta sensitivity.
     /// @param amount - Base-currency P&L per 1 percentage point of inflation shift.
-    /// @param currency - ISO-4217 currency of the inflation curve; omitted uses the base currency.
+    /// @param currency - ISO-4217 currency of the inflation curve of the shocked risk factor.
     ///
     /// # Errors
     ///
-    /// Throws if a supplied currency is not a known ISO-4217 code.
+    /// Throws if the currency is not a known ISO-4217 code.
     #[wasm_bindgen(js_name = addGirrInflationDelta)]
     pub fn add_girr_inflation_delta(
         &mut self,
+        currency: JsValue,
         amount: JsValue,
-        currency: Option<JsValue>,
     ) -> Result<(), JsValue> {
         let amount = js_f64(&amount, "amount")?;
-        let currency = self.currency_or_base(currency.as_ref(), "currency")?;
+        let currency = js_currency(&currency, "currency")?;
         self.inner.add_girr_inflation_delta(currency, amount);
         Ok(())
     }
 
     /// Add a GIRR cross-currency basis delta sensitivity.
     /// @param amount - Base-currency P&L per 1 percentage point of basis shift.
-    /// @param currency - ISO-4217 currency whose basis moves; omitted uses the base currency.
+    /// @param currency - ISO-4217 currency whose basis moves of the shocked risk factor.
     ///
     /// # Errors
     ///
-    /// Throws if a supplied currency is not a known ISO-4217 code.
+    /// Throws if the currency is not a known ISO-4217 code.
     #[wasm_bindgen(js_name = addGirrXccyBasisDelta)]
     pub fn add_girr_xccy_basis_delta(
         &mut self,
+        currency: JsValue,
         amount: JsValue,
-        currency: Option<JsValue>,
     ) -> Result<(), JsValue> {
         let amount = js_f64(&amount, "amount")?;
-        let currency = self.currency_or_base(currency.as_ref(), "currency")?;
+        let currency = js_currency(&currency, "currency")?;
         self.inner.add_girr_xccy_basis_delta(currency, amount);
         Ok(())
     }
@@ -570,23 +556,23 @@ impl JsFrtbSensitivities {
     /// @param option_maturity - Option maturity label such as `"1Y"`.
     /// @param underlying_tenor - Underlying swap tenor label such as `"5Y"`.
     /// @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
-    /// @param currency - ISO-4217 currency of the curve; omitted uses the base currency.
+    /// @param currency - ISO-4217 currency of the curve of the shocked risk factor.
     ///
     /// # Errors
     ///
-    /// Throws if a supplied currency is not a known ISO-4217 code.
+    /// Throws if the currency is not a known ISO-4217 code.
     #[wasm_bindgen(js_name = addGirrVega)]
     pub fn add_girr_vega(
         &mut self,
+        currency: JsValue,
         option_maturity: JsValue,
         underlying_tenor: JsValue,
         amount: JsValue,
-        currency: Option<JsValue>,
     ) -> Result<(), JsValue> {
         let option_maturity = js_string(&option_maturity, "optionMaturity")?;
         let underlying_tenor = js_string(&underlying_tenor, "underlyingTenor")?;
         let amount = js_f64(&amount, "amount")?;
-        let currency = self.currency_or_base(currency.as_ref(), "currency")?;
+        let currency = js_currency(&currency, "currency")?;
         self.inner
             .add_girr_vega(currency, &option_maturity, &underlying_tenor, amount);
         Ok(())
@@ -646,21 +632,21 @@ impl JsFrtbSensitivities {
     /// Add a GIRR curvature pair.
     /// @param cvr_up - Curvature risk position under the upward rate shock, in the base currency.
     /// @param cvr_down - Curvature risk position under the downward rate shock, in the base currency.
-    /// @param currency - ISO-4217 currency of the curve; omitted uses the base currency.
+    /// @param currency - ISO-4217 currency of the curve of the shocked risk factor.
     ///
     /// # Errors
     ///
-    /// Throws if a supplied currency is not a known ISO-4217 code.
+    /// Throws if the currency is not a known ISO-4217 code.
     #[wasm_bindgen(js_name = addGirrCurvature)]
     pub fn add_girr_curvature(
         &mut self,
+        currency: JsValue,
         cvr_up: JsValue,
         cvr_down: JsValue,
-        currency: Option<JsValue>,
     ) -> Result<(), JsValue> {
         let cvr_up = js_f64(&cvr_up, "cvrUp")?;
         let cvr_down = js_f64(&cvr_down, "cvrDown")?;
-        let currency = self.currency_or_base(currency.as_ref(), "currency")?;
+        let currency = js_currency(&currency, "currency")?;
         self.inner.add_girr_curvature(currency, cvr_up, cvr_down);
         Ok(())
     }
@@ -716,44 +702,14 @@ impl JsFrtbSensitivities {
         Ok(())
     }
 
-    /// Add a Default Risk Charge position.
-    /// @param issuer - Issuer identifier; long and short JTD net per issuer at charge time.
-    /// @param jtd_amount - Signed jump-to-default notional in the base currency (positive long, negative short), before the seniority LGD.
-    /// @param rating_bucket - Credit-rating bucket, 1 (AAA) to 9 (defaulted) per MAR22.24.
-    /// @param sector - `"corporate"`, `"sovereign"` or `"local_government"`.
-    /// @param seniority - `"senior_unsecured"`, `"subordinated"`, `"equity"` or `"covered_bond"`; selects the LGD.
-    /// @param asset_type - DRC asset type label such as `"corporate"`, `"sovereign"`, `"local_government"` or `"equity"`.
-    /// @param maturity_years - Residual maturity in years, finite and non-negative; JTD scales by maturity clipped to `[0.25, 1.0]`.
-    /// @param pnl_adjustment - Mark-to-market adjustment per MAR22.9 (negative for a long position carrying an unrealised loss); defaults to `0`.
-    ///
-    /// # Errors
-    ///
-    /// Throws if `sector`, `seniority` or `asset_type` is not a known label,
-    /// or `rating_bucket` is not an integer in `0..=255`.
+    /// Add a canonical non-securitisation DRC position.
+    /// @param position - DrcPosition object or JSON: issuer, signed jtd_amount in reporting currency before LGD, rating_bucket 1..9, sector, seniority, non-negative maturity_years and optional pnl_adjustment (default 0). Equity seniority requires corporate sector; securitisations are unsupported.
+    /// @throws Error - If fields are unknown, malformed or fail Rust position validation.
     #[wasm_bindgen(js_name = addDrcPosition)]
-    #[allow(clippy::too_many_arguments)]
-    pub fn add_drc_position(
-        &mut self,
-        issuer: JsValue,
-        jtd_amount: JsValue,
-        rating_bucket: JsValue,
-        sector: JsValue,
-        seniority: JsValue,
-        asset_type: JsValue,
-        maturity_years: JsValue,
-        pnl_adjustment: Option<JsValue>,
-    ) -> Result<(), JsValue> {
-        self.inner.add_drc_position(DrcPosition {
-            maturity_years: js_f64(&maturity_years, "maturityYears")?,
-            issuer: js_string(&issuer, "issuer")?,
-            jtd_amount: js_f64(&jtd_amount, "jtdAmount")?,
-            rating_bucket: js_uint(&rating_bucket, "ratingBucket")?,
-            sector: serde_label::<DrcSector>(&js_string(&sector, "sector")?)?,
-            seniority: serde_label::<DrcSeniority>(&js_string(&seniority, "seniority")?)?,
-            asset_type: serde_label::<DrcAssetType>(&js_string(&asset_type, "assetType")?)?,
-            pnl_adjustment: js_opt_f64(pnl_adjustment.as_ref(), "pnlAdjustment")?
-                .unwrap_or_default(),
-        });
+    pub fn add_drc_position(&mut self, position: JsValue) -> Result<(), JsValue> {
+        let position: DrcPosition = from_js_json(&position, "position")?;
+        position.validate().map_err(to_js_err)?;
+        self.inner.add_drc_position(position);
         Ok(())
     }
 
@@ -803,7 +759,7 @@ impl JsFrtbSensitivities {
 /// const engine = new margin.FrtbSbaEngine(["low", "high"], ["girr", "fx"]);
 /// engine.scenarios; // ["low", "high"]
 /// const sens = new margin.FrtbSensitivities("USD");
-/// sens.addGirrDelta("5Y", 100_000);
+/// sens.addGirrDelta("USD", "5Y", 100_000);
 /// engine.calculate(sens).binding_scenario;
 /// ```
 #[wasm_bindgen(js_name = FrtbSbaEngine)]

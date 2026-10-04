@@ -68,7 +68,6 @@ def test_build_credit_vol_report_from_typed_inputs() -> None:
                 "factors": [],
                 "covariance": {"n": 0, "factor_ids": [], "data": []},
                 "matching": {"mapping_table": []},
-                "pricing_mode": "delta_based",
             },
             "issuer_betas": [],
             "anchor_state": {"pc": 0.0, "by_level": []},

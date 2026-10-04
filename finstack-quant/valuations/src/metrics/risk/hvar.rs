@@ -11,7 +11,6 @@ use finstack_quant_core::Result;
 
 fn calculate_var_result(
     context: &mut MetricContext,
-    default_config: &VarConfig,
     missing_history_message: &str,
 ) -> Result<VarResult> {
     let history = context.get_market_history().ok_or_else(|| {
@@ -20,7 +19,7 @@ fn calculate_var_result(
     let config = context
         .get_metric_pricing_overrides()
         .and_then(|overrides| overrides.var_config.clone())
-        .unwrap_or_else(|| default_config.clone());
+        .unwrap_or_else(VarConfig::var_95);
     let dispatch = context.clone_pricer_dispatch();
     calculate_var_with_pricing(
         &[context.instrument.as_ref()],
@@ -62,26 +61,18 @@ fn cache_var_diagnostics(context: &mut MetricContext, result: &VarResult) {
 ///
 /// ```
 /// use finstack_quant_valuations::metrics::{MetricId, MetricRegistry};
-/// use finstack_quant_valuations::metrics::risk::{GenericHVar, VarConfig};
+/// use finstack_quant_valuations::metrics::risk::GenericHVar;
 /// use std::sync::Arc;
 ///
-/// // Create VaR calculator with 95% confidence
-/// let var_calc = GenericHVar::new(VarConfig::var_95());
+/// // Configuration comes from PricingOptions metric overrides (95% by default).
+/// let var_calc = GenericHVar;
 ///
 /// // Register in metric registry
 /// let mut registry = MetricRegistry::new();
 /// registry.register_metric(MetricId::HVar, Arc::new(var_calc), &[]);
 /// ```
-pub struct GenericHVar {
-    config: VarConfig,
-}
-
-impl GenericHVar {
-    /// Create a new VaR calculator with the given configuration.
-    pub fn new(config: VarConfig) -> Self {
-        Self { config }
-    }
-}
+#[derive(Debug, Clone, Copy, Default)]
+pub struct GenericHVar;
 
 impl MetricCalculator for GenericHVar {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
@@ -92,7 +83,6 @@ impl MetricCalculator for GenericHVar {
 
         let result = calculate_var_result(
             context,
-            &self.config,
             "Market history required for VaR calculation. Provide it via Instrument::price_with_metrics(...) with PricingOptions::with_market_history(...)",
         )?;
 
@@ -110,20 +100,15 @@ impl MetricCalculator for GenericHVar {
 /// This is the companion to [`GenericHVar`]. It computes the same historical simulation
 /// distribution but returns **Expected Shortfall** as the primary metric value.
 ///
+/// Configuration is resolved once from the pricing request; without an override
+/// both metrics use the same 95% configuration.
+///
 /// Notes:
 /// - If both `MetricId::HVar` and `MetricId::ExpectedShortfall` are requested, whichever is
 ///   computed first will populate the other in `context.computed` so the second computation
 ///   will be skipped by the registry (deterministic and avoids duplicated repricing).
-pub struct GenericExpectedShortfall {
-    config: VarConfig,
-}
-
-impl GenericExpectedShortfall {
-    /// Create a new Expected Shortfall calculator with the given configuration.
-    pub fn new(config: VarConfig) -> Self {
-        Self { config }
-    }
-}
+#[derive(Debug, Clone, Copy, Default)]
+pub struct GenericExpectedShortfall;
 
 impl MetricCalculator for GenericExpectedShortfall {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
@@ -134,7 +119,6 @@ impl MetricCalculator for GenericExpectedShortfall {
 
         let result = calculate_var_result(
             context,
-            &self.config,
             "Market history required for VaR/ES calculation. Provide it via Instrument::price_with_metrics(...) with PricingOptions::with_market_history(...)",
         )?;
 
@@ -161,18 +145,6 @@ mod tests {
     use std::sync::Arc;
     use test_utils::{history_from_rate_shifts, sample_as_of, standard_bond, usd_ois_market};
     use time::Duration;
-
-    #[test]
-    fn test_generic_hvar_creation() {
-        let var_calc = GenericHVar::new(VarConfig::var_95());
-        assert_eq!(var_calc.config.confidence_level, 0.95);
-
-        let var_calc = GenericHVar::new(VarConfig::var_99());
-        assert_eq!(var_calc.config.confidence_level, 0.99);
-
-        let var_calc = GenericHVar::new(VarConfig::new(0.975));
-        assert_eq!(var_calc.config.confidence_level, 0.975);
-    }
 
     #[test]
     fn test_hvar_via_metrics_framework() -> Result<()> {
@@ -265,6 +237,46 @@ mod tests {
         assert!((var2 - expected.var).abs() < 1e-10);
         assert!((es2 - expected.expected_shortfall).abs() < 1e-10);
 
+        Ok(())
+    }
+
+    #[test]
+    fn request_config_applies_to_both_historical_risk_metrics_in_either_order() -> Result<()> {
+        let as_of = sample_as_of();
+        let mut bond = standard_bond("RISK-CONFIG", as_of, as_of + Duration::days(365 * 5));
+        let config = VarConfig::var_99();
+        bond.metric_pricing_overrides.var_config = Some(config.clone());
+        let shifts: Vec<_> = (1..=101)
+            .map(|i| (as_of - Duration::days(i), i as f64 * 0.0001))
+            .collect();
+        let history = Arc::new(history_from_rate_shifts(as_of, &shifts));
+        let market = usd_ois_market(as_of)?;
+        let expected = calculate_var(&[&bond], &market, &history, as_of, &config, None)?;
+        let default = calculate_var(
+            &[&bond],
+            &market,
+            &history,
+            as_of,
+            &VarConfig::var_95(),
+            None,
+        )?;
+        assert_ne!(expected.var, default.var);
+        for metrics in [
+            [MetricId::HVar, MetricId::ExpectedShortfall],
+            [MetricId::ExpectedShortfall, MetricId::HVar],
+        ] {
+            let result = bond.price_with_metrics(
+                &market,
+                as_of,
+                &metrics,
+                crate::instruments::PricingOptions::default()
+                    .with_market_history(Arc::clone(&history)),
+            )?;
+            assert!((result.measures["hvar"] - expected.var).abs() < 1e-10);
+            assert!(
+                (result.measures["expected_shortfall"] - expected.expected_shortfall).abs() < 1e-10
+            );
+        }
         Ok(())
     }
 }

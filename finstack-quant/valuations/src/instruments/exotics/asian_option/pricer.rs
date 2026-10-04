@@ -395,15 +395,15 @@ impl AsianOptionMcPricer {
         config.seed = seed;
 
         // If arithmetic averaging, apply geometric-Asian control variate for variance reduction
-        let result_money =
-            match (inst.averaging_method, inst.option_type) {
-                (
-                    crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic,
-                    crate::instruments::OptionType::Call,
-                ) => {
+        let result_money = if matches!(
+            inst.averaging_method,
+            crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic
+        ) {
+            let (arith_full, geom_full) = match inst.option_type {
+                crate::instruments::OptionType::Call => {
                     // Use path capture to get per-path discounted payoffs for covariance
                     let mut cfg_cap = config;
-                    cfg_cap.path_capture = PathCaptureConfig::all().with_payoffs();
+                    cfg_cap.path_capture = PathCaptureConfig::all();
                     let pricer_cap = PathDependentPricer::new(cfg_cap);
 
                     // Arithmetic payoff
@@ -444,92 +444,11 @@ impl AsianOptionMcPricer {
                         discount_factor,
                     )?;
 
-                    // Extract per-path discounted payoffs
-                    // paths should be Some when path_capture is enabled in price_with_paths
-                    let xs: Vec<f64> = arith_full
-                        .paths
-                        .as_ref()
-                        .ok_or_else(|| {
-                            finstack_quant_core::Error::Validation(
-                                "Path capture enabled but paths not captured".into(),
-                            )
-                        })?
-                        .paths
-                        .iter()
-                        .map(|p| p.final_value)
-                        .collect();
-                    let ys: Vec<f64> = geom_full
-                        .paths
-                        .as_ref()
-                        .ok_or_else(|| {
-                            finstack_quant_core::Error::Validation(
-                                "Path capture enabled but paths not captured".into(),
-                            )
-                        })?
-                        .paths
-                        .iter()
-                        .map(|p| p.final_value)
-                        .collect();
-
-                    let n = xs.len();
-                    // Compensated (Neumaier) sample moments — the control-variate
-                    // estimator sums up to `num_paths` terms, so naive summation
-                    // would lose precision at large path counts (W-05).
-                    let mean_x = compensated_mean(&xs);
-                    let mean_y = compensated_mean(&ys);
-                    let var_x = compensated_variance(&xs, mean_x);
-                    let var_y = compensated_variance(&ys, mean_y);
-                    let cov_xy = compensated_covariance(&xs, &ys, mean_x, mean_y);
-
-                    // Analytical value of geometric Asian (control).
-                    //
-                    // The standard geometric-Asian closed form has no seasoning
-                    // adjustment, so it is only a valid control when the option is
-                    // unseasoned. For a seasoned arithmetic Asian the seasoning-
-                    // aware analytic control variate is used instead (see below).
-
-                    // Seasoning-aware analytic control variate (W-07). The
-                    // geometric Asian is priced on the *exact* future fixing times
-                    // the MC samples, with the past fixings' fixed log-product
-                    // folded in, so it is the true mean of the simulated geometric
-                    // payoff for both seasoned and unseasoned options. The seasoned
-                    // path therefore keeps the variance reduction instead of
-                    // discarding the geometric pass.
-                    // The MC payoffs (xs/ys) are notional-scaled while the
-                    // closed form is per unit notional, so the control mean must
-                    // be scaled to the same units before the CV adjustment.
-                    let control_analytical = inst.quantity
-                        * seasoned_geometric_asian_control(
-                            spot,
-                            inst.strike,
-                            r,
-                            q,
-                            sigma,
-                            discount_factor,
-                            hist_prod_log,
-                            hist_count,
-                            &future_fixing_times,
-                            true,
-                            Some(drift_schedule.as_ref()),
-                            Some(&fixing_multipliers),
-                        );
-                    let adj = apply_control_variate(
-                        mean_x,
-                        var_x,
-                        mean_y,
-                        var_y,
-                        cov_xy,
-                        control_analytical,
-                        n,
-                    );
-                    MoneyEstimate::from_estimate(adj, inst.currency)?.mean
+                    (arith_full, geom_full)
                 }
-                (
-                    crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic,
-                    crate::instruments::OptionType::Put,
-                ) => {
+                crate::instruments::OptionType::Put => {
                     let mut cfg_cap = config;
-                    cfg_cap.path_capture = PathCaptureConfig::all().with_payoffs();
+                    cfg_cap.path_capture = PathCaptureConfig::all();
                     let pricer_cap = PathDependentPricer::new(cfg_cap);
 
                     let arith_payoff = AsianPut::with_history(
@@ -568,120 +487,130 @@ impl AsianOptionMcPricer {
                         discount_factor,
                     )?;
 
-                    // paths should be Some when path_capture is enabled in price_with_paths
-                    let xs: Vec<f64> = arith_full
-                        .paths
-                        .as_ref()
-                        .ok_or_else(|| {
-                            finstack_quant_core::Error::Validation(
-                                "Path capture enabled but paths not captured".into(),
-                            )
-                        })?
-                        .paths
-                        .iter()
-                        .map(|p| p.final_value)
-                        .collect();
-                    let ys: Vec<f64> = geom_full
-                        .paths
-                        .as_ref()
-                        .ok_or_else(|| {
-                            finstack_quant_core::Error::Validation(
-                                "Path capture enabled but paths not captured".into(),
-                            )
-                        })?
-                        .paths
-                        .iter()
-                        .map(|p| p.final_value)
-                        .collect();
-                    let n = xs.len();
-                    // Compensated (Neumaier) sample moments (W-05).
-                    let mean_x = compensated_mean(&xs);
-                    let mean_y = compensated_mean(&ys);
-                    let var_x = compensated_variance(&xs, mean_x);
-                    let var_y = compensated_variance(&ys, mean_y);
-                    let cov_xy = compensated_covariance(&xs, &ys, mean_x, mean_y);
-
-                    // Seasoning-aware analytic control variate (W-07) — see the
-                    // call branch above for the rationale.
-                    // Scale the per-unit closed form to the notional-scaled MC
-                    // payoff units (see the call branch above).
-                    let control_analytical = inst.quantity
-                        * seasoned_geometric_asian_control(
-                            spot,
-                            inst.strike,
-                            r,
-                            q,
-                            sigma,
-                            discount_factor,
-                            hist_prod_log,
-                            hist_count,
-                            &future_fixing_times,
-                            false,
-                            Some(drift_schedule.as_ref()),
-                            Some(&fixing_multipliers),
-                        );
-                    let adj = apply_control_variate(
-                        mean_x,
-                        var_x,
-                        mean_y,
-                        var_y,
-                        cov_xy,
-                        control_analytical,
-                        n,
-                    );
-                    MoneyEstimate::from_estimate(adj, inst.currency)?.mean
-                }
-                // Geometric averaging (no CV needed) or fallback path
-                _ => {
-                    let pricer = PathDependentPricer::new(config);
-                    match inst.option_type {
-                        crate::instruments::OptionType::Call => {
-                            let payoff = AsianCall::with_history(
-                                inst.strike,
-                                inst.quantity,
-                                averaging,
-                                fixing_steps,
-                                hist_sum,
-                                hist_prod_log,
-                                hist_count,
-                            )?
-                            .with_fixing_multipliers(&fixing_multipliers)?;
-                            pricer
-                                .price_with_grid(
-                                    &process,
-                                    spot,
-                                    time_grid,
-                                    &payoff,
-                                    inst.currency,
-                                    discount_factor,
-                                )?
-                                .mean
-                        }
-                        crate::instruments::OptionType::Put => {
-                            let payoff = AsianPut::with_history(
-                                inst.strike,
-                                inst.quantity,
-                                averaging,
-                                fixing_steps,
-                                hist_sum,
-                                hist_prod_log,
-                                hist_count,
-                            )?
-                            .with_fixing_multipliers(&fixing_multipliers)?;
-                            pricer
-                                .price_with_grid(
-                                    &process,
-                                    spot,
-                                    time_grid,
-                                    &payoff,
-                                    inst.currency,
-                                    discount_factor,
-                                )?
-                                .mean
-                        }
-                    }
+                    (arith_full, geom_full)
                 }
             };
+            // Extract per-path discounted payoffs
+            // paths should be Some when path_capture is enabled in price_with_paths
+            let xs: Vec<f64> = arith_full
+                .paths
+                .as_ref()
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "Path capture enabled but paths not captured".into(),
+                    )
+                })?
+                .paths
+                .iter()
+                .map(|p| p.final_value)
+                .collect();
+            let ys: Vec<f64> = geom_full
+                .paths
+                .as_ref()
+                .ok_or_else(|| {
+                    finstack_quant_core::Error::Validation(
+                        "Path capture enabled but paths not captured".into(),
+                    )
+                })?
+                .paths
+                .iter()
+                .map(|p| p.final_value)
+                .collect();
+
+            let n = xs.len();
+            // Compensated (Neumaier) sample moments — the control-variate
+            // estimator sums up to `num_paths` terms, so naive summation
+            // would lose precision at large path counts (W-05).
+            let mean_x = compensated_mean(&xs);
+            let mean_y = compensated_mean(&ys);
+            let var_x = compensated_variance(&xs, mean_x);
+            let var_y = compensated_variance(&ys, mean_y);
+            let cov_xy = compensated_covariance(&xs, &ys, mean_x, mean_y);
+
+            // Analytical value of geometric Asian (control).
+            //
+            // The standard geometric-Asian closed form has no seasoning
+            // adjustment, so it is only a valid control when the option is
+            // unseasoned. For a seasoned arithmetic Asian the seasoning-
+            // aware analytic control variate is used instead (see below).
+
+            // Seasoning-aware analytic control variate (W-07). The
+            // geometric Asian is priced on the *exact* future fixing times
+            // the MC samples, with the past fixings' fixed log-product
+            // folded in, so it is the true mean of the simulated geometric
+            // payoff for both seasoned and unseasoned options. The seasoned
+            // path therefore keeps the variance reduction instead of
+            // discarding the geometric pass.
+            // The MC payoffs (xs/ys) are notional-scaled while the
+            // closed form is per unit notional, so the control mean must
+            // be scaled to the same units before the CV adjustment.
+            let control_analytical = inst.quantity
+                * seasoned_geometric_asian_control(
+                    spot,
+                    inst.strike,
+                    r,
+                    q,
+                    sigma,
+                    discount_factor,
+                    hist_prod_log,
+                    hist_count,
+                    &future_fixing_times,
+                    matches!(inst.option_type, crate::instruments::OptionType::Call),
+                    Some(drift_schedule.as_ref()),
+                    Some(&fixing_multipliers),
+                );
+            let adj =
+                apply_control_variate(mean_x, var_x, mean_y, var_y, cov_xy, control_analytical, n);
+            MoneyEstimate::from_estimate(adj, inst.currency)?.mean
+        } else {
+            let pricer = PathDependentPricer::new(config);
+            match inst.option_type {
+                crate::instruments::OptionType::Call => {
+                    let payoff = AsianCall::with_history(
+                        inst.strike,
+                        inst.quantity,
+                        averaging,
+                        fixing_steps,
+                        hist_sum,
+                        hist_prod_log,
+                        hist_count,
+                    )?
+                    .with_fixing_multipliers(&fixing_multipliers)?;
+                    pricer
+                        .price_with_grid(
+                            &process,
+                            spot,
+                            time_grid,
+                            &payoff,
+                            inst.currency,
+                            discount_factor,
+                        )?
+                        .mean
+                }
+                crate::instruments::OptionType::Put => {
+                    let payoff = AsianPut::with_history(
+                        inst.strike,
+                        inst.quantity,
+                        averaging,
+                        fixing_steps,
+                        hist_sum,
+                        hist_prod_log,
+                        hist_count,
+                    )?
+                    .with_fixing_multipliers(&fixing_multipliers)?;
+                    pricer
+                        .price_with_grid(
+                            &process,
+                            spot,
+                            time_grid,
+                            &payoff,
+                            inst.currency,
+                            discount_factor,
+                        )?
+                        .mean
+                }
+            }
+        };
 
         Ok(result_money)
     }

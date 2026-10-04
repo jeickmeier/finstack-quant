@@ -28,7 +28,6 @@ use crate::instruments::fixed_income::revolving_credit::pricing::monte_carlo_pro
 use crate::instruments::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-use finstack_quant_models::monte_carlo::rng::sobol::SobolRng;
 use finstack_quant_models::monte_carlo::traits::{Discretization, RandomStream, StochasticProcess};
 use finstack_quant_models::monte_carlo::TimeGrid;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
@@ -62,7 +61,7 @@ use crate::instruments::fixed_income::loan_terms::RateSpec;
 ///
 /// # Variance Reduction
 ///
-/// When `run.antithetic` is true and Sobol QMC is not used, each estimator
+/// When `run.antithetic` is true, each estimator
 /// generates a pair of paths using antithetic variates (z and -z), reducing
 /// variance for smooth payoffs.
 ///
@@ -330,10 +329,7 @@ pub fn generate_three_factor_paths(
     let caps: &[f64] = &utilization_caps;
 
     let seed = run.seed;
-    let use_sobol = stoch_spec.use_sobol_qmc;
-    // Antithetic is incompatible with Sobol QMC; `RevolvingCredit::validate()`
-    // rejects the combination, and this guard covers direct callers.
-    let use_antithetic = run.antithetic && !use_sobol;
+    let use_antithetic = run.antithetic;
     let mut paths = Vec::with_capacity(if use_antithetic {
         num_paths.saturating_mul(2)
     } else {
@@ -344,7 +340,6 @@ pub fn generate_three_factor_paths(
 
     // Simulate one path from its flat `num_steps × num_factors` normal draws
     // (step-major), negated when `sign` is -1 for the antithetic partner.
-    // Shared by the Sobol and Philox generators so both evolve identically.
     let simulate_path = |z_path: &[f64], sign: f64, z_step: &mut [f64], work: &mut [f64]| {
         let mut state = initial_state.to_vec();
         // Only record states at observation dates, not intermediate steps.
@@ -404,72 +399,46 @@ pub fn generate_three_factor_paths(
         }
     };
 
-    if use_sobol {
-        // One Sobol point per PATH: each path consumes a
-        // `num_steps × num_factors`-dimensional coordinate, per the Sobol
-        // dimension contract (see `monte_carlo::rng::sobol`). Drawing a
-        // 3-dimensional point per time step feeds van-der-Corput
-        // anti-correlated consecutive coordinates into successive time steps
-        // — statistically invalid path dynamics. Schedules whose refined grid
-        // exceeds the supported Sobol dimension are rejected; use
-        // pseudorandom paths (`use_sobol_qmc = false`) instead.
-        let sobol_dim = num_steps.saturating_mul(num_factors);
-        let mut rng = SobolRng::try_new(sobol_dim, seed).map_err(|err| {
-            finstack_quant_core::Error::Validation(format!(
-                "use_sobol_qmc requires one Sobol coordinate per (step, factor): \
-                 num_steps ({num_steps}) × num_factors ({num_factors}) = {sobol_dim}, \
-                 which is not supported ({err}); disable use_sobol_qmc for this schedule"
-            ))
-        })?;
-        let mut z_path = vec![0.0; sobol_dim];
+    // Parallel Philox path generation. Each estimator draws from its own
+    // Philox substream (`stream_id = iter_idx`), so the path at index `i`
+    // does not depend on which thread generates it and results are
+    // bit-identical across thread counts. An antithetic estimator yields
+    // the path and its negated partner.
+    let paths_per_iteration = if use_antithetic { 2 } else { 1 };
+    let num_iterations = num_paths;
+
+    let generate_iteration = |iter_idx: usize| {
+        let mut rng = PhiloxRng::with_stream(seed, iter_idx as u64);
+        // Step-major, one factor block per step: the same draw order as
+        // filling one `num_factors` block per step.
+        let mut z_path = vec![0.0; num_steps * num_factors];
+        for block in z_path.chunks_mut(num_factors.max(1)) {
+            rng.fill_std_normals(block);
+        }
         let mut z_step = vec![0.0; num_factors];
         let mut work = vec![0.0; work_size];
-        for _ in 0..num_paths {
-            rng.fill_std_normals(&mut z_path);
-            paths.push(simulate_path(&z_path, 1.0, &mut z_step, &mut work));
-        }
-    } else {
-        // Parallel Philox path generation. Each estimator draws from its own
-        // Philox substream (`stream_id = iter_idx`), so the path at index `i`
-        // does not depend on which thread generates it and results are
-        // bit-identical across thread counts. An antithetic estimator yields
-        // the path and its negated partner.
-        let paths_per_iteration = if use_antithetic { 2 } else { 1 };
-        let num_iterations = num_paths;
+        [1.0, -1.0][..paths_per_iteration]
+            .iter()
+            .map(|&sign| simulate_path(&z_path, sign, &mut z_step, &mut work))
+            .collect::<Vec<_>>()
+    };
 
-        let generate_iteration = |iter_idx: usize| {
-            let mut rng = PhiloxRng::with_stream(seed, iter_idx as u64);
-            // Step-major, one factor block per step: the same draw order as
-            // filling one `num_factors` block per step.
-            let mut z_path = vec![0.0; num_steps * num_factors];
-            for block in z_path.chunks_mut(num_factors.max(1)) {
-                rng.fill_std_normals(block);
-            }
-            let mut z_step = vec![0.0; num_factors];
-            let mut work = vec![0.0; work_size];
-            [1.0, -1.0][..paths_per_iteration]
-                .iter()
-                .map(|&sign| simulate_path(&z_path, sign, &mut z_step, &mut work))
-                .collect::<Vec<_>>()
-        };
+    #[cfg(not(target_arch = "wasm32"))]
+    let chunked: Vec<Vec<ThreeFactorPathData>> = {
+        use rayon::prelude::*;
+        (0..num_iterations)
+            .into_par_iter()
+            .map(generate_iteration)
+            .collect()
+    };
 
-        #[cfg(not(target_arch = "wasm32"))]
-        let chunked: Vec<Vec<ThreeFactorPathData>> = {
-            use rayon::prelude::*;
-            (0..num_iterations)
-                .into_par_iter()
-                .map(generate_iteration)
-                .collect()
-        };
+    #[cfg(target_arch = "wasm32")]
+    let chunked: Vec<Vec<ThreeFactorPathData>> =
+        (0..num_iterations).map(generate_iteration).collect();
 
-        #[cfg(target_arch = "wasm32")]
-        let chunked: Vec<Vec<ThreeFactorPathData>> =
-            (0..num_iterations).map(generate_iteration).collect();
-
-        // Iteration order is preserved by `collect()`, so paths keep the
-        // serial order with each antithetic pair adjacent.
-        paths.extend(chunked.into_iter().flatten());
-    }
+    // Iteration order is preserved by `collect()`, so paths keep the
+    // serial order with each antithetic pair adjacent.
+    paths.extend(chunked.into_iter().flatten());
 
     Ok(paths)
 }
@@ -880,7 +849,6 @@ mod tests {
                 sigma: 0.1,
                 spread_sensitivity: 0.0,
             },
-            use_sobol_qmc: false,
             mc_config: Some(config.clone()),
         };
         let run = RevolvingCreditMcRun {

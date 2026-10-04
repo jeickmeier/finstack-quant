@@ -36,8 +36,6 @@ use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::market_data::scalars::{MarketScalar, ScalarTimeSeries};
 use finstack_quant_core::market_data::surfaces::{VolCube, VolQuoteType, VolSurface};
 use finstack_quant_core::market_data::term_structures::{CreditIndexData, DiscountCurve};
-use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
 use finstack_quant_models::rates::clock::model_time_on_curve;
 use finstack_quant_models::rates::hull_white::HullWhiteCalibrationParams;
@@ -351,14 +349,13 @@ pub(crate) fn execute_params(
     }
     match params {
         StepParams::Discount(p) => {
-            let (ctx, report) = DiscountCurveTarget::solve(p, quotes, context, global_config)?;
-            let curve = ctx.get_discount(&p.curve_id)?;
-            let output = StepOutput::Curve(Arc::clone(&curve).into());
+            let (curve, report) = DiscountCurveTarget::solve(p, quotes, context, global_config)?;
             let report = attach_validation_result(
                 report,
                 curve.validate(&global_config.validation),
                 global_config,
             );
+            let output = StepOutput::Curve(curve.into());
             Ok(StepOutcome {
                 output,
                 credit_index_update: None,
@@ -366,14 +363,13 @@ pub(crate) fn execute_params(
             })
         }
         StepParams::Forward(p) => {
-            let (ctx, report) = ForwardCurveTarget::solve(p, quotes, context, global_config)?;
-            let curve = ctx.get_forward(&p.curve_id)?;
-            let output = StepOutput::Curve(Arc::clone(&curve).into());
+            let (curve, report) = ForwardCurveTarget::solve(p, quotes, context, global_config)?;
             let report = attach_validation_result(
                 report,
                 curve.validate(&global_config.validation),
                 global_config,
             );
+            let output = StepOutput::Curve(curve.into());
             Ok(StepOutcome {
                 output,
                 credit_index_update: None,
@@ -381,24 +377,13 @@ pub(crate) fn execute_params(
             })
         }
         StepParams::Hazard(p) => {
-            let (ctx, report) = HazardCurveTarget::solve(p, quotes, context, global_config)?;
-            let curve = ctx.get_hazard(&p.curve_id)?;
-            let output = StepOutput::Curve(Arc::clone(&curve).into());
-            let mut validation_cfg = global_config.validation.clone();
-            if quotes.iter().any(|quote| match quote {
-                MarketQuote::Cds(crate::quotes::cds::CdsQuote::CdsParSpread {
-                    spread_bp, ..
-                })
-                | MarketQuote::Cds(crate::quotes::cds::CdsQuote::CdsUpfront {
-                    coupon_bp: spread_bp,
-                    ..
-                }) => *spread_bp >= 1_000.0,
-                _ => false,
-            }) {
-                validation_cfg.max_hazard_rate = validation_cfg.max_hazard_rate.max(2.0);
-            }
-            let report =
-                attach_validation_result(report, curve.validate(&validation_cfg), global_config);
+            let (curve, report) = HazardCurveTarget::solve(p, quotes, context, global_config)?;
+            let report = attach_validation_result(
+                report,
+                curve.validate(&global_config.validation),
+                global_config,
+            );
+            let output = StepOutput::Curve(curve.into());
             Ok(StepOutcome {
                 output,
                 credit_index_update: None,
@@ -406,14 +391,13 @@ pub(crate) fn execute_params(
             })
         }
         StepParams::Inflation(p) => {
-            let (ctx, report) = InflationCurveTarget::solve(p, quotes, context, global_config)?;
-            let curve = ctx.get_inflation_curve(&p.curve_id)?;
-            let output = StepOutput::Curve(Arc::clone(&curve).into());
+            let (curve, report) = InflationCurveTarget::solve(p, quotes, context, global_config)?;
             let report = attach_validation_result(
                 report,
                 curve.validate(&global_config.validation),
                 global_config,
             );
+            let output = StepOutput::Curve(curve.into());
             Ok(StepOutcome {
                 output,
                 credit_index_update: None,
@@ -421,19 +405,15 @@ pub(crate) fn execute_params(
             })
         }
         StepParams::BaseCorrelation(p) => {
-            let (ctx, report) = BaseCorrelationTarget::solve(p, quotes, context, global_config)?;
-            let curve_id = CurveId::from(format!("{}_CORR", p.index_id));
-            let curve = ctx.get_base_correlation(curve_id.as_str())?;
-            let output = StepOutput::Curve(Arc::clone(&curve).into());
+            let (curve, index_update, report) =
+                BaseCorrelationTarget::solve(p, quotes, context, global_config)?;
             let report = attach_validation_result(
                 report,
                 curve.validate(&global_config.validation),
                 global_config,
             );
-            let credit_index_update = ctx
-                .get_credit_index(&p.index_id)
-                .ok()
-                .map(|idx| (p.index_id.clone(), idx.as_ref().clone()));
+            let output = StepOutput::Curve(curve.into());
+            let credit_index_update = index_update.map(|idx| (p.index_id.clone(), idx));
             Ok(StepOutcome {
                 output,
                 credit_index_update,
@@ -476,8 +456,7 @@ pub(crate) fn execute_params(
             })
         }
         StepParams::StudentT(p) => {
-            let (_, calibrated_df, report) =
-                StudentTTarget::solve(p, quotes, context, global_config)?;
+            let (calibrated_df, report) = StudentTTarget::solve(p, quotes, context, global_config)?;
             let scalar_key = format!("{}_STUDENT_T_DF", p.tranche_instrument_id);
             Ok(StepOutcome {
                 output: StepOutput::Scalars(vec![(
@@ -543,22 +522,11 @@ pub(crate) fn execute_params(
         }
         StepParams::CapFloorHullWhite(p) => {
             let disc_curve = context.get_discount(&p.discount_curve_id)?;
-            let discount_time = |t| {
-                model_time_on_curve(
-                    p.base_date,
-                    t,
-                    disc_curve.base_date(),
-                    disc_curve.day_count(),
-                )
-            };
-            let discount_base_time = discount_time(0.0)?;
-            // Quote/model time is ACT/365F from p.base_date. Both supplied
-            // functions must return factors relative to that same origin.
-            let discount_df = |t: f64| {
-                discount_time(t)
-                    .and_then(|end| disc_curve.df_between_times(discount_base_time, end))
-                    .unwrap_or(f64::NAN)
-            };
+            let model_curve = finstack_quant_models::rates::clock::ModelDiscountCurve::new(
+                disc_curve.as_ref(),
+                p.base_date,
+            )?;
+            let discount_df = |t| model_curve.get_df(t).unwrap_or(f64::NAN);
             let forward_curve = if p.forward_curve_id == p.discount_curve_id {
                 None
             } else {
@@ -705,19 +673,16 @@ pub(crate) fn execute_params(
             })
         }
         StepParams::XccyBasis(p) => {
-            let (ctx, report) = XccyBasisTarget::solve(p, quotes, context, global_config)?;
-            let curve = ctx.get_discount(&p.curve_id)?;
+            let (curve, spread_curve, report) =
+                XccyBasisTarget::solve(p, quotes, context, global_config)?;
             let report = attach_validation_result(
                 report,
                 curve.validate(&global_config.validation),
                 global_config,
             );
-            let output = match &p.basis_spread_curve_id {
-                Some(spread_id) if ctx.get_basis_spread(spread_id).is_ok() => {
-                    let spread = ctx.get_basis_spread(spread_id)?;
-                    StepOutput::Curves(vec![curve.into(), (*spread).clone().into()])
-                }
-                _ => StepOutput::Curve(curve.into()),
+            let output = match spread_curve {
+                Some(spread) => StepOutput::Curves(vec![curve.into(), spread.into()]),
+                None => StepOutput::Curve(curve.into()),
             };
             Ok(StepOutcome {
                 output,
@@ -726,8 +691,7 @@ pub(crate) fn execute_params(
             })
         }
         StepParams::Parametric(p) => {
-            let (ctx, report) = ParametricCurveTarget::solve(p, quotes, context, global_config)?;
-            let curve = ctx.get_parametric(&p.curve_id)?;
+            let (curve, report) = ParametricCurveTarget::solve(p, quotes, context, global_config)?;
             let output = StepOutput::Curve(curve.into());
             Ok(StepOutcome {
                 output,
@@ -794,7 +758,7 @@ mod tests {
     };
     use finstack_quant_core::types::{CurveId, UnderlyingId};
     use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::{
-        CdsTranche, CdsTranchePricer, CdsTranchePricerConfig,
+        CdsTranchePricer, CdsTranchePricerConfig,
     };
     use finstack_quant_valuations::instruments::OptionType;
     use finstack_quant_valuations::market::conventions::ids::{
@@ -981,10 +945,7 @@ mod tests {
             &crate::build::cds_tranche::CdsTrancheBuildOverrides::default(),
         )
         .expect("shared tranche builder");
-        let tranche = instrument
-            .as_any()
-            .downcast_ref::<CdsTranche>()
-            .expect("CdsTranche");
+        let tranche = instrument;
         let (settlement, _) = tranche.upfront.expect("settlement-dated upfront");
         assert_eq!(
             settlement,
@@ -1013,7 +974,7 @@ mod tests {
             "update STUDENT_T_FIXTURE_UPFRONT_PCT to {live:.12}"
         );
         let full_trade_residual = pricer
-            .price_tranche(tranche, &market, base_date)
+            .price_tranche(&tranche, &market, base_date)
             .expect("complete settled quote")
             .amount()
             / tranche.notional.amount();

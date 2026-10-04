@@ -10,7 +10,7 @@ from finstack_quant.models import credit
 @pytest.mark.parametrize("invalid", [float("nan"), float("inf"), -float("inf")])
 def test_credit_non_finite_inputs_raise_value_error(invalid: float) -> None:
     with pytest.raises(ValueError, match=r"(?i)quantile.*finite"):
-        credit.lgd.beta_recovery_quantile(0.4, 0.2, invalid)
+        credit.lgd.BetaRecovery(0.4, 0.2).quantile(invalid)
     with pytest.raises(ValueError, match=r"(?i)WARF.*finite"):
         credit.migration.RatingScale.standard().rating_from_warf(invalid)
     with pytest.raises(ValueError, match=r"(?i)non-finite"):
@@ -28,8 +28,8 @@ def test_lgd_typed_surface() -> None:
     assert stats.mean_lgd == pytest.approx(1.0 - stats.mean)
     assert credit.lgd.BetaRecovery.from_json(stats.to_json()).alpha == pytest.approx(stats.alpha)
     assert pickle.loads(pickle.dumps(stats)).beta_param == pytest.approx(stats.beta_param)  # noqa: S301 - trusted in-process round trip
-    assert stats.sample_seeded(3, 42) == credit.lgd.beta_recovery_sample(stats.mean, stats.std_dev, 3, 42)
-    assert stats.quantile(0.5) == pytest.approx(credit.lgd.beta_recovery_quantile(stats.mean, stats.std_dev, 0.5))
+    assert stats.sample_seeded(3, 42) == credit.lgd.BetaRecovery(stats.mean, stats.std_dev).sample_seeded(3, 42)
+    assert stats.quantile(0.5) == pytest.approx(credit.lgd.BetaRecovery(stats.mean, stats.std_dev).quantile(0.5))
 
     result = credit.lgd.workout_lgd(100.0, [("real_estate", 80.0, 0.30)], 0.05, 0.03, 2.0, 0.05)
     assert isinstance(result, credit.lgd.WorkoutLgdResult)
@@ -55,7 +55,7 @@ def test_lgd_typed_surface() -> None:
 
     floor = credit.lgd.DownturnLgd.regulatory_floor(0.05, 0.25)
     assert floor.method == "regulatory_floor"
-    assert floor.adjust(0.10) == pytest.approx(credit.lgd.downturn_lgd_regulatory_floor(0.10, 0.05, 0.25))
+    assert floor.adjust(0.10) == pytest.approx(credit.lgd.DownturnLgd.regulatory_floor(0.05, 0.25).adjust(0.10))
     assert credit.lgd.DownturnLgd.basel_unsecured().method == "regulatory_floor"
     assert pickle.loads(pickle.dumps(floor)).adjust(0.10) == pytest.approx(0.25)  # noqa: S301 - trusted in-process round trip
 

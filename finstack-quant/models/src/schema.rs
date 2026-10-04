@@ -53,8 +53,8 @@ use crate::{
     volatility::arbitrage::ArbitrageCheckConfig, volatility::arbitrage::ArbitrageReport,
     volatility::heston::HestonParams, volatility::rough_heston::RoughHestonFourierParams,
     volatility::sabr::ArbitrageValidationResult, volatility::svi::SviParams,
-    volatility::SabrMarketData, volatility::VolatilityConvention, BsGreeks, ExerciseStyle,
-    ForwardGreeks, HestonPricingParams, OptionType, SabrParameters,
+    volatility::VolatilityConvention, BsGreeks, ExerciseStyle, ForwardGreeks, HestonPricingParams,
+    OptionType, SabrParameters,
 };
 
 /// The crate's complete schema registry.
@@ -569,13 +569,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "rough_heston_params",
         Input,
         "Rough Heston model parameters."
-    ),
-    finstack_quant_core::schema_artifact!(
-        SabrMarketData,
-        "models",
-        "sabr_market_data",
-        Component,
-        "Market data for SABR calibration."
     ),
     finstack_quant_core::schema_artifact!(
         SabrParameters,

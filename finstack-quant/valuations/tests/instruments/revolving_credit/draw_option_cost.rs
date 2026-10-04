@@ -102,7 +102,6 @@ pub(crate) fn revolver(
                     sigma: utilization_vol,
                     spread_sensitivity: 0.0,
                 },
-                use_sobol_qmc: false,
                 mc_config: Some(McConfig {
                     correlation_matrix: None,
                     credit_spread_process: spread,

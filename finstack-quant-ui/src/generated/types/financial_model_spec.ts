@@ -6733,12 +6733,6 @@ export interface DD3Bbe1A355Ec94307B4C {
    * and interest rate dynamics, correlation, and default modeling.
    */
   mc_config?: D_78135C90Aa35A41Fbb8F | null;
-  /**
-   * Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).
-   * Mutually exclusive with `model_config.mc_antithetic = true`; validation
-   * rejects the combination.
-   */
-  use_sobol_qmc?: boolean;
   utilization_process: D_0Db717D28554658Ae7C4;
 }
 /**
@@ -11084,27 +11078,12 @@ export interface DCd57B00Ea344F9A6F7Fd {
       };
   csa: DFedf13C6253774F430Cb;
   /**
-   * Initial margin calculation methodology
-   *
-   * - Bilateral: SIMM or Schedule
-   * - Cleared: ClearingHouse (CCP-specific)
-   */
-  im_methodology: "haircut" | "simm" | "schedule" | "internal_model" | "clearing_house";
-  /**
-   * Settlement lag for margin transfers (business days)
-   */
-  settlement_lag: number;
-  /**
    * Explicit SIMM credit classification for credit-sensitive instruments.
    *
    * Required when a credit product uses `ImMethodology::Simm`; leave `None`
    * for non-credit instruments and non-SIMM margin methodologies.
    */
   simm_credit_classification?: D_8Ef975540682A003034E | null;
-  /**
-   * Variation margin exchange frequency
-   */
-  vm_frequency: "daily" | "weekly" | "monthly" | "on_demand";
 }
 /**
  * Full CSA specification (for bilateral trades)
@@ -13751,7 +13730,7 @@ export interface DB559Ae4814037C7E11Ce5 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * Swaption instrument
+ * European swaption instrument
  *
  * # Exercise lifecycle boundary
  *
@@ -13773,10 +13752,6 @@ export interface DDcc2738B179Dc9Ea48C6 {
    * - `ZeroCoupon`: Single discount to swap maturity
    */
   cash_settlement_method: "collateralized_cash_price" | "par_yield" | "isda_par_par" | "zero_coupon";
-  /**
-   * Exercise style (European, Bermudan, American). Defaults to European.
-   */
-  exercise_style: "european" | "american" | "bermudan";
   /**
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */

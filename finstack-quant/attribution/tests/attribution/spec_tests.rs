@@ -54,25 +54,27 @@ fn spec_rejects_unknown_metrics() {
 
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: empty_market_state(),
-        market_t1: empty_market_state(),
-        as_of_t0,
-        as_of_t1,
-        method: AttributionMethod::MetricsBased,
-        model_params_t0: None,
-        credit_factor_model: None,
-        credit_factor_detail_options: Default::default(),
-        config: Some(AttributionConfig {
-            tolerance_abs: None,
-            tolerance_pct: None,
-            metrics: Some(vec!["dv01".to_string(), "unknown_metric".to_string()]),
-            strict_validation: None,
-            rounding_scale: None,
-            rate_bump_bp: None,
-            target_currency: None,
-            execution_policy: None,
-        }),
-        full_cross_attribution: false,
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: empty_market_state(),
+            market_t1: empty_market_state(),
+            as_of_t0,
+            as_of_t1,
+            method: AttributionMethod::MetricsBased,
+            model_params_t0: None,
+            credit_factor_model: None,
+            credit_factor_detail_options: Default::default(),
+            config: Some(AttributionConfig {
+                tolerance_abs: None,
+                tolerance_pct: None,
+                metrics: Some(vec!["dv01".to_string(), "unknown_metric".to_string()]),
+                strict_validation: None,
+                rounding_scale: None,
+                rate_bump_bp: None,
+                target_currency: None,
+                execution_policy: None,
+            }),
+            full_cross_attribution: false,
+        },
     };
 
     let envelope = AttributionEnvelope::new(spec);
@@ -91,4 +93,47 @@ fn spec_rejects_unknown_metrics() {
     } else {
         panic!("Expected validation error, got {:?}", err);
     }
+}
+
+#[test]
+fn batch_shared_inputs_preserve_order_and_single_results() {
+    let fixture: serde_json::Value = serde_json::from_str(include_str!(
+        "../fixtures/production_convertible_credit.json"
+    ))
+    .unwrap();
+    let mut spec: AttributionSpec = serde_json::from_value(serde_json::json!({
+        "instrument": fixture["instrument"]["instrument"],
+        "market_t0": fixture["market_t0"],
+        "market_t1": fixture["market_t1"],
+        "as_of_t0": fixture["as_of_t0"],
+        "as_of_t1": fixture["as_of_t1"],
+        "method": "parallel",
+    }))
+    .unwrap();
+    let first = spec.execute().unwrap().attribution;
+    let mut second_payload = serde_json::to_value(&spec.instrument).unwrap();
+    second_payload["spec"]["id"] = "SECOND".into();
+    let second = serde_json::from_value(second_payload).unwrap();
+    let batch = finstack_quant_attribution::attribute_pnl_many(
+        &spec.inputs,
+        vec![spec.instrument.clone(), second],
+    )
+    .unwrap();
+    assert_eq!(batch[0].meta.instrument_id, first.meta.instrument_id);
+    assert_eq!(batch[1].meta.instrument_id, "SECOND");
+    assert_eq!(
+        serde_json::to_value(&batch[0]).unwrap(),
+        serde_json::to_value(&first).unwrap()
+    );
+    assert_eq!(batch[1].total_pnl, first.total_pnl);
+    assert!(
+        finstack_quant_attribution::attribute_pnl_many(&spec.inputs, vec![])
+            .unwrap()
+            .is_empty()
+    );
+    spec.inputs.as_of_t1 = spec.inputs.as_of_t0 - time::Duration::days(1);
+    assert!(
+        finstack_quant_attribution::attribute_pnl_many(&spec.inputs, vec![spec.instrument])
+            .is_err()
+    );
 }

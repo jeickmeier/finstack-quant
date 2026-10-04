@@ -38,8 +38,8 @@
 //! determine when those values are known. The selected volatility-expiry convention
 //! determines the ACT/365F clock on which annualized option volatility is quoted.
 
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::instruments::common_impl::vol_resolution::{
@@ -128,7 +128,6 @@ pub struct InflationCapFloor {
     #[serde(default = "crate::serde_defaults::bdc_modified_following")]
     pub business_day_convention: BusinessDayConvention,
     /// Optional holiday calendar identifier.
-    #[builder(optional)]
     pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
     /// Inflation index/curve identifier (e.g., US-CPI-U).
     pub inflation_index_id: CurveId,
@@ -159,11 +158,9 @@ pub struct InflationCapFloor {
     pub scenario_pricing_overrides: crate::instruments::ScenarioPricingOverrides,
     /// Contractual CPI observation lag; when `None` the index lag, then the
     /// curve's indexation lag, applies.
-    #[builder(optional)]
     pub lag: Option<InflationLag>,
     /// Contractual monthly CPI interpolation; takes precedence over index metadata.
     /// Defaults to monthly step interpolation when neither source supplies it.
-    #[builder(optional)]
     pub interpolation: Option<finstack_quant_core::market_data::scalars::InflationInterpolation>,
     /// Clock used by the volatility surface's annualized quotes. This is
     /// independent of CPI publication policy; changing it requires matching
@@ -580,7 +577,7 @@ impl crate::instruments::common_impl::traits::Instrument for InflationCapFloor {
         Some(self.start_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

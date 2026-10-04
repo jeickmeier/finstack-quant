@@ -1,6 +1,6 @@
 //! Cliquet option instrument definition.
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::equity::EquityPathModel;
 use finstack_quant_core::dates::Date;
@@ -476,7 +476,7 @@ impl crate::instruments::common_impl::traits::Instrument for CliquetOption {
         Ok(Some(Box::new(observed)))
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

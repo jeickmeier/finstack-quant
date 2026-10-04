@@ -80,7 +80,7 @@ impl RateSpec {
     /// Current rate for a date without an index lookup, as a decimal.
     ///
     /// Returns the fixed rate, or only the spread of a floating spec (use
-    /// [`Self::try_current_rate_with_index`] for the projected all-in rate).
+    /// [`Self::try_rate_for_period`] for the projected all-in rate).
     ///
     /// # Arguments
     ///
@@ -91,38 +91,6 @@ impl RateSpec {
             Self::Fixed { rate } => *rate,
             Self::Floating(spec) => spec.spread_bp.to_f64().unwrap_or_default() / 10_000.0,
         }
-    }
-
-    /// Current rate including the index forward where applicable, as a
-    /// decimal.
-    ///
-    /// # Arguments
-    ///
-    /// * `date` - Accrual start the rate is projected for.
-    /// * `accrual_end` - Exclusive end of the contractual coupon period.
-    /// * `accrual_year_fraction` - Positive finite coupon accrual under its
-    ///   contractual day count, including any required schedule context.
-    /// * `market` - Market holding the forward curve and fixings named by
-    ///   the floating spec's `forward_curve_id`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the forward curve or a required fixing is missing
-    /// or the projection fails.
-    pub fn try_current_rate_with_index(
-        &self,
-        date: Date,
-        accrual_end: Date,
-        accrual_year_fraction: f64,
-        market: &finstack_quant_core::market_data::context::MarketContext,
-    ) -> finstack_quant_core::Result<f64> {
-        let as_of = match self {
-            Self::Fixed { .. } => date,
-            Self::Floating(spec) => market
-                .get_forward(spec.forward_curve_id.as_str())?
-                .base_date(),
-        };
-        self.try_rate_for_period(date, accrual_end, accrual_year_fraction, as_of, market)
     }
 
     /// Contractual rate for an explicit accrual period, as a decimal.

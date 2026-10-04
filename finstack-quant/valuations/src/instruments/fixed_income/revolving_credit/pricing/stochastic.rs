@@ -70,9 +70,7 @@ impl RevolvingCreditPricer {
     ///
     /// # Errors
     ///
-    /// Returns a validation error for fewer than two independent estimators or
-    /// Sobol sampling: this pricing path does not provide the independent
-    /// randomized replicates needed to estimate uncertainty from Sobol paths.
+    /// Returns a validation error for fewer than two independent estimators.
     pub fn expected_cashflows(
         facility: &RevolvingCredit,
         market: &MarketContext,
@@ -151,9 +149,7 @@ impl RevolvingCreditPricer {
     /// # Errors
     ///
     /// Returns a validation error unless the facility has a stochastic spec
-    /// with at least two independent pseudorandom estimators. Sobol pricing
-    /// requires independent randomized replicates, which this path does not
-    /// provide.
+    /// with at least two independent pseudorandom estimators.
     pub fn price_with_paths(
         facility: &RevolvingCredit,
         market: &MarketContext,
@@ -214,14 +210,6 @@ impl RevolvingCreditPricer {
         if run.num_paths < 2 {
             return Err(finstack_quant_core::Error::Validation(
                 "stochastic revolving-credit pricing requires at least 2 independent estimators"
-                    .into(),
-            ));
-        }
-        if stoch_spec.use_sobol_qmc {
-            return Err(finstack_quant_core::Error::Validation(
-                "use_sobol_qmc cannot produce revolving-credit pricing confidence intervals \
-                 from one dependent Sobol net; independent randomized replicates are required \
-                 and are not provided by this pricing path"
                     .into(),
             ));
         }
@@ -327,7 +315,7 @@ impl RevolvingCreditPricer {
             .iter()
             .map(|r| r.draw_option_cost.amount())
             .collect();
-        let use_antithetic = run.antithetic && !stoch_spec.use_sobol_qmc;
+        let use_antithetic = run.antithetic;
         let currency = facility.commitment.currency();
         let estimate =
             MoneyEstimate::from_estimate(path_estimate(&pvs, use_antithetic)?, currency)?;
@@ -349,43 +337,6 @@ impl RevolvingCreditPricer {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn stochastic_pricing_rejects_sobol_without_independent_replicates() {
-        use crate::instruments::fixed_income::revolving_credit::types::{
-            StochasticUtilizationSpec, UtilizationProcess,
-        };
-
-        let mut facility = RevolvingCredit::example().expect("facility");
-        // A short grid fits the Sobol dimension table; dependence, not grid
-        // size, must prevent this pricing path from reporting a mean CI.
-        facility.maturity = facility.issue_date + time::Duration::days(7);
-        facility.draw_repay_spec = DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
-            utilization_process: UtilizationProcess::MeanReverting {
-                theta: 0.5,
-                kappa: 0.75,
-                sigma: 0.05,
-                spread_sensitivity: 0.0,
-            },
-            use_sobol_qmc: true,
-            mc_config: None,
-        }));
-        let run = RevolvingCreditMcRun {
-            num_paths: 8,
-            seed: 42,
-            antithetic: false,
-        };
-        let error = RevolvingCreditPricer::price_monte_carlo_with_run(
-            &facility,
-            &MarketContext::new(),
-            facility.issue_date,
-            &run,
-        )
-        .expect_err("dependent Sobol points do not estimate mean uncertainty");
-        assert!(error
-            .to_string()
-            .contains("independent randomized replicates"));
-    }
 
     #[test]
     fn path_estimate_requires_two_complete_independent_estimators() {

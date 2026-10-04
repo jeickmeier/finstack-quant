@@ -35,44 +35,46 @@ fn test_attribution_envelope_json_roundtrip() {
 
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: MarketContextState {
-            schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-            curves: vec![],
-            fx: None,
-            surfaces: vec![],
-            prices: std::collections::BTreeMap::new(),
-            series: vec![],
-            inflation_indices: vec![],
-            dividends: vec![],
-            credit_indices: vec![],
-            collateral: std::collections::BTreeMap::new(),
-            fx_delta_vol_surfaces: vec![],
-            hierarchy: None,
-            vol_cubes: vec![],
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: MarketContextState {
+                schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
+                curves: vec![],
+                fx: None,
+                surfaces: vec![],
+                prices: std::collections::BTreeMap::new(),
+                series: vec![],
+                inflation_indices: vec![],
+                dividends: vec![],
+                credit_indices: vec![],
+                collateral: std::collections::BTreeMap::new(),
+                fx_delta_vol_surfaces: vec![],
+                hierarchy: None,
+                vol_cubes: vec![],
+            },
+            market_t1: MarketContextState {
+                schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
+                curves: vec![],
+                fx: None,
+                surfaces: vec![],
+                prices: std::collections::BTreeMap::new(),
+                series: vec![],
+                inflation_indices: vec![],
+                dividends: vec![],
+                credit_indices: vec![],
+                collateral: std::collections::BTreeMap::new(),
+                fx_delta_vol_surfaces: vec![],
+                hierarchy: None,
+                vol_cubes: vec![],
+            },
+            as_of_t0: create_date(2025, Month::January, 1).unwrap(),
+            as_of_t1: create_date(2025, Month::January, 2).unwrap(),
+            method: AttributionMethod::Parallel,
+            config: None,
+            model_params_t0: None,
+            credit_factor_model: None,
+            credit_factor_detail_options: Default::default(),
+            full_cross_attribution: false,
         },
-        market_t1: MarketContextState {
-            schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-            curves: vec![],
-            fx: None,
-            surfaces: vec![],
-            prices: std::collections::BTreeMap::new(),
-            series: vec![],
-            inflation_indices: vec![],
-            dividends: vec![],
-            credit_indices: vec![],
-            collateral: std::collections::BTreeMap::new(),
-            fx_delta_vol_surfaces: vec![],
-            hierarchy: None,
-            vol_cubes: vec![],
-        },
-        as_of_t0: create_date(2025, Month::January, 1).unwrap(),
-        as_of_t1: create_date(2025, Month::January, 2).unwrap(),
-        method: AttributionMethod::Parallel,
-        config: None,
-        model_params_t0: None,
-        credit_factor_model: None,
-        credit_factor_detail_options: Default::default(),
-        full_cross_attribution: false,
     };
 
     let envelope = AttributionEnvelope::new(spec);
@@ -87,12 +89,18 @@ fn test_attribution_envelope_json_roundtrip() {
     assert_eq!(parsed.schema, AttributionSchema::Attribution);
 
     // Verify dates
-    assert_eq!(parsed.attribution.as_of_t0, envelope.attribution.as_of_t0);
-    assert_eq!(parsed.attribution.as_of_t1, envelope.attribution.as_of_t1);
+    assert_eq!(
+        parsed.attribution.inputs.as_of_t0,
+        envelope.attribution.inputs.as_of_t0
+    );
+    assert_eq!(
+        parsed.attribution.inputs.as_of_t1,
+        envelope.attribution.inputs.as_of_t1
+    );
 
     // Verify method
     assert!(matches!(
-        parsed.attribution.method,
+        parsed.attribution.inputs.method,
         AttributionMethod::Parallel
     ));
 }
@@ -112,44 +120,46 @@ fn test_attribution_envelope_deserialization_rejects_unknown_schema() {
 
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: MarketContextState {
-            schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-            curves: vec![],
-            fx: None,
-            surfaces: vec![],
-            prices: std::collections::BTreeMap::new(),
-            series: vec![],
-            inflation_indices: vec![],
-            dividends: vec![],
-            credit_indices: vec![],
-            collateral: std::collections::BTreeMap::new(),
-            fx_delta_vol_surfaces: vec![],
-            hierarchy: None,
-            vol_cubes: vec![],
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: MarketContextState {
+                schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
+                curves: vec![],
+                fx: None,
+                surfaces: vec![],
+                prices: std::collections::BTreeMap::new(),
+                series: vec![],
+                inflation_indices: vec![],
+                dividends: vec![],
+                credit_indices: vec![],
+                collateral: std::collections::BTreeMap::new(),
+                fx_delta_vol_surfaces: vec![],
+                hierarchy: None,
+                vol_cubes: vec![],
+            },
+            market_t1: MarketContextState {
+                schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
+                curves: vec![],
+                fx: None,
+                surfaces: vec![],
+                prices: std::collections::BTreeMap::new(),
+                series: vec![],
+                inflation_indices: vec![],
+                dividends: vec![],
+                credit_indices: vec![],
+                collateral: std::collections::BTreeMap::new(),
+                fx_delta_vol_surfaces: vec![],
+                hierarchy: None,
+                vol_cubes: vec![],
+            },
+            as_of_t0: create_date(2025, Month::January, 1).unwrap(),
+            as_of_t1: create_date(2025, Month::January, 2).unwrap(),
+            method: AttributionMethod::Parallel,
+            config: None,
+            model_params_t0: None,
+            credit_factor_model: None,
+            credit_factor_detail_options: Default::default(),
+            full_cross_attribution: false,
         },
-        market_t1: MarketContextState {
-            schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-            curves: vec![],
-            fx: None,
-            surfaces: vec![],
-            prices: std::collections::BTreeMap::new(),
-            series: vec![],
-            inflation_indices: vec![],
-            dividends: vec![],
-            credit_indices: vec![],
-            collateral: std::collections::BTreeMap::new(),
-            fx_delta_vol_surfaces: vec![],
-            hierarchy: None,
-            vol_cubes: vec![],
-        },
-        as_of_t0: create_date(2025, Month::January, 1).unwrap(),
-        as_of_t1: create_date(2025, Month::January, 2).unwrap(),
-        method: AttributionMethod::Parallel,
-        config: None,
-        model_params_t0: None,
-        credit_factor_model: None,
-        credit_factor_detail_options: Default::default(),
-        full_cross_attribution: false,
     };
 
     let envelope = AttributionEnvelope::new(spec);
@@ -181,48 +191,50 @@ fn test_attribution_envelope_waterfall_roundtrip() {
 
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: MarketContextState {
-            schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-            curves: vec![],
-            fx: None,
-            surfaces: vec![],
-            prices: std::collections::BTreeMap::new(),
-            series: vec![],
-            inflation_indices: vec![],
-            dividends: vec![],
-            credit_indices: vec![],
-            collateral: std::collections::BTreeMap::new(),
-            fx_delta_vol_surfaces: vec![],
-            hierarchy: None,
-            vol_cubes: vec![],
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: MarketContextState {
+                schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
+                curves: vec![],
+                fx: None,
+                surfaces: vec![],
+                prices: std::collections::BTreeMap::new(),
+                series: vec![],
+                inflation_indices: vec![],
+                dividends: vec![],
+                credit_indices: vec![],
+                collateral: std::collections::BTreeMap::new(),
+                fx_delta_vol_surfaces: vec![],
+                hierarchy: None,
+                vol_cubes: vec![],
+            },
+            market_t1: MarketContextState {
+                schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
+                curves: vec![],
+                fx: None,
+                surfaces: vec![],
+                prices: std::collections::BTreeMap::new(),
+                series: vec![],
+                inflation_indices: vec![],
+                dividends: vec![],
+                credit_indices: vec![],
+                collateral: std::collections::BTreeMap::new(),
+                fx_delta_vol_surfaces: vec![],
+                hierarchy: None,
+                vol_cubes: vec![],
+            },
+            as_of_t0: create_date(2025, Month::January, 1).unwrap(),
+            as_of_t1: create_date(2025, Month::January, 2).unwrap(),
+            method: AttributionMethod::Waterfall(vec![
+                AttributionFactor::Carry,
+                AttributionFactor::RatesCurves,
+                AttributionFactor::CreditCurves,
+            ]),
+            config: None,
+            model_params_t0: None,
+            credit_factor_model: None,
+            credit_factor_detail_options: Default::default(),
+            full_cross_attribution: false,
         },
-        market_t1: MarketContextState {
-            schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-            curves: vec![],
-            fx: None,
-            surfaces: vec![],
-            prices: std::collections::BTreeMap::new(),
-            series: vec![],
-            inflation_indices: vec![],
-            dividends: vec![],
-            credit_indices: vec![],
-            collateral: std::collections::BTreeMap::new(),
-            fx_delta_vol_surfaces: vec![],
-            hierarchy: None,
-            vol_cubes: vec![],
-        },
-        as_of_t0: create_date(2025, Month::January, 1).unwrap(),
-        as_of_t1: create_date(2025, Month::January, 2).unwrap(),
-        method: AttributionMethod::Waterfall(vec![
-            AttributionFactor::Carry,
-            AttributionFactor::RatesCurves,
-            AttributionFactor::CreditCurves,
-        ]),
-        config: None,
-        model_params_t0: None,
-        credit_factor_model: None,
-        credit_factor_detail_options: Default::default(),
-        full_cross_attribution: false,
     };
 
     let envelope = AttributionEnvelope::new(spec);
@@ -230,7 +242,7 @@ fn test_attribution_envelope_waterfall_roundtrip() {
     let parsed: AttributionEnvelope = serde_json::from_str(&json).unwrap();
 
     // Verify waterfall method with correct order
-    if let AttributionMethod::Waterfall(factors) = parsed.attribution.method {
+    if let AttributionMethod::Waterfall(factors) = parsed.attribution.inputs.method {
         assert_eq!(factors.len(), 3);
         assert_eq!(factors[0], AttributionFactor::Carry);
         assert_eq!(factors[1], AttributionFactor::RatesCurves);
@@ -273,7 +285,7 @@ fn test_attribution_envelope_from_example_json() {
     // Verify structure
     assert_eq!(envelope.schema, AttributionSchema::Attribution);
     assert!(matches!(
-        envelope.attribution.method,
+        envelope.attribution.inputs.method,
         AttributionMethod::Parallel
     ));
 
@@ -301,44 +313,46 @@ fn test_attribution_envelope_to_from_json_helpers() {
 
     let spec = AttributionSpec {
         instrument: InstrumentJson::Bond(bond),
-        market_t0: MarketContextState {
-            schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-            curves: vec![],
-            fx: None,
-            surfaces: vec![],
-            prices: std::collections::BTreeMap::new(),
-            series: vec![],
-            inflation_indices: vec![],
-            dividends: vec![],
-            credit_indices: vec![],
-            collateral: std::collections::BTreeMap::new(),
-            fx_delta_vol_surfaces: vec![],
-            hierarchy: None,
-            vol_cubes: vec![],
+        inputs: finstack_quant_attribution::AttributionInputs {
+            market_t0: MarketContextState {
+                schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
+                curves: vec![],
+                fx: None,
+                surfaces: vec![],
+                prices: std::collections::BTreeMap::new(),
+                series: vec![],
+                inflation_indices: vec![],
+                dividends: vec![],
+                credit_indices: vec![],
+                collateral: std::collections::BTreeMap::new(),
+                fx_delta_vol_surfaces: vec![],
+                hierarchy: None,
+                vol_cubes: vec![],
+            },
+            market_t1: MarketContextState {
+                schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
+                curves: vec![],
+                fx: None,
+                surfaces: vec![],
+                prices: std::collections::BTreeMap::new(),
+                series: vec![],
+                inflation_indices: vec![],
+                dividends: vec![],
+                credit_indices: vec![],
+                collateral: std::collections::BTreeMap::new(),
+                fx_delta_vol_surfaces: vec![],
+                hierarchy: None,
+                vol_cubes: vec![],
+            },
+            as_of_t0: create_date(2025, Month::January, 1).unwrap(),
+            as_of_t1: create_date(2025, Month::January, 2).unwrap(),
+            method: AttributionMethod::MetricsBased,
+            config: None,
+            model_params_t0: None,
+            credit_factor_model: None,
+            credit_factor_detail_options: Default::default(),
+            full_cross_attribution: false,
         },
-        market_t1: MarketContextState {
-            schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
-            curves: vec![],
-            fx: None,
-            surfaces: vec![],
-            prices: std::collections::BTreeMap::new(),
-            series: vec![],
-            inflation_indices: vec![],
-            dividends: vec![],
-            credit_indices: vec![],
-            collateral: std::collections::BTreeMap::new(),
-            fx_delta_vol_surfaces: vec![],
-            hierarchy: None,
-            vol_cubes: vec![],
-        },
-        as_of_t0: create_date(2025, Month::January, 1).unwrap(),
-        as_of_t1: create_date(2025, Month::January, 2).unwrap(),
-        method: AttributionMethod::MetricsBased,
-        config: None,
-        model_params_t0: None,
-        credit_factor_model: None,
-        credit_factor_detail_options: Default::default(),
-        full_cross_attribution: false,
     };
 
     let envelope = AttributionEnvelope::new(spec);
@@ -348,7 +362,7 @@ fn test_attribution_envelope_to_from_json_helpers() {
 
     assert_eq!(parsed.schema, envelope.schema);
     assert!(matches!(
-        parsed.attribution.method,
+        parsed.attribution.inputs.method,
         AttributionMethod::MetricsBased
     ));
 }

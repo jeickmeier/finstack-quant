@@ -56,13 +56,12 @@ def test_convertible_credit_move_is_not_counted_as_rates(method: str | dict) -> 
     assert abs(credit) > 5.0 * abs(float(payload["residual"]["amount"]))
 
 
-def test_attribute_pnl_envelope_is_the_typed_twin_of_the_json_wire() -> None:
+def test_attribute_pnl_envelope_preserves_canonical_json() -> None:
     import pickle
 
     from finstack_quant.attribution import (
         AttributionResultEnvelope,
         attribute_pnl_envelope,
-        attribute_pnl_envelope_json,
     )
 
     fixture = json.loads(
@@ -84,7 +83,7 @@ def test_attribute_pnl_envelope_is_the_typed_twin_of_the_json_wire() -> None:
     })
     typed = attribute_pnl_envelope(spec)
     assert isinstance(typed, AttributionResultEnvelope)
-    assert json.loads(typed.to_json()) == json.loads(attribute_pnl_envelope_json(spec))
+    assert AttributionResultEnvelope.from_json(typed.to_json()).to_json() == typed.to_json()
     assert json.loads(typed.attribution.to_json()) == json.loads(typed.to_json())["result"]["attribution"]
     assert isinstance(typed.results_meta, dict)
     restored = pickle.loads(pickle.dumps(typed))  # noqa: S301 - trusted in-process round trip

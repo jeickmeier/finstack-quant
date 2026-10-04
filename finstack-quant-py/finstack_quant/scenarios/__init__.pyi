@@ -26,6 +26,7 @@ from finstack_quant.scenarios import schema as schema
 
 __all__ = [
     "compose_scenarios",
+    "parallel_bp_many",
     "validate_scenario_spec",
     "list_builtin_templates",
     "list_builtin_template_metadata",
@@ -33,7 +34,6 @@ __all__ = [
     "list_template_components",
     "build_template_component",
     "apply_scenario",
-    "apply_scenario_to_market",
     "compute_horizon_return",
     "ApplicationReport",
     "ApplicationResult",
@@ -745,7 +745,7 @@ class ApplicationReport:
     Report describing what a scenario application changed.
 
     Exposed as the :attr:`ApplicationResult.report` attribute of the result
-    returned by :func:`apply_scenario` and :func:`apply_scenario_to_market`,
+    returned by :func:`apply_scenario`,
     and as the second element of the tuples returned by
     :func:`finstack_quant.portfolio.scenario_pnl` and
     :func:`finstack_quant.portfolio.apply_scenario_and_revalue`.
@@ -753,8 +753,8 @@ class ApplicationReport:
     Examples
     --------
     >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.scenarios import apply_scenario_to_market, compose_scenarios
-    >>> report = apply_scenario_to_market(compose_scenarios([]), MarketContext(), "2025-01-15").report
+    >>> from finstack_quant.scenarios import apply_scenario, compose_scenarios
+    >>> report = apply_scenario(compose_scenarios([]), MarketContext(), "2025-01-15").report
     >>> (report.operations_applied, report.user_operations, report.warnings)
     (0, 0, [])
     """
@@ -937,8 +937,8 @@ class ApplicationReport:
         Examples
         --------
         >>> from finstack_quant.core.market_data import MarketContext
-        >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario_to_market
-        >>> frame = apply_scenario_to_market(ScenarioSpec("s", []), MarketContext(), "2025-01-15").report.to_dataframe()
+        >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario
+        >>> frame = apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").report.to_dataframe()
         >>> list(frame.columns)[:4]
         ['operations_applied', 'user_operations', 'expanded_operations', 'warning_count']
         """
@@ -965,10 +965,8 @@ class ApplicationReport:
         Examples
         --------
         >>> from finstack_quant.core.market_data import MarketContext
-        >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario_to_market
-        >>> frame = apply_scenario_to_market(
-        ...     ScenarioSpec("s", []), MarketContext(), "2025-01-15"
-        ... ).report.changes_to_dataframe()
+        >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario
+        >>> frame = apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").report.changes_to_dataframe()
         >>> list(frame.columns)
         ['kind', 'id', 'curve_kind']
         """
@@ -994,10 +992,8 @@ class ApplicationReport:
         Examples
         --------
         >>> from finstack_quant.core.market_data import MarketContext
-        >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario_to_market
-        >>> frame = apply_scenario_to_market(
-        ...     ScenarioSpec("s", []), MarketContext(), "2025-01-15"
-        ... ).report.carry_to_dataframe()
+        >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario
+        >>> frame = apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").report.carry_to_dataframe()
         >>> list(frame.columns)
         ['instrument_id', 'amount', 'currency']
         """
@@ -1057,13 +1053,13 @@ class ApplicationResult:
     Result of applying a scenario: the mutated market, the mutated model (when
     one was supplied), and the application report.
 
-    Returned by :func:`apply_scenario` and :func:`apply_scenario_to_market`.
+    Returned by :func:`apply_scenario`.
 
     Examples
     --------
     >>> from finstack_quant.core.market_data import MarketContext
-    >>> from finstack_quant.scenarios import apply_scenario_to_market, compose_scenarios
-    >>> applied = apply_scenario_to_market(compose_scenarios([]), MarketContext(), "2025-01-15")
+    >>> from finstack_quant.scenarios import apply_scenario, compose_scenarios
+    >>> applied = apply_scenario(compose_scenarios([]), MarketContext(), "2025-01-15")
     >>> (type(applied.market).__name__, applied.model, applied.report.operations_applied)
     ('MarketContext', None, 0)
     """
@@ -1092,7 +1088,7 @@ class ApplicationResult:
         Returns
         -------
         FinancialModelSpec or None
-            Always ``None`` for :func:`apply_scenario_to_market`.
+            Always ``None`` for :func:`apply_scenario`.
 
         Notes
         -----
@@ -1153,8 +1149,8 @@ class ApplicationResult:
         Examples
         --------
         >>> from finstack_quant.core.market_data import MarketContext
-        >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario_to_market
-        >>> len(apply_scenario_to_market(ScenarioSpec("s", []), MarketContext(), "2025-01-15").to_dataframe())
+        >>> from finstack_quant.scenarios import ScenarioSpec, apply_scenario
+        >>> len(apply_scenario(ScenarioSpec("s", []), MarketContext(), "2025-01-15").to_dataframe())
         1
         """
         ...
@@ -1164,7 +1160,7 @@ class ApplicationResult:
         Serialize this result to canonical JSON.
 
         Emits the canonical ``ApplicationEnvelope`` shape, with ``market`` and
-        ``model`` as nested objects alongside the report fields.
+        ``model`` as nested objects alongside the canonical ``report`` object.
 
         Returns
         -------
@@ -1212,16 +1208,55 @@ class ApplicationResult:
         """
         ...
 
+def parallel_bp_many(
+    curve_kind: CurveKind | str,
+    curve_ids: list[str],
+    bp: float,
+    discount_curve_id: str | None = None,
+) -> list[OperationSpec]:
+    """Expand a parallel shift into one operation per curve identifier.
+
+    Parameters
+    ----------
+    curve_kind : CurveKind | str
+        Typed family or canonical discount, forward, par_cds, inflation or commodity family.
+    curve_ids : list[str]
+        Identifiers in execution order; an empty list produces no operations.
+    bp : float
+        Additive basis points, or percent of forward for commodity curves.
+    discount_curve_id : str | None, default None
+        Optional ParCDS discount curve copied onto each operation.
+
+    Returns
+    -------
+    list[OperationSpec]
+        One operation per curve in the supplied order.
+
+    Raises
+    ------
+    ValueError
+        If the curve family label is unknown.
+    TypeError
+        If identifiers are not strings or bp is not numeric.
+
+    Examples
+    --------
+    >>> from finstack_quant.scenarios import parallel_bp_many
+    >>> len(parallel_bp_many("discount", ["USD-OIS", "EUR-OIS"], 25.0))
+    2
+    """
+    ...
+
 def apply_scenario(
     scenario: ScenarioSpec | str,
     market: MarketContext | str,
-    model: FinancialModelSpec | str,
     as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
+    model: FinancialModelSpec | str | None = None,
     instruments: Sequence[Any] | None = None,
     config: FinstackConfig | str | None = None,
 ) -> ApplicationResult:
     """
-    Apply a scenario to both market data and a financial model.
+    Apply a scenario to copied market data and an optional financial model.
 
     Parameters
     ----------
@@ -1230,8 +1265,8 @@ def apply_scenario(
     market : MarketContext | str
         ``MarketContext`` object or JSON ``MarketContext`` string. Never
         mutated; the result carries a modified copy.
-    model : FinancialModelSpec | str
-        ``FinancialModelSpec`` object or JSON ``FinancialModelSpec`` string.
+    model : FinancialModelSpec | str | None, default None
+        Copied financial model or canonical JSON; omit for market-only scenarios.
     as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
         Valuation date (ISO 8601 accepted).
     instruments : Sequence[Instrument | str] | None, default None
@@ -1258,6 +1293,8 @@ def apply_scenario(
 
     Raises
     ------
+    TypeError
+        If scenario is neither a ScenarioSpec nor canonical JSON.
     ValueError
         If an input fails to parse or validate, or the scenario contains
         instrument-scoped operations and ``instruments`` is ``None`` (the Rust
@@ -1277,84 +1314,9 @@ def apply_scenario(
     ...     '{"id":"2025Q1","start":"2025-01-01","end":"2025-04-01",'
     ...     '"is_actual":false}],"nodes":{}}'
     ... )
-    >>> applied = apply_scenario(compose_scenarios([]), MarketContext(), model, "2025-01-15")
+    >>> applied = apply_scenario(compose_scenarios([]), MarketContext(), "2025-01-15", model)
     >>> applied.report.operations_applied
     0
-    """
-    ...
-
-def apply_scenario_to_market(
-    scenario: ScenarioSpec | str,
-    market: MarketContext | str,
-    as_of: datetime.date | datetime.datetime | pd.Timestamp | str,
-    instruments: Sequence[Any] | None = None,
-    config: FinstackConfig | str | None = None,
-) -> ApplicationResult:
-    """
-    Apply a scenario to market data only (no model mutations returned).
-
-    Parameters
-    ----------
-    scenario : ScenarioSpec | str
-        Typed scenario or JSON-serialized ``ScenarioSpec``.
-    market : MarketContext | str
-        ``MarketContext`` object or JSON ``MarketContext`` string. Never
-        mutated.
-    as_of : datetime.date | datetime.datetime | pandas.Timestamp | str
-        Valuation date (ISO 8601 accepted).
-    instruments : Sequence[Instrument | str] | None, default None
-        Typed instruments or canonical envelope JSON strings; required for
-        instrument-scoped operations, used for carry under
-        ``time_roll_forward``. Raw observations crossed in ``(as_of, new_date]``
-        are materialized from canonical pre-roll coupon projections; existing
-        exact-date fixings are preserved. Missing or conflicting projections
-        raise ``ValueError`` before any rolled market is returned. Shocked copies
-        are returned in ``ApplicationResult.instruments``.
-    config : FinstackConfig | str | None, default None
-        Library configuration; ``None`` uses the default.
-
-    Returns
-    -------
-    ApplicationResult
-        Typed result whose :attr:`~ApplicationResult.model` attribute is
-        ``None``.
-
-    Notes
-    -----
-    No holiday calendar is supplied, so business-day time rolls adjust
-    against a weekends-only calendar.
-
-    Raises
-    ------
-    ValueError
-        If an input fails to parse or validate, or the scenario contains
-        instrument-scoped operations and ``instruments`` is ``None`` (the Rust
-        engine rejects it after validating the scenario).
-    KeyError
-        If the scenario references market data, tenors or instruments that
-        do not exist.
-    RuntimeError
-        If the engine fails internally.
-
-    Examples
-    --------
-    >>> import datetime as dt
-    >>> from finstack_quant.core.market_data import DiscountCurve, MarketContext
-    >>> from finstack_quant.scenarios import OperationSpec, ScenarioSpec, apply_scenario_to_market
-    >>> market = MarketContext()
-    >>> market.insert(
-    ...     DiscountCurve(
-    ...         "USD-OIS",
-    ...         dt.date(2025, 1, 15),
-    ...         [(0.0, 1.0), (1.0, 0.96), (2.0, 0.92)],
-    ...         day_count="act_365f",
-    ...     )
-    ... )
-    MarketContext(discount=['USD-OIS'], fx=False)
-    >>> spec = ScenarioSpec("up25", [OperationSpec.curve_parallel_bp("discount", "USD-OIS", 25.0)])
-    >>> applied = apply_scenario_to_market(spec, market, "2025-01-15")
-    >>> applied.report.user_operations
-    1
     """
     ...
 
@@ -1583,8 +1545,8 @@ class HorizonResult:
         -------
         str
             JSON-serialized ``HorizonResult`` with currency-tagged values,
-            attribution, scenario report, decimal ``total_return`` and
-            ``annualized_return``, and a ``factor_contributions`` mapping keyed
+            attribution, scenario report and a ``summary`` containing decimal
+            ``total_return``, ``annualized_return`` and ``factor_contributions`` keyed
             by canonical attribution factor names. Undefined derived values are
             JSON ``null``, matching the WASM result shape.
 
@@ -2753,28 +2715,30 @@ class HierarchyTarget:
     path : list[str]
         Hierarchy path from the root, e.g. ``["Credit", "US", "IG"]``; every
         curve in that subtree is targeted.
-    tag_filter : dict[str, str] | None, default None
-        ``{key: value}`` equality predicates (AND semantics) a node must
-        satisfy for its subtree to be included. Use :meth:`from_json` for
-        ``in`` / ``exists`` predicates.
+    tag_filter : dict[str, Any] | None, default None
+        Canonical ``{"predicates": [...]}`` filter with equals, in and exists
+        predicates combined with AND semantics. ``None`` matches the subtree.
 
     Raises
     ------
     TypeError
-        If ``path`` is not a list of strings or ``tag_filter`` values are not
-        strings.
+        If ``path`` is not a list of strings or ``tag_filter`` is not JSON-serializable.
+    ValueError
+        If predicates do not match the canonical TagFilter shape.
 
     Examples
     --------
     >>> from finstack_quant.scenarios import HierarchyTarget
-    >>> target = HierarchyTarget(["Credit", "US"], {"sector": "financials"})
+    >>> target = HierarchyTarget(
+    ...     ["Credit", "US"], {"predicates": [{"equals": {"key": "sector", "value": "financials"}}]}
+    ... )
     >>> target.path
     ['Credit', 'US']
     >>> HierarchyTarget.from_json(target.to_json()) == target
     True
     """
 
-    def __init__(self, path: list[str], tag_filter: Mapping[str, str] | None = None) -> None: ...
+    def __init__(self, path: list[str], tag_filter: dict[str, Any] | None = None) -> None: ...
     @property
     def path(self) -> list[str]:
         """
@@ -2792,15 +2756,15 @@ class HierarchyTarget:
         ...
 
     @property
-    def tag_filter(self) -> list[tuple[str, str]] | None:
+    def tag_filter(self) -> dict[str, Any] | None:
         """
-        Equality tag predicates, or ``None`` when no filter is set.
+        Complete canonical tag predicates, or ``None`` when no filter is set.
 
         Returns
         -------
-        list[tuple[str, str]] or None
-            ``(key, value)`` pairs for ``equals`` predicates; ``in`` /
-            ``exists`` predicates are only visible via :meth:`to_json`.
+        dict[str, Any] or None
+            Canonical ``{"predicates": [...]}`` data, including equals, in
+            and exists predicates in their original order.
 
         Notes
         -----
@@ -2828,7 +2792,7 @@ class HierarchyTarget:
     def from_json(json: str) -> HierarchyTarget:
         """
         Deserialize from canonical JSON, including ``in`` / ``exists`` tag
-        predicates the constructor does not express.
+        predicates accepted by the constructor.
 
         Parameters
         ----------
@@ -2996,7 +2960,6 @@ class OperationSpec:
         """
         ...
 
-    @overload
     @classmethod
     def curve_parallel_bp(
         cls,
@@ -3034,6 +2997,8 @@ class OperationSpec:
         ------
         ValueError
             If ``curve_kind`` is not an accepted label.
+        TypeError
+            If ``curve_id`` is not a single string identifier.
 
         Examples
         --------
@@ -3042,98 +3007,6 @@ class OperationSpec:
         'curve_parallel_bp'
         """
         ...
-    @overload
-    @classmethod
-    def curve_parallel_bp(
-        cls,
-        curve_kind: CurveKind | str,
-        curve_id: list[str],
-        bp: float,
-        discount_curve_id: str | None = None,
-    ) -> list[OperationSpec]:
-        """
-        Parallel basis-point shift expanded across several curves.
-
-        Parameters
-        ----------
-        curve_kind : CurveKind | str
-            Curve family: ``"discount"``, ``"forward"``, ``"par_cds"``,
-            ``"inflation"`` or ``"commodity"``.
-        curve_id : list[str]
-            Identifiers of the curves to shock; one operation is produced
-            per identifier, in the order given.
-        bp : float
-            Additive shift in basis points applied to every node of each
-            curve; for ``CurveKind.commodity()`` the value is **percent of
-            the forward** rather than basis points.
-        discount_curve_id : str, optional
-            Discount curve used when re-bootstrapping shocked ParCDS
-            quotes. ``None`` (the default) leaves discounting unchanged.
-
-        Returns
-        -------
-        list[OperationSpec]
-            One operation per entry of ``curve_id``, same length and order.
-
-        Raises
-        ------
-        ValueError
-            If ``curve_kind`` is not an accepted label or ``curve_id`` holds
-            a non-string entry.
-
-        Examples
-        --------
-        >>> from finstack_quant.scenarios import OperationSpec
-        >>> len(OperationSpec.curve_parallel_bp("discount", ["USD-OIS", "EUR-OIS"], 10.0))
-        2
-        """
-        ...
-    @classmethod
-    def curve_parallel_bp(
-        cls,
-        curve_kind: CurveKind | str,
-        curve_id: str | list[str],
-        bp: float,
-        discount_curve_id: str | None = None,
-    ) -> OperationSpec | list[OperationSpec]:
-        """
-        Parallel basis-point shift on a curve.
-
-        Parameters
-        ----------
-        curve_kind : CurveKind | str
-            Curve family (``"discount"``, ``"forward"``, ``"par_cds"``,
-            ``"inflation"``, ``"commodity"``).
-        curve_id : str | list[str]
-            One curve identifier, or several: a list expands to one operation
-            per identifier (``ScenarioSpec::parallel_bp_many`` in Rust).
-        bp : float
-            Additive shift in basis points applied to every node; for
-            ``CurveKind.commodity()`` this is **percent of the forward**.
-        discount_curve_id : str, optional
-            Discount curve used when re-bootstrapping shocked ParCDS quotes.
-
-        Returns
-        -------
-        OperationSpec | list[OperationSpec]
-            A single operation for a ``str`` curve id, a list for a list.
-
-        Raises
-        ------
-        ValueError
-            If ``curve_kind`` is not an accepted label or ``curve_id`` is
-            neither a string nor a list of strings.
-
-        Examples
-        --------
-        >>> from finstack_quant.scenarios import CurveKind, OperationSpec
-        >>> OperationSpec.curve_parallel_bp(CurveKind.discount(), "USD-OIS", 10.0).kind
-        'curve_parallel_bp'
-        >>> len(OperationSpec.curve_parallel_bp("discount", ["USD-OIS", "EUR-OIS"], 10.0))
-        2
-        """
-        ...
-
     @classmethod
     def curve_node_bp(
         cls,

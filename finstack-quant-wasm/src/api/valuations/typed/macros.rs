@@ -363,3 +363,6 @@ macro_rules! handle_setters {
         }
     };
 }
+
+pub(crate) use instrument_class;
+pub(crate) use instrument_pricing;

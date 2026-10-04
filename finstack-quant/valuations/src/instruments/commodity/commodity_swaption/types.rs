@@ -18,8 +18,8 @@
 //! - d1 = [ln(F/K) + 0.5*sigma^2*T] / (sigma*sqrt(T))
 //! - d2 = d1 - sigma*sqrt(T)
 
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::OptionType;
 use finstack_quant_core::currency::Currency;
@@ -142,7 +142,6 @@ pub struct CommoditySwaption {
     /// Volatility surface ID for implied vol.
     pub vol_surface_id: CurveId,
     /// Optional calendar ID for date adjustments.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub calendar_id: Option<CalendarId>,
     /// Business day convention for date adjustments.
@@ -299,6 +298,11 @@ impl CommoditySwaption {
     /// * `market` - Market snapshot containing the commodity price curve and quote-currency discount curve.
     /// * `as_of` - Valuation date used to discount adjusted payments; contractual observation dates remain unchanged.
     pub fn forward_swap_rate(&self, market: &MarketContext, as_of: Date) -> Result<f64> {
+        self.forward_and_annuity(market, as_of)
+            .map(|inputs| inputs.0)
+    }
+
+    fn forward_and_annuity(&self, market: &MarketContext, as_of: Date) -> Result<(f64, f64)> {
         let price_curve = market.get_price_curve(self.forward_curve_id.as_str())?;
         let disc = market.get_discount(self.discount_curve_id.as_str())?;
         let periods = self.swap_periods()?;
@@ -356,10 +360,10 @@ impl CommoditySwaption {
         // Guard against a zero (or negative) annuity denominator: fall back to
         // the equal-weighted mean.
         if weight_total <= 0.0 {
-            return Ok(sum_fwd / periods.len() as f64);
+            return Ok((sum_fwd / periods.len() as f64, weight_total));
         }
 
-        Ok(weighted_fwd / weight_total)
+        Ok((weighted_fwd / weight_total, weight_total))
     }
 
     /// Compute the annuity factor for the underlying swap.
@@ -449,9 +453,8 @@ fn validate_black76_domain(
 impl CommoditySwaption {
     fn black76_inputs(&self, market: &MarketContext, as_of: Date) -> Result<Black76SwaptionInputs> {
         let time = self.time_to_expiry(as_of)?;
-        let forward = self.forward_swap_rate(market, as_of)?;
+        let (forward, annuity) = self.forward_and_annuity(market, as_of)?;
         validate_black76_domain(&self.id, forward, self.fixed_price, time, None, None)?;
-        let annuity = self.annuity(market, as_of)?;
         let sigma = if time > 0.0 {
             crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
                 &self.instrument_pricing_overrides.market_quotes,
@@ -550,7 +553,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
         Some(self.expiry)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for CommoditySwaption {

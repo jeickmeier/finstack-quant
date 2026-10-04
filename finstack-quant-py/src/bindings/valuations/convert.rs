@@ -50,7 +50,7 @@ pub(crate) fn rate_decimal_from_py(obj: &Bound<'_, PyAny>, what: &str) -> PyResu
 /// * `what` - Parameter name used in the `TypeError` message.
 pub(crate) fn bps_from_py(obj: &Bound<'_, PyAny>, what: &str) -> PyResult<f64> {
     if let Ok(bps) = obj.cast::<PyBps>() {
-        return Ok(bps.borrow().inner.as_decimal() * 10_000.0);
+        return Ok(f64::from(bps.borrow().inner.as_bp()));
     }
     if let Ok(value) = obj.extract::<f64>() {
         return Ok(value);
@@ -364,4 +364,15 @@ pub(crate) fn builder_repr(name: &str, fields: &[(&'static str, String)]) -> Str
         .collect::<Vec<_>>()
         .join(", ");
     format!("{name}({body})")
+}
+
+/// Consume a wrapped builder, returning ValueError when build already consumed it.
+///
+/// # Arguments
+///
+/// * `inner` - Stored builder removed on success; an empty wrapper remains consumed.
+pub(crate) fn take_builder<B>(inner: &mut Option<B>) -> PyResult<B> {
+    inner
+        .take()
+        .ok_or_else(|| value_error("builder already consumed by build()"))
 }

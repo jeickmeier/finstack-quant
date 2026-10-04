@@ -20,7 +20,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
-      "bytes": 90957,
+      "bytes": 89933,
       "kind": "input",
       "path": "schemas/factor_model/1/credit_factor_model.schema.json",
       "summary": "Calibrated credit factor hierarchy, loadable as pricing input.",
@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/factor_model/1/factor_model_config.schema.json",
-      "bytes": 60274,
+      "bytes": 59250,
       "kind": "input",
       "path": "schemas/factor_model/1/factor_model_config.schema.json",
       "summary": "Factor definitions, matchers and covariance settings.",
@@ -694,15 +694,6 @@
       "type_name": "RoughHestonParams"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/models/1/sabr_market_data.schema.json",
-      "bytes": 1336,
-      "kind": "component",
-      "path": "schemas/models/1/sabr_market_data.schema.json",
-      "summary": "Market data for SABR calibration.",
-      "title": "SabrMarketData",
-      "type_name": "SabrMarketData"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/models/1/sabr_parameters.schema.json",
       "bytes": 2049,
       "kind": "input",
@@ -848,7 +839,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/workout_lgd.schema.json",
-      "bytes": 4140,
+      "bytes": 4247,
       "kind": "component",
       "path": "schemas/models/1/workout_lgd.schema.json",
       "summary": "Workout-based LGD model using a collateral-first recovery waterfall.",

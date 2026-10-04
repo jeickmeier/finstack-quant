@@ -183,7 +183,7 @@ fn pipeline_helper_feature_ops_return_js_arrays() {
         "2026-01-01",
     ]);
     let exposures = crate::js_object(&vec![vec![Some(0.0), Some(1.0), Some(0.0), Some(1.0)]]);
-    let scored = neutralize_and_zscore(values, time_key, exposures, None).expect("scored");
+    let scored = neutralize_and_zscore(values, time_key, exposures).expect("scored");
     let scored: Vec<Option<f64>> = serde_wasm_bindgen::from_value(scored).expect("scored vec");
     assert!((scored[0].expect("score") + 0.632_455_532_033_675_9).abs() < 1e-12);
     assert!((scored[3].expect("score") - 1.264_911_064_067_351_8).abs() < 1e-12);

@@ -10,8 +10,8 @@ no-arbitrage checks on a standalone ``VolSurface``.
 
 Examples:
 --------
->>> from finstack_quant.calibration import CalibrationPlan, calibrate
->>> result = calibrate(CalibrationPlan([], id="smoke"))
+>>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, calibrate
+>>> result = calibrate(CalibrationEnvelope(CalibrationPlan([], id="smoke")))
 >>> result.success
 True
 """
@@ -2445,11 +2445,10 @@ type Quote = RateQuote | CdsQuote | VolQuote | InflationQuote | XccyQuote | CdsT
 type MarketDatum = Quote | FxSpotDatum | PriceDatum | DividendScheduleDatum | CollateralEntry
 
 class CalibrationStep:
-    """One calibration step: a target kind, its parameters, and its quotes.
+    """One calibration step: a target kind, parameters, and a named quote set.
 
-    Each constructor corresponds to one Rust ``StepParams`` variant. Quotes may
-    be attached inline via ``quotes`` (they become the step's own quote set) or
-    referenced by name via ``quote_set``.
+    Each constructor corresponds to a Rust ``StepParams`` variant. Quote payloads
+    belong to ``CalibrationEnvelope.market_data`` and their IDs to ``plan.quote_sets``.
 
     Examples:
     --------
@@ -2458,7 +2457,6 @@ class CalibrationStep:
     ...     "usd_ois",
     ...     "USD",
     ...     "2024-06-28",
-    ...     quotes=[RateQuote.deposit("d3m", "USD-SOFR", "3M", 0.0525)],
     ... )
     >>> step.id
     'usd_ois'
@@ -2470,7 +2468,6 @@ class CalibrationStep:
         id: str,
         currency: str,
         base_date: str,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         curve_id: str | None = None,
         **params: Any,
@@ -2485,11 +2482,8 @@ class CalibrationStep:
             ISO 4217 code of the curve currency.
         base_date : str
             Curve base (spot) date as an ISO date string.
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            Quotes attached inline as this step's own quote set.
         quote_set : str | None, default None
-            Name of a shared quote set declared on the plan, used instead of
-            ``quotes``.
+            Name of a quote set declared on the plan; defaults to ``id``.
         curve_id : str | None, default None
             Identifier of the produced curve; defaults to ``id``.
         params : Any
@@ -2504,8 +2498,7 @@ class CalibrationStep:
         Raises
         ------
         ValueError
-            If neither or both of ``quotes`` and ``quote_set`` are given, or a
-            parameter is unknown to the Rust step schema.
+            If a parameter is unknown to the Rust step schema or has the wrong shape.
 
         Examples:
         --------
@@ -2514,7 +2507,6 @@ class CalibrationStep:
         ...     "usd_ois",
         ...     "USD",
         ...     "2024-06-28",
-        ...     quotes=[RateQuote.swap("s2y", "USD-SOFR", "2Y", 0.043)],
         ... ).kind
         'discount'
 
@@ -2527,7 +2519,6 @@ class CalibrationStep:
         base_date: str,
         tenor_years: float,
         discount_curve_id: str,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         curve_id: str | None = None,
         **params: Any,
@@ -2546,8 +2537,6 @@ class CalibrationStep:
             Index tenor in years (``0.25`` for a 3M index).
         discount_curve_id : str
             Identifier of the discount curve solved in an earlier step.
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            Quotes attached inline as this step's own quote set.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         curve_id : str | None, default None
@@ -2576,7 +2565,6 @@ class CalibrationStep:
         ...     "2024-06-28",
         ...     0.25,
         ...     "usd_ois",
-        ...     quotes=[RateQuote.swap("s2y", "USD-LIBOR-3M", "2Y", 0.044)],
         ... ).kind
         'forward'
 
@@ -2591,7 +2579,6 @@ class CalibrationStep:
         discount_curve_id: str,
         recovery_rate: float,
         seniority: str | None = None,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         curve_id: str | None = None,
         **params: Any,
@@ -2616,8 +2603,6 @@ class CalibrationStep:
             Debt seniority tier recorded on the curve. ``None`` uses the Rust
             authoring default ``CalibrationStep::DEFAULT_HAZARD_SENIORITY``
             (``"senior"``).
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            CDS quotes attached inline.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         curve_id : str | None, default None
@@ -2646,7 +2631,6 @@ class CalibrationStep:
         ...     "2024-06-28",
         ...     "usd_ois",
         ...     0.4,
-        ...     quotes=[CdsQuote.par_spread("c5y", "ACME", "USD", "xr14", "5Y", 125.0, 0.4)],
         ... ).kind
         'hazard'
 
@@ -2661,7 +2645,6 @@ class CalibrationStep:
         index: str,
         observation_lag: str,
         base_cpi: float,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         curve_id: str | None = None,
         **params: Any,
@@ -2689,8 +2672,6 @@ class CalibrationStep:
             Contractual reference CPI at the start date, in index points, after
             observation lag and monthly interpolation. Supplied index fixings must
             reproduce this level, including their seasonality adjustment.
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            Zero-coupon inflation swap quotes attached inline.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         curve_id : str | None, default None
@@ -2719,7 +2700,6 @@ class CalibrationStep:
         ...     "US-CPI-U",
         ...     "3M",
         ...     310.0,
-        ...     quotes=[RateQuote.swap("z5y", "US-CPI-U", "5Y", 0.024)],
         ... ).kind
         'inflation'
 
@@ -2730,8 +2710,6 @@ class CalibrationStep:
         id: str,
         base_date: str,
         underlying_ticker: str,
-        model: str | None = None,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         vol_surface_id: str | None = None,
         **params: Any,
@@ -2746,12 +2724,6 @@ class CalibrationStep:
             Surface base date as an ISO date string.
         underlying_ticker : str
             Underlying ticker the surface belongs to.
-        model : str | None, default None
-            Surface model key, for example ``"sabr"``. ``None`` uses the Rust
-            authoring default ``CalibrationStep::DEFAULT_VOL_SURFACE_MODEL``
-            (``"sabr"``).
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            Volatility quotes attached inline.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         vol_surface_id : str | None, default None
@@ -2776,7 +2748,6 @@ class CalibrationStep:
         ...     "spx_vol",
         ...     "2024-06-28",
         ...     "SPX",
-        ...     quotes=[VolQuote.option_vol("v1", "SPX", "2026-01-15", 4500.0, 0.18)],
         ... ).kind
         'vol_surface'
 
@@ -2788,7 +2759,6 @@ class CalibrationStep:
         base_date: str,
         discount_curve_id: str,
         currency: str,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         vol_surface_id: str | None = None,
         **params: Any,
@@ -2805,8 +2775,6 @@ class CalibrationStep:
             Identifier of the discount curve solved in an earlier step.
         currency : str
             ISO 4217 code of the swaption currency.
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            Swaption volatility quotes attached inline.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         vol_surface_id : str | None, default None
@@ -2832,7 +2800,6 @@ class CalibrationStep:
         ...     "2024-06-28",
         ...     "usd_ois",
         ...     "USD",
-        ...     quotes=[VolQuote.swaption_vol("s1", "2026-01-15", "2036-01-15", 0.04, 0.0085, "normal")],
         ... ).kind
         'swaption_vol'
 
@@ -2847,7 +2814,6 @@ class CalibrationStep:
         base_date: str,
         discount_curve_id: str,
         currency: str,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         **params: Any,
     ) -> CalibrationStep:
@@ -2869,8 +2835,6 @@ class CalibrationStep:
             Identifier of the discount curve solved in an earlier step.
         currency : str
             ISO 4217 code of the tranche currency.
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            Tranche quotes attached inline.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         params : Any
@@ -2908,7 +2872,6 @@ class CalibrationStep:
         id: str,
         tranche_instrument_id: str,
         base_correlation_curve_id: str,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         **params: Any,
     ) -> CalibrationStep:
@@ -2922,8 +2885,6 @@ class CalibrationStep:
             Identifier of the tranche instrument repriced during the fit.
         base_correlation_curve_id : str
             Identifier of the base-correlation curve solved in an earlier step.
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            Tranche quotes attached inline.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         params : Any
@@ -2953,7 +2914,6 @@ class CalibrationStep:
         curve_id: str,
         currency: str,
         base_date: str,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         **params: Any,
     ) -> CalibrationStep:
@@ -2969,10 +2929,6 @@ class CalibrationStep:
             ISO 4217 code of the model currency.
         base_date : str
             Model base date as an ISO date string.
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            ATM swaption volatility quotes attached inline. Calibration rejects
-            strikes differing from the contractual forward by more than 1e-8
-            in decimal rate units (0.0001 bp).
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         params : Any
@@ -3009,7 +2965,6 @@ class CalibrationStep:
         index_id: str,
         currency: str,
         base_date: str,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         **params: Any,
     ) -> CalibrationStep:
@@ -3035,8 +2990,6 @@ class CalibrationStep:
             ISO 4217 code of the model currency; must match the index conventions.
         base_date : str
             Model base date as an ISO date string.
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            Cap/floor volatility quotes attached inline.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         params : Any
@@ -3077,7 +3030,6 @@ class CalibrationStep:
         id: str,
         base_date: str,
         underlying_ticker: str,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         vol_surface_id: str | None = None,
         **params: Any,
@@ -3092,8 +3044,6 @@ class CalibrationStep:
             Surface base date as an ISO date string.
         underlying_ticker : str
             Underlying ticker the surface belongs to.
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            Volatility quotes attached inline.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         vol_surface_id : str | None, default None
@@ -3118,7 +3068,6 @@ class CalibrationStep:
         ...     "spx_svi",
         ...     "2024-06-28",
         ...     "SPX",
-        ...     quotes=[VolQuote.option_vol("v1", "SPX", "2026-01-15", 4500.0, 0.18)],
         ... ).kind
         'svi_surface'
 
@@ -3131,7 +3080,6 @@ class CalibrationStep:
         base_date: str,
         fx_spot: float,
         domestic_discount_id: str,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         curve_id: str | None = None,
         **params: Any,
@@ -3150,8 +3098,6 @@ class CalibrationStep:
             Spot FX rate quoted as foreign units per one domestic unit.
         domestic_discount_id : str
             Identifier of the domestic discount curve solved in an earlier step.
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            Cross-currency basis swap quotes attached inline.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         curve_id : str | None, default None
@@ -3189,7 +3135,6 @@ class CalibrationStep:
         id: str,
         base_date: str,
         model: str | None = None,
-        quotes: list[Quote] | None = None,
         quote_set: str | None = None,
         curve_id: str | None = None,
         **params: Any,
@@ -3206,8 +3151,6 @@ class CalibrationStep:
             Parametric family key: ``"ns"`` for Nelson-Siegel or ``"nss"``
             for Nelson-Siegel-Svensson. ``None`` uses the Rust authoring
             default ``CalibrationStep::DEFAULT_PARAMETRIC_MODEL`` (``"ns"``).
-        quotes : list[RateQuote | CdsQuote | VolQuote] | None, default None
-            Rate quotes attached inline.
         quote_set : str | None, default None
             Name of a shared quote set declared on the plan.
         curve_id : str | None, default None
@@ -3235,7 +3178,6 @@ class CalibrationStep:
         ...     "ns",
         ...     "2024-06-28",
         ...     "ns",
-        ...     quotes=[RateQuote.swap("s5y", "USD-SOFR", "5Y", 0.042)],
         ... ).kind
         'parametric'
 
@@ -3293,35 +3235,6 @@ class CalibrationStep:
             Step parameters as a plain dictionary, using the Rust field names.
         """
 
-    @property
-    def quote_ids(self) -> list[str]:
-        """
-        Identifiers of the quotes attached to this step.
-
-        This property does not raise.
-
-        Returns
-        -------
-        list[str]
-            Identifiers of the quotes attached to this step, in quote-set
-            order; empty when the step only names a quote set.
-        """
-
-    @property
-    def quotes(self) -> list[Any]:
-        """
-        Quotes attached to this step, as plain dictionaries.
-
-        This property does not raise.
-
-        Returns
-        -------
-        list[Any]
-            Quotes attached to this step as ``{"kind": ..., ...}`` market-data
-            dictionaries. They are part of the step value and are kept by
-            :meth:`to_json`, :meth:`from_json` and pickle.
-        """
-
     def to_json(self) -> str:
         """
         Serialize the step to compact JSON.
@@ -3330,8 +3243,7 @@ class CalibrationStep:
         -------
         str
             Compact JSON encoding of the step: its ``id``, ``quote_set``,
-            ``kind`` and parameters, followed by a ``quotes`` array holding the
-            attached quotes. ``quotes`` is omitted when none are attached.
+            ``kind`` and parameters.
 
         Raises
         ------
@@ -3352,7 +3264,7 @@ class CalibrationStep:
         Returns
         -------
         CalibrationStep
-            The decoded step, including the quotes in its ``quotes`` array.
+            The decoded plain step with its quote-set reference.
 
         Raises
         ------
@@ -3363,9 +3275,9 @@ class CalibrationStep:
         --------
         >>> from finstack_quant.calibration import CalibrationStep, RateQuote
         >>> quotes = [RateQuote.deposit("D3M", "USD-SOFR-OIS", "3M", 0.052)]
-        >>> step = CalibrationStep.discount("USD-OIS", "USD", "2026-05-08", quotes=quotes)
-        >>> CalibrationStep.from_json(step.to_json()).quote_ids
-        ['D3M']
+        >>> step = CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")
+        >>> CalibrationStep.from_json(step.to_json()).quote_set
+        'USD-OIS'
         >>> CalibrationStep.from_json("{")
         Traceback (most recent call last):
         ValueError: ...
@@ -3406,21 +3318,12 @@ class CalibrationPlan:
         settings : CalibrationConfig | dict | None, default None
             Plan-level solver and acceptance settings; Rust defaults when None.
         quote_sets : dict[str, list[str]] | None, default None
-            Quote IDs grouped by set name. Attached quote payloads are retained
-            even when their set is supplied explicitly. Identical payloads
-            sharing an ID are collected once.
+            Quote IDs grouped by set name. IDs resolve in the envelope market data.
 
         Raises
         ------
         ValueError
             If ``settings`` is invalid.
-        CalibrationEnvelopeError
-            If attached sets disagree on quote IDs (``kind ==
-            "quote_set_conflict"``) or an ID has conflicting payloads
-            (``kind == "conflicting_market_datum"``); the plan assembly is
-            Rust ``CalibrationEnvelope::from_attached_steps``. Missing
-            referenced quote IDs and duplicate step IDs are rejected when the
-            envelope is validated.
 
         """
 
@@ -3466,19 +3369,14 @@ class CalibrationPlan:
     @property
     def steps(self) -> list[CalibrationStep]:
         """
-        The plan's steps in order, each with its attached quotes.
+        The plain plan's steps in execution order.
 
         This property does not raise.
 
         Returns
         -------
         list[CalibrationStep]
-            The plan's steps in order. Each step carries the ``market_data``
-            entries named by its quote set (Rust
-            ``CalibrationEnvelope::attached_steps``), so
-            ``CalibrationPlan(plan.steps, quote_sets=plan.quote_sets)`` rebuilds
-            the plan. A step whose quote set names an id that is not in
-            ``market_data`` carries no quotes.
+            Plain steps referencing the plan's named quote sets.
         """
 
     @property
@@ -3507,32 +3405,14 @@ class CalibrationPlan:
             Plan-level solver and acceptance settings.
         """
 
-    @property
-    def market_data(self) -> list[dict[str, Any]]:
-        """
-        Market data attached to the plan.
-
-        This property does not raise.
-
-        Returns
-        -------
-        list[dict[str, Any]]
-            Market data attached to the plan as ``{"kind": ..., ...}``
-            dictionaries: the distinct quotes attached to its steps, or the
-            envelope's market data for a plan read from
-            :attr:`CalibrationEnvelope.plan`.
-        """
-
     def to_json(self) -> str:
         """
-        Serialize the plan and its attached market data to compact JSON.
+        Serialize the plain plan to compact JSON.
 
         Returns
         -------
         str
-            Compact JSON in the calibration-envelope shape without prior
-            market: ``{"schema": ..., "plan": {...}, "market_data": [...]}``.
-            ``market_data`` is omitted when the plan has none.
+            Compact JSON containing the plan ID, steps, quote sets, and settings.
 
         Raises
         ------
@@ -3553,25 +3433,25 @@ class CalibrationPlan:
         Returns
         -------
         CalibrationPlan
-            The decoded plan with its attached market data. Only the shape is
-            checked here; a quote-set id missing from ``market_data`` is
-            reported when the plan is calibrated or validated. A
-            ``prior_market`` entry is dropped.
+            The decoded plain plan. Quote resolution is checked on its envelope.
 
         Raises
         ------
         ValueError
-            If ``json`` is malformed, lacks the ``schema`` marker or carries
+            If ``json`` is malformed or carries
             unknown fields.
 
         Examples
         --------
-        >>> from finstack_quant.calibration import CalibrationPlan, CalibrationStep, RateQuote
+        >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, CalibrationStep, RateQuote
         >>> quotes = [RateQuote.deposit("D3M", "USD-SOFR-OIS", "3M", 0.052)]
-        >>> plan = CalibrationPlan([CalibrationStep.discount("USD-OIS", "USD", "2026-05-08", quotes=quotes)])
+        >>> plan = CalibrationPlan(
+        ...     [CalibrationStep.discount("USD-OIS", "USD", "2026-05-08")],
+        ...     quote_sets={"USD-OIS": [q.id for q in quotes]},
+        ... )
         >>> restored = CalibrationPlan.from_json(plan.to_json())
-        >>> restored.market_data == plan.market_data, restored.steps[0].quote_ids
-        (True, ['D3M'])
+        >>> restored.to_json() == plan.to_json(), restored.steps[0].quote_set
+        (True, 'USD-OIS')
         >>> CalibrationPlan.from_json("{")
         Traceback (most recent call last):
         ValueError: ...
@@ -3605,14 +3485,10 @@ class CalibrationEnvelope:
         Parameters
         ----------
         plan : CalibrationPlan
-            The plan to execute; quotes attached to its steps are included in
-            ``market_data``.
+            Plain plan whose quote IDs resolve in ``market_data``.
         market_data : list[MarketDatum | dict] | None, default None
-            Additional flat market data: typed quotes and datums or
-            ``{"kind": ...}`` dicts such as ``fixing_series``. Rust
-            ``CalibrationEnvelope::with_market_data`` merges it onto the
-            attached quotes: an entry identical to one already present (same
-            kind, id and payload) is collected once.
+            Flat market data: typed quotes and datums or ``{"kind": ...}`` dicts.
+            Duplicate kind-and-ID inputs are rejected during validation.
         prior_market : list[dict] | None, default None
             Pre-built calibrated objects as ``{"kind": ..., ...}`` dicts.
 
@@ -3620,10 +3496,6 @@ class CalibrationEnvelope:
         ------
         ValueError
             If a market-data or prior-market entry has an invalid shape.
-        CalibrationEnvelopeError
-            If an entry repeats the kind and id of a market datum already
-            present with a different payload
-            (``kind == "conflicting_market_datum"``).
 
         """
 
@@ -3643,22 +3515,20 @@ class CalibrationEnvelope:
     @property
     def plan(self) -> CalibrationPlan:
         """
-        The plan carried by this envelope, with the envelope's market data.
+        The plain plan carried by this envelope.
 
         This property does not raise.
 
         Returns
         -------
         CalibrationPlan
-            The plan together with this envelope's ``market_data`` (the prior
-            market is not part of a plan), so ``calibrate(envelope.plan)``
-            resolves the same quotes as the envelope.
+            Plain steps, quote-set IDs, and settings. Market data stays on the envelope.
         """
 
     @property
-    def market_data(self) -> dict[str, Any]:
+    def market_data(self) -> list[dict[str, Any]]:
         """
-        Quote payload keyed by quote-set name.
+        Flat market data containing quotes and other observed inputs.
 
         This property does not raise.
 
@@ -4047,8 +3917,8 @@ class CalibrationReport:
 
     Examples:
     --------
-    >>> from finstack_quant.calibration import CalibrationPlan, calibrate
-    >>> calibrate(CalibrationPlan([], id="smoke")).report.success
+    >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, calibrate
+    >>> calibrate(CalibrationEnvelope(CalibrationPlan([], id="smoke"))).report.success
     True
 
     """
@@ -4368,8 +4238,8 @@ class CalibrationValidationReport:
 
     Examples:
     --------
-    >>> from finstack_quant.calibration import CalibrationPlan, dry_run
-    >>> dry_run(CalibrationPlan([], id="smoke")).is_valid
+    >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, dry_run
+    >>> dry_run(CalibrationEnvelope(CalibrationPlan([], id="smoke"))).is_valid
     True
 
     """
@@ -4480,8 +4350,8 @@ class CalibrationResult:
 
     Examples:
     --------
-    >>> from finstack_quant.calibration import CalibrationPlan, calibrate
-    >>> calibrate(CalibrationPlan([], id="smoke")).step_ids
+    >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, calibrate
+    >>> calibrate(CalibrationEnvelope(CalibrationPlan([], id="smoke"))).step_ids
     []
 
     """
@@ -4793,13 +4663,13 @@ class CalibrationEnvelopeError(RuntimeError):
     diagnostics: list[dict[str, Any]]
 
 def validate_calibration(
-    envelope: CalibrationEnvelope | CalibrationPlan | dict[str, Any] | str,
+    envelope: CalibrationEnvelope | dict[str, Any] | str,
 ) -> CalibrationEnvelope:
     """Validate a calibration envelope and return it in canonical typed form.
 
     Parameters
     ----------
-    envelope : CalibrationEnvelope | CalibrationPlan | dict | str
+    envelope : CalibrationEnvelope | dict | str
         Typed envelope, plan, dict, or JSON string using the schema marker
         ``finstack_quant.calibration/1``.
 
@@ -4817,20 +4687,20 @@ def validate_calibration(
 
     Examples:
     --------
-    >>> from finstack_quant.calibration import CalibrationPlan, validate_calibration
-    >>> validate_calibration(CalibrationPlan([], id="smoke")).plan.id
+    >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, validate_calibration
+    >>> validate_calibration(CalibrationEnvelope(CalibrationPlan([], id="smoke"))).plan.id
     'smoke'
 
     """
 
 def validate_calibration_json(
-    envelope: CalibrationEnvelope | CalibrationPlan | dict[str, Any] | str,
+    envelope: CalibrationEnvelope | dict[str, Any] | str,
 ) -> str:
     """JSON twin of :func:`validate_calibration`.
 
     Parameters
     ----------
-    envelope : CalibrationEnvelope | CalibrationPlan | dict | str
+    envelope : CalibrationEnvelope | dict | str
         Typed envelope, plan, dict, or JSON string.
 
     Returns
@@ -4845,14 +4715,16 @@ def validate_calibration_json(
 
     Examples:
     --------
-    >>> from finstack_quant.calibration import CalibrationPlan, validate_calibration_json
-    >>> "finstack_quant.calibration/1" in validate_calibration_json(CalibrationPlan([], id="smoke"))
+    >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, validate_calibration_json
+    >>> "finstack_quant.calibration/1" in validate_calibration_json(
+    ...     CalibrationEnvelope(CalibrationPlan([], id="smoke"))
+    ... )
     True
 
     """
 
 def dry_run(
-    envelope: CalibrationEnvelope | CalibrationPlan | dict[str, Any] | str,
+    envelope: CalibrationEnvelope | dict[str, Any] | str,
 ) -> CalibrationValidationReport:
     """Validate an envelope statically without invoking the solver.
 
@@ -4861,7 +4733,7 @@ def dry_run(
 
     Parameters
     ----------
-    envelope : CalibrationEnvelope | CalibrationPlan | dict | str
+    envelope : CalibrationEnvelope | dict | str
         Typed envelope, plan, dict, or JSON string.
 
     Returns
@@ -4878,20 +4750,20 @@ def dry_run(
 
     Examples:
     --------
-    >>> from finstack_quant.calibration import CalibrationPlan, dry_run
-    >>> dry_run(CalibrationPlan([], id="smoke")).errors
+    >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, dry_run
+    >>> dry_run(CalibrationEnvelope(CalibrationPlan([], id="smoke"))).errors
     []
 
     """
 
 def dry_run_json(
-    envelope: CalibrationEnvelope | CalibrationPlan | dict[str, Any] | str,
+    envelope: CalibrationEnvelope | dict[str, Any] | str,
 ) -> str:
     """JSON twin of :func:`dry_run`.
 
     Parameters
     ----------
-    envelope : CalibrationEnvelope | CalibrationPlan | dict | str
+    envelope : CalibrationEnvelope | dict | str
         Typed envelope, plan, dict, or JSON string.
 
     Returns
@@ -4906,21 +4778,21 @@ def dry_run_json(
 
     Examples:
     --------
-    >>> from finstack_quant.calibration import CalibrationPlan, dry_run_json
-    >>> "errors" in dry_run_json(CalibrationPlan([], id="smoke"))
+    >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, dry_run_json
+    >>> "errors" in dry_run_json(CalibrationEnvelope(CalibrationPlan([], id="smoke")))
     True
 
     """
 
 def calibrate(
-    envelope: CalibrationEnvelope | CalibrationPlan | dict[str, Any] | str,
+    envelope: CalibrationEnvelope | dict[str, Any] | str,
 ) -> CalibrationResult:
     """Execute a calibration plan and return the calibrated market and reports.
 
     Parameters
     ----------
-    envelope : CalibrationEnvelope | CalibrationPlan | dict | str
-        Typed envelope, plan (its inline quotes become the market data), dict,
+    envelope : CalibrationEnvelope | dict | str
+        Typed envelope, dict,
         or JSON string using the schema marker ``finstack_quant.calibration/1``.
 
     Returns
@@ -4937,8 +4809,8 @@ def calibrate(
 
     Examples:
     --------
-    >>> from finstack_quant.calibration import CalibrationPlan, calibrate
-    >>> calibrate(CalibrationPlan([], id="smoke")).success
+    >>> from finstack_quant.calibration import CalibrationEnvelope, CalibrationPlan, calibrate
+    >>> calibrate(CalibrationEnvelope(CalibrationPlan([], id="smoke"))).success
     True
 
     """

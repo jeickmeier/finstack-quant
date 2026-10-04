@@ -40,4 +40,4 @@ pub(crate) mod types;
 
 pub use types::{LookbackOption, LookbackOptionBuilder, LookbackType};
 
-crate::impl_equity_exotic_traits!(LookbackOption);
+crate::instruments::common_impl::traits::impl_equity_exotic_traits!(LookbackOption);

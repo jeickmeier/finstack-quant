@@ -5,7 +5,7 @@
 //! meet good delivery standards (coupon, term, agency).
 
 use crate::cashflow::builder::specs::PrepaymentModelSpec;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::fixed_income::mbs_passthrough::{AgencyMbsPassthrough, AgencyProgram};
 use finstack_quant_core::currency::Currency;
@@ -125,7 +125,6 @@ pub struct AgencyTba {
     ///
     /// When `None`, inferred from agency + term using
     /// [`SifmaSettlementClass::from_agency_term`].
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settlement_class: Option<SifmaSettlementClass>,
     /// Explicit settlement date override.
@@ -134,7 +133,6 @@ pub struct AgencyTba {
     /// `settlement_year`/`settlement_month` in
     /// [`AgencyTba::effective_settlement_date`]. Dollar rolls use this to keep leg
     /// pricing consistent with explicit roll settlement dates.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -147,7 +145,6 @@ pub struct AgencyTba {
     /// Trade price (percentage of par, e.g., 98.5).
     pub trade_price: f64,
     /// Trade date.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -159,13 +156,11 @@ pub struct AgencyTba {
     /// Defaults to 1.0 for a generic pool. Original face is `notional / factor`;
     /// the purchased current face remains `notional`. When an explicit pool is
     /// supplied, its factor is used and any specified factor must agree.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pool_factor: Option<f64>,
     /// Optional assumed pool for valuation.
     /// Its current and original faces are scaled together to the trade's
     /// purchased current face. If absent, generic pool characteristics apply.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assumed_pool: Option<Box<AgencyMbsPassthrough>>,
     /// Prepayment model of the generic assumed pool.
@@ -173,7 +168,6 @@ pub struct AgencyTba {
     /// Applies only when `assumed_pool` is absent (an explicit pool carries its
     /// own model); `None` uses the embedded generic PSA assumption. Setting it
     /// together with `assumed_pool` is rejected.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prepayment_spec: Option<PrepaymentModelSpec>,
     /// Discount curve identifier.
@@ -447,7 +441,7 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyTba {
         self.effective_settlement_date().ok()
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 #[cfg(test)]

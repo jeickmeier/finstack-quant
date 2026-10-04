@@ -69,45 +69,6 @@ pub fn seniority_recovery_stats_default(
     })
 }
 
-/// Draw recovery rates from a Beta distribution with a deterministic seed.
-///
-/// # Arguments
-///
-/// * `mean` - Target recovery-rate mean as a decimal fraction in `(0, 1)`.
-/// * `std` - Target recovery-rate standard deviation as a decimal fraction
-///   compatible with `mean` for a Beta distribution.
-/// * `n_samples` - Number of simulated recovery rates to return.
-/// * `seed` - Deterministic random seed; equal inputs and seed produce the
-///   same sample sequence.
-///
-/// # Errors
-/// Returns an error if the mean or standard deviation cannot parameterize a
-/// valid Beta recovery distribution, or if sampling fails.
-pub fn beta_recovery_sample(
-    mean: f64,
-    std: f64,
-    n_samples: usize,
-    seed: u64,
-) -> finstack_quant_core::Result<Vec<f64>> {
-    BetaRecovery::new(mean, std)?.sample_seeded(n_samples, seed)
-}
-
-/// Return the value at quantile `q` for a Beta recovery distribution.
-///
-/// # Arguments
-///
-/// * `mean` - Target recovery-rate mean as a decimal fraction in `(0, 1)`.
-/// * `std` - Target recovery-rate standard deviation as a decimal fraction
-///   compatible with `mean` for a Beta distribution.
-/// * `q` - Cumulative probability in the inclusive `0.0..=1.0` range.
-///
-/// # Errors
-/// Returns an error if the mean or standard deviation cannot parameterize a
-/// valid Beta recovery distribution, or if the quantile evaluation fails.
-pub fn beta_recovery_quantile(mean: f64, std: f64, q: f64) -> finstack_quant_core::Result<f64> {
-    BetaRecovery::new(mean, std)?.quantile(q)
-}
-
 /// Compute workout net recovery, LGD, and recovery rate from collateral specs.
 ///
 /// Each collateral tuple is `(type_name, book_value, haircut)`.
@@ -153,85 +114,6 @@ pub fn workout_lgd(
     model.evaluate(ead)
 }
 
-/// Apply a stressed downturn adjustment to base LGD.
-///
-/// Uses the proprietary mean-plus-multiple-of-Bernoulli-stdev approximation
-/// (see [`DownturnMethod::StressedApproximation`]
-/// for the formula and naming note — this is *not* the Frye-Jacobs (2012)
-/// model):
-///
-/// ```text
-/// LGD_downturn = LGD_base + lgd_sensitivity * sqrt(rho)
-///              * Phi_inv(stress_quantile) * sqrt(LGD_base * (1 - LGD_base))
-///   ```
-///
-/// # Arguments
-///
-/// * `base_lgd` - Through-the-cycle LGD in \[0, 1\].
-/// * `asset_correlation` - Asset correlation rho in (0, 1). Basel: 0.12-0.24.
-/// * `lgd_sensitivity` - LGD sensitivity to the systematic factor (>= 0).
-///   Typical: 0.3-0.5.
-/// * `stress_quantile` - Downturn quantile in (0, 1), e.g. 0.999.
-///
-/// # Errors
-/// Returns an error if the downturn model parameters or base LGD are invalid.
-pub fn downturn_lgd_stressed(
-    base_lgd: f64,
-    asset_correlation: f64,
-    lgd_sensitivity: f64,
-    stress_quantile: f64,
-) -> finstack_quant_core::Result<f64> {
-    DownturnLgd::stressed(asset_correlation, lgd_sensitivity, stress_quantile)?.adjust(base_lgd)
-}
-
-/// Apply a regulatory-floor downturn adjustment to base LGD.
-///
-/// # Arguments
-///
-/// * `base_lgd` - Through-the-cycle loss-given-default as a decimal fraction.
-/// * `add_on` - Downturn add-on expressed as a decimal LGD increment.
-/// * `floor` - Minimum permitted downturn LGD as a decimal fraction.
-///
-/// # Errors
-/// Returns an error if the downturn model parameters or base LGD are invalid.
-pub fn downturn_lgd_regulatory_floor(
-    base_lgd: f64,
-    add_on: f64,
-    floor: f64,
-) -> finstack_quant_core::Result<f64> {
-    DownturnLgd::regulatory_floor(add_on, floor)?.adjust(base_lgd)
-}
-
-/// Exposure at default for a fully drawn term loan.
-///
-/// # Arguments
-///
-/// * `principal` - Outstanding drawn principal in the facility's monetary
-///   units; it is fully included in exposure at default.
-///
-/// # Errors
-/// Returns an error if the principal is invalid.
-pub fn ead_term_loan(principal: f64) -> finstack_quant_core::Result<f64> {
-    Ok(EadCalculator::term_loan(principal)?.ead())
-}
-
-/// Exposure at default for a revolving facility.
-///
-/// # Arguments
-///
-/// * `drawn` - Currently drawn facility amount in the facility's monetary
-///   units.
-/// * `undrawn` - Remaining undrawn commitment in the same monetary units.
-/// * `ccf` - Credit-conversion factor as a decimal fraction applied to the
-///   undrawn amount.
-///
-/// # Errors
-/// Returns an error if drawn, undrawn, or CCF inputs are invalid.
-pub fn ead_revolver(drawn: f64, undrawn: f64, ccf: f64) -> finstack_quant_core::Result<f64> {
-    let ccf_obj = CreditConversionFactor::new(ccf)?;
-    Ok(EadCalculator::new(drawn, undrawn, ccf_obj)?.ead())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -252,8 +134,14 @@ mod tests {
 
     #[test]
     fn beta_recovery_sample_is_seeded() {
-        let first = beta_recovery_sample(0.4, 0.2, 4, 42).unwrap();
-        let second = beta_recovery_sample(0.4, 0.2, 4, 42).unwrap();
+        let first = BetaRecovery::new(0.4, 0.2)
+            .unwrap()
+            .sample_seeded(4, 42)
+            .unwrap();
+        let second = BetaRecovery::new(0.4, 0.2)
+            .unwrap()
+            .sample_seeded(4, 42)
+            .unwrap();
         assert_eq!(first, second);
     }
 

@@ -10,10 +10,6 @@ const computeMva = (imProfile, fundingSpreadCurve, discountCurve, survivalCurve 
     : wasm.computeMvaWithSurvival(imProfile, fundingSpreadCurve, discountCurve, survivalCurve);
 
 export const margin = {
-  csaUsdRegulatoryJson: wasm.csaUsdRegulatoryJson,
-  csaEurRegulatoryJson: wasm.csaEurRegulatoryJson,
-  validateCsaJson: wasm.validateCsaJson,
-  calculateVm: wasm.calculateVm,
   computeBilateralXva: wasm.computeBilateralXva,
   FrtbSbaEngine: wasm.FrtbSbaEngine,
   FrtbSensitivities: wasm.FrtbSensitivities,

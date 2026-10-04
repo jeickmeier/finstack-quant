@@ -524,10 +524,7 @@ pub(crate) fn discount_margin(
 
     // Project contractual cashflows once, then solve an additive discount
     // spread through the shared z-spread kernel.
-    let cashflows =
-        crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows(
-            deal, tranche_id, market, as_of,
-        )?;
+    let cashflows = (deal).tranche_cashflows(tranche_id, market, as_of)?;
 
     let quote = super::super::quote::SettlementQuote::for_tranche(
         deal,

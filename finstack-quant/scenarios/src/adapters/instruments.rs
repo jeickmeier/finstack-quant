@@ -4,7 +4,6 @@
 //! When instruments support `get_scenario_pricing_overrides_mut()`, shocks are applied functionally;
 //! otherwise they are stored as metadata attributes for downstream processing.
 
-use crate::adapters::traits::ScenarioEffect;
 use crate::warning::Warning;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
 use finstack_quant_valuations::pricer::InstrumentType;
@@ -49,54 +48,6 @@ fn instrument_label(attrs: &Attributes) -> String {
         .or_else(|| attrs.meta.get("name"))
         .cloned()
         .unwrap_or_else(|| "<unidentified>".to_string())
-}
-
-/// Generate a price-shock effect by instrument types.
-pub(crate) fn instrument_price_by_type_effects(
-    instrument_types: &[InstrumentType],
-    pct: f64,
-) -> Vec<ScenarioEffect> {
-    vec![ScenarioEffect::InstrumentPriceShock {
-        types: Some(instrument_types.to_vec()),
-        attrs: None,
-        pct,
-    }]
-}
-
-/// Generate a price-shock effect by attribute filter.
-pub(crate) fn instrument_price_by_attr_effects(
-    attrs: &indexmap::IndexMap<String, String>,
-    pct: f64,
-) -> Vec<ScenarioEffect> {
-    vec![ScenarioEffect::InstrumentPriceShock {
-        types: None,
-        attrs: Some(attrs.clone()),
-        pct,
-    }]
-}
-
-/// Generate a spread-shock effect by instrument types.
-pub(crate) fn instrument_spread_by_type_effects(
-    instrument_types: &[InstrumentType],
-    bp: f64,
-) -> Vec<ScenarioEffect> {
-    vec![ScenarioEffect::InstrumentSpreadShock {
-        types: Some(instrument_types.to_vec()),
-        attrs: None,
-        bp,
-    }]
-}
-
-/// Generate a spread-shock effect by attribute filter.
-pub(crate) fn instrument_spread_by_attr_effects(
-    attrs: &indexmap::IndexMap<String, String>,
-    bp: f64,
-) -> Vec<ScenarioEffect> {
-    vec![ScenarioEffect::InstrumentSpreadShock {
-        types: None,
-        attrs: Some(attrs.clone()),
-        bp,
-    }]
 }
 
 /// Kind of instrument shock: price (percent) or spread (bp).

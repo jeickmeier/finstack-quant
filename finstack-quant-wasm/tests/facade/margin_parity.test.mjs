@@ -13,7 +13,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
-import init, { core, margin } from '../../index.js';
+import init, { core, margin, valuations } from '../../index.js';
 
 await init({
   module_or_path: readFileSync(new URL('../../pkg/finstack_quant_wasm_bg.wasm', import.meta.url)),
@@ -101,12 +101,12 @@ function simmSensitivities() {
 
 function frtbSensitivities() {
   const sens = new margin.FrtbSensitivities('USD');
-  sens.addGirrDelta('5Y', 100_000);
-  sens.addGirrDelta('10Y', -40_000, 'EUR');
-  sens.addGirrInflationDelta(5_000);
-  sens.addGirrXccyBasisDelta(2_000, 'EUR');
-  sens.addGirrVega('1Y', '5Y', 3_000);
-  sens.addGirrCurvature(-1_500, -2_500);
+  sens.addGirrDelta('USD', '5Y', 100_000);
+  sens.addGirrDelta('EUR', '10Y', -40_000);
+  sens.addGirrInflationDelta('USD', 5_000);
+  sens.addGirrXccyBasisDelta('EUR', 2_000);
+  sens.addGirrVega('USD', '1Y', '5Y', 3_000);
+  sens.addGirrCurvature('USD', -1_500, -2_500);
   sens.addCsrNonsecDelta('ACME', 3, '5Y', 'bond', 5_000);
   sens.addCsrNonsecVega('ACME', 3, '1Y', 700);
   sens.addCsrNonsecCurvature('ACME', 3, -300, -500);
@@ -126,8 +126,24 @@ function frtbSensitivities() {
   sens.addCommodityDelta('WTI', 2, '1Y', 'cushing', 2_000);
   sens.addCommodityVega('WTI', 2, '1Y', 250);
   sens.addCommodityCurvature('WTI', 2, -100, -180);
-  sens.addDrcPosition('ACME', 1_000_000, 4, 'corporate', 'senior_unsecured', 'corporate', 2.0);
-  sens.addDrcPosition('ACME', -250_000, 4, 'corporate', 'subordinated', 'corporate', 0.5, -1_000);
+  sens.addDrcPosition({
+    issuer: 'ACME',
+    jtd_amount: 1_000_000,
+    rating_bucket: 4,
+    sector: 'corporate',
+    seniority: 'senior_unsecured',
+    maturity_years: 2.0,
+    pnl_adjustment: 0.0,
+  });
+  sens.addDrcPosition({
+    issuer: 'ACME',
+    jtd_amount: -250_000,
+    rating_bucket: 4,
+    sector: 'corporate',
+    seniority: 'subordinated',
+    maturity_years: 0.5,
+    pnl_adjustment: -1_000,
+  });
   sens.addRraoPosition('EXOTIC_1', 1_000_000, true);
   sens.addRraoPosition('GAP_1', 2_000_000, false);
   return sens;
@@ -211,7 +227,6 @@ test('CsaSpec twins build, amend, apply and validate plain specifications', () =
   const csa = golden.csa;
   const usd = margin.csaSpecUsdRegulatory();
   close(usd, csa.usd, 'usd');
-  close(usd, JSON.parse(margin.csaUsdRegulatoryJson()), 'usd vs json twin');
   close(margin.csaSpecEurRegulatory(), csa.eur, 'eur');
   close(margin.csaSpecRegulatory('GBP', 'GBP-CSA', 'GBP-SONIA'), csa.regulatory_gbp, 'gbp');
   close(
@@ -515,15 +530,11 @@ test('ScheduleImCalculator matches Python', () => {
   close(schedule.rate('interest_rate', 5.0), expected.rate, 'rate');
   close(
     {
-      asset_class: schedule.defaultAssetClass,
-      maturity_years: schedule.defaultMaturityYears,
       mpor_days: schedule.mporDays,
     },
     expected.defaults,
     'defaults'
   );
-  assert.equal(schedule.withAssetClass('credit').defaultAssetClass, expected.with_asset_class);
-  close(schedule.withMaturity(2.0).defaultMaturityYears, expected.with_maturity, 'with_maturity');
   close(
     margin.ScheduleImCalculator.fromRegistryId(golden.constants.BCBS_IOSCO_SCHEDULE_ID).rate(
       'credit',
@@ -553,26 +564,12 @@ test('ScheduleImCalculator matches Python', () => {
   );
   assert.equal(schedule.calculateNettingSetWithNgr([], 'USD', '2025-01-15'), undefined);
   throwsKind(() => margin.ScheduleImCalculator.fromRegistryId('nope'), 'not_found');
-  throwsKind(() => schedule.withMaturity(-1), 'validation');
 });
 
 test('HaircutImCalculator matches Python', () => {
   const expected = golden.haircut_im;
   const haircut = margin.HaircutImCalculator.bcbsStandard();
   close(haircut.haircutFor('cash'), expected.haircut_for_cash, 'haircut_for_cash');
-  assert.equal(haircut.defaultAssetClass, expected.default_asset_class);
-  assert.equal(
-    haircut.withDefaultAssetClass('government_bonds').defaultAssetClass,
-    expected.with_default_asset_class
-  );
-  close(
-    [
-      haircut.postedCollateralCurrency,
-      haircut.withPostedCollateralCurrency('EUR').postedCollateralCurrency,
-    ],
-    expected.posted_collateral_currency,
-    'posted_collateral_currency'
-  );
   assert.equal(haircut.mporDays, expected.mpor_days);
   close(
     margin.HaircutImCalculator.usTreasuries()
@@ -605,7 +602,6 @@ test('VmCalculator and the VmResult twins match Python', () => {
   assert.equal(calc.csa.id, expected.csa_id);
   const result = calc.calculate(1_000_000, 0, 'USD', '2024-06-17');
   close(result, expected.result, 'result');
-  close(result, margin.calculateVm(calc.csa, 1_000_000, 0, 'USD', '2024-06-17'), 'calculateVm');
   close(margin.vmResultNetMargin(result), expected.net_margin, 'net_margin');
   assert.equal(margin.vmResultRequiresCall(result), expected.requires_call);
 
@@ -669,7 +665,16 @@ test('FrtbSensitivities, FrtbSbaEngine and frtbSbaCharge match Python', () => {
   throwsKind(() => new margin.FrtbSbaEngine([]), 'validation', /at least one correlation scenario/);
   throwsKind(() => sens.addEquityDelta('AAPL', 1.5, 1), 'invalid_type');
   throwsKind(
-    () => sens.addDrcPosition('X', 1, 4, 'nope', 'senior_unsecured', 'corporate', 1),
+    () =>
+      sens.addDrcPosition({
+        issuer: 'X',
+        jtd_amount: 1,
+        rating_bucket: 4,
+        sector: 'nope',
+        seniority: 'senior_unsecured',
+        maturity_years: 1,
+        pnl_adjustment: 0.0,
+      }),
     'validation'
   );
 });
@@ -716,4 +721,52 @@ test('addRraoPosition requires the exotic flag', () => {
   const sens = new margin.FrtbSensitivities('USD');
   throwsKind(() => sens.addRraoPosition('X', 1_000_000), 'invalid_type');
   sens.addRraoPosition('X', 1_000_000, false);
+});
+
+test('GIRR requires explicit risk currency and DRC delegates complete Rust validation', () => {
+  const sens = new margin.FrtbSensitivities('USD');
+  assert.throws(() => sens.addGirrDelta('5Y', 100));
+  sens.addGirrDelta('EUR', '5Y', 100);
+  assert.deepEqual(JSON.parse(sens.toJson()).girr_delta, [['EUR', '5Y', 100]]);
+  const position = {
+    issuer: 'ACME',
+    jtd_amount: 1_000_000,
+    rating_bucket: 4,
+    sector: 'corporate',
+    seniority: 'senior_unsecured',
+    maturity_years: 2,
+  };
+  for (const change of [
+    { maturity_years: -1 },
+    { rating_bucket: 0 },
+    { seniority: 'equity', sector: 'sovereign' },
+    { asset_type: 'corporate' },
+  ]) {
+    assert.throws(() => sens.addDrcPosition({ ...position, ...change }));
+  }
+  assert.deepEqual(JSON.parse(sens.toJson()).drc_positions, []);
+  sens.addDrcPosition(position);
+  assert.equal(margin.frtbSbaCharge(sens).drc, 45_000);
+});
+
+test('instrument roundtrip preserves the CSA-owned no-IM election', () => {
+  const csa = margin.csaSpecUsdRegulatory();
+  csa.im_params = null;
+  csa.vm_params.frequency = 'weekly';
+  csa.vm_params.settlement_lag = 3;
+  const spec = { csa, clearing_status: 'bilateral' };
+  const payload = JSON.parse(valuations.instruments.InterestRateSwap.example().toJson());
+  payload.instrument.spec.margin_spec = spec;
+  const swap = valuations.instruments.InterestRateSwap.fromJson(JSON.stringify(payload));
+  const canonical = { csa: { ...csa }, clearing_status: 'bilateral' };
+  delete canonical.csa.im_params;
+  assert.deepEqual(swap.marginSpec, canonical);
+  assert.deepEqual(JSON.parse(swap.toJson()).instrument.spec.margin_spec, canonical);
+  for (const retired of ['im_methodology', 'vm_frequency', 'settlement_lag']) {
+    payload.instrument.spec.margin_spec = { ...spec, [retired]: 'simm' };
+    assert.throws(
+      () => valuations.instruments.InterestRateSwap.fromJson(JSON.stringify(payload)),
+      /unknown field/
+    );
+  }
 });

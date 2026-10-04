@@ -105,7 +105,6 @@ def test_swaption_builder_setters_accept_keyword_value() -> None:
         .option_type(value="call")
         .notional(value=Money(10_000_000.0, Currency("USD")))
         .expiry(value=datetime.date(2025, 1, 13))
-        .exercise_style(value="european")
         .settlement(value="cash")
         .cash_settlement_method(value="par_yield")
         .vol_model(value="normal")

@@ -153,26 +153,6 @@ pub enum DrcSeniority {
     Subordinated,
     /// Equity instruments.
     Equity,
-    /// Securitization tranches.
-    Securitization,
-}
-
-/// DRC asset type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(rename_all = "snake_case")]
-#[non_exhaustive]
-pub enum DrcAssetType {
-    /// Corporate bonds and loans.
-    Corporate,
-    /// Sovereign bonds.
-    Sovereign,
-    /// Local-government and municipal bonds.
-    LocalGovernment,
-    /// Securitization tranches.
-    Securitization,
-    /// Equity instruments.
-    Equity,
 }
 
 /// A position subject to the Default Risk Charge.
@@ -188,10 +168,11 @@ pub enum DrcAssetType {
 /// reflected in the trading-book valuation (e.g. an underwater long bond
 /// has a small negative `P&L` that reduces the exposed JTD). `jtd_amount`
 /// represents the signed *notional* (positive = long, negative = short);
-/// [`drc_charge`](super::drc::drc_charge) multiplies by [`DrcSeniority`]
+/// `FrtbSbaEngine` multiplies by [`DrcSeniority`]
 /// LGD and then applies the `pnl_adjustment` and the sign-preserving floor.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct DrcPosition {
     /// Residual contractual maturity in years; scaled into [0.25, 1.0] for JTD.
     /// Cash equities use the elected three-month or greater-than-one-year horizon.
@@ -199,7 +180,7 @@ pub struct DrcPosition {
     /// Issuer identifier.
     pub issuer: String,
     /// Signed JTD *notional* (positive = long, negative = short). Does
-    /// **not** include the LGD multiplier — [`super::drc::drc_charge`] applies LGD.
+    /// **not** include the LGD multiplier — `FrtbSbaEngine` applies LGD.
     pub jtd_amount: f64,
     /// Credit rating bucket (1-based per FRTB specification).
     pub rating_bucket: u8,
@@ -207,15 +188,36 @@ pub struct DrcPosition {
     pub sector: DrcSector,
     /// Seniority for LGD determination.
     pub seniority: DrcSeniority,
-    /// Asset sub-type: corporate, sovereign, local government, or equity.
-    /// Securitizations are rejected because they require a separate DRC model.
-    pub asset_type: DrcAssetType,
     /// Mark-to-market / P&L adjustment from MAR22.9. Default 0. Add a
     /// negative value for a long position with unrealised loss so the
     /// gross JTD is correctly floored at zero when the mark-down already
     /// exceeds `LGD * notional`.
     #[serde(default)]
     pub pnl_adjustment: f64,
+}
+
+impl DrcPosition {
+    /// Validate supported non-securitisation default-risk position terms.
+    ///
+    /// # Errors
+    ///
+    /// Rejects a blank issuer, rating outside 1..=9, negative or non-finite
+    /// maturity, non-finite amounts, or equity outside the corporate sector.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        if self.issuer.trim().is_empty()
+            || !(1..=9).contains(&self.rating_bucket)
+            || !self.maturity_years.is_finite()
+            || self.maturity_years < 0.0
+            || !self.jtd_amount.is_finite()
+            || !self.pnl_adjustment.is_finite()
+            || (self.seniority == DrcSeniority::Equity && self.sector != DrcSector::Corporate)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "invalid DRC issuer, rating, maturity, amounts or equity sector".into(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// A position subject to the Residual Risk Add-On.
@@ -601,15 +603,7 @@ impl FrtbSensitivities {
             }
         }
         for position in &self.drc_positions {
-            identifier("drc.issuer", &position.issuer)?;
-            if !(1..=9).contains(&position.rating_bucket) {
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "FRTB sensitivity drc has unknown rating bucket {}",
-                    position.rating_bucket
-                )));
-            }
-            finite("drc.jtd_amount", position.jtd_amount)?;
-            finite("drc.pnl_adjustment", position.pnl_adjustment)?;
+            position.validate()?;
         }
         for position in &self.rrao_exotic_notionals {
             identifier("rrao.instrument_id", &position.instrument_id)?;
@@ -1011,7 +1005,7 @@ impl FrtbSensitivities {
 
     /// Add a Default Risk Charge position.
     ///
-    /// Positions are appended, not netted: [`super::drc::drc_charge`] nets
+    /// Positions are appended, not netted: `FrtbSbaEngine` nets
     /// long and short JTD per issuer at charge time.
     ///
     /// # Arguments

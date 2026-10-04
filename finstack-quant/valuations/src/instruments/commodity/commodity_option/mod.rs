@@ -11,5 +11,5 @@ pub(crate) mod traits;
 mod types;
 
 pub use pricer::CommodityOptionMcPricer;
+pub use types::CommodityMcParams;
 pub use types::CommodityOption;
-pub use types::{CommodityMcParams, CommodityPricingModel};

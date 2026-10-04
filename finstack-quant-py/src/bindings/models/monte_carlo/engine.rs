@@ -33,8 +33,6 @@ use pyo3::prelude::*;
 /// seed : int, optional
 ///     Deterministic Philox seed. ``None`` uses the Rust ``GbmPathConfig``
 ///     default seed (``42``), so two calls without a seed are identical.
-/// antithetic : bool, default False
-///     Antithetic pairing request; path capture rejects ``True``.
 ///
 /// Returns
 /// -------
@@ -48,10 +46,10 @@ use pyo3::prelude::*;
 ///     ``rate`` or ``div_yield`` is non-finite; ``num_steps`` is zero or
 ///     cannot form a time grid; ``num_paths`` is outside ``[1, 100_000]``;
 ///     the compact output and shared time grids exceed ``64_000_000`` scalar
-///     values; a simulated spot is non-finite; or ``antithetic`` is ``True``.
+///     values; or a simulated spot is non-finite.
 #[pyfunction]
 #[allow(clippy::too_many_arguments)]
-#[pyo3(signature = (spot, rate, div_yield, vol, expiry, num_steps, num_paths, seed=None, antithetic=false))]
+#[pyo3(signature = (spot, rate, div_yield, vol, expiry, num_steps, num_paths, seed=None))]
 fn simulate_gbm_paths(
     py: Python<'_>,
     spot: f64,
@@ -62,12 +60,10 @@ fn simulate_gbm_paths(
     num_steps: usize,
     num_paths: usize,
     seed: Option<u64>,
-    antithetic: bool,
 ) -> PyResult<PyGbmPathSummary> {
     let mut config = finstack_quant_models::monte_carlo::GbmPathConfig::new(
         spot, rate, div_yield, vol, expiry, num_steps, num_paths,
-    )
-    .with_antithetic(antithetic);
+    );
     if let Some(seed) = seed {
         config = config.with_seed(seed);
     }

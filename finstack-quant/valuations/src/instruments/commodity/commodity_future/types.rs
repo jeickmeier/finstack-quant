@@ -1,7 +1,7 @@
 //! Linear futures on a directly observable or averaged price.
 
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::listed::ListedFutureTerms;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
@@ -368,7 +368,7 @@ impl crate::instruments::Instrument for CommodityFuture {
         Some(self.terms.settlement_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

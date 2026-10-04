@@ -272,12 +272,6 @@
       "reason": "Margin/collateral API plumbing, display text, or sensitivity bump; regulatory schedules live in margin registries."
     },
     {
-      "path": "finstack-quant-py/src/bindings/margin/xva.rs",
-      "category": "margin_regulatory",
-      "contains": "\"XvaResult(cva={:.4}, dva={:?}, fva={:?}, max_pfe={:.2})\",",
-      "reason": "Margin/collateral API plumbing, display text, or sensitivity bump; regulatory schedules live in margin registries."
-    },
-    {
       "path": "finstack-quant-py/src/bindings/models/monte_carlo/engine.rs",
       "category": "binding_default",
       "contains": "#[pyo3(signature = (num_paths, time_grid, seed=42, use_parallel=false, antithetic=false))]",
@@ -1002,18 +996,6 @@
       "category": "margin_regulatory",
       "contains": "description = \"Margin, collateral, and XVA primitives for Finstack\"",
       "reason": "Margin/collateral API plumbing, display text, or sensitivity bump; regulatory schedules live in margin registries."
-    },
-    {
-      "path": "finstack-quant/margin/src/calculators/im/clearing.rs",
-      "category": "margin_regulatory",
-      "contains": "=> \"generic_var\"",
-      "reason": "Registry identifier mapping, not a regulatory fallback assumption."
-    },
-    {
-      "path": "finstack-quant/margin/src/calculators/im/clearing.rs",
-      "category": "margin_regulatory",
-      "contains": "Generic VaR ({:.0}%)",
-      "reason": "Display-only label formatting; unknown-CCP generic VaR parameters are sourced from the margin CCP registry."
     },
     {
       "path": "finstack-quant/margin/src/calculators/im/haircut.rs",

@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::date_to_py;
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
+use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::money_to_py;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
@@ -173,25 +173,12 @@ impl PyTrancheCashflows {
     /// Raises
     /// ------
     /// ValueError
-    ///     If a component carries a different currency from the tranche, or the rows cannot be serialized.
+    ///     If component currencies differ or the canonical table cannot be built.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows = self
-            .inner
-            .get_cashflow_rows()
-            .map_err(crate::errors::core_to_py)?;
-        serde_rows_to_dataframe_with_schema(
+        crate::bindings::pandas_utils::table_to_dataframe(
             py,
-            &rows,
-            &[
-                ("date", "str"),
-                ("cashflow", "float64"),
-                ("interest", "float64"),
-                ("principal", "float64"),
-                ("pik", "float64"),
-                ("deferred", "float64"),
-                ("writedown", "float64"),
-            ],
+            &self.inner.to_table().map_err(crate::errors::core_to_py)?,
         )
     }
 

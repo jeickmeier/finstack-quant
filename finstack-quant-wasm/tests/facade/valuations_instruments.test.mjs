@@ -363,13 +363,20 @@ const RATE_HISTORY = {
 };
 
 test('calculateVarWithPricing matches the hvar metric and aggregates positions', () => {
-  const long = flatBond('LONG', 1_000_000);
+  const long = JSON.parse(flatBond('LONG', 1_000_000));
   const result = valuations.instruments.calculateVarWithPricing(
     [long],
     FLAT_MARKET,
     RATE_HISTORY,
     '2024-01-15'
   );
+  const fromText = valuations.instruments.calculateVarWithPricing(
+    JSON.stringify([long]),
+    FLAT_MARKET,
+    RATE_HISTORY,
+    '2024-01-15'
+  );
+  assert.deepEqual(fromText, result);
   const metric = valuations.instruments.priceInstrument(
     long,
     FLAT_MARKET,
@@ -417,6 +424,19 @@ test('calculateVarWithPricing matches the hvar metric and aggregates positions',
   );
 });
 
+test('VaR inventory rejects JSON strings nested inside the envelope array', () => {
+  assert.throws(
+    () =>
+      valuations.instruments.calculateVarWithPricing(
+        [flatBond('STRING', 1_000_000)],
+        FLAT_MARKET,
+        RATE_HISTORY,
+        '2024-01-15'
+      ),
+    (error) => error.kind === 'validation'
+  );
+});
+
 test('instrumentEnvelopeFromSpec wraps a bare spec and rejects tagged payloads', () => {
   const spec = {
     id: 'EURUSD-SPOT',
@@ -448,10 +468,6 @@ test('instrumentEnvelopeFromSpec wraps a bare spec and rejects tagged payloads',
 test('CdsOption is a typed class matching the Python wrapper', () => {
   const { CdsOption } = valuations.instruments;
   const option = CdsOption.example();
-  assert.equal(
-    valuations.instruments.CdsOption.fromJson(option.toJson()).toJson(),
-    option.toJson()
-  );
   assert.deepEqual(option.strike, { spread: '0.01' });
   assert.equal(option.optionType, 'call');
   assert.equal(option.expiry, '2025-06-20');
@@ -482,5 +498,18 @@ test('CdsOption is a typed class matching the Python wrapper', () => {
   assert.throws(
     () => CdsOption.builder().id('X').build(),
     (error) => error.kind === 'validation' && /missing required field/.test(error.message)
+  );
+});
+
+test('VaR inventory applies the whole-input byte limit', () => {
+  assert.throws(
+    () =>
+      valuations.instruments.calculateVarWithPricing(
+        `[]${' '.repeat(16 * 1024 * 1024)}`,
+        FLAT_MARKET,
+        RATE_HISTORY,
+        '2024-01-15'
+      ),
+    (error) => error.kind === 'validation'
   );
 });

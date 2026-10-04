@@ -19,8 +19,9 @@ use super::convert::{
 };
 use super::instruments::{enum_from_str, serialize_typed_instrument_json};
 use super::typed_fx::{
-    instrument_envelope_methods, instrument_pricing_methods, take_builder, typed_option_greeks,
+    instrument_envelope_methods, instrument_pricing_methods, typed_option_greeks,
 };
+use crate::bindings::valuations::convert::take_builder;
 
 type EquityOptionBuilderInner =
     finstack_quant_valuations::instruments::equity::equity_option::EquityOptionBuilder;
@@ -1110,4 +1111,4 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 ///
 /// Extend this list (sorted) when adding a class or function here; `mod.rs`
 /// merges every submodule list so registration stays in one place per file.
-pub(crate) const EXPORTS: &[&str] = &[];
+pub(crate) const EXPORTS: &[&str] = &["EquityOption", "EquityOptionBuilder"];

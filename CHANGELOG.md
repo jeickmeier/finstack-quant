@@ -2,6 +2,65 @@
 
 ## [Unreleased]
 
+### Margin API simplification
+
+#### Changed (breaking)
+
+- SIMM component calculations and FRTB/SA-CCR calculation stages are internal. Use validated sensitivity containers and the canonical engines; `calculate_from_sensitivities_parts` remains available for portfolio and MVA aggregation. Resolved SIMM parameters are immutable through `get_params()`, and construction uses fallible `SimmCalculator::new` rather than `Default`.
+- WASM removes `csaUsdRegulatoryJson`, `csaEurRegulatoryJson`, `validateCsaJson` and `calculateVm`. Use the canonical `csaSpec*` functions and `VmCalculator`; standard JSON serialization supplies wire text. Python/WASM schedule and haircut calculators remove settings and getters that did not affect any bound calculation.
+- Python/WASM GIRR adders require the risk currency as the first argument. DRC adders take one canonical position object; DRC no longer duplicates sector/seniority with `asset_type`, and unsupported securitisation seniority is removed. Position and engine validation share the complete Rust validator.
+- The published SIMM input schema is `SimmSensitivitiesJson`; the partial tuple-keyed `SimmSensitivities` schema is removed. Generic CCP fallback is the unit `GenericProxy` with registry key `generic_proxy`; fictitious VaR confidence/lookback metadata and literal calculator presets are removed.
+- XVA results remove the duplicated `pfe_profile` and name peak expected positive exposure `max_epe`. OTC margin specifications remove `im_methodology`, `vm_frequency` and `settlement_lag`; their CSA owns those elections, including explicit no-IM terms and business-day VM settlement. Repo margin cashflow currency derives from `cash_amount`.
+
+#### Fixed
+
+- Regulatory inputs cannot manufacture fallback charges for unknown buckets or tenors. Published SIMM examples use canonical uppercase tenors, and margin stub exports are checked against the runtime contract.
+
+
+### Calibration: simpler execution and canonical contracts
+
+#### Changed (breaking)
+
+- Removed the ineffective global `CalibrationConfig.calibration_method` and SABR-only `VolSurfaceParams.model` / vol-surface constructor selector. Curve fitting selects its method per step.
+- `ValidationConfig` partial JSON now uses the same Rust defaults as typed host constructors and still rejects unknown fields.
+- Reports and execution errors use exact typed `success_tolerance`; duplicated rounded tolerance metadata is removed.
+
+#### Fixed
+
+- Configuration overlays preserve nonserialized explanation settings. Distressed CDS calibration honors the caller's explicit maximum hazard rate.
+- Hazard replay caches hash complete canonical source and discount curves, including FX policy and replay conventions.
+
+#### Simplified
+
+- Targets return their produced curves or scalar directly, and the runtime installs each product once. Concrete instrument builders, canonical model functions, cache interfaces and decoded recipe bindings replace redundant type erasure, bypasses and repeated computations.
+
+### Features API simplification
+
+#### Changed (breaking)
+
+- Rust feature transforms now take `TimeSeriesOp`, `CrossSectionalOp`, or `PairwiseOp` at their canonical entry points; the redundant string wrappers and `*_with_op` names are removed. Python and WASM convert operation names at the binding boundary.
+- `neutralize_and_zscore` / `neutralizeAndZscore` no longer accepts `params`; OLS always includes an intercept before standardizing residuals.
+- Pandas feature helpers require `op`, `groups`, `exposures`, and `volatility` as keyword arguments where those inputs follow optional key selectors. Operation annotations accept strings or the matching operation enum only; WASM declarations use the corresponding generated selector union.
+- Feature parameters are resolved once per call, rolling statistics share one window driver, and OLS filters complete observations once while preserving numerical results and missing-data behavior.
+
+### Portfolio simplicity and binding contracts
+
+#### Changed (breaking)
+
+- Factor-model configuration no longer has `PricingMode` / `pricing_mode`. First-order sensitivities use `DeltaBasedEngine`; nonlinear scenario grids use `FullRepricingEngine::compute_pnl_profiles`.
+- Rust `apply_and_revalue` and `scenario_pnl` return `ScenarioRevalueView` and `ScenarioPnlView`, respectively. The separate `_view` calculation functions are removed. `mwr_xirr` takes `DatedCashflow` values; `mwr_xirr_from_cashflows` is removed.
+- Grid attribution stores allocation and selection together in `GridSectorEffect`. `GridSelectionEffect`, `selection_effects`, and Python's separate selection dataframe are removed; the sector dataframe contains both effects.
+- `PortfolioAttribution` retains aggregate factor totals and per-position detail; its seven unused optional aggregate detail fields are removed.
+- Python's redundant portfolio calculation `_json` functions are removed. Use the typed calculation and its result's `to_json()` method. Construct portfolios with `Portfolio.from_spec`; `build_portfolio_from_spec_json` is removed.
+- WASM `valuePortfolio`, `aggregateFullCashflows`, `applyScenarioAndRevalue`, `scenarioPnl`, `computeFactorSensitivities`, and `computePnlProfiles` accept reusable portfolio and/or `MarketContext` handles. Their duplicate `Built` / `WithMarket` variants and `buildPortfolioFromSpecJson` are removed; construct with `Portfolio.fromSpec` and `core.MarketContext.fromJson`.
+- Optimization expressions no longer expose the unusable `PvNative` metric. Python optimization results contain the canonical wire value; use `rebalance_from_spec(spec, result)` to reconstruct a portfolio, including after JSON or pickle reconstruction.
+
+#### Fixed
+
+- Optimization result JSON preserves `ResultsMeta` and roundtrips non-finite constraint slacks using Rust's string sentinels.
+- Margin construction rejects mismatched currencies, and portfolio margin deserialization rejects duplicate netting-set identifiers while applying the same nested validation as standalone netting sets.
+- Factor P&L profiles reject duplicate position identifiers, invalid axes, and non-finite coordinates or amounts; Brinson linking validates supplied effect reconciliations. WASM scenario batches preserve Rust's base-valuation and ordered scenario error precedence.
+
 ### Instrument envelope is a value (Python-binding audit FUP-003)
 
 #### Changed (breaking)
@@ -71,9 +130,9 @@
 #### Changed
 
 - **Breaking:** Python `hull_white.SwaptionQuote(expiry, tenor, volatility, is_normal_vol)` and `hull_white.CapFloorQuote(maturity, strike, volatility, is_cap, is_normal_vol)` require the flags; the `True` defaults (normal vol, cap) are removed, matching Rust and WASM.
-- Python `RateQuote.futures(convexity_adjustment=None)`, `VolQuote.option_vol(option_type=None)`, `CalibrationStep.hazard(seniority=None)`, `CalibrationStep.vol_surface(model=None)` and `CalibrationStep.parametric(model=None)` take the default from the Rust authoring consts (`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`, `VolQuote::DEFAULT_OPTION_TYPE`, `CalibrationStep::DEFAULT_*`) instead of repeating the value; omitted arguments give the same wire values as before, and `None` is now accepted.
-- **Breaking:** quotes attached to a Python `CalibrationStep` / `CalibrationPlan` are part of the Rust value instead of binding-only fields (audit CFCC-014). A step wraps the new Rust `AttachedStep` (step fields plus a `quotes` array, omitted when empty) and a plan is held as a Rust `CalibrationEnvelope` without prior market, so `CalibrationStep.to_json/from_json`, `CalibrationPlan.to_json/from_json`, `plan.steps` (new Rust `CalibrationEnvelope::attached_steps`) and `CalibrationEnvelope.plan` keep the attached quotes and the round-tripped plan calibrates identically. `CalibrationPlan.to_json()` now writes `{"schema", "plan", "market_data"}` and `from_json` requires that shape (a bare `{"id", "quote_sets", "steps", ...}` plan object is rejected). Rust `CalibrationEnvelope::from_attached_steps` takes `Vec<AttachedStep>` instead of `(CalibrationStep, Vec<MarketDatum>)` tuples.
-- `CalibrationEnvelope(plan, market_data=...)` merges the extra market data onto the plan's attached quotes with the new Rust `CalibrationEnvelope::with_market_data`: an identical repeat (same kind, id and payload) is collected once instead of failing with `duplicate_market_datum_id`, and a repeat with a different payload raises `CalibrationEnvelopeError` (`kind == "conflicting_market_datum"`). The `ConflictingMarketDatum` message is now "market datum id '...' has conflicting payloads".
+- Python `RateQuote.futures(convexity_adjustment=None)`, `VolQuote.option_vol(option_type=None)`, `CalibrationStep.hazard(seniority=None)`, `CalibrationStep.parametric(model=None)` take the default from the Rust authoring consts (`RateQuote::DEFAULT_CONVEXITY_ADJUSTMENT`, `VolQuote::DEFAULT_OPTION_TYPE`, `CalibrationStep::DEFAULT_*`) instead of repeating the value; omitted arguments give the same wire values as before, and `None` is now accepted.
+- **Breaking:** calibration steps and plans are plain Rust values across Python, WASM, JSON and pickle. Quote IDs are supplied in `CalibrationPlan.quote_sets`, and quote payloads belong only to `CalibrationEnvelope.market_data`. Execution and validation require an envelope, dictionary or canonical envelope JSON; attached quotes, `AttachedStep`, attachment assemblers and implicit plan execution are removed.
+- `CalibrationEnvelope(plan, market_data=...)` stores the explicit flat market-data inputs. Validation rejects duplicate kind-and-ID entries. Rust `CalibrationEnvelope::with_market_data` remains the explicit merge operation, collecting identical payloads and rejecting conflicting payloads.
 
 #### Added
 

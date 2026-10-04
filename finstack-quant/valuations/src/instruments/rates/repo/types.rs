@@ -12,7 +12,7 @@ use finstack_quant_core::{Error, Result};
 use finstack_quant_margin::RepoMarginSpec;
 use rust_decimal::Decimal;
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 
 fn repo_specs_id(currency: finstack_quant_core::currency::Currency) -> Result<&'static str> {
     match currency {
@@ -651,7 +651,7 @@ impl Instrument for Repo {
         Some(self.start_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 // Do not add explicit Instrument impl; provided by blanket impl.

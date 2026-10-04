@@ -207,7 +207,7 @@ it.each(manifest.cases)(
     expect(new Big(actual.value.amount).eq(baseline.value.amount)).toBe(false);
     expect(actual.instrument_id).toBe(baseline.instrument_id);
     const exported = unwrap(await worker.proxy.exportResult(actual));
-    expect(valuations.validateValuationResultJson(exported)).toBe(exported);
+    expect(valuations.valuationResultToJson(exported)).toBe(exported);
   },
   30000,
 );

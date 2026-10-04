@@ -118,15 +118,15 @@ fn master_scale_maps_batches_in_order_and_rejects_bad_pds() {
 
 #[test]
 fn latent_multi_factor_rejects_a_draw_vector_of_the_wrong_length() {
-    let model = LatentMultiFactor::uncorrelated(2, vec![0.2, 0.3]);
+    let model = LatentMultiFactor::uncorrelated(2, vec![0.2, 0.3]).expect("valid factors");
     assert_eq!(
         model
-            .try_generate_correlated_factors(&[1.0, -1.0])
+            .generate_correlated_factors(&[1.0, -1.0])
             .expect("two draws"),
         vec![0.2, -0.3]
     );
     let err = model
-        .try_generate_correlated_factors(&[1.0])
+        .generate_correlated_factors(&[1.0])
         .expect_err("one draw for two factors");
     let core: finstack_quant_core::Error = err.into();
     assert_eq!(core.kind(), ErrorKind::Validation);

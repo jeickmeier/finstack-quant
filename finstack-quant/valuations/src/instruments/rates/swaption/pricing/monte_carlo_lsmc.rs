@@ -480,7 +480,7 @@ mod tests {
                 &paths,
                 &|_, r| Ok((r, 1.0, if r > 0.0 { 1e-8 } else { 0.0 })),
                 &[1],
-                &PolynomialBasis::new(2),
+                &PolynomialBasis::new(2).expect("valid regression basis"),
                 &grid,
             )
             .expect("terminal payoffs");
@@ -497,7 +497,7 @@ mod tests {
                 &[vec![0.0, 0.0, 0.0]],
                 &|step, r| Ok((r, 1.0, if step == 1 { 200.0 } else { 100.0 })),
                 &[1, 2],
-                &PolynomialBasis::new(2),
+                &PolynomialBasis::new(2).expect("valid regression basis"),
                 &grid,
             )
             .expect("sparse policy");
@@ -514,7 +514,7 @@ mod tests {
                     0.03,
                     &grid,
                     &[1],
-                    &PolynomialBasis::new(2),
+                    &PolynomialBasis::new(2).expect("valid regression basis"),
                     Currency::USD,
                 )
                 .expect("paired estimate");
@@ -543,7 +543,7 @@ mod tests {
                 0.03,
                 &grid,
                 &[1],
-                &PolynomialBasis::new(2),
+                &PolynomialBasis::new(2).expect("valid regression basis"),
                 Currency::USD,
             )
             .expect("independent estimate");
@@ -581,7 +581,7 @@ mod tests {
                         ))
                     },
                     &[1, 2],
-                    &PolynomialBasis::new(1),
+                    &PolynomialBasis::new(1).expect("valid regression basis"),
                     &grid,
                 )
                 .expect("split policy");

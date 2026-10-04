@@ -79,7 +79,7 @@ impl CrossSectionalOp {
         Self::Winsorize,
     ];
 
-    /// Canonical snake_case name accepted by [`transform_cross_sectional`].
+    /// Canonical snake_case name used by JSON and host-language APIs.
     #[must_use]
     pub fn name(self) -> String {
         crate::types::op_name(&self)
@@ -123,138 +123,152 @@ impl CrossSectionalOp {
 ///
 /// # Arguments
 ///
-/// * `values` - Row-aligned numeric input values; `None` and non-finite values
-///   are handled according to the selected operation.
-/// * `time_key` - Row-aligned partition labels; each distinct label defines one
-///   cross-section transformed independently.
-/// * `op` - Canonical snake-case operation name, such as `"zscore"` or
-///   `"winsorize"`.
-/// * `params` - Optional operation-specific JSON parameters; omitted keys use
-///   the operation's documented defaults.
-///
-/// # Errors
-///
-/// Returns a validation error when input lengths differ, `op` is unsupported,
-/// operation parameters are malformed, a cap is infeasible, or arithmetic
-/// produces a non-finite result.
-pub fn transform_cross_sectional(
-    values: &[Option<f64>],
-    time_key: &[String],
-    op: &str,
-    params: Option<&Value>,
-) -> Result<Vec<Option<f64>>> {
-    transform_cross_sectional_with_op(values, time_key, CrossSectionalOp::from_str(op)?, params)
-}
-
-/// Transform a value column across entities within each time partition.
-///
-/// # Arguments
-///
 /// * `values` - Row-aligned numeric input values; output preserves this row
-///   order after independently transforming each partition.
+///   order after independently transforming each partition. `None` and
+///   non-finite values are handled according to the selected operation.
 /// * `time_key` - Row-aligned partition labels; length must equal `values`.
+///   Each distinct label defines one cross-section transformed independently.
 /// * `op` - Typed cross-sectional operation that determines the transform and
 ///   accepted parameter keys.
 /// * `params` - Optional operation-specific JSON parameters; omitted keys use
-///   the operation's documented defaults.
+///   the operation's documented defaults. See [`CrossSectionalOp::param_keys`].
 ///
 /// # Errors
 ///
 /// Returns a validation error when input lengths differ, operation parameters
 /// are malformed, a cap is infeasible, or arithmetic produces a non-finite result.
-pub fn transform_cross_sectional_with_op(
+pub fn transform_cross_sectional(
     values: &[Option<f64>],
     time_key: &[String],
     op: CrossSectionalOp,
     params: Option<&Value>,
 ) -> Result<Vec<Option<f64>>> {
     validate_lengths(values.len(), &[("time_key", time_key.len())])?;
-    reject_unknown_params(params, &op.name(), op.param_keys())?;
-    validate_params(op, params)?;
+    let op = ResolvedCrossSectionalOp::resolve(op, params)?;
     let partitions = crate::index::partition_by_key(time_key);
 
     let mut output = vec![None; values.len()];
     for indices in partitions.values() {
-        apply_cross_sectional_op(values, indices, op, params, &mut output)?;
+        op.apply(values, indices, &mut output)?;
     }
     validate_output(&output)?;
     Ok(output)
 }
 
-pub(crate) fn validate_params(op: CrossSectionalOp, params: Option<&Value>) -> Result<()> {
-    match op {
-        CrossSectionalOp::QuantileBucket => {
-            usize_param(params, "buckets", 10)?;
-        }
-        CrossSectionalOp::Clip | CrossSectionalOp::Winsorize => {
-            let quantiles = matches!(op, CrossSectionalOp::Winsorize);
-            let lower = f64_param(
-                params,
-                "lower",
-                if quantiles { 0.01 } else { f64::NEG_INFINITY },
-            )?;
-            let upper = f64_param(
-                params,
-                "upper",
-                if quantiles { 0.99 } else { f64::INFINITY },
-            )?;
-            if lower > upper
-                || (quantiles && (!(0.0..=1.0).contains(&lower) || !(0.0..=1.0).contains(&upper)))
-            {
-                return Err(Error::Validation(
-                    "invalid lower/upper bounds for cross-sectional transform".into(),
-                ));
-            }
-        }
-        CrossSectionalOp::ClipBySigma => {
-            if f64_param(params, "sigma", 3.0)? < 0.0 {
-                return Err(Error::Validation(
-                    "clip_by_sigma requires sigma >= 0".into(),
-                ));
-            }
-        }
-        CrossSectionalOp::CapWeights => {
-            let max_abs = f64_param(params, "max_abs", 1.0)?;
-            if !(0.0 < max_abs && max_abs <= 1.0) {
-                return Err(Error::Validation(
-                    "cap_weights requires 0 < max_abs <= 1".into(),
-                ));
-            }
-        }
-        CrossSectionalOp::FillMissing => {
-            f64_param(params, "value", 0.0)?;
-        }
-        _ => {}
-    }
-    Ok(())
+/// A cross-sectional operation with its parameters parsed and validated.
+#[derive(Clone, Copy)]
+pub(crate) enum ResolvedCrossSectionalOp {
+    Zscore,
+    Rank,
+    PercentileRank,
+    QuantileBucket { buckets: usize },
+    Demean,
+    RobustZscore,
+    MinmaxScale,
+    Clip { lower: f64, upper: f64 },
+    ClipBySigma { sigma: f64 },
+    NormalScoreTransform,
+    LongShortWeights,
+    CapWeights { max_abs: f64 },
+    FillMissing { value: f64 },
+    IsFinite,
+    NanMask,
+    Winsorize { lower: f64, upper: f64 },
 }
 
-pub(crate) fn apply_cross_sectional_op(
-    values: &[Option<f64>],
-    indices: &[usize],
-    op: CrossSectionalOp,
-    params: Option<&Value>,
-    output: &mut [Option<f64>],
-) -> Result<()> {
-    match op {
-        CrossSectionalOp::Zscore => zscore(values, indices, output),
-        CrossSectionalOp::Rank => rank(values, indices, output),
-        CrossSectionalOp::PercentileRank => percentile_rank(values, indices, output),
-        CrossSectionalOp::QuantileBucket => quantile_bucket(values, indices, params, output)?,
-        CrossSectionalOp::Demean => demean(values, indices, output),
-        CrossSectionalOp::RobustZscore => robust_zscore(values, indices, output),
-        CrossSectionalOp::MinmaxScale => minmax_scale(values, indices, output),
-        CrossSectionalOp::Clip => clip(values, indices, params, output)?,
-        CrossSectionalOp::ClipBySigma => clip_by_sigma(values, indices, params, output)?,
-        CrossSectionalOp::Winsorize => winsorize(values, indices, params, output)?,
-        CrossSectionalOp::NormalScoreTransform => normal_score_transform(values, indices, output),
-        CrossSectionalOp::LongShortWeights => long_short_weights(values, indices, output),
-        CrossSectionalOp::CapWeights => cap_weights(values, indices, params, output)?,
-        CrossSectionalOp::FillMissing => fill_missing(values, indices, params, output)?,
-        CrossSectionalOp::IsFinite => is_finite(values, indices, output),
-        CrossSectionalOp::NanMask => nan_mask(values, indices, output),
+impl ResolvedCrossSectionalOp {
+    pub(crate) fn resolve(op: CrossSectionalOp, params: Option<&Value>) -> Result<Self> {
+        reject_unknown_params(params, &op.name(), op.param_keys())?;
+        Ok(match op {
+            CrossSectionalOp::Zscore => Self::Zscore,
+            CrossSectionalOp::Rank => Self::Rank,
+            CrossSectionalOp::PercentileRank => Self::PercentileRank,
+            CrossSectionalOp::QuantileBucket => Self::QuantileBucket {
+                buckets: usize_param(params, "buckets", 10)?,
+            },
+            CrossSectionalOp::Demean => Self::Demean,
+            CrossSectionalOp::RobustZscore => Self::RobustZscore,
+            CrossSectionalOp::MinmaxScale => Self::MinmaxScale,
+            CrossSectionalOp::Clip | CrossSectionalOp::Winsorize => {
+                let quantiles = matches!(op, CrossSectionalOp::Winsorize);
+                let lower = f64_param(
+                    params,
+                    "lower",
+                    if quantiles { 0.01 } else { f64::NEG_INFINITY },
+                )?;
+                let upper = f64_param(
+                    params,
+                    "upper",
+                    if quantiles { 0.99 } else { f64::INFINITY },
+                )?;
+                if lower > upper
+                    || (quantiles
+                        && (!(0.0..=1.0).contains(&lower) || !(0.0..=1.0).contains(&upper)))
+                {
+                    return Err(Error::Validation(
+                        "invalid lower/upper bounds for cross-sectional transform".into(),
+                    ));
+                }
+                if quantiles {
+                    Self::Winsorize { lower, upper }
+                } else {
+                    Self::Clip { lower, upper }
+                }
+            }
+            CrossSectionalOp::ClipBySigma => {
+                let sigma = f64_param(params, "sigma", 3.0)?;
+                if sigma < 0.0 {
+                    return Err(Error::Validation(
+                        "clip_by_sigma requires sigma >= 0".into(),
+                    ));
+                }
+                Self::ClipBySigma { sigma }
+            }
+            CrossSectionalOp::CapWeights => {
+                let max_abs = f64_param(params, "max_abs", 1.0)?;
+                if !(0.0 < max_abs && max_abs <= 1.0) {
+                    return Err(Error::Validation(
+                        "cap_weights requires 0 < max_abs <= 1".into(),
+                    ));
+                }
+                Self::CapWeights { max_abs }
+            }
+            CrossSectionalOp::FillMissing => Self::FillMissing {
+                value: f64_param(params, "value", 0.0)?,
+            },
+            CrossSectionalOp::NormalScoreTransform => Self::NormalScoreTransform,
+            CrossSectionalOp::LongShortWeights => Self::LongShortWeights,
+            CrossSectionalOp::IsFinite => Self::IsFinite,
+            CrossSectionalOp::NanMask => Self::NanMask,
+        })
     }
-    Ok(())
+
+    pub(crate) fn apply(
+        self,
+        values: &[Option<f64>],
+        indices: &[usize],
+        output: &mut [Option<f64>],
+    ) -> Result<()> {
+        match self {
+            Self::Zscore => zscore(values, indices, output),
+            Self::Rank => ranked(values, indices, output, RankMode::ClosedPercentile),
+            Self::PercentileRank => ranked(values, indices, output, RankMode::OpenPercentile),
+            Self::QuantileBucket { buckets } => quantile_bucket(values, indices, buckets, output),
+            Self::Demean => demean(values, indices, output),
+            Self::RobustZscore => robust_zscore(values, indices, output),
+            Self::MinmaxScale => minmax_scale(values, indices, output),
+            Self::Clip { lower, upper } => clip(values, indices, lower, upper, output),
+            Self::ClipBySigma { sigma } => clip_by_sigma(values, indices, sigma, output)?,
+            Self::Winsorize { lower, upper } => winsorize(values, indices, lower, upper, output),
+            Self::NormalScoreTransform => normal_score_transform(values, indices, output),
+            Self::LongShortWeights => long_short_weights(values, indices, output),
+            Self::CapWeights { max_abs } => cap_weights(values, indices, max_abs, output)?,
+            Self::FillMissing { value } => fill_missing(values, indices, value, output),
+            Self::IsFinite => is_finite(values, indices, output),
+            Self::NanMask => nan_mask(values, indices, output),
+        }
+        Ok(())
+    }
 }
 
 fn finite_partition(values: &[Option<f64>], indices: &[usize]) -> Vec<(usize, f64)> {
@@ -295,10 +309,6 @@ fn demean(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>])
     for (idx, value) in finite_values {
         output[idx] = Some(value - mean);
     }
-}
-
-fn rank(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
-    ranked(values, indices, output, RankMode::ClosedPercentile);
 }
 
 #[derive(Clone, Copy)]
@@ -354,22 +364,16 @@ fn partition_ranks(values: &[Option<f64>], indices: &[usize], mode: RankMode) ->
     output
 }
 
-fn percentile_rank(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
-    ranked(values, indices, output, RankMode::OpenPercentile);
-}
-
 fn quantile_bucket(
     values: &[Option<f64>],
     indices: &[usize],
-    params: Option<&Value>,
+    buckets: usize,
     output: &mut [Option<f64>],
-) -> Result<()> {
-    let buckets = usize_param(params, "buckets", 10)?;
+) {
     for (idx, rank) in partition_ranks(values, indices, RankMode::ClosedPercentile) {
         let bucket = (rank * buckets as f64).floor().min((buckets - 1) as f64);
         output[idx] = Some(bucket);
     }
-    Ok(())
 }
 
 fn robust_zscore(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
@@ -437,34 +441,21 @@ fn minmax_scale(values: &[Option<f64>], indices: &[usize], output: &mut [Option<
 fn clip(
     values: &[Option<f64>],
     indices: &[usize],
-    params: Option<&Value>,
+    lower: f64,
+    upper: f64,
     output: &mut [Option<f64>],
-) -> Result<()> {
-    let lower = f64_param(params, "lower", f64::NEG_INFINITY)?;
-    let upper = f64_param(params, "upper", f64::INFINITY)?;
-    if lower > upper {
-        return Err(Error::Validation(
-            "clip requires lower <= upper".to_string(),
-        ));
-    }
+) {
     for (idx, value) in finite_partition(values, indices) {
         output[idx] = Some(value.clamp(lower, upper));
     }
-    Ok(())
 }
 
 fn clip_by_sigma(
     values: &[Option<f64>],
     indices: &[usize],
-    params: Option<&Value>,
+    sigma: f64,
     output: &mut [Option<f64>],
 ) -> Result<()> {
-    let sigma = f64_param(params, "sigma", 3.0)?;
-    if sigma < 0.0 {
-        return Err(Error::Validation(
-            "clip_by_sigma requires sigma >= 0".to_string(),
-        ));
-    }
     let finite_values = finite_partition(values, indices);
     let sample = finite_values
         .iter()
@@ -506,10 +497,9 @@ fn long_short_weights(values: &[Option<f64>], indices: &[usize], output: &mut [O
 fn cap_weights(
     values: &[Option<f64>],
     indices: &[usize],
-    params: Option<&Value>,
+    max_abs: f64,
     output: &mut [Option<f64>],
 ) -> Result<()> {
-    let max_abs = f64_param(params, "max_abs", 1.0)?;
     let finite_values = finite_partition(values, indices);
     let sample: Vec<_> = finite_values.iter().map(|(_, value)| *value).collect();
     let (_, centered) = scaled_centered(&sample);
@@ -551,14 +541,12 @@ fn cap_weights(
 fn fill_missing(
     values: &[Option<f64>],
     indices: &[usize],
-    params: Option<&Value>,
+    fill_value: f64,
     output: &mut [Option<f64>],
-) -> Result<()> {
-    let fill_value = f64_param(params, "value", 0.0)?;
+) {
     for &idx in indices {
         output[idx] = Some(finite(values[idx]).unwrap_or(fill_value));
     }
-    Ok(())
 }
 
 fn is_finite(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>]) {
@@ -584,17 +572,10 @@ fn nan_mask(values: &[Option<f64>], indices: &[usize], output: &mut [Option<f64>
 fn winsorize(
     values: &[Option<f64>],
     indices: &[usize],
-    params: Option<&Value>,
+    lower: f64,
+    upper: f64,
     output: &mut [Option<f64>],
-) -> Result<()> {
-    let lower = f64_param(params, "lower", 0.01)?;
-    let upper = f64_param(params, "upper", 0.99)?;
-    if !(0.0..=1.0).contains(&lower) || !(0.0..=1.0).contains(&upper) || lower > upper {
-        return Err(Error::Validation(
-            "winsorize requires 0 <= lower <= upper <= 1".to_string(),
-        ));
-    }
-
+) {
     let finite_values = finite_partition(values, indices);
     let mut sorted = finite_values
         .iter()
@@ -602,13 +583,12 @@ fn winsorize(
         .collect::<Vec<_>>();
     sorted.sort_by(f64::total_cmp);
     let Some(lower_bound) = quantile_cont(&sorted, lower) else {
-        return Ok(());
+        return;
     };
     let Some(upper_bound) = quantile_cont(&sorted, upper) else {
-        return Ok(());
+        return;
     };
     for (idx, value) in finite_values {
         output[idx] = Some(value.clamp(lower_bound, upper_bound));
     }
-    Ok(())
 }

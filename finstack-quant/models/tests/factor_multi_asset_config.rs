@@ -7,7 +7,7 @@ use finstack_quant_core::{ContractError, LoadLimits};
 use finstack_quant_models::factor::{
     AttributeFilter, BumpSizeConfig, DependencyFilter, DependencyType, FactorCovarianceMatrix,
     FactorDefinition, FactorId, FactorModelConfig, FactorModelConfigEnvelope, FactorType,
-    MappingRule, MarketMapping, MatchingConfig, PricingMode, RiskMeasure, UnmatchedPolicy,
+    MappingRule, MarketMapping, MatchingConfig, RiskMeasure, UnmatchedPolicy,
 };
 
 #[test]
@@ -17,7 +17,7 @@ fn factor_model_config_envelope_strict_loader_enforces_schema_and_validation() {
         covariance: FactorCovarianceMatrix::new(Vec::new(), Vec::new())
             .expect("empty covariance is valid"),
         matching: MatchingConfig::MappingTable(Vec::new()),
-        pricing_mode: PricingMode::DeltaBased,
+
         risk_measure: RiskMeasure::Variance,
         bump_config: None,
         unmatched_policy: None,
@@ -133,7 +133,7 @@ fn factor_model_config_supports_multi_asset_factor_universe() {
         factors,
         covariance,
         matching,
-        pricing_mode: PricingMode::DeltaBased,
+
         risk_measure: RiskMeasure::Variance,
         bump_config: Some(BumpSizeConfig::default()),
         unmatched_policy: Some(UnmatchedPolicy::Strict),
@@ -174,7 +174,7 @@ fn matching_config_validation_rejects_undeclared_non_credit_factor() {
             attribute_filter: AttributeFilter::default(),
             factor_id: FactorId::new("equity::missing"),
         }]),
-        pricing_mode: PricingMode::DeltaBased,
+
         risk_measure: RiskMeasure::Variance,
         bump_config: None,
         unmatched_policy: None,

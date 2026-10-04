@@ -616,14 +616,14 @@ async function main() {
     w.bsPrice(100, 100, 0.05, 0.0, 0.2, 1.0, true);
   });
 
-  const csaCanonical = w.csaUsdRegulatoryJson();
+  const csaCanonical = w.csaSpecUsdRegulatory();
 
-  bench('margin', 'csaUsdRegulatoryJson', 2000, () => {
-    w.csaUsdRegulatoryJson();
+  bench('margin', 'csaSpecUsdRegulatory', 2000, () => {
+    w.csaSpecUsdRegulatory();
   });
 
-  bench('margin', 'validateCsaJson', 2000, () => {
-    w.validateCsaJson(csaCanonical);
+  bench('margin', 'csaSpecValidate', 2000, () => {
+    w.csaSpecValidate(csaCanonical);
   });
 
   bench('statements', 'validateFinancialModelJson', 1500, () => {
@@ -851,12 +851,12 @@ async function main() {
     w.bsPrice(100, 100, 0.05, 0.0, 0.2, 1.0, false);
   });
 
-  bench('margin', 'csaEurRegulatoryJson', 2000, () => {
-    w.csaEurRegulatoryJson();
+  bench('margin', 'csaSpecEurRegulatory', 2000, () => {
+    w.csaSpecEurRegulatory();
   });
 
-  benchTry('margin', 'calculateVm', 3000, () => {
-    w.calculateVm(csaCanonical, 1000000.0, 800000.0, 'USD', '2024-06-15');
+  benchTry('margin', 'VmCalculator.calculate', 3000, () => {
+    new w.VmCalculator(csaCanonical).calculate(1000000.0, 800000.0, 'USD', '2024-06-15');
   });
 
   benchTry('statements_analytics', 'runVariance', 800, () => {
@@ -909,17 +909,28 @@ async function main() {
     w.explainFormula(FINANCIAL_MODEL_JSON, STATEMENT_RESULT_BASE_JSON, 'revenue', '2025Q1');
   });
 
-  benchTry('portfolio', 'buildPortfolioFromSpecJson', 3000, () => {
-    w.buildPortfolioFromSpecJson(PORTFOLIO_SPEC_JSON);
+  benchTry('portfolio', 'Portfolio.fromSpec', 3000, () => {
+    const book = w.Portfolio.fromSpec(PORTFOLIO_SPEC_JSON);
+    try {
+      book.toJson();
+    } finally {
+      book.free();
+    }
   });
 
-  benchTry('portfolio', 'valuePortfolio', 200, () => {
-    w.valuePortfolio(PORTFOLIO_SPEC_JSON, MARKET_CONTEXT_JSON, false);
-  });
-
-  benchTry('portfolio', 'aggregateFullCashflows', 200, () => {
-    w.aggregateFullCashflows(PORTFOLIO_SPEC_JSON, MARKET_CONTEXT_JSON);
-  });
+  const portfolioBook = w.Portfolio.fromSpec(PORTFOLIO_SPEC_JSON);
+  const portfolioMarket = w.MarketContext.fromJson(MARKET_CONTEXT_JSON);
+  try {
+    benchTry('portfolio', 'valuePortfolio', 200, () => {
+      w.valuePortfolio(portfolioBook, portfolioMarket, false);
+    });
+    benchTry('portfolio', 'aggregateFullCashflows', 200, () => {
+      w.aggregateFullCashflows(portfolioBook, portfolioMarket);
+    });
+  } finally {
+    portfolioBook.free();
+    portfolioMarket.free();
+  }
 
   let sampleValuationJson = '';
   let firstStandardMetric = 'accrued';
@@ -953,13 +964,13 @@ async function main() {
       ]);
     });
 
-    bench('valuations', 'validateValuationResultJson', 2000, () => {
-      w.validateValuationResultJson(sampleValuationJson);
+    bench('valuations', 'valuationResultToJson', 2000, () => {
+      w.valuationResultToJson(sampleValuationJson);
     });
   } else {
     skipBench('valuations', 'priceInstrument (discounting)', 'pricing fixture failed');
     skipBench('valuations', 'priceInstrument', 'pricing fixture failed');
-    skipBench('valuations', 'validateValuationResultJson', 'pricing fixture failed');
+    skipBench('valuations', 'valuationResultToJson', 'pricing fixture failed');
   }
 
   bench('scenarios', 'parseScenarioSpec', 5000, () => {
@@ -970,8 +981,8 @@ async function main() {
     w.composeScenarios(COMPOSE_SCENARIOS);
   });
 
-  bench('scenarios', 'buildScenarioSpec', 4000, () => {
-    w.buildScenarioSpec('composed-inline', [], undefined, undefined, 0);
+  bench('scenarios', 'parseScenarioSpec (object)', 4000, () => {
+    w.parseScenarioSpec({ id: 'composed-inline', operations: [], priority: 0 });
   });
 
   let firstTemplateComponentId = null;
@@ -1003,11 +1014,11 @@ async function main() {
   }
 
   benchTry('scenarios', 'applyScenario', 100, () => {
-    w.applyScenario(SCENARIO_SPEC_JSON, MARKET_CONTEXT_JSON, FINANCIAL_MODEL_JSON, '2024-01-02');
+    w.applyScenario(SCENARIO_SPEC_JSON, MARKET_CONTEXT_JSON, '2024-01-02', FINANCIAL_MODEL_JSON);
   });
 
-  benchTry('scenarios', 'applyScenarioToMarket', 150, () => {
-    w.applyScenarioToMarket(SCENARIO_SPEC_JSON, MARKET_CONTEXT_JSON, '2024-01-02');
+  benchTry('scenarios', 'applyScenario (market only)', 150, () => {
+    w.applyScenario(SCENARIO_SPEC_JSON, MARKET_CONTEXT_JSON, '2024-01-02');
   });
 
   printRows();

@@ -160,7 +160,6 @@ fn json_suffixed_exports_return_strings() {
         ("CovenantsNamespace", "validateCovenantSpecJson"),
         ("CovenantsNamespace", "validateCovenantReportJson"),
         ("CovenantsNamespace", "validateCovenantEngineJson"),
-        ("ValuationsNamespace", "validateValuationResultJson"),
         ("ValuationsNamespace", "valuationResultToJson"),
         ("CalibrationNamespace", "dryRunJson"),
         ("AttributionNamespace", "attributePnlEnvelopeJson"),
@@ -199,7 +198,6 @@ fn computation_results_are_structured_not_strings() {
         ("CalibrationNamespace", "dryRun"),
         ("AttributionNamespace", "attributePnl"),
         ("AttributionNamespace", "attributePnlEnvelope"),
-        ("MarginNamespace", "calculateVm"),
         (
             "ValuationInstrumentsNamespace",
             "structuredCreditTrancheOas",

@@ -2254,10 +2254,6 @@ export type DependencyType = "discount" | "forward" | "credit" | "spot" | "vol" 
  */
 export type IssuerBetaMode = "issuer_beta" | "bucket_only";
 /**
- * Strategy used when extracting factor sensitivities.
- */
-export type PricingMode = "delta_based" | "full_repricing";
-/**
  * Risk measure used when aggregating factor exposures.
  */
 export type RiskMeasure =
@@ -2994,10 +2990,6 @@ export type InflationVolatilityExpiry = "reference_date" | "publication_date";
  */
 export type CashSettlementMethod = "collateralized_cash_price" | "par_yield" | "isda_par_par" | "zero_coupon";
 /**
- * Exercise schedule convention for option models.
- */
-export type ExerciseStyle = "european" | "american" | "bermudan";
-/**
  * Finite JSON number that is strictly greater than zero.
  *
  * This type is used by serde field adapters so runtime deserialization and
@@ -3055,6 +3047,10 @@ export type ListedFutureSettlement =
       quantity_per_contract: number;
       type: "physical";
     };
+/**
+ * Exercise schedule convention for option models.
+ */
+export type ExerciseStyle = "european" | "american" | "bermudan";
 /**
  * Quotation model used for an option on a futures price.
  */
@@ -8317,12 +8313,6 @@ export interface StochasticUtilizationSpec {
    */
   mc_config?: McConfig | null;
   /**
-   * Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).
-   * Mutually exclusive with `model_config.mc_antithetic = true`; validation
-   * rejects the combination.
-   */
-  use_sobol_qmc?: boolean;
-  /**
    * Utilization process specification.
    */
   utilization_process: UtilizationProcess;
@@ -9425,7 +9415,7 @@ export interface AttributionSpec {
    */
   full_cross_attribution?: boolean;
   /**
-   * Instrument to attribute (as JSON envelope)
+   * Instrument payload to attribute, without its instrument envelope.
    */
   instrument: InstrumentJson;
   /**
@@ -9638,10 +9628,6 @@ export interface FactorModelConfig {
    * Declarative dependency-to-factor matching configuration.
    */
   matching: MatchingConfig;
-  /**
-   * Sensitivity extraction strategy used by the analysis pipeline.
-   */
-  pricing_mode: PricingMode;
   /**
    * Risk measure used when aggregating factor sensitivities.
    */
@@ -10902,27 +10888,12 @@ export interface OtcMarginSpec {
    */
   csa: CsaSpec;
   /**
-   * Initial margin calculation methodology
-   *
-   * - Bilateral: SIMM or Schedule
-   * - Cleared: ClearingHouse (CCP-specific)
-   */
-  im_methodology: ImMethodology;
-  /**
-   * Settlement lag for margin transfers (business days)
-   */
-  settlement_lag: number;
-  /**
    * Explicit SIMM credit classification for credit-sensitive instruments.
    *
    * Required when a credit product uses `ImMethodology::Simm`; leave `None`
    * for non-credit instruments and non-SIMM margin methodologies.
    */
   simm_credit_classification?: SimmCreditClassification | null;
-  /**
-   * Variation margin exchange frequency
-   */
-  vm_frequency: MarginTenor;
 }
 /**
  * Credit Support Annex specification (ISDA standard).
@@ -11706,7 +11677,7 @@ export interface ForwardRateAgreement {
   start_date: DateWire;
 }
 /**
- * Swaption instrument
+ * European swaption instrument
  *
  * # Exercise lifecycle boundary
  *
@@ -11731,10 +11702,6 @@ export interface Swaption {
    * - `ZeroCoupon`: Single discount to swap maturity
    */
   cash_settlement_method: CashSettlementMethod;
-  /**
-   * Exercise style (European, Bermudan, American). Defaults to European.
-   */
-  exercise_style: ExerciseStyle;
   /**
    * Option expiry date
    */
@@ -20114,6 +20081,58 @@ export interface TaylorAttributionConfig {
    * Vol bump size for vega computation (absolute vol points, e.g. 0.01 = 1%).
    */
   vol_bump?: number;
+}
+/**
+ * Shared market snapshots, dates, method and options for a batch of instruments
+ */
+export interface AttributionInputs {
+  /**
+   * Valuation date at T₀
+   */
+  as_of_t0: DateWire;
+  /**
+   * Valuation date at T₁
+   */
+  as_of_t1: DateWire;
+  /**
+   * Optional configuration overrides (defaults to FinstackConfig::default())
+   */
+  config?: AttributionConfig | null;
+  /**
+   * Detail/payload options for `credit_factor_detail`. Inert when
+   * `credit_factor_model` is `None`.
+   */
+  credit_factor_detail_options?: CreditFactorDetailOptions;
+  /**
+   * Optional calibrated credit factor model. When present (and the
+   * instrument has a recognizable issuer + credit-curve exposure), the
+   * returned `PnlAttribution` carries a `credit_factor_detail` field with
+   * generic / per-level / adder P&L additively decomposing
+   * `credit_curves_pnl`. Parallel and waterfall populate the detail via
+   * the reprice cascade; metrics-based and Taylor back-solve it after
+   * the linear decomposition.
+   */
+  credit_factor_model?: CreditFactorModel | null;
+  /**
+   * Option to compute all 36 cross-factor pairs when enabled
+   */
+  full_cross_attribution?: boolean;
+  /**
+   * Market context at T₀
+   */
+  market_t0: MarketContextState;
+  /**
+   * Market context at T₁
+   */
+  market_t1: MarketContextState;
+  /**
+   * Attribution methodology
+   */
+  method: AttributionMethod;
+  /**
+   * Optional model parameters at T₀ (for attributing parameter changes)
+   */
+  model_params_t0?: ModelParamsSnapshot | null;
 }
 /**
  * Attribution metadata.

@@ -974,7 +974,6 @@ export type PerPositionMetric =
       custom_key: string;
     }
   | "pv_base"
-  | "pv_native"
   | {
       attribute: string;
     }
@@ -2956,7 +2955,6 @@ export interface FactorPnlProfile {
    * Scenario shift coordinates in bump-size units.
    */
   shifts: number[];
-  [k: string]: unknown;
 }
 /**
  * Configuration for `campisi_attribution`.
@@ -3330,15 +3328,10 @@ export interface GridAttributionResult {
    */
   portfolio_return: number;
   /**
-   * Per-(cell, sector) allocation effects, in first-appearance order
+   * Per-(cell, sector) allocation and selection effects, in first-appearance order
    * (cells, then sectors within each cell).
    */
   sector_effects: GridSectorEffect[];
-  /**
-   * Per-(cell, sector) selection effects, in the same order as
-   * `sector_effects`.
-   */
-  selection_effects: GridSelectionEffect[];
   /**
    * Sum of the curve effects.
    */
@@ -3379,26 +3372,13 @@ export interface GridCellEffect {
   portfolio_weight: number;
 }
 /**
- * Per-(cell, sector) within-cell sector-allocation effect.
+ * Allocation and selection effects for one (cell, sector).
  */
 export interface GridSectorEffect {
   /**
    * Allocation effect `x_t^P (z_st^P − z_st^B)(r_st^B − r_t^B)`.
    */
   allocation_effect: number;
-  /**
-   * Duration-cell label.
-   */
-  cell: string;
-  /**
-   * Sector label within the cell.
-   */
-  sector: string;
-}
-/**
- * Per-(cell, sector) security-selection effect.
- */
-export interface GridSelectionEffect {
   /**
    * Duration-cell label.
    */
@@ -3850,6 +3830,9 @@ export interface ModelParamsAttribution {
   recovery_rate?: Money | null;
   [k: string]: unknown;
 }
+/**
+ * Margin results for a single netting set.
+ */
 export interface NettingSetMargin {
   as_of: DateWire;
   csa_id?: string | null;
@@ -4286,10 +4269,6 @@ export interface PortfolioAttribution {
    */
   carry: Money;
   /**
-   * Aggregate correlations detail (optional).
-   */
-  correlations_detail?: CorrelationsAttribution | null;
-  /**
    * Base correlation curves P&L in base currency.
    */
   correlations_pnl: Money;
@@ -4298,20 +4277,12 @@ export interface PortfolioAttribution {
    */
   credit_curves_pnl: Money;
   /**
-   * Aggregate credit curves detail (optional).
-   */
-  credit_detail?: CreditCurvesAttribution | null;
-  /**
    * Cross-factor interaction P&L in base currency.
    *
    * Aggregated from each position's native-currency `cross_factor_pnl`
    * after conversion to portfolio base currency.
    */
   cross_factor_pnl: Money;
-  /**
-   * Aggregate FX detail (optional).
-   */
-  fx_detail?: FxAttribution | null;
   /**
    * FX rate changes P&L in base currency.
    *
@@ -4342,10 +4313,6 @@ export interface PortfolioAttribution {
    */
   inflation_curves_pnl: Money;
   /**
-   * Aggregate inflation curves detail (optional).
-   */
-  inflation_detail?: InflationCurvesAttribution | null;
-  /**
    * Market scalars P&L in base currency.
    */
   market_scalars_pnl: Money;
@@ -4357,10 +4324,6 @@ export interface PortfolioAttribution {
    * Interest rate curves P&L in base currency.
    */
   rates_curves_pnl: Money;
-  /**
-   * Aggregate rates curves detail (optional).
-   */
-  rates_detail?: RatesCurvesAttribution | null;
   /**
    * Residual P&L (unexplained) in base currency.
    */
@@ -4374,10 +4337,6 @@ export interface PortfolioAttribution {
    */
   result_invalid: boolean;
   /**
-   * Aggregate scalars detail (optional).
-   */
-  scalars_detail?: ScalarsAttribution | null;
-  /**
    * Total portfolio P&L in base currency.
    *
    * This is the **all-in P&L** that includes:
@@ -4388,10 +4347,6 @@ export interface PortfolioAttribution {
    * cross-currency positions include FX translation P&L on the principal.
    */
   total_pnl: Money;
-  /**
-   * Aggregate volatility detail (optional).
-   */
-  vol_detail?: VolAttribution | null;
   /**
    * Implied volatility changes P&L in base currency.
    */
@@ -4715,10 +4670,10 @@ export interface PortfolioOptimizationResultWire {
    */
   binding_constraints: string[];
   /**
-   * Constraint slack values.
+   * Constraint slack values; undefined averages use the `"nan"` sentinel.
    */
   constraint_slacks: {
-    [k: string]: number;
+    [k: string]: NonFiniteF64Wire;
   };
   /**
    * Current weights keyed by position.
@@ -4740,6 +4695,10 @@ export interface PortfolioOptimizationResultWire {
    * Optional user-supplied problem label.
    */
   label?: string | null;
+  /**
+   * Configuration and numerical provenance from the solve.
+   */
+  meta: ResultsMeta;
   /**
    * Evaluated metrics.
    */

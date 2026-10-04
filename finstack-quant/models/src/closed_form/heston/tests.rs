@@ -153,7 +153,18 @@ fn test_cross_validation_with_core_heston() {
 
     let core_params = crate::volatility::heston::HestonParams::new(v0, kappa, theta, sigma_v, rho)
         .expect("valid Heston params");
-    let vol_price = core_params.price_european(spot, strike, r, q, time, true);
+    let vol_price = crate::closed_form::heston::heston_call_price_fourier(
+        spot,
+        strike,
+        time,
+        &crate::closed_form::heston::HestonPricingParams {
+            r,
+            q,
+            model: core_params,
+        },
+        None,
+    )
+    .expect("checked Heston price");
 
     // These are two implementations of the *same* Gil-Pelaez / Little-Trap
     // formulation, so the only admissible difference is quadrature error.
@@ -197,7 +208,18 @@ fn test_cross_validation_deep_otm_wing_divergence_is_bounded() {
 
     let core_params = crate::volatility::heston::HestonParams::new(v0, kappa, theta, sigma_v, rho)
         .expect("valid Heston params");
-    let core_price = core_params.price_european(spot, strike, r, q, time, true);
+    let core_price = crate::closed_form::heston::heston_call_price_fourier(
+        spot,
+        strike,
+        time,
+        &crate::closed_form::heston::HestonPricingParams {
+            r,
+            q,
+            model: core_params,
+        },
+        None,
+    )
+    .expect("checked Heston price");
 
     let abs_diff = (our_price - core_price).abs();
     let diff_bp = abs_diff * 10_000.0 / our_price.max(1e-12);

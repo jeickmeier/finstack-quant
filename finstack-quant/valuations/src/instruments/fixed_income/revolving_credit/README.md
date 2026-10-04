@@ -25,7 +25,7 @@ Import path:
 | `CommitmentStep`, `MarginStep`, `FeeStep` (from `loan_terms`) | Dated commitment, margin and fee changes; see "Dated terms". |
 | `LetterOfCreditSpec`, `LcEvent` (from `loan_terms`) | LC sublimit, outstanding face, issuances/expiries, LC and fronting fees, LC draw at default. |
 | `UpfrontFee`, `ScheduledFee`, `OidEirSpec` (from `loan_terms`) | Upfront fee as amount or percentage, dated fixed fees, effective-rate reporting switch. |
-| `StochasticUtilizationSpec`, `UtilizationProcess` | Utilization process, Sobol switch and optional `McConfig`. |
+| `StochasticUtilizationSpec`, `UtilizationProcess` | Utilization process and optional `McConfig`. |
 | `RevolvingCreditMcRun` | Estimator count, derived seed and antithetic flag resolved from `instrument_pricing_overrides.model_config`. |
 | `McConfig`, `CreditSpreadProcessSpec`, `InterestRateProcessSpec` | Optional multi-factor dynamics: correlation matrix, credit-spread and short-rate processes. |
 | `RevolvingCreditPricer` | `price_with_paths(facility, market, as_of)` for full Monte Carlo path capture; `expected_cashflows(..)` for the path-averaged schedule of a stochastic facility. |
@@ -49,7 +49,7 @@ revolving_credit/
 │   ├── path_pricing.rs               # single-path PV: discounting, survival, default leg (recovery + LEQ)
 │   ├── stochastic.rs                 # MC orchestration, statistics, expected cashflows
 │   ├── components.rs                 # upfront-fee PV
-│   ├── path_generator.rs             # 3-factor path generation (Philox or Sobol, optional antithetic)
+│   ├── path_generator.rs             # 3-factor path generation (Philox, optional antithetic)
 │   ├── monte_carlo_process.rs        # utilization / rate / spread process definitions
 │   └── monte_carlo_discretization.rs # discretization schemes
 └── metrics/              # utilization_rate, available_capacity, weighted_average_cost, CS01
@@ -126,9 +126,8 @@ Notes that bite:
   synthesized default already is). An explicit `Cir`/`Constant` process
   ignores the curve, so hazard CS01 would silently report zero; `validate()`
   rejects the combination.
-- `model_config.mc_antithetic = true` and `use_sobol_qmc` are mutually
-  exclusive; `validate()` rejects the combination, and requires at least 2
-  independent estimators (`model_config.mc_paths`).
+- `model_config.mc_paths` requires at least two independent estimators;
+  `model_config.mc_antithetic` controls paired Philox paths.
 
 ## Cashflow engine and sign conventions
 
@@ -283,7 +282,6 @@ let stochastic = DrawRepaySpec::Stochastic(Box::new(StochasticUtilizationSpec {
         sigma: 0.15,
         spread_sensitivity: 0.0, // > 0 links the target to the simulated spread
     },
-    use_sobol_qmc: false,
     mc_config: None,     // Some(McConfig { .. }) enables rate and credit dynamics
 }));
 ```

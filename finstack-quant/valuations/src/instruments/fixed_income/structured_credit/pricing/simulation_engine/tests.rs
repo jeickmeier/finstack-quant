@@ -343,20 +343,22 @@ mod cases {
         deal.credit_model.prepayment_spec = PrepaymentModelSpec::constant_cpr(0.0);
         deal.credit_model.default_spec = DefaultModelSpec::constant_cdr(0.0);
         let market = MarketContext::new();
-        let baseline = run_simulation_with_source(
+        let baseline = simulate_with_source(
             &deal,
             &market,
             deal.closing_date,
             &mut DeterministicPoolFlowSource,
         )
+        .map(|run| run.tranches)
         .expect("baseline");
         deal.pool.excess_spread_account = Money::new(12345.0, Currency::USD).expect("spread");
-        let actual = run_simulation_with_source(
+        let actual = simulate_with_source(
             &deal,
             &market,
             deal.closing_date,
             &mut DeterministicPoolFlowSource,
         )
+        .map(|run| run.tranches)
         .expect("funded spread");
         let interest = |results: &HashMap<String, TrancheCashflows>| {
             results
@@ -1003,12 +1005,13 @@ mod cases {
         let instrument = cleanup_call_deal();
         let market = MarketContext::new().insert(cleanup_discount_curve());
 
-        let results = run_simulation_with_source(
+        let results = simulate_with_source(
             &instrument,
             &market,
             cleanup_test_date(),
             &mut DeterministicPoolFlowSource,
         )
+        .map(|run| run.tranches)
         .expect("simulation");
 
         let tranche = results.get("A").expect("tranche A result");
@@ -1142,12 +1145,13 @@ mod cases {
 
         let market = MarketContext::new().insert(cc_discount_curve());
 
-        let with_reinvest = run_simulation_with_source(
+        let with_reinvest = simulate_with_source(
             &build_deal(true),
             &market,
             cc_test_date(),
             &mut DeterministicPoolFlowSource,
         )
+        .map(|run| run.tranches)
         .expect("simulation with reinvestment");
 
         let tranche = with_reinvest.get("A").expect("tranche A");
@@ -1245,12 +1249,13 @@ mod cases {
         instrument.credit_model.recovery_spec = RecoveryModelSpec::with_lag(0.0, 0);
 
         let market = MarketContext::new().insert(cc_discount_curve());
-        let results = run_simulation_with_source(
+        let results = simulate_with_source(
             &instrument,
             &market,
             cc_test_date(),
             &mut DeterministicPoolFlowSource,
         )
+        .map(|run| run.tranches)
         .expect("simulation");
 
         // Principal repaid + write-down must never exceed original face.
@@ -1337,12 +1342,13 @@ mod cases {
         let market = MarketContext::new().insert(cc_discount_curve());
         // The per-period cash-conservation debug assertion fires inside
         // simulate_period; reaching `finalize` without a panic is the test.
-        let results = run_simulation_with_source(
+        let results = simulate_with_source(
             &instrument,
             &market,
             cc_test_date(),
             &mut DeterministicPoolFlowSource,
         )
+        .map(|run| run.tranches)
         .expect("simulation");
 
         // Deal-level sanity: total cash distributed to tranches is positive
@@ -2598,12 +2604,13 @@ mod cases {
                 .expect("curve"),
         );
 
-        let results = run_simulation_with_source(
+        let results = simulate_with_source(
             &instrument,
             &market,
             start,
             &mut DeterministicPoolFlowSource,
         )
+        .map(|run| run.tranches)
         .expect("simulation");
 
         let tranche = results.get("A").expect("tranche A result");
@@ -2840,12 +2847,13 @@ mod cases {
 
         let market = MarketContext::new().insert(cc_discount_curve());
         let run = |lag: u32| {
-            run_simulation_with_source(
+            simulate_with_source(
                 &build_deal(lag),
                 &market,
                 closing,
                 &mut DeterministicPoolFlowSource,
             )
+            .map(|run| run.tranches)
             .expect("simulation")
         };
         let lagged = run(12);

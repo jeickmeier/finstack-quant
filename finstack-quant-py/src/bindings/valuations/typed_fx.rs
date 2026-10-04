@@ -14,7 +14,7 @@ use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::date_utils::{date_to_py, extract_date};
 use crate::bindings::extract::extract_market;
-use crate::errors::{core_to_py, value_error};
+use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_valuations::instruments::fx::fx_option::{
     FxDeltaConvention, FxDeltaConventionKind,
@@ -363,18 +363,6 @@ macro_rules! instrument_envelope_methods {
     };
 }
 pub(crate) use instrument_envelope_methods;
-
-/// Shared `build()` body: take the Rust builder, run the single Rust
-/// validation (`build()`), wrap.
-///
-/// # Arguments
-///
-/// * `inner` - Slot holding the consuming Rust builder (`None` once consumed).
-pub(crate) fn take_builder<B>(inner: &mut Option<B>) -> PyResult<B> {
-    inner
-        .take()
-        .ok_or_else(|| value_error("builder already consumed by build()"))
-}
 
 type FxForwardBuilderInner =
     finstack_quant_valuations::instruments::fx::fx_forward::FxForwardBuilder;
@@ -802,7 +790,7 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
 /// Apply one consuming Rust setter and record the field for ``__repr__``.
 macro_rules! fx_forward_set {
     ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{
-        let b = take_builder(&mut $slf.inner)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut $slf.inner)?;
         $slf.inner = Some($apply(b));
         $slf.fields.push((stringify!($field), $repr));
         Ok($slf)
@@ -1133,7 +1121,7 @@ impl PyFxForwardBuilder {
     ///     ``base_currency`` equals ``quote_currency``).
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyFxForward> {
-        let b = take_builder(&mut slf.inner)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         let inner = b.build().map_err(core_to_py)?;
         Ok(PyFxForward { inner })
     }
@@ -1726,7 +1714,7 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
 /// Apply one consuming Rust setter and record the field for ``__repr__``.
 macro_rules! fx_option_set {
     ($slf:ident, $field:ident, $repr:expr, $apply:expr) => {{
-        let b = take_builder(&mut $slf.inner)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut $slf.inner)?;
         $slf.inner = Some($apply(b));
         $slf.fields.push((stringify!($field), $repr));
         Ok($slf)
@@ -2092,7 +2080,7 @@ impl PyFxOptionBuilder {
     ///     ``base_currency`` equals ``quote_currency``).
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyFxOption> {
-        let b = take_builder(&mut slf.inner)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         let inner = b.build().map_err(core_to_py)?;
         Ok(PyFxOption { inner })
     }
@@ -2116,4 +2104,9 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 ///
 /// Extend this list (sorted) when adding a class or function here; `mod.rs`
 /// merges every submodule list so registration stays in one place per file.
-pub(crate) const EXPORTS: &[&str] = &[];
+pub(crate) const EXPORTS: &[&str] = &[
+    "FxForward",
+    "FxForwardBuilder",
+    "FxOption",
+    "FxOptionBuilder",
+];

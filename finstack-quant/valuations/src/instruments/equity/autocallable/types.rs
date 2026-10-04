@@ -33,7 +33,7 @@
 //!   Discrete Barrier Options." *Mathematical Finance*, 7(4), 325-349. `docs/REFERENCES.md#glasserman-2004-monte-carlo` `docs/REFERENCES.md#broadie-glasserman-kou-1997`
 //! - Haug, E. G. (2007). *The Complete Guide to Option Pricing Formulas*, Section 4.17. `docs/REFERENCES.md#haug-2007-option-formulas`
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::equity::EquityPathModel;
 use finstack_quant_core::dates::Date;
@@ -677,7 +677,7 @@ impl crate::instruments::common_impl::traits::Instrument for Autocallable {
         Ok(Some(Box::new(observed)))
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(
