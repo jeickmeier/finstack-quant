@@ -238,8 +238,6 @@ fn computation_results_are_structured_not_strings() {
         ("Evaluator", "evaluate"),
         ("Evaluator", "evaluateMonteCarlo"),
         ("DependencyTracer", "dependencyTree"),
-        ("CashflowsNamespace", "scheduleOutstandingByDate"),
-        ("CashflowsNamespace", "scheduleCalendarYearLadder"),
         ("AssetBackedFacility", "project"),
         ("RevolvingCredit", "expectedCashflows"),
     ] {

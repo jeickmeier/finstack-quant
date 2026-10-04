@@ -61,9 +61,6 @@ pub fn ex_coupon_rule_is_ex_coupon(
 
 /// Accrued interest of a schedule as of a date.
 ///
-/// Typed twin of `accruedInterest`, which takes schedule JSON and returns a
-/// number.
-///
 /// @param schedule - `CashFlowSchedule` handle.
 /// @param as_of - ISO-8601 accrual snapshot date; interest accrues through accrual end and stays accrued until payment.
 /// @param config - Optional `AccrualConfig` wire object (`{ method, ex_coupon, include_pik, frequency }`); omitted means linear accrual with the Rust defaults.

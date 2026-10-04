@@ -13,6 +13,14 @@
 - Rust correlation repair is named `nearest_correlation` in both analytics and models, matching Python `nearest_correlation` and WASM `nearestCorrelation`; `nearest_correlation_matrix` is removed.
 - Python `Performance.to_lookback_returns_dataframe` is removed. Use `Performance.lookback_returns(...).to_dataframe()`.
 
+### Cashflows API simplification
+
+#### Changed (breaking)
+
+- Removed the JSON-string schedule analytics `schedule_wal`, `schedule_outstanding_by_date` and `schedule_calendar_year_ladder` (WASM `scheduleWal`, `scheduleOutstandingByDate`, `scheduleCalendarYearLadder`). Parse once with `CashFlowSchedule.fromJson` and call `wal`, `outstandingByDate` or `calendarYearLadder` on the handle.
+- Removed the JSON-string `accrued_interest` (WASM `accruedInterest`). Use the typed `accrued_interest_amount` / `accruedInterestAmount` on a `CashFlowSchedule`, which returns `Money`.
+- The rate conversions `abs_to_smm`, `cdr_to_mdr`, `cpr_to_smm`, `mdr_to_cdr` and `smm_to_cpr` have one path: `finstack_quant_cashflows::builder` in Rust and `finstack_quant.cashflows.builder` in Python. The crate-root and package-root re-exports are removed. WASM is unchanged.
+
 ### Margin API simplification
 
 #### Changed (breaking)

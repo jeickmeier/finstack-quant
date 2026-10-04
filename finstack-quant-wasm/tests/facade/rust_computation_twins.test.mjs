@@ -157,9 +157,9 @@ test('cashflows.absToSmm matches the Rust ABS kernel', () => {
 });
 
 test('cashflows schedule analytics match the typed Python CashFlowSchedule methods', () => {
-  const schedule = cashflows.buildCashflowScheduleJson(CASHFLOW_SPEC, null);
-  assert.equal(cashflows.scheduleWal(schedule, '2024-08-31'), 1.0027397260273974);
-  const balances = cashflows.scheduleOutstandingByDate(schedule);
+  const schedule = cashflows.buildCashflowSchedule(CASHFLOW_SPEC);
+  assert.equal(schedule.wal('2024-08-31'), 1.0027397260273974);
+  const balances = schedule.outstandingByDate();
   assert.deepEqual(
     balances.map((row) => [row.date, Number(row.amount.amount)]),
     [
@@ -168,16 +168,16 @@ test('cashflows schedule analytics match the typed Python CashFlowSchedule metho
       ['2025-09-01', 0],
     ]
   );
-  const flows = JSON.parse(schedule).flows;
+  const flows = JSON.parse(schedule.toJson()).flows;
   const pvs = flows.map((flow) => Number(flow.amount.amount));
-  const ladder = cashflows.scheduleCalendarYearLadder(schedule, pvs);
+  const ladder = schedule.calendarYearLadder(pvs);
   assert.deepEqual(
     ladder.map((row) => row.year),
     [2024, 2025]
   );
   assert.ok(ladder.every((row) => Number.isFinite(row.pv)));
   assert.throws(
-    () => cashflows.scheduleCalendarYearLadder(schedule, pvs.slice(1)),
+    () => schedule.calendarYearLadder(pvs.slice(1)),
     (e) => e.kind === 'validation'
   );
 });
