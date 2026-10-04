@@ -18,7 +18,7 @@ use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
 use super::parameters::InflationLinkedBondParams;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 
 /// Indexation method for inflation adjustment
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -905,7 +905,7 @@ impl crate::instruments::common_impl::traits::Instrument for InflationLinkedBond
         Some(self.issue_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for InflationLinkedBond {

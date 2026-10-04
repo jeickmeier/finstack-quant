@@ -14,7 +14,7 @@ use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 
 /// Volatility convention for cap/floor pricing.
 ///
@@ -880,7 +880,7 @@ impl crate::instruments::common_impl::traits::Instrument for CapFloor {
         Some(self.start_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

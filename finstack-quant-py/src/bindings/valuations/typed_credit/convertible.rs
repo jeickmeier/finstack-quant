@@ -22,9 +22,8 @@ use super::super::convert::{
     money_to_py, opt_repr,
 };
 use super::super::instruments::serialize_typed_instrument_json;
-use super::super::typed_fx::{
-    instrument_envelope_methods, instrument_pricing_methods, take_builder,
-};
+use super::super::typed_fx::{instrument_envelope_methods, instrument_pricing_methods};
+use crate::bindings::valuations::convert::take_builder;
 
 type ConvertibleBondBuilderInner =
     finstack_quant_valuations::instruments::fixed_income::convertible::ConvertibleBondBuilder;

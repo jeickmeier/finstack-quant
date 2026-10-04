@@ -66,34 +66,58 @@ fn test_sell_protection_constructor() {
 #[test]
 fn test_convention_na_mappings() {
     let conv = CdsConvention::IsdaNa;
-    assert_eq!(conv.day_count(), DayCount::Act360);
-    assert_eq!(conv.frequency(), Tenor::quarterly());
-    assert_eq!(conv.settlement_delay(), 3);
+    assert_eq!(
+        conv.get_spec().expect("CDS registry").day_count,
+        DayCount::Act360
+    );
+    assert_eq!(
+        conv.get_spec().expect("CDS registry").frequency,
+        Tenor::quarterly()
+    );
+    assert_eq!(conv.get_spec().expect("CDS registry").settlement_days, 3);
 }
 
 #[test]
 fn test_convention_eu_mappings() {
     let conv = CdsConvention::IsdaEu;
-    assert_eq!(conv.day_count(), DayCount::Act360);
-    assert_eq!(conv.frequency(), Tenor::quarterly());
+    assert_eq!(
+        conv.get_spec().expect("CDS registry").day_count,
+        DayCount::Act360
+    );
+    assert_eq!(
+        conv.get_spec().expect("CDS registry").frequency,
+        Tenor::quarterly()
+    );
     // EU settlement changed from T+3 to T+1 on June 20, 2009 (ISDA Big Bang)
-    assert_eq!(conv.settlement_delay(), 1);
+    assert_eq!(conv.get_spec().expect("CDS registry").settlement_days, 1);
 }
 
 #[test]
 fn test_convention_as_mappings() {
     let conv = CdsConvention::IsdaAs;
-    assert_eq!(conv.day_count(), DayCount::Act360);
-    assert_eq!(conv.frequency(), Tenor::quarterly());
-    assert_eq!(conv.settlement_delay(), 3);
+    assert_eq!(
+        conv.get_spec().expect("CDS registry").day_count,
+        DayCount::Act360
+    );
+    assert_eq!(
+        conv.get_spec().expect("CDS registry").frequency,
+        Tenor::quarterly()
+    );
+    assert_eq!(conv.get_spec().expect("CDS registry").settlement_days, 3);
 }
 
 #[test]
 fn test_convention_custom_defaults() {
     let conv = CdsConvention::Custom;
-    assert_eq!(conv.day_count(), DayCount::Act360);
-    assert_eq!(conv.frequency(), Tenor::quarterly());
-    assert_eq!(conv.settlement_delay(), 3);
+    assert_eq!(
+        conv.get_spec().expect("CDS registry").day_count,
+        DayCount::Act360
+    );
+    assert_eq!(
+        conv.get_spec().expect("CDS registry").frequency,
+        Tenor::quarterly()
+    );
+    assert_eq!(conv.get_spec().expect("CDS registry").settlement_days, 3);
 }
 
 #[test]
@@ -118,11 +142,14 @@ fn test_builder_pattern() {
             roll_rule: finstack_quant_cashflows::builder::specs::RollRule::CdsImm,
             start,
             end,
-            frequency: convention.frequency(),
-            stub: convention.stub_convention(),
-            business_day_convention: convention.business_day_convention(),
+            frequency: convention.get_spec().expect("CDS registry").frequency,
+            stub: convention.get_spec().expect("CDS registry").stub,
+            business_day_convention: convention
+                .get_spec()
+                .expect("CDS registry")
+                .business_day_convention,
             calendar_id: None,
-            day_count: convention.day_count(),
+            day_count: convention.get_spec().expect("CDS registry").day_count,
             coupon_bp: Decimal::from(200),
             discount_curve_id: "USD-OIS".into(),
         })

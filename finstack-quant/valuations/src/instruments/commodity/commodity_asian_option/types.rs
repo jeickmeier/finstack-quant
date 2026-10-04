@@ -17,8 +17,8 @@
 //! - Turnbull, S. M., & Wakeman, L. M. (1991). "A Quick Algorithm for Pricing
 //!   European Average Options." `docs/REFERENCES.md#turnbull-wakeman-1991`
 
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::CommodityUnderlyingParams;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::exotics::asian_option::AveragingMethod;
 use crate::instruments::OptionType;
@@ -402,7 +402,7 @@ impl crate::instruments::common_impl::traits::Instrument for CommodityAsianOptio
         Some(self.expiry)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

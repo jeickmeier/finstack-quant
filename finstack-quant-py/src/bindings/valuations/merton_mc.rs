@@ -444,42 +444,9 @@ impl PyMertonMcResult {
     /// ``avg_recovery_rate``, ``pik_exercise_rate``.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let stats = &self.inner.path_statistics;
-        let row = serde_json::json!({
-            "clean_price_pct": self.inner.clean_price_pct,
-            "dirty_price_pct": self.inner.dirty_price_pct,
-            "expected_loss": self.inner.expected_loss,
-            "unexpected_loss": self.inner.unexpected_loss,
-            "expected_shortfall_95": self.inner.expected_shortfall_95,
-            "average_pik_fraction": self.inner.average_pik_fraction,
-            "effective_spread_bp": self.inner.effective_spread_bp,
-            "num_paths": self.inner.num_paths,
-            "standard_error": self.inner.standard_error,
-            "default_rate": stats.default_rate,
-            "avg_default_time": stats.avg_default_time,
-            "avg_terminal_notional": stats.avg_terminal_notional,
-            "avg_recovery_rate": stats.avg_recovery_rate,
-            "pik_exercise_rate": stats.pik_exercise_rate,
-        });
-        crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema(
+        crate::bindings::pandas_utils::table_to_dataframe(
             py,
-            &row,
-            &[
-                "clean_price_pct",
-                "dirty_price_pct",
-                "expected_loss",
-                "unexpected_loss",
-                "expected_shortfall_95",
-                "average_pik_fraction",
-                "effective_spread_bp",
-                "num_paths",
-                "standard_error",
-                "default_rate",
-                "avg_default_time",
-                "avg_terminal_notional",
-                "avg_recovery_rate",
-                "pik_exercise_rate",
-            ],
+            &self.inner.to_table().map_err(crate::errors::core_to_py)?,
         )
     }
 

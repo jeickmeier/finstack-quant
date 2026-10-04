@@ -44,3 +44,54 @@ pub struct EnhancedMonteCarloResult {
     /// with the same antithetic-aware standard error as the present value.
     pub draw_option_cost: MoneyEstimate,
 }
+
+impl EnhancedMonteCarloResult {
+    /// Project path identity, PV and draw-option cost in simulation order, retaining columns for an empty path set.
+    ///
+    /// Amounts are in the Monte Carlo estimate currency. Mixed path currencies
+    /// return an error before scalar export; path identities must fit signed 64-bit integers.
+    pub fn to_table(
+        &self,
+    ) -> finstack_quant_core::Result<finstack_quant_core::table::TableEnvelope> {
+        use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
+        let currency = self.mc_result.estimate.mean.currency();
+        for path in &self.path_results {
+            for amount in [path.pv, path.draw_option_cost] {
+                if amount.currency() != currency {
+                    return Err(finstack_quant_core::Error::CurrencyMismatch {
+                        expected: currency,
+                        actual: amount.currency(),
+                    });
+                }
+            }
+        }
+        let ids = (0..self.path_results.len())
+            .map(|index| {
+                i64::try_from(index).map_err(|_| {
+                    finstack_quant_core::Error::Validation("path identity exceeds i64".into())
+                })
+            })
+            .collect::<finstack_quant_core::Result<Vec<_>>>()?;
+        TableEnvelope::new(vec![
+            TableColumn::new("path", TableColumnData::Int64(ids)),
+            TableColumn::new(
+                "pv",
+                TableColumnData::Float64(
+                    self.path_results
+                        .iter()
+                        .map(|path| path.pv.amount())
+                        .collect(),
+                ),
+            ),
+            TableColumn::new(
+                "draw_option_cost",
+                TableColumnData::Float64(
+                    self.path_results
+                        .iter()
+                        .map(|path| path.draw_option_cost.amount())
+                        .collect(),
+                ),
+            ),
+        ])
+    }
+}

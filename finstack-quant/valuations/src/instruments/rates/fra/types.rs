@@ -5,9 +5,9 @@
 //! `pricing::engine`, and metrics are provided in the `metrics` submodule.
 
 use crate::cashflow::traits::CashflowProvider;
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::parameters::legs::PayReceive;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::market::conventions::ConventionRegistry;
@@ -66,7 +66,6 @@ pub struct ForwardRateAgreement {
     /// Notional amount
     pub notional: Money,
     /// Rate fixing date. If `None`, inferred from `start_date - reset_lag_days` business days.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -100,15 +99,12 @@ pub struct ForwardRateAgreement {
     /// Reset lag in business days (fixing to value date)
     pub reset_lag_days: i32,
     /// Optional fixing calendar identifier for business day adjustment
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixing_calendar_id: Option<CalendarId>,
     /// Optional business day convention for fixing date adjustment (default: ModifiedFollowing)
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixing_business_day_convention: Option<BusinessDayConvention>,
     /// Optional observed fixing (locked rate) when known
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observed_fixing: Option<f64>,
     /// Discount curve identifier
@@ -520,7 +516,7 @@ impl crate::instruments::common_impl::traits::Instrument for ForwardRateAgreemen
         Some(self.start_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for ForwardRateAgreement {

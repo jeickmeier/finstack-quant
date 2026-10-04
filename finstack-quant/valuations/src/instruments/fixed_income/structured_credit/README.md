@@ -43,7 +43,7 @@ There is **no `prelude` module** — import the names you need directly.
 | `HedgeSwap`, `SwapNotional`, `SwapPriority` | Interest-rate hedges paid through the waterfall as senior or junior fee recipients. |
 | `CallAssumption`, `CallScope` | Deal or tranche call for price-to-call analytics (`TrancheMetrics.wal_to_call`, `z_spread_to_call_bp`, `dm_to_call_bp`) — see [Calls and clean-up calls](#calls-and-clean-up-calls). |
 | `run_simulation_with_diagnostics`, `SimulationRun`, `SimulationDiagnostics`, `PeriodDiagnostics`, `CoverageTestDiagnostic`, `calculate_equity_metrics`, `EquityMetrics` | Period-by-period deal record and equity analytics — see [Deal diagnostics and equity analytics](#deal-diagnostics-and-equity-analytics). |
-| `run_simulation`, `generate_cashflows`, `generate_tranche_cashflows` | Deterministic projection entry points. |
+| `run_simulation`, `generate_cashflows` | Deterministic projection entry points. |
 | `execute_waterfall`, `execute_waterfall_with_explanation`, `WaterfallContext`, `WaterfallDistribution` | Waterfall execution. |
 | `CoverageTest`, `TestContext`, `TestResult` | Coverage-test evaluation. |
 | `calculate_tranche_metrics`, `TrancheMetrics`, `scenario_table`, `ScenarioTable`/`ScenarioGrid`/`ScenarioCell` | Tranche summary (price, WAL, z-spread, CS01, spread duration and convexity, effective duration and convexity from ±1 bp re-projection, discount margin for floaters) and scenario grids (one projection per cell, clean settlement price per current face). |
@@ -190,12 +190,12 @@ Deterministic cashflows without pricing:
 
 ```rust
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    generate_cashflows, generate_tranche_cashflows, run_simulation,
+    generate_cashflows, run_simulation,
 };
 
 let per_tranche = run_simulation(&deal, &context, as_of)?;          // HashMap<String, TrancheCashflows>
 let aggregate = generate_cashflows(&deal, &context, as_of)?;        // DatedFlows
-let class_a = generate_tranche_cashflows(&deal, "CLASS_A", &context, as_of)?;
+let class_a = run_simulation(&deal, &context, as_of)?.remove("CLASS_A");
 ```
 
 ## Waterfall

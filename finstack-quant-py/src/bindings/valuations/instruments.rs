@@ -276,25 +276,6 @@ pub(crate) fn opt_serde_to_py<'py, T: serde::Serialize>(
     value.map(|v| serde_to_py(py, v)).transpose()
 }
 
-/// Render a builder's set-so-far fields Python-style.
-pub(crate) fn builder_repr(name: &str, fields: &[(&'static str, String)]) -> String {
-    let body = fields
-        .iter()
-        .map(|(key, value)| format!("{key}={value}"))
-        .collect::<Vec<_>>()
-        .join(", ");
-    format!("{name}({body})")
-}
-
-/// Python-style repr of a `Money` value.
-pub(crate) fn money_repr(value: finstack_quant_core::money::Money) -> String {
-    format!(
-        "Money({}, {:?})",
-        value.amount(),
-        value.currency().to_string()
-    )
-}
-
 type BondBuilderInner = finstack_quant_valuations::instruments::fixed_income::bond::BondBuilder;
 type TermLoanBuilderInner =
     finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanBuilder;
@@ -1261,7 +1242,7 @@ impl PyBond {
         format!(
             "Bond(id={:?}, notional={}, issue_date={}, maturity={}, discount_curve_id={:?}, credit_curve_id={})",
             self.inner.id.as_str(),
-            money_repr(self.inner.notional),
+            crate::bindings::valuations::convert::money_repr(self.inner.notional),
             self.inner.issue_date,
             self.inner.maturity,
             self.inner.discount_curve_id.as_str(),
@@ -1342,13 +1323,6 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
     fields
 );
 
-/// Take the wrapped Rust builder or fail if `build()` already consumed it.
-fn take_bond(b: &mut PyBondBuilder) -> PyResult<BondBuilderInner> {
-    b.inner
-        .take()
-        .ok_or_else(|| value_error("builder already consumed by build()"))
-}
-
 #[pymethods]
 impl PyBondBuilder {
     /// Set the instrument identifier.
@@ -1364,7 +1338,7 @@ impl PyBondBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.id(InstrumentId::new(value.to_string())));
         slf.fields.push(("id", format!("{value:?}")));
         Ok(slf)
@@ -1396,9 +1370,12 @@ impl PyBondBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional")?;
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.notional(money));
-        slf.fields.push(("notional", money_repr(money)));
+        slf.fields.push((
+            "notional",
+            crate::bindings::valuations::convert::money_repr(money),
+        ));
         Ok(slf)
     }
 
@@ -1419,7 +1396,7 @@ impl PyBondBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = extract_date(value)?;
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.issue_date(date));
         slf.fields.push(("issue_date", date.to_string()));
         Ok(slf)
@@ -1442,7 +1419,7 @@ impl PyBondBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = extract_date(value)?;
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.maturity(date));
         slf.fields.push(("maturity", date.to_string()));
         Ok(slf)
@@ -1474,7 +1451,7 @@ impl PyBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::bond::CashflowSpec =
             spec_from_py(py, value, "cashflow_spec")?;
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.cashflow_spec(spec));
         slf.fields.push(("cashflow_spec", "{...}".to_string()));
         Ok(slf)
@@ -1496,7 +1473,7 @@ impl PyBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.discount_curve_id(CurveId::new(value.to_string())));
         slf.fields.push(("discount_curve_id", format!("{value:?}")));
         Ok(slf)
@@ -1518,7 +1495,7 @@ impl PyBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.credit_curve_id(CurveId::new(value.to_string())));
         slf.fields.push(("credit_curve_id", format!("{value:?}")));
         Ok(slf)
@@ -1540,7 +1517,7 @@ impl PyBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.repo_curve_id(CurveId::new(value.to_string())));
         slf.fields.push(("repo_curve_id", format!("{value:?}")));
         Ok(slf)
@@ -1572,7 +1549,7 @@ impl PyBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::bond::CallPutSchedule =
             spec_from_py(py, value, "call_put")?;
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.call_put(spec));
         slf.fields.push(("call_put", "{...}".to_string()));
         Ok(slf)
@@ -1602,7 +1579,7 @@ impl PyBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::bond::ReturnFloorSpec =
             spec_from_py(py, value, "return_floor")?;
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.return_floor(spec));
         slf.fields.push(("return_floor", "{...}".to_string()));
         Ok(slf)
@@ -1632,7 +1609,7 @@ impl PyBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let schedule: finstack_quant_cashflows::builder::CashFlowSchedule =
             spec_from_py(py, value, "custom_cashflows")?;
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.custom_cashflows(schedule));
         slf.fields.push(("custom_cashflows", "{...}".to_string()));
         Ok(slf)
@@ -1661,7 +1638,7 @@ impl PyBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let method: finstack_quant_valuations::instruments::fixed_income::bond::AccrualMethod =
             enum_from_str(value, "accrual_method")?;
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.accrual_method(method));
         slf.fields.push(("accrual_method", format!("{value:?}")));
         Ok(slf)
@@ -1693,7 +1670,7 @@ impl PyBondBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.attributes(attrs));
         slf.fields
             .push(("attributes", "Attributes(...)".to_string()));
@@ -1724,7 +1701,7 @@ impl PyBondBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention: finstack_quant_valuations::instruments::fixed_income::bond::BondSettlementConvention =
             spec_from_py(py, value, "settlement_convention")?;
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.settlement_convention(convention));
         slf.fields
             .push(("settlement_convention", "{...}".to_string()));
@@ -1745,14 +1722,14 @@ impl PyBondBuilder {
     ///     (the message names the field), or the bond fails validation.
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyBond> {
-        let b = take_bond(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         let inner = b.build().map_err(core_to_py)?;
         Ok(PyBond { inner })
     }
 
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
-        builder_repr("BondBuilder", &self.fields)
+        crate::bindings::valuations::convert::builder_repr("BondBuilder", &self.fields)
     }
 }
 
@@ -2213,7 +2190,7 @@ impl PyTermLoan {
         format!(
             "TermLoan(id={:?}, notional_limit={}, issue_date={}, maturity={}, discount_curve_id={:?})",
             self.inner.id.as_str(),
-            money_repr(self.inner.notional_limit),
+            crate::bindings::valuations::convert::money_repr(self.inner.notional_limit),
             self.inner.issue_date,
             self.inner.maturity,
             self.inner.discount_curve_id.as_str(),
@@ -2245,13 +2222,6 @@ crate::bindings::valuations::pricing::pricing_override_methods!(
     fields
 );
 
-/// Take the wrapped Rust builder or fail if `build()` already consumed it.
-fn take_term_loan(b: &mut PyTermLoanBuilder) -> PyResult<TermLoanBuilderInner> {
-    b.inner
-        .take()
-        .ok_or_else(|| value_error("builder already consumed by build()"))
-}
-
 #[pymethods]
 impl PyTermLoanBuilder {
     /// Set the instrument identifier.
@@ -2267,7 +2237,7 @@ impl PyTermLoanBuilder {
     ///     ``self``, for chaining.
     #[pyo3(text_signature = "($self, value)")]
     fn id<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.id(InstrumentId::new(value.to_string())));
         slf.fields.push(("id", format!("{value:?}")));
         Ok(slf)
@@ -2292,7 +2262,7 @@ impl PyTermLoanBuilder {
     #[pyo3(text_signature = "($self, value)")]
     fn currency<'py>(mut slf: PyRefMut<'py, Self>, value: &str) -> PyResult<PyRefMut<'py, Self>> {
         let ccy = crate::bindings::module_utils::parse_currency(value)?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.currency(ccy));
         slf.fields.push(("currency", format!("{value:?}")));
         Ok(slf)
@@ -2324,9 +2294,12 @@ impl PyTermLoanBuilder {
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let money = money_from_py(value, currency, "notional_limit")?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.notional_limit(money));
-        slf.fields.push(("notional_limit", money_repr(money)));
+        slf.fields.push((
+            "notional_limit",
+            crate::bindings::valuations::convert::money_repr(money),
+        ));
         Ok(slf)
     }
 
@@ -2347,7 +2320,7 @@ impl PyTermLoanBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = extract_date(value)?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.issue_date(date));
         slf.fields.push(("issue_date", date.to_string()));
         Ok(slf)
@@ -2370,7 +2343,7 @@ impl PyTermLoanBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let date = extract_date(value)?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.maturity(date));
         slf.fields.push(("maturity", date.to_string()));
         Ok(slf)
@@ -2414,7 +2387,7 @@ impl PyTermLoanBuilder {
                 rate.as_decimal().to_string(),
             )
         };
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.rate(spec));
         slf.fields.push(("rate", shown));
         Ok(slf)
@@ -2442,7 +2415,7 @@ impl PyTermLoanBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let tenor = crate::bindings::valuations::convert::tenor_from_py(value, "frequency")?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.frequency(tenor));
         slf.fields.push(("frequency", tenor.to_string()));
         Ok(slf)
@@ -2471,7 +2444,7 @@ impl PyTermLoanBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let day_count =
             crate::bindings::valuations::convert::day_count_from_py(value, "day_count")?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.day_count(day_count));
         slf.fields.push(("day_count", day_count.to_string()));
         Ok(slf)
@@ -2499,7 +2472,7 @@ impl PyTermLoanBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let convention = super::convert::bdc_from_str(value, "business_day_convention")?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.business_day_convention(convention));
         slf.fields
             .push(("business_day_convention", format!("{value:?}")));
@@ -2522,7 +2495,7 @@ impl PyTermLoanBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.calendar_id(value.into()));
         slf.fields.push(("calendar_id", format!("{value:?}")));
         Ok(slf)
@@ -2550,7 +2523,7 @@ impl PyTermLoanBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let stub = stub_kind_from_py(Some(value), "stub")?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.stub(stub));
         slf.fields.push((
             "stub",
@@ -2575,7 +2548,7 @@ impl PyTermLoanBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.discount_curve_id(CurveId::new(value.to_string())));
         slf.fields.push(("discount_curve_id", format!("{value:?}")));
         Ok(slf)
@@ -2597,7 +2570,7 @@ impl PyTermLoanBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.credit_curve_id(CurveId::new(value.to_string())));
         slf.fields.push(("credit_curve_id", format!("{value:?}")));
         Ok(slf)
@@ -2640,7 +2613,7 @@ impl PyTermLoanBuilder {
             } else {
                 spec_from_py(py, value, "amortization")?
             };
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.amortization(spec));
         slf.fields.push(("amortization", "{...}".to_string()));
         Ok(slf)
@@ -2668,7 +2641,7 @@ impl PyTermLoanBuilder {
         value: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let coupon_type = enum_from_str(value, "coupon_type")?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.coupon_type(coupon_type));
         slf.fields.push(("coupon_type", format!("{value:?}")));
         Ok(slf)
@@ -2711,9 +2684,12 @@ impl PyTermLoanBuilder {
             (fee, "{...}".to_string())
         } else {
             let money = money_from_py(value, currency, "upfront_fee")?;
-            (UpfrontFee::Amount(money), money_repr(money))
+            (
+                UpfrontFee::Amount(money),
+                crate::bindings::valuations::convert::money_repr(money),
+            )
         };
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.upfront_fee(fee));
         slf.fields.push(("upfront_fee", shown));
         Ok(slf)
@@ -2743,7 +2719,7 @@ impl PyTermLoanBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::DdtlSpec =
             spec_from_py(py, value, "ddtl")?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.ddtl(spec));
         slf.fields.push(("ddtl", "{...}".to_string()));
         Ok(slf)
@@ -2773,7 +2749,7 @@ impl PyTermLoanBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::TermLoanCovenantEvents =
             spec_from_py(py, value, "covenants")?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.covenants(spec));
         slf.fields.push(("covenants", "{...}".to_string()));
         Ok(slf)
@@ -2803,7 +2779,7 @@ impl PyTermLoanBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::OidEirSpec =
             spec_from_py(py, value, "oid_eir")?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.oid_eir(spec));
         slf.fields.push(("oid_eir", "{...}".to_string()));
         Ok(slf)
@@ -2833,7 +2809,7 @@ impl PyTermLoanBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let spec: finstack_quant_valuations::instruments::fixed_income::term_loan::LoanCallSchedule =
             spec_from_py(py, value, "call_schedule")?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.call_schedule(spec));
         slf.fields.push(("call_schedule", "{...}".to_string()));
         Ok(slf)
@@ -2855,7 +2831,7 @@ impl PyTermLoanBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: u32,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.settlement_days(value));
         slf.fields.push(("settlement_days", value.to_string()));
         Ok(slf)
@@ -2887,7 +2863,7 @@ impl PyTermLoanBuilder {
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let attrs = attributes_from_py(value)?;
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.attributes(attrs));
         slf.fields
             .push(("attributes", "Attributes(...)".to_string()));
@@ -2908,14 +2884,14 @@ impl PyTermLoanBuilder {
     ///     (the message names the field), or the loan fails validation.
     #[pyo3(text_signature = "($self)")]
     fn build(mut slf: PyRefMut<'_, Self>) -> PyResult<PyTermLoan> {
-        let b = take_term_loan(&mut slf)?;
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         let inner = b.build().map_err(core_to_py)?;
         Ok(PyTermLoan { inner })
     }
 
     /// Return ``repr(self)``.
     fn __repr__(&self) -> String {
-        builder_repr("TermLoanBuilder", &self.fields)
+        crate::bindings::valuations::convert::builder_repr("TermLoanBuilder", &self.fields)
     }
 }
 
@@ -2932,4 +2908,4 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 ///
 /// Extend this list (sorted) when adding a class or function here; `mod.rs`
 /// merges every submodule list so registration stays in one place per file.
-pub(crate) const EXPORTS: &[&str] = &["BondBuilder", "TermLoanBuilder"];
+pub(crate) const EXPORTS: &[&str] = &["Bond", "BondBuilder", "TermLoan", "TermLoanBuilder"];

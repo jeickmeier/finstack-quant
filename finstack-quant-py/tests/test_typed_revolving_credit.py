@@ -59,7 +59,6 @@ def stochastic_spec(volatility: float, spread: dict[str, object], *, credit: boo
                     "spread_sensitivity": 0.0,
                 }
             },
-            "use_sobol_qmc": False,
             "mc_config": {
                 "correlation_matrix": None,
                 "credit_spread_process": spread,

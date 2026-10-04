@@ -4,7 +4,6 @@ use crate::instruments::swaption::common::*;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_models::SabrParameters;
-use finstack_quant_valuations::instruments::ExerciseStyle;
 use finstack_quant_valuations::instruments::{Instrument, PricingOptions};
 use finstack_quant_valuations::metrics::MetricId;
 use finstack_quant_valuations::pricer::ModelKey;
@@ -88,28 +87,6 @@ fn at_expiry_direct_sabr_and_registry_models_share_intrinsic_without_volatility(
             "{model} terminal value {registry} must equal direct intrinsic {direct}"
         );
     }
-}
-
-#[test]
-fn unsupported_exercise_style_is_not_masked_by_expiry() {
-    let as_of = time::macros::date!(2024 - 01 - 01);
-    let expiry = time::macros::date!(2023 - 12 - 01);
-    let swap_end = time::macros::date!(2028 - 12 - 01);
-    let swaption = create_standard_payer_swaption(expiry, expiry, swap_end, 0.05)
-        .with_exercise_style(ExerciseStyle::Bermudan);
-    let market = MarketContext::new();
-
-    let direct_error = swaption
-        .value(&market, as_of)
-        .expect_err("generic direct pricing must reject Bermudan exercise");
-    assert!(direct_error.to_string().contains("only supports European"));
-
-    let registry_error = swaption
-        .price_with_metrics(&market, as_of, &[], PricingOptions::default())
-        .expect_err("generic registry pricing must reject Bermudan exercise");
-    assert!(registry_error
-        .to_string()
-        .contains("only supports European"));
 }
 
 /// At the exact expiry instant a European swaption is worth its intrinsic

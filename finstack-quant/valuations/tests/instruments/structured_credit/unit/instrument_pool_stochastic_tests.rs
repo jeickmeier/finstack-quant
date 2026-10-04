@@ -58,7 +58,6 @@ fn stochastic_revolver(volatility: f64, spread_sensitivity: f64, credit: bool) -
                     sigma: volatility,
                     spread_sensitivity,
                 },
-                use_sobol_qmc: false,
                 mc_config,
             },
         )))

@@ -17,14 +17,14 @@
 //!
 //! # Quick Example
 //! ```rust
-//! use finstack_quant_valuations::instruments::fixed_income::loan_quotes::compounding_frequency;
+//! use finstack_quant_valuations::instruments::pricing::time::compounding_frequency;
 //! use finstack_quant_core::dates::Tenor;
 //!
 //! assert_eq!(compounding_frequency(Tenor::quarterly()), 4.0);
 //! ```
 
 use finstack_quant_core::cashflow::CFKind;
-use finstack_quant_core::dates::{Date, DayCount, DayCountContext, Tenor};
+use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::solver::{BrentSolver, Solver};
 use finstack_quant_core::math::summation::NeumaierAccumulator;
@@ -32,28 +32,12 @@ use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
 
 use crate::cashflow::builder::CashFlowSchedule;
-use crate::instruments::fixed_income::bond::metrics::price_yield_spread::z_spread::z_spread_discount_factor;
+use crate::instruments::common_impl::pricing::time::z_spread_discount_factor;
 
 /// Absolute sanity bound on a solved discount margin, decimal (±5000 bp).
 /// Distressed loans legitimately solve well above 2000 bp; the bound only
 /// guards against solver divergence.
 pub const DISCOUNT_MARGIN_BOUND: f64 = 0.50;
-
-/// Periodic compounding frequency for the discount-margin zero-rate shift,
-/// from a contractual coupon frequency (quarterly → 4). Mirrors the FRN
-/// `bond_z_spread_compounding_frequency` helper.
-///
-/// # Arguments
-///
-/// * `frequency` - Contractual coupon or fee payment frequency.
-pub fn compounding_frequency(frequency: Tenor) -> f64 {
-    let years = frequency.to_years();
-    if years > 0.0 && years.is_finite() {
-        (1.0 / years).round().max(1.0)
-    } else {
-        1.0
-    }
-}
 
 /// Present value of `flows` at `settlement` with `dm` added to the
 /// periodically compounded zero rate of each discount factor.
@@ -68,7 +52,7 @@ pub fn compounding_frequency(frequency: Tenor) -> f64 {
 /// * `settlement` - Anchor date the flows are discounted to.
 /// * `disc` - Discount curve of the instrument.
 /// * `compounds_per_year` - Compounding frequency of the zero-rate shift, from
-///   [`compounding_frequency`].
+///   [`crate::instruments::pricing::time::compounding_frequency`].
 /// * `dm` - Discount margin, decimal (`0.025` = 250 bp).
 ///
 /// # Errors

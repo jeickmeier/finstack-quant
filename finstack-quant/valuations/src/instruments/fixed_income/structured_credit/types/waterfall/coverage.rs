@@ -7,7 +7,7 @@ use super::*;
 /// carried for defaulted collateral, the excess-CCC bucket and discount
 /// obligations (CLO indenture conventions). Percentages are percent values
 /// (`7.5` = 7.5%); haircuts are decimal fractions.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CoverageRules {
@@ -364,5 +364,34 @@ impl CoverageTestType {
             Self::Ic => "IC",
             Self::BorrowingBase => "BB",
         }
+    }
+}
+
+impl<'de> Deserialize<'de> for CoverageRules {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(remote = "CoverageRules")]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            #[serde(default)]
+            rating_haircuts: BTreeMap<CreditRating, f64>,
+
+            #[serde(default)]
+            defaulted_valuation: DefaultedValuation,
+
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            ccc_bucket: Option<CccBucketRule>,
+
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            discount_obligation: Option<DiscountObligationRule>,
+
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            borrowing_base: Option<super::super::borrowing_base::BorrowingBaseRules>,
+        }
+        let value = Wire::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
     }
 }

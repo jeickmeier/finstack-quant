@@ -24,8 +24,8 @@ use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
 use rust_decimal::Decimal;
 use time::macros::date;
 
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::numeric::decimal_to_f64;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use crate::market::conventions::ConventionRegistry;
@@ -85,7 +85,6 @@ pub struct Deposit {
     /// Note: `cashflow_schedule()` requires `fixed_rate` to be set. Leaving it as `None`
     /// is only appropriate if the caller never requests cashflow generation/PV from
     /// this instrument (e.g., constructing placeholders).
-    #[builder(optional)]
     #[serde(default, with = "finstack_quant_core::wire::optional_decimal")]
     #[cfg_attr(
         feature = "json-schema",
@@ -130,7 +129,6 @@ pub struct Deposit {
     ///
     /// Examples: "nyse", "target", "london", "tokyo".
     /// When set, enables calendar-aware spot date and accrual date adjustments.
-    #[builder(optional)]
     pub calendar_id: Option<CalendarId>,
 }
 
@@ -325,7 +323,7 @@ impl crate::instruments::common_impl::traits::Instrument for Deposit {
         self.effective_start_date().ok()
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 /// Minimum reasonable deposit rate (-10% = -1000 bp).

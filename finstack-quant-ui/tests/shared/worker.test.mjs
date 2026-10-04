@@ -217,14 +217,14 @@ it("exports identical host values and rejects non-bigint seeds through both boun
     const value = structuredClone(result);
     value.details.data.seed = seed;
     expect(unwrap(await proxy.exportResult(value))).toBe(
-      exportValuation(value, native.validateValuationResultJson),
+      exportValuation(value, native.valuationResultToJson),
     );
   }
   for (const seed of [0, 42, Number.MAX_SAFE_INTEGER, "42", -1n, 1n << 64n]) {
     const value = structuredClone(result);
     value.details.data.seed = seed;
     expect(() =>
-      exportValuation(value, native.validateValuationResultJson),
+      exportValuation(value, native.valuationResultToJson),
     ).toThrow();
     expect((await proxy.exportResult(value)).ok).toBe(false);
   }

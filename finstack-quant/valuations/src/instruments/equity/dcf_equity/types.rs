@@ -4,8 +4,8 @@
 //! - [`TerminalValueSpec`] for Gordon Growth, Exit Multiple, and H-Model terminals
 //! - [`DiscountedCashFlow`] instrument implementing the standard DCF formula
 
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::MarketDependencies;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::{Attributes, Instrument};
 use crate::instruments::equity::dcf_equity::pricer;
 use crate::pricer::InstrumentType;
@@ -278,7 +278,6 @@ pub struct DiscountedCashFlow {
     /// explicit flow is used directly (correct for annual grids).
     ///
     /// Ignored by `ExitMultiple` terminal values.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terminal_flow_override: Option<f64>,
     /// Equity bridge from enterprise value to equity value (debt, cash,
@@ -286,7 +285,6 @@ pub struct DiscountedCashFlow {
     /// adjustments), in instrument currency.
     pub equity_bridge: EquityBridge,
     /// Basic shares outstanding for per-share value calculation.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shares_outstanding: Option<f64>,
     /// Dilutive securities (options, warrants, RSUs, convertibles) for treasury stock method.
@@ -294,7 +292,6 @@ pub struct DiscountedCashFlow {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dilution_securities: Vec<DilutionSecurity>,
     /// Private company valuation discounts (DLOM, DLOC).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub valuation_discounts: Option<ValuationDiscounts>,
     /// Instrument-owned pricing inputs.
@@ -1067,7 +1064,7 @@ impl Instrument for DiscountedCashFlow {
         None
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 impl crate::cashflow::traits::CashflowScheduleSource for DiscountedCashFlow {
     /// Projected cash-flow schedule containing only the explicit `flows` on

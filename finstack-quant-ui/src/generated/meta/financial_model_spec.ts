@@ -7823,12 +7823,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StochasticUtilizationSpec/properties/mc_config/anyOf/1"
   },
   {
-    "path": "#/$defs/d_d3bbe1a355ec94307b4c/properties/use_sobol_qmc",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StochasticUtilizationSpec/properties/use_sobol_qmc",
-    "default": false,
-    "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `model_config.mc_antithetic = true`; validation\nrejects the combination."
-  },
-  {
     "path": "#/$defs/d_d3bbe1a355ec94307b4c/properties/utilization_process",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/StochasticUtilizationSpec/properties/utilization_process",
     "description": "Utilization process specification.",
@@ -7912,7 +7906,7 @@ export default [
   {
     "path": "#/$defs/d_dcc2738b179dc9ea48c6",
     "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Swaption",
-    "description": "Swaption instrument\n\n# Exercise lifecycle boundary\n\n`Instrument::value` prices the option claim through expiry. At expiry it\nreturns model-free intrinsic value; after expiry it returns zero. For\nphysical settlement, trade lifecycle infrastructure must materialize the\ndelivered [`InterestRateSwap`] from `underlying_fixed_leg`,\n`underlying_float_leg`, `notional`, and `option_type`. This instrument does\nnot retain an exercised swap position after expiry."
+    "description": "European swaption instrument\n\n# Exercise lifecycle boundary\n\n`Instrument::value` prices the option claim through expiry. At expiry it\nreturns model-free intrinsic value; after expiry it returns zero. For\nphysical settlement, trade lifecycle infrastructure must materialize the\ndelivered [`InterestRateSwap`] from `underlying_fixed_leg`,\n`underlying_float_leg`, `notional`, and `option_type`. This instrument does\nnot retain an exercised swap position after expiry."
   },
   {
     "path": "#/$defs/d_dcc2738b179dc9ea48c6/properties/attributes",
@@ -7927,13 +7921,6 @@ export default [
     "description": "Cash settlement annuity method (only used when settlement = Cash).\n\n- `CollateralizedCashPrice` (default): Actual collateral-discounted fixed-leg annuity\n- `ParYield`: Legacy flat-yield cash annuity\n- `IsdaParPar`: Legacy par-par annuity from the discount curve\n- `ZeroCoupon`: Single discount to swap maturity",
     "ref": "#/$defs/CashSettlementMethod",
     "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/CashSettlementMethod"
-  },
-  {
-    "path": "#/$defs/d_dcc2738b179dc9ea48c6/properties/exercise_style",
-    "source": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/Swaption/properties/exercise_style",
-    "description": "Exercise style (European, Bermudan, American). Defaults to European.",
-    "ref": "#/$defs/ExerciseStyle",
-    "resolvedRef": "https://finstack_quant.dev/schemas/statements/1/financial_model_spec.schema.json#/$defs/ExerciseStyle"
   },
   {
     "path": "#/$defs/d_dcc2738b179dc9ea48c6/properties/expiry",

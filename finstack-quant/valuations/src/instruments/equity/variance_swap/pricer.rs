@@ -122,16 +122,10 @@ pub(crate) fn observation_dates(inst: &VarianceSwap) -> Result<Vec<Date>> {
 }
 
 pub(crate) fn annualization_factor(inst: &VarianceSwap) -> f64 {
-    use finstack_quant_core::dates::TenorUnit;
-    if let Some(months) = inst.observation_frequency.months() {
-        12.0 / months as f64
-    } else if inst.observation_frequency.unit() == TenorUnit::Weeks {
-        52.0 / f64::from(inst.observation_frequency.count())
-    } else if inst.observation_frequency.unit() == TenorUnit::Days {
-        inst.trading_days_per_year / f64::from(inst.observation_frequency.count())
-    } else {
-        inst.trading_days_per_year
-    }
+    crate::instruments::common_impl::pricing::variance_observations::annualization_factor(
+        inst.observation_frequency,
+        inst.trading_days_per_year,
+    )
 }
 
 pub(crate) fn realized_fraction_by_observations(inst: &VarianceSwap, as_of: Date) -> Result<f64> {

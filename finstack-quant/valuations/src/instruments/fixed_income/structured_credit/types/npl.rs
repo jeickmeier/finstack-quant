@@ -34,7 +34,7 @@ use serde::{Deserialize, Serialize};
 /// assert!(spec.validate().is_ok());
 /// assert!((spec.net_proceeds_fraction() - 0.5).abs() < 1e-12);
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct LiquidationSpec {
@@ -107,5 +107,32 @@ impl LiquidationSpec {
             }
         }
         Ok(())
+    }
+}
+
+impl<'de> Deserialize<'de> for LiquidationSpec {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(remote = "LiquidationSpec")]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            months_to_resolution: u32,
+
+            proceeds_pct: f64,
+
+            #[serde(default)]
+            carry_cost_pct: f64,
+
+            #[serde(default)]
+            reperformance_prob: f64,
+
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            modified_rate: Option<f64>,
+        }
+        let value = Wire::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
     }
 }

@@ -57,10 +57,7 @@ export function createService(native: {
     | "runCreditUnderwritingChecks"
     | "renderCheckReportText"
   >;
-  valuations: Pick<
-    typeof valuations,
-    "instruments" | "validateValuationResultJson"
-  >;
+  valuations: Pick<typeof valuations, "instruments" | "valuationResultToJson">;
 }): WorkerApi {
   let ready: Promise<unknown> | undefined;
   const markets = new Map<string, { json: string; handle: MarketContext }>();
@@ -316,7 +313,7 @@ export function createService(native: {
     calendars: () => result(() => native.core.availableCalendars()),
     exportResult: (value) =>
       result(() =>
-        exportValuation(value, native.valuations.validateValuationResultJson),
+        exportValuation(value, native.valuations.valuationResultToJson),
       ),
   };
 }

@@ -81,15 +81,6 @@ pub mod numerical {
     /// Re-exported from [`finstack_quant_core::math::ZERO_TOLERANCE`].
     pub use finstack_quant_core::math::ZERO_TOLERANCE;
 
-    /// Tolerance for iterative solver convergence (bootstrap, calibration).
-    ///
-    /// Used as the convergence criterion for root-finding algorithms like
-    /// Brent's method: stop when |f(x)| < SOLVER_TOLERANCE.
-    ///
-    /// Value: 1e-8 (tight enough for financial precision while avoiding
-    /// excessive iterations for well-conditioned problems).
-    pub const SOLVER_TOLERANCE: f64 = 1e-8;
-
     /// Tolerance for comparing floating-point rates and spreads.
     ///
     /// Used when checking if two rates are "equal" for purposes like

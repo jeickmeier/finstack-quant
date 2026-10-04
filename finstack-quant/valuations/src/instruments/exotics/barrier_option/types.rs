@@ -1,6 +1,6 @@
 //! Barrier option instrument definition.
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::{Monitoring, OptionType};
 use finstack_quant_core::currency::Currency;
@@ -66,7 +66,6 @@ pub struct BarrierOption {
     /// Required when valuing after expiry so the realized intrinsic value is
     /// invariant to later market spot updates. At expiry, the current market
     /// spot is used when this field is absent.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expiry_fixing: Option<f64>,
     /// Observed barrier state for expired options.
@@ -342,7 +341,7 @@ impl crate::instruments::common_impl::traits::Instrument for BarrierOption {
         Ok(Some(Box::new(observed)))
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

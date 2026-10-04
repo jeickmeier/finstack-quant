@@ -25,7 +25,7 @@ use crate::instruments::credit_derivatives::cds::{
 
 use super::parameters::CdsIndexParams;
 use super::pricer::CdsIndexPricer;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 
 /// Pricing mode for CDS indices.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -219,20 +219,20 @@ pub struct CdsIndex {
 }
 
 impl CdsIndex {
-    fn premium_with_standard_defaults(&self) -> PremiumLegSpec {
+    fn premium_with_standard_defaults(&self) -> finstack_quant_core::Result<PremiumLegSpec> {
         let mut premium = self.premium_leg.clone();
         if premium.calendar_id.is_none() {
-            premium.calendar_id = Some(self.convention.default_calendar().into());
+            premium.calendar_id = Some(self.convention.get_spec()?.calendar_id.as_str().into());
         }
-        premium
+        Ok(premium)
     }
 
-    fn protection_with_standard_defaults(&self) -> ProtectionLegSpec {
+    fn protection_with_standard_defaults(&self) -> finstack_quant_core::Result<ProtectionLegSpec> {
         let mut protection = self.protection_leg.clone();
         if protection.settlement_delay == 0 {
-            protection.settlement_delay = self.convention.settlement_delay();
+            protection.settlement_delay = self.convention.get_spec()?.settlement_days;
         }
-        protection
+        Ok(protection)
     }
 
     /// Create a canonical example CDS Index for testing and documentation.
@@ -240,10 +240,10 @@ impl CdsIndex {
     /// Returns a CDX.NA.IG series 42 index with standard conventions.
     pub fn example() -> finstack_quant_core::Result<Self> {
         let convention = CdsConvention::IsdaNa;
-        let day_count = convention.day_count();
-        let frequency = convention.frequency();
-        let business_day_convention = convention.business_day_convention();
-        let stub = convention.stub_convention();
+        let day_count = convention.get_spec()?.day_count;
+        let frequency = convention.get_spec()?.frequency;
+        let business_day_convention = convention.get_spec()?.business_day_convention;
+        let stub = convention.get_spec()?.stub;
 
         Ok(Self {
             id: InstrumentId::new("CDX-IG-42"),
@@ -261,7 +261,7 @@ impl CdsIndex {
                 frequency,
                 stub,
                 business_day_convention,
-                calendar_id: Some(convention.default_calendar().into()),
+                calendar_id: Some(convention.get_spec()?.calendar_id.as_str().into()),
                 day_count,
                 coupon_bp: Decimal::from(60),
                 discount_curve_id: CurveId::new("USD-OIS"),
@@ -269,7 +269,7 @@ impl CdsIndex {
             protection_leg: ProtectionLegSpec {
                 credit_curve_id: CurveId::new("CDX.NA.IG.HAZARD"),
                 recovery_rate: 0.40,
-                settlement_delay: convention.settlement_delay(),
+                settlement_delay: convention.get_spec()?.settlement_days,
             },
             pricing: IndexPricing::SingleCurve,
             constituents: Vec::new(),
@@ -323,10 +323,10 @@ impl CdsIndex {
         credit_curve_id: impl Into<CurveId>,
     ) -> finstack_quant_core::Result<Self> {
         let convention = preset.convention;
-        let day_count = convention.day_count();
-        let frequency = convention.frequency();
-        let business_day_convention = convention.business_day_convention();
-        let stub = convention.stub_convention();
+        let day_count = convention.get_spec()?.day_count;
+        let frequency = convention.get_spec()?.frequency;
+        let business_day_convention = convention.get_spec()?.business_day_convention;
+        let stub = convention.get_spec()?.stub;
 
         let coupon_bp = Decimal::try_from(preset.coupon_bp).map_err(|e| {
             finstack_quant_core::Error::Validation(format!(
@@ -351,7 +351,7 @@ impl CdsIndex {
                 frequency,
                 stub,
                 business_day_convention,
-                calendar_id: Some(convention.default_calendar().into()),
+                calendar_id: Some(convention.get_spec()?.calendar_id.as_str().into()),
                 day_count,
                 coupon_bp,
                 discount_curve_id: discount_curve_id.into(),
@@ -359,7 +359,7 @@ impl CdsIndex {
             protection_leg: ProtectionLegSpec {
                 credit_curve_id: credit_curve_id.into(),
                 recovery_rate,
-                settlement_delay: convention.settlement_delay(),
+                settlement_delay: convention.get_spec()?.settlement_days,
             },
             pricing: IndexPricing::SingleCurve,
             constituents: Vec::new(),
@@ -441,8 +441,8 @@ impl CdsIndex {
             )?,
             side: self.side,
             convention: self.convention,
-            premium_leg: self.premium_with_standard_defaults(),
-            protection_leg: self.protection_with_standard_defaults(),
+            premium_leg: self.premium_with_standard_defaults()?,
+            protection_leg: self.protection_with_standard_defaults()?,
             instrument_pricing_overrides: self.instrument_pricing_overrides.clone(),
             metric_pricing_overrides: self.metric_pricing_overrides.clone(),
             scenario_pricing_overrides: self.scenario_pricing_overrides.clone(),
@@ -651,7 +651,7 @@ impl crate::instruments::common_impl::traits::Instrument for CdsIndex {
         Some(self.premium_leg.start)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for CdsIndex {

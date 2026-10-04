@@ -6,7 +6,6 @@
 //! quoted and stress-analysed on a trading desk.
 
 use crate::cashflow::builder::{DefaultModelSpec, PrepaymentModelSpec, RecoveryModelSpec};
-use crate::instruments::fixed_income::structured_credit::pricing::generate_tranche_cashflows;
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::instruments::Instrument;
 use finstack_quant_core::dates::Date;
@@ -156,7 +155,7 @@ pub fn scenario_table(
                 scenario.credit_model.recovery_spec =
                     RecoveryModelSpec::with_lag(1.0 - severity, lag);
 
-                let cashflows = generate_tranche_cashflows(&scenario, tranche_id, market, as_of)?;
+                let cashflows = (scenario).tranche_cashflows(tranche_id, market, as_of)?;
                 let price = if current_balance > 0.0 {
                     let quote = super::quote::SettlementQuote::for_tranche(
                         &scenario,

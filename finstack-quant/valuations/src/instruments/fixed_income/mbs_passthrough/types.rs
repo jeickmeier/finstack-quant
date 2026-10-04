@@ -5,7 +5,7 @@
 //! and payment delay conventions.
 
 use crate::cashflow::builder::specs::PrepaymentModelSpec;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::InstrumentPricingOverrides;
 use finstack_quant_core::currency::Currency;
@@ -326,7 +326,6 @@ pub struct AgencyMbsPassthrough {
     ///
     /// When omitted, pricing infers the latest paid period from the agency
     /// payment-delay rule and `as_of`.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -346,7 +345,6 @@ pub struct AgencyMbsPassthrough {
     /// months after the accrual month, rolled Following on the `usny`
     /// calendar (55 → 25th of the next month, 75 → 15th two months later).
     /// Must be at least 1.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stated_delay_days: Option<u32>,
     /// Prepayment model specification.
@@ -596,7 +594,7 @@ impl crate::instruments::common_impl::traits::Instrument for AgencyMbsPassthroug
         Ok(Some(Box::new(pool)))
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 #[cfg(test)]

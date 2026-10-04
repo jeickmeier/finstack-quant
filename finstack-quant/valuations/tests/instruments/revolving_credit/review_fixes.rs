@@ -71,7 +71,6 @@ fn stochastic(target: f64, volatility: f64, mc_config: Option<McConfig>) -> Draw
             sigma: volatility,
             spread_sensitivity: 0.0,
         },
-        use_sobol_qmc: false,
         mc_config,
     }))
 }

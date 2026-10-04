@@ -33,17 +33,17 @@
 //!
 //! // Detect from currency (recommended for cross-regional portfolios).
 //! assert_eq!(
-//!     CdsConvention::detect_from_currency(Currency::EUR),
+//!     CdsConvention::detect_from_currency(Currency::EUR).expect("CDS registry"),
 //!     CdsConvention::IsdaEu
 //! );
 //! assert_eq!(
-//!     CdsConvention::detect_from_currency(Currency::JPY),
+//!     CdsConvention::detect_from_currency(Currency::JPY).expect("CDS registry"),
 //!     CdsConvention::IsdaAs
 //! );
 //!
 //! // Anything else falls back to the most liquid market, North America.
 //! assert_eq!(
-//!     CdsConvention::detect_from_currency(Currency::USD),
+//!     CdsConvention::detect_from_currency(Currency::USD).expect("CDS registry"),
 //!     CdsConvention::IsdaNa
 //! );
 //! ```
@@ -63,7 +63,7 @@ use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 use time::macros::date;
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::credit_derivatives::cds::pricing::CdsPricer;
 
 pub use crate::instruments::common_impl::parameters::legs::PayReceive;
@@ -402,10 +402,11 @@ impl CreditDefaultSwap {
     /// Returns a 5-year investment-grade CDS with standard ISDA conventions.
     pub fn example() -> finstack_quant_core::Result<Self> {
         let convention = CdsConvention::IsdaNa;
-        let day_count = convention.day_count();
-        let frequency = convention.frequency();
-        let business_day_convention = convention.business_day_convention();
-        let stub = convention.stub_convention();
+        let spec = convention.get_spec()?;
+        let day_count = spec.day_count;
+        let frequency = spec.frequency;
+        let business_day_convention = spec.business_day_convention;
+        let stub = spec.stub;
 
         let coupon_bp = Decimal::try_from(100.0).map_err(|e: rust_decimal::Error| {
             finstack_quant_core::Error::Validation(e.to_string())
@@ -423,7 +424,7 @@ impl CreditDefaultSwap {
                 frequency,
                 stub,
                 business_day_convention,
-                calendar_id: Some(convention.default_calendar().into()),
+                calendar_id: Some(spec.calendar_id.as_str().into()),
                 day_count,
                 coupon_bp,
                 discount_curve_id: finstack_quant_core::types::CurveId::new("USD-OIS"),
@@ -431,7 +432,7 @@ impl CreditDefaultSwap {
             .protection_leg(ProtectionLegSpec {
                 credit_curve_id: finstack_quant_core::types::CurveId::new("CORP-HAZARD"),
                 recovery_rate: STANDARD_RECOVERY_SENIOR,
-                settlement_delay: convention.settlement_delay(),
+                settlement_delay: spec.settlement_days,
             })
             .instrument_pricing_overrides(Default::default())
             .attributes(Attributes::new())
@@ -463,10 +464,11 @@ impl CreditDefaultSwap {
         discount_curve_id: impl Into<finstack_quant_core::types::CurveId>,
         credit_curve_id: impl Into<finstack_quant_core::types::CurveId>,
     ) -> finstack_quant_core::Result<Self> {
-        let day_count = convention.day_count();
-        let frequency = convention.frequency();
-        let business_day_convention = convention.business_day_convention();
-        let stub = convention.stub_convention();
+        let spec = convention.get_spec()?;
+        let day_count = spec.day_count;
+        let frequency = spec.frequency;
+        let business_day_convention = spec.business_day_convention;
+        let stub = spec.stub;
 
         let cds = Self {
             id: id.into(),
@@ -480,7 +482,7 @@ impl CreditDefaultSwap {
                 frequency,
                 stub,
                 business_day_convention,
-                calendar_id: Some(convention.default_calendar().into()),
+                calendar_id: Some(spec.calendar_id.as_str().into()),
                 day_count,
                 coupon_bp,
                 discount_curve_id: discount_curve_id.into(),
@@ -488,7 +490,7 @@ impl CreditDefaultSwap {
             protection_leg: ProtectionLegSpec {
                 credit_curve_id: credit_curve_id.into(),
                 recovery_rate,
-                settlement_delay: convention.settlement_delay(),
+                settlement_delay: spec.settlement_days,
             },
             instrument_pricing_overrides: Default::default(),
             metric_pricing_overrides: Default::default(),
@@ -544,18 +546,18 @@ impl CreditDefaultSwap {
     ///         roll_rule: RollRule::CdsImm,
     ///         start: date!(2024 - 03 - 20),
     ///         end: date!(2029 - 03 - 20),
-    ///         frequency: CdsConvention::IsdaNa.frequency(),
-    ///         stub: CdsConvention::IsdaNa.stub_convention(),
-    ///         business_day_convention: CdsConvention::IsdaNa.business_day_convention(),
-    ///         calendar_id: Some(CdsConvention::IsdaNa.default_calendar().into()),
-    ///         day_count: CdsConvention::IsdaNa.day_count(),
+    ///         frequency: CdsConvention::IsdaNa.get_spec().expect("CDS registry").frequency,
+    ///         stub: CdsConvention::IsdaNa.get_spec().expect("CDS registry").stub,
+    ///         business_day_convention: CdsConvention::IsdaNa.get_spec().expect("CDS registry").business_day_convention,
+    ///         calendar_id: Some(CdsConvention::IsdaNa.get_spec().expect("CDS registry").calendar_id.as_str().into()),
+    ///         day_count: CdsConvention::IsdaNa.get_spec().expect("CDS registry").day_count,
     ///         coupon_bp: Decimal::try_from(100.0).expect("valid bp"),
     ///         discount_curve_id: CurveId::new("USD-OIS"),
     ///     })
     ///     .protection_leg(ProtectionLegSpec {
     ///         credit_curve_id: CurveId::new("CORP-HAZARD"),
     ///         recovery_rate: STANDARD_RECOVERY_SENIOR,
-    ///         settlement_delay: CdsConvention::IsdaNa.settlement_delay(),
+    ///         settlement_delay: CdsConvention::IsdaNa.get_spec().expect("CDS registry").settlement_days,
     ///     })
     ///     .instrument_pricing_overrides(InstrumentPricingOverrides::default())
     ///     .attributes(Attributes::new())
@@ -806,7 +808,7 @@ impl crate::instruments::common_impl::traits::Instrument for CreditDefaultSwap {
         Some(self.premium_leg.start)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl crate::cashflow::traits::CashflowScheduleSource for CreditDefaultSwap {
@@ -881,15 +883,36 @@ mod tests {
         assert_eq!(cds.convention, CdsConvention::IsdaNa);
         assert_eq!(cds.premium_leg.start, date!(2025 - 03 - 20));
         assert_eq!(cds.premium_leg.end, date!(2030 - 03 - 20));
-        assert_eq!(cds.premium_leg.day_count, CdsConvention::IsdaNa.day_count());
-        assert_eq!(cds.premium_leg.frequency, CdsConvention::IsdaNa.frequency());
+        assert_eq!(
+            cds.premium_leg.day_count,
+            CdsConvention::IsdaNa
+                .get_spec()
+                .expect("CDS registry")
+                .day_count
+        );
+        assert_eq!(
+            cds.premium_leg.frequency,
+            CdsConvention::IsdaNa
+                .get_spec()
+                .expect("CDS registry")
+                .frequency
+        );
         assert_eq!(
             cds.premium_leg.business_day_convention,
-            CdsConvention::IsdaNa.business_day_convention()
+            CdsConvention::IsdaNa
+                .get_spec()
+                .expect("CDS registry")
+                .business_day_convention
         );
         assert_eq!(
             cds.premium_leg.calendar_id.as_deref(),
-            Some(CdsConvention::IsdaNa.default_calendar())
+            Some(
+                CdsConvention::IsdaNa
+                    .get_spec()
+                    .expect("CDS registry")
+                    .calendar_id
+                    .as_str()
+            )
         );
         assert_eq!(cds.premium_leg.coupon_bp.to_f64(), Some(100.0));
         assert_eq!(cds.premium_leg.discount_curve_id, CurveId::new("USD-OIS"));
@@ -900,7 +923,10 @@ mod tests {
         assert_eq!(cds.protection_leg.recovery_rate, 0.40);
         assert_eq!(
             cds.protection_leg.settlement_delay,
-            CdsConvention::IsdaNa.settlement_delay()
+            CdsConvention::IsdaNa
+                .get_spec()
+                .expect("CDS registry")
+                .settlement_days
         );
     }
 

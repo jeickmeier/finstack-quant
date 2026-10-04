@@ -20,7 +20,11 @@ use time::{Date, Month};
 #[test]
 fn test_cds_convention_calendars_resolve() {
     // North American convention should resolve to NYSE calendar
-    let na_calendar_id = CdsConvention::IsdaNa.default_calendar();
+    let na_calendar_id = CdsConvention::IsdaNa
+        .get_spec()
+        .expect("CDS registry")
+        .calendar_id
+        .as_str();
     let na_calendar = calendar_by_id(na_calendar_id);
     assert!(
         na_calendar.is_some(),
@@ -29,7 +33,11 @@ fn test_cds_convention_calendars_resolve() {
     );
 
     // European convention should resolve to TARGET2 calendar
-    let eu_calendar_id = CdsConvention::IsdaEu.default_calendar();
+    let eu_calendar_id = CdsConvention::IsdaEu
+        .get_spec()
+        .expect("CDS registry")
+        .calendar_id
+        .as_str();
     let eu_calendar = calendar_by_id(eu_calendar_id);
     assert!(
         eu_calendar.is_some(),
@@ -38,7 +46,11 @@ fn test_cds_convention_calendars_resolve() {
     );
 
     // Asian convention should resolve to Tokyo calendar
-    let as_calendar_id = CdsConvention::IsdaAs.default_calendar();
+    let as_calendar_id = CdsConvention::IsdaAs
+        .get_spec()
+        .expect("CDS registry")
+        .calendar_id
+        .as_str();
     let as_calendar = calendar_by_id(as_calendar_id);
     assert!(
         as_calendar.is_some(),
@@ -56,21 +68,30 @@ fn test_cds_convention_calendars_resolve() {
 fn test_cds_settlement_delays_isda_standard() {
     // North American: T+3
     assert_eq!(
-        CdsConvention::IsdaNa.settlement_delay(),
+        CdsConvention::IsdaNa
+            .get_spec()
+            .expect("CDS registry")
+            .settlement_days,
         3,
         "North American CDS should have T+3 settlement"
     );
 
     // European: T+1 (post-2009 Big Bang)
     assert_eq!(
-        CdsConvention::IsdaEu.settlement_delay(),
+        CdsConvention::IsdaEu
+            .get_spec()
+            .expect("CDS registry")
+            .settlement_days,
         1,
         "European CDS should have T+1 settlement (post-2009 Big Bang protocol)"
     );
 
     // Asian: T+3
     assert_eq!(
-        CdsConvention::IsdaAs.settlement_delay(),
+        CdsConvention::IsdaAs
+            .get_spec()
+            .expect("CDS registry")
+            .settlement_days,
         3,
         "Asian CDS should have T+3 settlement"
     );
@@ -84,21 +105,30 @@ fn test_cds_settlement_delays_isda_standard() {
 fn test_cds_day_count_conventions() {
     // North American: ACT/360
     assert_eq!(
-        CdsConvention::IsdaNa.day_count(),
+        CdsConvention::IsdaNa
+            .get_spec()
+            .expect("CDS registry")
+            .day_count,
         DayCount::Act360,
         "North American CDS should use ACT/360"
     );
 
     // European: ACT/360
     assert_eq!(
-        CdsConvention::IsdaEu.day_count(),
+        CdsConvention::IsdaEu
+            .get_spec()
+            .expect("CDS registry")
+            .day_count,
         DayCount::Act360,
         "European CDS should use ACT/360"
     );
 
     // Asian: ACT/360
     assert_eq!(
-        CdsConvention::IsdaAs.day_count(),
+        CdsConvention::IsdaAs
+            .get_spec()
+            .expect("CDS registry")
+            .day_count,
         DayCount::Act360,
         "Asian CDS should use ACT/360"
     );
@@ -201,7 +231,7 @@ fn test_cds_conventions_consistency() {
         CdsConvention::IsdaAs,
     ] {
         // All conventions should have quarterly payment frequency
-        let frequency = convention.frequency();
+        let frequency = convention.get_spec().expect("CDS registry").frequency;
         assert_eq!(
             frequency.months(),
             Some(3),
@@ -210,7 +240,10 @@ fn test_cds_conventions_consistency() {
         );
 
         // All conventions should use Modified Following BDC
-        let business_day_convention = convention.business_day_convention();
+        let business_day_convention = convention
+            .get_spec()
+            .expect("CDS registry")
+            .business_day_convention;
         assert_eq!(
             business_day_convention,
             finstack_quant_core::dates::BusinessDayConvention::ModifiedFollowing,
@@ -219,7 +252,7 @@ fn test_cds_conventions_consistency() {
         );
 
         // All conventions should use Short Front stub
-        let stub = convention.stub_convention();
+        let stub = convention.get_spec().expect("CDS registry").stub;
         assert_eq!(
             stub,
             finstack_quant_core::dates::StubKind::ShortFront,
@@ -236,43 +269,43 @@ fn test_cds_convention_currency_detection() {
 
     // North American currencies
     assert_eq!(
-        CdsConvention::detect_from_currency(Currency::USD),
+        CdsConvention::detect_from_currency(Currency::USD).expect("CDS registry"),
         CdsConvention::IsdaNa
     );
     assert_eq!(
-        CdsConvention::detect_from_currency(Currency::CAD),
+        CdsConvention::detect_from_currency(Currency::CAD).expect("CDS registry"),
         CdsConvention::IsdaNa
     );
 
     // European currencies
     assert_eq!(
-        CdsConvention::detect_from_currency(Currency::EUR),
+        CdsConvention::detect_from_currency(Currency::EUR).expect("CDS registry"),
         CdsConvention::IsdaEu
     );
     assert_eq!(
-        CdsConvention::detect_from_currency(Currency::GBP),
+        CdsConvention::detect_from_currency(Currency::GBP).expect("CDS registry"),
         CdsConvention::IsdaEu
     );
     assert_eq!(
-        CdsConvention::detect_from_currency(Currency::CHF),
+        CdsConvention::detect_from_currency(Currency::CHF).expect("CDS registry"),
         CdsConvention::IsdaEu
     );
 
     // Asian currencies
     assert_eq!(
-        CdsConvention::detect_from_currency(Currency::JPY),
+        CdsConvention::detect_from_currency(Currency::JPY).expect("CDS registry"),
         CdsConvention::IsdaAs
     );
     assert_eq!(
-        CdsConvention::detect_from_currency(Currency::AUD),
+        CdsConvention::detect_from_currency(Currency::AUD).expect("CDS registry"),
         CdsConvention::IsdaAs
     );
     assert_eq!(
-        CdsConvention::detect_from_currency(Currency::HKD),
+        CdsConvention::detect_from_currency(Currency::HKD).expect("CDS registry"),
         CdsConvention::IsdaAs
     );
     assert_eq!(
-        CdsConvention::detect_from_currency(Currency::SGD),
+        CdsConvention::detect_from_currency(Currency::SGD).expect("CDS registry"),
         CdsConvention::IsdaAs
     );
 }

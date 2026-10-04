@@ -154,7 +154,6 @@ pub struct FutureOptionTerms {
     /// Required for [`FutureOptionPremiumStyle::FuturesStyle`]. Set this to the
     /// trade price for cumulative P&L since inception or to the preceding
     /// official settlement price for one-day variation margin.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub option_reference_price: Option<f64>,
     /// Optional change in the underlying futures price, in price points, for
@@ -162,7 +161,6 @@ pub struct FutureOptionTerms {
     ///
     /// Rate-futures-option wrappers use this caller-supplied transform to
     /// report DV01 without inferring economics from an exchange symbol.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub underlying_price_change_per_bp: Option<f64>,
     /// Option strike in the same futures-price points.
@@ -191,7 +189,6 @@ pub struct FutureOptionTerms {
     /// Cash payment or delivery of an underlying future.
     pub settlement: FutureOptionSettlement,
     /// Recorded early-exercise or expiry observation. Required from expiry onward.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exercise: Option<FutureOptionExercise>,
     /// Black-76 or normal quotation model.

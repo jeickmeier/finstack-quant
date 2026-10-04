@@ -169,6 +169,94 @@ pub struct TrancheValuation {
     pub metrics: BTreeMap<MetricId, f64>,
 }
 
+impl TrancheCashflows {
+    pub(crate) fn validate_currency(
+        &self,
+        currency: finstack_quant_core::currency::Currency,
+    ) -> finstack_quant_core::Result<()> {
+        for amount in [
+            &self.final_balance,
+            &self.total_interest,
+            &self.total_principal,
+            &self.total_pik,
+            &self.total_deferred,
+            &self.total_writedown,
+        ]
+        .into_iter()
+        .chain(
+            [
+                &self.cashflows,
+                &self.interest_flows,
+                &self.principal_flows,
+                &self.pik_flows,
+                &self.deferred_flows,
+                &self.writedown_flows,
+            ]
+            .into_iter()
+            .flatten()
+            .map(|(_, amount)| amount)
+            .chain(self.detailed_flows.iter().map(|flow| &flow.amount)),
+        ) {
+            if amount.currency() != currency {
+                return Err(finstack_quant_core::Error::CurrencyMismatch {
+                    expected: currency,
+                    actual: amount.currency(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Project payment dates and paid, interest, principal, PIK, deferred and write-down amounts into a table.
+    ///
+    /// Duplicate dates are summed in component order; absent components are zero.
+    /// Empty results retain the date and six numeric columns. All amounts use the
+    /// total-interest currency; mixed currencies return an error before scalar export.
+    pub fn to_table(
+        &self,
+    ) -> finstack_quant_core::Result<finstack_quant_core::table::TableEnvelope> {
+        use finstack_quant_core::table::{TableColumn, TableColumnData, TableEnvelope};
+        self.validate_currency(self.total_interest.currency())?;
+        let mut by_date: BTreeMap<Date, [f64; 6]> = BTreeMap::new();
+        for (index, flows) in [
+            &self.cashflows,
+            &self.interest_flows,
+            &self.principal_flows,
+            &self.pik_flows,
+            &self.deferred_flows,
+            &self.writedown_flows,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            for (date, amount) in flows {
+                by_date.entry(*date).or_default()[index] += amount.amount();
+            }
+        }
+        let mut columns = vec![TableColumn::new(
+            "date",
+            TableColumnData::String(by_date.keys().map(ToString::to_string).collect()),
+        )];
+        for (index, name) in [
+            "cashflow",
+            "interest",
+            "principal",
+            "pik",
+            "deferred",
+            "writedown",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            columns.push(TableColumn::new(
+                name,
+                TableColumnData::Float64(by_date.values().map(|row| row[index]).collect()),
+            ));
+        }
+        TableEnvelope::new(columns)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

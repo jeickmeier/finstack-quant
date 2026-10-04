@@ -22,21 +22,10 @@ use finstack_quant_core::dates::StubKind;
 use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
 use wasm_bindgen::prelude::*;
 
-/// Parse a canonical instrument envelope into one concrete Rust instrument;
-/// Rust rejects a different instrument type with a `validation` error.
-fn parse_typed<T>(json: &str) -> Result<T, JsValue>
-where
-    T: TryFrom<InstrumentJson, Error = finstack_quant_core::Error>,
-{
-    finstack_quant_valuations::pricer::parse_typed_instrument_json(json).map_err(to_js_err)
-}
-
-/// Typed wrapper for the Rust `Bond` instrument.
-#[wasm_bindgen(js_name = Bond)]
-#[derive(Clone)]
-pub struct JsBond {
-    pub(crate) inner: finstack_quant_valuations::instruments::Bond,
-}
+crate::api::valuations::typed::macros::instrument_class!(
+    /// Typed wrapper for the canonical Rust Bond instrument.
+    JsBond, "Bond", finstack_quant_valuations::instruments::Bond
+);
 
 #[wasm_bindgen(js_class = Bond)]
 impl JsBond {
@@ -348,65 +337,15 @@ impl JsBond {
             inner: self.inner.clone().min_xirr(rate.inner),
         }
     }
-
-    /// Deserialize a bond from its canonical v1 instrument envelope.
-    ///
-    /// Bare payloads are rejected; the loader's validation runs on the result.
-    /// @param json - A `finstack_quant.instrument/1` envelope containing type `"bond"`.
-    /// @returns The validated bond.
-    /// @throws If the JSON is malformed, has a different instrument type, or fails validation.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsBond, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        parse_typed(json).map(|inner| JsBond { inner })
-    }
-
-    /// Serialize to a canonical `finstack_quant.instrument/1` envelope.
-    ///
-    /// Pass the result to `valuations.instruments.priceInstrument` (or the
-    /// other generic pricing entry points) to price this bond.
-    /// @returns Canonical instrument envelope accepted by `priceInstrument` and `Bond.fromJson`.
-    /// @throws If serialization fails.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::Bond(
-            self.inner.clone(),
-        )))
-        .map_err(to_js_err)
-    }
-
-    /// Instrument identifier.
-    #[wasm_bindgen(getter)]
-    pub fn id(&self) -> String {
-        self.inner.id.to_string()
-    }
 }
 
-/// Typed wrapper for the Rust `TermLoan` instrument.
-///
-/// Rust has no `fixed`/`floating` convenience constructors for term loans;
-/// construct via `TermLoan.fromJson` with a canonical v1 instrument envelope
-/// or start from `TermLoan.example()`.
-#[wasm_bindgen(js_name = TermLoan)]
-#[derive(Clone)]
-pub struct JsTermLoan {
-    pub(crate) inner: finstack_quant_valuations::instruments::TermLoan,
-}
+crate::api::valuations::typed::macros::instrument_class!(
+    /// Typed wrapper for the canonical Rust TermLoan instrument.
+    JsTermLoan, "TermLoan", finstack_quant_valuations::instruments::TermLoan
+);
 
 #[wasm_bindgen(js_class = TermLoan)]
 impl JsTermLoan {
-    /// Deserialize a term loan from its canonical v1 instrument envelope.
-    ///
-    /// Bare payloads are rejected; the loader's validation runs on the result.
-    /// @param json - A `finstack_quant.instrument/1` envelope containing type `"term_loan"`.
-    /// @returns The validated term loan.
-    /// @throws If the JSON is malformed, has a different instrument type, or fails validation.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsTermLoan, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        parse_typed(json).map(|inner| JsTermLoan { inner })
-    }
-
     /// Canonical example term loan (mirrors Rust `TermLoan::example`).
     ///
     /// Returns a 5-year USD fixed-rate loan (6%, quarterly, Act/360, 2.5%
@@ -439,54 +378,15 @@ impl JsTermLoan {
             .map(|inner| JsTermLoan { inner })
             .map_err(to_js_err)
     }
-
-    /// Serialize to a canonical `finstack_quant.instrument/1` envelope.
-    ///
-    /// Pass the result to `valuations.instruments.priceInstrument` (or the
-    /// other generic pricing entry points) to price this loan.
-    /// @returns Canonical instrument envelope accepted by `priceInstrument` and `TermLoan.fromJson`.
-    /// @throws If serialization fails.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::TermLoan(
-            self.inner.clone(),
-        )))
-        .map_err(to_js_err)
-    }
-
-    /// Instrument identifier.
-    #[wasm_bindgen(getter)]
-    pub fn id(&self) -> String {
-        self.inner.id.to_string()
-    }
 }
 
-/// Typed wrapper for the Rust `AssetBackedFacility` instrument (a warehouse
-/// line against a collateral pool under advance rates, concentration limits
-/// and a borrowing-base test).
-///
-/// Construct via `AssetBackedFacility.fromJson` with a canonical v1
-/// instrument envelope or start from `AssetBackedFacility.example()`; price
-/// by passing `toJson()` to `valuations.instruments.priceInstrument`.
-#[wasm_bindgen(js_name = AssetBackedFacility)]
-#[derive(Clone)]
-pub struct JsAssetBackedFacility {
-    pub(crate) inner: finstack_quant_valuations::instruments::AssetBackedFacility,
-}
+crate::api::valuations::typed::macros::instrument_class!(
+    /// Typed wrapper for the canonical Rust AssetBackedFacility instrument.
+    JsAssetBackedFacility, "AssetBackedFacility", finstack_quant_valuations::instruments::AssetBackedFacility
+);
 
 #[wasm_bindgen(js_class = AssetBackedFacility)]
 impl JsAssetBackedFacility {
-    /// Parse a canonical `finstack_quant.instrument/1` envelope whose
-    /// instrument is an `asset_backed_facility`.
-    /// @param json - Canonical instrument envelope JSON.
-    /// @returns The typed facility.
-    /// @throws If the JSON is malformed, has a different instrument type, or fails validation.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsAssetBackedFacility, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        parse_typed(json).map(|inner| JsAssetBackedFacility { inner })
-    }
-
     /// The canonical example facility: the example CLO pool financed by a
     /// USD 80M commitment drawn USD 70M.
     /// @returns The example facility.
@@ -495,24 +395,6 @@ impl JsAssetBackedFacility {
         finstack_quant_valuations::instruments::AssetBackedFacility::example()
             .map(|inner| JsAssetBackedFacility { inner })
             .map_err(to_js_err)
-    }
-
-    /// Serialize to a canonical `finstack_quant.instrument/1` envelope.
-    /// @returns Canonical instrument envelope accepted by `priceInstrument` and `AssetBackedFacility.fromJson`.
-    /// @throws If serialization fails.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&InstrumentEnvelope::new(
-            InstrumentJson::AssetBackedFacility(Box::new(self.inner.clone())),
-        ))
-        .map_err(to_js_err)
-    }
-
-    /// Instrument identifier.
-    /// @returns Stable instrument identifier.
-    #[wasm_bindgen(getter)]
-    pub fn id(&self) -> String {
-        self.inner.id.to_string()
     }
 
     /// Undrawn commitment at closing: `commitment - drawn`.
@@ -585,31 +467,13 @@ impl JsAssetBackedFacility {
     }
 }
 
-/// Typed wrapper for the Rust `RevolvingCredit` instrument.
-///
-/// Construct via `RevolvingCredit.fromJson` with a canonical v1 instrument
-/// envelope or start from `RevolvingCredit.example()`; price by passing
-/// `toJson()` to the generic pricing entry points.
-#[wasm_bindgen(js_name = RevolvingCredit)]
-#[derive(Clone)]
-pub struct JsRevolvingCredit {
-    pub(crate) inner: finstack_quant_valuations::instruments::RevolvingCredit,
-}
+crate::api::valuations::typed::macros::instrument_class!(
+    /// Typed wrapper for the canonical Rust RevolvingCredit instrument.
+    JsRevolvingCredit, "RevolvingCredit", finstack_quant_valuations::instruments::RevolvingCredit
+);
 
 #[wasm_bindgen(js_class = RevolvingCredit)]
 impl JsRevolvingCredit {
-    /// Deserialize a revolving credit facility from its canonical v1 instrument envelope.
-    ///
-    /// Bare payloads are rejected; the loader's validation runs on the result.
-    /// @param json - A `finstack_quant.instrument/1` envelope containing type `"revolving_credit"`.
-    /// @returns The validated facility.
-    /// @throws If the JSON is malformed, has a different instrument type, or fails validation.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsRevolvingCredit, JsValue> {
-        let json: &str = &json_text(&json, "json")?;
-        parse_typed(json).map(|inner| JsRevolvingCredit { inner })
-    }
-
     /// Canonical example facility (mirrors Rust `RevolvingCredit::example`).
     ///
     /// Returns a three-year USD 50M SOFR + 250bp facility with USD 10M drawn
@@ -620,26 +484,6 @@ impl JsRevolvingCredit {
         finstack_quant_valuations::instruments::RevolvingCredit::example()
             .map(|inner| JsRevolvingCredit { inner })
             .map_err(to_js_err)
-    }
-
-    /// Serialize to a canonical `finstack_quant.instrument/1` envelope.
-    ///
-    /// Pass the result to `valuations.instruments.priceInstrument` (or the
-    /// other generic pricing entry points) to price this facility.
-    /// @returns Canonical instrument envelope accepted by `priceInstrument` and `RevolvingCredit.fromJson`.
-    /// @throws If serialization fails.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&InstrumentEnvelope::new(InstrumentJson::RevolvingCredit(
-            self.inner.clone(),
-        )))
-        .map_err(to_js_err)
-    }
-
-    /// Instrument identifier.
-    #[wasm_bindgen(getter)]
-    pub fn id(&self) -> String {
-        self.inner.id.to_string()
     }
 
     /// Whether the draw/repay schedule is stochastic (Monte Carlo) rather than

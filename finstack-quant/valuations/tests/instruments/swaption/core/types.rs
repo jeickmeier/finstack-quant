@@ -186,7 +186,6 @@ fn test_sabr_parameter_constructors_and_internal_conversion() {
 #[test]
 fn test_swaption_example_and_builder_helpers() {
     let example = Swaption::example().expect("example");
-    assert_eq!(example.exercise_style, ExerciseStyle::European);
     assert_eq!(example.settlement, SettlementType::Cash);
     assert_eq!(
         example.cash_settlement_method,

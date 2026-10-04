@@ -1,6 +1,6 @@
 //! WASM bindings for instrument pricing and metric introspection.
 //!
-//! CDS-family example payloads live in [`super::credit_derivatives`].
+//! Typed instruments own their canonical example payloads.
 //! Structural credit-model factories live under `crate::api::models::credit`.
 //!
 //! # Monte-Carlo determinism
@@ -165,30 +165,14 @@ pub(super) fn standard_option_greeks_with_context(
     .map_err(to_js_err)
 }
 
-/// Deserialize a `ValuationResult` from JSON and return the canonical JSON.
-///
-/// Validates the input conforms to the `ValuationResult` schema.
-/// @param json - Canonical valuation-result JSON to validate and reserialize.
-///
-/// # Errors
-///
-/// Throws a JavaScript exception if `json` is malformed or does not match the
-/// `ValuationResult` schema, or the canonical result cannot be serialized.
-#[wasm_bindgen(js_name = validateValuationResultJson)]
-pub fn validate_valuation_result_json(json: JsValue) -> Result<String, JsValue> {
-    let json: &str = &json_text(&json, "json")?;
-    let result: ValuationResult = serde_json::from_str(json).map_err(to_js_err)?;
-    valuation_result_json(result)
-}
-
-/// Serialize a structured `ValuationResult` object to canonical JSON.
+/// Validate and serialize a `ValuationResult` object or JSON text to canonical JSON.
 ///
 /// The inverse of the structured `priceInstrument*` return: it accepts the
 /// plain object those entry points return, with 64-bit fields such as the
 /// Monte Carlo `seed` as `BigInt`, and writes the same canonical JSON as
 /// Python `ValuationResult.to_json()`, keeping every integer exact. Use it in
 /// place of `JSON.stringify`, which throws on `BigInt`.
-/// @param result - `ValuationResult` object returned by `priceInstrument`,
+/// @param result - Canonical JSON text or a `ValuationResult` object returned by `priceInstrument`,
 /// `priceInstrumentWithMarket`, a typed instrument's `price`, or a portfolio
 /// valuation's `valuation_result` entry; 64-bit fields must be `BigInt` or
 /// safe-integer numbers.

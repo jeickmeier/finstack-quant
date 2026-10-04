@@ -24,8 +24,9 @@
 //!   curve), any basis between the discount curve and the projection index
 //!   curve is included in the solved DM.
 
+use crate::instruments::common_impl::pricing::time::compounding_frequency;
 use crate::instruments::fixed_income::loan_quotes::{
-    compounding_frequency, pv_with_discount_margin, solve_discount_margin,
+    pv_with_discount_margin, solve_discount_margin,
 };
 use crate::instruments::fixed_income::term_loan::pricing::TermLoanDiscountingPricer;
 use crate::instruments::TermLoan;

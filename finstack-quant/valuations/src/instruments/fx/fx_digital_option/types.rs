@@ -1,7 +1,7 @@
 //! FX digital (binary) option instrument definition.
 
 use super::pricer;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::MarketDependencies;
 use crate::instruments::OptionType;
@@ -232,7 +232,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxDigitalOption {
         None
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 
     fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
         let mut deps = MarketDependencies::new();

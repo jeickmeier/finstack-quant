@@ -433,7 +433,7 @@ pub(crate) fn bump_surfaces_vol_absolute(
 /// variables with absolute bump sizes `h` (first variable) and `k` (second).
 ///
 /// Returns `[f(+h,+k) - f(+h,-k) - f(-h,+k) + f(-h,-k)] / (4 h k)`.
-pub(crate) fn central_mixed<EEpp, EEpm, EEmp, Eemm, E1, E2, E3, E4>(
+pub(crate) fn central_mixed<EEpp, EEpm, EEmp, Eemm>(
     eval_pp: EEpp,
     eval_pm: EEpm,
     eval_mp: EEmp,
@@ -442,14 +442,10 @@ pub(crate) fn central_mixed<EEpp, EEpm, EEmp, Eemm, E1, E2, E3, E4>(
     k_abs: f64,
 ) -> finstack_quant_core::Result<f64>
 where
-    EEpp: FnOnce() -> finstack_quant_core::Result<E1>,
-    EEpm: FnOnce() -> finstack_quant_core::Result<E2>,
-    EEmp: FnOnce() -> finstack_quant_core::Result<E3>,
-    Eemm: FnOnce() -> finstack_quant_core::Result<E4>,
-    E1: Into<f64>,
-    E2: Into<f64>,
-    E3: Into<f64>,
-    E4: Into<f64>,
+    EEpp: FnOnce() -> finstack_quant_core::Result<f64>,
+    EEpm: FnOnce() -> finstack_quant_core::Result<f64>,
+    EEmp: FnOnce() -> finstack_quant_core::Result<f64>,
+    Eemm: FnOnce() -> finstack_quant_core::Result<f64>,
 {
     // Guard against invalid bump sizes
     if !h_abs.is_finite() || h_abs <= 0.0 {
@@ -458,10 +454,10 @@ where
     if !k_abs.is_finite() || k_abs <= 0.0 {
         return Err(finstack_quant_core::InputError::NonPositiveValue.into());
     }
-    let v_pp = eval_pp()?.into();
-    let v_pm = eval_pm()?.into();
-    let v_mp = eval_mp()?.into();
-    let v_mm = eval_mm()?.into();
+    let v_pp = eval_pp()?;
+    let v_pm = eval_pm()?;
+    let v_mp = eval_mp()?;
+    let v_mm = eval_mm()?;
     Ok((v_pp - v_pm - v_mp + v_mm) / (4.0 * h_abs * k_abs))
 }
 

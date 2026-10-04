@@ -395,12 +395,14 @@ export interface D_4F077E8Bfdae2A5Fc362 {
  *     compounding: Default::default(),
  * };
  *
- * let swap = BasisSwap::new(
- *     "BASIS_SWAP_001",
- *     Money::from((1_000_000_i64, Currency::USD)),
- *     primary_leg,
- *     reference_leg,
- * );
+ * let swap = BasisSwap::builder()
+ *     .id("BASIS_SWAP_001".into())
+ *     .notional(Money::from((1_000_000_i64, Currency::USD)))
+ *     .primary_leg(primary_leg)
+ *     .reference_leg(reference_leg)
+ *     .allow_calendar_fallback(true)
+ *     .attributes(Default::default())
+ *     .build().expect("valid basis swap");
  * ```
  */
 export interface DF2Becfb3409F67Ce2D6F {

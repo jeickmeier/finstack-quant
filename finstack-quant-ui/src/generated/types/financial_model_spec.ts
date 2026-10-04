@@ -6733,12 +6733,6 @@ export interface DD3Bbe1A355Ec94307B4C {
    * and interest rate dynamics, correlation, and default modeling.
    */
   mc_config?: D_78135C90Aa35A41Fbb8F | null;
-  /**
-   * Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).
-   * Mutually exclusive with `model_config.mc_antithetic = true`; validation
-   * rejects the combination.
-   */
-  use_sobol_qmc?: boolean;
   utilization_process: D_0Db717D28554658Ae7C4;
 }
 /**
@@ -13736,7 +13730,7 @@ export interface DB559Ae4814037C7E11Ce5 {
   scenario_spread_shock_bp?: number | null;
 }
 /**
- * Swaption instrument
+ * European swaption instrument
  *
  * # Exercise lifecycle boundary
  *
@@ -13758,10 +13752,6 @@ export interface DDcc2738B179Dc9Ea48C6 {
    * - `ZeroCoupon`: Single discount to swap maturity
    */
   cash_settlement_method: "collateralized_cash_price" | "par_yield" | "isda_par_par" | "zero_coupon";
-  /**
-   * Exercise style (European, Bermudan, American). Defaults to European.
-   */
-  exercise_style: "european" | "american" | "bermudan";
   /**
    * ISO 8601 calendar date encoded as a `YYYY-MM-DD` JSON string.
    */

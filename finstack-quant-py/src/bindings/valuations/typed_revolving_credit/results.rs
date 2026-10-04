@@ -3,7 +3,7 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, serde_to_py};
+use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::money_to_py;
 use crate::errors::{display_to_py, serde_json_to_py};
 use finstack_quant_valuations::instruments::fixed_income::revolving_credit::EnhancedMonteCarloResult;
@@ -251,30 +251,12 @@ impl PyEnhancedMonteCarloResult {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the rows cannot be serialized.
+    ///     If component currencies differ or the canonical table cannot be built.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let rows: Vec<serde_json::Value> = self
-            .inner
-            .path_results
-            .iter()
-            .enumerate()
-            .map(|(path, result)| {
-                serde_json::json!({
-                    "path": path,
-                    "pv": result.pv.amount(),
-                    "draw_option_cost": result.draw_option_cost.amount(),
-                })
-            })
-            .collect();
-        serde_rows_to_dataframe_with_schema(
+        crate::bindings::pandas_utils::table_to_dataframe(
             py,
-            &rows,
-            &[
-                ("path", "int64"),
-                ("pv", "float64"),
-                ("draw_option_cost", "float64"),
-            ],
+            &self.inner.to_table().map_err(crate::errors::core_to_py)?,
         )
     }
 

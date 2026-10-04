@@ -341,8 +341,7 @@ pub trait HasDayCount {
 ///
 /// Calculates delta (price sensitivity to underlying spot) using the central
 /// finite difference method. Works with any instrument that implements the
-/// required traits: [`Instrument`], [`HasExpiry`],
-/// and [`HasDayCount`]. The instrument must expose its focused metric overrides
+/// required trait: [`Instrument`]. The instrument must expose its focused metric overrides
 /// through [`Instrument::get_metric_pricing_overrides_mut`].
 ///
 /// # Mathematical Foundation
@@ -370,7 +369,7 @@ impl<I> Default for GenericFdDelta<I> {
 
 impl<I> MetricCalculator for GenericFdDelta<I>
 where
-    I: Instrument + HasExpiry + HasDayCount + Clone + 'static,
+    I: Instrument + Clone + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -452,7 +451,7 @@ impl<I> Default for GenericFdGamma<I> {
 
 impl<I> MetricCalculator for GenericFdGamma<I>
 where
-    I: Instrument + HasExpiry + HasDayCount + Clone + 'static,
+    I: Instrument + Clone + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;

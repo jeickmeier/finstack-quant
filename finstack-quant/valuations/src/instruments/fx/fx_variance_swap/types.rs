@@ -1,7 +1,7 @@
 //! FX variance swap type definitions and pricing logic.
 
 use super::pricer;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::traits::Instrument as InstrumentTrait;
 use finstack_quant_core::currency::Currency;
@@ -55,7 +55,6 @@ pub struct FxVarianceSwap {
     /// Quote currency (domestic)
     pub quote_currency: Currency,
     /// Optional spot identifier used to look up historical series.
-    #[builder(optional)]
     pub spot_id: Option<PriceId>,
     /// Variance notional (in quote currency units)
     pub notional: Money,
@@ -77,7 +76,6 @@ pub struct FxVarianceSwap {
     pub maturity: Date,
     /// Optional cash-settlement date. Defaults to the adjusted final observation date.
     #[serde(default)]
-    #[builder(optional)]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
         feature = "json-schema",
@@ -114,21 +112,17 @@ pub struct FxVarianceSwap {
     /// Series ID for open prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
     /// Defaults to `spot_id` (or currency-pair string) when absent.
     #[serde(default)]
-    #[builder(optional)]
     pub open_series_id: Option<String>,
     /// Series ID for high prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
     /// Defaults to `spot_id` (or currency-pair string) when absent.
     #[serde(default)]
-    #[builder(optional)]
     pub high_series_id: Option<String>,
     /// Series ID for low prices (required for Parkinson, GarmanKlass, RogersSatchell, YangZhang).
     /// Defaults to `spot_id` (or currency-pair string) when absent.
     #[serde(default)]
-    #[builder(optional)]
     pub low_series_id: Option<String>,
     /// Series ID for close prices. Defaults to `spot_id` (or currency-pair string) when absent.
     #[serde(default)]
-    #[builder(optional)]
     pub close_series_id: Option<String>,
     /// Pay/receive variance
     pub side: PayReceive,
@@ -451,7 +445,7 @@ impl InstrumentTrait for FxVarianceSwap {
         pricer::compute_pv(self, context, as_of)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 // FxVarianceSwap uses both domestic and foreign curves for forward construction

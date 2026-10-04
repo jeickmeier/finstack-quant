@@ -20,11 +20,10 @@ use super::super::convert::{
     enum_to_py_string, float_repr, money_from_py, money_repr, money_to_py, opt_repr,
 };
 use super::super::instruments::{enum_from_str, serialize_typed_instrument_json};
-use super::super::typed_fx::{
-    instrument_envelope_methods, instrument_pricing_methods, take_builder,
-};
+use super::super::typed_fx::{instrument_envelope_methods, instrument_pricing_methods};
 use super::super::typed_legs::{PyPremiumLegSpec, PyProtectionLegSpec};
 use super::cds::cds_convention_from_str;
+use crate::bindings::valuations::convert::take_builder;
 
 type CdsIndexBuilderInner =
     finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIndexBuilder;

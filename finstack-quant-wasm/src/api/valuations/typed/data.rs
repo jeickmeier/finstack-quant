@@ -18,7 +18,7 @@ use finstack_quant_valuations::instruments::credit_derivatives::cds_index::CdsIn
 use finstack_quant_valuations::instruments::credit_derivatives::cds_tranche::CdsTrancheParams;
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::AmortizationEvent;
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::merton_mc::{
-    BarrierCrossing, MertonMcConfig, PikMode, PikSchedule,
+    MertonMcConfig, PikSchedule,
 };
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AssetPool, CoverageRules, CoverageTestSpec, PenaltyStep, PoolAsset, PrepaymentPenalty,
@@ -66,7 +66,7 @@ impl JsMertonMcConfig {
     }
 
     /// Return a copy with a different PIK schedule.
-    /// @param s - `PikSchedule` plain object or JSON string, e.g. from `valuations.instruments.pikScheduleUniform`.
+    /// @param s - `PikSchedule` plain object or JSON string, e.g. `{ uniform: "cash" }`.
     /// @returns A new configuration; the receiver is not modified.
     /// @throws Error - Throws with kind `validation` if `s` does not match the `PikSchedule` schema.
     #[wasm_bindgen(js_name = pikSchedule)]
@@ -212,77 +212,6 @@ impl JsMertonMcConfig {
     }
 }
 
-/// `BarrierCrossing::Discrete`: default is checked only on the simulation grid.
-/// @returns The `BarrierCrossing` value `"discrete"`.
-/// @throws Error - Throws if the value cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = barrierCrossingDiscrete)]
-pub fn barrier_crossing_discrete() -> Result<JsValue, JsValue> {
-    to_js_value(&BarrierCrossing::Discrete)
-}
-
-/// `BarrierCrossing::BrownianBridge`: corrects for crossings between grid points.
-/// @returns The `BarrierCrossing` value `"brownian_bridge"`.
-/// @throws Error - Throws if the value cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = barrierCrossingBrownianBridge)]
-pub fn barrier_crossing_brownian_bridge() -> Result<JsValue, JsValue> {
-    to_js_value(&BarrierCrossing::BrownianBridge)
-}
-
-/// `PikMode::Cash`: the coupon is paid in cash.
-/// @returns The `PikMode` value.
-/// @throws Error - Throws if the value cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = pikModeCash)]
-pub fn pik_mode_cash() -> Result<JsValue, JsValue> {
-    to_js_value(&PikMode::Cash)
-}
-
-/// `PikMode::Pik`: the coupon accretes to the notional.
-/// @returns The `PikMode` value.
-/// @throws Error - Throws if the value cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = pikModePik)]
-pub fn pik_mode_pik() -> Result<JsValue, JsValue> {
-    to_js_value(&PikMode::Pik)
-}
-
-/// `PikMode::Split`: part of the coupon is paid in cash and part accretes.
-/// @param cash_fraction - Fraction of the coupon paid in cash, in `[0, 1]`.
-/// @param pik_fraction - Fraction of the coupon accreted, in `[0, 1]`.
-/// @returns The `PikMode` value.
-/// @throws Error - Throws with kind `invalid_type` if a fraction is not a number.
-#[wasm_bindgen(js_name = pikModeSplit)]
-pub fn pik_mode_split(cash_fraction: JsValue, pik_fraction: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&PikMode::Split {
-        cash_fraction: arg::num(&cash_fraction, "cashFraction")?,
-        pik_fraction: arg::num(&pik_fraction, "pikFraction")?,
-    })
-}
-
-/// `PikMode::Toggle`: the issuer elects cash or PIK each period under the toggle model.
-/// @returns The `PikMode` value.
-/// @throws Error - Throws if the value cannot be converted to JavaScript.
-#[wasm_bindgen(js_name = pikModeToggle)]
-pub fn pik_mode_toggle() -> Result<JsValue, JsValue> {
-    to_js_value(&PikMode::Toggle)
-}
-
-/// `PikSchedule::Uniform`: one PIK mode for the life of the bond.
-/// @param mode - `PikMode` plain value or JSON string.
-/// @returns The `PikSchedule` plain object.
-/// @throws Error - Throws with kind `validation` if `mode` does not match the `PikMode` schema.
-#[wasm_bindgen(js_name = pikScheduleUniform)]
-pub fn pik_schedule_uniform(mode: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&PikSchedule::Uniform(arg::json_or_name(&mode, "mode")?))
-}
-
-/// `PikSchedule::Stepped`: the PIK mode changes at given times.
-/// @param steps - `[timeInYears, PikMode]` pairs in increasing time order; each mode applies from its time on.
-/// @returns The `PikSchedule` plain object.
-/// @throws Error - Throws with kind `validation` if `steps` is not an array of `[number, PikMode]` pairs.
-#[wasm_bindgen(js_name = pikScheduleStepped)]
-pub fn pik_schedule_stepped(steps: JsValue) -> Result<JsValue, JsValue> {
-    to_js_value(&PikSchedule::Stepped(arg::json(&steps, "steps")?))
-}
-
 /// The PIK mode in force at a time (mirrors Rust `PikSchedule::mode_at`).
 /// @param schedule - `PikSchedule` plain object or JSON string.
 /// @param t - Time from issue in years.
@@ -371,42 +300,6 @@ pub fn pool_asset_floating_rate_loan(
     ))
 }
 
-/// Return a copy of a pool with its representative lines replaced.
-/// @param pool - `AssetPool` plain object or JSON string.
-/// @param rep_lines - `RepLine` plain objects (or a JSON array string).
-/// @returns A new `AssetPool` plain object carrying `rep_lines`.
-/// @throws Error - Throws with kind `validation` if `pool` or `repLines` does not match its schema.
-#[wasm_bindgen(js_name = assetPoolWithRepLines)]
-pub fn asset_pool_with_rep_lines(pool: JsValue, rep_lines: JsValue) -> Result<JsValue, JsValue> {
-    let mut pool: AssetPool = arg::json(&pool, "pool")?;
-    pool.rep_lines = Some(arg::json(&rep_lines, "repLines")?);
-    to_js_value(&pool)
-}
-
-/// Return a copy of a pool with its loan-level assets replaced.
-/// @param pool - `AssetPool` plain object or JSON string.
-/// @param value - `PoolAsset` plain objects (or a JSON array string).
-/// @returns A new `AssetPool` plain object carrying `assets`.
-/// @throws Error - Throws with kind `validation` if `pool` or `value` does not match its schema.
-#[wasm_bindgen(js_name = assetPoolWithAssets)]
-pub fn asset_pool_with_assets(pool: JsValue, value: JsValue) -> Result<JsValue, JsValue> {
-    let mut pool: AssetPool = arg::json(&pool, "pool")?;
-    pool.assets = arg::json(&value, "value")?;
-    to_js_value(&pool)
-}
-
-/// Return a copy of a pool collateralized by typed instruments.
-/// @param pool - `AssetPool` plain object or JSON string.
-/// @param collateral - `InstrumentCollateral` plain object: `bonds`, `term_loans` and `revolvers` instrument specs plus the optional `call_exercise`, `put_exercise` and `overrides` exercise policies.
-/// @returns A new `AssetPool` plain object carrying `instruments`.
-/// @throws Error - Throws with kind `validation` if `pool` or `collateral` does not match its schema.
-#[wasm_bindgen(js_name = assetPoolWithInstruments)]
-pub fn asset_pool_with_instruments(pool: JsValue, collateral: JsValue) -> Result<JsValue, JsValue> {
-    let mut pool: AssetPool = arg::json(&pool, "pool")?;
-    pool.instruments = Some(arg::json(&collateral, "collateral")?);
-    to_js_value(&pool)
-}
-
 /// Return a copy of a pool with its reserve account configured.
 /// @param pool - `AssetPool` plain object or JSON string.
 /// @param reserve_account - Opening reserve balance as a `Money` plain object.
@@ -433,74 +326,6 @@ pub fn asset_pool_with_reserve(
         .map(|value| arg::json(value, "reserveInterestDestination"))
         .transpose()?
         .unwrap_or_default();
-    to_js_value(&pool)
-}
-
-/// Return a copy of a pool with a reinvestment period.
-/// @param pool - `AssetPool` plain object or JSON string.
-/// @param value - `ReinvestmentPeriod` plain object or JSON string: end date, active flag and reinvestment criteria.
-/// @returns A new `AssetPool` plain object carrying `reinvestment_period`.
-/// @throws Error - Throws with kind `validation` if `pool` or `value` does not match its schema.
-#[wasm_bindgen(js_name = assetPoolWithReinvestmentPeriod)]
-pub fn asset_pool_with_reinvestment_period(
-    pool: JsValue,
-    value: JsValue,
-) -> Result<JsValue, JsValue> {
-    let mut pool: AssetPool = arg::json(&pool, "pool")?;
-    pool.reinvestment_period = Some(arg::json(&value, "value")?);
-    to_js_value(&pool)
-}
-
-/// Account balances accepted by `assetPoolWithAccounts`; absent fields are left unchanged.
-#[derive(serde::Deserialize)]
-#[serde(deny_unknown_fields)]
-struct PoolAccounts {
-    #[serde(default)]
-    cumulative_defaults: Option<finstack_quant_core::money::Money>,
-    #[serde(default)]
-    cumulative_recoveries: Option<finstack_quant_core::money::Money>,
-    #[serde(default)]
-    cumulative_prepayments: Option<finstack_quant_core::money::Money>,
-    #[serde(default)]
-    cumulative_scheduled_amortization: Option<finstack_quant_core::money::Money>,
-    #[serde(default)]
-    collection_account: Option<finstack_quant_core::money::Money>,
-    #[serde(default)]
-    excess_spread_account: Option<finstack_quant_core::money::Money>,
-    #[serde(default)]
-    original_balance: Option<finstack_quant_core::money::Money>,
-}
-
-/// Return a copy of a pool with seasoned account balances.
-/// @param pool - `AssetPool` plain object or JSON string.
-/// @param accounts - Plain object with any of `cumulative_defaults`, `cumulative_recoveries`, `cumulative_prepayments`, `cumulative_scheduled_amortization`, `collection_account`, `excess_spread_account` and `original_balance`, each a `Money` plain object; absent fields keep the pool's value.
-/// @returns A new `AssetPool` plain object with the given balances.
-/// @throws Error - Throws with kind `validation` if `pool` does not match the `AssetPool` schema or `accounts` has an unknown field or a malformed amount.
-#[wasm_bindgen(js_name = assetPoolWithAccounts)]
-pub fn asset_pool_with_accounts(pool: JsValue, accounts: JsValue) -> Result<JsValue, JsValue> {
-    let mut pool: AssetPool = arg::json(&pool, "pool")?;
-    let accounts: PoolAccounts = arg::json(&accounts, "accounts")?;
-    if let Some(value) = accounts.original_balance {
-        pool.original_balance = Some(value);
-    }
-    if let Some(value) = accounts.cumulative_defaults {
-        pool.cumulative_defaults = value;
-    }
-    if let Some(value) = accounts.cumulative_recoveries {
-        pool.cumulative_recoveries = value;
-    }
-    if let Some(value) = accounts.cumulative_prepayments {
-        pool.cumulative_prepayments = value;
-    }
-    if let Some(value) = accounts.cumulative_scheduled_amortization {
-        pool.cumulative_scheduled_amortization = value;
-    }
-    if let Some(value) = accounts.collection_account {
-        pool.collection_account = value;
-    }
-    if let Some(value) = accounts.excess_spread_account {
-        pool.excess_spread_account = value;
-    }
     to_js_value(&pool)
 }
 

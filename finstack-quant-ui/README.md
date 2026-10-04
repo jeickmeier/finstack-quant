@@ -81,7 +81,7 @@ integers and non-JSON host objects fail instead of silently losing information.
 
 `finstack-quant-ui/host` reuses published facade types. `adaptValuation` preserves
 actual structured results, and `exportValuation(result,
-valuations.validateValuationResultJson)` emits integer tokens validated by Rust.
+valuations.valuationResultToJson)` emits integer tokens validated by Rust.
 All five detail variants use Rust-derived WASM host declarations and validation
 metadata. Monte Carlo has a dedicated view; the other four retain raw views,
 including structured-credit bigint counts. Cashflow structure comes from the

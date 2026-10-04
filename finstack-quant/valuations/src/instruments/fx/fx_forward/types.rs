@@ -6,7 +6,7 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
 use finstack_quant_core::currency::Currency;
@@ -84,7 +84,6 @@ pub struct FxForward {
     /// Notional amount in base currency.
     pub notional: Money,
     /// Contract forward rate (quote per base). If None, valued at-market.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contract_rate: Option<f64>,
     /// Domestic (quote currency) discount curve ID.
@@ -92,7 +91,6 @@ pub struct FxForward {
     /// Foreign (base currency) discount curve ID.
     pub foreign_discount_curve_id: CurveId,
     /// Optional spot rate override (quote per base). If None, source from FxMatrix.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quoted_spot: Option<f64>,
     /// Optional base currency calendar for business day adjustment.
@@ -651,7 +649,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxForward {
         ))
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {

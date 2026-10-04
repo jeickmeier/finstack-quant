@@ -13,7 +13,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::monte_carlo::process::schwartz_smith::SchwartzSmithParams;
 use finstack_quant_valuations::instruments::commodity::commodity_option::{
-    CommodityMcParams, CommodityOption, CommodityPricingModel,
+    CommodityMcParams, CommodityOption,
 };
 use finstack_quant_valuations::instruments::Attributes;
 use finstack_quant_valuations::instruments::CommodityUnderlyingParams;
@@ -89,14 +89,14 @@ fn test_schwartz_smith_gbm_limit_converges_to_black76() {
     // This ensures E[exp(Y_T)] = exp(Y_0) = S_0 = F_0.
     let sigma_y = 0.20;
     let mc_params = CommodityMcParams {
-        model: CommodityPricingModel::SchwartzSmith(SchwartzSmithParams {
+        params: SchwartzSmithParams {
             kappa: 0.01,                    // Very small mean reversion
             sigma_x: 0.001,                 // Negligible short-term vol
             sigma_y,                        // Dominant long-term vol (matching Black-76 vol)
             rho_xy: 0.0,                    // No correlation
             mu_y: -0.5 * sigma_y * sigma_y, // Ito correction for martingale
             lambda_x: 0.0,                  // No risk premium
-        }),
+        },
         num_paths: 100_000,
         num_steps: 100,
         seed: Some(42),
@@ -125,18 +125,18 @@ fn test_mc_estimates_consistent_across_path_counts() {
     let market = build_market(as_of);
     let call = build_commodity_option(100.0, OptionType::Call);
 
-    let ss_model = CommodityPricingModel::SchwartzSmith(SchwartzSmithParams {
+    let ss_model = SchwartzSmithParams {
         kappa: 2.0,
         sigma_x: 0.30,
         sigma_y: 0.15,
         rho_xy: -0.5,
         mu_y: 0.0,
         lambda_x: 0.0,
-    });
+    };
 
     // Price with 10k paths
     let mc_10k = CommodityMcParams {
-        model: ss_model.clone(),
+        params: ss_model.clone(),
         num_paths: 10_000,
         num_steps: 50,
         seed: Some(42),
@@ -145,7 +145,7 @@ fn test_mc_estimates_consistent_across_path_counts() {
 
     // Price with 100k paths
     let mc_100k = CommodityMcParams {
-        model: ss_model,
+        params: ss_model,
         num_paths: 100_000,
         num_steps: 50,
         seed: Some(42),
@@ -191,17 +191,17 @@ fn test_put_call_parity_mc() {
 
     // Near-GBM limit with Ito correction for martingale property
     let sigma_y = 0.20;
-    let ss_model = CommodityPricingModel::SchwartzSmith(SchwartzSmithParams {
+    let ss_model = SchwartzSmithParams {
         kappa: 0.01,
         sigma_x: 0.001,
         sigma_y,
         rho_xy: 0.0,
         mu_y: -0.5 * sigma_y * sigma_y,
         lambda_x: 0.0,
-    });
+    };
 
     let mc_params = CommodityMcParams {
-        model: ss_model,
+        params: ss_model,
         num_paths: 100_000,
         num_steps: 100,
         seed: Some(42),
@@ -245,14 +245,14 @@ fn test_schwartz_smith_positive_option_values() {
     let market = build_market(as_of);
 
     let mc_params = CommodityMcParams {
-        model: CommodityPricingModel::SchwartzSmith(SchwartzSmithParams {
+        params: SchwartzSmithParams {
             kappa: 2.0,
             sigma_x: 0.30,
             sigma_y: 0.15,
             rho_xy: -0.5,
             mu_y: 0.0,
             lambda_x: 0.0,
-        }),
+        },
         num_paths: 50_000,
         num_steps: 50,
         seed: Some(42),
@@ -288,37 +288,6 @@ fn test_schwartz_smith_positive_option_values() {
     );
 }
 
-/// Verify that the Black76 model variant falls back to analytical pricing.
-#[test]
-fn test_mc_black76_fallback() {
-    use finstack_quant_valuations::instruments::Instrument;
-
-    let as_of = date(2025, 1, 1);
-    let market = build_market(as_of);
-
-    let call = build_commodity_option(100.0, OptionType::Call);
-
-    let analytical_pv = call.value(&market, as_of).expect("analytical price");
-
-    let mc_params = CommodityMcParams {
-        model: CommodityPricingModel::Black76,
-        num_paths: 1_000, // Should be ignored
-        num_steps: 10,    // Should be ignored
-        seed: Some(42),
-    };
-
-    let mc_pv = call
-        .npv_mc(&mc_params, &market, as_of)
-        .expect("BS fallback");
-
-    assert!(
-        (mc_pv.amount() - analytical_pv.amount()).abs() < 1e-10,
-        "Black76 MC fallback should match analytical: MC={:.6}, analytical={:.6}",
-        mc_pv.amount(),
-        analytical_pv.amount(),
-    );
-}
-
 #[test]
 fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
     use finstack_quant_valuations::{
@@ -330,14 +299,14 @@ fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
     let market = build_market(as_of);
     let mut call = build_commodity_option(100.0, OptionType::Call);
     let params = CommodityMcParams {
-        model: CommodityPricingModel::SchwartzSmith(SchwartzSmithParams {
+        params: SchwartzSmithParams {
             kappa: 2.0,
             sigma_x: 0.3,
             sigma_y: 0.15,
             rho_xy: -0.5,
             mu_y: 0.0,
             lambda_x: 0.0,
-        }),
+        },
         num_paths: 2000,
         num_steps: 12,
         seed: Some(123),
@@ -387,17 +356,17 @@ fn mc_result_reports_scaled_uncertainty_and_replay_metadata() {
 #[test]
 fn commodity_mc_params_use_num_paths_and_num_steps() {
     // schema-rejection-test: `n_paths` / `n_steps`
-    let model = r#"{"schwartz_smith": {"kappa": 2.0, "sigma_x": 0.3, "sigma_y": 0.15, "rho_xy": -0.5, "mu_y": 0.0, "lambda_x": 0.0}}"#;
+    let params = r#"{"kappa": 2.0, "sigma_x": 0.3, "sigma_y": 0.15, "rho_xy": -0.5, "mu_y": 0.0, "lambda_x": 0.0}"#;
     for retired in [
-        format!(r#"{{"model": {model}, "n_paths": 100, "num_steps": 10}}"#),
-        format!(r#"{{"model": {model}, "num_paths": 100, "n_steps": 10}}"#),
+        format!(r#"{{"params": {params}, "n_paths": 100, "num_steps": 10}}"#),
+        format!(r#"{{"params": {params}, "num_paths": 100, "n_steps": 10}}"#),
     ] {
         let err = serde_json::from_str::<CommodityMcParams>(&retired)
             .expect_err("retired CommodityMcParams key must be rejected");
         assert!(err.to_string().contains("unknown field"), "{err}");
     }
     let params: CommodityMcParams = serde_json::from_str(&format!(
-        r#"{{"model": {model}, "num_paths": 100, "num_steps": 10}}"#
+        r#"{{"params": {params}, "num_paths": 100, "num_steps": 10}}"#
     ))
     .expect("canonical CommodityMcParams parse");
     assert_eq!((params.num_paths, params.num_steps), (100, 10));

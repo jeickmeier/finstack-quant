@@ -864,7 +864,7 @@ mod tests {
             Box::new(self.clone())
         }
 
-        crate::impl_focused_pricing_overrides!();
+        crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 
         fn price_with_metrics(
             &self,

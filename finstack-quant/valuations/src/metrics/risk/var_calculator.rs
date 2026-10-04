@@ -397,26 +397,8 @@ where
         .iter()
         .map(|inst| *inst as &dyn Instrument)
         .collect();
-    calculate_var_dyn(
-        &instrument_refs,
-        base_market,
-        history,
-        as_of,
-        config,
-        provider.clone(),
-    )
-}
-
-fn calculate_var_dyn(
-    instruments: &[&dyn Instrument],
-    base_market: &MarketContext,
-    history: &MarketHistory,
-    as_of: Date,
-    config: &VarConfig,
-    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
-) -> Result<VarResult> {
     calculate_var_with_pricing(
-        instruments,
+        &instrument_refs,
         base_market,
         history,
         as_of,
@@ -587,45 +569,6 @@ fn calculate_var_full_revaluation(
     VarResult::from_distribution(pnls, config.confidence_level)
 }
 
-fn calculate_var_taylor(
-    instruments: &[&dyn Instrument],
-    base_market: &MarketContext,
-    history: &MarketHistory,
-    as_of: Date,
-    config: &VarConfig,
-    dispatch: &PricingDispatch,
-    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
-) -> Result<VarResult> {
-    let _span = tracing::debug_span!(
-        "historical_var.taylor",
-        instrument_count = instruments.len(),
-        scenario_count = history.len(),
-    )
-    .entered();
-
-    if instruments.len() == 1 {
-        return calculate_var_taylor_approximation(
-            instruments[0],
-            base_market,
-            history,
-            as_of,
-            config,
-            dispatch,
-            provider.clone(),
-        );
-    }
-
-    calculate_portfolio_var_taylor(
-        instruments,
-        base_market,
-        history,
-        as_of,
-        config,
-        dispatch,
-        provider.clone(),
-    )
-}
-
 // Taylor Approximation
 
 #[derive(Default)]
@@ -728,84 +671,6 @@ fn convert_money_to_reporting(
         ))?
         .rate;
     Ok(value.amount() * rate)
-}
-
-fn calculate_var_taylor_approximation(
-    instrument: &dyn Instrument,
-    base_market: &MarketContext,
-    history: &MarketHistory,
-    as_of: Date,
-    config: &VarConfig,
-    dispatch: &PricingDispatch,
-    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
-) -> Result<VarResult> {
-    let base_value = reprice_with_dispatch(instrument, base_market, as_of, dispatch)?;
-    let reporting_currency = resolve_reporting_currency_from_values(
-        &[base_value],
-        config.reporting_currency,
-        "Historical VaR",
-    )?;
-    let sensitivities = compute_taylor_sensitivities(
-        instrument,
-        base_market,
-        as_of,
-        base_value,
-        dispatch,
-        provider.clone(),
-    )?;
-
-    let mut spot_cache: HashMap<String, f64> = HashMap::default();
-    let mut pnls = Vec::with_capacity(history.len());
-    let mut skipped = TaylorSkipFlags::default();
-
-    // When the sensitivities are already in the reporting currency,
-    // `convert_money_to_reporting` short-circuits and never consults the
-    // market, so we can skip rebuilding the scenario-shifted market entirely.
-    let needs_fx_conversion = sensitivities.currency != reporting_currency;
-
-    for scenario in history.iter() {
-        let pnl_local = taylor_pnl_for_scenario(
-            &sensitivities,
-            base_market,
-            scenario,
-            &mut spot_cache,
-            &mut skipped,
-        )?;
-        let pnl_money = Money::new(pnl_local, sensitivities.currency)?;
-        // Convert P&L using the scenario-shifted market's FX rates, not the
-        // base market's: when a scenario shocks FX, the reporting-currency
-        // value of the P&L must reflect the shifted rates. This mirrors the
-        // full-revaluation path (`calculate_var_full_revaluation`). For the
-        // same-currency case the conversion ignores the market, so the
-        // expensive `scenario.apply` rebuild is skipped.
-        let converted = if needs_fx_conversion {
-            let scenario_market = scenario.apply(base_market, provider.as_deref())?;
-            convert_money_to_reporting(
-                pnl_money,
-                reporting_currency,
-                &scenario_market,
-                as_of,
-                "Historical VaR",
-            )?
-        } else {
-            convert_money_to_reporting(
-                pnl_money,
-                reporting_currency,
-                base_market,
-                as_of,
-                "Historical VaR",
-            )?
-        };
-        pnls.push(converted);
-    }
-
-    // Surface any factors the Taylor approximation had to skip rather than
-    // hard-failing the job: once in the logs, and durably on the result so
-    // callers (including bindings) can see the degradation.
-    skipped.warn_if_any("historical_var.taylor.single");
-
-    VarResult::from_distribution(pnls, config.confidence_level)
-        .map(|result| result.with_taylor_skips(skipped))
 }
 
 fn compute_taylor_sensitivities(
@@ -1211,7 +1076,7 @@ fn spot_from_market(market: &MarketContext, ticker: &str) -> Result<f64> {
     Ok(spot)
 }
 
-fn calculate_portfolio_var_taylor(
+fn calculate_var_taylor(
     instruments: &[&dyn Instrument],
     base_market: &MarketContext,
     history: &MarketHistory,
@@ -1220,17 +1085,12 @@ fn calculate_portfolio_var_taylor(
     dispatch: &PricingDispatch,
     provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
 ) -> Result<VarResult> {
-    if instruments.is_empty() {
-        return Ok(VarResult {
-            var: 0.0,
-            expected_shortfall: 0.0,
-            pnl_distribution: vec![],
-            confidence_level: config.confidence_level,
-            num_scenarios: 0,
-            skipped_fx: false,
-            skipped_vol: false,
-        });
-    }
+    let _span = tracing::debug_span!(
+        "historical_var.taylor",
+        instrument_count = instruments.len(),
+        scenario_count = history.len(),
+    )
+    .entered();
 
     let mut sensitivities: Vec<TaylorSensitivities> = Vec::with_capacity(instruments.len());
     let mut base_values: Vec<Money> = Vec::with_capacity(instruments.len());
@@ -1786,13 +1646,7 @@ mod tests {
         );
         let history = MarketHistory::new(as_of, 1, vec![scenario]);
 
-        let err = calculate_var_dyn(
-            &[&usd as &dyn Instrument, &eur as &dyn Instrument],
-            &base_market,
-            &history,
-            as_of,
-            &VarConfig::var_95(), None,
-        )
+        let err = calculate_var_with_pricing(&[&usd as &dyn Instrument, &eur as &dyn Instrument], &base_market, &history, as_of, &VarConfig::var_95(), PricingDispatch::InstrumentDefault, None)
         .expect_err(
             "mixed-currency VaR must not aggregate native-currency P&L without a reporting currency",
         );
@@ -1844,12 +1698,13 @@ mod tests {
         );
         let history = MarketHistory::new(as_of, 1, vec![scenario]);
 
-        let result = calculate_var_dyn(
+        let result = calculate_var_with_pricing(
             &[&usd as &dyn Instrument, &eur as &dyn Instrument],
             &base_market,
             &history,
             as_of,
             &VarConfig::var_95().with_reporting_currency(Currency::USD),
+            PricingDispatch::InstrumentDefault,
             None,
         )?;
         assert!((result.pnl_distribution[0] - 30.0).abs() < 1e-12);
@@ -2298,12 +2153,13 @@ mod tests {
         // The job must succeed (graceful degradation), not hard-fail. The vol
         // shock is the only risk factor and it is skipped, so the Taylor P&L
         // distribution is all-zero and VaR/ES come back as 0.
-        let result = calculate_var_dyn(
+        let result = calculate_var_with_pricing(
             &[&option as &dyn Instrument],
             &base_market,
             &history,
             as_of,
             &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
+            PricingDispatch::InstrumentDefault,
             None,
         )
         .expect("Taylor VaR must degrade gracefully for a vol-exposed instrument");
@@ -2823,12 +2679,13 @@ mod tests {
 
         // Calculate portfolio VaR
         let instruments: Vec<&dyn Instrument> = vec![&bond1, &bond2];
-        let portfolio_var = calculate_var_dyn(
+        let portfolio_var = calculate_var_with_pricing(
             &instruments,
             market.as_ref(),
             &history,
             as_of,
             &config,
+            PricingDispatch::InstrumentDefault,
             None,
         )?;
 

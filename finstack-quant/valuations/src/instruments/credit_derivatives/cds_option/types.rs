@@ -42,7 +42,7 @@ use rust_decimal::Decimal;
 use time::Month;
 
 use super::parameters::CdsOptionParams;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 
 /// Maximum valid implied volatility (inclusive upper bound).
 /// 500% lognormal vol is extremely high but theoretically valid.
@@ -542,7 +542,10 @@ impl CdsOption {
         let calendar = self.standard_calendar()?;
         let trade_date = adjust(as_of, BusinessDayConvention::Following, calendar)?;
         trade_date.add_business_days(
-            self.underlying_convention.settlement_delay().into(),
+            self.underlying_convention
+                .get_spec()?
+                .settlement_days
+                .into(),
             calendar,
         )
     }
@@ -594,7 +597,7 @@ impl CdsOption {
     }
 
     fn standard_calendar(&self) -> finstack_quant_core::Result<&'static dyn HolidayCalendar> {
-        let calendar_id = self.underlying_convention.default_calendar();
+        let calendar_id = self.underlying_convention.get_spec()?.calendar_id.as_str();
         calendar_by_id(calendar_id).ok_or_else(|| {
             finstack_quant_core::Error::Validation(format!(
                 "missing CDS option calendar '{calendar_id}' for {:?}",
@@ -735,7 +738,7 @@ impl crate::instruments::common_impl::traits::Instrument for CdsOption {
         None
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 // Declare canonical market dependencies for the DV01 calculator.

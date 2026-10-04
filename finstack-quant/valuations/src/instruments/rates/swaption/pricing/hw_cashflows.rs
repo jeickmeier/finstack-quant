@@ -38,23 +38,7 @@ impl HwSwaptionCashflows {
             _ => return Err(finstack_quant_core::Error::Validation(
                 "Hull-White swaption trees require simple floating coupons or compounded coupons without observation shifts, lookbacks or rate cutoffs".into())),
         };
-        let fixed_params = BuildPeriodsParams {
-            start: fixed.start,
-            end: fixed.end,
-            frequency: fixed.frequency,
-            stub: fixed.stub,
-            business_day_convention: fixed.business_day_convention,
-            calendar_id: fixed
-                .calendar_id
-                .as_deref()
-                .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
-            end_of_month: fixed.end_of_month,
-            day_count: fixed.day_count,
-            payment_lag_days: fixed.payment_lag_days,
-            reset_lag_days: None,
-            adjust_accrual_dates: false,
-            roll_rule: RollRule::None,
-        };
+        let fixed_params = fixed.schedule_params(false);
         let fixed_payments_per_year = fixed.frequency.payments_per_year();
         let fixed = build_periods(fixed_params)?
             .iter()

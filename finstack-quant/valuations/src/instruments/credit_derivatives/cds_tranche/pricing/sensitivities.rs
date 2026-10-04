@@ -1,8 +1,6 @@
 //! Numerical pricing, expected-loss, and sensitivity helpers for CDS tranches.
 //!
-use super::config::{
-    CdsTranchePricer, NUMERICAL_TOLERANCE, PAR_SPREAD_MAX_ITER, PAR_SPREAD_TOLERANCE,
-};
+use super::config::{CdsTranchePricer, NUMERICAL_TOLERANCE, PAR_SPREAD_TOLERANCE};
 use super::registry::JumpToDefaultResult;
 use crate::cashflow::builder::specs::RollRule;
 use crate::cashflow::primitives::CFKind;
@@ -422,44 +420,70 @@ impl CdsTranchePricer {
         Ok(pv.amount())
     }
 
-    /// Calculate Spread DV01 (sensitivity to 1bp change in running coupon).
+    fn coupon_projection(
+        &self,
+        tranche: &CdsTranche,
+        market: &MarketContext,
+        as_of: Date,
+    ) -> Result<(
+        Vec<super::config::ProjectedDiscountedRow>,
+        std::sync::Arc<finstack_quant_core::market_data::term_structures::DiscountCurve>,
+    )> {
+        tranche.validate()?;
+        let curve = market.get_discount(&tranche.discount_curve_id)?;
+        let rows = if tranche.realized_loss >= tranche.detach_pct / 100.0 {
+            Vec::new()
+        } else {
+            self.project_coupon_rows(tranche, market, as_of, 1.0 / BASIS_POINTS_PER_UNIT, true)?
+        };
+        Ok((rows, curve))
+    }
+
+    /// Calculate spread DV01 from the signed premium present value for one basis point of running coupon.
     ///
-    /// Uses central difference for O(h²) accuracy, consistent with CS01 and Correlation01.
+    /// Credit losses, amortization and accrual on default are independent of the
+    /// coupon. The unit projection includes tiny premium rows so this derivative
+    /// also exists at zero coupon; upfront and protection do not contribute.
+    ///
+    /// # Arguments
+    ///
+    /// * `tranche` - Valid tranche, including protection side and outstanding note balance.
+    /// * `market` - Credit-index and discount curves used to project and discount the premium leg.
+    /// * `as_of` - Valuation date defining unsettled flows and relative discount factors.
     pub fn calculate_spread_dv01(
         &self,
         tranche: &CdsTranche,
         market: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
-        // Central difference: (PV(c+1bp) - PV(c-1bp)) / 2
-        let mut tranche_up = tranche.clone();
-        tranche_up.coupon_bp += 1.0;
-
-        let mut tranche_down = tranche.clone();
-        tranche_down.coupon_bp -= 1.0;
-
-        let pv_up = self.price_tranche(&tranche_up, market, as_of)?.amount();
-        let pv_down = self.price_tranche(&tranche_down, market, as_of)?.amount();
-
-        Ok((pv_up - pv_down) / 2.0)
+        let (rows, curve) = self.coupon_projection(tranche, market, as_of)?;
+        let premium: Vec<_> = rows
+            .into_iter()
+            .filter(|row| row.cashflow.kind == CFKind::Fixed)
+            .collect();
+        let pv = self.discount_projected_rows(&premium, curve.as_ref(), as_of)?;
+        finstack_quant_core::money::Money::new(pv, tranche.notional.currency())
+            .map(|amount| amount.amount())
     }
 
-    /// Calculate the par spread (running coupon in bp that sets PV = 0).
+    /// Calculate the running coupon in basis points that sets the signed present value to zero.
     ///
-    /// The par spread is always a positive basis-point number regardless of protection side.
+    /// A single unit-premium projection supplies the coupon coefficient and
+    /// the constant protection and dated-upfront terms. A negligible premium
+    /// coefficient returns zero. Otherwise the solution is restricted to
+    /// [0, 100000] bp and checked against the same projected rows, retaining
+    /// premium-row suppression and the notional-scaled residual tolerance.
     ///
-    /// # Algorithm
+    /// # Arguments
     ///
-    /// Uses Newton-Raphson iteration to find the spread that makes NPV = 0:
-    /// 1. Seed with `|protection_pv| / |premium_per_bp|` — both legs are signed by
-    ///    `project_discountable_rows` (opposite polarities per side), so unsigned magnitudes
-    ///    give a correct positive starting point for both `Pay` (buy protection) and `Receive` (sell protection).
-    /// 2. Iterate: `spread_new = spread - NPV(spread) / Spread_DV01`
-    /// 3. Converge when `|NPV| < tolerance` or max iterations reached.
+    /// * `tranche` - Valid tranche, including protection side, realized losses and any dated upfront.
+    /// * `market` - Credit-index and discount curves for the canonical cashflow projection.
+    /// * `as_of` - Valuation date used to select unsettled payments and rebase discounting.
     ///
-    /// This is more accurate than a plain ratio method because it accounts for the non-linear
-    /// relationship between spread and premium leg PV due to accrual-on-default and notional
-    /// write-down effects.
+    /// # Errors
+    ///
+    /// Returns an error for invalid inputs or market data, or when no coupon
+    /// within the accepted domain meets the present-value tolerance.
     #[must_use = "par spread result should be used"]
     pub fn calculate_par_spread(
         &self,
@@ -467,103 +491,42 @@ impl CdsTranchePricer {
         market: &MarketContext,
         as_of: Date,
     ) -> Result<f64> {
-        tranche.validate()?;
-        let discount_curve = market.get_discount(&tranche.discount_curve_id)?;
-
-        // Initial guess: unsigned magnitude of protection PV divided by premium per bp.
-        // Both quantities are signed by project_discountable_rows (opposite polarities for
-        // Pay vs Receive), so we use their absolute values to guarantee a
-        // positive seed for both protection sides.
-        let mut unit_tranche = tranche.clone();
-        unit_tranche.coupon_bp = 1.0;
-        let premium_per_bp_rows = self.project_discountable_rows(&unit_tranche, market, as_of)?;
-        let premium_per_bp = self.discount_projected_rows(
-            &premium_per_bp_rows
-                .iter()
-                .filter(|row| row.cashflow.kind == CFKind::Fixed)
-                .cloned()
-                .collect::<Vec<_>>(),
-            discount_curve.as_ref(),
-            as_of,
-        )?;
-
+        let (mut rows, curve) = self.coupon_projection(tranche, market, as_of)?;
+        let premium: Vec<_> = rows
+            .iter()
+            .filter(|row| row.cashflow.kind == CFKind::Fixed)
+            .cloned()
+            .collect();
+        let premium_per_bp = self.discount_projected_rows(&premium, curve.as_ref(), as_of)?;
         if premium_per_bp.abs() < NUMERICAL_TOLERANCE {
             return Ok(0.0);
         }
-
-        let protection_rows = self.project_discountable_rows(tranche, market, as_of)?;
-        let protection_pv = self.discount_projected_rows(
-            &protection_rows
-                .iter()
-                .filter(|row| row.cashflow.kind == CFKind::DefaultedNotional)
-                .cloned()
-                .collect::<Vec<_>>(),
-            discount_curve.as_ref(),
-            as_of,
-        )?;
-
-        // Initial guess: unsigned ratio of protection PV magnitude to premium per bp magnitude.
-        //
-        // `project_discountable_rows` applies a side-dependent sign to every cashflow
-        // (`premium_sign = -1 / +1` and `protection_sign = +1 / -1` for
-        // `Pay` / `Receive`).  Consequently both `protection_pv` and
-        // `premium_per_bp` are signed with opposite polarities, making their raw ratio
-        // always negative.  Taking unsigned magnitudes produces the correct positive
-        // initial guess for both sides.
-        let mut spread = protection_pv.abs() / premium_per_bp.abs().max(NUMERICAL_TOLERANCE);
-
-        // Newton-Raphson iteration to refine the par spread.
-        //
-        // On non-convergence the solver returns an explicit error rather than
-        // the last (un-converged) iterate: a silently-returned non-par spread
-        // would feed wrong numbers into upfront / breakeven calculations with
-        // no signal that the root-find failed.
-        let mut last_npv = f64::INFINITY;
-        for _iter in 0..PAR_SPREAD_MAX_ITER {
-            // Create test tranche with current spread guess
-            let mut test_tranche = tranche.clone();
-            test_tranche.coupon_bp = spread;
-
-            // Calculate NPV at current spread
-            let npv = self.price_tranche(&test_tranche, market, as_of)?.amount();
-            last_npv = npv;
-
-            // Check convergence (NPV close to zero)
-            if npv.abs() < PAR_SPREAD_TOLERANCE * tranche.notional.amount() {
-                return Ok(spread);
+        let constants: Vec<_> = rows
+            .iter()
+            .filter(|row| row.cashflow.kind != CFKind::Fixed)
+            .cloned()
+            .collect();
+        let constant_pv = self.discount_projected_rows(&constants, curve.as_ref(), as_of)?;
+        let spread = (-constant_pv / premium_per_bp).clamp(0.0, 100000.0);
+        for row in &mut rows {
+            if row.cashflow.kind == CFKind::Fixed {
+                row.cashflow.amount = finstack_quant_core::money::Money::new(
+                    row.cashflow.amount.amount() * spread,
+                    row.cashflow.amount.currency(),
+                )?;
+                row.cashflow.rate = Some(spread / BASIS_POINTS_PER_UNIT);
             }
-
-            // Calculate Spread DV01 for Newton step
-            let spread_dv01 = self.calculate_spread_dv01(&test_tranche, market, as_of)?;
-
-            if spread_dv01.abs() < NUMERICAL_TOLERANCE {
-                // Degenerate Jacobian: the Newton step is undefined, so the
-                // par spread cannot be resolved. Fail loudly.
-                return Err(finstack_quant_core::Error::Validation(format!(
-                    "CDS tranche par-spread solve failed: Spread DV01 collapsed to \
-                     {spread_dv01:.3e} at spread {spread:.4} bp (NPV {npv:.3e}); the \
-                     premium leg is insensitive to the coupon so no par spread exists."
-                )));
-            }
-
-            // Newton step: spread_new = spread - NPV / DV01.
-            // The seed is always positive, so the clamp keeps subsequent iterates
-            // non-negative for both protection sides.
-            let adjustment = npv / spread_dv01;
-            spread -= adjustment;
-
-            // Ensure spread stays reasonable (non-negative, bounded)
-            spread = spread.clamp(0.0, 100000.0); // Max 10000% = 100000bp
         }
-
-        // Exhausted the iteration budget without meeting the NPV tolerance.
-        Err(finstack_quant_core::Error::Validation(format!(
-            "CDS tranche par-spread solve did not converge within {PAR_SPREAD_MAX_ITER} \
-             Newton iterations: last spread {spread:.4} bp leaves NPV {last_npv:.3e} \
-             (tolerance {:.3e}). Inspect the credit/discount curves or widen the \
-             iteration budget.",
-            PAR_SPREAD_TOLERANCE * tranche.notional.amount()
-        )))
+        rows.retain(|row| {
+            row.cashflow.kind != CFKind::Fixed || row.cashflow.amount.amount().abs() > f64::EPSILON
+        });
+        let npv = self.discount_projected_rows(&rows, curve.as_ref(), as_of)?;
+        let tolerance = PAR_SPREAD_TOLERANCE * tranche.notional.amount();
+        if npv.abs() < tolerance {
+            Ok(spread)
+        } else {
+            Err(Error::Validation(format!("CDS tranche par spread {spread:.4} bp leaves NPV {npv:.3e} (tolerance {tolerance:.3e}); no par coupon within [0, 100000] bp")))
+        }
     }
 
     /// Calculate expected loss metric (the total expected loss at maturity).

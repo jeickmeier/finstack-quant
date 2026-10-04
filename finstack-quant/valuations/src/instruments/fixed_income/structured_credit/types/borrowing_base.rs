@@ -16,7 +16,7 @@ use super::pool::{AssetPool, PoolAsset};
 /// variant (`"first_lien_loan"`, `"new_auto_loan"`, ...) or `"*"` for every
 /// class without a more specific entry; collateral with no matching entry is
 /// ineligible.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct AdvanceRate {
@@ -100,7 +100,7 @@ pub enum ConcentrationScope {
 
 /// Cap on the eligible collateral any one obligor, industry or asset class
 /// may contribute; balance above the cap is excluded from the borrowing base.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct ConcentrationLimit {
@@ -152,7 +152,7 @@ impl ConcentrationLimit {
 }
 
 /// Advance rates and concentration limits that define a borrowing base.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct BorrowingBaseRules {
@@ -360,5 +360,63 @@ fn concentration_key(scope: ConcentrationScope, asset: &PoolAsset) -> Option<Str
         ConcentrationScope::Obligor => asset.obligor_id.clone(),
         ConcentrationScope::Industry => asset.industry.clone(),
         ConcentrationScope::AssetClass => Some(asset.asset_type.wire_name().to_string()),
+    }
+}
+
+impl<'de> Deserialize<'de> for AdvanceRate {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(remote = "AdvanceRate")]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            asset_class: String,
+
+            rate: f64,
+
+            #[serde(default)]
+            eligibility: EligibilityRule,
+        }
+        let value = Wire::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
+    }
+}
+
+impl<'de> Deserialize<'de> for ConcentrationLimit {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(remote = "ConcentrationLimit")]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            scope: ConcentrationScope,
+
+            max_pct: f64,
+        }
+        let value = Wire::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
+    }
+}
+
+impl<'de> Deserialize<'de> for BorrowingBaseRules {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(remote = "BorrowingBaseRules")]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            advance_rates: Vec<AdvanceRate>,
+
+            #[serde(default)]
+            concentration_limits: Vec<ConcentrationLimit>,
+        }
+        let value = Wire::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
     }
 }

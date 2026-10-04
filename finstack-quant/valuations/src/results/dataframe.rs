@@ -74,6 +74,19 @@ impl ValuationResult {
             .collect()
     }
 
+    /// Select composite rows for a base metric, preserving measure order.
+    ///
+    /// # Arguments
+    ///
+    /// * `base` - Exact base metric name, such as `bucketed_dv01`; scalar
+    ///   entries and other bases are excluded, and an unknown name returns no rows.
+    pub fn to_series_rows(&self, base: &str) -> Vec<ValuationLongRow> {
+        self.to_long_rows()
+            .into_iter()
+            .filter(|row| row.metric == base && row.curve.is_some())
+            .collect()
+    }
+
     /// Convert this result to a flat row for DataFrame export.
     ///
     /// All measures are emitted as named columns; no metric is

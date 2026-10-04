@@ -32,7 +32,7 @@ use serde::{Deserialize, Serialize};
 /// };
 /// assert!(balloon.validate().is_ok());
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct BalloonSpec {
@@ -131,7 +131,7 @@ pub struct PenaltyStep {
 /// The premium a prepayment owes is collected by the trust as interest
 /// (nothing is charged after `through`); a lockout blocks voluntary
 /// prepayment outright.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum PrepaymentPenalty {
@@ -390,7 +390,7 @@ impl PrepaymentPenalty {
 /// and the shortfall falls on the most junior classes first through the
 /// sequential interest waterfall. The special servicing fee accrues only on
 /// specially serviced balances.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct SpecialServicingSpec {
@@ -414,5 +414,95 @@ impl SpecialServicingSpec {
             )));
         }
         Ok(())
+    }
+}
+
+impl<'de> Deserialize<'de> for BalloonSpec {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(remote = "BalloonSpec")]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            extension_prob: f64,
+
+            extension_months: u32,
+
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            extension_rate: Option<f64>,
+
+            #[serde(default)]
+            loss_prob: f64,
+
+            #[serde(default)]
+            severity_pct: f64,
+
+            #[serde(default)]
+            workout_months: u32,
+        }
+        let value = Wire::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
+    }
+}
+
+impl<'de> Deserialize<'de> for PrepaymentPenalty {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(remote = "PrepaymentPenalty")]
+        #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+        enum Wire {
+            Lockout {
+                #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+                through: Option<Date>,
+            },
+
+            Fixed {
+                pct: f64,
+
+                #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+                through: Option<Date>,
+            },
+
+            StepDown {
+                schedule: Vec<PenaltyStep>,
+            },
+
+            YieldMaintenance {
+                #[serde(default, skip_serializing_if = "Option::is_none")]
+                discount_curve_id: Option<finstack_quant_core::types::CurveId>,
+
+                #[serde(default, skip_serializing_if = "Option::is_none")]
+                reinvestment_rate: Option<f64>,
+
+                #[serde(default, skip_serializing_if = "Option::is_none")]
+                floor_pct: Option<f64>,
+
+                #[serde(default, with = "finstack_quant_core::wire::optional_date")]
+                through: Option<Date>,
+            },
+        }
+        let value = Wire::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
+    }
+}
+
+impl<'de> Deserialize<'de> for SpecialServicingSpec {
+    fn deserialize<D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> std::result::Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(remote = "SpecialServicingSpec")]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            appraisal_reduction_pct: f64,
+        }
+        let value = Wire::deserialize(deserializer)?;
+        value.validate().map_err(serde::de::Error::custom)?;
+        Ok(value)
     }
 }

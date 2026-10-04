@@ -2,7 +2,7 @@ use super::{DealType, StructuredCredit, TrancheSeniority};
 use crate::cashflow::traits::{
     schedule_from_classified_flows, CashflowProvider, ScheduleBuildOpts,
 };
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::fixed_income::loan_terms::RateSpec;
 use crate::instruments::model_params::ModelParamsSnapshot;
@@ -221,7 +221,7 @@ impl Instrument for StructuredCredit {
         }
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl StructuredCredit {

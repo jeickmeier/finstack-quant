@@ -181,7 +181,7 @@ Reachable from both host languages under the `valuations` namespace:
   calibration (`calibrate`, `CalibrationResult`) is the sibling
   `finstack_quant.calibration` package.
 - WASM/JS: `valuations` from `finstack-quant-wasm` —
-  `validateValuationResultJson`, the `valuationResult*` accessors, the
+  `valuationResultToJson`, the `valuationResult*` accessors, the
   exotic-rates coupon helpers, and the `instruments`, `creditDerivatives`,
   `composite`, `market`, `fx`, and `schema` namespaces. Reusable engines live
   under the sibling `models` namespace, and `calibrate` /

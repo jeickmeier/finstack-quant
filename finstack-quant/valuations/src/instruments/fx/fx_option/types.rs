@@ -52,7 +52,7 @@ use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_core::Result;
 
 use super::pricer;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 
 fn default_fx_underlying(base_currency: Currency, quote_currency: Currency) -> FxUnderlyingParams {
     // Fall back to currency-aware OIS curves instead of hardwiring USD legs.
@@ -495,7 +495,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxOption {
         ))
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption {

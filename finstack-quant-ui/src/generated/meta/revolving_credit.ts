@@ -2102,12 +2102,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/StochasticUtilizationSpec/properties/mc_config/anyOf/1"
   },
   {
-    "path": "#/$defs/d_818d7c74805f8d3a4bee/properties/use_sobol_qmc",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/StochasticUtilizationSpec/properties/use_sobol_qmc",
-    "default": false,
-    "description": "Use Sobol quasi-Monte Carlo RNG instead of Philox (default: false).\nMutually exclusive with `model_config.mc_antithetic = true`; validation\nrejects the combination."
-  },
-  {
     "path": "#/$defs/d_818d7c74805f8d3a4bee/properties/utilization_process",
     "source": "https://finstack_quant.dev/schemas/instrument/1/fixed_income/revolving_credit.schema.json#/$defs/StochasticUtilizationSpec/properties/utilization_process",
     "description": "Utilization process specification.",

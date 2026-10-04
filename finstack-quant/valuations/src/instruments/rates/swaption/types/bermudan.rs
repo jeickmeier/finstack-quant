@@ -1,7 +1,7 @@
 //! Pricing and metric helpers for interest-rate instruments.
 //!
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::parameters::OptionType;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::rates::irs::{FixedLegSpec, FloatLegSpec, InterestRateSwap, PayReceive};
 use finstack_quant_core::currency::Currency;
@@ -16,7 +16,7 @@ use rust_decimal::Decimal;
 
 use super::definitions::{BermudanSchedule, BermudanType, CashSettlementMethod};
 use super::swaption::{vanilla_underlier, Swaption, VanillaSwaptionUnderlier};
-use crate::instruments::{ExerciseStyle, SettlementType, VolatilityModel};
+use crate::instruments::{SettlementType, VolatilityModel};
 
 // Bermudan Swaption Instrument
 
@@ -441,25 +441,7 @@ impl BermudanSwaption {
     ) -> Result<Vec<crate::cashflow::builder::periods::SchedulePeriod>> {
         let underlier = self.underlying_irs_at(start)?;
         let fixed = underlier.resolved_fixed_leg()?;
-        crate::cashflow::builder::periods::build_periods(
-            crate::cashflow::builder::periods::BuildPeriodsParams {
-                start: fixed.start,
-                end: fixed.end,
-                frequency: fixed.frequency,
-                stub: fixed.stub,
-                business_day_convention: fixed.business_day_convention,
-                calendar_id: fixed
-                    .calendar_id
-                    .as_deref()
-                    .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID),
-                end_of_month: fixed.end_of_month,
-                day_count: fixed.day_count,
-                payment_lag_days: fixed.payment_lag_days,
-                reset_lag_days: None,
-                adjust_accrual_dates: false,
-                roll_rule: crate::cashflow::builder::specs::RollRule::None,
-            },
-        )
+        crate::cashflow::builder::periods::build_periods(fixed.schedule_params(false))
     }
 
     fn underlying_irs_at(&self, start: Date) -> Result<InterestRateSwap> {
@@ -568,7 +550,6 @@ impl BermudanSwaption {
             option_type: self.option_type,
             notional: self.notional,
             expiry: first_ex,
-            exercise_style: ExerciseStyle::European,
             settlement: self.settlement,
             cash_settlement_method: CashSettlementMethod::default(),
             vol_model: VolatilityModel::Black,
@@ -627,7 +608,7 @@ impl crate::instruments::common_impl::traits::Instrument for BermudanSwaption {
         Some(self.get_underlying_start_date())
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

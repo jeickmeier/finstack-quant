@@ -6,7 +6,7 @@
 
 use crate::cashflow::builder::CashFlowSchedule;
 use crate::cashflow::primitives::CFKind;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, Tenor};
@@ -325,7 +325,6 @@ pub struct Ndf {
     ///
     /// `None` values the NDF at-market: the contract rate equals the market
     /// forward, so the settlement amount and PV are zero.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub contract_rate: Option<f64>,
     /// Settlement currency discount curve ID.
@@ -335,31 +334,26 @@ pub struct Ndf {
     /// Optional foreign (base) currency discount curve ID.
     /// Required for pre-fixing forward estimation unless `quoted_forward`
     /// is supplied.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub foreign_discount_curve_id: Option<CurveId>,
     /// Observed fixing rate. Interpretation depends on `quote_convention`.
     /// If Some, NDF is post-fixing.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub observed_fixing: Option<f64>,
     /// Official fixing source/benchmark enum for type-safe specification.
     ///
     /// Use this field for validated fixing sources.
     /// See [`NdfFixingSource`] for supported benchmarks and their typical currencies.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixing_source: Option<NdfFixingSource>,
     /// Optional spot rate override for forward rate calculation.
     /// Interpretation depends on `quote_convention`.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quoted_spot: Option<f64>,
     /// Explicit pre-fixing forward rate in `quote_convention` units.
     ///
     /// Use this for NDF market quotes or basis-adjusted forwards when a base
     /// currency discount curve is unavailable.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quoted_forward: Option<f64>,
     /// Optional base currency calendar.
@@ -954,7 +948,7 @@ impl crate::instruments::common_impl::traits::Instrument for Ndf {
         None
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 impl finstack_quant_cashflows::CashflowScheduleSource for Ndf {

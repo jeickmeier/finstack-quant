@@ -15,7 +15,7 @@ use crate::instruments::fixed_income::bond::{CallPutSchedule, CashflowSpec};
 use crate::instruments::model_params::ModelParamsSnapshot;
 
 use super::pricing;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 
 /// Share-price trigger of a convertible bond: the last sale price must be at
 /// least `threshold_pct` of the conversion price on `required_days_above` of
@@ -159,7 +159,6 @@ pub struct ConvertibleBond {
     /// blends it with risk-free discounting as `risky × (1 − R) + rf × R`
     /// using [`Self::recovery_rate`]. The hazard curve's own recovery rate is
     /// used only to convert spread bumps into hazard shifts for CS01.
-    #[builder(optional)]
     pub credit_curve_id: Option<CurveId>,
     /// Conversion terms for equity conversion.
     pub conversion: ConversionSpec,
@@ -172,10 +171,8 @@ pub struct ConvertibleBond {
     /// Optional unitless continuous dividend-yield scalar id (decimal,
     /// 0.02 = 2%). `None` means a zero dividend yield; a configured id must
     /// resolve.
-    #[builder(optional)]
     pub div_yield_id: Option<PriceId>,
     /// Optional call/put schedule (issuer/holder redemption before maturity).
-    #[builder(optional)]
     pub call_put: Option<CallPutSchedule>,
     /// Optional soft-call trigger condition.
     ///
@@ -190,7 +187,6 @@ pub struct ConvertibleBond {
     /// trigger is evaluated on the instantaneous node spot with a
     /// Broadie-Glasserman-Kou-style barrier adjustment approximating the
     /// k-of-n-days observation window; the realized path is not tracked.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub soft_call_trigger: Option<PriceTrigger>,
     /// Number of business days from trade date to settlement date.
@@ -202,7 +198,6 @@ pub struct ConvertibleBond {
     /// - **US Treasury**: 1 (T+1)
     ///
     /// If `None`, settlement is assumed same-day (as_of = settlement date).
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settlement_days: Option<u32>,
     /// Assumed recovery rate on default, as a fraction (e.g., 0.40 = 40%).
@@ -216,7 +211,6 @@ pub struct ConvertibleBond {
     ///
     /// Required when `credit_curve_id` is set; otherwise absence means that no
     /// credit adjustment is requested.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recovery_rate: Option<f64>,
     /// Coupon leg (fixed, floating, step-up or amortizing), the same type as
@@ -1171,7 +1165,7 @@ impl crate::instruments::common_impl::traits::Instrument for ConvertibleBond {
         }
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 fn validate_conversion_date(

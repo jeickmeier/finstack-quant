@@ -1,7 +1,7 @@
 //! FX touch option (American binary option) instrument definition.
 
 use super::pricer;
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount};
@@ -112,7 +112,6 @@ pub struct FxTouchOption {
     pub expiry: Date,
     /// First date on which barrier monitoring is active. When set, a live
     /// valuation after this date requires `observed_barrier_breached`.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[serde(with = "finstack_quant_core::wire::optional_date")]
     #[cfg_attr(
@@ -327,7 +326,7 @@ impl crate::instruments::common_impl::traits::Instrument for FxTouchOption {
         Ok(Some(Box::new(observed)))
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 // Touch options use finite-difference Greeks (barrier discontinuities make

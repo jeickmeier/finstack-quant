@@ -24,7 +24,6 @@
 
 pub(crate) mod assumptions;
 pub(crate) mod metrics;
-pub(crate) mod pricer;
 pub(crate) mod pricing;
 pub(crate) mod types;
 pub(crate) mod utils;
@@ -61,9 +60,7 @@ pub use utils::{
     validate_tiers, ValidationError,
 };
 
-pub use pricing::{
-    execute_waterfall, generate_cashflows, generate_tranche_cashflows, run_simulation,
-};
+pub use pricing::{execute_waterfall, generate_cashflows, run_simulation};
 
 pub use pricing::coverage_tests::{TestContext, TestResult};
 pub use pricing::stochastic::StructuredCreditPricingMode;

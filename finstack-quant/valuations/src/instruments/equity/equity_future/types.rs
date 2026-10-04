@@ -1,9 +1,9 @@
 //! Exchange-listed equity futures, including fixed-currency quanto contracts.
 
-use crate::impl_instrument_base;
 use crate::instruments::common_impl::dependencies::VolatilityDependency;
 use crate::instruments::common_impl::listed::ListedFutureTerms;
 use crate::instruments::common_impl::parameters::QuantoSpec;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
@@ -38,7 +38,6 @@ pub struct EquityFuture {
     /// Current equity or index level.
     pub spot_id: PriceId,
     /// Optional continuous dividend-yield scalar in decimal annual units.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub div_yield_id: Option<PriceId>,
     /// Optional discrete dividends `(ex_date, amount)` in index points.
@@ -52,13 +51,11 @@ pub struct EquityFuture {
     pub discrete_dividends: Vec<(Date, f64)>,
     /// Equity volatility surface (decimal vol per square-root year). Required
     /// with `quanto`, where it drives the quanto drift.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vol_surface_id: Option<CurveId>,
     /// Required quanto adjustment when settlement and underlying currencies
     /// differ. `quanto.asset_discount_curve_id` is the underlying-currency
     /// carry curve and `quanto.asset_currency` must equal `underlying_currency`.
-    #[builder(optional)]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quanto: Option<QuantoSpec>,
     /// Instrument-owned pricing inputs.
@@ -441,7 +438,7 @@ impl crate::instruments::Instrument for EquityFuture {
         Some(self.terms.settlement_date)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
 crate::impl_empty_cashflow_provider!(

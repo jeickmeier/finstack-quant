@@ -317,7 +317,6 @@ def stochastic_revolver(*, correlation: float = 0.0, num_paths: int = 2048) -> d
     payload["instrument"]["spec"]["draw_repay_spec"] = {
         "stochastic": {
             "utilization_process": {"mean_reverting": {"theta": 0.55, "kappa": 1.0, "sigma": 0.10}},
-            "use_sobol_qmc": False,
             "mc_config": {
                 "correlation_matrix": None,
                 "credit_spread_process": {

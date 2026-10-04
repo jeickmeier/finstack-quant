@@ -12,9 +12,9 @@ use finstack_quant_models::credit::pool::{
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     calculate_tranche_breakeven_cdr, calculate_tranche_discount_margin, calculate_tranche_metrics,
-    calculate_tranche_oas, generate_cashflows, generate_tranche_cashflows, run_simulation,
-    scenario_table, AssetPool, DealType, HedgeSwap, OasConfig, PoolAsset, ScenarioGrid,
-    StructuredCredit, StructuredCreditPricingMode, Tranche, TrancheSeniority, TrancheStructure,
+    calculate_tranche_oas, generate_cashflows, run_simulation, scenario_table, AssetPool, DealType,
+    HedgeSwap, OasConfig, PoolAsset, ScenarioGrid, StructuredCredit, StructuredCreditPricingMode,
+    Tranche, TrancheSeniority, TrancheStructure,
 };
 use finstack_quant_valuations::instruments::{
     Instrument, PricingOptions, ScenarioPricingOverrides,
@@ -281,7 +281,12 @@ fn price_with_metrics_standalone_returns_base_value_when_no_metrics_or_hedges() 
     market = market.insert(discount_curve(closing_date()));
 
     let result = sc
-        .price_with_metrics_standalone(&market, closing_date(), &[])
+        .price_with_metrics(
+            &market,
+            closing_date(),
+            &[],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
         .expect("standalone pricing");
     let canonical = sc
         .price_with_metrics(&market, closing_date(), &[], PricingOptions::default())
@@ -301,7 +306,12 @@ fn standalone_pricing_applies_scenario_price_shock_once() {
     let mut sc = build_sc("ABS-STANDALONE-SCENARIO", 1_000_000.0);
     let market = MarketContext::new().insert(discount_curve(closing_date()));
     let baseline = sc
-        .price_with_metrics_standalone(&market, closing_date(), &[])
+        .price_with_metrics(
+            &market,
+            closing_date(),
+            &[],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
         .expect("baseline standalone pricing")
         .value
         .amount();
@@ -309,7 +319,12 @@ fn standalone_pricing_applies_scenario_price_shock_once() {
         ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
 
     let shocked = sc
-        .price_with_metrics_standalone(&market, closing_date(), &[])
+        .price_with_metrics(
+            &market,
+            closing_date(),
+            &[],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
         .expect("shocked standalone pricing")
         .value
         .amount();
@@ -387,10 +402,10 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         generate_cashflows(&sc, &market, closing_date())
             .expect_err("invalid aggregate cashflows")
             .to_string(),
-        generate_tranche_cashflows(&sc, "missing", &market, closing_date())
+        (sc).tranche_cashflows("missing", &market, closing_date())
             .expect_err("invalid tranche cashflows")
             .to_string(),
-        generate_tranche_cashflows(&sc, "missing", &market, closing_date())
+        (sc).tranche_cashflows("missing", &market, closing_date())
             .expect_err("invalid tranche helper")
             .to_string(),
         sc.value_tranche("missing", &market, closing_date())
@@ -421,9 +436,14 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         scenario_table(&sc, "missing", &market, closing_date(), &grid)
             .expect_err("invalid scenario table")
             .to_string(),
-        sc.price_with_metrics_standalone(&market, closing_date(), &[])
-            .expect_err("invalid metric pricing")
-            .to_string(),
+        sc.price_with_metrics(
+            &market,
+            closing_date(),
+            &[],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
+        .expect_err("invalid metric pricing")
+        .to_string(),
         sc.price_stochastic(&market, closing_date(), None, None)
             .expect_err("invalid stochastic pricing")
             .to_string(),
@@ -456,7 +476,12 @@ fn hedge_pricing_validates_nested_swap_before_market_access() {
     let sc = build_sc("ABS-INVALID-HEDGE", 1_000_000.0).with_hedge_swap(HedgeSwap::new(swap));
 
     let err = sc
-        .price_with_metrics_standalone(&MarketContext::new(), closing_date(), &[])
+        .price_with_metrics(
+            &MarketContext::new(),
+            closing_date(),
+            &[],
+            finstack_quant_valuations::instruments::PricingOptions::default(),
+        )
         .expect_err("invalid nested hedge must fail before missing curves");
     let message = err.to_string();
     assert!(

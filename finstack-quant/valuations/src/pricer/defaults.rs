@@ -73,9 +73,7 @@ pub(crate) struct RevolvingCreditDefaults {
     /// simulates two paths per estimator). The seed is derived per facility
     /// from `model_config.mc_seed_scenario`.
     pub(crate) num_paths: usize,
-    /// Whether antithetic variance reduction is enabled by default. Must stay
-    /// `false` while Sobol facilities (`use_sobol_qmc`) rely on the default,
-    /// because the two are mutually exclusive.
+    /// Whether paired antithetic Philox paths are enabled by default.
     pub(crate) antithetic: bool,
 }
 

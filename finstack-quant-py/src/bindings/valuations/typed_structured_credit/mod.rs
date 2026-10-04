@@ -39,7 +39,8 @@ macro_rules! sc_wire_methods {
             /// Raises
             /// ------
             /// ValueError
-            ///     If ``json`` is malformed or carries unknown fields.
+            ///     If ``json`` is malformed, carries unknown fields, or violates the
+            ///     Rust type's validated reconstruction constraints.
             #[staticmethod]
             #[pyo3(text_signature = "(json)")]
             fn from_json(json: &str) -> PyResult<Self> {
@@ -158,6 +159,7 @@ pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// merges every submodule list so registration stays in one place per file.
 pub(crate) const EXPORTS: &[&str] = &[
     "AdvanceRate",
+    "AssetPool",
     "BalloonSpec",
     "BorrowingBaseRules",
     "CallAssumption",
@@ -170,10 +172,16 @@ pub(crate) const EXPORTS: &[&str] = &[
     "PoolAsset",
     "PoolStats",
     "PrepaymentPenalty",
+    "RepLine",
     "SimulationDiagnostics",
     "SpecialServicingSpec",
     "StochasticPricingResult",
+    "StructuredCredit",
+    "StructuredCreditBuilder",
+    "Tranche",
+    "TrancheBuilder",
     "TrancheCashflows",
+    "TrancheStructure",
     "Waterfall",
     "calculate_pool_stats",
 ];

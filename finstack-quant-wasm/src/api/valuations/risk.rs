@@ -4,7 +4,7 @@
 //! `finstack_quant_valuations::metrics::risk::calculate_var_with_pricing`,
 //! returning the `VarResult` plain object.
 
-use super::pricing::{parse_market_json, parse_pricing_instrument_json};
+use super::pricing::parse_market_json;
 use crate::utils::input::{from_js_json, js_opt_string, js_string, json_text};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_valuations::metrics::risk::{MarketHistory, VarConfig};
@@ -19,7 +19,7 @@ use wasm_bindgen::prelude::*;
 /// distribution (R type-7 linear-interpolated quantile), so offsetting
 /// positions diversify. Quote-recalibrated shocks (credit spreads) use the
 /// same recalibration provider as `priceInstrument`.
-/// @param instruments_json - Array of `finstack_quant.instrument/1` envelopes (JSON strings or plain objects), or one JSON string holding that array; an empty array returns zero VaR and ES.
+/// @param instruments_json - Array of plain `finstack_quant.instrument/1` envelope objects, or one JSON string holding that array; nested JSON strings are rejected. The whole inventory is capped at 16 MiB; an empty array returns zero VaR and ES.
 /// @param market_json - Unshocked base market (JSON string or plain object) every scenario perturbs.
 /// @param history_json - `MarketHistory` (JSON string or plain object); a non-empty portfolio needs at least one scenario.
 /// @param as_of - ISO-8601 valuation date for the base and every scenario revaluation.
@@ -36,14 +36,10 @@ pub fn calculate_var_with_pricing(
     config: Option<JsValue>,
     model: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
-    let envelopes: Vec<serde_json::Value> = from_js_json(&instruments_json, "instrumentsJson")?;
-    let parsed = envelopes
-        .into_iter()
-        .map(|envelope| match envelope {
-            serde_json::Value::String(text) => parse_pricing_instrument_json(&text, None),
-            other => parse_pricing_instrument_json(&other.to_string(), None),
-        })
-        .collect::<Result<Vec<_>, JsValue>>()?;
+    let parsed = finstack_quant_valuations::pricer::json::parse_boxed_instruments_from_json(
+        &json_text(&instruments_json, "instrumentsJson")?,
+    )
+    .map_err(to_js_err)?;
     let market = parse_market_json(&json_text(&market_json, "marketJson")?)?;
     let history: MarketHistory = from_js_json(&history_json, "historyJson")?;
     let as_of = parse_iso_date(&js_string(&as_of, "asOf")?)?;
@@ -54,7 +50,7 @@ pub fn calculate_var_with_pricing(
     let model = js_opt_string(model.as_ref(), "model")?;
     let dispatch =
         PricingDispatch::from_model(model.as_deref().unwrap_or("default")).map_err(to_js_err)?;
-    let refs: Vec<_> = parsed.iter().map(|p| p.as_instrument()).collect();
+    let refs: Vec<_> = parsed.iter().map(|p| p.as_ref()).collect();
     let result = finstack_quant_valuations::metrics::risk::calculate_var_with_pricing(
         &refs,
         &market,

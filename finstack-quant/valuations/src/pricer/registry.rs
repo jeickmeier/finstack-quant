@@ -451,7 +451,7 @@ impl PricerRegistry {
             )
         })?;
 
-        if metrics.is_empty() {
+        if metrics.is_empty() && instrument.key() != InstrumentType::Composite {
             return Ok(base_result);
         }
 
@@ -748,7 +748,7 @@ mod tests {
             Ok(crate::instruments::common_impl::dependencies::MarketDependencies::new())
         }
 
-        crate::impl_instrument_base!(InstrumentType::Bond);
+        crate::instruments::common_impl::traits::impl_instrument_base!(InstrumentType::Bond);
 
         fn validate_invariants(&self) -> finstack_quant_core::Result<()> {
             Err(finstack_quant_core::Error::Validation(
@@ -803,7 +803,7 @@ mod tests {
             Ok(crate::instruments::common_impl::dependencies::MarketDependencies::new())
         }
 
-        crate::impl_instrument_base!(InstrumentType::Bond);
+        crate::instruments::common_impl::traits::impl_instrument_base!(InstrumentType::Bond);
 
         fn resolve_pricing_as_of(
             &self,
@@ -1765,6 +1765,82 @@ mod tests {
             "PV with empty metrics should equal bare value: baseline={:.4} with_metrics={:.4}",
             baseline.amount(),
             with_metrics.value.amount()
+        );
+    }
+    #[test]
+    fn composite_reuses_leaf_results_only_within_one_request() {
+        use crate::instruments::{
+            CompositeInstrument, Equity, Instrument, InstrumentJson, PricingOptions,
+        };
+        use finstack_quant_core::currency::Currency;
+        use time::macros::date;
+        struct CountingEquity {
+            calls: Arc<AtomicUsize>,
+        }
+        impl Pricer for CountingEquity {
+            fn key(&self) -> PricerKey {
+                PricerKey::new(InstrumentType::Equity, ModelKey::Discounting)
+            }
+            fn price_dyn(
+                &self,
+                instrument: &dyn Priceable,
+                market: &Market,
+                as_of: finstack_quant_core::dates::Date,
+            ) -> std::result::Result<crate::results::ValuationResult, PricingError> {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                let equity =
+                    super::super::expect_inst::<Equity>(instrument, InstrumentType::Equity)?;
+                Ok(crate::results::ValuationResult::stamped(
+                    instrument.id(),
+                    as_of,
+                    equity.base_value(market, as_of).map_err(|error| {
+                        PricingError::from_core(
+                            error,
+                            super::super::PricingErrorContext::from_instrument(instrument),
+                        )
+                    })?,
+                ))
+            }
+        }
+        let calls = Arc::new(AtomicUsize::new(0));
+        let mut registry = super::super::standard_pricer_registry().clone();
+        registry.replace(CountingEquity {
+            calls: Arc::clone(&calls),
+        });
+        let options = PricingOptions::default().with_registry(Arc::new(registry));
+        let mut composite = CompositeInstrument::example().unwrap();
+        let market = Market::new();
+        let as_of = date!(2025 - 01 - 02);
+        let (measures, detail) = composite
+            .valuation_details_with_metrics(&market, as_of, &[], options.clone())
+            .unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
+        assert!(measures.is_empty());
+        assert_eq!(
+            detail
+                .leg_results
+                .iter()
+                .map(|leg| leg.reporting_value.amount())
+                .sum::<f64>(),
+            10.0
+        );
+        assert_eq!(detail.leg_results[0].native_value.amount(), 100.0);
+        *composite.spec.legs[0].instrument = InstrumentJson::Equity(
+            Equity::new("COMPOSITE-LONG", "LONG", Currency::USD)
+                .with_quantity(1.0)
+                .with_quoted_spot(120.0),
+        );
+        let (_, detail) = composite
+            .valuation_details_with_metrics(&market, as_of, &[], options)
+            .unwrap();
+        assert_eq!(calls.load(Ordering::SeqCst), 4);
+        assert_eq!(
+            detail
+                .leg_results
+                .iter()
+                .map(|leg| leg.reporting_value.amount())
+                .sum::<f64>(),
+            30.0
         );
     }
 }

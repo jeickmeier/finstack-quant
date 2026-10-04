@@ -478,7 +478,6 @@ def swaption(idx: int) -> tuple[str, dict]:
             "option_type": opt_type,
             "notional": {"amount": "10000000", "currency": "USD"},
             "expiry": "2025-07-15",
-            "exercise_style": "european",
             "settlement": "cash",
             "cash_settlement_method": "collateralized_cash_price",
             "vol_model": "black",

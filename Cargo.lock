@@ -828,6 +828,7 @@ dependencies = [
  "criterion",
  "finstack-quant-test-utils",
  "indexmap",
+ "jsonschema",
  "lru",
  "nalgebra",
  "phf",

@@ -57,6 +57,7 @@ json-schema = [
     "finstack-quant-models/json-schema",
 ]
 jsonschema-validate = [
+    "finstack-quant-core/jsonschema-validate",
     "json-schema",
     "dep:jsonschema",
     "finstack-quant-cashflows/jsonschema-validate",

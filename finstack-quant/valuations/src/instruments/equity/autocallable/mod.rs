@@ -54,4 +54,4 @@ pub(crate) mod types;
 
 pub use types::{Autocallable, FinalPayoffType};
 
-crate::impl_equity_exotic_traits!(Autocallable);
+crate::instruments::common_impl::traits::impl_equity_exotic_traits!(Autocallable);

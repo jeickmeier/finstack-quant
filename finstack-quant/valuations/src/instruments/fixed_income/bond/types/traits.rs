@@ -1,6 +1,6 @@
 //! Trait implementations for Bond (Instrument and Monte Carlo).
 
-use crate::impl_instrument_base;
+use crate::instruments::common_impl::traits::impl_instrument_base;
 use finstack_quant_core::types::CurveId;
 
 use super::definitions::Bond;
@@ -97,7 +97,7 @@ impl crate::instruments::common_impl::traits::Instrument for Bond {
         Ok(deps)
     }
 
-    crate::impl_focused_pricing_overrides!();
+    crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 
     fn scenario_spread_shock_supported(&self) -> bool {
         // Mirrors the guards in `base_value`: the shock is exact only for

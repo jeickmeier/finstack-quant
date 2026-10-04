@@ -78,13 +78,8 @@ impl MetricCalculator for LoanToValue {
                 "LoanToValue: asset PV must be positive".into(),
             ));
         }
-        let mut financing_pv = 0.0_f64;
-        for financing in &inst.financing {
-            let pv = financing
-                .as_instrument()
-                .value(&context.curves, context.as_of)?;
-            financing_pv += pv.amount();
-        }
+        let financing_pv =
+            super::super::levered_pricer::financing_pv(inst, &context.curves, context.as_of)?;
         Ok(financing_pv.abs() / denom)
     }
 }

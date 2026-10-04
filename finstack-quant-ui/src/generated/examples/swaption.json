@@ -3,7 +3,6 @@
     "spec": {
       "attributes": {},
       "cash_settlement_method": "collateralized_cash_price",
-      "exercise_style": "european",
       "expiry": "2027-01-15",
       "id": "SWPN-1Yx5Y-USD",
       "notional": {

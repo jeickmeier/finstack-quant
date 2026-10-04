@@ -25,18 +25,8 @@
 
 use finstack_quant_core::schema::SchemaArtifact;
 use finstack_quant_core::{Error, Result};
-use jsonschema::error::ValidationErrorKind;
-use jsonschema::paths::{Location, LocationSegment};
 use serde_json::Value;
 use std::collections::BTreeMap;
-
-/// How many nested union failures to drill through before reporting as-is.
-///
-/// Instrument payloads nest a tagged envelope inside a tagged spec inside a
-/// tagged cashflow schedule, so three levels is the observed working depth; the
-/// fourth is headroom. Beyond it the reported message is the raw union failure,
-/// which is correct but coarse.
-const MAX_UNION_EXPANSION_DEPTH: usize = 4;
 
 /// Every domain registry, labelled with its Python/WASM namespace name.
 ///
@@ -295,21 +285,7 @@ pub fn render_profile(artifact: &SchemaArtifact, profile: &str) -> Result<Value>
     }
 }
 
-/// One validation failure, located by JSON Pointer into the payload.
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Failure {
-    /// JSON Pointer into the payload, naming the value that failed.
-    pub pointer: String,
-    /// What was wrong, phrased so the caller can act on it.
-    pub message: String,
-}
-
-impl Failure {
-    /// Render as the `{pointer, message}` object the bindings return.
-    fn to_value(&self) -> Value {
-        serde_json::json!({"pointer": self.pointer, "message": self.message})
-    }
-}
+pub use finstack_quant_core::schema::diagnostics::Failure;
 
 /// Render a slice of failures as a JSON array.
 ///
@@ -329,7 +305,7 @@ impl Failure {
 /// ```
 #[must_use]
 pub fn failures_to_value(failures: &[Failure]) -> Value {
-    Value::Array(failures.iter().map(Failure::to_value).collect())
+    Value::Array(failures.iter().map(|failure| serde_json::json!({"pointer": failure.pointer, "message": failure.message})).collect())
 }
 
 /// Validate a payload against one published artifact.
@@ -375,183 +351,13 @@ pub fn validate(artifact: &SchemaArtifact, payload: &Value) -> Result<Vec<Failur
 /// Returns [`Error::Internal`] if the document is not a compilable schema.
 pub fn validate_document(schema: &Value, payload: &Value) -> Result<Vec<Failure>> {
     let validator = build_validator(schema)?;
-    let mut failures = Vec::new();
-    for error in validator.iter_errors(payload) {
-        failures.extend(expand_failure(&error, schema, MAX_UNION_EXPANSION_DEPTH));
-    }
-    Ok(failures)
-}
-
-/// Whether an error kind is a union failure worth drilling into.
-fn is_union_failure(kind: &ValidationErrorKind) -> bool {
-    matches!(
-        kind,
-        ValidationErrorKind::AnyOf | ValidationErrorKind::OneOfNotValid
-    )
-}
-
-/// Follow one `$ref` target, returning the document it lands in and the node.
-///
-/// The document is returned alongside the node because it becomes the base for
-/// any further local `#/$defs/...` reference inside that node.
-fn follow_reference(target: &str, base: &Value) -> Option<(Value, Value)> {
-    let (document_id, fragment) = target.split_once('#').unwrap_or((target, ""));
-    let document = if document_id.is_empty() {
-        base.clone()
-    } else {
-        corpus().ok()?.get(document_id)?.clone()
-    };
-    let node = if fragment.is_empty() {
-        document.clone()
-    } else {
-        document.pointer(fragment)?.clone()
-    };
-    Some((document, node))
-}
-
-/// Resolve a keyword location into the schema node it names.
-///
-/// Keyword locations interleave `$ref` segments with property and index steps,
-/// for example `/properties/instrument/$ref/properties/spec/$ref/oneOf`. A
-/// `$ref` segment means "follow the reference on the current node".
-///
-/// Returns the resolved node together with the document it lives in.
-fn schema_node_at(root: &Value, location: &Location) -> Option<(Value, Value)> {
-    let mut base = root.clone();
-    let mut current = root.clone();
-    for segment in location {
-        match segment {
-            LocationSegment::Property("$ref") => {
-                let target = current.get("$ref")?.as_str()?;
-                let (next_base, node) = follow_reference(target, &base)?;
-                base = next_base;
-                current = node;
-            }
-            LocationSegment::Property(name) => current = current.get(name)?.clone(),
-            LocationSegment::Index(position) => current = current.get(position)?.clone(),
-        }
-    }
-    Some((base, current))
-}
-
-/// Read every branch of a union as a scalar `const`, if they all are.
-///
-/// A unit enum is published as a union of single-`const` branches, so a wrong
-/// spelling would otherwise report once per branch. Recognising the shape lets
-/// one message enumerate the accepted values, matching what the typed loader
-/// says.
-fn const_union_values(branches: &[Value]) -> Option<Vec<String>> {
-    branches
-        .iter()
-        .map(|branch| match branch.get("const") {
-            Some(Value::String(value)) => Some(value.clone()),
-            Some(other) if !other.is_object() && !other.is_array() => Some(other.to_string()),
-            _ => None,
-        })
-        .collect()
-}
-
-/// Join a parent instance pointer with a child's relative pointer.
-fn join_pointer(parent: &str, child: &str) -> String {
-    format!("{parent}{child}")
-}
-
-/// Turn one validation error into the most specific failures available.
-fn expand_failure(
-    error: &jsonschema::ValidationError<'_>,
-    root: &Value,
-    depth: usize,
-) -> Vec<Failure> {
-    let here = Failure {
-        pointer: error.instance_path.to_string(),
-        message: error.to_string(),
-    };
-    if depth == 0 || !is_union_failure(&error.kind) {
-        return vec![here];
-    }
-    let Some((base, node)) = schema_node_at(root, &error.schema_path) else {
-        return vec![here];
-    };
-    let Some(branches) = node.as_array() else {
-        return vec![here];
-    };
-    if branches.is_empty() {
-        return vec![here];
-    }
-
-    if let Some(allowed) = const_union_values(branches) {
-        return vec![Failure {
-            pointer: here.pointer,
-            message: format!("{} is not one of [{}]", error.instance, allowed.join(", ")),
-        }];
-    }
-
-    let Some(best) = best_branch_failures(branches, &base, &error.instance, depth) else {
-        return vec![here];
-    };
-    if best.is_empty() {
-        return vec![here];
-    }
-    best.into_iter()
-        .map(|failure| Failure {
-            pointer: join_pointer(&here.pointer, &failure.pointer),
-            message: failure.message,
-        })
-        .collect()
-}
-
-/// Validate the instance against every branch and return the closest match's failures.
-///
-/// "Closest" is fewest failures. For the tagged unions in this workspace the
-/// intended branch is unambiguous — every other branch rejects the
-/// discriminator outright and reports far more — so counting is enough without
-/// reading discriminators.
-fn best_branch_failures(
-    branches: &[Value],
-    base: &Value,
-    instance: &Value,
-    depth: usize,
-) -> Option<Vec<Failure>> {
-    let mut best: Option<Vec<Failure>> = None;
-    for branch in branches {
-        let Some(schema) = branch_schema(branch, base) else {
-            continue;
-        };
-        let Ok(validator) = build_validator(&schema) else {
-            continue;
-        };
-        let mut failures = Vec::new();
-        for error in validator.iter_errors(instance) {
-            failures.extend(expand_failure(&error, &schema, depth - 1));
-        }
-        if failures.is_empty() {
-            continue;
-        }
-        if best
-            .as_ref()
-            .is_none_or(|current| failures.len() < current.len())
-        {
-            best = Some(failures);
-        }
-    }
-    best
-}
-
-/// Build a standalone, compilable schema for one union branch.
-///
-/// The branch is lifted out of its document, so any local `#/$defs/...`
-/// reference it carries would dangle. Copying the owning document's `$defs`
-/// alongside it keeps those references resolvable; absolute references are
-/// already served from the corpus.
-fn branch_schema(branch: &Value, base: &Value) -> Option<Value> {
-    let mut schema = branch.clone();
-    let object = schema.as_object_mut()?;
-    if !object.contains_key("$defs") {
-        if let Some(defs) = base.get("$defs") {
-            object.insert("$defs".to_string(), defs.clone());
-        }
-    }
-    Some(schema)
+    Ok(finstack_quant_core::schema::diagnostics::collect_failures(
+        &validator,
+        schema,
+        payload,
+        &|id| corpus().ok()?.get(id).cloned(),
+        &build_validator,
+    ))
 }
 
 #[cfg(test)]
