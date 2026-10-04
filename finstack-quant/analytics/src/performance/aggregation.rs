@@ -2,11 +2,9 @@
 //! [`Performance`].
 
 use super::{LookbackReturns, Performance};
-use crate::aggregation::{
-    group_by_period_dated, group_period_buckets, period_stats_inner, PeriodStats, PeriodicReturn,
-};
+use crate::aggregation::{group_period_buckets, period_stats_inner, PeriodStats, PeriodicReturn};
 use crate::correlation::{
-    nearest_correlation_matrix, validate_correlation_matrix, NearestCorrelationOpts,
+    nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts,
 };
 use crate::dates::{Date, FiscalConfig, PeriodKind};
 use crate::drawdown::{drawdown_details, to_drawdown_series, DrawdownEpisode};
@@ -219,7 +217,7 @@ impl Performance {
             let rf_aligned = rf
                 .get(offset..offset.saturating_add(returns.len()))
                 .unwrap_or(&[]);
-            excess_returns(returns, rf_aligned, Some(nperiods))
+            excess_returns(returns, rf_aligned, nperiods)
         }))
     }
 
@@ -300,7 +298,9 @@ impl Performance {
             aggregation_frequency,
             fiscal_config,
         );
-        Ok(period_stats_inner(grouped.into_iter().map(|(_, _, r)| r)))
+        Ok(period_stats_inner(
+            grouped.into_iter().map(|point| point.value),
+        ))
     }
 
     /// Calendar-bucketed compounded returns per ticker.
@@ -323,10 +323,11 @@ impl Performance {
     /// the active analysis window.
     pub fn periodic_returns(&self, frequency: PeriodKind) -> Vec<Vec<PeriodicReturn>> {
         self.map_tickers(|i| {
-            group_by_period_dated(
+            group_period_buckets(
                 self.active_dates_for_ticker_unchecked(i),
                 self.active_returns(i),
                 frequency,
+                None,
             )
         })
     }
@@ -387,11 +388,13 @@ fn finalize_correlation_matrix(matrix: Vec<Vec<f64>>) -> crate::Result<(Vec<Vec<
     if validate_correlation_matrix(&flat, n).is_ok() {
         return Ok((matrix, false));
     }
-    let repaired = nearest_correlation_matrix(&flat, n, NearestCorrelationOpts::default())
-        .map_err(|err| crate::error::InputError::InvalidReturnSeries {
-            ticker: "<correlation>".into(),
-            index: 0,
-            reason: err.to_string(),
+    let repaired =
+        nearest_correlation(&flat, n, NearestCorrelationOpts::default()).map_err(|err| {
+            crate::error::InputError::InvalidReturnSeries {
+                ticker: "<correlation>".into(),
+                index: 0,
+                reason: err.to_string(),
+            }
         })?;
     if validate_correlation_matrix(&repaired, n).is_err() {
         return Err(crate::error::InputError::InvalidReturnSeries {

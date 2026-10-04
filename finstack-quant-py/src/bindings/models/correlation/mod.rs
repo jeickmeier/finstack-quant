@@ -1605,7 +1605,7 @@ fn nearest_correlation(
         max_iter: max_iter.unwrap_or(defaults.max_iter),
         tol: tol.unwrap_or(defaults.tol),
     };
-    py.detach(|| corr::nearest_correlation_matrix(&matrix, n, opts))
+    py.detach(|| corr::nearest_correlation(&matrix, n, opts))
         .map_err(|err| correlation_to_py(corr::Error::from(err)))
 }
 

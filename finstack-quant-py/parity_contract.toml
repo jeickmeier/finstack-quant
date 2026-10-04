@@ -910,10 +910,9 @@ public = [
 # `finstack_quant.models.correlation.__all__` must appear here (alphabetical,
 # matching the package __all__ ordering). Python names mirror the canonical
 # Rust names in finstack_quant_models::correlation (LatentFactorKind, not
-# LatentFactor) with one documented rename: hosts expose `nearest_correlation`
-# for the Rust `nearest_correlation_matrix` (canonical home
-# finstack_quant_analytics::correlation, re-exported through
-# finstack_quant_models::correlation).
+# LatentFactor). `nearest_correlation` is canonically owned by
+# finstack_quant_analytics::correlation and re-exported through
+# finstack_quant_models::correlation.
 # Errors: `finstack_quant_models::correlation::Error` folds into the core
 # taxonomy (`From<correlation::Error> for core::Error`); non-convergence /
 # eigendecomposition failures map to `RuntimeError`, everything else to

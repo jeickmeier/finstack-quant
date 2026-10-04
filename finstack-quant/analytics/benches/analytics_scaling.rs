@@ -18,7 +18,7 @@ use std::hint::black_box;
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use finstack_quant_analytics::correlation::{
-    nearest_correlation_matrix, validate_correlation_matrix, NearestCorrelationOpts,
+    nearest_correlation, validate_correlation_matrix, NearestCorrelationOpts,
 };
 use finstack_quant_analytics::regression::constrained_least_squares;
 use finstack_quant_analytics::{Performance, ReturnKind};
@@ -142,9 +142,7 @@ fn scaling_nearest_correlation(c: &mut Criterion) {
         );
         group.throughput(Throughput::Elements((n * n) as u64));
         group.bench_with_input(BenchmarkId::from_parameter(n), &n, |b, &n| {
-            b.iter(|| {
-                black_box(nearest_correlation_matrix(&input, n, opts).expect("Higham converges"))
-            });
+            b.iter(|| black_box(nearest_correlation(&input, n, opts).expect("Higham converges")));
         });
     }
     group.finish();

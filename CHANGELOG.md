@@ -10,6 +10,8 @@
 - `ReturnKind` is built with `ReturnKind::from_label(label, risk_free_rate)`. `FromStr` and `with_risk_free_rate` are removed. `multi_factor_greeks` now rejects a non-zero `risk_free_rate` with `"excess"` (or an omitted kind) instead of ignoring it.
 - Python `Performance.to_excess_returns_dataframe` no longer broadcasts a scalar `rf`; pass one value per active date, as `excess_returns` requires. `excess_returns` accepts a NumPy array or pandas `Series` as well as a list.
 - Rust `Performance::skew_kurt` and `Performance::value_at_risk_and_es` are crate-internal. Use `skewness` / `kurtosis` and `value_at_risk` / `expected_shortfall`.
+- Rust correlation repair is named `nearest_correlation` in both analytics and models, matching Python `nearest_correlation` and WASM `nearestCorrelation`; `nearest_correlation_matrix` is removed.
+- Python `Performance.to_lookback_returns_dataframe` is removed. Use `Performance.lookback_returns(...).to_dataframe()`.
 
 ### Margin API simplification
 
