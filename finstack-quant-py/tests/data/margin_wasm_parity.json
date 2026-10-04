@@ -1039,7 +1039,6 @@
       ],
       "drc_positions": [
         {
-          "asset_type": "corporate",
           "issuer": "ACME",
           "jtd_amount": 1000000.0,
           "maturity_years": 2.0,
@@ -1049,7 +1048,6 @@
           "seniority": "senior_unsecured"
         },
         {
-          "asset_type": "corporate",
           "issuer": "ACME",
           "jtd_amount": -250000.0,
           "maturity_years": 0.5,
@@ -1166,7 +1164,6 @@
     }
   },
   "haircut_im": {
-    "default_asset_class": "government_bonds",
     "eligible_collateral": {
       "eligible": [
         {
@@ -1226,12 +1223,7 @@
     "from_schedule_haircut": 0.0,
     "haircut_for_cash": 0.0,
     "mpor_days": 2,
-    "posted_collateral_currency": [
-      null,
-      "EUR"
-    ],
-    "treasuries_terms_haircut": 0.015,
-    "with_default_asset_class": "government_bonds"
+    "treasuries_terms_haircut": 0.015
   },
   "labels": {
     "clearing_status": [
@@ -1688,8 +1680,6 @@
   },
   "schedule_im": {
     "defaults": {
-      "asset_class": "interest_rate",
-      "maturity_years": 5.0,
       "mpor_days": 10
     },
     "for_notional": {
@@ -1730,9 +1720,7 @@
       "mpor_days": 10
     },
     "ngr_empty": null,
-    "rate": 0.04,
-    "with_asset_class": "credit",
-    "with_maturity": 2.0
+    "rate": 0.04
   },
   "simm": {
     "base_currency": "USD",

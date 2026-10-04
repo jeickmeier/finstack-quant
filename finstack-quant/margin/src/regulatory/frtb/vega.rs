@@ -7,7 +7,7 @@
 use super::aggregation::{
     inter_bucket, inter_bucket_plus_undiversified, inter_bucket_with, intra_bucket_pairwise,
 };
-use super::params::{self, equity, fx, girr};
+use super::params::{self, commodity, csr, equity, fx, girr};
 use super::types::{CorrelationScenario, FrtbRiskClass, FrtbSensitivities};
 use finstack_quant_core::HashMap;
 use std::collections::BTreeMap;
@@ -62,10 +62,9 @@ fn girr_vega(sens: &FrtbSensitivities, scenario: CorrelationScenario) -> f64 {
     let mut by_currency: HashMap<_, Vec<VegaEntry>> = HashMap::default();
     for ((ccy, opt_mat, und_tenor), vega) in &sens.girr_vega {
         let ws = vega * girr::GIRR_VEGA_RISK_WEIGHT;
-        // Default to 5Y if the label is unrecognised — matches the GIRR
-        // delta fallback and is dominated by the exp-decay elsewhere.
-        let t_opt = girr::tenor_to_years(opt_mat).unwrap_or(5.0);
-        let t_und = girr::tenor_to_years(und_tenor).unwrap_or(5.0);
+        // The engine validates tenor labels before this private stage.
+        let t_opt = girr::tenor_to_years(opt_mat).unwrap_or(f64::NAN);
+        let t_und = girr::tenor_to_years(und_tenor).unwrap_or(f64::NAN);
         by_currency
             .entry(*ccy)
             .or_default()
@@ -165,10 +164,13 @@ fn generic_bucketed_vega(
 ) -> f64 {
     let mut buckets = BTreeMap::<u8, Vec<(f64, (&str, f64))>>::new();
     for ((name, bucket, tenor), vega) in sensitivities {
-        let weight = if class == FrtbRiskClass::Equity {
-            equity::equity_vega_risk_weight(*bucket)
-        } else {
-            1.0
+        let weight = match class {
+            FrtbRiskClass::Equity => equity::equity_vega_risk_weight(*bucket),
+            FrtbRiskClass::CsrNonSec => csr::CSR_NONSEC_VEGA_RISK_WEIGHT,
+            FrtbRiskClass::CsrSecCtp => csr::CSR_SEC_CTP_VEGA_RISK_WEIGHT,
+            FrtbRiskClass::CsrSecNonCtp => csr::CSR_SEC_NONCTP_VEGA_RISK_WEIGHT,
+            FrtbRiskClass::Commodity => commodity::COMMODITY_VEGA_RISK_WEIGHT,
+            _ => f64::NAN,
         };
         buckets.entry(*bucket).or_default().push((
             vega * weight,

@@ -262,8 +262,8 @@ test('computeBilateralXva rejects unknown exposure-profile fields', () => {
 });
 
 test('VM validation and desk direction retain settlement metadata', () => {
-  const csa = margin.csaUsdRegulatoryJson();
-  const collect = margin.calculateVm(csa, 1e6, 0, 'USD', '2025-01-10');
+  const csa = margin.csaSpecUsdRegulatory();
+  const collect = new margin.VmCalculator(csa).calculate(1e6, 0, 'USD', '2025-01-10');
   // Canonical Rust `VmResult` serde: Money amounts are exact decimal strings.
   assert.deepEqual(Object.keys(collect).sort(), [
     'collect_amount',
@@ -278,11 +278,11 @@ test('VM validation and desk direction retain settlement metadata', () => {
   assert.equal(collect.gross_exposure.currency, 'USD');
   assert.equal(collect.date, '2025-01-10');
   assert.equal(collect.settlement_date, '2025-01-13');
-  const post = margin.calculateVm(csa, -1e6, 0, 'USD', '2025-01-10');
+  const post = new margin.VmCalculator(csa).calculate(-1e6, 0, 'USD', '2025-01-10');
   assert.equal(Number(post.post_amount.amount), 1e6);
-  const invalid = JSON.parse(csa);
+  const invalid = structuredClone(csa);
   invalid.calendar_id = 'unknown-calendar';
-  assert.throws(() => margin.validateCsaJson(JSON.stringify(invalid)));
+  assert.throws(() => margin.csaSpecValidate(invalid));
 });
 
 test('a Merton-calibrated hazard curve feeds computeBilateralXva through HazardCurve.fromJson', () => {

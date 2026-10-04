@@ -294,6 +294,10 @@ def test_contract_symbols_match_live_surface(crate_name: str, crate: dict[str, A
     module = importlib.import_module(crate["python_package"])
     module_all = set(getattr(module, "__all__", []))
     actual = {n for n in dir(module) if not n.startswith("_") and not inspect.ismodule(getattr(module, n))}
+    if crate_name == "margin":
+        stub = Path(module.__file__).with_name("__init__.pyi")
+        assert set(_pyi_all_names(stub)) == module_all
+
     assert module_all == expected_all, (
         f"finstack_quant.{crate_name} __all__ diverged from contract.\n"
         f"  missing from __all__: {sorted(expected_all - module_all)}\n"

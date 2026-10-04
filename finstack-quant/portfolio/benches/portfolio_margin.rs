@@ -175,7 +175,8 @@ fn bench_margin_aggregation(c: &mut Criterion) {
 }
 
 fn bench_expiry_resolved_curvature(c: &mut Criterion) {
-    let calculator = SimmCalculator::default();
+    let calculator = SimmCalculator::new(finstack_quant_margin::SimmVersion::default())
+        .expect("embedded registry");
     let mut group = c.benchmark_group("simm_expiry_resolved_curvature");
     for factor_count in [16, 64] {
         let inputs: Vec<_> = (0..factor_count)

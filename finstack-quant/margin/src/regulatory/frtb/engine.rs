@@ -373,7 +373,6 @@ mod tests {
             rating_bucket: 4, // BBB -> RW = 0.06 per MAR22.24
             sector: DrcSector::Corporate,
             seniority: DrcSeniority::SeniorUnsecured,
-            asset_type: DrcAssetType::Corporate,
             pnl_adjustment: 0.0,
         });
 
@@ -403,7 +402,6 @@ mod tests {
             rating_bucket: 4, // BBB, RW = 0.06
             sector: DrcSector::Corporate,
             seniority: DrcSeniority::SeniorUnsecured,
-            asset_type: DrcAssetType::Corporate,
             pnl_adjustment: 0.0,
         });
         // Short sovereign exposure (Sovereign bucket) — must NOT hedge
@@ -415,7 +413,6 @@ mod tests {
             rating_bucket: 2, // AA, RW = 0.02
             sector: DrcSector::Sovereign,
             seniority: DrcSeniority::SeniorUnsecured,
-            asset_type: DrcAssetType::Sovereign,
             pnl_adjustment: 0.0,
         });
 

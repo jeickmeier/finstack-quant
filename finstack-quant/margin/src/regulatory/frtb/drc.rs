@@ -4,7 +4,7 @@
 //! that delta/vega/curvature cannot model. It is NOT subject to
 //! correlation scenarios.
 
-use super::types::{DrcAssetType, DrcPosition, DrcSector, DrcSeniority};
+use super::types::{DrcPosition, DrcSector, DrcSeniority};
 use finstack_quant_core::HashMap;
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
@@ -32,7 +32,6 @@ pub const DRC_LGD: &[(DrcSeniority, f64)] = &[
     (DrcSeniority::SeniorUnsecured, 0.75),
     (DrcSeniority::Subordinated, 1.00),
     (DrcSeniority::Equity, 1.00),
-    (DrcSeniority::Securitization, 1.00),
 ];
 
 /// Compute the Default Risk Charge (MAR22.20-22.24).
@@ -79,37 +78,12 @@ pub fn drc_charge(positions: &[DrcPosition]) -> finstack_quant_core::Result<f64>
     }
     let mut obligors = BTreeMap::<&str, Obligor>::new();
     for pos in positions {
-        let valid_sector = match pos.asset_type {
-            DrcAssetType::Corporate | DrcAssetType::Equity => pos.sector == DrcSector::Corporate,
-            DrcAssetType::Sovereign => pos.sector == DrcSector::Sovereign,
-            DrcAssetType::LocalGovernment => pos.sector == DrcSector::LocalGovernment,
-            DrcAssetType::Securitization => false,
-        };
-        if !valid_sector || pos.seniority == DrcSeniority::Securitization {
-            return Err(finstack_quant_core::Error::Validation("DRC requires consistent non-securitisation asset and bucket classifications; securitisation DRC is unsupported".into()));
-        }
-        if pos.issuer.trim().is_empty()
-            || !(1..=9).contains(&pos.rating_bucket)
-            || !pos.maturity_years.is_finite()
-            || pos.maturity_years < 0.0
-            || !pos.jtd_amount.is_finite()
-            || !pos.pnl_adjustment.is_finite()
-            || (pos.asset_type == DrcAssetType::Equity) != (pos.seniority == DrcSeniority::Equity)
-        {
-            return Err(finstack_quant_core::Error::Validation(
-                "invalid DRC amount, maturity, rating or equity seniority".into(),
-            ));
-        }
+        pos.validate()?;
         let rank = match pos.seniority {
             DrcSeniority::CoveredBond => 0,
             DrcSeniority::SeniorUnsecured => 1,
             DrcSeniority::Subordinated => 2,
             DrcSeniority::Equity => 3,
-            DrcSeniority::Securitization => {
-                return Err(finstack_quant_core::Error::Validation(
-                    "securitization DRC is unsupported".into(),
-                ))
-            }
         };
         let entry = obligors.entry(&pos.issuer).or_insert(Obligor {
             sector: pos.sector,
@@ -170,26 +144,20 @@ static DRC_LGD_BY_SENIORITY: LazyLock<finstack_quant_core::HashMap<DrcSeniority,
 
 /// Look up DRC risk weight by rating bucket.
 ///
-/// Unknown buckets fall back to the Unrated weight (15% per MAR22.24),
-/// matching how the Basel text treats exposures that lack an external
-/// rating. Callers who want a stricter policy should validate rating
-/// assignment upstream and not rely on this fallback.
-///
-/// The fixed D457 table above is the canonical regulatory source.
+/// Unknown buckets return NaN; the canonical position validator rejects them.
 fn drc_risk_weight(rating_bucket: u8) -> f64 {
     DRC_RW_BY_BUCKET
         .get(&rating_bucket)
         .copied()
-        .unwrap_or(0.15) // Default: Unrated per MAR22.24
+        .unwrap_or(f64::NAN)
 }
 
 /// Look up LGD by seniority.
 ///
-/// Defaults to 75% (senior unsecured) per Basel guidance for unmapped
-/// seniorities.
+/// All supported seniorities have a prescribed value; no default is invented.
 fn drc_lgd(seniority: DrcSeniority) -> f64 {
     DRC_LGD_BY_SENIORITY
         .get(&seniority)
         .copied()
-        .unwrap_or(0.75) // Default: senior unsecured
+        .unwrap_or(f64::NAN)
 }

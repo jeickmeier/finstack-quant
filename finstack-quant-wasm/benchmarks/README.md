@@ -24,7 +24,7 @@ Nothing here is published. `scripts` and `benchmarks` are absent from the
 wasm-bindgen output, not the `index.js` facade — and exits 1 with a build hint if
 either `pkg-node/finstack_quant_wasm.js` or `pkg-node/finstack_quant_wasm_bg.wasm`
 is missing. Every symbol in the file is therefore a flat bindgen name
-(`w.blackScholesCall`, `w.csaUsdRegulatoryJson`), not a namespaced facade name
+(`w.blackScholesCall`, `w.csaSpecUsdRegulatory`), not a namespaced facade name
 (`models.monteCarlo.blackScholesCall`). That deliberately bypasses the facade layer so
 the numbers are boundary cost only; it also means the benchmark does not exercise
 the wrappers `exports/*.js` installs.
@@ -50,7 +50,7 @@ Rows are grouped by a `domain` string, printed as the first column.
 | `analytics`                 | `Performance` built from both prices and returns: `sharpe`, `volatility`, `sortino`, `meanReturn`, `downsideDeviation`, VaR/ES/parametric VaR, moments, `geometricMean`, `cumulativeReturns`, `excessReturns`, drawdown series and details, rolling sharpe/vol, `trackingError`, `informationRatio`, `rSquared`, `calmar` |
 | `correlation`               | `correlationBounds`, `jointProbabilities`, Gaussian copula `conditionalDefaultProb`, `RecoverySpec.constant().conditionalRecovery`                                                                                                                                                                                        |
 | `models.monteCarlo`         | `blackScholesCall`/`Put` closed forms, and European/Asian/American MC at **50,000 paths** per call (3–5 iterations each)                                                                                                                                                                                                  |
-| `margin`                    | `csaUsdRegulatoryJson`, `csaEurRegulatoryJson`, `validateCsaJson`, `calculateVm`                                                                                                                                                                                                                                          |
+| `margin`                    | `csaSpecUsdRegulatory`, `csaSpecEurRegulatory`, `csaSpecValidate`, `VmCalculator.calculate`                                                                                                                                                                                                                               |
 | `statements`                | `validateFinancialModelJson`, `modelNodeIds`                                                                                                                                                                                                                                                                              |
 | `statements_analytics`      | `runSensitivity`, `backtestForecast`, `runVariance`, `evaluateScenarioSet`, `generateTornadoEntries`, `evaluateMonteCarlo`, `goalSeek`, `dependencyTree`, `explainFormula`                                                                                                                                                |
 | `portfolio`                 | `parsePortfolioSpecJson`, `Portfolio.fromSpec(...).toJson()`, `valuePortfolio`, `aggregateFullCashflows`                                                                                                                                                                                                                  |

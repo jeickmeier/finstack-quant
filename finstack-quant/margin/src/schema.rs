@@ -13,7 +13,7 @@ use crate::{
     types::SimmSensitivitiesJson, xva::mva::ImDecayProfile, xva::mva::MvaResult,
     xva::types::ExposureProfile, xva::types::FundingConfig, xva::types::XvaResult,
     ConcentrationBreach, ImCollateralResult, ImResult, RepoMarginSpec, ScheduleAssetClass,
-    SimmSensitivities, SimmVersion, VmResult,
+    SimmVersion, VmResult,
 };
 use crate::{CsaSpec, MarginCall, OtcMarginSpec};
 
@@ -373,21 +373,10 @@ mod examples {
         example(&crate::ScheduleAssetClass::InterestRate)
     }
 
-    /// Equity, FX and commodity sensitivities.
-    ///
-    /// The rates and credit maps are keyed by tuples and have no JSON object
-    /// form; [`simm_sensitivities_json`] is the wire shape that carries them.
-    pub(super) fn simm_sensitivities() -> Result<Vec<Value>> {
-        let mut sensitivities = crate::SimmSensitivities::new(Currency::USD);
-        sensitivities.add_equity_delta("AAPL", 250_000.0);
-        sensitivities.add_fx_delta(Currency::EUR, 400_000.0);
-        example(&sensitivities)
-    }
-
     pub(super) fn simm_sensitivities_json() -> Result<Vec<Value>> {
         let mut sensitivities = crate::SimmSensitivities::new(Currency::USD);
-        sensitivities.add_ir_delta(Currency::USD, "5y", 12_500.0);
-        sensitivities.add_ir_delta(Currency::USD, "10y", -8_000.0);
+        sensitivities.add_ir_delta(Currency::USD, "5Y", 12_500.0);
+        sensitivities.add_ir_delta(Currency::USD, "10Y", -8_000.0);
         sensitivities.add_equity_delta("AAPL", 250_000.0);
         sensitivities.add_fx_delta(Currency::EUR, 400_000.0);
         example(&crate::types::SimmSensitivitiesJson::from(&sensitivities))
@@ -422,8 +411,7 @@ mod examples {
             "total_xva": 19_200.0,
             "epe_profile": [[0.0, 0.0], [0.5, 85_000.0], [1.0, 64_000.0]],
             "ene_profile": [[0.0, 0.0], [0.5, -43_000.0], [1.0, -33_000.0]],
-            "pfe_profile": [[0.0, 0.0], [0.5, 210_000.0], [1.0, 168_000.0]],
-            "max_pfe": 210_000.0,
+            "max_epe": 85_000.0,
             "effective_epe_profile": [[0.0, 0.0], [0.5, 85_000.0], [1.0, 85_000.0]],
             "effective_epe": 63_750.0,
             "meta": meta
@@ -617,14 +605,6 @@ pub const ARTIFACTS: &[finstack_quant_core::schema::SchemaArtifact] = &[
         "Asset class for schedule-based IM calculation."
     )
     .with_examples(examples::schedule_asset_class),
-    finstack_quant_core::schema_artifact!(
-        SimmSensitivities,
-        "margin",
-        "simm_sensitivities",
-        Input,
-        "SIMM sensitivity inputs organized by risk class."
-    )
-    .with_examples(examples::simm_sensitivities),
     finstack_quant_core::schema_artifact!(
         SimmSensitivitiesJson,
         "margin",

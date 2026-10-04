@@ -48,7 +48,9 @@ pub fn equity_risk_weight(bucket: u8) -> f64 {
 /// * `bucket` - Equity bucket 1 through 13; small-cap/other buckets 9-11 use the 100% cap.
 #[must_use]
 pub fn equity_vega_risk_weight(bucket: u8) -> f64 {
-    if (9..=11).contains(&bucket) {
+    if !(1..=13).contains(&bucket) {
+        f64::NAN
+    } else if (9..=11).contains(&bucket) {
         1.0
     } else {
         0.55 * 2.0_f64.sqrt()

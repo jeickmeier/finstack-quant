@@ -778,7 +778,7 @@ mod tests {
 
     #[test]
     fn test_netting_set_from_cleared_spec() {
-        use finstack_quant_margin::types::{CsaSpec, ImMethodology, MarginTenor};
+        use finstack_quant_margin::types::CsaSpec;
 
         let start = test_date();
         let end = Date::from_calendar_date(2029, Month::June, 15).expect("valid date");
@@ -799,10 +799,7 @@ mod tests {
             clearing_status: ClearingStatus::Cleared {
                 ccp: "LCH".to_string(),
             },
-            im_methodology: ImMethodology::ClearingHouse,
             simm_credit_classification: None,
-            vm_frequency: MarginTenor::Daily,
-            settlement_lag: 0,
         });
 
         let netting_set = swap.netting_set_id().expect("netting set");

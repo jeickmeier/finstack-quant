@@ -4,7 +4,7 @@
 //! including IRS, CDS, CDS Index, and TRS.
 
 use super::csa::CsaSpec;
-use super::enums::{ClearingStatus, ImMethodology, MarginTenor};
+use super::enums::{ClearingStatus, ImMethodology};
 use super::simm_types::SimmCreditSector;
 use crate::registry::{embedded_registry, margin_registry_from_config};
 use finstack_quant_core::config::FinstackConfig;
@@ -110,24 +110,12 @@ pub struct OtcMarginSpec {
     /// Clearing status: bilateral or cleared through CCP
     pub clearing_status: ClearingStatus,
 
-    /// Initial margin calculation methodology
-    ///
-    /// - Bilateral: SIMM or Schedule
-    /// - Cleared: ClearingHouse (CCP-specific)
-    pub im_methodology: ImMethodology,
-
     /// Explicit SIMM credit classification for credit-sensitive instruments.
     ///
     /// Required when a credit product uses `ImMethodology::Simm`; leave `None`
     /// for non-credit instruments and non-SIMM margin methodologies.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub simm_credit_classification: Option<SimmCreditClassification>,
-
-    /// Variation margin exchange frequency
-    pub vm_frequency: MarginTenor,
-
-    /// Settlement lag for margin transfers (business days)
-    pub settlement_lag: u32,
 }
 
 impl OtcMarginSpec {
@@ -135,6 +123,12 @@ impl OtcMarginSpec {
     ///
     /// This is the standard configuration for large dealer-to-dealer
     /// or dealer-to-client bilateral trades.
+    ///
+    /// # Arguments
+    ///
+    /// * `csa` - Agreement terms in their collateral currency. Existing IM terms
+    ///   are switched to SIMM; absent IM remains an explicit no-IM election.
+    ///   VM frequency and business-day settlement lag are preserved.
     #[must_use]
     pub fn bilateral_simm(mut csa: CsaSpec) -> Self {
         if let Some(im) = &mut csa.im_params {
@@ -143,16 +137,19 @@ impl OtcMarginSpec {
         Self {
             csa,
             clearing_status: ClearingStatus::Bilateral,
-            im_methodology: ImMethodology::Simm,
             simm_credit_classification: None,
-            vm_frequency: MarginTenor::Daily,
-            settlement_lag: 1,
         }
     }
 
     /// Create a bilateral margin spec using schedule-based IM.
     ///
     /// Used when SIMM is not implemented or for smaller counterparties.
+    ///
+    /// # Arguments
+    ///
+    /// * `csa` - Agreement terms in their collateral currency. Existing IM terms
+    ///   are switched to schedule IM; absent IM remains an explicit no-IM
+    ///   election. VM frequency and business-day settlement lag are preserved.
     #[must_use]
     pub fn bilateral_schedule(mut csa: CsaSpec) -> Self {
         if let Some(im) = &mut csa.im_params {
@@ -161,10 +158,7 @@ impl OtcMarginSpec {
         Self {
             csa,
             clearing_status: ClearingStatus::Bilateral,
-            im_methodology: ImMethodology::Schedule,
             simm_credit_classification: None,
-            vm_frequency: MarginTenor::Daily,
-            settlement_lag: 1,
         }
     }
 
@@ -230,10 +224,7 @@ impl OtcMarginSpec {
         Ok(Self {
             csa,
             clearing_status: ClearingStatus::Cleared { ccp: ccp_name },
-            im_methodology: ImMethodology::ClearingHouse,
             simm_credit_classification: None,
-            vm_frequency: MarginTenor::Daily,
-            settlement_lag: registry.defaults.cleared_settlement.settlement_lag,
         })
     }
 
@@ -262,11 +253,15 @@ impl OtcMarginSpec {
         cfg: &FinstackConfig,
     ) -> Result<Self> {
         let registry = margin_registry_from_config(cfg)?;
-        let eligible_collateral =
-            super::collateral::EligibleCollateralSchedule::from_finstack_config(
-                cfg,
-                "bcbs_standard",
-            )?;
+        let eligible_collateral = registry
+            .collateral_schedules
+            .get("bcbs_standard")
+            .cloned()
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Validation(
+                    "collateral schedule 'bcbs_standard' not found".into(),
+                )
+            })?;
         Self::build_cleared(ccp.into(), currency, &registry, eligible_collateral)
     }
 
@@ -285,25 +280,19 @@ impl OtcMarginSpec {
         self
     }
 
-    /// Validate CSA terms and the duplicated methodology elections.
+    /// Validate CSA terms and their compatibility with the clearing status.
     ///
     /// # Errors
     ///
-    /// Rejects invalid CSA terms, inconsistent IM methodology declarations, or
-    /// a clearing-house methodology on a bilateral trade (and vice versa).
+    /// Rejects invalid CSA terms, a clearing-house methodology on a bilateral trade (and vice versa).
     pub fn validate(&self) -> Result<()> {
         self.csa.validate()?;
-        if let Some(im) = &self.csa.im_params {
-            if im.methodology != self.im_methodology {
+        if let Some(methodology) = self.get_im_methodology() {
+            if self.is_cleared() != (methodology == ImMethodology::ClearingHouse) {
                 return Err(finstack_quant_core::Error::Validation(
-                    "Conflicting IM methodology declarations in OTC specification and CSA".into(),
+                    "Clearing status conflicts with IM methodology".into(),
                 ));
             }
-        }
-        if self.is_cleared() != (self.im_methodology == ImMethodology::ClearingHouse) {
-            return Err(finstack_quant_core::Error::Validation(
-                "Clearing status conflicts with IM methodology".into(),
-            ));
         }
         Ok(())
     }
@@ -316,12 +305,20 @@ impl OtcMarginSpec {
     /// credit risk-class and sector classification.
     pub fn validate_for_credit(&self) -> Result<()> {
         self.validate()?;
-        if self.im_methodology == ImMethodology::Simm && self.simm_credit_classification.is_none() {
+        if self.get_im_methodology() == Some(ImMethodology::Simm)
+            && self.simm_credit_classification.is_none()
+        {
             return Err(finstack_quant_core::Error::Validation(
                 "SIMM credit products require simm_credit_classification".to_string(),
             ));
         }
         Ok(())
+    }
+
+    /// Initial-margin election owned by the CSA, or `None` when no IM is required.
+    #[must_use]
+    pub fn get_im_methodology(&self) -> Option<ImMethodology> {
+        self.csa.im_params.as_ref().map(|im| im.methodology)
     }
 
     /// Check if this is a cleared trade.
@@ -362,8 +359,11 @@ mod tests {
         let spec = OtcMarginSpec::usd_bilateral().expect("registry should load");
         assert!(spec.is_bilateral());
         assert!(!spec.is_cleared());
-        assert_eq!(spec.im_methodology, ImMethodology::Simm);
-        assert_eq!(spec.vm_frequency, MarginTenor::Daily);
+        assert_eq!(spec.get_im_methodology(), Some(ImMethodology::Simm));
+        assert_eq!(
+            spec.csa.vm_params.frequency,
+            super::super::MarginTenor::Daily
+        );
         assert!(spec.simm_credit_classification.is_none());
         assert!(spec.ccp().is_none());
     }
@@ -373,9 +373,12 @@ mod tests {
         let spec = OtcMarginSpec::cleared("LCH", Currency::USD).expect("registry should load");
         assert!(spec.is_cleared());
         assert!(!spec.is_bilateral());
-        assert_eq!(spec.im_methodology, ImMethodology::ClearingHouse);
+        assert_eq!(
+            spec.get_im_methodology(),
+            Some(ImMethodology::ClearingHouse)
+        );
         assert_eq!(spec.ccp(), Some("LCH"));
-        assert_eq!(spec.settlement_lag, 0);
+        assert_eq!(spec.csa.vm_params.settlement_lag, 0);
     }
 
     #[test]

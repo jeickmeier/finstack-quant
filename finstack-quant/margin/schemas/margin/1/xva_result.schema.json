@@ -198,7 +198,7 @@
         ]
       ],
       "fva": 4100.0,
-      "max_pfe": 210000.0,
+      "max_epe": 85000.0,
       "meta": {
         "fx_policy_applied": null,
         "numeric_mode": "f64",
@@ -214,20 +214,6 @@
         },
         "version": "0.9.0"
       },
-      "pfe_profile": [
-        [
-          0.0,
-          0.0
-        ],
-        [
-          0.5,
-          210000.0
-        ],
-        [
-          1.0,
-          168000.0
-        ]
-      ],
       "total_xva": 19200.0
     }
   ],
@@ -315,8 +301,8 @@
         "null"
       ]
     },
-    "max_pfe": {
-      "description": "Maximum PFE across the profile (`max_t PFE(t)`).\n\nIn the deterministic engine this equals `max_t EPE(t)` by\nconstruction (see [`Self::pfe_profile`]). Used for coarse credit\nlimit monitoring where a Monte Carlo tail quantile is not\navailable.",
+    "max_epe": {
+      "description": "Maximum expected positive exposure across the profile, in reporting currency.",
       "format": "double",
       "type": "number"
     },
@@ -347,25 +333,6 @@
         "null"
       ]
     },
-    "pfe_profile": {
-      "description": "Potential Future Exposure profile: `(time, PFE(t))`.\n\n**IMPORTANT** — the deterministic CVA engine has a single path,\nso the distribution of exposures collapses to a point mass at\n`max(V(t), 0)`. In that degenerate case every quantile (and the\nmean) equals `EPE(t)`, and this field holds the EPE path, not a\ntail quantile. The name is retained so downstream systems keep\ntheir column bindings; supply a profile from a Monte Carlo exposure\nsimulation when a true 97.5%-quantile PFE is required for limit\nmonitoring.",
-      "items": {
-        "maxItems": 2,
-        "minItems": 2,
-        "prefixItems": [
-          {
-            "format": "double",
-            "type": "number"
-          },
-          {
-            "format": "double",
-            "type": "number"
-          }
-        ],
-        "type": "array"
-      },
-      "type": "array"
-    },
     "total_xva": {
       "description": "All-in valuation adjustment: `CVA − DVA + FVA + MVA`.\n\nUncomputed components contribute zero. This is the quantity subtracted\nfrom the risk-free value of the netting set.\n\n# References\n\n- Gregory, J. (2020). *The xVA Challenge*, 4th ed. Wiley. Chapter 14. `docs/REFERENCES.md#gregory-xva-challenge`\n- Green, A. (2015). *XVA*. Wiley. Chapters 9-10. `docs/REFERENCES.md#green-xva`",
       "format": "double",
@@ -377,8 +344,7 @@
     "total_xva",
     "epe_profile",
     "ene_profile",
-    "pfe_profile",
-    "max_pfe",
+    "max_epe",
     "effective_epe_profile",
     "effective_epe"
   ],

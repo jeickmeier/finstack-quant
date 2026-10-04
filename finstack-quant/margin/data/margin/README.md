@@ -178,8 +178,7 @@ rough proxy for `IM / |exposure base|`. No CCP publishes such a rate, and none
 of these figures is traceable to a CCP disclosure. They exist so
 `ClearingImCalculator` can produce a number without a full CCP model.
 
-The `generic_var` entry (99% confidence, 250-day lookback) reflects common CCP
-VaR-model practice but is not any specific CCP's published parameterisation.
+The `generic_proxy` entry contains only MPOR and the conservative exposure-times-rate proxy.
 `mpor_days = 5` for every CCP matches the usual cleared-derivative margin
 period of risk.
 
@@ -193,7 +192,7 @@ SwapClear 2%, ICE Clear Credit 10%), `::mpor_days` (LCH and CME, 5 days) and
 `::conservative_calculation` (the LCH 2% rate through the calculator).
 
 **Not pinned.** The LCH CDSClear, CME, ICE Clear US, JSCC, Eurex and generic
-rates, and the whole `generic_var` parameterisation.
+rates, and the `generic_proxy` rate and MPOR.
 
 **Regeneration.** If a real CCP margin model or a published CPMI-IOSCO
 quantitative disclosure becomes available, replace the heuristic and record

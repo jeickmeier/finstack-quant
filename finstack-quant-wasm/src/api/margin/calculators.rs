@@ -80,7 +80,6 @@ pub fn vm_result_requires_call(result: JsValue) -> Result<bool, JsValue> {
 #[wasm_bindgen(js_name = VmCalculator)]
 pub struct JsVmCalculator {
     inner: fm::VmCalculator,
-    csa: fm::CsaSpec,
 }
 
 #[wasm_bindgen(js_class = VmCalculator)]
@@ -95,8 +94,7 @@ impl JsVmCalculator {
     pub fn new(csa: JsValue) -> Result<JsVmCalculator, JsValue> {
         let csa = parse_csa(&csa, "csa")?;
         Ok(Self {
-            inner: fm::VmCalculator::new(csa.clone()),
-            csa,
+            inner: fm::VmCalculator::new(csa),
         })
     }
 
@@ -107,7 +105,7 @@ impl JsVmCalculator {
     /// Throws if the specification cannot be converted to a JavaScript value.
     #[wasm_bindgen(getter)]
     pub fn csa(&self) -> Result<JsValue, JsValue> {
-        to_js_value(&self.csa)
+        to_js_value(&self.inner.get_csa())
     }
 
     /// Calculate variation margin for one date.
@@ -157,7 +155,7 @@ impl JsVmCalculator {
         exposures: JsValue,
         initial_collateral: JsValue,
     ) -> Result<JsValue, JsValue> {
-        let currency = self.csa.base_currency;
+        let currency = self.inner.get_csa().base_currency;
         let exposures = from_js_json::<Vec<(String, f64)>>(&exposures, "exposures")?
             .into_iter()
             .map(|(date, amount)| {
@@ -272,54 +270,6 @@ impl JsScheduleImCalculator {
             inner: fm::ScheduleImCalculator::from_finstack_config(&config.inner)
                 .map_err(to_js_err)?,
         })
-    }
-
-    /// Copy with a new default schedule asset class.
-    /// @param asset_class - Lower-case schedule asset class label: `"interest_rate"`, `"credit"`, `"equity"`, `"commodity"`, `"fx"`, `"other"`, or `"custom_<name>"` for a registry-defined class.
-    /// @returns A new `ScheduleImCalculator` handle.
-    ///
-    /// # Errors
-    ///
-    /// Throws if the asset class label is unknown.
-    #[wasm_bindgen(js_name = withAssetClass)]
-    pub fn with_asset_class(
-        &self,
-        asset_class: JsValue,
-    ) -> Result<JsScheduleImCalculator, JsValue> {
-        let asset_class = schedule_asset_class(&js_string(&asset_class, "assetClass")?)?;
-        Ok(Self {
-            inner: self.inner.clone().with_asset_class(asset_class),
-        })
-    }
-
-    /// Copy with a new default maturity.
-    /// @param years - Representative remaining maturity in years; finite and non-negative.
-    /// @returns A new `ScheduleImCalculator` handle.
-    ///
-    /// # Errors
-    ///
-    /// Throws if `years` is negative or non-finite.
-    #[wasm_bindgen(js_name = withMaturity)]
-    pub fn with_maturity(&self, years: JsValue) -> Result<JsScheduleImCalculator, JsValue> {
-        Ok(Self {
-            inner: self
-                .inner
-                .clone()
-                .with_maturity(js_f64(&years, "years")?)
-                .map_err(to_js_err)?,
-        })
-    }
-
-    /// Default schedule asset class label used when a trade does not name one.
-    #[wasm_bindgen(getter, js_name = defaultAssetClass)]
-    pub fn default_asset_class(&self) -> String {
-        self.inner.default_asset_class.as_str().into_owned()
-    }
-
-    /// Default remaining maturity in years used for the schedule-rate lookup.
-    #[wasm_bindgen(getter, js_name = defaultMaturityYears)]
-    pub fn default_maturity_years(&self) -> f64 {
-        self.inner.default_maturity_years
     }
 
     /// Margin period of risk in business days stamped on every result.
@@ -489,42 +439,6 @@ impl JsHaircutImCalculator {
         })
     }
 
-    /// Copy with a default collateral asset class.
-    /// @param asset_class - `CollateralAssetClass` wire label such as `"government_bonds"`.
-    /// @returns A new `HaircutImCalculator` handle.
-    ///
-    /// # Errors
-    ///
-    /// Throws if the label is not a collateral asset class.
-    #[wasm_bindgen(js_name = withDefaultAssetClass)]
-    pub fn with_default_asset_class(
-        &self,
-        asset_class: JsValue,
-    ) -> Result<JsHaircutImCalculator, JsValue> {
-        let asset_class = collateral_asset_class(&asset_class, "assetClass")?;
-        Ok(Self {
-            inner: self.inner.clone().with_default_asset_class(asset_class),
-        })
-    }
-
-    /// Copy with a posted-collateral currency, used to detect FX mismatch.
-    /// @param currency - ISO-4217 currency of the posted collateral.
-    /// @returns A new `HaircutImCalculator` handle.
-    ///
-    /// # Errors
-    ///
-    /// Throws if `currency` is not a known currency code.
-    #[wasm_bindgen(js_name = withPostedCollateralCurrency)]
-    pub fn with_posted_collateral_currency(
-        &self,
-        currency: JsValue,
-    ) -> Result<JsHaircutImCalculator, JsValue> {
-        let currency = js_currency(&currency, "currency")?;
-        Ok(Self {
-            inner: self.inner.clone().with_posted_collateral_currency(currency),
-        })
-    }
-
     /// Copy configured to select an eligible entry by collateral maturity and rating.
     /// @param remaining_years - Residual collateral maturity in years; finite and non-negative.
     /// @param rating - Credit rating such as `"AAA"` or `"A-"`; required when the schedule imposes a minimum rating (no rating is inferred).
@@ -562,20 +476,6 @@ impl JsHaircutImCalculator {
     #[wasm_bindgen(getter, js_name = eligibleCollateral)]
     pub fn eligible_collateral(&self) -> Result<JsValue, JsValue> {
         to_js_value(self.inner.eligible_collateral())
-    }
-
-    /// Default `CollateralAssetClass` wire label.
-    #[wasm_bindgen(getter, js_name = defaultAssetClass)]
-    pub fn default_asset_class(&self) -> String {
-        self.inner.default_asset_class().to_string()
-    }
-
-    /// ISO-4217 posted-collateral currency, or `undefined` when none is configured.
-    #[wasm_bindgen(getter, js_name = postedCollateralCurrency)]
-    pub fn posted_collateral_currency(&self) -> Option<String> {
-        self.inner
-            .posted_collateral_currency()
-            .map(|currency| currency.to_string())
     }
 
     /// Margin period of risk in business days stamped on every result (`HAIRCUT_MPOR_DAYS`).

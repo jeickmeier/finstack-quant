@@ -122,9 +122,6 @@ impl ImResult {
 ///         ))
 ///     }
 ///
-///     fn methodology(&self) -> ImMethodology {
-///         ImMethodology::InternalModel
-///     }
 /// }
 /// ```
 pub trait ImCalculator: Send + Sync {
@@ -145,7 +142,4 @@ pub trait ImCalculator: Send + Sync {
         context: &MarketContext,
         as_of: Date,
     ) -> Result<ImResult>;
-
-    /// Get the methodology this calculator implements.
-    fn methodology(&self) -> ImMethodology;
 }

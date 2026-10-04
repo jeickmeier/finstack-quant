@@ -5,7 +5,6 @@
 //! - DV01-based SIMM calculations
 //! - CSA bilateral vs cleared margin requirements
 
-use finstack_quant_core::HashMap;
 use finstack_quant_core::{currency::Currency, dates::Date, money::Money, types::InstrumentId};
 use finstack_quant_margin::{
     ClearingStatus, CsaSpec, ImMethodology, ImParameters, MarginCallTiming, MarginTenor,
@@ -65,10 +64,7 @@ fn create_bilateral_margin_spec() -> OtcMarginSpec {
     OtcMarginSpec {
         csa,
         clearing_status: ClearingStatus::Bilateral,
-        im_methodology: ImMethodology::Simm,
         simm_credit_classification: None,
-        vm_frequency: MarginTenor::Daily,
-        settlement_lag: 1,
     }
 }
 
@@ -106,10 +102,7 @@ fn create_cleared_margin_spec() -> OtcMarginSpec {
         clearing_status: ClearingStatus::Cleared {
             ccp: "LCH".to_string(),
         },
-        im_methodology: ImMethodology::ClearingHouse,
         simm_credit_classification: None,
-        vm_frequency: MarginTenor::Daily,
-        settlement_lag: 0,
     }
 }
 
@@ -122,7 +115,10 @@ fn test_irs_with_bilateral_margin() {
     let spec = swap.margin_spec.as_ref().expect("margin spec exists");
 
     assert!(matches!(spec.clearing_status, ClearingStatus::Bilateral));
-    assert!(matches!(spec.im_methodology, ImMethodology::Simm));
+    assert!(matches!(
+        spec.get_im_methodology(),
+        Some(ImMethodology::Simm)
+    ));
     assert_eq!(spec.csa.vm_params.threshold.amount(), 500_000.0);
 }
 
@@ -171,11 +167,14 @@ fn test_vm_calculation_for_irs() {
 #[test]
 fn test_simm_calculator_exists() {
     // Verify SIMM calculator can be created
-    let simm = SimmCalculator::default();
+    let simm = SimmCalculator::new(finstack_quant_margin::SimmVersion::default())
+        .expect("embedded registry");
 
     // Test IR delta calculation with empty sensitivities (edge case)
-    let empty_dv01: HashMap<String, f64> = HashMap::default();
-    let ir_margin = simm.calculate_ir_delta(&empty_dv01);
+    let empty = finstack_quant_margin::SimmSensitivities::new(Currency::USD);
+    let (ir_margin, _) = simm
+        .calculate_from_sensitivities_parts(&empty, Currency::USD)
+        .expect("empty sensitivities");
 
     // Empty sensitivities should produce zero margin
     assert_eq!(

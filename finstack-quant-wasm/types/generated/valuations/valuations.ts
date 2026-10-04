@@ -9555,27 +9555,12 @@ export interface OtcMarginSpec {
    */
   csa: CsaSpec;
   /**
-   * Initial margin calculation methodology
-   *
-   * - Bilateral: SIMM or Schedule
-   * - Cleared: ClearingHouse (CCP-specific)
-   */
-  im_methodology: ImMethodology;
-  /**
-   * Settlement lag for margin transfers (business days)
-   */
-  settlement_lag: number;
-  /**
    * Explicit SIMM credit classification for credit-sensitive instruments.
    *
    * Required when a credit product uses `ImMethodology::Simm`; leave `None`
    * for non-credit instruments and non-SIMM margin methodologies.
    */
   simm_credit_classification?: SimmCreditClassification | null;
-  /**
-   * Variation margin exchange frequency
-   */
-  vm_frequency: MarginTenor;
 }
 /**
  * Credit Support Annex specification (ISDA standard).

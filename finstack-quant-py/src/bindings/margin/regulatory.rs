@@ -13,11 +13,10 @@ use crate::bindings::pandas_utils::{
     serde_to_py, table_to_dataframe, ColumnSchema,
 };
 use crate::errors::{core_to_py, display_to_py};
-use finstack_quant_core::currency::Currency;
 use finstack_quant_margin::regulatory::{
     frtb::{
-        frtb_sba_charge as frtb_sba_charge_rs, CorrelationScenario, DrcAssetType, DrcPosition,
-        DrcSector, DrcSeniority, FrtbRiskClass, FrtbSbaEngine, FrtbSbaResult, FrtbSensitivities,
+        frtb_sba_charge as frtb_sba_charge_rs, CorrelationScenario, DrcPosition, FrtbRiskClass,
+        FrtbSbaEngine, FrtbSbaResult, FrtbSensitivities,
     },
     sa_ccr::{
         saccr_ead as saccr_ead_rs, EadResult, SaCcrAssetClass, SaCcrEngine, SaCcrNettingSetConfig,
@@ -134,7 +133,7 @@ impl PyFrtbSensitivities {
     /// frame : pandas.DataFrame
     ///     Columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
     ///     ``tenor``, ``amount`` (plus the DRC columns ``sector``,
-    ///     ``seniority``, ``asset_type``, ``maturity_years``,
+    ///     ``seniority``, ``maturity_years``,
     ///     ``pnl_adjustment`` on ``drc`` rows) encoded as ``to_dataframe``
     ///     documents. ``curvature_up`` / ``curvature_down`` rows are
     ///     recombined into pairs; ``rrao`` rows carry ``exotic_notional`` /
@@ -167,11 +166,11 @@ impl PyFrtbSensitivities {
 
     /// Add a GIRR delta: ``amount`` is base-currency P&L per **1 percentage
     /// point** of curve shift (``100 x DV01``) at ``tenor``; ``currency``
-    /// defaults to the base currency. Raises ``ValueError`` for an unknown
+    /// identifies the shocked curve. Raises ``ValueError`` for an unknown
     /// currency.
-    #[pyo3(signature = (tenor, amount, currency = None))]
-    fn add_girr_delta(&mut self, tenor: &str, amount: f64, currency: Option<&str>) -> PyResult<()> {
-        let ccy = self.currency_or_base(currency)?;
+    #[pyo3(signature = (currency, tenor, amount))]
+    fn add_girr_delta(&mut self, currency: &str, tenor: &str, amount: f64) -> PyResult<()> {
+        let ccy = parse_currency(currency)?;
         self.inner.add_girr_delta(ccy, tenor, amount);
         Ok(())
     }
@@ -179,9 +178,9 @@ impl PyFrtbSensitivities {
     /// Add a GIRR inflation delta: ``amount`` is base-currency P&L per 1
     /// percentage point of inflation shift. Raises ``ValueError`` for an
     /// unknown currency.
-    #[pyo3(signature = (amount, currency = None))]
-    fn add_girr_inflation_delta(&mut self, amount: f64, currency: Option<&str>) -> PyResult<()> {
-        let ccy = self.currency_or_base(currency)?;
+    #[pyo3(signature = (currency, amount))]
+    fn add_girr_inflation_delta(&mut self, currency: &str, amount: f64) -> PyResult<()> {
+        let ccy = parse_currency(currency)?;
         self.inner.add_girr_inflation_delta(ccy, amount);
         Ok(())
     }
@@ -189,9 +188,9 @@ impl PyFrtbSensitivities {
     /// Add a GIRR cross-currency basis delta: ``amount`` is base-currency
     /// P&L per 1 percentage point of basis shift for ``currency``. Raises
     /// ``ValueError`` for an unknown currency.
-    #[pyo3(signature = (amount, currency = None))]
-    fn add_girr_xccy_basis_delta(&mut self, amount: f64, currency: Option<&str>) -> PyResult<()> {
-        let ccy = self.currency_or_base(currency)?;
+    #[pyo3(signature = (currency, amount))]
+    fn add_girr_xccy_basis_delta(&mut self, currency: &str, amount: f64) -> PyResult<()> {
+        let ccy = parse_currency(currency)?;
         self.inner.add_girr_xccy_basis_delta(ccy, amount);
         Ok(())
     }
@@ -359,15 +358,15 @@ impl PyFrtbSensitivities {
     /// implied-volatility move for the ``option_maturity`` x
     /// ``underlying_tenor`` point. Raises ``ValueError`` for an unknown
     /// currency.
-    #[pyo3(signature = (option_maturity, underlying_tenor, amount, currency = None))]
+    #[pyo3(signature = (currency, option_maturity, underlying_tenor, amount))]
     fn add_girr_vega(
         &mut self,
+        currency: &str,
         option_maturity: &str,
         underlying_tenor: &str,
         amount: f64,
-        currency: Option<&str>,
     ) -> PyResult<()> {
-        let ccy = self.currency_or_base(currency)?;
+        let ccy = parse_currency(currency)?;
         self.inner
             .add_girr_vega(ccy, option_maturity, underlying_tenor, amount);
         Ok(())
@@ -394,14 +393,9 @@ impl PyFrtbSensitivities {
 
     /// Add a GIRR curvature pair (up / down shocked P&L positions in base
     /// currency). Raises ``ValueError`` for an unknown currency.
-    #[pyo3(signature = (cvr_up, cvr_down, currency = None))]
-    fn add_girr_curvature(
-        &mut self,
-        cvr_up: f64,
-        cvr_down: f64,
-        currency: Option<&str>,
-    ) -> PyResult<()> {
-        let ccy = self.currency_or_base(currency)?;
+    #[pyo3(signature = (currency, cvr_up, cvr_down))]
+    fn add_girr_curvature(&mut self, currency: &str, cvr_up: f64, cvr_down: f64) -> PyResult<()> {
+        let ccy = parse_currency(currency)?;
         self.inner.add_girr_curvature(ccy, cvr_up, cvr_down);
         Ok(())
     }
@@ -430,56 +424,28 @@ impl PyFrtbSensitivities {
         Ok(())
     }
 
-    /// Add a Default Risk Charge position.
+    /// Add a canonical non-securitisation DRC position.
     ///
     /// Parameters
     /// ----------
-    /// issuer : str
-    ///     Issuer identifier; long and short JTD net per issuer at charge time.
-    /// jtd_amount : float
-    ///     Signed jump-to-default **notional** in base currency (positive =
-    ///     long, negative = short), before the seniority LGD.
-    /// rating_bucket : int
-    ///     Credit-rating bucket, 1 (AAA) to 9 (defaulted) per MAR22.24.
-    /// sector : str
-    ///     ``"corporate"``, ``"sovereign"`` or ``"local_government"``.
-    /// seniority : str
-    ///     ``"senior_unsecured"``, ``"subordinated"``, ``"equity"`` or
-    ///     ``"covered_bond"`` (selects the LGD).
-    /// asset_type : str
-    ///     ``"corporate"``, ``"sovereign"``, ``"local_government"`` or ``"equity"``;
-    ///     securitization DRC is rejected by the engine.
-    /// maturity_years : float
-    ///     Finite nonnegative residual maturity; JTD scales by years clipped to [0.25, 1.0].
-    /// pnl_adjustment : float, default 0.0
-    ///     Mark-to-market adjustment per MAR22.9 (negative for a long
-    ///     position carrying an unrealised loss).
+    /// position : dict
+    ///     Rust DrcPosition fields: issuer, signed jtd_amount in reporting
+    ///     currency before LGD, rating_bucket (1..9), sector, seniority,
+    ///     maturity_years (non-negative), and optional pnl_adjustment (default 0).
+    ///     Equity seniority requires corporate sector. Securitisations are unsupported.
     ///
-    /// Raises ``ValueError`` for an unknown sector, seniority or asset-type
-    /// label.
-    #[pyo3(signature = (issuer, jtd_amount, rating_bucket, sector, seniority, asset_type, maturity_years, pnl_adjustment = 0.0))]
-    #[allow(clippy::too_many_arguments)]
-    fn add_drc_position(
-        &mut self,
-        issuer: &str,
-        jtd_amount: f64,
-        rating_bucket: u8,
-        sector: &str,
-        seniority: &str,
-        asset_type: &str,
-        maturity_years: f64,
-        pnl_adjustment: f64,
-    ) -> PyResult<()> {
-        self.inner.add_drc_position(DrcPosition {
-            maturity_years,
-            issuer: issuer.to_string(),
-            jtd_amount,
-            rating_bucket,
-            sector: parse_label::<DrcSector>(sector)?,
-            seniority: parse_label::<DrcSeniority>(seniority)?,
-            asset_type: parse_label::<DrcAssetType>(asset_type)?,
-            pnl_adjustment,
-        });
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If fields are unknown, malformed, or fail Rust position validation.
+    /// TypeError
+    ///     If the position contains values that cannot be converted to JSON.
+    #[pyo3(signature = (position))]
+    fn add_drc_position(&mut self, position: &Bound<'_, PyAny>) -> PyResult<()> {
+        let position: DrcPosition =
+            crate::bindings::module_utils::py_to_serde(position.py(), position, "position")?;
+        position.validate().map_err(core_to_py)?;
+        self.inner.add_drc_position(position);
         Ok(())
     }
 
@@ -504,9 +470,9 @@ impl PyFrtbSensitivities {
     ///
     /// Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
     /// ``amount``, then the DRC columns ``sector``, ``seniority``,
-    /// ``asset_type``, ``maturity_years``, ``pnl_adjustment`` (``None`` /
+    /// ``maturity_years``, ``pnl_adjustment`` (``None`` /
     /// ``NaN`` on non-DRC rows). One row per populated bucket; an empty
-    /// container still carries all eleven columns. Long format is used
+    /// container still carries all ten columns. Long format is used
     /// deliberately — a column per bucket would give a different schema for
     /// every portfolio.
     ///
@@ -582,15 +548,6 @@ impl PyFrtbSensitivities {
     fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
         let frame = self.to_dataframe(py).ok()?;
         frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-}
-
-impl PyFrtbSensitivities {
-    fn currency_or_base(&self, currency: Option<&str>) -> PyResult<Currency> {
-        match currency {
-            Some(c) => parse_currency(c),
-            None => Ok(self.inner.base_currency),
-        }
     }
 }
 

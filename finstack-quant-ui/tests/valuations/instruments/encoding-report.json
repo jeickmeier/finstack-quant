@@ -6943,7 +6943,6 @@
           "#/$defs/CmoTranche/properties/priority",
           "#/$defs/ImParameters/properties/mpor_days",
           "#/$defs/VmParameters/properties/settlement_lag",
-          "#/$defs/OtcMarginSpec/properties/settlement_lag",
           "#/$defs/BermudanSchedule/properties/notice_days",
           "#/$defs/RepoMarginSpec/properties/settlement_lag",
           "#/$defs/CdsIndex/properties/num_constituents",
@@ -10407,7 +10406,6 @@
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
           "#/$defs/d_d753b8f92c808b4fcb8e/properties/mpor_days",
           "#/$defs/d_f0ed2e93baffede20ff4/properties/settlement_lag",
-          "#/$defs/d_fda93e7996d8b702c7e1/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_765a4643a287f5eb4b9d/properties/num_constituents",
           "#/$defs/d_47e5e74524615b78a19f/properties/count"
@@ -18514,7 +18512,6 @@
           "#/$defs/CmoTranche/properties/priority",
           "#/$defs/ImParameters/properties/mpor_days",
           "#/$defs/VmParameters/properties/settlement_lag",
-          "#/$defs/OtcMarginSpec/properties/settlement_lag",
           "#/$defs/BermudanSchedule/properties/notice_days",
           "#/$defs/RepoMarginSpec/properties/settlement_lag",
           "#/$defs/CdsIndex/properties/num_constituents",
@@ -19763,7 +19760,6 @@
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
           "#/$defs/d_689f3cd8deb433e8f1b4/properties/mpor_days",
           "#/$defs/d_346928387a11c641c3eb/properties/settlement_lag",
-          "#/$defs/d_7b94c5f3c5a73dd2ae20/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_47e5e74524615b78a19f/properties/count"
         ],
@@ -30777,7 +30773,6 @@
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
           "#/$defs/d_71c7dfd12d3c79d088e8/properties/mpor_days",
           "#/$defs/d_3b6c8eaba5e197393c0d/properties/settlement_lag",
-          "#/$defs/d_d95a602bcefda408da7c/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count"
         ],
         "uint8": [
@@ -37735,7 +37730,6 @@
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
           "#/$defs/ImParameters/properties/mpor_days",
           "#/$defs/VmParameters/properties/settlement_lag",
-          "#/$defs/OtcMarginSpec/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/PoolAsset/properties/amortization_term_months",
           "#/$defs/BalloonSpec/properties/extension_months",
@@ -39868,7 +39862,6 @@
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
           "#/$defs/d_bcbfd40d0be718fa0b1b/properties/mpor_days",
           "#/$defs/d_5b15bcb648e98c9285ec/properties/settlement_lag",
-          "#/$defs/d_814830ab7e82884f46f8/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_47e5e74524615b78a19f/properties/count"
         ],
@@ -40486,7 +40479,6 @@
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
           "#/$defs/d_16219cd83aea7d546c03/properties/mpor_days",
           "#/$defs/d_b3867d24415e3fb4e481/properties/settlement_lag",
-          "#/$defs/d_9b23d255e9ed709328d1/properties/settlement_lag",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
           "#/$defs/d_47e5e74524615b78a19f/properties/count"
         ],

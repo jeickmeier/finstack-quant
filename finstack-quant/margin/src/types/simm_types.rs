@@ -520,8 +520,7 @@ impl From<SimmSensitivitiesJson> for SimmSensitivities {
 /// # References
 ///
 /// - ISDA SIMM: `docs/REFERENCES.md#isda-simm`
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SimmSensitivities {
     /// Base currency for the sensitivities.
     ///
@@ -1027,7 +1026,7 @@ impl SimmSensitivities {
 /// * `a` - First SIMM risk class to normalize for a symmetric lookup.
 /// * `b` - Second SIMM risk class to normalize for a symmetric lookup.
 #[must_use]
-pub fn ordered_risk_class_pair(
+pub(crate) fn ordered_risk_class_pair(
     a: SimmRiskClass,
     b: SimmRiskClass,
 ) -> (SimmRiskClass, SimmRiskClass) {
@@ -1047,7 +1046,7 @@ pub fn ordered_risk_class_pair(
 /// * `b` - Second tenor label, compared lexicographically without changing its
 ///   text in the returned key.
 #[must_use]
-pub fn ordered_tenor_pair(a: &str, b: &str) -> (String, String) {
+pub(crate) fn ordered_tenor_pair(a: &str, b: &str) -> (String, String) {
     if a <= b {
         (a.to_string(), b.to_string())
     } else {
@@ -1062,7 +1061,7 @@ pub fn ordered_tenor_pair(a: &str, b: &str) -> (String, String) {
 /// * `a` - First SIMM credit sector to normalize for a symmetric lookup.
 /// * `b` - Second SIMM credit sector to normalize for a symmetric lookup.
 #[must_use]
-pub fn ordered_credit_sector_pair(
+pub(crate) fn ordered_credit_sector_pair(
     a: SimmCreditSector,
     b: SimmCreditSector,
 ) -> (SimmCreditSector, SimmCreditSector) {

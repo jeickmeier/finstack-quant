@@ -17,16 +17,6 @@ pub(super) fn validate_rate(name: &str, v: f64) -> Result<()> {
     Ok(())
 }
 
-/// Reject probabilities outside the closed unit interval `[0, 1]`.
-pub(super) fn validate_probability(name: &str, v: f64) -> Result<()> {
-    if !v.is_finite() || !(0.0..=1.0).contains(&v) {
-        return Err(Error::Validation(format!(
-            "invalid probability '{name}': must be in [0,1]"
-        )));
-    }
-    Ok(())
-}
-
 /// Reject negative, NaN, or infinite numeric inputs (risk weights,
 /// vega weights, concentration thresholds, etc.).
 pub(super) fn validate_non_negative(name: &str, v: f64) -> Result<()> {

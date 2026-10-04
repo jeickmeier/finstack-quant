@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Margin API simplification
+
+#### Changed (breaking)
+
+- SIMM component calculations and FRTB/SA-CCR calculation stages are internal. Use validated sensitivity containers and the canonical engines; `calculate_from_sensitivities_parts` remains available for portfolio and MVA aggregation. Resolved SIMM parameters are immutable through `get_params()`, and construction uses fallible `SimmCalculator::new` rather than `Default`.
+- WASM removes `csaUsdRegulatoryJson`, `csaEurRegulatoryJson`, `validateCsaJson` and `calculateVm`. Use the canonical `csaSpec*` functions and `VmCalculator`; standard JSON serialization supplies wire text. Python/WASM schedule and haircut calculators remove settings and getters that did not affect any bound calculation.
+- Python/WASM GIRR adders require the risk currency as the first argument. DRC adders take one canonical position object; DRC no longer duplicates sector/seniority with `asset_type`, and unsupported securitisation seniority is removed. Position and engine validation share the complete Rust validator.
+- The published SIMM input schema is `SimmSensitivitiesJson`; the partial tuple-keyed `SimmSensitivities` schema is removed. Generic CCP fallback is the unit `GenericProxy` with registry key `generic_proxy`; fictitious VaR confidence/lookback metadata and literal calculator presets are removed.
+- XVA results remove the duplicated `pfe_profile` and name peak expected positive exposure `max_epe`. OTC margin specifications remove `im_methodology`, `vm_frequency` and `settlement_lag`; their CSA owns those elections, including explicit no-IM terms and business-day VM settlement. Repo margin cashflow currency derives from `cash_amount`.
+
+#### Fixed
+
+- Regulatory inputs cannot manufacture fallback charges for unknown buckets or tenors. Published SIMM examples use canonical uppercase tenors, and margin stub exports are checked against the runtime contract.
+
+
 ### Calibration: simpler execution and canonical contracts
 
 #### Changed (breaking)
