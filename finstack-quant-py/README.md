@@ -309,8 +309,8 @@ documented deviations from strict crate mirroring live there:
   portfolio-loss simulation); the shared correlation-matrix helpers
   (`validate_correlation_matrix`, `nearest_correlation`) are canonically owned
   by `finstack_quant_analytics::correlation` and re-exported through
-  `finstack_quant_models::correlation`. `nearest_correlation` is the one
-  documented rename (Rust: `nearest_correlation_matrix`).
+  `finstack_quant_models::correlation`. `nearest_correlation` uses the same
+  canonical name in Rust and Python (WASM: `nearestCorrelation`).
 - `reporting` is pure Python with no Rust crate and no WASM parity.
 - `core.table` is a binding-level host-interop surface backed by
   `finstack-quant-arrow`, which the umbrella crate does not re-export. It has no

@@ -9,6 +9,25 @@ use finstack_quant_wasm::api::{
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
+/// Accrue a schedule JSON payload through the typed accrual engine.
+fn accrued_interest(
+    schedule_json: &str,
+    as_of: &str,
+    config_json: Option<&str>,
+) -> Result<f64, JsValue> {
+    let schedule =
+        cashflows::schedule::JsCashFlowSchedule::from_json(JsValue::from(schedule_json))?;
+    let config = config_json.map(js_sys::JSON::parse).transpose()?;
+    let money =
+        cashflows::accrual::accrued_interest_amount_js(&schedule, JsValue::from(as_of), config)?;
+    let text: String = js_sys::JSON::stringify(&money)?.into();
+    let money: serde_json::Value = serde_json::from_str(&text).unwrap();
+    Ok(match &money["amount"] {
+        serde_json::Value::String(amount) => amount.parse().unwrap(),
+        amount => amount.as_f64().unwrap(),
+    })
+}
+
 fn cashflow_spec_json() -> String {
     serde_json::json!({
         "notional": {
@@ -205,15 +224,7 @@ fn cashflows_json_bridge_builds_accrues_and_prices_custom_bond() {
     let flows: Vec<serde_json::Value> = serde_json::from_str(&flows_json).unwrap();
     let schedule: serde_json::Value = serde_json::from_str(&schedule_json).unwrap();
     assert_eq!(flows.len(), schedule["flows"].as_array().unwrap().len());
-    assert!(
-        cashflows::accrued_interest(
-            JsValue::from(&schedule_json),
-            JsValue::from("2025-02-28"),
-            None
-        )
-        .unwrap()
-            > 0.0
-    );
+    assert!(accrued_interest(&schedule_json, "2025-02-28", None).unwrap() > 0.0);
 
     let instrument_json = bond_from_cashflows_json(
         JsValue::from("CUSTOM-CF"),
@@ -378,15 +389,7 @@ fn cashflows_json_bridge_accepts_config_and_missing_quoted_clean_price_pct() {
     })
     .to_string();
 
-    assert!(
-        cashflows::accrued_interest(
-            JsValue::from(&schedule_json),
-            JsValue::from("2025-02-28"),
-            Some(JsValue::from(config_json))
-        )
-        .unwrap()
-            > 0.0
-    );
+    assert!(accrued_interest(&schedule_json, "2025-02-28", Some(&config_json)).unwrap() > 0.0);
 
     let instrument_json = bond_from_cashflows_json(
         JsValue::from("CUSTOM-CF-NO-QUOTE"),
@@ -406,12 +409,7 @@ fn cashflows_json_bridge_rejects_bad_inputs() {
             .expect("schedule should build");
 
     assert!(cashflows::validate_cashflow_schedule_json(JsValue::from("{not json")).is_err());
-    assert!(cashflows::accrued_interest(
-        JsValue::from(&schedule_json),
-        JsValue::from("2025-02-30"),
-        None
-    )
-    .is_err());
+    assert!(accrued_interest(&schedule_json, "2025-02-30", None).is_err());
 }
 
 #[wasm_bindgen_test]

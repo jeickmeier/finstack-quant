@@ -3,7 +3,7 @@
 use crate::instruments::fixed_income::structured_credit::types::constants::YTM_SOLVER_TOLERANCE;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::dates::DayCountContext;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;
 use serde::Deserialize;
 

@@ -212,8 +212,7 @@ impl StudentTCopula {
 const MIN_LAGUERRE_ORDER: usize = 10;
 
 /// Upper bound on the Gauss-Laguerre order accepted by the Student-t
-/// copula. `O(n²)` eigendecomposition inside
-/// [`GaussLaguerreQuadrature::new`] remains cheap below this bound;
+/// copula. The `O(n²)` Golub-Welsch eigendecomposition remains cheap below this bound;
 /// above it, numerical conditioning of the Jacobi matrix starts to
 /// erode reliable weight recovery for the highest-index nodes.
 const MAX_LAGUERRE_ORDER: usize = 64;

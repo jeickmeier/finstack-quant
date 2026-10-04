@@ -2,7 +2,7 @@
 //!
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use std::cell::RefCell;
 
 /// Resolve the bond's OAS from any supported price-driving quote.

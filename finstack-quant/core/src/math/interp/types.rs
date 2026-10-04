@@ -8,13 +8,6 @@ use super::strategies::{
     CubicHermiteStrategy, LinearStrategy, LogLinearStrategy, MonotoneConvexStrategy,
     PiecewiseQuadraticForwardStrategy,
 };
-use super::traits::InterpFn;
-
-/// Epsilon for finite difference derivative calculations.
-///
-/// This is the default value used in [`InterpFn::interp_prime`] for numerical
-/// derivatives.
-pub const DERIVATIVE_EPSILON: f64 = 1e-6;
 
 /// Validation policy for interpolator input values.
 ///
@@ -519,13 +512,6 @@ mod tests {
     fn validation_policy_default_is_strict() {
         let default = ValidationPolicy::default();
         assert_eq!(default, ValidationPolicy::Strict);
-    }
-
-    // DERIVATIVE_EPSILON Tests
-
-    #[test]
-    fn derivative_epsilon_defined() {
-        assert_eq!(DERIVATIVE_EPSILON, 1e-6);
     }
 
     // InterpStyle FromStr / Display roundtrip tests

@@ -21,7 +21,7 @@
 //! # Examples
 //!
 //! ```rust
-//! use finstack_quant_core::market_data::dividends::{DividendSchedule, DividendScheduleBuilder};
+//! use finstack_quant_core::market_data::dividends::DividendSchedule;
 //! use finstack_quant_core::money::Money;
 //! use finstack_quant_core::currency::Currency;
 //! use finstack_quant_core::dates::Date;
@@ -30,7 +30,7 @@
 //! let d1 = Date::from_calendar_date(2025, Month::March, 15).expect("Valid date");
 //! let d2 = Date::from_calendar_date(2025, Month::June, 15).expect("Valid date");
 //!
-//! let schedule = DividendScheduleBuilder::new("AAPL-DIVS")
+//! let schedule = DividendSchedule::builder("AAPL-DIVS")
 //!     .underlying("AAPL")
 //!     .currency(Currency::USD)
 //!     .cash(d1, Money::new(0.24, Currency::USD).expect("valid money fixture"))
@@ -202,22 +202,6 @@ impl DividendSchedule {
         self.currency
     }
 
-    /// Return events filtered to a date range inclusive.
-    pub fn events_between(&self, start: Date, end: Date) -> Vec<&DividendEvent> {
-        self.events
-            .iter()
-            .filter(|e| e.date >= start && e.date <= end)
-            .collect()
-    }
-
-    /// Convenience: cash dividends only (ignoring yield/stock entries).
-    pub fn cash_events(&self) -> impl Iterator<Item = (Date, &Money)> {
-        self.events.iter().filter_map(|e| match &e.kind {
-            DividendKind::Cash(m) => Some((e.date, m)),
-            _ => None,
-        })
-    }
-
     /// Validate schedule content (positive cash amounts, non-negative ratios).
     pub fn validate(&self) -> Result<()> {
         for ev in &self.events {
@@ -253,7 +237,7 @@ pub struct DividendScheduleBuilder {
 
 impl DividendScheduleBuilder {
     /// Start a new builder with identifier `id`.
-    pub fn new(id: impl Into<CurveId>) -> Self {
+    fn new(id: impl Into<CurveId>) -> Self {
         Self {
             id: id.into(),
             underlying: None,
@@ -326,7 +310,7 @@ mod tests {
         let d2 = Date::from_calendar_date(2025, Month::March, 15).expect("Valid test date");
         let d3 = Date::from_calendar_date(2025, Month::June, 15).expect("Valid test date");
 
-        let sched = DividendScheduleBuilder::new("AAPL-DIVS")
+        let sched = DividendSchedule::builder("AAPL-DIVS")
             .underlying("AAPL")
             .cash(
                 d1,
@@ -341,7 +325,5 @@ mod tests {
             .expect("DividendScheduleBuilder should succeed in test");
 
         assert_eq!(sched.events.len(), 3);
-        let between = sched.events_between(d1, d2);
-        assert_eq!(between.len(), 2);
     }
 }

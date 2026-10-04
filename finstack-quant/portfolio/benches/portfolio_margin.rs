@@ -179,7 +179,8 @@ fn bench_expiry_resolved_curvature(c: &mut Criterion) {
         .expect("embedded registry");
     let mut group = c.benchmark_group("simm_expiry_resolved_curvature");
     for factor_count in [16, 64] {
-        let inputs: Vec<_> = (0..factor_count)
+        let mut sensitivities = SimmSensitivities::new(Currency::USD);
+        sensitivities.curvature = (0..factor_count)
             .flat_map(|factor| {
                 [("2W", 1_000.0), ("1Y", -1_000.0)].map(|(expiry, vega)| SimmCurvatureSensitivity {
                     risk_class: SimmRiskClass::InterestRate,
@@ -193,11 +194,14 @@ fn bench_expiry_resolved_curvature(c: &mut Criterion) {
             .collect();
         group.bench_with_input(
             BenchmarkId::from_parameter(factor_count),
-            &inputs,
-            |b, inputs| {
+            &sensitivities,
+            |b, sensitivities| {
                 b.iter(|| {
                     calculator
-                        .calculate_curvature(std::hint::black_box(inputs))
+                        .calculate_from_sensitivities_parts(
+                            std::hint::black_box(sensitivities),
+                            Currency::USD,
+                        )
                         .expect("valid expiry-resolved curvature inputs")
                 });
             },

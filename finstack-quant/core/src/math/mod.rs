@@ -5,69 +5,25 @@
 //!
 //! # Root Finding
 //!
-//! The `solver` module provides multiple root-finding algorithms:
-//! - `NewtonSolver`: Newton iteration with finite-difference or analytic derivatives
-//! - `BrentSolver`: bracketed root finding by bisection, secant, and inverse quadratic steps
+//! [`BrentSolver`](crate::math::solver::BrentSolver) is the scalar root finder: `solve()` searches for a
+//! sign-changing bracket around an initial guess and `solve_in_bracket()` takes
+//! one directly. It is derivative-free, so it serves implied volatility,
+//! yield, spread and rate-of-return solves alike.
 //!
-//! When analytic derivatives are available, `NewtonSolver::solve_with_derivative`
-//! avoids finite-difference derivative estimates.
-//!
-//! ## Solver Selection Guide
-//!
-//! ### 1D Root Finding (`solver` module)
-//!
-//! | Use case | Solver | Method | Notes |
-//! |----------|-------------------|--------|-----|
-//! | **Implied volatility** | `NewtonSolver` | `solve_with_derivative()` | Use when vega is available |
-//! | **Yield-to-maturity** | `NewtonSolver` | `solve_with_derivative()` | Use when duration is available |
-//! | **IRR/XIRR** | `NewtonSolver` | `solve_with_derivative()` | Uses analytic d(NPV)/dr |
-//! | **Bracketed roots** | `BrentSolver` | `solve()` | Requires a sign-changing bracket |
-//! | **Smooth function, no derivatives** | `NewtonSolver` | `solve()` | Uses finite differences |
-//!
-//! ### Multi-Dimensional Optimization (`solver_multi` module)
-//!
-//! | Use case | Method | Notes |
-//! |----------|-------------------|-----|
-//! | **SABR calibration** | `solve_system_with_dim_stats()` | System of market quotes, returns stats |
-//! | **Curve bootstrapping** | `solve_system_with_jacobian_stats()` | Use when analytic sensitivities are available |
-//! | **Simple minimization** | `minimize()` | Scalar objective function |
-//! | **With known Jacobian** | `solve_system_with_jacobian_stats()` | Avoids numerical Jacobian estimates |
-//!
-//!
-//! ### Performance Trade-offs
-//!
-//! Analytic derivatives avoid finite-difference noise when the derivative or
-//! Jacobian is already available. Finite differences are useful for black-box
-//! objectives where only function values are exposed.
+//! [`LevenbergMarquardtSolver`](crate::math::solver_multi::LevenbergMarquardtSolver) solves multi-dimensional least-squares systems
+//! (SABR calibration, global curve fits), with a finite-difference or
+//! caller-supplied Jacobian.
 //!
 //! # Examples
 //!
-//! ## Root finding with finite differences
+//! ## Root finding
 //!
 //! ```rust
-//! use finstack_quant_core::math::{Solver, mean, variance};
-//! use finstack_quant_core::math::solver::NewtonSolver;
+//! use finstack_quant_core::math::BrentSolver;
 //! # fn main() -> finstack_quant_core::Result<()> {
 //!
-//! let solver = NewtonSolver::new();
-//! let root = solver.solve(|x| x * x - 2.0, 1.0)?;
+//! let root = BrentSolver::new().solve(|x| x * x - 2.0, 1.0)?;
 //! assert!((root - 2f64.sqrt()).abs() < 1e-9);
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! ## Root finding with analytic derivatives
-//!
-//! ```rust
-//! use finstack_quant_core::math::solver::NewtonSolver;
-//! # fn main() -> finstack_quant_core::Result<()> {
-//!
-//! let solver = NewtonSolver::new();
-//! let f = |x: f64| x * x - 2.0;
-//! let f_prime = |x: f64| 2.0 * x;  // Analytic derivative
-//!
-//! let root = solver.solve_with_derivative(f, f_prime, 1.0)?;
-//! assert!((root - 2f64.sqrt()).abs() < 1e-10);
 //! # Ok(())
 //! # }
 //! ```
@@ -194,11 +150,11 @@ pub use distributions::{
 };
 pub use integration::{
     gauss_legendre_grid, gauss_legendre_integrate, gauss_legendre_integrate_adaptive,
-    gauss_legendre_integrate_composite, GaussHermiteQuadrature, GaussLaguerreQuadrature,
+    gauss_legendre_integrate_composite, GaussHermiteQuadrature,
 };
 pub use interp::{
-    CubicHermiteStrategy, ExtrapolationPolicy, InterpFn, Interpolator, LinearStrategy,
-    LogLinearStrategy, MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy,
+    CubicHermiteStrategy, ExtrapolationPolicy, Interpolator, LinearStrategy, LogLinearStrategy,
+    MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy,
 };
 pub use linalg::{
     apply_lower_triangular, check_correlation_matrix, cholesky_correlation, cholesky_decomposition,
@@ -208,7 +164,7 @@ pub use linalg::{
 pub use probability::{correlation_bounds, joint_probabilities, CorrelatedBernoulli};
 pub use random::sobol::{SobolRng, MAX_SOBOL_DIMENSION};
 pub use random::{box_muller_transform, Pcg64Rng, RandomNumberGenerator};
-pub use solver::{BracketHint, BrentSolver, NewtonSolver, Solver};
+pub use solver::BrentSolver;
 pub use solver_multi::{AnalyticalDerivatives, LevenbergMarquardtSolver};
 pub use special_functions::{
     erf, ln_gamma, log_norm_cdf, norm_cdf, norm_pdf, standard_normal_inv_cdf, student_t_cdf,
@@ -217,10 +173,7 @@ pub use special_functions::{
 pub use stats::{
     correlation, covariance, finite_count, finite_max_or_nan, finite_min_or_nan, mean, mean_or_nan,
     mean_var, median_or_nan, population_variance, quantile, quantile_linear_or_nan,
-    required_samples, sample_std_or_nan, sample_variance_or_nan, variance, OnlineCovariance,
-    OnlineStats,
+    sample_std_or_nan, sample_variance_or_nan, variance, OnlineCovariance, OnlineStats,
 };
 pub use summation::{kahan_sum, neumaier_sum, NeumaierAccumulator};
-pub use time_grid::{
-    map_date_to_step, map_dates_to_steps, map_exercise_dates_to_steps, TimeGrid, TimeGridError,
-};
+pub use time_grid::{map_date_to_step, map_exercise_dates_to_steps, TimeGrid, TimeGridError};

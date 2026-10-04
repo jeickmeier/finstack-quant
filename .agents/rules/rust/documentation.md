@@ -68,11 +68,10 @@ Every module (`mod.rs` or standalone file) must have a module-level doc comment 
 //!
 //! # Examples
 //! ```rust
-//! use finstack_quant_core::math::{Solver, mean, variance};
-//! use finstack_quant_core::math::solver::NewtonSolver;
+//! use finstack_quant_core::math::{BrentSolver, mean, variance};
 //!
-//! // Root finding with Newton's method
-//! let solver = NewtonSolver::new();
+//! // Root finding with Brent's method
+//! let solver = BrentSolver::new();
 //! let root = solver.solve(|x| x * x - 2.0, 1.0).unwrap();
 //! assert!((root - 2f64.sqrt()).abs() < 1e-9);
 //!

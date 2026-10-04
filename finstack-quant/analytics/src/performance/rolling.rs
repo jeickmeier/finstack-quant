@@ -2,31 +2,17 @@
 
 use super::Performance;
 use crate::math::summation::NeumaierAccumulator;
-use crate::returns::MIN_GROWTH_FACTOR;
 use crate::risk_metrics::{
     rolling_sharpe, rolling_sortino, rolling_volatility, DatedSeries, RollingMetric,
     ROLLING_KERNEL_RECOMPUTE_INTERVAL,
 };
 
-#[inline]
-fn log_factor(r: f64) -> Option<f64> {
-    if !r.is_finite() {
-        None
-    } else {
-        Some(if r > -1.0 {
-            r.ln_1p()
-        } else {
-            MIN_GROWTH_FACTOR.ln()
-        })
-    }
-}
-
-fn recompute_log_sum(window: &[f64]) -> Option<NeumaierAccumulator> {
+fn recompute_log_sum(window: &[f64]) -> NeumaierAccumulator {
     let mut acc = NeumaierAccumulator::new();
     for &r in window {
-        acc.add(log_factor(r)?);
+        acc.add(r.ln_1p());
     }
-    Some(acc)
+    acc
 }
 
 impl Performance {
@@ -60,44 +46,37 @@ impl Performance {
         let mut values = Vec::with_capacity(count);
         let mut out_dates = Vec::with_capacity(count);
 
-        // Incremental sliding log-sum. NaN/Inf inside the active window mark
-        // the affected outputs as NaN, matching `comp_total`'s contract.
+        // Construction and deserialization guarantee finite returns > -1.
+        // Update their log growth directly, retaining numerical recovery.
         let mut log_sum = recompute_log_sum(&returns[..window]);
-        values.push(
-            log_sum
-                .filter(|acc| acc.total().is_finite())
-                .map_or(f64::NAN, |acc| acc.total().exp_m1()),
-        );
+        let total = log_sum.total();
+        values.push(if total.is_finite() {
+            total.exp_m1()
+        } else {
+            f64::NAN
+        });
         out_dates.push(dates[window - 1]);
 
         let mut steps_since_recompute = 0_usize;
         for end in (window + 1)..=n {
             let add = returns[end - 1];
             let rem = returns[end - 1 - window];
-            match (log_factor(add), log_factor(rem), log_sum.as_mut()) {
-                (Some(a), Some(r), Some(acc)) => {
-                    acc.add(a);
-                    acc.add(-r);
-                }
-                _ => {
-                    // A non-finite return entering or leaving the window
-                    // forces a full recompute against the next slice.
-                    log_sum = None;
-                }
-            }
+            log_sum.add(add.ln_1p());
+            log_sum.add(-rem.ln_1p());
             steps_since_recompute += 1;
-            if log_sum.is_none_or(|acc| !acc.total().is_finite())
+            if !log_sum.total().is_finite()
                 || steps_since_recompute >= ROLLING_KERNEL_RECOMPUTE_INTERVAL
             {
                 let start = end - window;
                 log_sum = recompute_log_sum(&returns[start..end]);
                 steps_since_recompute = 0;
             }
-            values.push(
-                log_sum
-                    .filter(|acc| acc.total().is_finite())
-                    .map_or(f64::NAN, |acc| acc.total().exp_m1()),
-            );
+            let total = log_sum.total();
+            values.push(if total.is_finite() {
+                total.exp_m1()
+            } else {
+                f64::NAN
+            });
             out_dates.push(dates[end - 1]);
         }
         Ok(DatedSeries {

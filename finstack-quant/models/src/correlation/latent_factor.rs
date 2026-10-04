@@ -289,7 +289,7 @@ impl LatentFactorSpec {
     ///
     /// Returns [`crate::correlation::Error`] if a multi-factor specification
     /// contains an invalid volatility vector or correlation matrix. Call
-    /// [`crate::correlation::nearest_correlation_matrix`] explicitly before
+    /// [`crate::correlation::nearest_correlation`] explicitly before
     /// construction when projection is part of the caller's policy.
     pub fn build(&self) -> Result<LatentFactorKind> {
         Ok(match self {

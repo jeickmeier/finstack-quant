@@ -7,7 +7,7 @@
 use super::conventions::{validate_forward_for_convention, VolatilityConvention};
 use crate::closed_form::volatility::{bachelier_call, black_call, black_shifted_call};
 use finstack_quant_core::error::InputError;
-use finstack_quant_core::math::{BrentSolver, Solver};
+use finstack_quant_core::math::BrentSolver;
 use finstack_quant_core::Result;
 
 /// ATM-only conversion (strike = forward) by equating model prices.

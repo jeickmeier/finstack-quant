@@ -26,7 +26,7 @@
 use finstack_quant_core::cashflow::CFKind;
 use finstack_quant_core::dates::{Date, DayCount, DayCountContext};
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::summation::NeumaierAccumulator;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;

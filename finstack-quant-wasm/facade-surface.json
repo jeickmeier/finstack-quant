@@ -410,7 +410,6 @@
       "CashFlowBuilder",
       "CashFlowSchedule",
       "absToSmm",
-      "accruedInterest",
       "accruedInterestAmount",
       "aggregateByPeriod",
       "aggregateCashflowsChecked",
@@ -464,10 +463,8 @@
       "prepaymentModelSpecVector",
       "recoveryModelSpecRecoveryRate",
       "recoveryModelSpecValidate",
-      "scheduleCalendarYearLadder",
       "scheduleFromClassifiedFlows",
       "scheduleFromDatedFlows",
-      "scheduleOutstandingByDate",
       "scheduleParamsAnnualActact",
       "scheduleParamsEurEstrSwap",
       "scheduleParamsEurGovBond",
@@ -479,7 +476,6 @@
       "scheduleParamsUsdSofrSwap",
       "scheduleParamsUsdTreasury",
       "scheduleParamsValidate",
-      "scheduleWal",
       "schema",
       "smmToCpr",
       "validateCashflowScheduleJson"
@@ -538,9 +534,6 @@
     "getters": []
   },
   "cashflows.absToSmm": {
-    "kind": "function"
-  },
-  "cashflows.accruedInterest": {
     "kind": "function"
   },
   "cashflows.accruedInterestAmount": {
@@ -702,16 +695,10 @@
   "cashflows.recoveryModelSpecValidate": {
     "kind": "function"
   },
-  "cashflows.scheduleCalendarYearLadder": {
-    "kind": "function"
-  },
   "cashflows.scheduleFromClassifiedFlows": {
     "kind": "function"
   },
   "cashflows.scheduleFromDatedFlows": {
-    "kind": "function"
-  },
-  "cashflows.scheduleOutstandingByDate": {
     "kind": "function"
   },
   "cashflows.scheduleParamsAnnualActact": {
@@ -745,9 +732,6 @@
     "kind": "function"
   },
   "cashflows.scheduleParamsValidate": {
-    "kind": "function"
-  },
-  "cashflows.scheduleWal": {
     "kind": "function"
   },
   "cashflows.smmToCpr": {

@@ -453,7 +453,7 @@ fn cashflows_dts_matches_json_bridge_surface() {
     assert!(!dts.contains("buildCashflowScheduleEnvelopeJson"));
     assert!(!dts.contains("validateCashflowScheduleEnvelopeJson"));
     assert!(dts.contains("datedFlowsJson(scheduleJson: JsonInput): string;"));
-    assert!(dts.contains("accruedInterest("));
+    assert!(!dts.contains("accruedInterest("));
     let cashflows_start = dts.find("export interface CashflowsNamespace").unwrap();
     let cashflows_end = dts[cashflows_start..]
         .find("export declare const cashflows")
@@ -1824,9 +1824,6 @@ fn rust_computation_twins_are_declared() {
     let dts = index_dts();
     for sig in [
         "absToSmm(speed: number, month: number): number;",
-        "scheduleWal(scheduleJson: JsonInput, asOf: string): number;",
-        "scheduleOutstandingByDate(scheduleJson: JsonInput): DatedFlowJson[];",
-        "scheduleCalendarYearLadder(scheduleJson: JsonInput, pvs: number[] | Float64Array): CalendarYearLadderRow[];",
         "instrumentCashflows(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, model: string): generated.valuations.InstrumentCashflowEnvelope;",
         "valuationResultMetricSeries(result: ValuationResult | string, base: string): [string[], number][];",
         "calibrationEnvelopeContentHash(envelopeJson: CalibrationEnvelope | string): string;",

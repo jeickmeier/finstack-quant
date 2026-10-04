@@ -5,8 +5,15 @@ import json
 
 import pytest
 
-from finstack_quant.cashflows import accrued_interest, build_cashflow_schedule_json
-from finstack_quant.cashflows.accrual import ExCouponRule
+from finstack_quant.cashflows import build_cashflow_schedule_json
+from finstack_quant.cashflows.accrual import AccrualConfig, ExCouponRule, accrued_interest_amount
+from finstack_quant.cashflows.builder import CashFlowSchedule
+
+
+def accrued_interest(schedule_json: str, as_of: object, config_json: str | None = None) -> float:
+    """Accrue a schedule JSON payload through the typed accrual engine."""
+    config = AccrualConfig.from_json(config_json) if config_json is not None else None
+    return accrued_interest_amount(CashFlowSchedule.from_json(schedule_json), as_of, config).amount
 
 
 def test_record_date_retains_coupon_until_next_settlement() -> None:

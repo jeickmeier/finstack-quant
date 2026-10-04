@@ -287,10 +287,14 @@ class TestDateAcceptanceIsUniform:
         )
 
     def test_cashflows_accrued_interest(self) -> None:
-        from finstack_quant.cashflows import accrued_interest
+        from finstack_quant.cashflows.accrual import accrued_interest_amount
+        from finstack_quant.cashflows.builder import CashFlowSchedule
 
-        schedule = self._schedule()
-        assert accrued_interest(schedule, "2025-02-28") == accrued_interest(schedule, datetime.date(2025, 2, 28))
+        schedule = CashFlowSchedule.from_json(self._schedule())
+        assert (
+            accrued_interest_amount(schedule, "2025-02-28").amount
+            == accrued_interest_amount(schedule, datetime.date(2025, 2, 28)).amount
+        )
 
     def test_covenants_evaluate_engine(self) -> None:
         from finstack_quant import covenants
@@ -315,15 +319,19 @@ class TestDateAcceptanceIsUniform:
 
     def test_a_pandas_timestamp_is_also_accepted(self) -> None:
         """`pandas.Timestamp` is what a quant actually holds after a `read_csv`."""
-        from finstack_quant.cashflows import accrued_interest
+        from finstack_quant.cashflows.accrual import accrued_interest_amount
+        from finstack_quant.cashflows.builder import CashFlowSchedule
 
-        schedule = self._schedule()
-        assert accrued_interest(schedule, pd.Timestamp("2025-02-28")) == (accrued_interest(schedule, "2025-02-28"))
+        schedule = CashFlowSchedule.from_json(self._schedule())
+        assert (
+            accrued_interest_amount(schedule, pd.Timestamp("2025-02-28")).amount
+            == accrued_interest_amount(schedule, "2025-02-28").amount
+        )
 
     def test_factor_model_decompose_levels(self) -> None:
         """A third, structurally different entry point: takes a `time::Date`.
 
-        `accrued_interest` and `evaluate_engine` forward an ISO string to
+        `evaluate_engine` forwards an ISO string to
         the crate; `decompose_levels` converts to a `time::Date` instead, so it
         exercises the other half of the helper pair. Comparing the stamped
         ``date`` catches an off-by-one in the conversion, which comparing only

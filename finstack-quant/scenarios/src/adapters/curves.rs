@@ -17,7 +17,7 @@ use finstack_quant_core::market_data::bumps::{
 };
 use finstack_quant_core::market_data::context::{CurveStorage, MarketContext};
 use finstack_quant_core::market_data::term_structures::{
-    DiscountCurve, ForwardCurve, InflationCurve, PriceCurve, PriceCurveKind,
+    DiscountCurve, ForwardCurve, InflationCurve, PriceCurve,
 };
 use finstack_quant_core::types::CurveId;
 use finstack_quant_valuations::recalibration::{
@@ -369,20 +369,6 @@ fn preview_inflation_implied(base: &InflationCurve, deltas_bp: &[f64], t: f64) -
     implied_inflation_rate(&preview, t)
 }
 
-fn rebuild_forward_curve(base: &ForwardCurve, bumped: Vec<(f64, f64)>) -> Result<ForwardCurve> {
-    Ok(ForwardCurve::builder(base.id().as_str(), base.tenor())
-        .base_date(base.base_date())
-        .reset_lag(base.reset_lag())
-        .projection_grid_opt(base.projection_grid().map(<[f64]>::to_vec))
-        .day_count(base.day_count())
-        .interp(base.interp_style())
-        .extrapolation(base.extrapolation())
-        .rate_calibration_opt(base.rate_calibration().cloned())
-        .fx_policy_opt(base.fx_policy().map(ToOwned::to_owned))
-        .knots(bumped)
-        .build()?)
-}
-
 fn preview_forward_rate(base: &ForwardCurve, deltas_bp: &[f64], t: f64) -> Result<f64> {
     let knots = base.knots();
     let bumped: Vec<(f64, f64)> = knots
@@ -391,23 +377,7 @@ fn preview_forward_rate(base: &ForwardCurve, deltas_bp: &[f64], t: f64) -> Resul
         .zip(deltas_bp.iter())
         .map(|((&tk, &fwd), &bp)| (tk, fwd + bp * 1e-4))
         .collect();
-    Ok(rebuild_forward_curve(base, bumped)?.rate(t))
-}
-
-fn rebuild_price_curve(
-    base: &PriceCurve,
-    bumped: Vec<(f64, f64)>,
-    spot: f64,
-) -> Result<PriceCurve> {
-    Ok(PriceCurve::builder(base.id().as_str())
-        .kind(base.kind())
-        .base_date(base.base_date())
-        .day_count(base.day_count())
-        .spot_price(spot)
-        .interp(base.interp_style())
-        .extrapolation(base.extrapolation())
-        .knots(bumped)
-        .build()?)
+    Ok(base.rebuild_with_knots(bumped)?.rate(t))
 }
 
 fn preview_commodity_price(base: &PriceCurve, deltas_pct: &[f64], t: f64) -> Result<f64> {
@@ -423,7 +393,7 @@ fn preview_commodity_price(base: &PriceCurve, deltas_pct: &[f64], t: f64) -> Res
     } else {
         base.spot_price()
     };
-    Ok(rebuild_price_curve(base, bumped, spot)?.price(t))
+    Ok(base.rebuild_with_knots(bumped, spot)?.price(t))
 }
 
 fn preview_vol_index_level(base: &PriceCurve, deltas_pts: &[f64], t: f64) -> Result<f64> {
@@ -439,7 +409,7 @@ fn preview_vol_index_level(base: &PriceCurve, deltas_pts: &[f64], t: f64) -> Res
     } else {
         base.spot_price()
     };
-    Ok(rebuild_price_curve(base, bumped, spot)?.price(t))
+    Ok(base.rebuild_with_knots(bumped, spot)?.price(t))
 }
 
 /// Typical percent-of-forward stress range for commodity price curves.
@@ -901,7 +871,7 @@ fn curve_node_effects_on(
             }
 
             let bumped_points: Vec<(f64, f64)> = knots.into_iter().zip(forwards).collect();
-            let new_curve = rebuild_forward_curve(&base_curve, bumped_points)?;
+            let new_curve = base_curve.rebuild_with_knots(bumped_points)?;
 
             Ok(update_effects(new_curve, result.warnings))
         }
@@ -997,7 +967,7 @@ fn curve_node_effects_on(
             }
 
             let bumped_points: Vec<(f64, f64)> = knots.into_iter().zip(prices).collect();
-            let new_curve = rebuild_price_curve(&base_curve, bumped_points, spot)?;
+            let new_curve = base_curve.rebuild_with_knots(bumped_points, spot)?;
 
             let mut warnings = result.warnings;
             if let Some(w) = commodity_node_shock_warning(curve_id, nodes) {
@@ -1031,17 +1001,8 @@ pub(crate) fn vol_index_parallel_effects(
     let knots: Vec<f64> = base_curve.knots().to_vec();
     let bumped_levels: Vec<f64> = base_curve.prices().iter().map(|l| l + points).collect();
     let bumped_points: Vec<(f64, f64)> = knots.into_iter().zip(bumped_levels).collect();
-    let new_curve = finstack_quant_core::market_data::term_structures::PriceCurve::builder(
-        base_curve.id().as_str(),
-    )
-    .kind(PriceCurveKind::VolIndex)
-    .base_date(base_curve.base_date())
-    .day_count(base_curve.day_count())
-    .spot_price(base_curve.spot_price() + points)
-    .interp(base_curve.interp_style())
-    .extrapolation(base_curve.extrapolation())
-    .knots(bumped_points)
-    .build()?;
+    let new_curve =
+        base_curve.rebuild_with_knots(bumped_points, base_curve.spot_price() + points)?;
 
     Ok(vec![ScenarioEffect::UpdateCurve(CurveStorage::from(
         new_curve,
@@ -1101,17 +1062,7 @@ pub(crate) fn vol_index_node_effects(
     }
 
     let bumped_points: Vec<(f64, f64)> = knots.into_iter().zip(levels).collect();
-    let new_curve = finstack_quant_core::market_data::term_structures::PriceCurve::builder(
-        base_curve.id().as_str(),
-    )
-    .kind(PriceCurveKind::VolIndex)
-    .base_date(base_curve.base_date())
-    .day_count(base_curve.day_count())
-    .spot_price(spot_level)
-    .interp(base_curve.interp_style())
-    .extrapolation(base_curve.extrapolation())
-    .knots(bumped_points)
-    .build()?;
+    let new_curve = base_curve.rebuild_with_knots(bumped_points, spot_level)?;
 
     Ok(update_effects(new_curve, result.warnings))
 }

@@ -11,7 +11,7 @@ import json
 
 import pytest
 
-from finstack_quant.cashflows import abs_to_smm, builder
+from finstack_quant.cashflows.builder import abs_to_smm
 from finstack_quant.core.market_data import DiscountCurve, MarketContext
 from finstack_quant.core.money import Money
 from finstack_quant.portfolio import (
@@ -44,10 +44,9 @@ MODEL = {
 }
 
 
-def test_abs_to_smm_is_bound_flat_and_on_builder() -> None:
+def test_abs_to_smm_is_bound_on_builder() -> None:
     assert abs_to_smm(0.015, 1) == 0.015
     assert abs_to_smm(0.015, 11) == 0.01764705882352941
-    assert builder.abs_to_smm(0.015, 11) == abs_to_smm(0.015, 11)
     with pytest.raises(ValueError, match="speed"):
         abs_to_smm(1.5, 1)
 

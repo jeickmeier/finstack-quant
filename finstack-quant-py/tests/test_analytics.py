@@ -106,14 +106,13 @@ def test_empty_drawdown_frame_retains_populated_dtypes_and_leaf_shape() -> None:
     pd.testing.assert_frame_equal(populated, perf.drawdown_details(0)[0].to_dataframe())
 
 
-def test_lookback_leaf_and_panel_frames_have_identical_labels() -> None:
+def test_lookback_frame_preserves_ticker_and_metric_labels() -> None:
     perf = Performance.from_returns_arrays(
         _daily_dates(4), [[0.01, 0.02, 0.03, 0.04], [-0.01, 0.03, 0.02, 0.01]], ["A", "B"]
     )
-    ref_date = _daily_dates(4)[-1]
-    pd.testing.assert_frame_equal(
-        perf.lookback_returns(ref_date).to_dataframe(), perf.to_lookback_returns_dataframe(ref_date)
-    )
+    frame = perf.lookback_returns(_daily_dates(4)[-1]).to_dataframe()
+    assert list(frame.index) == ["A", "B"]
+    assert list(frame.columns) == ["mtd", "qtd", "ytd", "fytd"]
 
 
 @pytest.fixture

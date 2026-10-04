@@ -389,14 +389,46 @@ impl PriceCurve {
 
     /// Create a builder pre-populated with this curve's data but a new ID.
     pub fn to_builder_with_id(&self, new_id: impl Into<CurveId>) -> PriceCurveBuilder {
+        self.metadata_builder(new_id)
+            .spot_price(self.spot_price)
+            .knots(self.knots.iter().copied().zip(self.prices.iter().copied()))
+    }
+
+    /// Builder pre-populated with this curve's metadata (kind, base date,
+    /// day count, interpolation, extrapolation) but **no** knots or spot.
+    /// Shared by every rebuild-style operation so no field is dropped.
+    fn metadata_builder(&self, new_id: impl Into<CurveId>) -> PriceCurveBuilder {
         PriceCurve::builder(new_id)
             .kind(self.kind)
             .base_date(self.base)
             .day_count(self.day_count)
-            .spot_price(self.spot_price)
-            .knots(self.knots.iter().copied().zip(self.prices.iter().copied()))
             .interp(self.interp.style())
             .extrapolation(self.interp.extrapolation())
+    }
+
+    /// Rebuild this curve with replacement knots and spot while preserving
+    /// its id, kind, base date, day count, interpolation and extrapolation.
+    ///
+    /// # Arguments
+    ///
+    /// * `knots` - Replacement `(time, price)` pillars: times in year
+    ///   fractions from the base date under the curve's day count, prices in
+    ///   the curve's native price unit.
+    /// * `spot_price` - Replacement spot price in the same unit; it is the
+    ///   curve's value at `t = 0`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the replacement knots or spot violate the
+    /// curve's validation or interpolation constraints.
+    pub fn rebuild_with_knots<I>(&self, knots: I, spot_price: f64) -> crate::Result<Self>
+    where
+        I: IntoIterator<Item = (f64, f64)>,
+    {
+        self.metadata_builder(self.id.clone())
+            .spot_price(spot_price)
+            .knots(knots)
+            .build()
     }
 
     /// Create a new curve with a parallel bump applied (additive, in price units).
@@ -424,14 +456,9 @@ impl PriceCurve {
         let bumped_points = bump_knots_parallel(&self.knots, &self.prices, bump);
         let new_id = crate::market_data::bumps::id_bump_bp(self.id.as_str(), bump * 100.0);
 
-        PriceCurve::builder(new_id)
-            .kind(self.kind)
-            .base_date(self.base)
-            .day_count(self.day_count)
+        self.metadata_builder(new_id)
             .spot_price(self.spot_price + bump)
             .knots(bumped_points)
-            .interp(self.interp.style())
-            .extrapolation(self.interp.extrapolation())
             .build()
     }
 
@@ -461,14 +488,9 @@ impl PriceCurve {
         let bumped_points = bump_knots_percentage(&self.knots, &self.prices, pct);
         let new_id = format!("{}+{:.2}%", self.id.as_str(), pct * 100.0);
 
-        PriceCurve::builder(new_id)
-            .kind(self.kind)
-            .base_date(self.base)
-            .day_count(self.day_count)
+        self.metadata_builder(new_id)
             .spot_price(self.spot_price * (1.0 + pct))
             .knots(bumped_points)
-            .interp(self.interp.style())
-            .extrapolation(self.interp.extrapolation())
             .build()
     }
 
@@ -526,14 +548,9 @@ impl PriceCurve {
             }
         }
         let new_id = crate::market_data::bumps::id_bump_bp(self.id.as_str(), bump * 100.0);
-        PriceCurve::builder(new_id)
-            .kind(self.kind)
-            .base_date(self.base)
-            .day_count(self.day_count)
+        self.metadata_builder(new_id)
             .spot_price(self.spot_price) // Spot typically not bumped in key-rate
             .knots(bumped_points)
-            .interp(self.interp.style())
-            .extrapolation(self.interp.extrapolation())
             .build()
     }
 
@@ -568,14 +585,10 @@ impl PriceCurve {
         let new_spot = self.price(dt_years);
         rolled_points.insert(0, (0.0, new_spot));
 
-        PriceCurve::builder(self.id.clone())
-            .kind(self.kind)
+        self.metadata_builder(self.id.clone())
             .base_date(new_base)
-            .day_count(self.day_count)
             .spot_price(new_spot)
             .knots(rolled_points)
-            .interp(self.interp.style())
-            .extrapolation(self.interp.extrapolation())
             .build()
     }
 }
@@ -815,14 +828,9 @@ impl Bumpable for PriceCurve {
                             );
                             (time, if time == 0.0 { self.spot_price } else { price * (1.0 + percentage * weight) })
                         });
-                        PriceCurve::builder(spec.standard_bump_id(self.id()))
-                            .kind(self.kind)
-                            .base_date(self.base)
-                            .day_count(self.day_count)
+                        self.metadata_builder(spec.standard_bump_id(self.id()))
                             .spot_price(self.spot_price)
                             .knots(points)
-                            .interp(self.interp.style())
-                            .extrapolation(self.interp.extrapolation())
                             .build()
                     }
                     _ => {

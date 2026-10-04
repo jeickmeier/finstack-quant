@@ -108,22 +108,6 @@ fn all_curve_ids_collects_entire_tree() {
 }
 
 #[test]
-fn path_for_curve_finds_correct_location() {
-    let h = MarketDataHierarchy::builder()
-        .add_node("Rates/USD/OIS")
-        .curve_ids(&["USD-OIS"])
-        .add_node("Credit/US/IG/Financials")
-        .curve_ids(&["JPM-5Y"])
-        .build()
-        .unwrap();
-
-    let path = h.path_for_curve(&CurveId::from("JPM-5Y")).unwrap();
-    assert_eq!(path, vec!["Credit", "US", "IG", "Financials"]);
-
-    assert!(h.path_for_curve(&CurveId::from("NONEXISTENT")).is_none());
-}
-
-#[test]
 fn serde_round_trip() {
     let h = MarketDataHierarchy::builder()
         .add_node("Rates/USD/OIS")
@@ -149,23 +133,6 @@ fn serde_round_trip() {
     let node = deserialized.get_node(&path).unwrap();
     assert_eq!(node.tags().get("sector").unwrap(), "Financials");
     assert_eq!(node.curve_ids().len(), 2);
-}
-
-#[test]
-fn insert_and_remove_curve() {
-    let mut h = MarketDataHierarchy::builder()
-        .add_node("Rates/USD")
-        .curve_ids(&["USD-OIS"])
-        .build()
-        .unwrap();
-
-    h.insert_curve("Rates/USD", "USD-SOFR-3M").unwrap();
-    let path: Vec<String> = vec!["Rates".into(), "USD".into()];
-    assert_eq!(h.get_node(&path).unwrap().curve_ids().len(), 2);
-
-    assert!(h.remove_curve(&CurveId::from("USD-OIS")));
-    assert_eq!(h.get_node(&path).unwrap().curve_ids().len(), 1);
-    assert!(!h.remove_curve(&CurveId::from("NONEXISTENT")));
 }
 
 // ─── Resolution engine tests ─────────────────────────────────────────────────
@@ -431,14 +398,6 @@ fn resolve_cumulative_with_tag_filter_scopes_to_subtree() {
     //   USD/Credit       (asset_class=credit) → curves: JPM-5Y
     //   EUR
     //   EUR/Rates        (asset_class=rates)  → curves: EUR-ESTR
-    let mut h = MarketDataHierarchy::new();
-    h.insert_curve("USD/Rates", "USD-OIS").unwrap();
-    h.insert_curve("USD/Rates", "USD-SOFR").unwrap();
-    h.insert_curve("USD/Credit", "JPM-5Y").unwrap();
-    h.insert_curve("EUR/Rates", "EUR-ESTR").unwrap();
-
-    // Tag the nodes via the builder on a fresh hierarchy (insert_curve does not
-    // attach tags). Rebuild using builder to attach tags properly.
     let h = MarketDataHierarchy::builder()
         .add_node("USD/Rates")
         .tag("asset_class", "rates")

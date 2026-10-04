@@ -1,5 +1,5 @@
 use finstack_quant_core::market_data::traits::Discounting;
-use finstack_quant_core::math::{BrentSolver, Solver};
+use finstack_quant_core::math::BrentSolver;
 use finstack_quant_core::{Error, Result};
 
 use crate::trees::hull_white_tree::HullWhiteTree;

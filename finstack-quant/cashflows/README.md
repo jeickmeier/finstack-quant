@@ -25,7 +25,7 @@ umbrella crate as `finstack_quant::cashflows`.
 | [`aggregation`](src/aggregation.rs) | Period bucketing, currency-checked totals, credit-adjusted PV, calendar-year ladders |
 | [`primitives`](src/lib.rs) | `CashFlow` / `CFKind` re-exported from core, plus `is_cash_settlement_kind` |
 | [`traits`](src/traits.rs) | `CashflowScheduleSource`, `CashflowProvider`, `ScheduleBuildOpts`, and the `schedule_from_*` adapters |
-| [`json`](src/json.rs) | Serde-first construction: `CashflowScheduleBuildSpec`, `build_cashflow_schedule_json`, `validate_cashflow_schedule*`, `dated_flows_json`, `accrued_interest` |
+| [`json`](src/json.rs) | Serde-first construction: `CashflowScheduleBuildSpec`, `build_cashflow_schedule_json`, `validate_cashflow_schedule*`, `dated_flows_json` |
 | [`schema`](src/schema.rs) | Published JSON Schema artifacts and `jsonschema` resources |
 
 Crate-root type aliases: `DatedFlow = (Date, Money)` and
@@ -159,8 +159,8 @@ Discount curves use their own date basis for relative discounting.
   `false` and are excluded from `dated_flows_json`.
 - Prepayment/default rate conversions (`cpr_to_smm`, `smm_to_cpr`,
   `cdr_to_mdr`, `mdr_to_cdr`) live in the private `builder::credit_rates`
-  module and are re-exported from `builder` and from the crate root, so hosts
-  can bind them flat. They validate their inputs and return `Result`.
+  module and are re-exported from `builder`. They validate their inputs and
+  return `Result`.
 - Errors are `finstack_quant_core::Error`; this crate defines no error type of
   its own.
 
@@ -210,11 +210,11 @@ stability rules.
 - **Python** — typed submodules under `finstack_quant.cashflows`:
   `primitives`, `builder`, `accrual`, `aggregation`, `schema`, plus the JSON
   bridge (`build_cashflow_schedule_json`, `validate_cashflow_schedule_json`,
-  `dated_flows_json`, `accrued_interest`) and the four rate conversions flat on
-  the package root.
+  `dated_flows_json`) on the package root; the rate conversions live on
+  `builder`.
 - **WASM** — JSON-only surface in
   [`exports/cashflows.js`](../../finstack-quant-wasm/exports/cashflows.js):
-  `accruedInterest`, `buildCashflowScheduleJson`, `validateCashflowScheduleJson`,
+  `buildCashflowScheduleJson`, `validateCashflowScheduleJson`,
   `datedFlowsJson`, and `cprToSmm` / `smmToCpr` / `cdrToMdr` / `mdrToCdr`.
 
 The authoritative contract, including the deliberately Rust-only surface, is

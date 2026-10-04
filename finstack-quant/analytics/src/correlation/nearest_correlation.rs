@@ -32,7 +32,7 @@
 //!
 //! # When to use
 //!
-//! Use `nearest_correlation_matrix` when an upstream pipeline produces a matrix
+//! Use `nearest_correlation` when an upstream pipeline produces a matrix
 //! that *should* be a correlation matrix but has small numerical defects
 //! (typical causes: thresholded sample estimates, shrinkage, missing-data
 //! imputation, user-edited blocks). When the input is wildly off — e.g.
@@ -42,7 +42,7 @@
 
 use super::{Error, Result};
 
-/// Convergence parameters for [`nearest_correlation_matrix`].
+/// Convergence parameters for [`nearest_correlation()`].
 ///
 /// The defaults (`max_iter = 200`, `tol = 1e-10`) are a conservative balance
 /// between runtime and accuracy for correlation matrices up to ~50×50 that
@@ -100,7 +100,7 @@ impl Default for NearestCorrelationOpts {
 ///   or a PSD projection cannot decompose its symmetric input.
 /// * [`Error::DidNotConverge`] if the algorithm fails to converge within
 ///   `opts.max_iter` iterations.
-pub fn nearest_correlation_matrix(
+pub fn nearest_correlation(
     input: &[f64],
     n: usize,
     opts: NearestCorrelationOpts,
@@ -290,7 +290,7 @@ mod tests {
     fn identity_is_fixed_point() {
         let input = vec![1.0, 0.0, 0.0, 1.0];
         let repaired =
-            nearest_correlation_matrix(&input, 2, NearestCorrelationOpts::default()).expect("ok");
+            nearest_correlation(&input, 2, NearestCorrelationOpts::default()).expect("ok");
         assert!(max_abs_diff(&input, &repaired) < 1e-12);
     }
 
@@ -298,7 +298,7 @@ mod tests {
     fn already_valid_matrix_is_unchanged() {
         let input = vec![1.0, 0.5, 0.3, 0.5, 1.0, 0.4, 0.3, 0.4, 1.0];
         let repaired =
-            nearest_correlation_matrix(&input, 3, NearestCorrelationOpts::default()).expect("ok");
+            nearest_correlation(&input, 3, NearestCorrelationOpts::default()).expect("ok");
         // Valid PSD correlation matrices are a fixed point of the projection.
         assert!(max_abs_diff(&input, &repaired) < 1e-8);
         validate_correlation_matrix(&repaired, 3).expect("repaired matrix is valid");
@@ -316,7 +316,7 @@ mod tests {
         assert!(validate_correlation_matrix(&input, 3).is_err());
 
         let repaired =
-            nearest_correlation_matrix(&input, 3, NearestCorrelationOpts::default()).expect("ok");
+            nearest_correlation(&input, 3, NearestCorrelationOpts::default()).expect("ok");
         validate_correlation_matrix(&repaired, 3).expect("repaired matrix is valid");
 
         for i in 0..3 {
@@ -331,7 +331,7 @@ mod tests {
     #[test]
     fn rejects_wrong_size() {
         let input = vec![1.0, 0.5, 0.5, 1.0];
-        let err = nearest_correlation_matrix(&input, 3, NearestCorrelationOpts::default())
+        let err = nearest_correlation(&input, 3, NearestCorrelationOpts::default())
             .expect_err("size mismatch");
         assert!(matches!(err, Error::InvalidSize { .. }));
     }
@@ -339,7 +339,7 @@ mod tests {
     #[test]
     fn rejects_overflowing_dimensions_without_panicking() {
         for n in [usize::MAX, 1usize << (usize::BITS / 2)] {
-            let err = nearest_correlation_matrix(&[], n, NearestCorrelationOpts::default())
+            let err = nearest_correlation(&[], n, NearestCorrelationOpts::default())
                 .expect_err("an overflowing dimension is invalid");
             assert!(matches!(err, Error::InvalidSize { expected, actual: 0 } if expected == n));
             assert!(err.to_string().contains("Invalid matrix size"));
@@ -349,7 +349,7 @@ mod tests {
     #[test]
     fn rejects_diagonal_far_from_one() {
         let input = vec![0.5, 0.1, 0.1, 1.0];
-        let err = nearest_correlation_matrix(&input, 2, NearestCorrelationOpts::default())
+        let err = nearest_correlation(&input, 2, NearestCorrelationOpts::default())
             .expect_err("diagonal guard");
         assert!(matches!(err, Error::DiagonalNotOne { .. }));
     }
@@ -357,7 +357,7 @@ mod tests {
     #[test]
     fn rejects_gross_asymmetry() {
         let input = vec![1.0, 0.5, 0.3, 1.0];
-        let err = nearest_correlation_matrix(&input, 2, NearestCorrelationOpts::default())
+        let err = nearest_correlation(&input, 2, NearestCorrelationOpts::default())
             .expect_err("symmetry guard");
         assert!(matches!(err, Error::NotSymmetric { .. }));
     }
@@ -365,7 +365,7 @@ mod tests {
     #[test]
     fn non_finite_input_reports_eigendecomposition_failure() {
         let input = vec![1.0, f64::NAN, f64::NAN, 1.0];
-        let err = nearest_correlation_matrix(&input, 2, NearestCorrelationOpts::default())
+        let err = nearest_correlation(&input, 2, NearestCorrelationOpts::default())
             .expect_err("eigendecomposition failure must be reported");
 
         assert!(matches!(err, Error::EigenDecompositionFailed));
@@ -374,7 +374,7 @@ mod tests {
 
     #[test]
     fn non_finite_diagonal_reports_eigendecomposition_failure() {
-        let err = nearest_correlation_matrix(&[f64::NAN], 1, NearestCorrelationOpts::default())
+        let err = nearest_correlation(&[f64::NAN], 1, NearestCorrelationOpts::default())
             .expect_err("non-finite diagonal must be reported");
 
         assert!(matches!(err, Error::EigenDecompositionFailed));
@@ -400,7 +400,7 @@ mod tests {
             -0.55, -0.55, 1.0,
         ];
         let repaired =
-            nearest_correlation_matrix(&input, 3, NearestCorrelationOpts::default()).expect("ok");
+            nearest_correlation(&input, 3, NearestCorrelationOpts::default()).expect("ok");
 
         // The repaired matrix must be a valid correlation matrix.
         validate_correlation_matrix(&repaired, 3).expect("repaired is a valid correlation matrix");
@@ -441,7 +441,7 @@ mod tests {
             0.1, 0.3, 1.0002,
         ];
         let repaired =
-            nearest_correlation_matrix(&input, 3, NearestCorrelationOpts::default()).expect("ok");
+            nearest_correlation(&input, 3, NearestCorrelationOpts::default()).expect("ok");
         for i in 0..3 {
             assert!(
                 (repaired[i * 3 + i] - 1.0).abs() < 1e-15,
@@ -465,7 +465,7 @@ mod tests {
             max_iter: 1,
             tol: 1e-16,
         };
-        let err = nearest_correlation_matrix(&input, 3, opts).expect_err("must not converge");
+        let err = nearest_correlation(&input, 3, opts).expect_err("must not converge");
         assert!(matches!(err, Error::DidNotConverge { max_iter: 1, .. }));
     }
 
@@ -483,7 +483,7 @@ mod tests {
             max_iter: 200,
             tol: 1e-4,
         };
-        let repaired = nearest_correlation_matrix(&input, 3, opts).expect("converges");
+        let repaired = nearest_correlation(&input, 3, opts).expect("converges");
         validate_correlation_matrix(&repaired, 3).expect("valid despite loose tolerance");
     }
 
@@ -510,7 +510,7 @@ mod tests {
             max_iter: 400,
             tol: 1e-9,
         };
-        let repaired = nearest_correlation_matrix(&input, n, opts).expect("converges");
+        let repaired = nearest_correlation(&input, n, opts).expect("converges");
 
         // Unit diagonal, symmetry, and PSD — the three invariants the
         // projection must restore.

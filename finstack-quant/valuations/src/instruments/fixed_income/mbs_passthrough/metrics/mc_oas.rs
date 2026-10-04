@@ -42,7 +42,7 @@ use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use crate::instruments::rates::hw1f::{initial_short_rate_from_curve, prepare_hw1f_params};
 use finstack_quant_core::dates::{Date, DayCount};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::{Error as CoreError, Result};
 use finstack_quant_models::monte_carlo::process::ou::HullWhite1FParams;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
