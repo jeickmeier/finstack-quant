@@ -19,7 +19,7 @@ use crate::instruments::fixed_income::convertible::pricing::{
 };
 use crate::instruments::fixed_income::convertible::ConvertibleBond;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::{Error, Result};
 
 pub(crate) struct ImpliedVolCalculator;

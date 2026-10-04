@@ -445,34 +445,6 @@ pub fn map_date_to_step(
     Ok(step_index.min(steps))
 }
 
-/// Map multiple calendar dates to step indices.
-///
-/// # Arguments
-///
-/// * `base_date` - Valuation date that defines time zero for the lattice.
-/// * `dates` - Calendar dates to map; output positions preserve this order.
-/// * `maturity_date` - Terminal lattice date that defines the full time span.
-/// * `steps` - Number of uniform lattice intervals between base and maturity.
-/// * `day_count` - Day-count convention used to convert dates to year fractions.
-/// * `ctx` - Supplemental calendar or reference-period data required by `day_count`.
-///
-/// # Errors
-///
-/// Returns the first day-count error encountered while mapping the dates.
-pub fn map_dates_to_steps(
-    base_date: Date,
-    dates: &[Date],
-    maturity_date: Date,
-    steps: usize,
-    day_count: DayCount,
-    ctx: DayCountContext<'_>,
-) -> crate::Result<Vec<usize>> {
-    dates
-        .iter()
-        .map(|&d| map_date_to_step(base_date, d, maturity_date, steps, day_count, ctx))
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -666,23 +638,6 @@ mod tests {
             map_date_to_step(base, mid, maturity, 0, DayCount::Act365F, ctx).expect("map date"),
             0
         );
-    }
-
-    #[test]
-    fn test_map_dates_to_steps_preserves_input_order() {
-        let base = date!(2024 - 01 - 01);
-        let maturity = date!(2025 - 01 - 01);
-        let steps = map_dates_to_steps(
-            base,
-            &[date!(2025 - 01 - 01), date!(2024 - 01 - 01)],
-            maturity,
-            4,
-            DayCount::Act365F,
-            DayCountContext::default(),
-        )
-        .expect("map dates");
-
-        assert_eq!(steps, vec![4, 0]);
     }
 
     #[test]

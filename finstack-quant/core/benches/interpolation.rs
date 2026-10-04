@@ -9,8 +9,8 @@
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::math::interp::{
-    CubicHermiteStrategy, ExtrapolationPolicy, InterpFn, Interpolator, LinearStrategy,
-    LogLinearStrategy, MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy, ValidationPolicy,
+    CubicHermiteStrategy, ExtrapolationPolicy, Interpolator, LinearStrategy, LogLinearStrategy,
+    MonotoneConvexStrategy, PiecewiseQuadraticForwardStrategy, ValidationPolicy,
 };
 use std::hint::black_box;
 

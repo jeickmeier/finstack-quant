@@ -8,7 +8,7 @@ use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext};
 use finstack_quant_core::dates::{Date, DayCountContext};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use std::cell::RefCell;
 
 /// Z-spread solver tolerance on the spread axis (decimal, not bp).

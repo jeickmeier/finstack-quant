@@ -104,7 +104,7 @@ pub mod variance_reduction;
 #[cfg(test)]
 mod mc_process_params_serialization;
 
-pub use finstack_quant_core::math::stats::{required_samples, OnlineCovariance, OnlineStats};
+pub use finstack_quant_core::math::stats::{OnlineCovariance, OnlineStats};
 pub use finstack_quant_core::math::time_grid::TimeGrid;
 pub use gbm_paths::{simulate_gbm_paths, GbmPathConfig, GbmPathSummary};
 pub use traits::{

@@ -22,15 +22,17 @@
 //!
 //! let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-8);
 //!
-//! // Minimize sum of squares: (x-2)^2 + (y-3)^2
-//! let objective = |params: &[f64]| -> f64 {
-//!     (params[0] - 2.0).powi(2) + (params[1] - 3.0).powi(2)
+//! // Solve the residual system x + y = 5, x - y = 1.
+//! let residuals = |params: &[f64], resid: &mut [f64]| {
+//!     resid[0] = params[0] + params[1] - 5.0;
+//!     resid[1] = params[0] - params[1] - 1.0;
 //! };
 //!
-//! let initial = vec![0.0, 0.0];
-//! let result = solver.minimize(objective, &initial, None).expect("Minimization should succeed");
-//! assert!((result[0] - 2.0).abs() < 1e-6);
-//! assert!((result[1] - 3.0).abs() < 1e-6);
+//! let solution = solver
+//!     .solve_system_with_dim_stats(residuals, &[0.0, 0.0], 2)
+//!     .expect("system solve should succeed");
+//! assert!((solution.params[0] - 3.0).abs() < 1e-6);
+//! assert!((solution.params[1] - 2.0).abs() < 1e-6);
 //! ```
 //!
 //! # References
@@ -95,15 +97,6 @@ impl NormalEquationsWorkspace {
 /// This trait allows optimization algorithms to use exact derivatives
 /// when available, significantly improving convergence speed and accuracy.
 pub trait AnalyticalDerivatives {
-    /// Compute the gradient of the objective function.
-    ///
-    /// # Arguments
-    /// * `_params` - Current parameter values
-    /// * `_gradient` - Output buffer for gradient (must be same length as params)
-    fn gradient(&self, _params: &[f64], _gradient: &mut [f64]) -> Option<()> {
-        None
-    }
-
     /// Compute the Jacobian matrix for a system of equations.
     ///
     /// # Arguments
@@ -186,12 +179,6 @@ pub const LAMBDA_MIN: f64 = 1e-15;
 /// becoming effectively stuck in pure gradient descent mode.
 pub const LAMBDA_MAX: f64 = 1e15;
 
-/// Number of consecutive iterations at λ bounds before warning.
-///
-/// If λ hits its bounds for this many consecutive iterations, it may indicate
-/// an ill-conditioned problem or poor initial guess.
-pub const LAMBDA_BOUND_WARNING_THRESHOLD: usize = 5;
-
 /// Relative floor applied to the `JᵀJ` diagonal in Marquardt damping.
 ///
 /// The damping term is `λ · max(JᵀJ_ii, floor)` with
@@ -230,9 +217,8 @@ pub const MARQUARDT_DIAG_FLOOR_REL: f64 = 1e-12;
 /// # Damping Parameter Bounds
 ///
 /// The damping parameter λ is bounded to [`LAMBDA_MIN`] and [`LAMBDA_MAX`] to ensure
-/// numerical stability. If λ hits these bounds for [`LAMBDA_BOUND_WARNING_THRESHOLD`]
-/// consecutive iterations, the solver records this in [`LmStats::lambda_bound_hits`]
-/// which may indicate an ill-conditioned problem.
+/// numerical stability. Each time λ is clamped the solver counts it in
+/// [`LmStats::lambda_bound_hits`]; a high count may indicate an ill-conditioned problem.
 ///
 /// # Convergence
 ///
@@ -304,279 +290,6 @@ impl LevenbergMarquardtSolver {
     pub fn with_max_iterations(mut self, max_iterations: usize) -> Self {
         self.max_iterations = max_iterations;
         self
-    }
-
-    /// Set initial damping parameter.
-    pub fn with_lambda_init(mut self, lambda: f64) -> Self {
-        self.lambda_init = lambda;
-        self
-    }
-
-    /// Set finite difference step size.
-    pub fn with_fd_step(mut self, step: f64) -> Self {
-        self.fd_step = step;
-        self
-    }
-
-    /// Minimize objective function starting from an initial guess.
-    ///
-    /// # Scalar-objective formulation (important)
-    ///
-    /// This routine wraps the scalar objective as a single LM "residual", so the
-    /// update step targets `f(x) = 0`, **not** `∇f(x) = 0`. It is only suitable
-    /// for objectives whose minimum value is approximately zero — e.g.
-    /// least-squares residual norms / sums of squared errors. Objectives with
-    /// strictly positive minima may stall near the optimum, and objectives that
-    /// can go negative may have improving steps rejected. See
-    ///  ("Scalar-objective LM is
-    /// a root-finder for f(x)=0").
-    ///
-    /// # Arguments
-    /// * `objective` - Function to minimize, takes a parameter vector and returns a scalar.
-    /// * `initial` - Finite initial parameter guess, within every supplied inclusive bound.
-    /// * `bounds` - Optional ordered, non-NaN inclusive lower/upper pair for each
-    ///   parameter; infinities leave a side unbounded. Finite-difference probes
-    ///   stay within these bounds, and equal endpoints fix a parameter.
-    ///
-    /// # Returns
-    /// Optimal parameter vector that minimizes the objective.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error::Validation`] for invalid initial parameters or bounds.
-    /// Returns [`InputError::SolverConvergenceFailed`] on numerical failure, or when the
-    /// iteration budget is exhausted or the step is below `min_step_size` at a point satisfying
-    /// neither the residual nor the (bounds-projected) gradient tolerance.
-    /// Termination at a genuinely converged point — objective within
-    /// `tolerance` of zero, or projected gradient below `tolerance` (e.g. a
-    /// box-constrained minimum on the boundary) — still returns `Ok`.
-    pub fn minimize<Obj>(
-        &self,
-        objective: Obj,
-        initial: &[f64],
-        bounds: Option<&[(f64, f64)]>,
-    ) -> Result<Vec<f64>>
-    where
-        Obj: Fn(&[f64]) -> f64,
-    {
-        let residuals_func = |params: &[f64], resid: &mut [f64]| {
-            resid[0] = objective(params);
-        };
-
-        // Reusable finite-difference scratch, allocated once instead of per LM
-        // iteration.
-        let mut jac_params_plus = initial.to_vec();
-        let mut jac_params_minus = initial.to_vec();
-        let jacobian_func = |p: &[f64], _r: &[f64], _eval_counter: &mut usize, out: &mut [f64]| {
-            self.compute_jacobian_into(
-                &objective,
-                p,
-                bounds,
-                &mut jac_params_plus,
-                &mut jac_params_minus,
-                out,
-            );
-        };
-
-        // Convergence check: Gradient Norm (jac is flat 1×n = gradient)
-        let convergence_check =
-            |p: &[f64], r: &[f64], jac: &[f64]| -> Option<LmTerminationReason> {
-                let grad_norm = projected_gradient_norm(jac, p, bounds);
-                if r[0].is_finite() && grad_norm < self.tolerance {
-                    Some(LmTerminationReason::ConvergedGradient)
-                } else {
-                    None
-                }
-            };
-
-        let solution = self.solve_lm_core_with_stats(
-            initial.to_vec(),
-            &residuals_func,
-            jacobian_func,
-            convergence_check,
-            1, // n_residuals
-            bounds,
-        )?;
-        self.scalar_solution_to_result(
-            solution,
-            |p| self.compute_jacobian(&objective, p, bounds),
-            bounds,
-        )
-    }
-
-    /// Map a scalar-objective [`LmSolution`] to either the parameter vector or
-    /// a structured convergence error.
-    ///
-    /// `NumericalFailure` always becomes
-    /// [`InputError::SolverConvergenceFailed`]. `MaxIterations` and
-    /// `StepTooSmall` are accepted only when the iterate is converged in
-    /// substance: the final residual (objective value) is within tolerance, or
-    /// the bounds-projected gradient norm is within tolerance (a genuine
-    /// stationary point, possibly on a box-constraint boundary). A budget
-    /// exhaustion or pure stall away from any such point is an error — the
-    /// previous behaviour of silently returning the best iterate is gone
-    /// (review 2026-06-09, core math).
-    fn scalar_solution_to_result<G>(
-        &self,
-        solution: LmSolution,
-        gradient_at: G,
-        bounds: Option<&[(f64, f64)]>,
-    ) -> Result<Vec<f64>>
-    where
-        G: FnOnce(&[f64]) -> Vec<f64>,
-    {
-        use LmTerminationReason as Reason;
-        let converged = solution.stats.final_residual_norm.is_finite()
-            && match solution.stats.termination_reason {
-                Reason::ConvergedResidualNorm
-                | Reason::ConvergedRelativeReduction
-                | Reason::ConvergedGradient => true,
-                Reason::NumericalFailure => false,
-                Reason::MaxIterations | Reason::StepTooSmall => {
-                    solution.stats.final_residual_norm.abs() <= self.tolerance || {
-                        let gradient = gradient_at(&solution.params);
-                        projected_gradient_norm(&gradient, &solution.params, bounds)
-                            < self.tolerance
-                    }
-                }
-            };
-        if converged {
-            Ok(solution.params)
-        } else {
-            Err(InputError::SolverConvergenceFailed {
-                iterations: solution.stats.iterations,
-                residual: solution.stats.final_residual_norm,
-                last_x: solution.stats.final_step_norm,
-                reason: format!(
-                    "Levenberg-Marquardt minimize terminated with {:?} before reaching \
-                     tolerance {:.1e} (last_x reports the final step norm)",
-                    solution.stats.termination_reason, self.tolerance
-                ),
-            }
-            .into())
-        }
-    }
-
-    /// Compute Jacobian matrix using finite differences.
-    ///
-    /// Returns a flat `Vec<f64>` in row-major layout: `jacobian[i * n_params + j]`
-    /// where i = residual index, j = param index. For scalar objective, Jacobian is 1×n.
-    fn compute_jacobian<Obj>(
-        &self,
-        objective: &Obj,
-        params: &[f64],
-        bounds: Option<&[(f64, f64)]>,
-    ) -> Vec<f64>
-    where
-        Obj: Fn(&[f64]) -> f64,
-    {
-        let n = params.len();
-        let mut jacobian = vec![0.0; n]; // For scalar objective, Jacobian is 1×n
-        let mut params_plus = params.to_vec();
-        let mut params_minus = params.to_vec();
-        self.compute_jacobian_into(
-            objective,
-            params,
-            bounds,
-            &mut params_plus,
-            &mut params_minus,
-            &mut jacobian,
-        );
-        jacobian
-    }
-
-    /// Compute the scalar-objective gradient (1×n Jacobian) into `out` using
-    /// central finite differences, or a feasible one-sided stencil near a box
-    /// bound. Reuses scratch buffers without per-iteration heap allocation.
-    ///
-    /// `params_plus`, `params_minus`, and `out` must each have the same length
-    /// as `params`. On return, `params_plus`/`params_minus` are restored to
-    /// equal `params`.
-    fn compute_jacobian_into<Obj>(
-        &self,
-        objective: &Obj,
-        params: &[f64],
-        bounds: Option<&[(f64, f64)]>,
-        params_plus: &mut [f64],
-        params_minus: &mut [f64],
-        out: &mut [f64],
-    ) where
-        Obj: Fn(&[f64]) -> f64,
-    {
-        params_plus.copy_from_slice(params);
-        params_minus.copy_from_slice(params);
-        let mut base_value = None;
-
-        for (j, &p_j) in params.iter().enumerate() {
-            let (lo, hi) = bounds.map_or((f64::NEG_INFINITY, f64::INFINITY), |b| b[j]);
-            if lo >= hi {
-                out[j] = 0.0;
-                continue;
-            }
-            let h = (p_j.abs() * self.fd_step).max(self.fd_step);
-            if p_j + h <= hi && p_j - h >= lo {
-                params_plus[j] = p_j + h;
-                params_minus[j] = p_j - h;
-                let f_plus = objective(params_plus);
-                let f_minus = objective(params_minus);
-                out[j] = (f_plus - f_minus) / (params_plus[j] - params_minus[j]);
-            } else {
-                // Keep the usual second-order accuracy at a boundary by
-                // taking two probes on the side with more feasible room.
-                let forward = hi - p_j >= p_j - lo;
-                let room = if forward { hi - p_j } else { p_j - lo };
-                let step = h.min(0.5 * room) * if forward { 1.0 } else { -1.0 };
-                params_plus[j] = (p_j + step).clamp(lo, hi);
-                params_minus[j] = if step.abs() > 0.0 {
-                    (p_j + 2.0 * step).clamp(lo, hi)
-                } else if forward {
-                    hi
-                } else {
-                    lo
-                };
-                let d1 = params_plus[j] - p_j;
-                let d2 = params_minus[j] - p_j;
-                let f0 = *base_value.get_or_insert_with(|| objective(params));
-                let f2 = objective(params_minus);
-                out[j] = if d1.abs() > 0.0 && (d2 - d1).abs() > 0.0 {
-                    let f1 = objective(params_plus);
-                    // Nonuniform second-order stencil also accounts for
-                    // rounding of the two representable probe coordinates.
-                    d2 / (d2 - d1) * ((f1 - f0) / d1) - d1 / (d2 - d1) * ((f2 - f0) / d2)
-                } else if d2.abs() > 0.0 {
-                    // An interval with only two representable points cannot
-                    // support a three-point stencil; use its feasible secant.
-                    (f2 - f0) / d2
-                } else {
-                    0.0
-                };
-            }
-            params_plus[j] = p_j;
-            params_minus[j] = p_j;
-        }
-    }
-
-    /// Compute gradient using analytical derivatives if available, otherwise finite differences.
-    fn compute_gradient_with_analytical<Obj, D>(
-        &self,
-        objective: &Obj,
-        params: &[f64],
-        derivatives: Option<&D>,
-        bounds: Option<&[(f64, f64)]>,
-    ) -> Vec<f64>
-    where
-        Obj: Fn(&[f64]) -> f64,
-        D: AnalyticalDerivatives,
-    {
-        if let Some(deriv) = derivatives {
-            let mut gradient = vec![0.0; params.len()];
-            if deriv.gradient(params, &mut gradient).is_some() {
-                return gradient;
-            }
-        }
-
-        // Fall back to finite differences (Jacobian is 1×n, flat row)
-        self.compute_jacobian(objective, params, bounds)
     }
 
     /// Compute Jacobian for a system of residuals into a pre-allocated buffer.
@@ -657,8 +370,8 @@ impl LevenbergMarquardtSolver {
         // fraction of the largest diagonal entry, giving Marquardt's
         // scale-invariant λ·diag(JᵀJ) damping (Marquardt 1963).
         //
-        // For rank-deficient formulations (m < n, e.g. the scalar-objective
-        // wrapper where JᵀJ = ggᵀ is rank 1) true Marquardt damping is
+        // For rank-deficient formulations (m < n, fewer residuals than
+        // parameters) true Marquardt damping is
         // pathological: in the large-λ limit the step components scale as
         // -f/(λ·g_i), *diverging* exactly where the gradient is small, and
         // the iteration zigzags to a stall. There the floor is raised to
@@ -700,15 +413,6 @@ impl LevenbergMarquardtSolver {
         Ok(())
     }
 
-    /// Apply box constraints to parameters.
-    fn apply_bounds(&self, params: &mut [f64], bounds: Option<&[(f64, f64)]>) {
-        if let Some(bounds) = bounds {
-            for (i, (lo, hi)) in bounds.iter().enumerate().take(params.len()) {
-                params[i] = params[i].clamp(*lo, *hi);
-            }
-        }
-    }
-
     fn solve_lm_core_with_stats<Res, Jac, Check>(
         &self,
         mut params: Vec<f64>,
@@ -716,7 +420,6 @@ impl LevenbergMarquardtSolver {
         mut jacobian_func: Jac,
         convergence_check: Check,
         n_residuals: usize,
-        bounds: Option<&[(f64, f64)]>,
     ) -> Result<LmSolution>
     where
         Res: Fn(&[f64], &mut [f64]),
@@ -730,18 +433,6 @@ impl LevenbergMarquardtSolver {
             return Err(crate::Error::Validation(
                 "LM initial parameters must be finite".into(),
             ));
-        }
-        if let Some(bounds) = bounds {
-            if bounds.len() != params.len()
-                || bounds
-                    .iter()
-                    .zip(&params)
-                    .any(|(&(lo, hi), value)| !(lo..=hi).contains(value))
-            {
-                return Err(crate::Error::Validation(
-                    "LM requires one ordered non-NaN bound pair per parameter and initial parameters within those bounds".into(),
-                ));
-            }
         }
 
         let mut lambda = self.lambda_init;
@@ -813,7 +504,6 @@ impl LevenbergMarquardtSolver {
             for (i, &s) in ne_ws.step.iter().enumerate() {
                 new_params[i] += s;
             }
-            self.apply_bounds(&mut new_params, bounds);
 
             let effective_step_norm: f64 = new_params
                 .iter()
@@ -890,88 +580,6 @@ impl LevenbergMarquardtSolver {
         })
     }
 
-    /// Minimize objective function with analytical derivatives.
-    ///
-    /// The same scalar-objective formulation caveat and error semantics as
-    /// [`Self::minimize`] apply: the step targets `f(x) = 0`, and
-    /// non-convergent terminations return
-    /// [`InputError::SolverConvergenceFailed`] instead of silently handing back
-    /// the best iterate.
-    ///
-    /// # Arguments
-    /// * `objective` - Function to minimize
-    /// * `derivatives` - Provider of analytical derivatives
-    /// * `initial` - Finite initial parameter guess, within every supplied inclusive bound.
-    /// * `bounds` - Optional ordered, non-NaN inclusive lower/upper pair for each
-    ///   parameter; infinities leave a side unbounded. Finite-difference probes
-    ///   stay within these bounds, and equal endpoints fix a parameter.
-    ///
-    /// # Returns
-    /// Optimal parameter vector
-    ///
-    /// # Errors
-    ///
-    /// Returns [`crate::Error::Validation`] for invalid initial parameters or bounds.
-    /// Returns [`InputError::SolverConvergenceFailed`] on `MaxIterations`,
-    /// `NumericalFailure`, or a stall at a non-converged point (see [`Self::minimize`]).
-    pub fn minimize_with_derivatives<Obj, D>(
-        &self,
-        objective: Obj,
-        derivatives: &D,
-        initial: &[f64],
-        bounds: Option<&[(f64, f64)]>,
-    ) -> Result<Vec<f64>>
-    where
-        Obj: Fn(&[f64]) -> f64,
-        D: AnalyticalDerivatives,
-    {
-        let residuals_func = |params: &[f64], resid: &mut [f64]| {
-            resid[0] = objective(params);
-        };
-
-        // Reusable finite-difference scratch (used only on the FD fallback path),
-        // allocated once instead of per LM iteration.
-        let mut jac_params_plus = initial.to_vec();
-        let mut jac_params_minus = initial.to_vec();
-        let jacobian_func = |p: &[f64], _r: &[f64], _eval_counter: &mut usize, out: &mut [f64]| {
-            if derivatives.gradient(p, out).is_none() {
-                self.compute_jacobian_into(
-                    &objective,
-                    p,
-                    bounds,
-                    &mut jac_params_plus,
-                    &mut jac_params_minus,
-                    out,
-                );
-            }
-        };
-
-        // Convergence check: Gradient Norm (jac is flat 1×n = gradient)
-        let convergence_check =
-            |p: &[f64], r: &[f64], jac: &[f64]| -> Option<LmTerminationReason> {
-                let grad_norm = projected_gradient_norm(jac, p, bounds);
-                if r[0].is_finite() && grad_norm < self.tolerance {
-                    Some(LmTerminationReason::ConvergedGradient)
-                } else {
-                    None
-                }
-            };
-
-        let solution = self.solve_lm_core_with_stats(
-            initial.to_vec(),
-            &residuals_func,
-            jacobian_func,
-            convergence_check,
-            1, // n_residuals
-            bounds,
-        )?;
-        self.scalar_solution_to_result(
-            solution,
-            |p| self.compute_gradient_with_analytical(&objective, p, Some(derivatives), bounds),
-            bounds,
-        )
-    }
-
     /// Solve system of equations with explicit residual dimension and stats.
     pub fn solve_system_with_dim_stats<Res>(
         &self,
@@ -1012,7 +620,6 @@ impl LevenbergMarquardtSolver {
             jacobian_func,
             convergence_check,
             n_residuals,
-            None,
         )
     }
 
@@ -1080,176 +687,13 @@ impl LevenbergMarquardtSolver {
             jacobian_func,
             convergence_check,
             n_residuals,
-            None, // bounds
         )
     }
-}
-
-/// Norm of the gradient projected onto the feasible directions of box bounds.
-///
-/// Gradient components that push a parameter further into an active bound
-/// (lower bound with positive gradient, upper bound with negative gradient —
-/// for a minimization step `-g`) are zeroed: at such points the objective
-/// cannot be reduced without leaving the box, so they do not count against
-/// stationarity. Without bounds this is the plain Euclidean gradient norm.
-fn projected_gradient_norm(gradient: &[f64], params: &[f64], bounds: Option<&[(f64, f64)]>) -> f64 {
-    let mut sum_sq = 0.0;
-    for (i, &g) in gradient.iter().enumerate() {
-        let blocked = bounds
-            .and_then(|b| b.get(i))
-            .is_some_and(|&(lo, hi)| (params[i] <= lo && g > 0.0) || (params[i] >= hi && g < 0.0));
-        if !blocked {
-            sum_sq += g * g;
-        }
-    }
-    sum_sq.sqrt()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_levenberg_marquardt_simple_minimum() {
-        // Review 2026-06-09 (core math): this test previously passed via the
-        // silent best-guess-on-MaxIterations behaviour with tolerance 1e-10
-        // (the scalar root-finder formulation stalls at gradient ~1e-9 once
-        // the residual underflows toward f64 epsilon). Use an attainable
-        // gradient tolerance now that non-convergence is a hard error.
-        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-8);
-
-        // Minimize (x-2)^2 + (y-3)^2
-        let objective =
-            |params: &[f64]| -> f64 { (params[0] - 2.0).powi(2) + (params[1] - 3.0).powi(2) };
-
-        let initial = vec![0.0, 0.0];
-        let result = solver
-            .minimize(objective, &initial, None)
-            .expect("Minimization should succeed in test");
-
-        assert!((result[0] - 2.0).abs() < 1e-6);
-        assert!((result[1] - 3.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_levenberg_marquardt_with_bounds() {
-        let solver = LevenbergMarquardtSolver::new();
-
-        // Minimize (x-5)^2 + (y-5)^2 with bounds
-        let objective =
-            |params: &[f64]| -> f64 { (params[0] - 5.0).powi(2) + (params[1] - 5.0).powi(2) };
-
-        let initial = vec![0.0, 0.0];
-        let bounds = vec![(0.0, 3.0), (0.0, 3.0)]; // Constrain solution
-        let result = solver
-            .minimize(objective, &initial, Some(&bounds))
-            .expect("Minimization should succeed in test");
-
-        // Solution should be at boundary (3, 3)
-        assert!((result[0] - 3.0).abs() < 1e-6);
-        assert!((result[1] - 3.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn test_minimize_rejects_invalid_initial_bounds_before_evaluation() {
-        struct QuarticDerivatives;
-        impl AnalyticalDerivatives for QuarticDerivatives {
-            fn gradient(&self, params: &[f64], gradient: &mut [f64]) -> Option<()> {
-                let x = params[0];
-                gradient[0] = 2.0 * (x - 0.5) * (x - 2.0) * (2.0 * x - 2.5);
-                Some(())
-            }
-        }
-        let solver = LevenbergMarquardtSolver::new();
-        for (initial, bounds) in [
-            (2.0, vec![(0.0, 1.0)]),
-            (0.5, vec![(1.0, 0.0)]),
-            (0.5, vec![(f64::NAN, 1.0)]),
-            (0.5, vec![(0.0, f64::NAN)]),
-            (0.5, vec![]),
-            (0.5, vec![(0.0, 1.0), (0.0, 1.0)]),
-            (f64::NAN, vec![(0.0, 1.0)]),
-            (f64::INFINITY, vec![(0.0, f64::INFINITY)]),
-        ] {
-            let evaluations = std::cell::Cell::new(0);
-            let objective = |p: &[f64]| {
-                evaluations.set(evaluations.get() + 1);
-                (p[0] - 0.5).powi(2) * (p[0] - 2.0).powi(2)
-            };
-            for analytical in [false, true] {
-                let result = if analytical {
-                    solver.minimize_with_derivatives(
-                        objective,
-                        &QuarticDerivatives,
-                        &[initial],
-                        Some(&bounds),
-                    )
-                } else {
-                    solver.minimize(objective, &[initial], Some(&bounds))
-                };
-                assert!(result.is_err(), "{result:?}");
-                assert_eq!(evaluations.get(), 0);
-            }
-        }
-    }
-
-    #[test]
-    fn test_minimize_bounded_finite_differences_stay_feasible() {
-        struct FiniteDifferences;
-        impl AnalyticalDerivatives for FiniteDifferences {}
-
-        let solver = LevenbergMarquardtSolver::new();
-        for (lo, hi) in [(0.0, 1.0), (0.0, 1e-7)] {
-            let width = hi - lo;
-            let target = lo + 0.5 * width;
-            let bounds = [(lo, hi), (2.0, 2.0)];
-            for initial in [lo, hi, lo + 0.1 * width] {
-                let objective = |p: &[f64]| {
-                    assert!((lo..=hi).contains(&p[0]), "infeasible probe: {p:?}");
-                    assert_eq!(p[1], 2.0, "fixed parameter was perturbed");
-                    ((p[0] - target) / width).powi(2)
-                };
-                for derivative_fallback in [false, true] {
-                    let result = if derivative_fallback {
-                        solver.minimize_with_derivatives(
-                            objective,
-                            &FiniteDifferences,
-                            &[initial, 2.0],
-                            Some(&bounds),
-                        )
-                    } else {
-                        solver.minimize(objective, &[initial, 2.0], Some(&bounds))
-                    }
-                    .expect("feasible bounded quadratic should converge");
-                    assert!(((result[0] - target) / width).abs() < 1e-4);
-                    assert_eq!(result[1], 2.0);
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn test_minimize_accepts_fully_fixed_parameters_without_probing() {
-        let calls = std::cell::Cell::new(0);
-        let result = LevenbergMarquardtSolver::new()
-            .minimize(
-                |p| {
-                    calls.set(calls.get() + 1);
-                    assert_eq!(p, &[2.0]);
-                    1.0
-                },
-                &[2.0],
-                Some(&[(2.0, 2.0)]),
-            )
-            .expect("the only feasible point is the constrained minimum");
-        assert_eq!(result, [2.0]);
-        assert_eq!(calls.get(), 1);
-        for value in [f64::NAN, f64::INFINITY] {
-            assert!(LevenbergMarquardtSolver::new()
-                .minimize(|_| value, &[2.0], Some(&[(2.0, 2.0)]))
-                .is_err());
-        }
-    }
 
     #[test]
     fn test_lm_solution_is_invariant_to_uniform_residual_scale() {
@@ -1268,80 +712,6 @@ mod tests {
             );
             assert!((solution.params[0] - 2.0).abs() < 1e-9, "scale={scale}");
         }
-    }
-
-    #[test]
-    fn test_minimize_errors_on_max_iterations() {
-        // Review 2026-06-09 (core math): minimize() used to silently return the
-        // best iterate on MaxIterations; it must now fail loudly.
-        let solver = LevenbergMarquardtSolver::new()
-            .with_tolerance(1e-12)
-            .with_max_iterations(0);
-
-        let objective = |params: &[f64]| -> f64 { (params[0] - 2.0).powi(2) };
-        let result = solver.minimize(objective, &[0.0], None);
-
-        match result {
-            Err(crate::Error::Input(InputError::SolverConvergenceFailed { reason, .. })) => {
-                assert!(reason.contains("MaxIterations"), "reason: {reason}");
-            }
-            other => panic!("expected SolverConvergenceFailed, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_minimize_errors_on_non_finite_initial_objective() {
-        let solver = LevenbergMarquardtSolver::new();
-        let objective = |_params: &[f64]| -> f64 { f64::NAN };
-
-        match solver.minimize(objective, &[0.0], None) {
-            Err(crate::Error::Input(InputError::SolverConvergenceFailed { .. })) => {}
-            other => panic!("expected SolverConvergenceFailed, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn test_minimize_with_derivatives_errors_on_max_iterations() {
-        struct QuadraticDerivatives;
-        impl AnalyticalDerivatives for QuadraticDerivatives {
-            fn gradient(&self, params: &[f64], gradient: &mut [f64]) -> Option<()> {
-                gradient[0] = 2.0 * (params[0] - 2.0);
-                Some(())
-            }
-        }
-
-        let solver = LevenbergMarquardtSolver::new()
-            .with_tolerance(1e-12)
-            .with_max_iterations(0);
-
-        let objective = |params: &[f64]| -> f64 { (params[0] - 2.0).powi(2) };
-        let result =
-            solver.minimize_with_derivatives(objective, &QuadraticDerivatives, &[0.0], None);
-        assert!(
-            matches!(
-                result,
-                Err(crate::Error::Input(
-                    InputError::SolverConvergenceFailed { .. }
-                ))
-            ),
-            "expected SolverConvergenceFailed, got {result:?}"
-        );
-    }
-
-    #[test]
-    fn test_projected_gradient_norm_zeroes_active_bounds() {
-        // At the upper bound with a negative gradient (descent direction blocked
-        // by the box), the component must not count against stationarity.
-        let gradient = [-4.0, -4.0];
-        let params = [3.0, 3.0];
-        let bounds = [(0.0, 3.0), (0.0, 3.0)];
-        assert_eq!(
-            projected_gradient_norm(&gradient, &params, Some(&bounds)),
-            0.0
-        );
-        // Without bounds the full norm applies.
-        let norm = projected_gradient_norm(&gradient, &params, None);
-        assert!((norm - 32.0_f64.sqrt()).abs() < 1e-12);
     }
 
     #[test]
@@ -1386,92 +756,6 @@ mod tests {
             LmTerminationReason::MaxIterations
         );
         assert_eq!(solution.stats.iterations, 0);
-    }
-
-    #[test]
-    fn test_least_squares_fitting() {
-        // Review 2026-06-09 (core math): previously passed via silent
-        // best-guess-on-MaxIterations (residual ~5e-5 after 100 evals). The
-        // scalar formulation converges linearly here, so give it an adequate
-        // budget and an attainable gradient tolerance.
-        let solver = LevenbergMarquardtSolver::new()
-            .with_tolerance(1e-6)
-            .with_max_iterations(2000);
-
-        // Fit a quadratic y = a*x^2 + b*x + c to some data points
-        // True parameters: a=1, b=-2, c=3
-        let x_data = [-2.0, -1.0, 0.0, 1.0, 2.0];
-        let y_data = [11.0, 6.0, 3.0, 2.0, 3.0]; // y = x^2 - 2*x + 3
-
-        // Least squares objective
-        let objective = move |params: &[f64]| -> f64 {
-            let a = params[0];
-            let b = params[1];
-            let c = params[2];
-
-            x_data
-                .iter()
-                .zip(y_data.iter())
-                .map(|(&x, &y_true)| {
-                    let y_pred = a * x * x + b * x + c;
-                    (y_pred - y_true).powi(2)
-                })
-                .sum()
-        };
-
-        let initial = vec![0.5, 0.5, 0.5];
-        let result = solver
-            .minimize(objective, &initial, None)
-            .expect("Minimization should succeed in test");
-
-        // Should recover the true parameters (within reasonable tolerance)
-        assert!(
-            (result[0] - 1.0).abs() < 0.01,
-            "a = {}, expected 1.0",
-            result[0]
-        );
-        assert!(
-            (result[1] - (-2.0)).abs() < 0.01,
-            "b = {}, expected -2.0",
-            result[1]
-        );
-        assert!(
-            (result[2] - 3.0).abs() < 0.01,
-            "c = {}, expected 3.0",
-            result[2]
-        );
-    }
-
-    #[test]
-    fn test_analytical_derivatives_simple() {
-        // Simple quadratic with analytical derivatives
-        struct QuadraticDerivatives;
-
-        impl AnalyticalDerivatives for QuadraticDerivatives {
-            fn gradient(&self, params: &[f64], gradient: &mut [f64]) -> Option<()> {
-                // f(x,y) = (x-2)^2 + (y-3)^2
-                gradient[0] = 2.0 * (params[0] - 2.0);
-                gradient[1] = 2.0 * (params[1] - 3.0);
-                Some(())
-            }
-        }
-
-        // Review 2026-06-09 (core math): tolerance loosened from 1e-10 to an
-        // attainable gradient norm now that MaxIterations is a hard error.
-        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-8);
-
-        let objective =
-            |params: &[f64]| -> f64 { (params[0] - 2.0).powi(2) + (params[1] - 3.0).powi(2) };
-
-        let derivatives = QuadraticDerivatives;
-        let initial = vec![0.0, 0.0];
-
-        let result = solver
-            .minimize_with_derivatives(objective, &derivatives, &initial, None)
-            .expect("Minimization should succeed in test");
-
-        assert!((result[0] - 2.0).abs() < 1e-8);
-        assert!((result[1] - 3.0).abs() < 1e-8);
     }
 
     #[test]
@@ -1610,54 +894,6 @@ mod tests {
             .params;
 
         assert_eq!(result.len(), 3, "Result should have same length as initial");
-    }
-
-    #[test]
-    fn analytic_and_finite_difference_solvers_converge_to_same_solution() {
-        // Test that analytic and finite-difference derivatives converge equivalently.
-        struct SimpleGradient;
-        impl AnalyticalDerivatives for SimpleGradient {
-            fn gradient(&self, params: &[f64], gradient: &mut [f64]) -> Option<()> {
-                // f(x,y) = (x-2)^2 + (y-3)^2
-                gradient[0] = 2.0 * (params[0] - 2.0);
-                gradient[1] = 2.0 * (params[1] - 3.0);
-                Some(())
-            }
-        }
-
-        // Review 2026-06-09 (core math): tolerance loosened from 1e-10 to an
-        // attainable gradient norm now that MaxIterations is a hard error.
-        let solver = LevenbergMarquardtSolver::new().with_tolerance(1e-8);
-        let objective =
-            |params: &[f64]| -> f64 { (params[0] - 2.0).powi(2) + (params[1] - 3.0).powi(2) };
-        let derivatives = SimpleGradient;
-        let initial = vec![0.0, 0.0];
-
-        // Method 1: With analytic derivatives
-        let result1 = solver
-            .minimize_with_derivatives(objective, &derivatives, &initial, None)
-            .expect("minimize_with_derivatives should succeed in test");
-
-        // Method 2: With finite differences
-        let result2 = solver
-            .minimize(objective, &initial, None)
-            .expect("minimize should succeed in test");
-
-        // Both should converge to same solution (within reasonable tolerance)
-        // Note: Different convergence paths may yield slightly different final values
-        for (i, (&v1, &v2)) in result1.iter().zip(result2.iter()).enumerate() {
-            assert!(
-                (v1 - v2).abs() < 1e-6,
-                "Analytic and finite diff should converge to same solution at index {}: {} vs {}",
-                i,
-                v1,
-                v2
-            );
-        }
-
-        // Both should be close to [2.0, 3.0]
-        assert!((result1[0] - 2.0).abs() < 1e-8);
-        assert!((result1[1] - 3.0).abs() < 1e-8);
     }
 
     #[test]

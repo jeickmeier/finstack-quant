@@ -5,7 +5,7 @@
 //! flexibility and type safety.
 
 use super::{
-    traits::{InterpFn, InterpolationStrategy},
+    traits::InterpolationStrategy,
     types::{ExtrapolationPolicy, ValidationPolicy},
     utils::{validate_finite_series, validate_knots, validate_positive_series},
 };
@@ -29,7 +29,7 @@ use crate::error::InputError;
 ///
 /// ```rust
 /// use finstack_quant_core::math::interp::{
-///     ExtrapolationPolicy, InterpFn, Interpolator, LinearStrategy, ValidationPolicy,
+///     ExtrapolationPolicy, Interpolator, LinearStrategy, ValidationPolicy,
 /// };
 ///
 /// # fn main() -> finstack_quant_core::Result<()> {
@@ -160,15 +160,26 @@ impl<S: InterpolationStrategy> Interpolator<S> {
     }
 }
 
-impl<S: InterpolationStrategy> InterpFn for Interpolator<S> {
+impl<S: InterpolationStrategy> Interpolator<S> {
+    /// Interpolate at coordinate `x`.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - Evaluation point (typically a year fraction or time). Behavior
+    ///   outside the knot domain follows the interpolator's extrapolation policy.
     #[inline]
-    fn interp(&self, x: f64) -> f64 {
+    pub fn interp(&self, x: f64) -> f64 {
         self.strategy
             .interp(x, &self.knots, &self.values, self.extrapolation)
     }
 
+    /// First derivative at `x`, computed analytically by the strategy.
+    ///
+    /// # Arguments
+    ///
+    /// * `x` - Evaluation point, in the same units as the knots.
     #[inline]
-    fn interp_prime(&self, x: f64) -> f64 {
+    pub fn interp_prime(&self, x: f64) -> f64 {
         self.strategy
             .interp_prime(x, &self.knots, &self.values, self.extrapolation)
     }

@@ -13,9 +13,7 @@
 //! configuration structs (e.g. `EvolutionParams`) and keep runtime engine types
 //! (`BinomialTree`, etc.) non-serializable.
 
-pub use finstack_quant_core::math::time_grid::{
-    map_date_to_step, map_dates_to_steps, map_exercise_dates_to_steps,
-};
+pub use finstack_quant_core::math::time_grid::{map_date_to_step, map_exercise_dates_to_steps};
 
 /// Standard state variable keys for consistency
 pub mod state_keys {

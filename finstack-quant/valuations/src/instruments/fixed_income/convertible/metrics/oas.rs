@@ -30,7 +30,7 @@ use crate::instruments::fixed_income::convertible::pricing::{
 };
 use crate::instruments::fixed_income::convertible::ConvertibleBond;
 use crate::metrics::{bump_discount_curve_parallel, MetricCalculator, MetricContext};
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;
 
 pub(crate) struct OasCalculator;

@@ -7,7 +7,7 @@ use crate::instruments::{BreakevenConfig, BreakevenMode, BreakevenTarget};
 use crate::metrics::sensitivities::theta::calculate_theta_date;
 use crate::metrics::{MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::Result;
 use std::borrow::Cow;
 use std::cell::RefCell;

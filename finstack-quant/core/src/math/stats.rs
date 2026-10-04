@@ -44,7 +44,7 @@
 //! - Kahan, W. (1965). "Further Remarks on Reducing Truncation Errors."
 //!   *Communications of the ACM*, 8(1), 40. `docs/REFERENCES.md#kahan-1965`
 
-use super::special_functions::{standard_normal_inv_cdf, student_t_inv_cdf};
+use super::special_functions::student_t_inv_cdf;
 use super::summation::kahan_sum;
 
 /// Arithmetic mean.
@@ -925,26 +925,6 @@ impl OnlineStats {
     }
 }
 
-/// Compute relative error bound for target confidence.
-///
-/// Returns the number of samples required to achieve a target
-/// relative error (standard error / mean) at a given confidence level.
-///
-/// # Arguments
-///
-/// * `cv` - Coefficient of variation (σ / μ)
-/// * `target_rel_error` - Target relative standard error
-/// * `alpha` - Significance level (0.05 for 95% confidence)
-///
-/// # Returns
-///
-/// Minimum number of samples required.
-pub fn required_samples(cv: f64, target_rel_error: f64, alpha: f64) -> usize {
-    let z = standard_normal_inv_cdf(1.0 - alpha / 2.0);
-    let n = (z * cv / target_rel_error).powi(2);
-    n.ceil() as usize
-}
-
 /// Online covariance accumulator using Welford's algorithm.
 ///
 /// Computes mean, variance, and covariance for two variables in a single pass.
@@ -1094,6 +1074,7 @@ impl OnlineCovariance {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::math::standard_normal_inv_cdf;
 
     #[test]
     fn range_estimators_use_each_observed_bar_from_the_first() {
@@ -1281,12 +1262,6 @@ mod tests {
 
         assert!((standard_normal_inv_cdf(0.5)).abs() < 0.01);
         assert!((standard_normal_inv_cdf(0.25) + standard_normal_inv_cdf(0.75)).abs() < 0.01);
-    }
-
-    #[test]
-    fn test_required_samples() {
-        let n = required_samples(1.0, 0.01, 0.05);
-        assert!(n > 38000);
     }
 
     #[test]

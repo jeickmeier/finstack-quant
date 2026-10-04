@@ -705,7 +705,7 @@ impl HullWhiteTree {
                 (weighted_sum.ln() - target_df.ln()) / dt
             }
             _ => {
-                use finstack_quant_core::math::solver::{BrentSolver, Solver};
+                use finstack_quant_core::math::solver::BrentSolver;
                 let objective = |alpha: f64| -> f64 {
                     let mut model_df = 0.0;
                     for (idx, &q) in curr_state_prices.iter().enumerate() {

@@ -1,12 +1,11 @@
 //! Benchmarks for root-finding solvers.
 //!
-//! Compares Newton solver with analytic derivatives vs finite differences,
-//! and compares different solver strategies (Newton, Brent, Hybrid).
+//! Brent root finding, XIRR/IRR, and Levenberg-Marquardt system solves.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::cashflow::{irr, xirr, xirr_with_daycount};
 use finstack_quant_core::dates::{Date, DayCount};
-use finstack_quant_core::math::solver::{BrentSolver, NewtonSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver;
 use std::hint::black_box;
 use time::Month;
@@ -53,34 +52,6 @@ impl DenseSystem {
             *resid_slot = acc;
         }
     }
-}
-
-fn benchmark_newton_analytic_vs_fd(c: &mut Criterion) {
-    let mut group = c.benchmark_group("newton_solver");
-
-    // Test function: x^3 - 2x - 5 = 0
-    let f = |x: f64| x.powi(3) - 2.0 * x - 5.0;
-    let f_prime = |x: f64| 3.0 * x.powi(2) - 2.0;
-
-    let solver = NewtonSolver::new();
-
-    group.bench_function("finite_difference", |b| {
-        b.iter(|| {
-            solver
-                .solve(black_box(&f), black_box(2.0))
-                .expect("Should converge")
-        })
-    });
-
-    group.bench_function("analytic_derivative", |b| {
-        b.iter(|| {
-            solver
-                .solve_with_derivative(black_box(&f), black_box(&f_prime), black_box(2.0))
-                .expect("Should converge")
-        })
-    });
-
-    group.finish();
 }
 
 fn benchmark_xirr_performance(c: &mut Criterion) {
@@ -175,31 +146,11 @@ fn benchmark_xirr_daycount_variants(c: &mut Criterion) {
     group.finish();
 }
 
-fn benchmark_solver_comparison(c: &mut Criterion) {
+fn benchmark_brent(c: &mut Criterion) {
     let mut group = c.benchmark_group("solver_comparison");
 
-    // Test function: x^2 - 2 = 0 (simple case where all methods work well)
     let f = |x: f64| x * x - 2.0;
-    let f_prime = |x: f64| 2.0 * x;
-
-    let newton = NewtonSolver::new();
     let brent = BrentSolver::new();
-
-    group.bench_function("newton_fd", |b| {
-        b.iter(|| {
-            newton
-                .solve(black_box(&f), black_box(1.0))
-                .expect("Should converge")
-        })
-    });
-
-    group.bench_function("newton_analytic", |b| {
-        b.iter(|| {
-            newton
-                .solve_with_derivative(black_box(&f), black_box(&f_prime), black_box(1.0))
-                .expect("Should converge")
-        })
-    });
 
     group.bench_function("brent", |b| {
         b.iter(|| {
@@ -269,10 +220,9 @@ fn benchmark_lm_global_sizes(c: &mut Criterion) {
 
 criterion_group!(
     benches,
-    benchmark_newton_analytic_vs_fd,
     benchmark_xirr_performance,
     benchmark_xirr_daycount_variants,
-    benchmark_solver_comparison,
+    benchmark_brent,
     benchmark_irr_periodic,
     benchmark_lm_global_sizes,
 );

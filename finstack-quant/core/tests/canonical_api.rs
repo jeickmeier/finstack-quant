@@ -276,31 +276,6 @@ mod quadrature_tests {
         }
     }
 
-    /// Test that serialization/deserialization preserves behavior.
-    #[test]
-    fn quadrature_serde_equivalence() {
-        for order in [5, 7, 10, 15, 20] {
-            let original = GaussHermiteQuadrature::new(order).expect("valid order");
-
-            // Serialize and deserialize
-            let json = serde_json::to_string(&original).unwrap();
-            let restored: GaussHermiteQuadrature = serde_json::from_str(&json).unwrap();
-
-            // Test with integration
-            let f = |x: f64| x * x;
-            let result_original = original.integrate(f);
-            let result_restored = restored.integrate(f);
-
-            assert!(
-                (result_original - result_restored).abs() < 1e-12,
-                "Serde roundtrip should preserve behavior for order {}: original={}, restored={}",
-                order,
-                result_original,
-                result_restored
-            );
-        }
-    }
-
     /// Test that `new()` returns `Err` for unsupported orders.
     #[test]
     fn new_rejects_unsupported_orders() {

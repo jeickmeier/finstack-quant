@@ -5,7 +5,7 @@ use crate::instruments::fixed_income::bond::pricing::quote_conversions::price_fr
 use crate::instruments::fixed_income::bond::pricing::settlement::QuoteDateContext;
 use crate::instruments::Bond;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use std::cell::RefCell;
 
 /// Discount-margin solver tolerance on the DM axis (decimal).

@@ -47,7 +47,7 @@
 //!   Springer Finance (2nd ed.), Chapter 3. `docs/REFERENCES.md#brigo-mercurio-2006-interest-rate-models`
 
 use finstack_quant_core::math::piecewise::PiecewiseConstantCurve;
-use finstack_quant_core::math::solver::{BrentSolver, Solver};
+use finstack_quant_core::math::solver::BrentSolver;
 use finstack_quant_core::math::special_functions::norm_cdf;
 use std::collections::BTreeMap;
 

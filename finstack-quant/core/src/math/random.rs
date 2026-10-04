@@ -59,7 +59,7 @@ pub mod poisson;
 pub mod sobol;
 
 pub use brownian_bridge::BrownianBridge;
-pub use poisson::{poisson_from_normal, poisson_inverse_cdf};
+pub use poisson::poisson_inverse_cdf;
 
 /// Random number generator trait for statistical sampling.
 ///
