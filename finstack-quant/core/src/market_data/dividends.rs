@@ -202,22 +202,6 @@ impl DividendSchedule {
         self.currency
     }
 
-    /// Return events filtered to a date range inclusive.
-    pub fn events_between(&self, start: Date, end: Date) -> Vec<&DividendEvent> {
-        self.events
-            .iter()
-            .filter(|e| e.date >= start && e.date <= end)
-            .collect()
-    }
-
-    /// Convenience: cash dividends only (ignoring yield/stock entries).
-    pub fn cash_events(&self) -> impl Iterator<Item = (Date, &Money)> {
-        self.events.iter().filter_map(|e| match &e.kind {
-            DividendKind::Cash(m) => Some((e.date, m)),
-            _ => None,
-        })
-    }
-
     /// Validate schedule content (positive cash amounts, non-negative ratios).
     pub fn validate(&self) -> Result<()> {
         for ev in &self.events {
@@ -341,7 +325,5 @@ mod tests {
             .expect("DividendScheduleBuilder should succeed in test");
 
         assert_eq!(sched.events.len(), 3);
-        let between = sched.events_between(d1, d2);
-        assert_eq!(between.len(), 2);
     }
 }

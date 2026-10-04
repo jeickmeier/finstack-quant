@@ -166,12 +166,12 @@ mod tests {
     };
     use crate::instruments::InstrumentPricingOverrides;
     use crate::metrics::{MetricCalculator, MetricContext};
+    use finstack_quant_core::config::FinstackConfig;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
     use finstack_quant_core::market_data::scalars::MarketScalar;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::money::Money;
-    use finstack_quant_core::prelude::FinstackConfig;
     use time::Month;
 
     fn make_bond_with_quote(notional_usd: f64, quoted_clean_pct: f64) -> ConvertibleBond {

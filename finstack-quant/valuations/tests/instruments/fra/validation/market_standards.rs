@@ -9,7 +9,7 @@
 use crate::instruments::fra::common::*;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::DayCount;
-use finstack_quant_core::prelude::MarketContext;
+use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_valuations::instruments::Instrument;
 use finstack_quant_valuations::metrics::MetricId;
 
