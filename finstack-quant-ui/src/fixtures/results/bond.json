@@ -38,7 +38,7 @@
         "version": 1
       },
       "fx_policy_applied": null,
-      "timestamp": "+002026-10-02T03:43:48.112000000Z",
+      "timestamp": "+002026-10-04T22:15:54.177000000Z",
       "version": "0.9.0"
     },
     "covenants": null
@@ -81,6 +81,7 @@
       "roll_specialness",
       "theta",
       "theta_carry",
+      "theta_period_days",
       "theta_roll_down"
     ],
     "Credit": [
@@ -431,5 +432,5 @@
       "bucketed": true
     }
   ],
-  "facadeWasmSha256": "b294337580e5c84b09ea7436a851d8f11b51d38da7f0456e3317183e827d82c2"
+  "facadeWasmSha256": "6a6a30146f8d1804907a57b42517c4cb29d5027d980cee3d3c5308d85fa799b7"
 }
