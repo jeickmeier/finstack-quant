@@ -413,7 +413,7 @@ impl BaseCorrelationCurveBuilder {
     /// # Arguments
     ///
     /// * `id` - Unique market-data identifier stored on the completed curve.
-    pub fn new(id: impl Into<CurveId>) -> Self {
+    fn new(id: impl Into<CurveId>) -> Self {
         Self {
             id: id.into(),
             points: Vec::new(),
