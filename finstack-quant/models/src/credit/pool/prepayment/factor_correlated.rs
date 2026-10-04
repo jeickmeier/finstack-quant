@@ -106,10 +106,6 @@ impl StochasticPrepayment for FactorCorrelatedPrepay {
     fn factor_loading(&self) -> f64 {
         self.factor_loading
     }
-
-    fn model_name(&self) -> &'static str {
-        "Factor-Correlated Prepayment"
-    }
 }
 
 #[cfg(test)]

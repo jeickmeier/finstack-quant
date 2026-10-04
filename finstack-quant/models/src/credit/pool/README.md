@@ -6,8 +6,8 @@ calibration registries, and valuation results.
 
 Public specifications and kernels include:
 
-- `StochasticDefaultSpec`, `StochasticDefault`, and `MacroCreditFactors`;
-- `StochasticPrepaySpec`, `StochasticPrepayment`, and `RichardRollPrepay`;
+- `StochasticDefaultSpec` and `StochasticDefault`;
+- `StochasticPrepaySpec` and `StochasticPrepayment`;
 - `CorrelationStructure`;
 - `PerNameCopulaDefault` and `PoolGranularity`.
 

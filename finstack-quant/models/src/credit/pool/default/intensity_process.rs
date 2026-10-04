@@ -52,7 +52,7 @@
 //! - Duffie, D., & Singleton, K. J. (1999). "Modeling Term Structures of Defaultable Bonds." `docs/REFERENCES.md#duffie-singleton-1999`
 //! - Lando, D. (1998). "On Cox Processes and Credit Risky Securities." `docs/REFERENCES.md#lando-1998`
 
-use super::traits::{MacroCreditFactors, StochasticDefault};
+use super::traits::StochasticDefault;
 
 /// Intensity process (Cox model) default model.
 ///
@@ -111,12 +111,7 @@ impl IntensityProcessDefault {
 }
 
 impl StochasticDefault for IntensityProcessDefault {
-    fn conditional_mdr(
-        &self,
-        _seasoning: u32,
-        factors: &[f64],
-        _macro_factors: &MacroCreditFactors,
-    ) -> f64 {
+    fn conditional_mdr(&self, _seasoning: u32, factors: &[f64]) -> f64 {
         let z = factors.first().copied().unwrap_or(0.0);
 
         let intensity = self.intensity(z);
@@ -131,10 +126,6 @@ impl StochasticDefault for IntensityProcessDefault {
 
     fn correlation(&self) -> f64 {
         self.correlation
-    }
-
-    fn model_name(&self) -> &'static str {
-        "Intensity Process Default Model"
     }
 
     fn expected_mdr(&self, _seasoning: u32) -> f64 {
@@ -152,11 +143,10 @@ mod tests {
     #[test]
     fn production_credit_audit_intensity_has_no_implicit_seasoning() {
         let model = IntensityProcessDefault::new(0.12, 0.0, 0.30);
-        let factors = MacroCreditFactors::default();
         let expected = 1.0 - (-0.12_f64 / 12.0).exp();
         for month in [0, 1, 12, 24, 60] {
             assert!(
-                (model.conditional_mdr(month, &[0.0], &factors) - expected).abs() < 1e-14,
+                (model.conditional_mdr(month, &[0.0]) - expected).abs() < 1e-14,
                 "base intensity must apply at month {month}"
             );
             assert!((model.expected_mdr(month) - expected).abs() < 1e-14);
@@ -166,9 +156,7 @@ mod tests {
     #[test]
     fn test_conditional_mdr_at_zero_factor() {
         let model = IntensityProcessDefault::new(0.02, 0.5, 0.30);
-        let factors = MacroCreditFactors::default();
-
-        let mdr = model.conditional_mdr(12, &[0.0], &factors);
+        let mdr = model.conditional_mdr(12, &[0.0]);
 
         // At Z=0 the compensated shock is exp(−½β²σ²), so the intensity is
         // base_hazard × exp(−½β²σ²) (the shock has unit MEAN, not unit mode).
@@ -215,11 +203,9 @@ mod tests {
     #[test]
     fn test_negative_factor_increases_mdr() {
         let model = IntensityProcessDefault::new(0.02, 0.5, 0.30);
-        let factors = MacroCreditFactors::default();
-
-        let mdr_neg = model.conditional_mdr(12, &[-2.0], &factors);
-        let mdr_zero = model.conditional_mdr(12, &[0.0], &factors);
-        let mdr_pos = model.conditional_mdr(12, &[2.0], &factors);
+        let mdr_neg = model.conditional_mdr(12, &[-2.0]);
+        let mdr_zero = model.conditional_mdr(12, &[0.0]);
+        let mdr_pos = model.conditional_mdr(12, &[2.0]);
 
         // Canonical convention: low latent factor = stress.
         // Negative factor increases intensity -> higher MDR

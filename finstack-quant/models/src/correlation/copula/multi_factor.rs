@@ -36,8 +36,7 @@ const MULTI_FACTOR_QUADRATURE_ORDER: u8 = 10;
 /// Global-plus-sector two-factor Gaussian copula.
 ///
 /// The total correlation supplied to each pricing call is split between the
-/// global and sector factors. The default sector share is 40%; callers may
-/// set another finite share with [`Self::with_sector_fraction`].
+/// global and sector factors. The sector share is 40%.
 ///
 /// # References
 ///
@@ -52,11 +51,9 @@ pub struct MultiFactorCopula {
 
 impl Clone for MultiFactorCopula {
     fn clone(&self) -> Self {
-        let order = u8::try_from(self.quadrature.get_points().len())
-            .unwrap_or(MULTI_FACTOR_QUADRATURE_ORDER);
         Self {
             sector_fraction: self.sector_fraction,
-            quadrature: select_quadrature(order),
+            quadrature: select_quadrature(MULTI_FACTOR_QUADRATURE_ORDER),
         }
     }
 }
@@ -80,42 +77,10 @@ impl MultiFactorCopula {
     /// Create a global-plus-sector Gaussian copula.
     #[must_use]
     pub fn new() -> Self {
-        Self::with_quadrature_order(MULTI_FACTOR_QUADRATURE_ORDER)
-    }
-
-    /// Create a global-plus-sector copula with explicit quadrature order.
-    ///
-    /// # Arguments
-    ///
-    /// * `quadrature_order` - Gauss-Hermite points per systematic factor.
-    #[must_use]
-    pub fn with_quadrature_order(quadrature_order: u8) -> Self {
         Self {
             sector_fraction: 0.4,
-            quadrature: select_quadrature(quadrature_order),
+            quadrature: select_quadrature(MULTI_FACTOR_QUADRATURE_ORDER),
         }
-    }
-
-    /// Set the share of total correlation assigned to the sector factor.
-    ///
-    /// # Arguments
-    ///
-    /// * `sector_fraction` - Fraction in `[0, 1]`; finite values are clamped.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `sector_fraction` is non-finite.
-    pub fn with_sector_fraction(
-        mut self,
-        sector_fraction: f64,
-    ) -> finstack_quant_core::Result<Self> {
-        if !sector_fraction.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(
-                "multi-factor copula sector_fraction must be finite".into(),
-            ));
-        }
-        self.sector_fraction = sector_fraction.clamp(0.0, 1.0);
-        Ok(self)
     }
 
     /// Compute idiosyncratic loading given factor loadings.
@@ -263,9 +228,7 @@ mod tests {
 
     #[test]
     fn test_correlation_decomposition() {
-        let copula = MultiFactorCopula::new()
-            .with_sector_fraction(0.5)
-            .expect("finite sector fraction");
+        let copula = MultiFactorCopula::new();
         let (global, sector) = copula.decompose_correlation(0.36);
 
         // Total correlation should reconstruct

@@ -123,10 +123,6 @@ impl StochasticPrepayment for RegimeSwitchingPrepay {
     fn factor_loading(&self) -> f64 {
         self.factor_loading
     }
-
-    fn model_name(&self) -> &'static str {
-        "Regime-Switching Prepayment"
-    }
 }
 
 #[cfg(test)]

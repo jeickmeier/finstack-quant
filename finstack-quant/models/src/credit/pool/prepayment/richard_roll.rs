@@ -4,12 +4,11 @@
 //! - Refinancing incentive (rate sensitivity)
 //! - Seasoning ramp
 //! - Burnout effects
-//! - Seasonality patterns
 //!
 //! # Mathematical Model
 //!
 //! ```text
-//! CPR(t, r, B) = refi_incentive(r) × seasoning(t) × burnout(B) × seasonality(month)
+//! CPR(t, r, B) = refi_incentive(r) × seasoning(t) × burnout(B)
 //! ```
 //!
 //! ## Refinancing Incentive
@@ -36,77 +35,56 @@
 use super::super::{clamped_cpr_to_smm, expected_shocked_smm};
 use super::traits::StochasticPrepayment;
 
+/// Refinancing slope parameter (lambda) of the arctangent incentive response.
+const REFI_SLOPE: f64 = 20.0;
+/// Seasoning ramp length in months (PSA-like ramp).
+const RAMP_MONTHS: u32 = 30;
+
 /// Richard-Roll prepayment model for RMBS.
 ///
 /// Full stochastic prepayment model with refinancing incentive,
-/// seasoning, burnout, and optional seasonality.
+/// seasoning, and burnout.
 #[derive(Debug, Clone)]
-pub struct RichardRollPrepay {
+pub(crate) struct RichardRollPrepay {
     /// Base CPR at full seasoning (post-ramp)
     base_cpr: f64,
     /// Refinancing sensitivity parameter (gamma)
     refi_sensitivity: f64,
-    /// Refinancing slope parameter (lambda)
-    refi_slope: f64,
     /// AssetPool coupon rate (WAC)
     pool_coupon: f64,
     /// Burnout decay rate per prepayment
     burnout_rate: f64,
-    /// Seasonality amplitude (0 = no seasonality)
-    seasonality_amplitude: f64,
     /// Factor loading for correlation
     factor_loading: f64,
     /// CPR volatility
     cpr_volatility: f64,
-    /// Ramp months (typically 30 for PSA-like ramp)
-    ramp_months: u32,
 }
 
 impl RichardRollPrepay {
     /// Create a Richard-Roll prepayment model.
     ///
     /// # Arguments
-    /// * `base_cpr` - Base CPR at full seasoning
-    /// * `refi_sensitivity` - Sensitivity to refinancing incentive (gamma)
-    /// * `pool_coupon` - AssetPool weighted average coupon
-    /// * `burnout_rate` - Burnout decay rate
-    pub fn new(base_cpr: f64, refi_sensitivity: f64, pool_coupon: f64, burnout_rate: f64) -> Self {
-        Self {
-            base_cpr: base_cpr.clamp(0.0, 1.0),
-            refi_sensitivity: refi_sensitivity.clamp(0.0, 10.0),
-            refi_slope: 20.0, // Standard slope
-            pool_coupon,
-            burnout_rate: burnout_rate.clamp(0.0, 1.0),
-            seasonality_amplitude: 0.0,
-            factor_loading: 0.4,
-            cpr_volatility: 0.20,
-            ramp_months: 30,
-        }
-    }
-
-    /// Create with full customization.
-    #[allow(clippy::too_many_arguments)]
-    pub(crate) fn with_all_params(
+    /// * `base_cpr` - Annual base CPR at full seasoning as a decimal, clamped to `[0, 1]`
+    /// * `refi_sensitivity` - Sensitivity to refinancing incentive (gamma), clamped to `[0, 10]`
+    /// * `pool_coupon` - Pool weighted average coupon as an annual decimal rate
+    /// * `burnout_rate` - Burnout decay rate, clamped to `[0, 1]`
+    /// * `factor_loading` - Loading on the systematic prepayment factor, clamped to `[-1, 1]`
+    /// * `cpr_volatility` - Lognormal CPR shock volatility, clamped to `[0, 1]`
+    pub(crate) fn new(
         base_cpr: f64,
         refi_sensitivity: f64,
-        refi_slope: f64,
         pool_coupon: f64,
         burnout_rate: f64,
-        seasonality_amplitude: f64,
         factor_loading: f64,
         cpr_volatility: f64,
-        ramp_months: u32,
     ) -> Self {
         Self {
             base_cpr: base_cpr.clamp(0.0, 1.0),
             refi_sensitivity: refi_sensitivity.clamp(0.0, 10.0),
-            refi_slope: refi_slope.clamp(1.0, 100.0),
             pool_coupon,
             burnout_rate: burnout_rate.clamp(0.0, 1.0),
-            seasonality_amplitude: seasonality_amplitude.clamp(0.0, 0.5),
             factor_loading: factor_loading.clamp(-1.0, 1.0),
             cpr_volatility: cpr_volatility.clamp(0.0, 1.0),
-            ramp_months: ramp_months.max(1),
         }
     }
 
@@ -118,31 +96,18 @@ impl RichardRollPrepay {
     /// ```
     fn refi_multiplier(&self, market_rate: f64) -> f64 {
         let incentive = self.pool_coupon - market_rate;
-        let atan_term = (self.refi_slope * incentive).atan();
+        let atan_term = (REFI_SLOPE * incentive).atan();
         let normalized = atan_term / (std::f64::consts::PI / 2.0);
         (1.0 + self.refi_sensitivity * normalized).max(0.0)
     }
 
     /// Calculate the seasoning ramp multiplier.
     fn seasoning_multiplier(&self, seasoning: u32) -> f64 {
-        if seasoning >= self.ramp_months {
+        if seasoning >= RAMP_MONTHS {
             1.0
         } else {
-            seasoning as f64 / self.ramp_months as f64
+            seasoning as f64 / RAMP_MONTHS as f64
         }
-    }
-
-    /// Calculate the seasonality multiplier.
-    ///
-    /// Mortgage prepayments are higher in spring/summer (home sales).
-    fn seasonality_multiplier(&self, month_of_year: u32) -> f64 {
-        if self.seasonality_amplitude < 1e-10 {
-            return 1.0;
-        }
-
-        // Peak in June (month 6), trough in December (month 12)
-        let angle = 2.0 * std::f64::consts::PI * (month_of_year as f64 - 6.0) / 12.0;
-        1.0 + self.seasonality_amplitude * angle.cos()
     }
 }
 
@@ -157,9 +122,8 @@ impl StochasticPrepayment for RichardRollPrepay {
         // Base CPR with multipliers
         let refi_mult = self.refi_multiplier(market_rate);
         let season_mult = self.seasoning_multiplier(seasoning);
-        let month_mult = self.seasonality_multiplier((seasoning % 12) + 1);
 
-        let base_conditional_cpr = self.base_cpr * refi_mult * season_mult * month_mult * burnout;
+        let base_conditional_cpr = self.base_cpr * refi_mult * season_mult * burnout;
 
         let z = factors.first().copied().unwrap_or(0.0);
         let shock = (self.factor_loading * z * self.cpr_volatility).exp();
@@ -175,10 +139,9 @@ impl StochasticPrepayment for RichardRollPrepay {
         // at-the-money convention changes.
         let refi_mult = self.refi_multiplier(self.pool_coupon);
         let season_mult = self.seasoning_multiplier(seasoning);
-        let month_mult = self.seasonality_multiplier((seasoning % 12) + 1);
         // Average the clipped monthly rate, not the annual CPR before its
         // nonlinear conversion. Burnout is one under this baseline convention.
-        let base_cpr = self.base_cpr * refi_mult * season_mult * month_mult;
+        let base_cpr = self.base_cpr * refi_mult * season_mult;
         expected_shocked_smm(base_cpr, self.factor_loading * self.cpr_volatility)
     }
 
@@ -186,16 +149,8 @@ impl StochasticPrepayment for RichardRollPrepay {
         self.factor_loading
     }
 
-    fn model_name(&self) -> &'static str {
-        "Richard-Roll Prepayment Model"
-    }
-
     fn has_burnout(&self) -> bool {
         self.burnout_rate > 0.0
-    }
-
-    fn is_rate_sensitive(&self) -> bool {
-        self.refi_sensitivity > 0.0
     }
 
     fn update_burnout(&self, current_burnout: f64, realized_smm: f64, expected_smm: f64) -> f64 {
@@ -229,8 +184,7 @@ impl StochasticPrepayment for RichardRollPrepay {
 mod tests {
     #[test]
     fn expected_smm_integrates_the_monthly_rate_used_for_burnout() {
-        let model =
-            RichardRollPrepay::with_all_params(0.20, 0.0, 20.0, 0.05, 0.10, 0.0, 1.0, 1.0, 30);
+        let model = RichardRollPrepay::new(0.20, 0.0, 0.05, 0.10, 1.0, 1.0);
         let step = 0.0001;
         let integrated: f64 = (0..200_000)
             .map(|i| {
@@ -248,7 +202,7 @@ mod tests {
     #[test]
     fn refi_incentive_moves_prepayment_speed_in_the_right_direction() {
         let pool_coupon = 0.06_f64;
-        let model = RichardRollPrepay::new(0.06, 2.0, pool_coupon, 0.0);
+        let model = RichardRollPrepay::new(0.06, 2.0, pool_coupon, 0.0, 0.4, 0.20);
 
         // No incentive: coupon exactly at market.
         let at_market = model.refi_multiplier(pool_coupon);
@@ -281,18 +235,17 @@ mod tests {
 
     #[test]
     fn test_richard_roll_creation() {
-        let model = RichardRollPrepay::new(0.06, 2.0, 0.045, 0.10);
+        let model = RichardRollPrepay::new(0.06, 2.0, 0.045, 0.10, 0.4, 0.20);
 
         assert!((model.base_cpr - 0.06).abs() < 1e-10);
         assert!((model.refi_sensitivity - 2.0).abs() < 1e-10);
         assert!((model.burnout_rate - 0.10).abs() < 1e-10);
         assert!(model.has_burnout());
-        assert!(model.is_rate_sensitive());
     }
 
     #[test]
     fn test_refi_incentive_increases_prepay() {
-        let model = RichardRollPrepay::new(0.06, 2.0, 0.045, 0.10);
+        let model = RichardRollPrepay::new(0.06, 2.0, 0.045, 0.10, 0.4, 0.20);
 
         // When market rate is below pool coupon (refi incentive)
         let smm_low_rate = model.conditional_smm(36, &[0.0], 0.03, 1.0);
@@ -311,7 +264,7 @@ mod tests {
 
     #[test]
     fn test_seasoning_ramp() {
-        let model = RichardRollPrepay::new(0.06, 0.0, 0.045, 0.0);
+        let model = RichardRollPrepay::new(0.06, 0.0, 0.045, 0.0, 0.4, 0.20);
 
         let smm_early = model.conditional_smm(6, &[0.0], 0.045, 1.0);
         let smm_late = model.conditional_smm(36, &[0.0], 0.045, 1.0);
@@ -323,7 +276,7 @@ mod tests {
 
     #[test]
     fn test_burnout_update() {
-        let model = RichardRollPrepay::new(0.06, 2.0, 0.045, 0.10);
+        let model = RichardRollPrepay::new(0.06, 2.0, 0.045, 0.10, 0.4, 0.20);
 
         // When realized prepayments exceed expected
         let new_burnout = model.update_burnout(1.0, 0.02, 0.01);
@@ -351,7 +304,7 @@ mod tests {
 
     #[test]
     fn test_factor_shock() {
-        let model = RichardRollPrepay::new(0.06, 0.0, 0.045, 0.0);
+        let model = RichardRollPrepay::new(0.06, 0.0, 0.045, 0.0, 0.4, 0.20);
 
         let smm_neg = model.conditional_smm(36, &[-2.0], 0.045, 1.0);
         let smm_zero = model.conditional_smm(36, &[0.0], 0.045, 1.0);

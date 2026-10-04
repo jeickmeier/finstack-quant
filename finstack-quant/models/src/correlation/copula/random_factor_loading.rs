@@ -157,63 +157,6 @@ impl RandomFactorLoadingCopula {
         }
     }
 
-    /// Create with custom quadrature order for higher precision.
-    ///
-    /// # Arguments
-    /// * `loading_vol` - Volatility of factor loading, clamped to [0.0, 0.5]
-    /// * `order` - Requested quadrature order for both integration dimensions
-    ///
-    /// # Returns
-    ///
-    /// An RFL copula using the requested quadrature order.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `loading_vol` is not finite.
-    #[must_use]
-    pub fn with_quadrature_order(loading_vol: f64, order: u8) -> Self {
-        assert!(
-            loading_vol.is_finite(),
-            "RFL loading volatility must be finite"
-        );
-        Self {
-            loading_volatility: loading_vol.clamp(0.0, 0.5),
-            quadrature_order: order,
-            outer_quadrature: select_quadrature(order),
-            inner_quadrature: select_quadrature(order),
-            location_cache: Mutex::new(None),
-        }
-    }
-
-    /// Get the loading volatility.
-    ///
-    /// # Returns
-    ///
-    /// The bounded loading-volatility parameter in decimal units.
-    #[must_use]
-    pub fn loading_volatility(&self) -> f64 {
-        self.loading_volatility
-    }
-
-    /// Realized pairwise correlation `E[β²]` actually produced by the model
-    /// for the supplied requested `correlation`.
-    ///
-    /// Evaluates the clipped-normal second moment at the calibrated location.
-    /// It agrees with `correlation` to numerical root-finding precision.
-    ///
-    /// # Arguments
-    ///
-    /// * `correlation` - Target pairwise latent correlation in `[0, 1]`.
-    ///
-    /// # Returns
-    ///
-    /// The realized correlation, or NaN for an invalid target or failed solve.
-    #[must_use]
-    pub fn realized_correlation(&self, correlation: f64) -> f64 {
-        let location = self.loading_location(correlation);
-        self.clipped_second_moment(location)
-    }
-
     /// Stress-correlation proxy: a heuristic gauge of how much extra
     /// correlation mass appears in the high-loading tail (`η > 2`).
     ///
@@ -488,17 +431,17 @@ mod tests {
     fn test_rfl_creation() {
         let copula = RandomFactorLoadingCopula::new(0.15);
         assert_eq!(copula.num_factors(), 2);
-        assert!((copula.loading_volatility() - 0.15).abs() < 1e-10);
+        assert!((copula.loading_volatility - 0.15).abs() < 1e-10);
         assert_eq!(copula.model_name(), "Random Factor Loading Copula");
     }
 
     #[test]
     fn test_rfl_loading_volatility_clamped() {
         let copula_high = RandomFactorLoadingCopula::new(1.0);
-        assert!(copula_high.loading_volatility() <= 0.5);
+        assert!(copula_high.loading_volatility <= 0.5);
 
         let copula_neg = RandomFactorLoadingCopula::new(-0.1);
-        assert!(copula_neg.loading_volatility() >= 0.0);
+        assert!(copula_neg.loading_volatility >= 0.0);
     }
 
     #[test]
@@ -588,7 +531,7 @@ mod tests {
         assert_eq!(copula.tail_dependence(1.0), 1.0);
         let rho = 0.9;
         let location = copula.loading_location(rho);
-        let eta_at_perfect_loading = (1.0 - location) / copula.loading_volatility();
+        let eta_at_perfect_loading = (1.0 - location) / copula.loading_volatility;
         assert_eq!(
             copula.latent_variable(1.0, 0.0, eta_at_perfect_loading + 1e-8, rho),
             1.0
@@ -605,7 +548,8 @@ mod tests {
     fn loading_calibration_preserves_correlations_below_the_loading_variance() {
         let copula = RandomFactorLoadingCopula::new(0.5);
         for rho in [1e-10, 1e-6, 0.001, 0.01, 0.04] {
-            assert!((copula.realized_correlation(rho) - rho).abs() < 1e-12);
+            let second_moment = copula.clipped_second_moment(copula.loading_location(rho));
+            assert!((second_moment - rho).abs() < 1e-12);
         }
         assert!(copula.loading_location(0.01) < 0.0);
     }
@@ -663,7 +607,8 @@ mod tests {
                     (realized - rho).abs() < 1e-9,
                     "σ_β={sigma}, ρ={rho}: actual E[β²]={realized}"
                 );
-                assert!((copula.realized_correlation(rho) - realized).abs() < 1e-9);
+                let second_moment = copula.clipped_second_moment(copula.loading_location(rho));
+                assert!((second_moment - realized).abs() < 1e-9);
             }
         }
     }

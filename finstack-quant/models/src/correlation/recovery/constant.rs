@@ -56,46 +56,6 @@ impl ConstantRecovery {
             rate: rate.clamp(0.0, 1.0),
         }
     }
-
-    /// ISDA standard recovery rate (40%).
-    ///
-    /// # Returns
-    ///
-    /// A constant 40% recovery model.
-    #[must_use]
-    pub fn isda_standard() -> Self {
-        Self::new(0.40)
-    }
-
-    /// Senior secured recovery rate (55%).
-    ///
-    /// # Returns
-    ///
-    /// A constant 55% recovery model.
-    #[must_use]
-    pub fn senior_secured() -> Self {
-        Self::new(0.55)
-    }
-
-    /// Subordinated debt recovery rate (25%).
-    ///
-    /// # Returns
-    ///
-    /// A constant 25% recovery model.
-    #[must_use]
-    pub fn subordinated() -> Self {
-        Self::new(0.25)
-    }
-
-    /// Get the recovery rate.
-    ///
-    /// # Returns
-    ///
-    /// The constant recovery rate in decimal form.
-    #[must_use]
-    pub fn rate(&self) -> f64 {
-        self.rate
-    }
 }
 
 impl RecoveryModel for ConstantRecovery {
@@ -124,17 +84,17 @@ mod tests {
     #[test]
     fn test_constant_recovery_creation() {
         let model = ConstantRecovery::new(0.40);
-        assert!((model.rate() - 0.40).abs() < 1e-10);
+        assert!((model.rate - 0.40).abs() < 1e-10);
         assert_eq!(model.model_name(), "Constant Recovery");
     }
 
     #[test]
     fn test_constant_recovery_clamping() {
         let high = ConstantRecovery::new(1.5);
-        assert!((high.rate() - 1.0).abs() < 1e-10);
+        assert!((high.rate - 1.0).abs() < 1e-10);
 
         let low = ConstantRecovery::new(-0.1);
-        assert!((low.rate() - 0.0).abs() < 1e-10);
+        assert!((low.rate - 0.0).abs() < 1e-10);
     }
 
     #[test]
@@ -157,17 +117,5 @@ mod tests {
         let model = ConstantRecovery::new(0.40);
         assert!(!model.is_stochastic());
         assert!((model.recovery_volatility()).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_standard_models() {
-        let isda = ConstantRecovery::isda_standard();
-        assert!((isda.rate() - 0.40).abs() < 1e-10);
-
-        let senior = ConstantRecovery::senior_secured();
-        assert!((senior.rate() - 0.55).abs() < 1e-10);
-
-        let sub = ConstantRecovery::subordinated();
-        assert!((sub.rate() - 0.25).abs() < 1e-10);
     }
 }

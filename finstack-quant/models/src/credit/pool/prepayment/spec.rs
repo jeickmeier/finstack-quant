@@ -184,16 +184,13 @@ impl StochasticPrepaySpec {
                 burnout_rate,
                 factor_loading,
                 cpr_volatility,
-            } => Some(Box::new(RichardRollPrepay::with_all_params(
+            } => Some(Box::new(RichardRollPrepay::new(
                 *base_cpr,
                 *refi_sensitivity,
-                20.0, // default refi_slope
                 *pool_coupon,
                 *burnout_rate,
-                0.0, // no seasonality by default
                 *factor_loading,
                 *cpr_volatility,
-                30, // default ramp months
             ))),
 
             StochasticPrepaySpec::RegimeSwitching {
@@ -279,7 +276,7 @@ mod tests {
         assert!(model.is_some());
 
         let model = model.expect("Should build Richard-Roll model");
-        assert_eq!(model.model_name(), "Richard-Roll Prepayment Model");
+        assert!(format!("{model:?}").starts_with("RichardRollPrepay"));
     }
 
     #[test]
@@ -290,7 +287,7 @@ mod tests {
         assert!(spec.factor_loading().is_some());
 
         let model = spec.build().expect("regime-switching model should build");
-        assert_eq!(model.model_name(), "Regime-Switching Prepayment");
+        assert!(format!("{model:?}").starts_with("RegimeSwitchingPrepay"));
         assert!(model.conditional_smm(24, &[2.0], 0.05, 1.0) > model.expected_smm(24));
     }
 

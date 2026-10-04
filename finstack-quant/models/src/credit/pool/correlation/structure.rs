@@ -251,72 +251,6 @@ impl CorrelationStructure {
         }
     }
 
-    /// Get the intra-sector correlation (for sectored structures).
-    pub fn intra_sector_correlation(&self) -> Option<f64> {
-        match self {
-            CorrelationStructure::Sectored { intra_sector, .. } => Some(*intra_sector),
-            _ => None,
-        }
-    }
-
-    /// Get the inter-sector correlation (for sectored structures).
-    pub fn inter_sector_correlation(&self) -> Option<f64> {
-        match self {
-            CorrelationStructure::Sectored { inter_sector, .. } => Some(*inter_sector),
-            _ => None,
-        }
-    }
-
-    /// Check if this is a flat correlation structure.
-    pub fn is_flat(&self) -> bool {
-        matches!(self, CorrelationStructure::Flat { .. })
-    }
-
-    /// Check if this is a sectored correlation structure.
-    pub fn is_sectored(&self) -> bool {
-        matches!(self, CorrelationStructure::Sectored { .. })
-    }
-
-    /// Get correlation between two assets.
-    ///
-    /// # Arguments
-    /// * `i` - First asset index
-    /// * `j` - Second asset index
-    /// * `same_sector` - Whether assets are in the same sector
-    pub fn pairwise_correlation(&self, i: usize, j: usize, same_sector: bool) -> f64 {
-        if i == j {
-            return 1.0;
-        }
-
-        match self {
-            CorrelationStructure::Flat {
-                asset_correlation, ..
-            } => *asset_correlation,
-            CorrelationStructure::Sectored {
-                intra_sector,
-                inter_sector,
-                ..
-            } => {
-                if same_sector {
-                    *intra_sector
-                } else {
-                    *inter_sector
-                }
-            }
-            CorrelationStructure::Matrix {
-                correlations,
-                labels,
-            } => {
-                let n = labels.len();
-                if i < n && j < n {
-                    correlations.get(i * n + j).copied().unwrap_or(0.0)
-                } else {
-                    0.0
-                }
-            }
-        }
-    }
-
     /// Bump asset correlation by the given amount.
     ///
     /// For flat structures, bumps the single asset correlation.
@@ -650,7 +584,7 @@ mod tests {
 
         assert!((corr.asset_correlation() - 0.10).abs() < 1e-10);
         assert!((corr.prepay_default_correlation() - (-0.30)).abs() < 1e-10);
-        assert!(corr.is_flat());
+        assert!(matches!(corr, CorrelationStructure::Flat { .. }));
     }
 
     #[test]
@@ -658,22 +592,16 @@ mod tests {
         let corr =
             CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("valid sector correlation");
 
-        assert!(corr.is_sectored());
-        assert_eq!(corr.intra_sector_correlation(), Some(0.30));
-        assert_eq!(corr.inter_sector_correlation(), Some(0.10));
-    }
-
-    #[test]
-    fn test_pairwise_correlation() {
-        let sectored =
-            CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("valid sector correlation");
-
-        // Same sector
-        assert!((sectored.pairwise_correlation(0, 1, true) - 0.30).abs() < 1e-10);
-        // Different sector
-        assert!((sectored.pairwise_correlation(0, 1, false) - 0.10).abs() < 1e-10);
-        // Same asset
-        assert!((sectored.pairwise_correlation(0, 0, true) - 1.0).abs() < 1e-10);
+        let CorrelationStructure::Sectored {
+            intra_sector,
+            inter_sector,
+            ..
+        } = corr
+        else {
+            panic!("should be sectored");
+        };
+        assert_eq!(intra_sector, 0.30);
+        assert_eq!(inter_sector, 0.10);
     }
 
     #[test]
@@ -694,7 +622,7 @@ mod tests {
     #[test]
     fn test_default() {
         let corr = CorrelationStructure::default();
-        assert!(corr.is_flat());
+        assert!(matches!(corr, CorrelationStructure::Flat { .. }));
         assert!(corr.asset_correlation() > 0.0);
     }
 
@@ -713,24 +641,18 @@ mod tests {
             CorrelationStructure::sectored(0.30, 0.10, -0.20).expect("valid sector correlation");
         let bumped = corr.bump_asset(0.10);
 
+        let CorrelationStructure::Sectored {
+            intra_sector,
+            inter_sector,
+            ..
+        } = bumped
+        else {
+            panic!("should be sectored");
+        };
         // Intra bumps by full delta
-        assert!(
-            (bumped
-                .intra_sector_correlation()
-                .expect("should be sectored")
-                - 0.40)
-                .abs()
-                < 1e-10
-        );
+        assert!((intra_sector - 0.40).abs() < 1e-10);
         // Inter bumps by half delta
-        assert!(
-            (bumped
-                .inter_sector_correlation()
-                .expect("should be sectored")
-                - 0.15)
-                .abs()
-                < 1e-10
-        );
+        assert!((inter_sector - 0.15).abs() < 1e-10);
     }
 
     #[test]

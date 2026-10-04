@@ -45,7 +45,7 @@
 //! - Gaussian copula reference: `docs/REFERENCES.md#li-2000-gaussian-copula`
 //!
 
-use super::{get_cached_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
+use super::{default_quadrature, Copula, DEFAULT_QUADRATURE_ORDER};
 use finstack_quant_core::math::{norm_cdf, GaussHermiteQuadrature};
 use std::sync::Arc;
 
@@ -124,27 +124,9 @@ impl GaussianCopula {
     /// ```
     #[must_use]
     pub fn new() -> Self {
-        let order = DEFAULT_QUADRATURE_ORDER;
         Self {
-            quadrature_order: order,
-            quadrature: get_cached_quadrature(order),
-        }
-    }
-
-    /// Create with custom quadrature order for higher precision.
-    ///
-    /// # Arguments
-    /// * `order` - Number of Gauss-Hermite quadrature points. Higher = more accuracy.
-    ///
-    /// # Returns
-    ///
-    /// A one-factor Gaussian copula using the requested quadrature order, or the
-    /// default order if the requested value is unsupported.
-    #[must_use]
-    pub fn with_quadrature_order(order: u8) -> Self {
-        Self {
-            quadrature_order: order,
-            quadrature: get_cached_quadrature(order),
+            quadrature_order: DEFAULT_QUADRATURE_ORDER,
+            quadrature: default_quadrature(),
         }
     }
 }

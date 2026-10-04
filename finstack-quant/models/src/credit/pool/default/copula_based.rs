@@ -21,7 +21,7 @@
 //! - Li, D. X. (2000). "On Default Correlation: A Copula Function Approach." `docs/REFERENCES.md#li-2000-gaussian-copula`
 
 use super::super::clamped_cdr_to_mdr;
-use super::traits::{MacroCreditFactors, StochasticDefault};
+use super::traits::StochasticDefault;
 use crate::correlation::copula::{Copula, CopulaSpec};
 use finstack_quant_core::math::{standard_normal_inv_cdf, student_t_inv_cdf};
 
@@ -100,12 +100,7 @@ impl CopulaBasedDefault {
 }
 
 impl StochasticDefault for CopulaBasedDefault {
-    fn conditional_mdr(
-        &self,
-        _seasoning: u32,
-        factors: &[f64],
-        _macro_factors: &MacroCreditFactors,
-    ) -> f64 {
+    fn conditional_mdr(&self, _seasoning: u32, factors: &[f64]) -> f64 {
         let threshold = self.default_threshold(self.base_cdr);
 
         let annual_cond_pd =
@@ -118,10 +113,6 @@ impl StochasticDefault for CopulaBasedDefault {
 
     fn correlation(&self) -> f64 {
         self.correlation
-    }
-
-    fn model_name(&self) -> &'static str {
-        "Copula-Based Default Model"
     }
 
     fn expected_mdr(&self, _seasoning: u32) -> f64 {
@@ -146,9 +137,7 @@ mod tests {
     fn test_conditional_mdr_at_zero_factor() {
         let model = CopulaBasedDefault::new(0.02, CopulaSpec::Gaussian, 0.20)
             .expect("valid Gaussian copula");
-        let factors = MacroCreditFactors::default();
-
-        let mdr = model.conditional_mdr(12, &[0.0], &factors);
+        let mdr = model.conditional_mdr(12, &[0.0]);
         let expected = model.expected_mdr(12);
 
         // At Z=0 with correlation, conditional differs from unconditional
@@ -166,11 +155,9 @@ mod tests {
     fn test_negative_factor_increases_mdr() {
         let model = CopulaBasedDefault::new(0.02, CopulaSpec::Gaussian, 0.30)
             .expect("valid Gaussian copula");
-        let factors = MacroCreditFactors::default();
-
-        let mdr_neg = model.conditional_mdr(12, &[-2.0], &factors);
-        let mdr_zero = model.conditional_mdr(12, &[0.0], &factors);
-        let mdr_pos = model.conditional_mdr(12, &[2.0], &factors);
+        let mdr_neg = model.conditional_mdr(12, &[-2.0]);
+        let mdr_zero = model.conditional_mdr(12, &[0.0]);
+        let mdr_pos = model.conditional_mdr(12, &[2.0]);
 
         // Negative factor (stress) should increase defaults
         assert!(mdr_neg > mdr_zero, "Negative factor should increase MDR");

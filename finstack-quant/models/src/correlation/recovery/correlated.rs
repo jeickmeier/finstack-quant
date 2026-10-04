@@ -8,7 +8,7 @@
 //!
 //! ```text
 //! shock(Z) = ρ_R · σ_R · Z
-//! R(Z) = min_R + (max_R - min_R) * logistic(center(μ_R) + shock(Z) / local_slope)
+//! R(Z) = logistic(center(μ_R) + shock(Z) / local_slope)
 //! ```
 //!
 //! where:
@@ -18,13 +18,13 @@
 //! - `Z` is the supplied latent market factor
 //!
 //! The implementation does **not** hard-clamp an affine recovery rule. Instead,
-//! it uses a logistic transform so recovery stays inside the configured bounds
+//! it uses a logistic transform so recovery stays inside `[0, 1]`
 //! smoothly while preserving the target mean exactly at `Z = 0`.
 //!
 //! # Sign Convention
 //!
 //! The crate-wide canonical convention is "low latent factor = stress": the
-//! copula default models concentrate defaults at `Z < 0`. The preset
+//! copula default models concentrate defaults at `Z < 0`. Market
 //! calibrations therefore use `ρ_R > 0`, so negative (stress) factor
 //! realizations DECREASE recovery and defaults/recoveries co-move
 //! negatively. Callers that want the opposite mapping should either negate
@@ -68,10 +68,6 @@ pub struct CorrelatedRecovery {
     /// Correlation with the systematic factor (typically positive under the
     /// canonical low-factor-stress convention: recovery falls in stress)
     factor_correlation: f64,
-    /// Minimum recovery (floor)
-    min_recovery: f64,
-    /// Maximum recovery (ceiling)
-    max_recovery: f64,
     /// Cached `E_Z[R(Z)]` computed once at construction by adaptive
     /// quadrature against `N(0, 1)`. Used by [`RecoveryModel::expected_recovery`]
     /// so `lgd()` reflects the Jensen-corrected unconditional mean, not the
@@ -90,7 +86,7 @@ impl CorrelatedRecovery {
     ///
     /// # Returns
     ///
-    /// A bounded stochastic recovery model with default bounds `[0.0, 1.0]`.
+    /// A stochastic recovery model bounded to `[0.0, 1.0]`.
     ///
     /// # Examples
     ///
@@ -108,103 +104,10 @@ impl CorrelatedRecovery {
             mean_recovery: mean.clamp(0.0, 1.0),
             recovery_volatility: vol.clamp(0.0, 0.50),
             factor_correlation: corr.clamp(-1.0, 1.0),
-            min_recovery: 0.0,
-            max_recovery: 1.0,
             unconditional_expected_recovery: 0.0,
         };
         model.unconditional_expected_recovery = model.compute_unconditional_expected_recovery();
         model
-    }
-
-    /// Create with custom bounds.
-    ///
-    /// # Arguments
-    /// * `mean` - Recovery at zero factor, bounded to the chosen recovery
-    ///   interval; either boundary gives a constant recovery model.
-    /// * `vol` - Recovery-volatility scale, clamped to `[0.0, 0.50]`.
-    /// * `corr` - Factor sensitivity, clamped to `[-1.0, 1.0]`.
-    /// * `min` - Minimum recovery (floor), clamped to [0.0, 0.5]
-    /// * `max` - Maximum recovery (ceiling), clamped to [0.5, 1.0]
-    ///
-    /// # Returns
-    ///
-    /// A bounded stochastic recovery model with caller-specified recovery bounds.
-    /// Equal bounds produce constant recovery at that value.
-    #[must_use]
-    pub fn with_bounds(mean: f64, vol: f64, corr: f64, min: f64, max: f64) -> Self {
-        let mut model = Self::new(mean, vol, corr);
-        model.min_recovery = min.clamp(0.0, 0.5);
-        model.max_recovery = max.clamp(0.5, 1.0);
-        // Bounds affect the logistic transform, so the cached expectation must
-        // be recomputed after overriding them.
-        model.unconditional_expected_recovery = model.compute_unconditional_expected_recovery();
-        model
-    }
-
-    /// Market-standard calibration from CDX equity tranche.
-    ///
-    /// Parameters:
-    /// - Mean: 40%
-    /// - Vol: 25%
-    /// - Correlation: +40% (recovery falls in stress under the canonical
-    ///   low-factor-stress convention)
-    ///
-    /// # Returns
-    ///
-    /// The default stochastic-recovery calibration used by this crate.
-    #[must_use]
-    pub fn market_standard() -> Self {
-        Self::new(0.40, 0.25, 0.40)
-    }
-
-    /// Conservative calibration with higher vol and correlation.
-    ///
-    /// Parameters:
-    /// - Mean: 40%
-    /// - Vol: 30%
-    /// - Correlation: +50%
-    ///
-    /// # Returns
-    ///
-    /// A higher-volatility, more factor-sensitive stochastic-recovery calibration.
-    #[must_use]
-    pub fn conservative() -> Self {
-        Self::new(0.40, 0.30, 0.50)
-    }
-
-    /// Get the target recovery at `Z = 0` (location parameter).
-    ///
-    /// This is the `μ_R` input parameter after clamping — the median of the
-    /// logistic-bounded recovery distribution, not the Jensen-corrected
-    /// unconditional mean. Use [`RecoveryModel::expected_recovery`] when you
-    /// need `E_Z[R(Z)]`.
-    ///
-    /// # Returns
-    ///
-    /// The target recovery at zero market shock, in decimal form.
-    #[must_use]
-    pub fn mean(&self) -> f64 {
-        self.mean_recovery
-    }
-
-    /// Get the recovery volatility.
-    ///
-    /// # Returns
-    ///
-    /// The recovery-volatility scale in decimal form.
-    #[must_use]
-    pub fn volatility(&self) -> f64 {
-        self.recovery_volatility
-    }
-
-    /// Get the factor correlation.
-    ///
-    /// # Returns
-    ///
-    /// The signed factor-sensitivity parameter.
-    #[must_use]
-    pub fn correlation(&self) -> f64 {
-        self.factor_correlation
     }
 
     /// Compute `E_Z[R(Z)]` by adaptive integration against `N(0, 1)`.
@@ -214,22 +117,13 @@ impl CorrelatedRecovery {
     /// to zero. The discarded logistic tails contribute less than `3e-16`.
     fn compute_unconditional_expected_recovery(&self) -> f64 {
         let location = self.logistic_bounded_recovery(0.0);
-        let width = self.max_recovery - self.min_recovery;
         let shock_scale = (self.factor_correlation * self.recovery_volatility).abs();
-        if shock_scale == 0.0
-            || width == 0.0
-            || location <= self.min_recovery
-            || location >= self.max_recovery
-        {
+        if shock_scale == 0.0 || location <= 0.0 || location >= 1.0 {
             return location;
         }
 
-        let p = (self
-            .mean_recovery
-            .clamp(self.min_recovery, self.max_recovery)
-            - self.min_recovery)
-            / width;
-        let local_slope = (width * p * (1.0 - p)).max(f64::MIN_POSITIVE);
+        let p = self.mean_recovery;
+        let local_slope = (p * (1.0 - p)).max(f64::MIN_POSITIVE);
         let logit_slope = shock_scale / local_slope;
         if logit_slope <= 1.0 {
             // Ten Gaussian standard deviations leave less than 2e-23 mass.
@@ -248,36 +142,26 @@ impl CorrelatedRecovery {
             |logit| {
                 let z = (logit - center) / logit_slope;
                 let recovery = self.logistic_bounded_recovery(local_slope * (logit - center));
-                (recovery - self.min_recovery) * norm_pdf(z) / logit_slope
+                recovery * norm_pdf(z) / logit_slope
             },
             -36.0,
             36.0,
             1e-12,
             24,
         );
-        self.min_recovery
-            + integral.unwrap_or(f64::NAN)
-            + width * norm_cdf((center - 36.0) / logit_slope)
+        integral.unwrap_or(f64::NAN) + norm_cdf((center - 36.0) / logit_slope)
     }
 
     fn logistic_bounded_recovery(&self, shock: f64) -> f64 {
-        let width = self.max_recovery - self.min_recovery;
-        if width == 0.0 {
-            return self.min_recovery;
-        }
-        let mean = self
-            .mean_recovery
-            .clamp(self.min_recovery, self.max_recovery);
+        let p = self.mean_recovery;
         // The bounded logistic has degenerate, constant distributions at
         // either endpoint. Handle them before forming log-odds or a slope.
-        if mean <= self.min_recovery || mean >= self.max_recovery {
-            return mean;
+        if p <= 0.0 || p >= 1.0 {
+            return p;
         }
-        let p = (mean - self.min_recovery) / width;
         let center = (p / (1.0 - p)).ln();
-        let local_slope = (width * p * (1.0 - p)).max(f64::MIN_POSITIVE);
-        let squashed = 1.0 / (1.0 + (-(center + shock / local_slope)).exp());
-        self.min_recovery + width * squashed
+        let local_slope = (p * (1.0 - p)).max(f64::MIN_POSITIVE);
+        1.0 / (1.0 + (-(center + shock / local_slope)).exp())
     }
 }
 
@@ -321,18 +205,6 @@ mod tests {
     }
 
     #[test]
-    fn custom_equal_and_narrow_bounds_preserve_recovery_without_panicking() {
-        for (min, max, mean) in [(0.5, 0.5, 0.4), (0.5 - 1e-10, 0.5 + 1e-10, 0.5)] {
-            let model = CorrelatedRecovery::with_bounds(mean, 0.25, 0.4, min, max);
-            for factor in [-10.0, 0.0, 10.0] {
-                let recovery = model.conditional_recovery(factor);
-                assert!(recovery.is_finite() && (min..=max).contains(&recovery));
-            }
-            assert!((model.conditional_recovery(0.0) - mean.clamp(min, max)).abs() < 1e-12);
-        }
-    }
-
-    #[test]
     fn zero_and_full_recovery_are_constant_at_every_factor() {
         for mean in [0.0, 1.0] {
             let model = CorrelatedRecovery::new(mean, 0.25, 0.4);
@@ -364,14 +236,14 @@ mod tests {
     #[test]
     fn test_correlated_recovery_creation() {
         let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
-        assert!((model.mean() - 0.40).abs() < 1e-10);
-        assert!((model.volatility() - 0.25).abs() < 1e-10);
-        assert!((model.correlation() - 0.40).abs() < 1e-10);
+        assert!((model.mean_recovery - 0.40).abs() < 1e-10);
+        assert!((model.recovery_volatility - 0.25).abs() < 1e-10);
+        assert!((model.factor_correlation - 0.40).abs() < 1e-10);
     }
 
     #[test]
     fn test_conditional_recovery_in_stress() {
-        let model = CorrelatedRecovery::market_standard();
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
 
         // Canonical convention: low latent factor = stress, so Z = -2 is a
         // stress scenario and recovery must FALL below R(0).
@@ -380,14 +252,14 @@ mod tests {
         // Compare against R(0) (mean location), which is the reference
         // unaffected by the Jensen correction.
         assert!(
-            stress_recovery < model.mean(),
+            stress_recovery < model.mean_recovery,
             "Stress (low factor) must depress recovery below R(0) so defaults and recoveries co-move negatively"
         );
     }
 
     #[test]
     fn test_conditional_recovery_varies() {
-        let model = CorrelatedRecovery::market_standard();
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
 
         let r_neg = model.conditional_recovery(-2.0);
         let r_zero = model.conditional_recovery(0.0);
@@ -402,14 +274,14 @@ mod tests {
 
     #[test]
     fn test_conditional_recovery_at_zero_equals_location() {
-        let model = CorrelatedRecovery::market_standard();
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
 
         // At Z=0, R(Z) equals the location parameter μ_R (median recovery).
         // This is *not* generally the same as the unconditional mean E[R(Z)]
         // because the logistic transform is non-linear (Jensen's inequality).
         let r_at_zero = model.conditional_recovery(0.0);
         assert!(
-            (r_at_zero - model.mean()).abs() < 1e-10,
+            (r_at_zero - model.mean_recovery).abs() < 1e-10,
             "Recovery at Z=0 should equal the location parameter μ_R"
         );
     }
@@ -420,8 +292,8 @@ mod tests {
         // integrating the logistic-bounded recovery against N(0,1). It should
         // differ from R(0) when ρ_R·σ_R ≠ 0, and match R(0) exactly when the
         // recovery is deterministic.
-        let model = CorrelatedRecovery::market_standard();
-        let r_at_zero = model.mean();
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
+        let r_at_zero = model.mean_recovery;
         let e_r = model.expected_recovery();
 
         // The two differ by the Jensen correction; it is small but non-zero.
@@ -435,7 +307,7 @@ mod tests {
         // When correlation is zero, R is deterministic and E[R] = R(0).
         let det_model = CorrelatedRecovery::new(0.40, 0.25, 0.0);
         assert!(
-            (det_model.expected_recovery() - det_model.mean()).abs() < 1e-12,
+            (det_model.expected_recovery() - det_model.mean_recovery).abs() < 1e-12,
             "Deterministic recovery: E[R] must equal R(0)"
         );
 
@@ -477,7 +349,7 @@ mod tests {
 
     #[test]
     fn test_is_stochastic() {
-        let model = CorrelatedRecovery::market_standard();
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
         assert!(model.is_stochastic());
         assert!(model.recovery_volatility() > 0.0);
     }
@@ -512,7 +384,7 @@ mod tests {
 
     #[test]
     fn test_lgd_calculation() {
-        let model = CorrelatedRecovery::market_standard();
+        let model = CorrelatedRecovery::new(0.40, 0.25, 0.40);
 
         // LGD = 1 - E[R(Z)]. The Jensen correction is small (a few bp), so
         // LGD should be close to but not exactly equal to 1 - R(0) = 0.60.
@@ -525,18 +397,6 @@ mod tests {
         );
 
         // Conditional LGD at Z=0 must equal 1 - R(0) exactly.
-        assert!((model.conditional_lgd(0.0) - (1.0 - model.mean())).abs() < 1e-10);
-    }
-
-    #[test]
-    fn test_market_standard_and_conservative() {
-        let standard = CorrelatedRecovery::market_standard();
-        let conservative = CorrelatedRecovery::conservative();
-
-        // Conservative should have higher vol
-        assert!(conservative.volatility() > standard.volatility());
-
-        // Conservative should have stronger (positive) factor correlation
-        assert!(conservative.correlation() > standard.correlation());
+        assert!((model.conditional_lgd(0.0) - (1.0 - model.mean_recovery)).abs() < 1e-10);
     }
 }
