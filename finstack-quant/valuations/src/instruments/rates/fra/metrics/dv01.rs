@@ -194,15 +194,7 @@ fn rebuild_forward_curve_from_basis_quotes(
         points.push((base_curve.tenor(), base_curve.rate(base_curve.tenor())));
     }
 
-    ForwardCurve::builder(base_curve.id().clone(), base_curve.tenor())
-        .base_date(base_curve.base_date())
-        .reset_lag(base_curve.reset_lag())
-        .day_count(base_curve.day_count())
-        .knots(points)
-        .interp(base_curve.interp_style())
-        .extrapolation(base_curve.extrapolation())
-        .rate_calibration_opt(base_curve.rate_calibration().cloned())
-        .build()
+    base_curve.rebuild_with_knots(points)
 }
 
 fn pillar_time(base_curve: &ForwardCurve, pillar: &RateCalibrationPillar) -> Result<f64> {
