@@ -16,8 +16,8 @@ def fixture() -> dict:
         ).read_text()
     )
     spec = result["instrument"]["instrument"]["spec"]
-    spec["prepayment_spec"] = {"cpr": 0.0, "curve": None}
-    spec["default_spec"] = {"cdr": 0.0, "curve": None}
+    spec["prepayment_spec"] = {"cpr": 0.0, "curve": "constant"}
+    spec["default_spec"] = {"cdr": 0.0, "curve": "constant"}
     return result
 
 

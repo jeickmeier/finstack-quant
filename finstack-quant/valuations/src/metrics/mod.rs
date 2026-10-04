@@ -322,8 +322,7 @@ pub(crate) use sensitivities::cs01_z_spread::{
 };
 pub(crate) use sensitivities::dv01::{Dv01CalculatorConfig, UnifiedDv01Calculator};
 pub(crate) use sensitivities::fd_greeks::{
-    GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVega, GenericFdVolga, HasDayCount,
-    HasExpiry,
+    GenericFdDelta, GenericFdGamma, GenericFdVanna, GenericFdVega, GenericFdVolga,
 };
 pub(crate) use sensitivities::option_greeks::OptionGreekCalculator;
 pub(crate) use sensitivities::rf_component_dv01::{RfComponentDv01Calculator, RfComponentPriced};

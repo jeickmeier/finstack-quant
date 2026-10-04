@@ -141,7 +141,8 @@ pub fn evaluate_engine(
 ) -> Result<indexmap::IndexMap<String, CovenantReport>> {
     let engine = parse_engine(engine_json)?;
     let source = HashMapMetricSource::from_json(metrics_json)?;
-    engine.evaluate(&source, parse_iso_date(as_of)?)
+    let test_date = parse_iso_date(as_of)?;
+    engine.evaluate_specs(&engine.applicable_specs(test_date), &source, test_date)
 }
 
 /// Evaluate a covenant engine document against an already-built metric source.

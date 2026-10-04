@@ -538,15 +538,6 @@ impl FxForward {
             .map(Ok)
             .unwrap_or_else(|| self.market_forward_rate(market, as_of))
     }
-
-    fn single_leg_schedule(
-        &self,
-        as_of: Date,
-        amount: Money,
-    ) -> finstack_quant_core::Result<(Date, Money)> {
-        let _ = as_of;
-        Ok((self.maturity, amount))
-    }
 }
 
 impl crate::instruments::common_impl::traits::Instrument for FxForward {
@@ -678,8 +669,8 @@ impl finstack_quant_cashflows::CashflowScheduleSource for FxForward {
         let quote_amount =
             Money::new(-self.notional.amount() * contract_rate, self.quote_currency)?;
 
-        let base_flow = self.single_leg_schedule(as_of, base_amount)?;
-        let quote_schedule = self.single_leg_schedule(as_of, quote_amount)?;
+        let base_flow = (self.maturity, base_amount);
+        let quote_schedule = (self.maturity, quote_amount);
         let representation = if self.contract_rate.is_some() {
             crate::cashflow::builder::CashflowRepresentation::Contractual
         } else {

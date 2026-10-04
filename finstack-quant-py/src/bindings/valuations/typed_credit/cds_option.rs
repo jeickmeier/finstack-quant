@@ -4,7 +4,7 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::money::{decimal_from_py, decimal_to_py, is_python_decimal, PyMoney};
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -433,7 +433,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         cdso_set!(slf, expiry, date_repr(date), |b: CdsOptionBuilderInner| b
             .expiry(date))
     }
@@ -454,7 +454,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         cdso_set!(
             slf,
             underlying_maturity,
@@ -532,7 +532,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         cdso_set!(
             slf,
             premium_settlement_date,
@@ -558,7 +558,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         cdso_set!(
             slf,
             exercise_settlement_date,
@@ -584,7 +584,7 @@ impl PyCdsOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         cdso_set!(
             slf,
             underlying_start_date,

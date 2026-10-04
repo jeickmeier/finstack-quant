@@ -433,8 +433,8 @@ mod serde_tests {
         let quad5 = GaussHermiteQuadrature::new(5).expect("valid order");
         let json = serde_json::to_string(&quad5).unwrap();
         let deserialized: GaussHermiteQuadrature = serde_json::from_str(&json).unwrap();
-        assert_eq!(quad5.points.len(), deserialized.points.len());
-        assert_eq!(quad5.weights.len(), deserialized.weights.len());
+        assert_eq!(quad5.get_points().len(), deserialized.get_points().len());
+        assert_eq!(quad5.get_weights().len(), deserialized.get_weights().len());
     }
 
     #[test]
@@ -442,8 +442,8 @@ mod serde_tests {
         let quad7 = GaussHermiteQuadrature::new(7).expect("valid order");
         let json = serde_json::to_string(&quad7).unwrap();
         let deserialized: GaussHermiteQuadrature = serde_json::from_str(&json).unwrap();
-        assert_eq!(quad7.points.len(), deserialized.points.len());
-        assert_eq!(quad7.weights.len(), deserialized.weights.len());
+        assert_eq!(quad7.get_points().len(), deserialized.get_points().len());
+        assert_eq!(quad7.get_weights().len(), deserialized.get_weights().len());
     }
 
     #[test]
@@ -451,8 +451,8 @@ mod serde_tests {
         let quad10 = GaussHermiteQuadrature::new(10).expect("valid order");
         let json = serde_json::to_string(&quad10).unwrap();
         let deserialized: GaussHermiteQuadrature = serde_json::from_str(&json).unwrap();
-        assert_eq!(quad10.points.len(), deserialized.points.len());
-        assert_eq!(quad10.weights.len(), deserialized.weights.len());
+        assert_eq!(quad10.get_points().len(), deserialized.get_points().len());
+        assert_eq!(quad10.get_weights().len(), deserialized.get_weights().len());
 
         let quad5_json =
             serde_json::to_string(&GaussHermiteQuadrature::new(5).expect("valid order")).unwrap();
@@ -462,26 +462,26 @@ mod serde_tests {
     #[test]
     fn gauss_hermite_quadrature_order_15() {
         let quad15 = GaussHermiteQuadrature::new(15).expect("valid order");
-        assert_eq!(quad15.points.len(), 15);
-        assert_eq!(quad15.weights.len(), 15);
+        assert_eq!(quad15.get_points().len(), 15);
+        assert_eq!(quad15.get_weights().len(), 15);
 
         let json = serde_json::to_string(&quad15).unwrap();
         let deserialized: GaussHermiteQuadrature = serde_json::from_str(&json).unwrap();
-        assert_eq!(quad15.points.len(), deserialized.points.len());
-        assert_eq!(quad15.weights.len(), deserialized.weights.len());
+        assert_eq!(quad15.get_points().len(), deserialized.get_points().len());
+        assert_eq!(quad15.get_weights().len(), deserialized.get_weights().len());
         assert!(json.contains("\"order\":15"));
     }
 
     #[test]
     fn gauss_hermite_quadrature_order_20() {
         let quad20 = GaussHermiteQuadrature::new(20).expect("valid order");
-        assert_eq!(quad20.points.len(), 20);
-        assert_eq!(quad20.weights.len(), 20);
+        assert_eq!(quad20.get_points().len(), 20);
+        assert_eq!(quad20.get_weights().len(), 20);
 
         let json = serde_json::to_string(&quad20).unwrap();
         let deserialized: GaussHermiteQuadrature = serde_json::from_str(&json).unwrap();
-        assert_eq!(quad20.points.len(), deserialized.points.len());
-        assert_eq!(quad20.weights.len(), deserialized.weights.len());
+        assert_eq!(quad20.get_points().len(), deserialized.get_points().len());
+        assert_eq!(quad20.get_weights().len(), deserialized.get_weights().len());
         assert!(json.contains("\"order\":20"));
     }
 
@@ -491,7 +491,7 @@ mod serde_tests {
         for order in [5, 7, 10, 15, 20] {
             let quad = GaussHermiteQuadrature::new(order);
             assert!(quad.is_ok(), "Order {} should be supported", order);
-            assert_eq!(quad.unwrap().points.len(), order);
+            assert_eq!(quad.unwrap().get_points().len(), order);
         }
 
         // Test unsupported orders

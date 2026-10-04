@@ -142,39 +142,6 @@ fn date_to_period_id(
     PeriodId::from_date(date, frequency)
 }
 
-/// Group daily returns by period, compounding within each period.
-///
-/// Assigns each observation to a [`PeriodId`] bucket determined by `frequency`
-/// and `fiscal_config`, then compounds the intra-period returns using
-/// [`comp_total`]. The result is a time-ordered sequence of
-/// `(period_id, compounded_return)` pairs suitable for period-level
-/// statistics.
-///
-/// # Arguments
-///
-/// * `dates` - Sorted slice of observation dates.
-/// * `returns` - Return series aligned with `dates`. If longer, excess
-///   elements are ignored.
-/// * `frequency` - Aggregation frequency (e.g., `Monthly`, `Annual`).
-/// * `fiscal_config` - Fiscal year configuration, required when `frequency` is
-///   `Annual` and a non-calendar fiscal year is desired.
-///
-/// # Returns
-///
-/// A `Vec<(PeriodId, f64)>` in chronological order. Returns an empty
-/// vector if either `dates` or `returns` is empty.
-pub(crate) fn group_by_period(
-    dates: &[Date],
-    returns: &[f64],
-    frequency: PeriodKind,
-    fiscal_config: Option<FiscalConfig>,
-) -> Vec<(PeriodId, f64)> {
-    group_period_buckets(dates, returns, frequency, fiscal_config)
-        .into_iter()
-        .map(|(pid, _, compounded)| (pid, compounded))
-        .collect()
-}
-
 /// Calendar-bucket compounded returns, tagging each bucket with its **last
 /// observation date** (the period-end). Reuses [`comp_total`] so buckets
 /// reconcile exactly with `cumulative_returns`. Calendar bucketing only
@@ -192,7 +159,7 @@ pub(crate) fn group_by_period_dated(
 
 /// Shared period grouper: one `(PeriodId, last observation date, compounded)`
 /// row per contiguous bucket of `frequency`.
-fn group_period_buckets(
+pub(crate) fn group_period_buckets(
     dates: &[Date],
     returns: &[f64],
     frequency: PeriodKind,
@@ -222,23 +189,7 @@ fn group_period_buckets(
     result
 }
 
-/// Period-level trading statistics from per-period compounded returns:
-/// win rate, payoff ratio, Kelly criterion, and consecutive streak lengths.
-///
-/// # Arguments
-///
-/// * `grouped` - Slice of `(PeriodId, compounded_return)` pairs, typically
-///   produced by [`group_by_period`]. The `PeriodId` values are not used
-///   in the computation; only the returns matter.
-///
-/// # Returns
-///
-/// A [`PeriodStats`] struct. If `grouped` is empty, all fields are `0.0` / `0`.
-pub(crate) fn period_stats_from_grouped(grouped: &[(PeriodId, f64)]) -> PeriodStats {
-    period_stats_inner(grouped.iter().map(|&(_, r)| r))
-}
-
-fn period_stats_inner(returns: impl Iterator<Item = f64>) -> PeriodStats {
+pub(crate) fn period_stats_inner(returns: impl Iterator<Item = f64>) -> PeriodStats {
     let mut total = 0usize;
     let mut best = f64::NEG_INFINITY;
     let mut worst = f64::INFINITY;
@@ -433,7 +384,7 @@ mod tests {
     fn group_by_monthly() {
         let dates = vec![d(2025, 1, 2), d(2025, 1, 3), d(2025, 2, 3), d(2025, 2, 4)];
         let returns = vec![0.01, 0.02, -0.01, 0.03];
-        let grouped = group_by_period(&dates, &returns, PeriodKind::Monthly, None);
+        let grouped = group_period_buckets(&dates, &returns, PeriodKind::Monthly, None);
         assert_eq!(grouped.len(), 2);
         assert_eq!(grouped[0].0, month(2025, 1));
         assert_eq!(grouped[1].0, month(2025, 2));
@@ -441,13 +392,13 @@ mod tests {
 
     #[test]
     fn period_stats_from_grouped_basic() {
-        let grouped = vec![
+        let grouped = [
             (month(2025, 1), 0.05),
             (month(2025, 2), -0.02),
             (month(2025, 3), 0.03),
             (month(2025, 4), 0.01),
         ];
-        let stats = period_stats_from_grouped(&grouped);
+        let stats = period_stats_inner(grouped.iter().map(|&(_, r)| r));
         assert!((stats.best - 0.05).abs() < 1e-12);
         assert!((stats.worst - (-0.02)).abs() < 1e-12);
         assert!((stats.win_rate - 0.75).abs() < 1e-12);
@@ -455,18 +406,18 @@ mod tests {
 
     #[test]
     fn period_stats_from_grouped_empty() {
-        let stats = period_stats_from_grouped(&[]);
+        let stats = period_stats_inner(std::iter::empty());
         assert_eq!(stats.win_rate, 0.0);
     }
 
     #[test]
     fn period_stats_from_grouped_all_winning_reports_full_kelly() {
-        let grouped = vec![
+        let grouped = [
             (month(2025, 1), 0.02),
             (month(2025, 2), 0.01),
             (month(2025, 3), 0.03),
         ];
-        let stats = period_stats_from_grouped(&grouped);
+        let stats = period_stats_inner(grouped.iter().map(|&(_, r)| r));
         assert!(stats.payoff_ratio.is_infinite());
         assert!(stats.profit_factor.is_infinite());
         assert!(stats.cpc_ratio.is_infinite());
@@ -478,7 +429,7 @@ mod tests {
         let dates = vec![d(2024, 12, 30), d(2024, 12, 31), d(2025, 1, 2)];
         let returns = vec![0.01, 0.02, 0.03];
 
-        let grouped = group_by_period(&dates, &returns, PeriodKind::Weekly, None);
+        let grouped = group_period_buckets(&dates, &returns, PeriodKind::Weekly, None);
 
         assert_eq!(
             grouped.len(),

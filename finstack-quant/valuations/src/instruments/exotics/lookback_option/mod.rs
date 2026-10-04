@@ -39,5 +39,3 @@ pub(crate) mod pricer;
 pub(crate) mod types;
 
 pub use types::{LookbackOption, LookbackOptionBuilder, LookbackType};
-
-crate::instruments::common_impl::traits::impl_equity_exotic_traits!(LookbackOption);

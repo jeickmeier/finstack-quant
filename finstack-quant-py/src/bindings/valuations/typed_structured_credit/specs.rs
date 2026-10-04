@@ -4,7 +4,7 @@
 
 use pyo3::prelude::*;
 
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     BalloonSpec, LiquidationSpec, PenaltyStep, PrepaymentPenalty, SpecialServicingSpec,
@@ -16,7 +16,7 @@ type PenaltySteps<'py> = Vec<(Bound<'py, PyAny>, f64)>;
 fn opt_date(
     value: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Option<finstack_quant_core::dates::Date>> {
-    value.map(extract_date).transpose()
+    value.map(py_to_date).transpose()
 }
 
 /// Balloon terms of a commercial mortgage at maturity.
@@ -286,7 +286,7 @@ impl PyPrepaymentPenalty {
             .iter()
             .map(|(through, pct)| {
                 Ok(PenaltyStep {
-                    through: extract_date(through)?,
+                    through: py_to_date(through)?,
                     pct: *pct,
                 })
             })

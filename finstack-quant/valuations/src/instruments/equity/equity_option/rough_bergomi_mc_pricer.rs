@@ -9,7 +9,7 @@
 //! hybrid scheme (`RiemannLiouvilleVolterra`). This differs from the rough
 //! Heston model, which uses standard Brownian motion with a singular kernel.
 
-use super::pricing::{collect_inputs_extended, require_european, resolve_lifecycle_value};
+use super::pricing::{collect_inputs, require_european, resolve_lifecycle_value};
 use super::types::EquityOption;
 use crate::instruments::common_impl::parameters::OptionType;
 use crate::instruments::common_impl::traits::Instrument;
@@ -297,7 +297,7 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
             )
         })?;
 
-        // W-31: `collect_inputs_extended` applies the escrowed-dividend model
+        // W-31: `collect_inputs` applies the escrowed-dividend model
         // (spot shift + `q = 0`) when `discrete_dividends` is non-empty. The
         // escrowed-dividend identity holds only under Black-Scholes; under the
         // rough Bergomi stochastic-vol dynamics it is invalid, so feeding the
@@ -321,7 +321,7 @@ impl crate::pricer::Pricer for EquityOptionRoughBergomiMcPricer {
             ));
         }
 
-        let inputs = collect_inputs_extended(equity_option, market, as_of).map_err(|e| {
+        let inputs = collect_inputs(equity_option, market, as_of).map_err(|e| {
             crate::pricer::PricingError::model_failure_with_context(
                 e.to_string(),
                 crate::pricer::PricingErrorContext::from_instrument(equity_option)

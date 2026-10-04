@@ -232,7 +232,7 @@ mod quadrature_tests {
         for order in [5, 7, 10, 15, 20] {
             let quad = GaussHermiteQuadrature::new(order).expect("valid order");
             assert_eq!(
-                quad.points.len(),
+                quad.get_points().len(),
                 order,
                 "Order {} should have {} points",
                 order,

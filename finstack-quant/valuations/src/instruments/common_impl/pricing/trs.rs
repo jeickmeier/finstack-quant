@@ -54,19 +54,6 @@ use crate::instruments::common_impl::pricing::time::{
 use crate::instruments::rates::irs::FloatingLegCompounding;
 use finstack_quant_core::currency::Currency;
 
-fn signed_year_fraction(
-    day_count: DayCount,
-    as_of: Date,
-    date: Date,
-) -> finstack_quant_core::Result<f64> {
-    let context = DayCountContext::default();
-    if date >= as_of {
-        day_count.year_fraction(as_of, date, context)
-    } else {
-        Ok(-day_count.year_fraction(date, as_of, context)?)
-    }
-}
-
 /// Project one financing-leg accrual period's floating rate, excluding spread.
 ///
 /// `simple` legs use the discount-factor-implied simple forward over the period;
@@ -359,8 +346,10 @@ impl TrsEngine {
             }
 
             let day_count = params.schedule.params.day_count;
-            let t_start = signed_year_fraction(day_count, as_of, period_start)?;
-            let t_end = signed_year_fraction(day_count, as_of, period_end)?;
+            let t_start =
+                day_count.signed_year_fraction(as_of, period_start, DayCountContext::default())?;
+            let t_end =
+                day_count.signed_year_fraction(as_of, period_end, DayCountContext::default())?;
 
             let total_return = model.period_return(
                 &PeriodReturnInputs {

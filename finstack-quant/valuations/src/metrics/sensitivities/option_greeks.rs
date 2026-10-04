@@ -15,18 +15,6 @@ use crate::instruments::common_impl::traits::{
 use crate::metrics::{metric_not_found, MetricCalculator, MetricContext, MetricId};
 use finstack_quant_core::Result;
 
-impl super::fd_greeks::HasExpiry for crate::instruments::EquityOption {
-    fn expiry(&self) -> finstack_quant_core::dates::Date {
-        self.expiry
-    }
-}
-
-impl super::fd_greeks::HasDayCount for crate::instruments::EquityOption {
-    fn day_count(&self) -> finstack_quant_core::dates::DayCount {
-        self.day_count
-    }
-}
-
 /// Equity's native provider evaluates Black-Scholes. Other registered models
 /// must differentiate their selected valuation function, holding their explicit
 /// model parameters fixed. In particular, a surface bump is not a Heston

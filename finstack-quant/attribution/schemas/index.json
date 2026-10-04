@@ -2,7 +2,7 @@
   "artifacts": [
     {
       "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
-      "bytes": 1243625,
+      "bytes": 1250496,
       "kind": "input",
       "path": "schemas/attribution/1/attribution.schema.json",
       "summary": "One multi-period P&L attribution run: positions, markets and method.",
@@ -11,7 +11,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
-      "bytes": 233609,
+      "bytes": 232698,
       "kind": "input",
       "path": "schemas/attribution/1/attribution_inputs.schema.json",
       "summary": "Shared attribution settings without an instrument payload.",

@@ -28,7 +28,7 @@ use crate::metrics::core::finite_difference::{
 };
 use crate::metrics::sensitivities::config as sens_config;
 use crate::metrics::{MetricCalculator, MetricContext};
-use finstack_quant_core::dates::{Date, DayCount};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::types::CurveId;
 use finstack_quant_core::Result;
@@ -309,30 +309,6 @@ where
         scratch.revert_scratch_bump(token)?;
     }
     value
-}
-
-// Traits for Instruments with Expiry and DayCount Information
-
-/// Trait for instruments that have an expiry date.
-///
-/// Used for adaptive bump size calculations based on time to expiry.
-/// Instruments with shorter time to expiry typically require smaller bumps
-/// to maintain numerical accuracy in finite difference calculations.
-pub trait HasExpiry {
-    /// Returns the expiry date for this instrument.
-    fn expiry(&self) -> Date;
-}
-
-/// Trait for instruments that have a day count convention.
-///
-/// Used for computing time fractions in adaptive bump calculations.
-/// The day count convention determines how time between dates is measured,
-/// affecting the calculation of year fractions for time-to-expiry.
-pub trait HasDayCount {
-    /// Returns the day count convention for this instrument.
-    ///
-    /// Common conventions include Act/365F, Act/360, 30/360, etc.
-    fn day_count(&self) -> DayCount;
 }
 
 // Generic FD Greeks Calculators
@@ -651,7 +627,7 @@ impl<I> Default for GenericFdVolga<I> {
 
 impl<I> MetricCalculator for GenericFdVolga<I>
 where
-    I: Instrument + HasExpiry + HasDayCount + Clone + 'static,
+    I: Instrument + Clone + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -664,12 +640,12 @@ where
         // If expired, volga is zero — mirror vanna's guard. On an expired
         // option, vega ≈ 0, so volga = (vega(σ+h) - vega(σ-h))/h^2 amplifies
         // near-zero noise into NaN/garbage.
-        let t = instrument.day_count().year_fraction(
-            as_of,
-            HasExpiry::expiry(instrument),
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        let expiry = instrument.expiry().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "Instrument missing expiry for finite-difference option Greeks".into(),
+            )
+        })?;
+        if as_of >= expiry {
             return Ok(0.0);
         }
 
@@ -741,7 +717,7 @@ impl<I> Default for GenericFdVanna<I> {
 
 impl<I> MetricCalculator for GenericFdVanna<I>
 where
-    I: Instrument + HasExpiry + HasDayCount + Clone + 'static,
+    I: Instrument + Clone + 'static,
 {
     fn calculate(&self, context: &mut MetricContext) -> Result<f64> {
         let instrument: &I = context.instrument_as()?;
@@ -752,12 +728,12 @@ where
         )?;
 
         // If expired, vanna is zero (avoid bumping / repricing beyond expiry).
-        let t = instrument.day_count().year_fraction(
-            as_of,
-            HasExpiry::expiry(instrument),
-            finstack_quant_core::dates::DayCountContext::default(),
-        )?;
-        if t <= 0.0 {
+        let expiry = instrument.expiry().ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "Instrument missing expiry for finite-difference option Greeks".into(),
+            )
+        })?;
+        if as_of >= expiry {
             return Ok(0.0);
         }
 
@@ -867,7 +843,6 @@ mod tests {
     struct TestFdInstrument {
         id: String,
         expiry: Date,
-        day_count: DayCount,
         spot_id: PriceId,
         overrides: MetricPricingOverrides,
         instrument_overrides: crate::instruments::InstrumentPricingOverrides,
@@ -879,7 +854,6 @@ mod tests {
             Self {
                 id: id.to_string(),
                 expiry,
-                day_count: DayCount::Act365F,
                 spot_id: spot_id.into(),
                 overrides: MetricPricingOverrides::default(),
                 instrument_overrides: Default::default(),
@@ -893,7 +867,6 @@ mod tests {
     struct RoundingSensitiveInstrument {
         id: String,
         expiry: Date,
-        day_count: DayCount,
         spot_id: PriceId,
         overrides: MetricPricingOverrides,
         instrument_overrides: crate::instruments::InstrumentPricingOverrides,
@@ -914,7 +887,6 @@ mod tests {
             Self {
                 id: id.to_string(),
                 expiry,
-                day_count: DayCount::Act365F,
                 spot_id: spot_id.into(),
                 overrides: MetricPricingOverrides::default(),
                 instrument_overrides: Default::default(),
@@ -932,31 +904,10 @@ mod tests {
         }
     }
 
-    impl HasExpiry for TestFdInstrument {
-        fn expiry(&self) -> Date {
-            self.expiry
-        }
-    }
-
-    impl HasDayCount for TestFdInstrument {
-        fn day_count(&self) -> DayCount {
-            self.day_count
-        }
-    }
-
-    impl HasExpiry for RoundingSensitiveInstrument {
-        fn expiry(&self) -> Date {
-            self.expiry
-        }
-    }
-
-    impl HasDayCount for RoundingSensitiveInstrument {
-        fn day_count(&self) -> DayCount {
-            self.day_count
-        }
-    }
-
     impl crate::instruments::common_impl::traits::Instrument for TestFdInstrument {
+        fn expiry(&self) -> Option<Date> {
+            Some(self.expiry)
+        }
         fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
             let mut dependencies = MarketDependencies::new();
             dependencies.add_market_scalar_id(self.spot_id.as_str());
@@ -1057,6 +1008,9 @@ mod tests {
     }
 
     impl crate::instruments::common_impl::traits::Instrument for RoundingSensitiveInstrument {
+        fn expiry(&self) -> Option<Date> {
+            Some(self.expiry)
+        }
         fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
             let mut dependencies = MarketDependencies::new();
             dependencies.add_market_scalar_id(self.spot_id.as_str());
@@ -1159,11 +1113,7 @@ mod tests {
 
     fn registry_for_test<I>() -> MetricRegistry
     where
-        I: crate::instruments::common_impl::traits::Instrument
-            + HasExpiry
-            + HasDayCount
-            + Clone
-            + 'static,
+        I: crate::instruments::common_impl::traits::Instrument + Clone + 'static,
     {
         let mut registry = MetricRegistry::new();
         registry
@@ -1334,6 +1284,33 @@ mod tests {
     }
 
     #[test]
+    fn option_greeks_use_canonical_expiry_before_market_lookups() {
+        let expiry = date!(2027 - 01 - 01);
+        for as_of in [expiry, date!(2027 - 01 - 02)] {
+            let inst = TestFdInstrument::new("FD-EXPIRED", expiry, "MISSING-SPOT");
+            let mut ctx = MetricContext::new(
+                Arc::new(inst),
+                Arc::new(MarketContext::new()),
+                as_of,
+                Money::from((0_i64, Currency::USD)),
+                MetricContext::default_config(),
+            );
+            assert_eq!(
+                GenericFdVanna::<TestFdInstrument>::default()
+                    .calculate(&mut ctx)
+                    .expect("expired vanna"),
+                0.0
+            );
+            assert_eq!(
+                GenericFdVolga::<TestFdInstrument>::default()
+                    .calculate(&mut ctx)
+                    .expect("expired volga"),
+                0.0
+            );
+        }
+    }
+
+    #[test]
     fn delta_errors_on_zero_spot() {
         let as_of = date!(2025 - 01 - 01);
         let inst = TestFdInstrument::new("FD-TEST", date!(2026 - 01 - 01), "SPOT");
@@ -1422,7 +1399,6 @@ mod tests {
     struct VolLinearInstrument {
         id: String,
         expiry: Date,
-        day_count: DayCount,
         spot_id: PriceId,
         surface_terms: Vec<(String, f64)>,
         multiply_by_spot: bool,
@@ -1441,7 +1417,6 @@ mod tests {
             Self {
                 id: id.to_string(),
                 expiry,
-                day_count: DayCount::Act365F,
                 spot_id: spot_id.into(),
                 surface_terms: vec![(vol_surface_id.to_string(), slope)],
                 multiply_by_spot: false,
@@ -1461,7 +1436,6 @@ mod tests {
             Self {
                 id: id.to_string(),
                 expiry,
-                day_count: DayCount::Act365F,
                 spot_id: spot_id.into(),
                 surface_terms: surface_terms
                     .into_iter()
@@ -1500,19 +1474,10 @@ mod tests {
         }
     }
 
-    impl HasExpiry for VolLinearInstrument {
-        fn expiry(&self) -> Date {
-            self.expiry
-        }
-    }
-
-    impl HasDayCount for VolLinearInstrument {
-        fn day_count(&self) -> DayCount {
-            self.day_count
-        }
-    }
-
     impl crate::instruments::common_impl::traits::Instrument for VolLinearInstrument {
+        fn expiry(&self) -> Option<Date> {
+            Some(self.expiry)
+        }
         fn market_dependencies(&self) -> finstack_quant_core::Result<MarketDependencies> {
             let mut dependencies = MarketDependencies::new();
             dependencies.add_market_scalar_id(self.spot_id.as_str());

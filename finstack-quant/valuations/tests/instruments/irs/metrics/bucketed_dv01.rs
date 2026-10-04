@@ -58,6 +58,8 @@ fn build_flat_forward_curve(rate: f64, base_date: Date, id: &str) -> ForwardCurv
 
 fn create_swap(as_of: Date, end: Date) -> InterestRateSwap {
     InterestRateSwap {
+        adjust_fixed_accrual_dates: false,
+        adjust_float_accrual_dates: false,
         id: "IRS_BUCKETED_DV01_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
@@ -111,7 +113,7 @@ fn test_bucketed_vs_parallel_dv01_sanity() {
     // curve; this keeps bucketed vs parallel DV01 comparable in a single-curve
     // setting, which is what this sanity check is targeting.
     // Use lookback=0 to avoid requiring historical fixings at as_of for the first coupon.
-    swap.float_leg.compounding = FloatingLegCompounding::fedfunds();
+    swap.float_leg.compounding = FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
     swap.float_leg.forward_curve_id = "USD_OIS".into();
 
     let disc_curve = build_flat_discount_curve(0.05, as_of);

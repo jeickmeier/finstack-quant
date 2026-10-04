@@ -10,6 +10,8 @@ use finstack_quant_core::table::{TableColumn, TableColumnData, TableColumnRole, 
 
 use super::Performance;
 use crate::dates::{Date, PeriodKind};
+use crate::drawdown::{calmar, recovery_factor};
+use crate::returns::comp_total;
 use crate::risk_metrics::CagrDayCount;
 
 impl Performance {
@@ -141,14 +143,23 @@ impl Performance {
         Self::ensure_confidence(confidence)?;
         let (var, es) = self.value_at_risk_and_es(confidence);
         let (skew, kurt) = self.skew_kurt();
+        let cagrs = self.cagr(CagrDayCount::default(), None)?;
+        let drawdowns = self.max_drawdown();
+        let calmars = cagrs
+            .iter()
+            .zip(&drawdowns)
+            .map(|(&growth, &drawdown)| calmar(growth, drawdown))
+            .collect();
+        let recovery_factors =
+            self.map_tickers(|i| recovery_factor(comp_total(self.active_returns(i)), drawdowns[i]));
         let metrics: [(&str, Vec<f64>); 22] = [
-            ("cagr", self.cagr(CagrDayCount::default(), None)?),
+            ("cagr", cagrs),
             ("mean_return", self.mean_return(true)),
             ("volatility", self.volatility(true)),
             ("sharpe", self.sharpe(risk_free_rate)),
             ("sortino", self.sortino(0.0)),
-            ("calmar", self.calmar()?),
-            ("max_drawdown", self.max_drawdown()),
+            ("calmar", calmars),
+            ("max_drawdown", drawdowns),
             ("value_at_risk", var),
             ("expected_shortfall", es),
             ("tracking_error", self.tracking_error()),
@@ -161,7 +172,7 @@ impl Performance {
             ("gain_to_pain", self.gain_to_pain()),
             ("ulcer_index", self.ulcer_index()),
             ("pain_index", self.pain_index()),
-            ("recovery_factor", self.recovery_factor()),
+            ("recovery_factor", recovery_factors),
             ("tail_ratio", self.tail_ratio(confidence)?),
             ("r_squared", self.r_squared()),
         ];

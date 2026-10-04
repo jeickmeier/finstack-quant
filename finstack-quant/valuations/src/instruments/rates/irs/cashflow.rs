@@ -105,16 +105,6 @@ fn is_irregular_fixed_period(
     }))
 }
 
-fn adjust_accrual_dates(irs: &InterestRateSwap) -> bool {
-    matches!(
-        irs.attributes.get_meta("schedule_adjust"),
-        Some("acc_and_pay_dates")
-    ) || matches!(
-        irs.attributes.get_meta("adjust_accrual_dates"),
-        Some("true")
-    )
-}
-
 fn resolve_compounded_fixing_calendar(
     irs: &InterestRateSwap,
 ) -> Result<&'static dyn finstack_quant_core::dates::HolidayCalendar> {
@@ -154,7 +144,7 @@ pub(crate) fn projected_compounded_float_leg_schedule(
         day_count: float.day_count,
         payment_lag_days: float.payment_lag_days,
         reset_lag_days: None,
-        adjust_accrual_dates: adjust_accrual_dates(irs),
+        adjust_accrual_dates: irs.adjust_float_accrual_dates,
         roll_rule: crate::cashflow::builder::specs::RollRule::None,
     })?;
     if periods.is_empty() {
@@ -295,7 +285,7 @@ pub(crate) fn fixed_leg_schedule(irs: &InterestRateSwap) -> Result<CashFlowSched
         .calendar_id
         .as_deref()
         .unwrap_or(crate::cashflow::builder::calendar::WEEKENDS_ONLY_ID);
-    let adjust_accrual_dates = adjust_accrual_dates(irs);
+    let adjust_accrual_dates = irs.adjust_fixed_accrual_dates;
     let periods = build_periods(BuildPeriodsParams {
         start: fixed.start,
         end: fixed.end,
@@ -445,7 +435,7 @@ pub(crate) fn float_leg_schedule_with_curves_as_of(
                 stub: float.stub,
                 end_of_month: float.end_of_month,
                 payment_lag_days: float.payment_lag_days,
-                adjust_accrual_dates: false,
+                adjust_accrual_dates: irs.adjust_float_accrual_dates,
                 roll_rule: crate::cashflow::builder::specs::RollRule::None,
             },
         });
@@ -813,7 +803,10 @@ mod tests {
                 .expect("swap")
         };
 
-        let swap_no_cutoff = build_swap("OIS-NO-CUTOFF", FloatingLegCompounding::fedfunds());
+        let swap_no_cutoff = build_swap(
+            "OIS-NO-CUTOFF",
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+        );
         // 5-day rate cut-off freezes the last 5 overnight rates of each period.
         let swap_cutoff = build_swap("OIS-CUTOFF-5D", FloatingLegCompounding::rate_cutoff(5));
 

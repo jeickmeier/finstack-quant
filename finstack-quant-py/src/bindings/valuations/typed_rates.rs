@@ -14,7 +14,7 @@ use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::types::PyAttributes;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::core_to_py;
@@ -178,8 +178,8 @@ impl PyInterestRateSwap {
             notional: money_from_py(notional, currency, "notional")?,
             side: enum_from_str(side, "side")?,
             fixed_rate: rate_decimal_from_py(fixed_rate, "fixed_rate")?,
-            start_date: extract_date(start_date)?,
-            maturity: extract_date(maturity)?,
+            start_date: py_to_date(start_date)?,
+            maturity: py_to_date(maturity)?,
             index_id,
             discount_curve_id,
             forward_curve_id,
@@ -418,6 +418,18 @@ impl PyInterestRateSwap {
         PyFloatLegSpec::from_inner(self.inner.float_leg.clone())
     }
 
+    /// Whether fixed coupon accrual dates use that leg's calendar and business-day convention.
+    #[getter]
+    fn adjust_fixed_accrual_dates(&self) -> bool {
+        self.inner.adjust_fixed_accrual_dates
+    }
+
+    /// Whether floating coupon accrual dates use that leg's calendar and business-day convention.
+    #[getter]
+    fn adjust_float_accrual_dates(&self) -> bool {
+        self.inner.adjust_float_accrual_dates
+    }
+
     /// OTC margin (CSA / initial-margin) specification in serde form, or ``None``.
     #[getter]
     fn margin_spec<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
@@ -614,6 +626,38 @@ impl PyInterestRateSwapBuilder {
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.float_leg(value.inner.clone()));
         slf.fields.push(("float_leg", value.__repr__()));
+        Ok(slf)
+    }
+
+    /// Select adjustment of fixed coupon accrual dates independently of payment dates.
+    ///
+    /// # Arguments
+    /// * `value` - True applies the fixed leg's calendar and business-day convention to accrual boundaries; false (default) retains contractual dates.
+    #[pyo3(text_signature = "($self, value)")]
+    fn adjust_fixed_accrual_dates<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: bool,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
+        slf.inner = Some(b.adjust_fixed_accrual_dates(value));
+        slf.fields
+            .push(("adjust_fixed_accrual_dates", value.to_string()));
+        Ok(slf)
+    }
+
+    /// Select adjustment of floating coupon accrual dates independently of payment dates.
+    ///
+    /// # Arguments
+    /// * `value` - True applies the floating leg's calendar and business-day convention to accrual boundaries; false (default) retains contractual dates.
+    #[pyo3(text_signature = "($self, value)")]
+    fn adjust_float_accrual_dates<'py>(
+        mut slf: PyRefMut<'py, Self>,
+        value: bool,
+    ) -> PyResult<PyRefMut<'py, Self>> {
+        let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
+        slf.inner = Some(b.adjust_float_accrual_dates(value));
+        slf.fields
+            .push(("adjust_float_accrual_dates", value.to_string()));
         Ok(slf)
     }
 
@@ -982,7 +1026,7 @@ impl PySwaption {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<f64> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let inner = self.inner.clone();
         py.detach(move || inner.forward_swap_rate(&market, as_of))
             .map_err(core_to_py)
@@ -1234,7 +1278,7 @@ impl PySwaptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let expiry = extract_date(value)?;
+        let expiry = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.expiry(expiry));
         slf.fields.push(("expiry", expiry.to_string()));
@@ -2112,7 +2156,7 @@ impl PyCapFloorBuilder {
         amount: &Bound<'_, PyAny>,
         currency: Option<&str>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let payment_date = extract_date(payment_date)?;
+        let payment_date = py_to_date(payment_date)?;
         let amount = money_from_py(amount, currency, "amount")?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.premium((payment_date, amount)));
@@ -2139,7 +2183,7 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let start_date = extract_date(value)?;
+        let start_date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.start_date(start_date));
         slf.fields.push(("start_date", start_date.to_string()));
@@ -2162,7 +2206,7 @@ impl PyCapFloorBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let maturity = extract_date(value)?;
+        let maturity = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.maturity(maturity));
         slf.fields.push(("maturity", maturity.to_string()));

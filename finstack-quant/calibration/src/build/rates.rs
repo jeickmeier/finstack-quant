@@ -1,9 +1,10 @@
 //! Builders for interest rate instruments from market quotes.
 
-use crate::build::helpers::{resolve_calendar, resolve_spot_date};
+use crate::build::helpers::resolve_spot_date;
 use crate::build::BuildCtx;
 use crate::quotes::ids::Pillar;
 use crate::quotes::rates::RateQuote;
+use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
     adjust, third_wednesday, BusinessDayConvention, Date, DateExt, TenorUnit,
 };
@@ -189,7 +190,7 @@ pub(crate) fn resolve_rate_quote_dates(
                 conv.market_settlement_days,
                 conv.market_business_day_convention,
             )?;
-            let cal = resolve_calendar(&conv.market_calendar_id)?;
+            let cal = calendar_by_id_strict(&conv.market_calendar_id)?;
             let end = match pillar {
                 Pillar::Tenor(t) => {
                     t.add_to_date(spot, Some(cal), conv.market_business_day_convention)?
@@ -211,7 +212,7 @@ pub(crate) fn resolve_rate_quote_dates(
                 conv.market_settlement_days,
                 conv.market_business_day_convention,
             )?;
-            let cal = resolve_calendar(&conv.market_calendar_id)?;
+            let cal = calendar_by_id_strict(&conv.market_calendar_id)?;
             let start = match start_pillar {
                 Pillar::Tenor(t) => {
                     t.add_to_date(spot, Some(cal), conv.market_business_day_convention)?
@@ -232,7 +233,7 @@ pub(crate) fn resolve_rate_quote_dates(
         } => {
             let fut_conv = registry.require_ir_future(contract)?;
             let idx_conv = registry.require_rate_index(&fut_conv.index_id)?;
-            let cal = resolve_calendar(&fut_conv.calendar_id)?;
+            let cal = calendar_by_id_strict(&fut_conv.calendar_id)?;
             let business_day_convention = idx_conv.market_business_day_convention;
             let expiry = adjust(*expiry, business_day_convention, cal)?;
             let (period_start, period_end) = match fut_conv.reference_period {
@@ -313,7 +314,7 @@ pub(crate) fn resolve_rate_quote_dates(
                 conv.market_settlement_days,
                 conv.market_business_day_convention,
             )?;
-            let cal = resolve_calendar(&conv.market_calendar_id)?;
+            let cal = calendar_by_id_strict(&conv.market_calendar_id)?;
             let maturity = match pillar {
                 Pillar::Tenor(t) => {
                     t.add_to_date(start, Some(cal), conv.market_business_day_convention)?
@@ -635,7 +636,7 @@ fn apply_swap_spread(swap: &mut InterestRateSwap, spread_decimal: &Option<f64>) 
 }
 
 fn resolve_fixing_date(start: Date, conv: &RateIndexConventions) -> Result<Date> {
-    let cal = resolve_calendar(&conv.market_calendar_id)?;
+    let cal = calendar_by_id_strict(&conv.market_calendar_id)?;
     let lag = conv.default_reset_lag_days;
 
     start.add_business_days(-lag, cal)

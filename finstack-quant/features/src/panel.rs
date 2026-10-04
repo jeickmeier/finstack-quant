@@ -92,12 +92,10 @@ fn resolve_input<'a>(
     columns: &'a [PanelTransformColumn],
     operation: &PanelOperation,
 ) -> Result<&'a [Option<f64>]> {
-    let requested = match operation.input() {
-        Some(name) => name,
-        None => columns
+    let Some(requested) = operation.input() else {
+        return Ok(columns
             .last()
-            .map(|column| column.name.as_str())
-            .unwrap_or("values"),
+            .map_or(spec.values.as_slice(), |column| column.values.as_slice()));
     };
     if requested == "values" {
         return Ok(&spec.values);

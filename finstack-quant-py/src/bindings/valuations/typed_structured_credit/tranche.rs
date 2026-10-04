@@ -3,7 +3,7 @@ use pyo3::prelude::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::valuations::convert::{
     attributes_from_py, attributes_to_py, bool_repr, enum_to_py_string, money_to_py, opt_repr,
     rate_decimal_from_py,
@@ -477,7 +477,7 @@ impl PyTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let maturity = extract_date(value)?;
+        let maturity = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.maturity(maturity));
         Ok(slf)

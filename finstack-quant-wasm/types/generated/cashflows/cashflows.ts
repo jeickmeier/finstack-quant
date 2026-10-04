@@ -508,12 +508,15 @@ export type PaymentProgramSpec =
  */
 export type PrincipalExchange = "none" | "initial_and_final";
 /**
- * Default curve shape.
+ * Cashflow default-model specification.
  */
-export type DefaultCurve =
+export type DefaultModelSpec =
   | {
+      /**
+       * Annual decimal CDR in `[0, 1]`.
+       */
+      cdr: number;
       curve: "constant";
-      [k: string]: unknown;
     }
   | {
       curve: "sda";
@@ -521,7 +524,6 @@ export type DefaultCurve =
        * Speed multiplier (1.0 = 100% SDA)
        */
       speed_multiplier: number;
-      [k: string]: unknown;
     }
   | {
       curve: "vector";
@@ -529,7 +531,6 @@ export type DefaultCurve =
        * Annual CDR per month of seasoning as decimals, month 1 first.
        */
       monthly_cdr: number[];
-      [k: string]: unknown;
     }
   | {
       /**
@@ -543,7 +544,6 @@ export type DefaultCurve =
        * Loss severity as a decimal fraction of defaulted par in `(0, 1]`.
        */
       severity: number;
-      [k: string]: unknown;
     }
   | {
       /**
@@ -556,15 +556,17 @@ export type DefaultCurve =
        */
       cumulative_default_rate: number;
       curve: "timing";
-      [k: string]: unknown;
     };
 /**
- * Prepayment curve shape.
+ * Cashflow prepayment-model specification.
  */
-export type PrepaymentCurve =
+export type PrepaymentModelSpec =
   | {
+      /**
+       * Annual decimal CPR in `[0, 1]`.
+       */
+      cpr: number;
       curve: "constant";
-      [k: string]: unknown;
     }
   | {
       curve: "psa";
@@ -572,7 +574,6 @@ export type PrepaymentCurve =
        * Speed multiplier (1.0 = 100% PSA)
        */
       speed_multiplier: number;
-      [k: string]: unknown;
     }
   | {
       curve: "cmbs_lockout";
@@ -580,7 +581,10 @@ export type PrepaymentCurve =
        * Number of months with zero prepayment (e.g., 60 for 5-year lockout)
        */
       lockout_months: number;
-      [k: string]: unknown;
+      /**
+       * Annual decimal CPR after lockout, in `[0, 1]`.
+       */
+      post_lockout_cpr: number;
     }
   | {
       curve: "abs";
@@ -589,7 +593,6 @@ export type PrepaymentCurve =
        * (`0.015` = 1.5% ABS).
        */
       speed: number;
-      [k: string]: unknown;
     }
   | {
       curve: "vector";
@@ -597,7 +600,6 @@ export type PrepaymentCurve =
        * Annual CPR per month of seasoning as decimals, month 1 first.
        */
       monthly_cpr: number[];
-      [k: string]: unknown;
     };
 
 /**
@@ -1397,47 +1399,12 @@ export interface PrincipalEventSpec {
   payment_date: valuations.DateWire;
 }
 /**
- * Cashflow default-model specification.
- */
-export interface DefaultModelSpec {
-  /**
-   * CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).
-   *
-   * This field is **ignored** when any curve other than
-   * [`DefaultCurve::Constant`] is active: the monthly rate is then derived
-   * entirely from the curve.
-   */
-  cdr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: DefaultCurve | null;
-}
-/**
  * Currency-preserving cashflow totals by reporting period.
  */
 export interface PeriodAggregation {
   [k: string]: {
     [k: string]: valuations.Money;
   };
-}
-/**
- * Cashflow prepayment-model specification.
- */
-export interface PrepaymentModelSpec {
-  /**
-   * CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
-   *
-   * This field is **ignored** when [`PrepaymentCurve::Psa`],
-   * [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
-   * monthly rate is then derived entirely from the curve. It IS used by
-   * [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
-   */
-  cpr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: PrepaymentCurve | null;
 }
 /**
  * Cashflow recovery-model specification.

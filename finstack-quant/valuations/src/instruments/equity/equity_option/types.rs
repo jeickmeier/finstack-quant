@@ -1091,7 +1091,13 @@ mod tests {
         let price = option
             .value(&curves, as_of)
             .expect("NPV calculation should succeed in test");
-        let (spot, r, q, sigma, t) = pricing::collect_inputs(&option, &curves, as_of)
+        let pricing::inputs::EquityOptionInputs {
+            spot,
+            r,
+            q,
+            sigma,
+            t_vol: t,
+        } = pricing::collect_inputs(&option, &curves, as_of)
             .expect("Input collection should succeed in test");
         let expected_unit =
             bs_price_unchecked(spot, option.strike, r, q, sigma, t, option.option_type);
@@ -1169,8 +1175,11 @@ mod tests {
             .expect("dividend risk");
         let actual = results[&MetricId::Dividend01];
         let delta = option.delta(&curves, as_of).expect("delta");
-        let (prepaid, _, _, _, t) =
-            pricing::collect_inputs(&option, &curves, as_of).expect("inputs");
+        let pricing::inputs::EquityOptionInputs {
+            spot: prepaid,
+            t_vol: t,
+            ..
+        } = pricing::collect_inputs(&option, &curves, as_of).expect("inputs");
         let expected = -delta * prepaid * t * 1e-4;
         assert!((actual - expected).abs() < 1e-5, "{actual} vs {expected}");
     }
@@ -1273,8 +1282,13 @@ mod tests {
         let override_price = override_option
             .value(&curves, as_of)
             .expect("should succeed");
-        let (spot, r, q, _, t) =
-            pricing::collect_inputs(&override_option, &curves, as_of).expect("should succeed");
+        let pricing::inputs::EquityOptionInputs {
+            spot,
+            r,
+            q,
+            t_vol: t,
+            ..
+        } = pricing::collect_inputs(&override_option, &curves, as_of).expect("should succeed");
         let expected = bs_price_unchecked(
             spot,
             override_option.strike,
@@ -1342,8 +1356,8 @@ mod tests {
         let option = base_option(expiry);
 
         // Verify the curve and model clocks remain separate.
-        let inputs = pricing::collect_inputs_extended(&option, &curves, as_of)
-            .expect("collect_inputs_extended should succeed");
+        let inputs = pricing::collect_inputs(&option, &curves, as_of)
+            .expect("collect_inputs should succeed");
         let discount_curve = curves.get_discount(DISC_ID).expect("discount curve");
         let curve_time = year_fraction(discount_curve.day_count(), as_of, expiry)
             .expect("curve day-count fraction");
@@ -1507,7 +1521,13 @@ mod tests {
         let curves = build_market_context(as_of, 100.0, 0.25, 0.05, 0.02);
 
         // Verify inputs reflect spot adjustment and q=0
-        let (spot, r, q, _sigma, _t) = pricing::collect_inputs(&option, &curves, as_of)
+        let pricing::inputs::EquityOptionInputs {
+            spot,
+            r,
+            q,
+            sigma: _sigma,
+            t_vol: _t,
+        } = pricing::collect_inputs(&option, &curves, as_of)
             .expect("collect_inputs should succeed");
         assert!(
             spot < 100.0,
@@ -1538,7 +1558,13 @@ mod tests {
         let curves = build_market_context(as_of, 100.0, 0.25, 0.05, 0.02);
 
         // With empty discrete_dividends (default), should use continuous yield
-        let (spot, _r, q, _sigma, _t) = pricing::collect_inputs(&option, &curves, as_of)
+        let pricing::inputs::EquityOptionInputs {
+            spot,
+            r: _r,
+            q,
+            sigma: _sigma,
+            t_vol: _t,
+        } = pricing::collect_inputs(&option, &curves, as_of)
             .expect("collect_inputs should succeed");
 
         assert!(
@@ -1566,7 +1592,13 @@ mod tests {
 
         let curves = build_market_context(as_of, 100.0, 0.25, 0.05, 0.0);
 
-        let (spot, _r, q, _sigma, _t) = pricing::collect_inputs(&option, &curves, as_of)
+        let pricing::inputs::EquityOptionInputs {
+            spot,
+            r: _r,
+            q,
+            sigma: _sigma,
+            t_vol: _t,
+        } = pricing::collect_inputs(&option, &curves, as_of)
             .expect("collect_inputs should succeed");
 
         // No future dividends within option life — spot unadjusted, q=0
@@ -1596,7 +1628,13 @@ mod tests {
 
         let curves = build_market_context(as_of, 100.0, 0.25, 0.05, 0.0);
 
-        let (spot, r, q, _sigma, _t) = pricing::collect_inputs(&option, &curves, as_of)
+        let pricing::inputs::EquityOptionInputs {
+            spot,
+            r,
+            q,
+            sigma: _sigma,
+            t_vol: _t,
+        } = pricing::collect_inputs(&option, &curves, as_of)
             .expect("collect_inputs should succeed");
 
         // Only the $1.50 September dividend should reduce spot

@@ -2,7 +2,7 @@ use pyo3::prelude::*;
 
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::valuations::convert::{
     bps_from_py, money_from_py, money_to_py, opt_repr, rate_decimal_from_py,
 };
@@ -124,7 +124,7 @@ spread_bp=None, forward_curve_id=None, index_floor_bp=None, cpr=None, cdr=None, 
         amortization_term_months: Option<u32>,
         io_months: Option<u32>,
     ) -> PyResult<Self> {
-        let maturity = extract_date(maturity)?;
+        let maturity = py_to_date(maturity)?;
         let balance = money_from_py(balance, None, "balance")?;
         let rate = rate_decimal_from_py(rate, "rate")?;
         let spread_bp = spread_bp

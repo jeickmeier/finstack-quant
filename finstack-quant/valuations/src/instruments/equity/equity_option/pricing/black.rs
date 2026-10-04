@@ -1,8 +1,8 @@
 //! Black–Scholes / tree pricing and cash greeks for equity options.
 
 use super::inputs::{
-    collect_inputs, collect_inputs_extended, early_exercise_market_params, escrowed_spot_drho,
-    future_dividends, resolve_lifecycle_value,
+    collect_inputs, early_exercise_market_params, escrowed_spot_drho, future_dividends,
+    resolve_lifecycle_value,
 };
 use crate::instruments::common_impl::helpers::year_fraction;
 use crate::instruments::common_impl::parameters::{OptionMarketParams, OptionType};
@@ -28,7 +28,13 @@ pub(crate) fn compute_pv(
     let ccy = inst.currency;
     let unit_price = match inst.exercise_style {
         ExerciseStyle::European => {
-            let (spot, r, q, sigma, t) = collect_inputs(inst, curves, as_of)?;
+            let super::inputs::EquityOptionInputs {
+                spot,
+                r,
+                q,
+                sigma,
+                t_vol: t,
+            } = collect_inputs(inst, curves, as_of)?;
             bs_price_unchecked(spot, inst.strike, r, q, sigma, t, inst.option_type)
         }
         ExerciseStyle::American => {
@@ -164,7 +170,7 @@ pub(crate) fn compute_greeks(
             ..Default::default()
         });
     }
-    let inputs = collect_inputs_extended(inst, curves, as_of)?;
+    let inputs = collect_inputs(inst, curves, as_of)?;
     let (spot, r, q, sigma, t) = (inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol);
 
     if t <= 0.0 {

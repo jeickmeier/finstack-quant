@@ -110,7 +110,7 @@ pub trait Discounting: Send + Sync {
     ///
     /// Returns an error if:
     /// - Day-count year fraction calculation fails
-    /// - Either discount factor is non-finite or non-positive
+    /// - Either discount factor or their quotient is non-finite or non-positive
     #[inline]
     fn df_between_dates(&self, from: Date, to: Date) -> crate::Result<f64> {
         if from == to {
@@ -136,7 +136,13 @@ pub trait Discounting: Send + Sync {
             )));
         }
 
-        Ok(df_to / df_from)
+        let relative_df = df_to / df_from;
+        if !relative_df.is_finite() || relative_df <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "Invalid relative discount factor from {from} to {to}: {relative_df}"
+            )));
+        }
+        Ok(relative_df)
     }
 
     /// Discount factor from `from_t` to `to_t` where `t` is year-fraction
@@ -171,7 +177,13 @@ pub trait Discounting: Send + Sync {
             )));
         }
 
-        Ok(df_to / df_from)
+        let relative_df = df_to / df_from;
+        if !relative_df.is_finite() || relative_df <= 0.0 {
+            return Err(crate::Error::Validation(format!(
+                "Invalid relative discount factor from {from_t} to {to_t}: {relative_df}"
+            )));
+        }
+        Ok(relative_df)
     }
 
     /// Instantaneous forward rate at time `t` (year fraction from base date).
@@ -301,6 +313,39 @@ mod tests {
             .df_between_dates(as_of, to)
             .expect("constant curve should produce valid DFs");
         assert_eq!(df, 1.0);
+    }
+
+    #[test]
+    fn relative_discounting_rejects_overflow_and_underflow() {
+        struct ExtremeCurve {
+            id: CurveId,
+            reverse: bool,
+        }
+        impl Discounting for ExtremeCurve {
+            fn id(&self) -> &CurveId {
+                &self.id
+            }
+            fn base_date(&self) -> Date {
+                Date::from_calendar_date(2025, time::Month::January, 1).expect("date")
+            }
+            fn df(&self, t: f64) -> f64 {
+                if (t > 0.0) != self.reverse {
+                    1e308
+                } else {
+                    1e-308
+                }
+            }
+        }
+        for reverse in [false, true] {
+            let curve = ExtremeCurve {
+                id: CurveId::new("EXTREME"),
+                reverse,
+            };
+            let base = curve.base_date();
+            assert!(curve
+                .df_between_dates(base, base + time::Duration::days(365))
+                .is_err());
+        }
     }
 
     #[test]

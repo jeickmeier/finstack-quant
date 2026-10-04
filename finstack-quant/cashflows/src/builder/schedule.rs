@@ -1322,7 +1322,6 @@ impl CashFlowSchedule {
                 periods,
                 disc,
                 date_ctx,
-                None,
             )
         }
     }

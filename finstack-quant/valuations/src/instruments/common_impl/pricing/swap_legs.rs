@@ -11,11 +11,8 @@
 //! - Neumaier compensated summation for long-dated swaps
 //! - Holiday-aware payment delay handling
 
-use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 use finstack_quant_core::dates::calendar_by_id;
-use finstack_quant_core::dates::{Date, DateExt, DayCount};
-use finstack_quant_core::market_data::term_structures::DiscountCurve;
-use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::dates::{Date, DateExt};
 use finstack_quant_core::Result;
 
 /// Minimum threshold for annuity values to avoid divide-by-zero in par spread calculations.
@@ -109,123 +106,18 @@ pub struct LegPeriod {
     pub year_fraction: f64,
 }
 
-/// Parameters for pricing a fixed rate leg.
-#[derive(Debug, Clone)]
-pub struct FixedLegParams {
-    /// Fixed rate (decimal, e.g., 0.05 for 5%).
-    pub rate: f64,
-    /// Day count convention for accrual.
-    pub day_count: DayCount,
-    /// Payment delay in business days after period end.
-    pub payment_lag_days: i32,
-    /// Optional calendar ID for payment date adjustments.
-    pub calendar_id: Option<finstack_quant_core::types::CalendarId>,
-}
-
-impl FixedLegParams {
-    /// Validate fixed leg parameters.
-    ///
-    /// Checks that:
-    /// - Rate is finite
-    pub fn validate(&self) -> Result<()> {
-        if !self.rate.is_finite() {
-            return Err(finstack_quant_core::Error::Validation(
-                "Fixed rate must be finite".into(),
-            ));
-        }
-        Ok(())
-    }
-}
-
-/// Compute present value of a fixed rate leg.
-///
-/// This is the Bloomberg-validated implementation from IRS pricing, generalized to work
-/// with any swap instrument. It handles:
-/// - Fixed coupon calculation with proper day count
-/// - Payment delay adjustment
-/// - Numerical stability via Kahan summation
-/// - Robust relative discount factors
-///
-/// # Arguments
-///
-/// * `periods` - Iterator over the leg's accrual periods; it is consumed while
-///   valuing the fixed coupons.
-/// * `notional` - Unsigned contractual notional in the leg currency. The
-///   caller applies payer/receiver sign conventions to the returned PV.
-/// * `params` - Fixed coupon rate, day-count, and payment-lag conventions.
-/// * `disc` - Discount curve used to value future payments relative to
-///   `as_of`.
-/// * `as_of` - Valuation date and cashflow cutoff: payments on or before this
-///   date are excluded, and remaining payments are discounted from it.
-///
-/// # Returns
-///
-/// Present value of the fixed leg as a raw f64 (unsigned).
-/// The caller is responsible for applying sign conventions.
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Parameter validation fails
-/// - Discount factor calculation fails due to numerical instability
-pub fn pv_fixed_leg<I>(
-    periods: I,
-    notional: f64,
-    params: &FixedLegParams,
-    disc: &DiscountCurve,
-    as_of: Date,
-) -> Result<f64>
-where
-    I: Iterator<Item = LegPeriod>,
-{
-    params.validate()?;
-
-    // Use incremental Kahan accumulator to avoid Vec allocation
-    let mut acc = NeumaierAccumulator::new();
-
-    for period in periods {
-        // Apply payment delay to determine the actual payment date
-        let payment_date = add_payment_delay(
-            period.accrual_end,
-            params.payment_lag_days,
-            params.calendar_id.as_deref(),
-        )?;
-
-        // Skip cashflows where the payment has already settled
-        // (payment_date <= as_of means the payment has been made)
-        if payment_date <= as_of {
-            continue;
-        }
-
-        // Fixed coupon amount
-        let coupon_amount = notional * params.rate * period.year_fraction;
-
-        // Discount from as_of for correct theta
-        let df = relative_df_discount_curve(disc, as_of, payment_date)?;
-        acc.add(coupon_amount * df);
-    }
-
-    Ok(acc.total())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
+    use finstack_quant_core::dates::DayCount;
+    use finstack_quant_core::market_data::term_structures::DiscountCurve;
     use finstack_quant_core::types::CurveId;
     use time::Month;
 
     fn date(year: i32, month: u8, day: u8) -> Date {
         Date::from_calendar_date(year, Month::try_from(month).expect("valid month"), day)
             .expect("valid date")
-    }
-
-    fn fixed_rate(rate: f64, day_count: DayCount) -> FixedLegParams {
-        FixedLegParams {
-            rate,
-            day_count,
-            payment_lag_days: 0,
-            calendar_id: None,
-        }
     }
 
     fn test_discount_curve(base_date: Date) -> DiscountCurve {
@@ -269,58 +161,6 @@ mod tests {
         );
         let df = result.expect("relative DF should be valid");
         assert!(df > 0.0, "Relative DF should be positive: {}", df);
-    }
-
-    #[test]
-    fn pv_fixed_leg_basic() {
-        let base_date = date(2024, 1, 1);
-        let disc = test_discount_curve(base_date);
-
-        let periods = vec![
-            LegPeriod {
-                accrual_start: date(2024, 1, 1),
-                accrual_end: date(2024, 7, 1),
-                reset_date: None,
-                year_fraction: 0.5,
-            },
-            LegPeriod {
-                accrual_start: date(2024, 7, 1),
-                accrual_end: date(2025, 1, 1),
-                reset_date: None,
-                year_fraction: 0.5,
-            },
-        ];
-
-        let params = fixed_rate(0.03, DayCount::Thirty360);
-        let pv = pv_fixed_leg(periods.into_iter(), 1_000_000.0, &params, &disc, base_date)
-            .expect("should price");
-
-        // Should be positive (receiving fixed)
-        assert!(pv > 0.0, "PV should be positive: {}", pv);
-
-        // Approximate check: 2 × 0.5 × 0.03 × 1M × avg_df ≈ 30000 × 0.95 ≈ 28500
-        assert!(
-            pv > 20000.0 && pv < 35000.0,
-            "PV should be reasonable: {}",
-            pv
-        );
-    }
-
-    #[test]
-    fn pv_fixed_leg_validates_nan_rate() {
-        let base_date = date(2024, 1, 1);
-        let disc = test_discount_curve(base_date);
-
-        let periods = vec![LegPeriod {
-            accrual_start: date(2024, 1, 1),
-            accrual_end: date(2024, 7, 1),
-            reset_date: None,
-            year_fraction: 0.5,
-        }];
-
-        let params = fixed_rate(f64::NAN, DayCount::Thirty360);
-        let result = pv_fixed_leg(periods.into_iter(), 1_000_000.0, &params, &disc, base_date);
-        assert!(result.is_err(), "Should reject NaN rate");
     }
 
     #[test]
@@ -379,8 +219,6 @@ mod tests {
 
     #[test]
     fn relative_df_discount_curve_long_horizon() {
-        use finstack_quant_core::market_data::term_structures::DiscountCurve;
-
         // Create a curve that extends far into the future
         let base_date = date(2024, 1, 1);
         let curve = DiscountCurve::builder("TEST-LONG")

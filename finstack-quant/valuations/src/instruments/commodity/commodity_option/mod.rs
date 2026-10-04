@@ -7,8 +7,7 @@
 pub(crate) mod metrics;
 /// Pricer for commodity options.
 pub(crate) mod pricer;
-pub(crate) mod traits;
-mod types;
+pub(crate) mod types;
 
 pub use pricer::CommodityOptionMcPricer;
 pub use types::CommodityMcParams;

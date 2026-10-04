@@ -102,7 +102,7 @@ fn structured_credit_tranche_discount_margin(
     let deal = extract_structured_credit(py, instrument)?;
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
-    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+    let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     py.detach(move || {
         calculate_tranche_discount_margin(&deal, &tranche_id, &market, as_of, market_price_pct)
     })
@@ -143,7 +143,7 @@ fn structured_credit_tranche_breakeven_cdr(
     let deal = extract_structured_credit(py, instrument)?;
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
-    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+    let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     py.detach(move || calculate_tranche_breakeven_cdr(&deal, &tranche_id, &market, as_of))
         .map_err(core_to_py)
 }
@@ -192,7 +192,7 @@ fn structured_credit_tranche_oas(
     let deal = extract_structured_credit(py, instrument)?;
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
-    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+    let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let config: OasConfig = match config.filter(|value| !value.is_none()) {
         Some(value) => {
             let json = crate::bindings::module_utils::py_to_json_string(py, value, "OasConfig")?;
@@ -256,7 +256,7 @@ fn structured_credit_tranche_metrics(
     let deal = extract_structured_credit(py, instrument)?;
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
-    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+    let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let inner = py
         .detach(move || {
             calculate_tranche_metrics(&deal, &tranche_id, &market, as_of, market_price_pct)
@@ -303,7 +303,7 @@ fn structured_credit_tranche_scenario_table(
     let deal = extract_structured_credit(py, instrument)?;
     let market = extract_market(py, market)?;
     let tranche_id = tranche_id.to_owned();
-    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+    let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let grid_json = crate::bindings::module_utils::py_to_json_string(py, grid, "ScenarioGrid")?;
     let grid: ScenarioGrid = serde_json::from_str(&grid_json)
         .map_err(|e| serde_json_to_py(e, "invalid scenario grid JSON"))?;

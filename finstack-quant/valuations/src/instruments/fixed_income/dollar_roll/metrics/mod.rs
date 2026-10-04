@@ -150,7 +150,7 @@ mod production_mortgage_audit {
 /// response and gives a different number.
 #[cfg(test)]
 mod rate_risk_rebuild_tests {
-    use crate::cashflow::builder::specs::{PrepaymentCurve, PrepaymentModelSpec};
+    use crate::cashflow::builder::specs::PrepaymentModelSpec;
     use crate::instruments::fixed_income::cmo::pricer::{price_cmo, resolve_collateral};
     use crate::instruments::fixed_income::dollar_roll::pricer::price_dollar_roll;
     use crate::instruments::fixed_income::tba::pricer::{create_assumed_pool, price_tba};
@@ -186,8 +186,8 @@ mod rate_risk_rebuild_tests {
     }
 
     fn psa(model: &PrepaymentModelSpec) -> f64 {
-        match model.curve {
-            Some(PrepaymentCurve::Psa { speed_multiplier }) => speed_multiplier,
+        match model {
+            PrepaymentModelSpec::Psa { speed_multiplier } => *speed_multiplier,
             _ => panic!("generic pools use a PSA model"),
         }
     }

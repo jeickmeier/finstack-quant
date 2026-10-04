@@ -228,7 +228,6 @@ fn validate_file(file: &DefaultsFile) -> Result<()> {
             use_parallel: file.rust.path_dependent_pricer.use_parallel,
         },
     )?;
-    validate_engine("rust.engine", &file.rust.engine)?;
     validate_positive_usize(
         "rust.path_dependent_pricer.chunk_size",
         file.rust.path_dependent_pricer.chunk_size,
@@ -262,12 +261,6 @@ fn validate_runtime(label: &str, defaults: &PricerRuntimeDefaults) -> Result<()>
     validate_positive_usize(&format!("{label}.num_paths"), defaults.num_paths)?;
     let _seed = defaults.seed;
     let _parallel = defaults.use_parallel;
-    Ok(())
-}
-
-fn validate_engine(_label: &str, defaults: &EngineDefaults) -> Result<()> {
-    let _parallel = defaults.use_parallel;
-    let _antithetic = defaults.antithetic;
     Ok(())
 }
 

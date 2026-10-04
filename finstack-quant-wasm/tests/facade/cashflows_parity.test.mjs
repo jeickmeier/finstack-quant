@@ -763,9 +763,6 @@ test('CFCC-008: fromFlows validates every row in Rust; fromParts does not', () =
 
 test('CFCC-010: compounding presets and default-model survival helpers come from Rust', () => {
   const inArrears = { compounded_in_arrears: { lookback_days: 0 } };
-  for (const preset of ['Sofr', 'Fedfunds', 'Sonia', 'Estr', 'Tona', 'Saron']) {
-    assert.deepEqual(cashflows[`floatingLegCompounding${preset}`](), inArrears);
-  }
   assert.deepEqual(cashflows.floatingLegCompoundingSofrObservationShift(), {
     compounded_with_observation_shift: { shift_days: 2 },
   });

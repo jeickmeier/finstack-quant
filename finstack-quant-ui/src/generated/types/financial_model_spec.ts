@@ -35,7 +35,7 @@ export type DB375E274438Ab847F1Fc = string;
  *
  * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
  * assert_eq!(
- *     FloatingLegCompounding::sofr(),
+ *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
  *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
  * );
  * ```
@@ -10163,6 +10163,18 @@ export interface DB559Ae4814037C7E11Ce3 {
  *   `docs/REFERENCES.md#bloomberg-swpm`
  */
 export interface DB5Fbe42D95B9Dc65Bd05 {
+  /**
+   * Adjust fixed coupon accrual boundaries using the fixed leg's calendar and
+   * business-day convention. Defaults to false (contractual unadjusted accrual);
+   * payment-date adjustment and payment lag are independent.
+   */
+  adjust_fixed_accrual_dates?: boolean;
+  /**
+   * Adjust floating coupon accrual boundaries using the floating leg's calendar
+   * and business-day convention, for term and overnight coupons alike. Defaults
+   * to false; reset lag is applied to the resulting accrual start.
+   */
+  adjust_float_accrual_dates?: boolean;
   attributes: D_87642A02554Ab08B56E34;
   fixed_leg: DF6Da7F7Ae3129Fc74F07;
   float_leg: D_450829Dac3A74A5C8761;
@@ -10611,7 +10623,7 @@ export interface D_450829Dac3A74A5C8761 {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -13649,7 +13661,7 @@ export interface D_7D1A98F209076E58Ed77 {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -14490,7 +14502,7 @@ export interface D_450829Dac3A74A5C87611 {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```

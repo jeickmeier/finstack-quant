@@ -5,7 +5,7 @@ use pyo3::prelude::*;
 use pyo3::types::PyList;
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::{core_to_py, serde_json_to_py};
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -601,8 +601,8 @@ impl PyCdsIndex {
             InstrumentId::new(id.to_string()),
             money_from_py(notional, None, "notional")?,
             enum_from_str(side, "side")?,
-            extract_date(start)?,
-            extract_date(end)?,
+            py_to_date(start)?,
+            py_to_date(end)?,
             recovery_rate,
             CurveId::new(discount_curve_id.to_string()),
             CurveId::new(credit_curve_id.to_string()),
@@ -642,7 +642,7 @@ impl PyCdsIndex {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<f64> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         self.inner.par_spread(&market, as_of).map_err(core_to_py)
     }
 
@@ -677,7 +677,7 @@ impl PyCdsIndex {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<f64> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         self.inner.risky_pv01(&market, as_of).map_err(core_to_py)
     }
 
@@ -716,7 +716,7 @@ impl PyCdsIndex {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<f64> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let provider =
             finstack_quant_calibration::recalibration::CachedRecalibrationProvider::new();
         self.inner

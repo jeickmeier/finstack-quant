@@ -207,9 +207,11 @@ pub fn compute_credit_context(
     let mut dscr_incl_fees = Vec::new();
     let mut interest_coverage = Vec::new();
     let mut ltv = Vec::new();
+    let mut skipped_periods = Vec::new();
 
     for period in periods {
         let Some(cf) = inst_data.get(&period.id) else {
+            skipped_periods.push(period.id);
             continue;
         };
         for node in [numerators.cfads, numerators.interest_coverage] {
@@ -279,6 +281,12 @@ pub fn compute_credit_context(
             }
         }
 
+        let coverage_counts = (
+            dscr.len(),
+            dscr_total.len(),
+            dscr_incl_fees.len(),
+            interest_coverage.len(),
+        );
         if let Some(cfads) = statement.get(numerators.cfads, &period.id) {
             if !cfads.is_finite() {
                 return Err(Error::eval(format!(
@@ -311,6 +319,13 @@ pub fn compute_credit_context(
                 interest_coverage.push((period.id, value));
             }
         }
+        if coverage_counts.0 == dscr.len()
+            || coverage_counts.1 == dscr_total.len()
+            || coverage_counts.2 == dscr_incl_fees.len()
+            || coverage_counts.3 == interest_coverage.len()
+        {
+            skipped_periods.push(period.id);
+        }
     }
 
     let dscr_min = dscr.iter().map(|(_, v)| *v).reduce(f64::min);
@@ -318,19 +333,6 @@ pub fn compute_credit_context(
     let dscr_incl_fees_min = dscr_incl_fees.iter().map(|(_, v)| *v).reduce(f64::min);
     let interest_coverage_min = interest_coverage.iter().map(|(_, v)| *v).reduce(f64::min);
 
-    // Surface coverage gaps: any requested period absent from at least one
-    // of the coverage series was (partially) skipped and is excluded from
-    // the min statistics above.
-    let skipped_periods: Vec<PeriodId> = periods
-        .iter()
-        .map(|p| p.id)
-        .filter(|pid| {
-            !(dscr.iter().any(|(p, _)| p == pid)
-                && dscr_total.iter().any(|(p, _)| p == pid)
-                && dscr_incl_fees.iter().any(|(p, _)| p == pid)
-                && interest_coverage.iter().any(|(p, _)| p == pid))
-        })
-        .collect();
     if !skipped_periods.is_empty() {
         tracing::warn!(
             instrument_id,

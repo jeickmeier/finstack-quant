@@ -1,7 +1,6 @@
 //! Validation and pool normalization that run before a deal is priced.
 
 use super::{CreditModelConfig, StructuredCredit};
-use finstack_quant_core::validation::validate_f64_unit_interval;
 use finstack_quant_core::Result;
 
 impl StructuredCredit {
@@ -10,10 +9,6 @@ impl StructuredCredit {
         let model = &self.credit_model;
         // Include peak seasoning to validate an entire PSA/SDA curve, not just
         // the zero-time rate where a malformed multiplier can be hidden.
-        validate_f64_unit_interval(
-            model.prepayment_spec.cpr,
-            "credit_model.prepayment_spec.cpr",
-        )?;
         model.prepayment_spec.validate()?;
         model.default_spec.validate()?;
         model.recovery_spec.validate()?;

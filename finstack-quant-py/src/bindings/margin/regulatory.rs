@@ -6,7 +6,7 @@
 
 use super::frame::{opt_str, records, req_bool, req_date, req_f64, req_str, sensitivity_rows};
 use super::types::{extract_netting_set_id, PyNettingSetId};
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::module_utils::parse_currency;
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
@@ -765,12 +765,12 @@ impl PySaCcrTrade {
             supervisory_category: supervisory_category
                 .map(parse_label::<SaCcrSupervisoryCategory>)
                 .transpose()?,
-            option_maturity_date: option_maturity_date.map(extract_date).transpose()?,
+            option_maturity_date: option_maturity_date.map(py_to_date).transpose()?,
             trade_id: trade_id.to_string(),
             asset_class: parse_label::<SaCcrAssetClass>(asset_class)?,
             notional,
-            start_date: extract_date(start_date)?,
-            end_date: extract_date(end_date)?,
+            start_date: py_to_date(start_date)?,
+            end_date: py_to_date(end_date)?,
             underlier: underlier.to_string(),
             hedging_set: hedging_set.to_string(),
             direction,
@@ -832,7 +832,7 @@ impl PySaCcrTrade {
                         .get_item("option_maturity_date")?
                         .filter(|v| !v.is_none())
                         .as_ref()
-                        .map(extract_date)
+                        .map(py_to_date)
                         .transpose()?,
                     trade_id: req_str(row, "trade_id")?,
                     asset_class: parse_label::<SaCcrAssetClass>(&req_str(row, "asset_class")?)?,
@@ -1020,7 +1020,7 @@ impl PySaCcrNettingSetConfig {
         let inner = SaCcrNettingSetConfig::unmargined(
             extract_netting_set_id(netting_set_id)?,
             collateral,
-            extract_date(as_of)?,
+            py_to_date(as_of)?,
         );
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })
@@ -1067,7 +1067,7 @@ impl PySaCcrNettingSetConfig {
             mta,
             nica,
             mpor_days,
-            extract_date(as_of)?,
+            py_to_date(as_of)?,
         );
         inner.validate().map_err(core_to_py)?;
         Ok(Self { inner })

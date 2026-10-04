@@ -72,16 +72,18 @@ class TestPrimitives:
 
 
 class TestBuilderSpecs:
-    def test_floating_leg_compounding_presets_come_from_rust(self) -> None:
-        """CFCC-010: the Rust RFR presets and is_overnight are bound."""
+    def test_floating_leg_compounding_observation_conventions_come_from_rust(self) -> None:
+        """Explicit observation mechanics and overnight classification use Rust."""
         from finstack_quant.cashflows.builder import FloatingLegCompounding as C
 
-        for preset in (C.sofr, C.fedfunds, C.sonia, C.estr, C.tona, C.saron):
-            assert preset() == C.compounded_in_arrears(0)
         assert C.sofr_observation_shift() == C.compounded_with_observation_shift(2)
         assert C.sonia_observation_shift() == C.compounded_with_observation_shift(5)
         assert C.rate_cutoff(3).is_overnight()
-        assert [c.is_overnight() for c in (C.SIMPLE, C.SIMPLE_AVERAGE, C.sofr())] == [False, True, True]
+        assert [c.is_overnight() for c in (C.SIMPLE, C.SIMPLE_AVERAGE, C.compounded_in_arrears(0))] == [
+            False,
+            True,
+            True,
+        ]
         with pytest.raises(TypeError):
             C.compounded_in_arrears()  # type: ignore[call-arg]
 
@@ -588,10 +590,10 @@ class TestBuilderSpecs:
 
         psa = PrepaymentModelSpec.psa(1.0)
         assert psa.smm(30) > psa.smm(1)
-        assert PrepaymentModelSpec.constant_cpr(0.06).cpr == pytest.approx(0.06)
+        assert PrepaymentModelSpec.constant_cpr(0.06).curve["cpr"] == pytest.approx(0.06)
         sda = DefaultModelSpec.sda(1.0)
         assert sda.mdr(30) > sda.mdr(1)
-        assert DefaultModelSpec.cdr_2pct().cdr == pytest.approx(0.02)
+        assert DefaultModelSpec.cdr_2pct().curve["cdr"] == pytest.approx(0.02)
         rec = RecoveryModelSpec(rate=0.40, recovery_lag=12)
         rec.validate()
         assert rec.recovery_lag == 12

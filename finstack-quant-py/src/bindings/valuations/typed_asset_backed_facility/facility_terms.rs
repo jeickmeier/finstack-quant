@@ -4,7 +4,7 @@
 
 use pyo3::prelude::*;
 
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use finstack_quant_valuations::instruments::fixed_income::asset_backed_facility::{
     AmortizationEvent, TermOutSpec,
 };
@@ -119,7 +119,7 @@ impl PyAmortizationEvent {
     fn date(date: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
             inner: AmortizationEvent::Date {
-                date: extract_date(date)?,
+                date: py_to_date(date)?,
             },
         })
     }

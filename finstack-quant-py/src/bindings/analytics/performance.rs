@@ -2,7 +2,7 @@
 
 use super::types::*;
 use crate::bindings::core::dates::daycount::PyDayCount;
-use crate::bindings::date_utils::{date_to_py, extract_date, py_to_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::{
     dates_to_datetime_index, dict_to_dataframe, int_values_to_series, table_to_dataframe,
     values_to_series,
@@ -447,8 +447,8 @@ impl PyPerformance {
 
     /// Restrict analytics to a date window.
     fn reset_date_range(&mut self, start: Bound<'_, PyAny>, end: Bound<'_, PyAny>) -> PyResult<()> {
-        let s = extract_date(&start)?;
-        let e = extract_date(&end)?;
+        let s = py_to_date(&start)?;
+        let e = py_to_date(&end)?;
         self.inner.reset_date_range(s, e);
         Ok(())
     }

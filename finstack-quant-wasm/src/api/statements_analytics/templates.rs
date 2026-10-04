@@ -35,12 +35,13 @@ fn present(value: Option<JsValue>) -> Option<JsValue> {
 /// @param name - Identifier of the outstanding-balance node to create.
 /// @param new_volume_node - Existing node holding each period's new volume.
 /// @param decay_curve - Fraction of a cohort still outstanding `lag` periods after origination, as decimals starting at lag 0 (e.g. `[1.0, 0.8, 0.5]`).
+/// Existing generated node identifiers are replaced.
 /// @returns The extended `FinancialModelSpec` plain object.
 ///
 /// # Errors
 ///
 /// Throws with kind `validation` if the model is malformed, a node identifier
-/// is invalid or duplicated, or the generated formula does not compile.
+/// is invalid, or the generated formula does not compile.
 #[wasm_bindgen(js_name = addVintageBuildup)]
 pub fn add_vintage_buildup(
     model: JsValue,
@@ -53,8 +54,7 @@ pub fn add_vintage_buildup(
         &js_string(&name, "name")?,
         &js_string(&new_volume_node, "newVolumeNode")?,
         &js_f64_seq(&decay_curve, "decayCurve")?,
-    )
-    .map_err(to_js_err)?;
+    );
     finish(builder)
 }
 
@@ -68,12 +68,13 @@ pub fn add_vintage_buildup(
 /// @param name - Prefix of the generated `<name>_beg` and `<name>_end` nodes.
 /// @param increases - Existing nodes added to the balance each period.
 /// @param decreases - Existing nodes subtracted from the balance each period.
+/// Existing generated node identifiers are replaced.
 /// @returns The extended `FinancialModelSpec` plain object.
 ///
 /// # Errors
 ///
 /// Throws with kind `validation` if the model is malformed, a node identifier
-/// is invalid or duplicated, or a generated formula does not compile.
+/// is invalid, or a generated formula does not compile.
 #[wasm_bindgen(js_name = addRollForward)]
 pub fn add_roll_forward(
     model: JsValue,
@@ -88,8 +89,7 @@ pub fn add_roll_forward(
         &js_string(&name, "name")?,
         &refs(&increases),
         &refs(&decreases),
-    )
-    .map_err(to_js_err)?;
+    );
     finish(builder)
 }
 
@@ -102,12 +102,13 @@ pub fn add_roll_forward(
 /// @param increases - Existing nodes added to the balance each period.
 /// @param decreases - Existing nodes subtracted from the balance each period.
 /// @param opening - Opening balance of the first period, in the balance's own units.
+/// Existing generated node identifiers are replaced.
 /// @returns The extended `FinancialModelSpec` plain object.
 ///
 /// # Errors
 ///
 /// Throws with kind `validation` if the model is malformed, a node identifier
-/// is invalid or duplicated, or a generated formula does not compile.
+/// is invalid, or a generated formula does not compile.
 #[wasm_bindgen(js_name = addRollForwardWithOpening)]
 pub fn add_roll_forward_with_opening(
     model: JsValue,
@@ -124,8 +125,7 @@ pub fn add_roll_forward_with_opening(
         &refs(&increases),
         &refs(&decreases),
         js_f64(&opening, "opening")?,
-    )
-    .map_err(to_js_err)?;
+    );
     finish(builder)
 }
 
@@ -138,12 +138,13 @@ pub fn add_roll_forward_with_opening(
 /// @param total_expenses_node - Identifier of the total-expenses node to create.
 /// @param expense_nodes - Existing operating-expense line nodes summed into the total.
 /// @param noi_node - Identifier of the NOI node to create (`total revenue - total expenses`).
+/// Existing generated node identifiers are replaced.
 /// @returns The extended `FinancialModelSpec` plain object.
 ///
 /// # Errors
 ///
 /// Throws with kind `validation` if the model is malformed, a node list is
-/// empty, a node identifier is invalid or duplicated, or a generated formula
+/// empty, a node identifier is invalid, or a generated formula
 /// does not compile.
 #[wasm_bindgen(js_name = addNoiBuildup)]
 pub fn add_noi_buildup(
@@ -175,12 +176,13 @@ pub fn add_noi_buildup(
 /// @param noi_node - Existing NOI node.
 /// @param capex_nodes - Existing capital-expenditure nodes subtracted from NOI; an empty list makes NCF equal NOI.
 /// @param ncf_node - Identifier of the NCF node to create.
+/// Existing generated node identifiers are replaced.
 /// @returns The extended `FinancialModelSpec` plain object.
 ///
 /// # Errors
 ///
 /// Throws with kind `validation` if the model is malformed, a node identifier
-/// is invalid or duplicated, or the generated formula does not compile.
+/// is invalid, or the generated formula does not compile.
 #[wasm_bindgen(js_name = addNcfBuildup)]
 pub fn add_ncf_buildup(
     model: JsValue,
@@ -205,6 +207,7 @@ pub fn add_ncf_buildup(
 /// @param model - `FinancialModelSpec` to extend (object or JSON).
 /// @param leases - Array of `LeaseSpec` objects, at least one (array or JSON).
 /// @param nodes - Optional `RentRollOutputNodes` naming the generated total nodes; omitted uses the Rust default names (object or JSON).
+/// Existing generated node identifiers are replaced.
 /// @returns The extended `FinancialModelSpec` plain object.
 ///
 /// # Errors
@@ -239,6 +242,7 @@ pub fn add_rent_roll(
 /// @param capex_nodes - Existing capital-expenditure nodes; omitted means none.
 /// @param management_fee - Optional `ManagementFeeSpec` (`rate` as a decimal of its `base`); omitted adds no fee (object or JSON).
 /// @param nodes - Optional `PropertyTemplateNodes` naming the generated nodes; omitted uses the Rust default names (object or JSON).
+/// Existing generated node identifiers are replaced.
 /// @returns The extended `FinancialModelSpec` plain object.
 ///
 /// # Errors

@@ -259,6 +259,9 @@ impl CovenantEngine {
         &self,
         observations: &[DatedMetrics],
     ) -> Result<Vec<DatedCovenantReports>> {
+        if !observations.is_empty() {
+            self.validate()?;
+        }
         observations
             .iter()
             .map(|row| {
@@ -267,7 +270,11 @@ impl CovenantEngine {
                 );
                 Ok(DatedCovenantReports {
                     as_of: row.date,
-                    reports: self.evaluate(&source, row.date)?,
+                    reports: self.evaluate_specs(
+                        &self.applicable_specs(row.date),
+                        &source,
+                        row.date,
+                    )?,
                 })
             })
             .collect()

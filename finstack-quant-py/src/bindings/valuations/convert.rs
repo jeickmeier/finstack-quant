@@ -293,7 +293,7 @@ pub(crate) fn day_count_from_py(
 /// # Arguments
 ///
 /// * `obj` - A two-element tuple/list `(payment_date, amount)` where the
-///   date is any value accepted by `extract_date` and the amount is a
+///   date is any value accepted by `py_to_date` and the amount is a
 ///   `Money` (or a bare number when `currency` is given).
 /// * `currency` - ISO-4217 code applied when the amount is a bare number.
 /// * `what` - Parameter name used in error messages.
@@ -309,7 +309,7 @@ pub(crate) fn dated_money_from_py(
                 "{what}: expected a (date, Money) pair, got {type_name}"
             ))
         })?;
-    let date = crate::bindings::date_utils::extract_date(&date_obj)?;
+    let date = crate::bindings::date_utils::py_to_date(&date_obj)?;
     let money = money_from_py(&money_obj, currency, what)?;
     Ok((date, money))
 }

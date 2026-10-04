@@ -4,7 +4,7 @@ use pyo3::prelude::*;
 
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{enum_to_py_string, money_to_py};
 use crate::errors::value_error;
@@ -66,7 +66,7 @@ fn opt_money(value: Option<PyRef<'_, PyMoney>>) -> Option<finstack_quant_core::m
 fn opt_date(
     value: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<Option<finstack_quant_core::dates::Date>> {
-    value.map(extract_date).transpose()
+    value.map(py_to_date).transpose()
 }
 
 /// Deserialize an optional dict / JSON string sub-spec.
@@ -260,7 +260,7 @@ impl PyPoolAsset {
             spread_bp,
             forward_curve_id,
             index_floor_bp,
-            maturity: extract_date(maturity)?,
+            maturity: py_to_date(maturity)?,
             rating,
             industry,
             obligor_id,
@@ -339,7 +339,7 @@ impl PyPoolAsset {
                 id,
                 balance.inner,
                 rate,
-                extract_date(maturity)?,
+                py_to_date(maturity)?,
                 day_count.inner,
             ),
         })
@@ -400,7 +400,7 @@ impl PyPoolAsset {
                 balance.inner,
                 forward_curve_id,
                 spread_bp,
-                extract_date(maturity)?,
+                py_to_date(maturity)?,
                 day_count.inner,
             ),
         })

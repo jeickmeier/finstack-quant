@@ -454,8 +454,8 @@ def clo_deal(*, one_period: bool = False, oc_trigger: float | None = None) -> di
         ],
     })
     spec.update({
-        "prepayment_spec": {"cpr": 0.0, "curve": None},
-        "default_spec": {"cdr": 0.0, "curve": None},
+        "prepayment_spec": {"cpr": 0.0, "curve": "constant"},
+        "default_spec": {"cdr": 0.0, "curve": "constant"},
         "recovery_spec": {"rate": 0.4, "recovery_lag": 0},
     })
     return payload

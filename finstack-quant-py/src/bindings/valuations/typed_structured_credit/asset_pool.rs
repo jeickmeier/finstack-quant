@@ -759,7 +759,7 @@ impl PyAssetPool {
     /// 10.0
     #[pyo3(text_signature = "($self, as_of)")]
     fn weighted_avg_maturity(&self, as_of: &Bound<'_, PyAny>) -> PyResult<f64> {
-        let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+        let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         self.inner
             .weighted_avg_maturity(as_of)
             .map_err(crate::errors::core_to_py)

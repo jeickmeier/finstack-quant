@@ -6182,6 +6182,38 @@ class InterestRateSwap:
         """
         ...
 
+    @property
+    def adjust_fixed_accrual_dates(self) -> bool:
+        """Whether fixed coupon accrual boundaries are adjusted.
+
+        Returns
+        -------
+        bool
+            True uses the fixed leg's calendar and business-day convention;
+            false (default) retains contractual accrual dates.
+
+        Notes
+        -----
+        This accessor does not raise. Payment-date adjustment remains independent.
+        """
+        ...
+
+    @property
+    def adjust_float_accrual_dates(self) -> bool:
+        """Whether floating coupon accrual boundaries are adjusted.
+
+        Returns
+        -------
+        bool
+            True uses the floating leg's calendar and business-day convention;
+            false (default) retains contractual accrual dates.
+
+        Notes
+        -----
+        This accessor does not raise. Payment-date adjustment remains independent.
+        """
+        ...
+
 class InterestRateSwapBuilder:
     """
     Fluent builder for :class:`InterestRateSwap`; wraps the Rust
@@ -6475,6 +6507,52 @@ class InterestRateSwapBuilder:
             (the message names the builder and the field, e.g.
             ``InterestRateSwapBuilder: missing required field 'id'``), or the instrument
             fails validation.
+        """
+        ...
+
+    def adjust_fixed_accrual_dates(self, value: bool) -> InterestRateSwapBuilder:
+        """Select fixed coupon accrual-date adjustment.
+
+        Parameters
+        ----------
+        value : bool
+            True uses the fixed leg's calendar and business-day convention;
+            false (default) retains contractual dates independently of payment dates.
+
+        Returns
+        -------
+        InterestRateSwapBuilder
+            This builder for chaining.
+
+        Raises
+        ------
+        ValueError
+            If this builder has already been consumed by build.
+        TypeError
+            If value is not a boolean.
+        """
+        ...
+
+    def adjust_float_accrual_dates(self, value: bool) -> InterestRateSwapBuilder:
+        """Select floating coupon accrual-date adjustment.
+
+        Parameters
+        ----------
+        value : bool
+            True uses the floating leg's calendar and business-day convention;
+            false (default) retains contractual dates independently of payment dates.
+
+        Returns
+        -------
+        InterestRateSwapBuilder
+            This builder for chaining.
+
+        Raises
+        ------
+        ValueError
+            If this builder has already been consumed by build.
+        TypeError
+            If value is not a boolean.
         """
         ...
 

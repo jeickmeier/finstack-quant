@@ -372,15 +372,15 @@ export type DB556Bbeb1Ecf96C44C5A =
  */
 export type Id2 = string;
 /**
- * Prepayment curve shape.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_73686c0456fd11c88d3e".
+ * Prepayment model specification.
  */
-export type D_73686C0456Fd11C88D3E =
+export type PrepaymentModelSpec =
   | {
+      /**
+       * Annual decimal CPR in `[0, 1]`.
+       */
+      cpr: number;
       curve: "constant";
-      [k: string]: unknown;
     }
   | {
       curve: "psa";
@@ -388,7 +388,6 @@ export type D_73686C0456Fd11C88D3E =
        * Speed multiplier (1.0 = 100% PSA)
        */
       speed_multiplier: number;
-      [k: string]: unknown;
     }
   | {
       curve: "cmbs_lockout";
@@ -396,7 +395,10 @@ export type D_73686C0456Fd11C88D3E =
        * Number of months with zero prepayment (e.g., 60 for 5-year lockout)
        */
       lockout_months: number;
-      [k: string]: unknown;
+      /**
+       * Annual decimal CPR after lockout, in `[0, 1]`.
+       */
+      post_lockout_cpr: number;
     }
   | {
       curve: "abs";
@@ -405,7 +407,6 @@ export type D_73686C0456Fd11C88D3E =
        * (`0.015` = 1.5% ABS).
        */
       speed: number;
-      [k: string]: unknown;
     }
   | {
       curve: "vector";
@@ -413,7 +414,6 @@ export type D_73686C0456Fd11C88D3E =
        * Annual CPR per month of seasoning as decimals, month 1 first.
        */
       monthly_cpr: number[];
-      [k: string]: unknown;
     };
 /**
  * Deal name (e.g., "FNR 2024-1")
@@ -458,6 +458,53 @@ export type Id6 = string;
  * Unique instrument identifier.
  */
 export type Id7 = string;
+/**
+ * Cashflow prepayment-model specification.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "d_a1f0b2382a0ae4ef0e72".
+ */
+export type PrepaymentModelSpec1 =
+  | {
+      /**
+       * Annual decimal CPR in `[0, 1]`.
+       */
+      cpr: number;
+      curve: "constant";
+    }
+  | {
+      curve: "psa";
+      /**
+       * Speed multiplier (1.0 = 100% PSA)
+       */
+      speed_multiplier: number;
+    }
+  | {
+      curve: "cmbs_lockout";
+      /**
+       * Number of months with zero prepayment (e.g., 60 for 5-year lockout)
+       */
+      lockout_months: number;
+      /**
+       * Annual decimal CPR after lockout, in `[0, 1]`.
+       */
+      post_lockout_cpr: number;
+    }
+  | {
+      curve: "abs";
+      /**
+       * Monthly prepayment as a decimal fraction of the original balance
+       * (`0.015` = 1.5% ABS).
+       */
+      speed: number;
+    }
+  | {
+      curve: "vector";
+      /**
+       * Annual CPR per month of seasoning as decimals, month 1 first.
+       */
+      monthly_cpr: number[];
+    };
 /**
  * SIFMA MBS settlement class.
  *
@@ -1262,7 +1309,7 @@ export type Decimal5 = string;
  *
  * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
  * assert_eq!(
- *     FloatingLegCompounding::sofr(),
+ *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
  *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
  * );
  * ```
@@ -2036,15 +2083,15 @@ export type DayCount12 =
   | "act_act_afb"
   | "bus_252";
 /**
- * Default curve shape.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_457581f86de0cd986f20".
+ * Default model specification.
  */
-export type D_457581F86De0Cd986F20 =
+export type DefaultModelSpec =
   | {
+      /**
+       * Annual decimal CDR in `[0, 1]`.
+       */
+      cdr: number;
       curve: "constant";
-      [k: string]: unknown;
     }
   | {
       curve: "sda";
@@ -2052,7 +2099,6 @@ export type D_457581F86De0Cd986F20 =
        * Speed multiplier (1.0 = 100% SDA)
        */
       speed_multiplier: number;
-      [k: string]: unknown;
     }
   | {
       curve: "vector";
@@ -2060,7 +2106,6 @@ export type D_457581F86De0Cd986F20 =
        * Annual CDR per month of seasoning as decimals, month 1 first.
        */
       monthly_cdr: number[];
-      [k: string]: unknown;
     }
   | {
       /**
@@ -2074,7 +2119,6 @@ export type D_457581F86De0Cd986F20 =
        * Loss severity as a decimal fraction of defaulted par in `(0, 1]`.
        */
       severity: number;
-      [k: string]: unknown;
     }
   | {
       /**
@@ -2087,7 +2131,6 @@ export type D_457581F86De0Cd986F20 =
        */
       cumulative_default_rate: number;
       curve: "timing";
-      [k: string]: unknown;
     };
 /**
  * Opaque string identifier.
@@ -2102,6 +2145,50 @@ export type Id29 = string;
  */
 export type Date39 = string;
 /**
+ * Cashflow prepayment-model specification.
+ */
+export type PrepaymentModelSpec2 =
+  | {
+      /**
+       * Annual decimal CPR in `[0, 1]`.
+       */
+      cpr: number;
+      curve: "constant";
+    }
+  | {
+      curve: "psa";
+      /**
+       * Speed multiplier (1.0 = 100% PSA)
+       */
+      speed_multiplier: number;
+    }
+  | {
+      curve: "cmbs_lockout";
+      /**
+       * Number of months with zero prepayment (e.g., 60 for 5-year lockout)
+       */
+      lockout_months: number;
+      /**
+       * Annual decimal CPR after lockout, in `[0, 1]`.
+       */
+      post_lockout_cpr: number;
+    }
+  | {
+      curve: "abs";
+      /**
+       * Monthly prepayment as a decimal fraction of the original balance
+       * (`0.015` = 1.5% ABS).
+       */
+      speed: number;
+    }
+  | {
+      curve: "vector";
+      /**
+       * Annual CPR per month of seasoning as decimals, month 1 first.
+       */
+      monthly_cpr: number[];
+    };
+/**
  * ISO 8601 calendar date string.
  */
 export type Date40 = string;
@@ -2115,21 +2202,62 @@ export type Date40 = string;
  * via the `definition` "StochasticDefaultSpec".
  */
 export type StochasticDefaultSpec =
-  | {
-      /**
-       * CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).
-       *
-       * This field is **ignored** when any curve other than
-       * [`DefaultCurve::Constant`] is active: the monthly rate is then derived
-       * entirely from the curve.
-       */
-      cdr: number;
-      /**
-       * Optional curve shape (default: constant)
-       */
-      curve?: DefaultCurve | null;
+  | ((
+      | {
+          /**
+           * Annual decimal CDR in `[0, 1]`.
+           */
+          cdr: number;
+          curve: "constant";
+          [k: string]: unknown;
+        }
+      | {
+          curve: "sda";
+          /**
+           * Speed multiplier (1.0 = 100% SDA)
+           */
+          speed_multiplier: number;
+          [k: string]: unknown;
+        }
+      | {
+          curve: "vector";
+          /**
+           * Annual CDR per month of seasoning as decimals, month 1 first.
+           */
+          monthly_cdr: number[];
+          [k: string]: unknown;
+        }
+      | {
+          /**
+           * Cumulative net loss in percent of the original balance per month
+           * of seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the
+           * last value is held.
+           */
+          cumulative_net_loss_pct: number[];
+          curve: "cumulative_loss";
+          /**
+           * Loss severity as a decimal fraction of defaulted par in `(0, 1]`.
+           */
+          severity: number;
+          [k: string]: unknown;
+        }
+      | {
+          /**
+           * Share of lifetime defaults occurring in each year of seasoning, in
+           * percent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100.
+           */
+          annual_pct: number[];
+          /**
+           * Lifetime defaults as a decimal fraction of the original balance.
+           */
+          cumulative_default_rate: number;
+          curve: "timing";
+          [k: string]: unknown;
+        }
+    ) & {
       model: "deterministic";
-    }
+      [k: string]: unknown;
+    })
   | {
       /**
        * Base annual CDR
@@ -2201,15 +2329,15 @@ export type StochasticDefaultSpec =
       model: "factor_correlated";
     };
 /**
- * Default curve shape.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "DefaultCurve".
+ * Base deterministic default specification
  */
-export type DefaultCurve =
+export type DefaultModelSpec1 =
   | {
+      /**
+       * Annual decimal CDR in `[0, 1]`.
+       */
+      cdr: number;
       curve: "constant";
-      [k: string]: unknown;
     }
   | {
       curve: "sda";
@@ -2217,7 +2345,6 @@ export type DefaultCurve =
        * Speed multiplier (1.0 = 100% SDA)
        */
       speed_multiplier: number;
-      [k: string]: unknown;
     }
   | {
       curve: "vector";
@@ -2225,7 +2352,6 @@ export type DefaultCurve =
        * Annual CDR per month of seasoning as decimals, month 1 first.
        */
       monthly_cdr: number[];
-      [k: string]: unknown;
     }
   | {
       /**
@@ -2239,7 +2365,6 @@ export type DefaultCurve =
        * Loss severity as a decimal fraction of defaulted par in `(0, 1]`.
        */
       severity: number;
-      [k: string]: unknown;
     }
   | {
       /**
@@ -2252,7 +2377,6 @@ export type DefaultCurve =
        */
       cumulative_default_rate: number;
       curve: "timing";
-      [k: string]: unknown;
     };
 /**
  * Stochastic prepayment model specification.
@@ -2264,22 +2388,56 @@ export type DefaultCurve =
  * via the `definition` "StochasticPrepaySpec".
  */
 export type StochasticPrepaySpec =
-  | {
-      /**
-       * CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
-       *
-       * This field is **ignored** when [`PrepaymentCurve::Psa`],
-       * [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
-       * monthly rate is then derived entirely from the curve. It IS used by
-       * [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
-       */
-      cpr: number;
-      /**
-       * Optional curve shape (default: constant)
-       */
-      curve?: PrepaymentCurve | null;
+  | ((
+      | {
+          /**
+           * Annual decimal CPR in `[0, 1]`.
+           */
+          cpr: number;
+          curve: "constant";
+          [k: string]: unknown;
+        }
+      | {
+          curve: "psa";
+          /**
+           * Speed multiplier (1.0 = 100% PSA)
+           */
+          speed_multiplier: number;
+          [k: string]: unknown;
+        }
+      | {
+          curve: "cmbs_lockout";
+          /**
+           * Number of months with zero prepayment (e.g., 60 for 5-year lockout)
+           */
+          lockout_months: number;
+          /**
+           * Annual decimal CPR after lockout, in `[0, 1]`.
+           */
+          post_lockout_cpr: number;
+          [k: string]: unknown;
+        }
+      | {
+          curve: "abs";
+          /**
+           * Monthly prepayment as a decimal fraction of the original balance
+           * (`0.015` = 1.5% ABS).
+           */
+          speed: number;
+          [k: string]: unknown;
+        }
+      | {
+          curve: "vector";
+          /**
+           * Annual CPR per month of seasoning as decimals, month 1 first.
+           */
+          monthly_cpr: number[];
+          [k: string]: unknown;
+        }
+    ) & {
       model: "deterministic";
-    }
+      [k: string]: unknown;
+    })
   | {
       base_spec: PrepaymentModelSpec3;
       /**
@@ -2347,15 +2505,15 @@ export type StochasticPrepaySpec =
       transition_up: number;
     };
 /**
- * Prepayment curve shape.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "PrepaymentCurve".
+ * Cashflow prepayment-model specification.
  */
-export type PrepaymentCurve =
+export type PrepaymentModelSpec3 =
   | {
+      /**
+       * Annual decimal CPR in `[0, 1]`.
+       */
+      cpr: number;
       curve: "constant";
-      [k: string]: unknown;
     }
   | {
       curve: "psa";
@@ -2363,7 +2521,6 @@ export type PrepaymentCurve =
        * Speed multiplier (1.0 = 100% PSA)
        */
       speed_multiplier: number;
-      [k: string]: unknown;
     }
   | {
       curve: "cmbs_lockout";
@@ -2371,7 +2528,10 @@ export type PrepaymentCurve =
        * Number of months with zero prepayment (e.g., 60 for 5-year lockout)
        */
       lockout_months: number;
-      [k: string]: unknown;
+      /**
+       * Annual decimal CPR after lockout, in `[0, 1]`.
+       */
+      post_lockout_cpr: number;
     }
   | {
       curve: "abs";
@@ -2380,7 +2540,6 @@ export type PrepaymentCurve =
        * (`0.015` = 1.5% ABS).
        */
       speed: number;
-      [k: string]: unknown;
     }
   | {
       curve: "vector";
@@ -2388,7 +2547,6 @@ export type PrepaymentCurve =
        * Annual CPR per month of seasoning as decimals, month 1 first.
        */
       monthly_cpr: number[];
-      [k: string]: unknown;
     };
 /**
  * Recovery model specification for configuration and serialization.
@@ -12366,6 +12524,56 @@ export type CoveragePlacement =
       kind: "after_junior_fees";
     };
 /**
+ * Default model specification.
+ */
+export type DefaultModelSpec2 =
+  | {
+      /**
+       * Annual decimal CDR in `[0, 1]`.
+       */
+      cdr: number;
+      curve: "constant";
+    }
+  | {
+      curve: "sda";
+      /**
+       * Speed multiplier (1.0 = 100% SDA)
+       */
+      speed_multiplier: number;
+    }
+  | {
+      curve: "vector";
+      /**
+       * Annual CDR per month of seasoning as decimals, month 1 first.
+       */
+      monthly_cdr: number[];
+    }
+  | {
+      /**
+       * Cumulative net loss in percent of the original balance per month
+       * of seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the
+       * last value is held.
+       */
+      cumulative_net_loss_pct: number[];
+      curve: "cumulative_loss";
+      /**
+       * Loss severity as a decimal fraction of defaulted par in `(0, 1]`.
+       */
+      severity: number;
+    }
+  | {
+      /**
+       * Share of lifetime defaults occurring in each year of seasoning, in
+       * percent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100.
+       */
+      annual_pct: number[];
+      /**
+       * Lifetime defaults as a decimal fraction of the original balance.
+       */
+      cumulative_default_rate: number;
+      curve: "timing";
+    };
+/**
  * Opaque string identifier.
  */
 export type Id241 = string;
@@ -12416,6 +12624,50 @@ export type LossRecognition = "at_default" | "at_liquidation";
  * ISO 8601 calendar date string.
  */
 export type Date130 = string;
+/**
+ * Cashflow prepayment-model specification.
+ */
+export type PrepaymentModelSpec4 =
+  | {
+      /**
+       * Annual decimal CPR in `[0, 1]`.
+       */
+      cpr: number;
+      curve: "constant";
+    }
+  | {
+      curve: "psa";
+      /**
+       * Speed multiplier (1.0 = 100% PSA)
+       */
+      speed_multiplier: number;
+    }
+  | {
+      curve: "cmbs_lockout";
+      /**
+       * Number of months with zero prepayment (e.g., 60 for 5-year lockout)
+       */
+      lockout_months: number;
+      /**
+       * Annual decimal CPR after lockout, in `[0, 1]`.
+       */
+      post_lockout_cpr: number;
+    }
+  | {
+      curve: "abs";
+      /**
+       * Monthly prepayment as a decimal fraction of the original balance
+       * (`0.015` = 1.5% ABS).
+       */
+      speed: number;
+    }
+  | {
+      curve: "vector";
+      /**
+       * Annual CPR per month of seasoning as decimals, month 1 first.
+       */
+      monthly_cpr: number[];
+    };
 /**
  * ISO 8601 calendar date string.
  */
@@ -16127,6 +16379,59 @@ export type Currency50 =
   | "ZMW"
   | "ZWL";
 /**
+ * Cashflow default-model specification.
+ *
+ * This interface was referenced by `SharedDefs`'s JSON-Schema
+ * via the `definition` "d_c367978e081b7093ec11".
+ */
+export type DefaultModelSpec3 =
+  | {
+      /**
+       * Annual decimal CDR in `[0, 1]`.
+       */
+      cdr: number;
+      curve: "constant";
+    }
+  | {
+      curve: "sda";
+      /**
+       * Speed multiplier (1.0 = 100% SDA)
+       */
+      speed_multiplier: number;
+    }
+  | {
+      curve: "vector";
+      /**
+       * Annual CDR per month of seasoning as decimals, month 1 first.
+       */
+      monthly_cdr: number[];
+    }
+  | {
+      /**
+       * Cumulative net loss in percent of the original balance per month
+       * of seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the
+       * last value is held.
+       */
+      cumulative_net_loss_pct: number[];
+      curve: "cumulative_loss";
+      /**
+       * Loss severity as a decimal fraction of defaulted par in `(0, 1]`.
+       */
+      severity: number;
+    }
+  | {
+      /**
+       * Share of lifetime defaults occurring in each year of seasoning, in
+       * percent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100.
+       */
+      annual_pct: number[];
+      /**
+       * Lifetime defaults as a decimal fraction of the original balance.
+       */
+      cumulative_default_rate: number;
+      curve: "timing";
+    };
+/**
  * Barrier-crossing detection policy for first-passage default simulation.
  *
  * `Discrete` only checks the barrier at grid points (fast but biased for
@@ -16310,7 +16615,6 @@ export interface SharedDefs {
   DdtlSpec?: DdtlSpec;
   DealFees?: DealFees;
   DealType?: DealType;
-  DefaultCurve?: DefaultCurve;
   DefaultedValuation?: DefaultedValuation;
   DeflationProtection?: DeflationProtection;
   DelinquencyModel?: DelinquencyModel;
@@ -16456,7 +16760,6 @@ export interface SharedDefs {
   Position?: Position;
   PositiveF64Wire?: PositiveF64Wire;
   PremiumLegSpec?: PremiumLegSpec2;
-  PrepaymentCurve?: PrepaymentCurve;
   PrepaymentPenalty?: PrepaymentPenalty;
   PriceTrigger?: PriceTrigger;
   PrivateMarketsFund?: PrivateMarketsFund;
@@ -18117,24 +18420,6 @@ export interface Money1 {
     | "ZWL";
 }
 /**
- * Prepayment model specification.
- */
-export interface PrepaymentModelSpec {
-  /**
-   * CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
-   *
-   * This field is **ignored** when [`PrepaymentCurve::Psa`],
-   * [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
-   * monthly rate is then derived entirely from the curve. It IS used by
-   * [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
-   */
-  cpr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: D_73686C0456Fd11C88D3E | null;
-}
-/**
  * Scenario-only pricing adjustments.
  */
 export interface ScenarioPricingOverrides {
@@ -19000,27 +19285,6 @@ export interface Money4 {
     | "ZAR"
     | "ZMW"
     | "ZWL";
-}
-/**
- * Cashflow prepayment-model specification.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_a1f0b2382a0ae4ef0e72".
- */
-export interface PrepaymentModelSpec1 {
-  /**
-   * CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
-   *
-   * This field is **ignored** when [`PrepaymentCurve::Psa`],
-   * [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
-   * monthly rate is then derived entirely from the curve. It IS used by
-   * [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
-   */
-  cpr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: D_73686C0456Fd11C88D3E | null;
 }
 /**
  * Scenario-only pricing adjustments.
@@ -27676,23 +27940,6 @@ export interface Money31 {
     | "ZWL";
 }
 /**
- * Default model specification.
- */
-export interface DefaultModelSpec {
-  /**
-   * CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).
-   *
-   * This field is **ignored** when any curve other than
-   * [`DefaultCurve::Constant`] is active: the monthly rate is then derived
-   * entirely from the curve.
-   */
-  cdr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: D_457581F86De0Cd986F20 | null;
-}
-/**
  * Roll-rate delinquency model with optional servicer advancing and loan
  * modification.
  *
@@ -28259,24 +28506,6 @@ export interface MetricPricingOverrides7 {
   var_config?: DE49387F97C0F9D510642 | null;
 }
 /**
- * Cashflow prepayment-model specification.
- */
-export interface PrepaymentModelSpec2 {
-  /**
-   * CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
-   *
-   * This field is **ignored** when [`PrepaymentCurve::Psa`],
-   * [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
-   * monthly rate is then derived entirely from the curve. It IS used by
-   * [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
-   */
-  cpr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: D_73686C0456Fd11C88D3E | null;
-}
-/**
  * Recovery model specification.
  */
 export interface RecoveryModelSpec {
@@ -28322,41 +28551,6 @@ export interface ScenarioPricingOverrides7 {
    * curve) bonds, shock the hazard curve instead (e.g. a par-CDS curve bump).
    */
   scenario_spread_shock_bp?: number | null;
-}
-/**
- * Base deterministic default specification
- */
-export interface DefaultModelSpec1 {
-  /**
-   * CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).
-   *
-   * This field is **ignored** when any curve other than
-   * [`DefaultCurve::Constant`] is active: the monthly rate is then derived
-   * entirely from the curve.
-   */
-  cdr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: D_457581F86De0Cd986F20 | null;
-}
-/**
- * Cashflow prepayment-model specification.
- */
-export interface PrepaymentModelSpec3 {
-  /**
-   * CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
-   *
-   * This field is **ignored** when [`PrepaymentCurve::Psa`],
-   * [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
-   * monthly rate is then derived entirely from the curve. It IS used by
-   * [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
-   */
-  cpr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: D_73686C0456Fd11C88D3E | null;
 }
 /**
  * Term-out after revolving: collateral principal repays the facility
@@ -29386,7 +29580,7 @@ export interface FloatLegSpec {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -29528,7 +29722,7 @@ export interface FloatLegSpec1 {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -31062,6 +31256,18 @@ export interface ScenarioPricingOverrides13 {
  * via the `definition` "InterestRateSwap".
  */
 export interface InterestRateSwap {
+  /**
+   * Adjust fixed coupon accrual boundaries using the fixed leg's calendar and
+   * business-day convention. Defaults to false (contractual unadjusted accrual);
+   * payment-date adjustment and payment lag are independent.
+   */
+  adjust_fixed_accrual_dates?: boolean;
+  /**
+   * Adjust floating coupon accrual boundaries using the floating leg's calendar
+   * and business-day convention, for term and overnight coupons alike. Defaults
+   * to false; reset lag is applied to the resulting accrual start.
+   */
+  adjust_float_accrual_dates?: boolean;
   attributes: Attributes15;
   fixed_leg: FixedLegSpec;
   float_leg: FloatLegSpec2;
@@ -31198,7 +31404,7 @@ export interface FloatLegSpec2 {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -32971,7 +33177,7 @@ export interface FloatLegSpec3 {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -34996,7 +35202,7 @@ export interface FloatLegSpec4 {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -35500,7 +35706,7 @@ export interface FloatLegSpec5 {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -35634,7 +35840,7 @@ export interface InterestRateFuture {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -36463,7 +36669,7 @@ export interface OvernightCouponConvention {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -48743,7 +48949,7 @@ export interface FinancingLegSpec {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -49269,7 +49475,7 @@ export interface FinancingLegSpec1 {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -51561,23 +51767,6 @@ export interface Metadata {
   trustee_id?: string | null;
 }
 /**
- * Default model specification.
- */
-export interface DefaultModelSpec2 {
-  /**
-   * CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).
-   *
-   * This field is **ignored** when any curve other than
-   * [`DefaultCurve::Constant`] is active: the monthly rate is then derived
-   * entirely from the curve.
-   */
-  cdr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: D_457581F86De0Cd986F20 | null;
-}
-/**
  * Parsed financial tenor.
  */
 export interface Tenor27 {
@@ -51664,6 +51853,18 @@ export interface HedgeSwap {
  *   `docs/REFERENCES.md#bloomberg-swpm`
  */
 export interface InterestRateSwap1 {
+  /**
+   * Adjust fixed coupon accrual boundaries using the fixed leg's calendar and
+   * business-day convention. Defaults to false (contractual unadjusted accrual);
+   * payment-date adjustment and payment lag are independent.
+   */
+  adjust_fixed_accrual_dates?: boolean;
+  /**
+   * Adjust floating coupon accrual boundaries using the floating leg's calendar
+   * and business-day convention, for term and overnight coupons alike. Defaults
+   * to false; reset lag is applied to the resulting accrual start.
+   */
+  adjust_float_accrual_dates?: boolean;
   attributes: Attributes15;
   fixed_leg: FixedLegSpec;
   float_leg: FloatLegSpec2;
@@ -51808,24 +52009,6 @@ export interface AssetPool2 {
    * replenishment from repayments.
    */
   reserve_target?: Money6 | null;
-}
-/**
- * Cashflow prepayment-model specification.
- */
-export interface PrepaymentModelSpec4 {
-  /**
-   * CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
-   *
-   * This field is **ignored** when [`PrepaymentCurve::Psa`],
-   * [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
-   * monthly rate is then derived entirely from the curve. It IS used by
-   * [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
-   */
-  cpr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: D_73686C0456Fd11C88D3E | null;
 }
 /**
  * Recovery model specification.
@@ -56384,7 +56567,7 @@ export interface CreditParams1 {
  *     id: "USD-CSA-2024".to_string(),
  *     base_currency: Currency::USD,
  *     vm_params: VmParameters::regulatory_standard(Currency::USD)?,
- *     im_params: Some(ImParameters::simm_standard(Currency::USD)?),
+ *     im_params: Some(ImParameters::for_methodology(finstack_quant_margin::types::ImMethodology::Simm, Currency::USD)?),
  *     eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,
  *     call_timing: MarginCallTiming::regulatory_standard()?,
  *     collateral_curve_id: "USD-OIS".into(),
@@ -56549,7 +56732,7 @@ export interface FinancingLegSpec2 {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -56680,7 +56863,7 @@ export interface FloatLegSpec6 {
    *
    * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
    * assert_eq!(
-   *     FloatingLegCompounding::sofr(),
+   *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
    *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
    * );
    * ```
@@ -58181,26 +58364,6 @@ export interface D_10A2B628165F3F3E10E71 {
 export interface InstrumentPricingOverrides78 {
   market_quotes?: DB0A5Fc543381Da6A5722;
   model_config?: D_572Ad1Befb7D94914652;
-}
-/**
- * Cashflow default-model specification.
- *
- * This interface was referenced by `SharedDefs`'s JSON-Schema
- * via the `definition` "d_c367978e081b7093ec11".
- */
-export interface DefaultModelSpec3 {
-  /**
-   * CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).
-   *
-   * This field is **ignored** when any curve other than
-   * [`DefaultCurve::Constant`] is active: the monthly rate is then derived
-   * entirely from the curve.
-   */
-  cdr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: D_457581F86De0Cd986F20 | null;
 }
 /**
  * Merton structural credit model.

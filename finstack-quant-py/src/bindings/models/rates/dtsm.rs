@@ -10,7 +10,7 @@
 //! The free functions are thin twins over the same Rust entry points for
 //! callers holding plain nested lists.
 
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::{dates_to_datetime_index, dict_to_dataframe};
 use crate::errors::{core_to_py, serde_json_to_py, value_error};
 use finstack_quant_models::rates::dtsm::{
@@ -36,7 +36,7 @@ fn extract_dates(dates: Option<&Bound<'_, PyAny>>) -> PyResult<Option<Vec<time::
         Some(obj) if obj.is_none() => Ok(None),
         Some(obj) => obj
             .try_iter()?
-            .map(|item| extract_date(&item?))
+            .map(|item| py_to_date(&item?))
             .collect::<PyResult<Vec<_>>>()
             .map(Some),
     }

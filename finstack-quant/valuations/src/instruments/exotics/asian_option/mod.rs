@@ -37,5 +37,3 @@ pub(crate) mod heston_mc_pricer;
 
 pub use pricer::{AsianOptionAnalyticalGeometricPricer, AsianOptionSemiAnalyticalTwPricer};
 pub use types::{AsianOption, AsianOptionBuilder, AveragingMethod};
-
-crate::instruments::common_impl::traits::impl_equity_exotic_traits!(AsianOption);

@@ -442,8 +442,8 @@ fn attribute_portfolio_pnl(
     let portfolio = extract_portfolio_ref(py, portfolio)?;
     let market_t0 = extract_market_ref(py, market_t0)?;
     let market_t1 = extract_market_ref(py, market_t1)?;
-    let as_of_t0 = crate::bindings::date_utils::extract_date(as_of_t0)?;
-    let as_of_t1 = crate::bindings::date_utils::extract_date(as_of_t1)?;
+    let as_of_t0 = crate::bindings::date_utils::py_to_date(as_of_t0)?;
+    let as_of_t1 = crate::bindings::date_utils::py_to_date(as_of_t1)?;
 
     let method_json = py_to_json_string(py, method, "method")?;
     let config_json = config

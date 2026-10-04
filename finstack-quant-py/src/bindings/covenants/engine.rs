@@ -3,7 +3,7 @@
 
 use super::report::PyCovenantReport;
 use super::spec::{PyCovenantSpec, PyCovenantWaiver};
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, display_to_py, value_error};
@@ -97,7 +97,7 @@ pub(crate) fn extract_metric_frame(frame: &Bound<'_, PyAny>) -> PyResult<Vec<Dat
     let index = frame.getattr("index")?.call_method0("tolist")?;
     let dates = index
         .try_iter()?
-        .map(|item| extract_date(&item?))
+        .map(|item| py_to_date(&item?))
         .collect::<PyResult<Vec<_>>>()?;
     let values: Vec<Vec<f64>> = frame
         .call_method1("astype", ("float64",))?
@@ -211,7 +211,7 @@ impl PyCovenantEngine {
         metrics: &Bound<'py, PyAny>,
         as_of: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyDict>> {
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let source = extract_metrics(metrics)?;
         let reports = py.detach(|| self.inner.evaluate(&source, as_of).map_err(core_to_py))?;
         reports_to_pydict(py, reports)
@@ -235,7 +235,7 @@ impl PyCovenantEngine {
         scope: &str,
     ) -> PyResult<Bound<'py, PyDict>> {
         let scope = super::spec::parse_scope(scope)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let source = extract_metrics(metrics)?;
         let reports = py.detach(|| {
             self.inner

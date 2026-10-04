@@ -100,7 +100,7 @@ pub(crate) fn compute_horizon_return<'py>(
 
     // Owned copy so the compute can run without the GIL.
     let market_ctx = extract_market(py, market)?;
-    let date = crate::bindings::date_utils::extract_date(as_of)?;
+    let date = crate::bindings::date_utils::py_to_date(as_of)?;
     let scenario = crate::bindings::extract::extract_scenario_spec(py, scenario)?;
     let attribution_method = method
         .map(finstack_quant_scenarios::horizon::attribution_method_from_str)

@@ -6,7 +6,7 @@ use pyo3::types::PyList;
 
 use super::builder::schedule::PyCashFlowSchedule;
 use crate::bindings::core::market_data::context::PyMarketContext;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 
 /// Raw rate or FX observation retained by canonical coupon projection.
@@ -30,7 +30,7 @@ impl PyProjectedFixing {
         Ok(Self {
             inner: ProjectedFixing {
                 series_id,
-                date: extract_date(date)?,
+                date: py_to_date(date)?,
                 value,
             },
         })
@@ -66,8 +66,8 @@ fn materialize_fixings(
     finstack_quant_cashflows::fixings::materialize_fixings(
         &market.inner,
         schedules.iter().map(|schedule| &schedule.inner),
-        extract_date(old_date)?,
-        extract_date(new_date)?,
+        py_to_date(old_date)?,
+        py_to_date(new_date)?,
     )
     .map(PyMarketContext::from_inner)
     .map_err(core_to_py)

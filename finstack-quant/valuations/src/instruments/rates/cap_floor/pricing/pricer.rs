@@ -146,29 +146,12 @@ pub(crate) fn price_cap_floor(
     Ok(total_pv)
 }
 
-/// New simplified Cap/Floor pricer supporting multiple models.
-pub(crate) struct SimpleCapFloorBlackPricer {
-    model: ModelKey,
-}
-
-impl SimpleCapFloorBlackPricer {
-    /// Create a new cap/floor Black pricer with default model
-    pub(crate) fn new() -> Self {
-        Self {
-            model: ModelKey::Black76,
-        }
-    }
-}
-
-impl Default for SimpleCapFloorBlackPricer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+/// Black76 cap/floor pricer.
+pub(crate) struct SimpleCapFloorBlackPricer;
 
 impl Pricer for SimpleCapFloorBlackPricer {
     fn key(&self) -> PricerKey {
-        PricerKey::new(InstrumentType::CapFloor, self.model)
+        PricerKey::new(InstrumentType::CapFloor, ModelKey::Black76)
     }
 
     fn price_dyn(

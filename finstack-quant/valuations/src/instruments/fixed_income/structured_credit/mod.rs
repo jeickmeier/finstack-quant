@@ -28,7 +28,6 @@ pub(crate) mod pricing;
 pub(crate) mod types;
 pub(crate) mod utils;
 
-pub use crate::cashflow::builder::{DefaultCurve, PrepaymentCurve};
 pub use types::{
     calculate_pool_stats, AdvanceRate, AdvancingPolicy, AfcSpec, AllocationMode, AssetPool,
     AssetType, BalloonSpec, BorrowingBaseReport, BorrowingBaseRules, CallAssumption,

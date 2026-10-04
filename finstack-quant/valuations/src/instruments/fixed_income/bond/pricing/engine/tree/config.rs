@@ -16,11 +16,12 @@ use finstack_quant_core::types::CurveId;
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
-#[derive(Default)]
 pub enum TreeModelChoice {
-    /// Ho-Lee / BDT model (current default) with exogenous volatility.
-    #[default]
-    HoLee,
+    /// Ho-Lee model with normal short-rate volatility.
+    HoLee {
+        /// Annualized absolute rate volatility; `0.01` means 100 basis points.
+        sigma: f64,
+    },
     /// Hull-White 1-factor with user-specified parameters.
     HullWhite {
         /// Mean reversion speed (e.g., 0.03 for 3%)
@@ -35,6 +36,12 @@ pub enum TreeModelChoice {
         /// Lognormal short-rate volatility (e.g., 0.20 for 20%)
         sigma: f64,
     },
+}
+
+impl Default for TreeModelChoice {
+    fn default() -> Self {
+        Self::HoLee { sigma: 0.01 }
+    }
 }
 
 /// Configuration for tree-based bond pricing (callable/putable bonds, OAS).
@@ -131,7 +138,6 @@ pub enum TreeModelChoice {
 /// // Hull-White model (production recommended for callable bonds)
 /// let hw = TreePricerConfig {
 ///     tree_steps: 100,
-///     volatility: 0.01,
 ///     tree_model: TreeModelChoice::HullWhite { kappa: 0.03, sigma: 0.01 },
 ///     ..Default::default()
 /// };
@@ -143,18 +149,6 @@ pub struct TreePricerConfig {
     /// Higher values improve accuracy but increase computation time quadratically.
     /// Recommended: 100 for trading, 200+ for risk reports.
     pub tree_steps: usize,
-
-    /// Short rate volatility (annualized).
-    ///
-    /// ⚠️ **Interpretation depends on model type**:
-    /// - **Ho-Lee (default)**: Normal volatility in rate units (0.01 = 100 bp)
-    /// - **BDT**: Lognormal volatility as proportion (0.20 = 20%)
-    ///
-    /// The default value of 100 bp (0.01) is appropriate for Ho-Lee model
-    /// in normal rate environments. For BDT, use 15-25% (0.15-0.25).
-    ///
-    /// See struct-level documentation for calibration guidance and typical ranges.
-    pub volatility: f64,
 
     /// Convergence tolerance for iterative solvers (OAS root finding).
     ///
@@ -200,7 +194,6 @@ impl Default for TreePricerConfig {
     fn default() -> Self {
         Self {
             tree_steps: 200,
-            volatility: 0.01, // 100 bp normal vol - appropriate for Ho-Lee
             tolerance: 1e-6,
             max_iterations: 50,
             initial_bracket_size_bp: Some(1000.0),
@@ -221,7 +214,7 @@ impl Default for TreePricerConfig {
 /// lattice takes its factor dynamics from `resolve_rates_credit_config`, and
 /// the rates-only tree resolves its model in [`bond_tree_config`].
 pub(crate) fn bond_tree_settings(bond: &Bond) -> TreePricerConfig {
-    tree_config_with_model(bond, TreeModelChoice::HoLee)
+    tree_config_with_model(bond, TreeModelChoice::HoLee { sigma: 0.0 })
 }
 
 /// Get the rates-only tree pricer configuration for a bond.
@@ -370,7 +363,6 @@ fn tree_config_with_model(bond: &Bond, tree_model: TreeModelChoice) -> TreePrice
     };
     TreePricerConfig {
         tree_steps: model.tree_steps.unwrap_or(100),
-        volatility: 0.0,
         tolerance: 1e-6,
         max_iterations: 50,
         initial_bracket_size_bp: Some(1000.0),

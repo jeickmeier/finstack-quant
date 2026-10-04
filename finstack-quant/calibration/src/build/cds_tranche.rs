@@ -1,11 +1,12 @@
 //! Builders for CDS Tranche instruments from market quotes.
 
 use crate::build::cds::cds_accrual_start;
-use crate::build::helpers::{resolve_calendar, resolve_spot_date};
+use crate::build::helpers::resolve_spot_date;
 use crate::build::BuildCtx;
 use crate::quotes::cds_tranche::CdsTrancheQuote;
 use finstack_quant_cashflows::builder::specs::RollRule;
 use finstack_quant_cashflows::builder::ScheduleParams;
+use finstack_quant_core::dates::calendar_by_id_strict;
 use finstack_quant_core::dates::{
     adjust, next_cds_date, BusinessDayConvention, DateExt, DayCount, Tenor,
 };
@@ -181,7 +182,7 @@ pub fn build_cds_tranche_instrument(
         conv.business_day_convention,
     )?;
 
-    let cal = resolve_calendar(&conv.calendar_id)?;
+    let cal = calendar_by_id_strict(&conv.calendar_id)?;
 
     let discount_id = ctx.require_curve_id("discount")?.to_string();
 
@@ -344,7 +345,7 @@ mod tests {
             conv.business_day_convention,
         )
         .expect("spot date");
-        let cal = resolve_calendar(&conv.calendar_id).expect("calendar");
+        let cal = calendar_by_id_strict(&conv.calendar_id).expect("calendar");
         let maturity_adj =
             adjust(maturity, conv.business_day_convention, cal).expect("maturity adjustment");
 

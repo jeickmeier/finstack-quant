@@ -144,16 +144,15 @@ pub(crate) fn contains_capital_structure_reference(formula: &str) -> crate::erro
 ///
 /// # Arguments
 ///
-/// * `formula` - The formula string to analyze
+/// * `ast` - Parsed formula whose same-period references are needed.
 ///
 /// # Returns
 ///
 /// Returns a set of `NodeId` values that are direct dependencies in the current period.
-pub(crate) fn extract_direct_dependencies(formula: &str) -> crate::error::Result<IndexSet<NodeId>> {
-    let ast = parse_formula(formula)?;
+pub(crate) fn extract_direct_dependencies(ast: &StmtExpr) -> IndexSet<NodeId> {
     let mut identifiers: IndexSet<String> = IndexSet::new();
-    collect_identifiers_from_ast(&ast, &mut identifiers, true);
-    Ok(identifiers.into_iter().map(NodeId::from).collect())
+    collect_identifiers_from_ast(ast, &mut identifiers, true);
+    identifiers.into_iter().map(NodeId::from).collect()
 }
 
 /// Recursively collect identifiers from an AST node.
@@ -163,7 +162,7 @@ pub(crate) fn extract_direct_dependencies(formula: &str) -> crate::error::Result
 /// * `identifiers` - Set to collect identifiers into
 /// * `ignore_lag` - If true, do not traverse into `lag()` or `shift()` calls
 ///   (except when the offset is a literal 0, which is a current-period dependency)
-fn collect_identifiers_from_ast(
+pub(crate) fn collect_identifiers_from_ast(
     expr: &StmtExpr,
     identifiers: &mut IndexSet<String>,
     ignore_lag: bool,
@@ -418,7 +417,7 @@ mod tests {
     #[test]
     fn test_extract_direct_dependencies_ignore_lag() {
         let formula = "revenue + lag(cogs, 1)";
-        let deps = extract_direct_dependencies(formula).expect("should parse");
+        let deps = extract_direct_dependencies(&parse_formula(formula).expect("should parse"));
         assert!(deps.contains("revenue"));
         assert!(!deps.contains("cogs"));
     }
@@ -427,7 +426,7 @@ mod tests {
     fn test_extract_direct_dependencies_zero_shift_included() {
         // shift(x, 0) should include x as a direct dependency since it refers to current period
         let formula = "shift(revenue, 0)";
-        let deps = extract_direct_dependencies(formula).expect("should parse");
+        let deps = extract_direct_dependencies(&parse_formula(formula).expect("should parse"));
         assert!(deps.contains("revenue"));
     }
 
@@ -435,7 +434,7 @@ mod tests {
     fn test_extract_direct_dependencies_zero_lag_included() {
         // lag(x, 0) should include x as a direct dependency since it refers to current period
         let formula = "lag(revenue, 0)";
-        let deps = extract_direct_dependencies(formula).expect("should parse");
+        let deps = extract_direct_dependencies(&parse_formula(formula).expect("should parse"));
         assert!(deps.contains("revenue"));
     }
 
@@ -443,7 +442,7 @@ mod tests {
     fn test_extract_direct_dependencies_nonzero_shift_excluded() {
         // shift(x, 1) should NOT include x as a direct dependency
         let formula = "shift(revenue, 1)";
-        let deps = extract_direct_dependencies(formula).expect("should parse");
+        let deps = extract_direct_dependencies(&parse_formula(formula).expect("should parse"));
         assert!(!deps.contains("revenue"));
     }
 }

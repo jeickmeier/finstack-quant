@@ -4,7 +4,7 @@
 
 use pyo3::prelude::*;
 
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     AdvanceRate, BorrowingBaseRules, ConcentrationLimit, ConcentrationScope, EligibilityRule,
@@ -67,7 +67,7 @@ impl PyEligibilityRule {
         Ok(Self {
             inner: EligibilityRule {
                 exclude_defaulted,
-                max_maturity: max_maturity.map(extract_date).transpose()?,
+                max_maturity: max_maturity.map(py_to_date).transpose()?,
                 max_days_past_due,
                 exclude_non_performing,
             },

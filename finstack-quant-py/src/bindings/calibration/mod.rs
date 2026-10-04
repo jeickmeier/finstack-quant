@@ -325,7 +325,7 @@ fn calibrate_bermudan_lmm_base_vol(
 ) -> PyResult<f64> {
     let instrument_json = crate::bindings::extract::extract_instrument_json(instrument)?;
     let market = crate::bindings::extract::extract_market(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+    let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     py.detach(move || {
         finstack_quant_calibration::calibrate_bermudan_lmm_base_vol_from_json(
             &instrument_json,

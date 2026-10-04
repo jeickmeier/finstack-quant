@@ -5,7 +5,7 @@
 //! Model parameters are sourced from required market scalars.
 
 use super::pricing::{
-    collect_inputs_extended, reject_future_discrete_dividends_for_stochastic_vol, require_european,
+    collect_inputs, reject_future_discrete_dividends_for_stochastic_vol, require_european,
     resolve_lifecycle_value,
 };
 use super::types::EquityOption;
@@ -99,7 +99,7 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonFourierPricer {
             "rough Heston Fourier",
         )?;
 
-        let inputs = collect_inputs_extended(equity_option, market, as_of).map_err(|e| {
+        let inputs = collect_inputs(equity_option, market, as_of).map_err(|e| {
             crate::pricer::PricingError::model_failure_with_context(
                 e.to_string(),
                 crate::pricer::PricingErrorContext::from_instrument(equity_option)

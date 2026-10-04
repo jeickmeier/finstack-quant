@@ -1,17 +1,12 @@
 //! FX touch option pricer implementation.
 
-use crate::instruments::common_impl::helpers::zero_rate_from_df;
 use crate::instruments::fx::fx_touch_option::types::{
     BarrierDirection, FxTouchOption, PayoutTiming, TouchType,
 };
-use finstack_quant_core::dates::{Date, DayCountContext};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::money::fx::FxQuery;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::Result;
-
-#[derive(Debug, Clone, Default)]
-pub(crate) struct FxTouchOptionCalculator;
 
 pub(crate) fn compute_pv(
     inst: &FxTouchOption,
@@ -22,142 +17,106 @@ pub(crate) fn compute_pv(
     if as_of > inst.expiry {
         return Ok(Money::from((0_i64, inst.quote_currency)));
     }
-    FxTouchOptionCalculator.npv(inst, curves, as_of)
-}
-
-impl FxTouchOptionCalculator {
-    pub(crate) fn npv(
-        &self,
-        inst: &FxTouchOption,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<Money> {
-        let start = inst.monitoring_start_date.ok_or_else(|| {
-            finstack_quant_core::Error::Validation(
-                "FxTouchOption requires monitoring_start_date".to_string(),
-            )
-        })?;
-        if as_of < start {
-            return Err(finstack_quant_core::Error::Validation(
+    let start = inst.monitoring_start_date.ok_or_else(|| {
+        finstack_quant_core::Error::Validation(
+            "FxTouchOption requires monitoring_start_date".to_string(),
+        )
+    })?;
+    if as_of < start {
+        return Err(finstack_quant_core::Error::Validation(
                 "FxTouchOption analytical pricing requires monitoring_start_date on or before as_of; future monitoring windows are unsupported"
                     .to_string(),
             ));
-        }
-        if as_of > start && as_of <= inst.expiry && inst.observed_barrier_breached.is_none() {
-            return Err(finstack_quant_core::Error::Validation(
-                "Seasoned FX touch option requires observed_barrier_breached after monitoring starts"
-                    .to_string(),
-            ));
-        }
-        let (spot, r_d, r_f, sigma, t) = self.collect_inputs(inst, curves, as_of)?;
+    }
+    if as_of > start && as_of <= inst.expiry && inst.observed_barrier_breached.is_none() {
+        return Err(finstack_quant_core::Error::Validation(
+            "Seasoned FX touch option requires observed_barrier_breached after monitoring starts"
+                .to_string(),
+        ));
+    }
+    let crate::instruments::fx::shared::FxOptionInputs {
+        spot,
+        r_domestic: r_d,
+        r_foreign: r_f,
+        sigma,
+        t,
+    } = crate::instruments::fx::shared::collect_fx_option_inputs(input_request(
+        inst, curves, as_of,
+    ))?;
 
-        if t <= 0.0 {
-            let observed_barrier_breached = inst.observed_barrier_breached.ok_or_else(|| {
-                finstack_quant_core::Error::Validation(
-                    "Expired FX touch option requires explicit observed touch state".to_string(),
-                )
-            })?;
-            let pv = match (
-                inst.touch_type,
-                observed_barrier_breached,
-                inst.payout_timing,
-            ) {
-                (TouchType::OneTouch, true, PayoutTiming::AtHit)
-                | (TouchType::OneTouch, false, _)
-                | (TouchType::NoTouch, true, _) => 0.0,
-                (TouchType::OneTouch, true, PayoutTiming::AtExpiry)
-                | (TouchType::NoTouch, false, _) => inst.payout_amount.amount(),
-            };
-            return Money::new(pv, inst.quote_currency);
-        }
-
-        if inst.observed_barrier_breached == Some(true) {
-            let pv = match (inst.touch_type, inst.payout_timing) {
-                (TouchType::OneTouch, PayoutTiming::AtHit) | (TouchType::NoTouch, _) => 0.0,
-                (TouchType::OneTouch, PayoutTiming::AtExpiry) => {
-                    (-r_d * t).exp() * inst.payout_amount.amount()
-                }
-            };
-            return Money::new(pv, inst.quote_currency);
-        }
-
-        let price = price_touch(
-            inst,
-            spot,
-            inst.barrier,
-            r_d,
-            r_f,
-            sigma,
-            t,
+    if t <= 0.0 {
+        let observed_barrier_breached = inst.observed_barrier_breached.ok_or_else(|| {
+            finstack_quant_core::Error::Validation(
+                "Expired FX touch option requires explicit observed touch state".to_string(),
+            )
+        })?;
+        let pv = match (
             inst.touch_type,
-            inst.barrier_direction,
+            observed_barrier_breached,
             inst.payout_timing,
-            inst.payout_amount.amount(),
-        )?;
-
-        Money::new(price, inst.quote_currency)
+        ) {
+            (TouchType::OneTouch, true, PayoutTiming::AtHit)
+            | (TouchType::OneTouch, false, _)
+            | (TouchType::NoTouch, true, _) => 0.0,
+            (TouchType::OneTouch, true, PayoutTiming::AtExpiry)
+            | (TouchType::NoTouch, false, _) => inst.payout_amount.amount(),
+        };
+        return Money::new(pv, inst.quote_currency);
     }
 
-    pub(crate) fn collect_inputs(
-        &self,
-        inst: &FxTouchOption,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<(f64, f64, f64, f64, f64)> {
-        if as_of >= inst.expiry {
-            return self.collect_inputs_expired(inst, curves, as_of);
-        }
-
-        let domestic_disc = curves.get_discount(inst.domestic_discount_curve_id.as_str())?;
-        let foreign_disc = curves.get_discount(inst.foreign_discount_curve_id.as_str())?;
-
-        let t_vol = inst
-            .day_count
-            .year_fraction(as_of, inst.expiry, DayCountContext::default())?;
-
-        // Date-based DF lookups; rates are derived to satisfy
-        // `exp(-r * t_vol) = df` so day-count differences between the curves
-        // and the vol surface are absorbed into `r`.
-        let df_d = domestic_disc.df_between_dates(as_of, inst.expiry)?;
-        let df_f = foreign_disc.df_between_dates(as_of, inst.expiry)?;
-
-        let r_d = zero_rate_from_df(df_d, t_vol, "FxTouchOption domestic discount")?;
-        let r_f = zero_rate_from_df(df_f, t_vol, "FxTouchOption foreign discount")?;
-
-        let spot = fx_spot(inst, curves, as_of)?;
-
-        let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &inst.instrument_pricing_overrides.market_quotes,
-            curves,
-            inst.vol_surface_id.as_str(),
-            t_vol,
-            inst.barrier,
-        )?;
-
-        Ok((spot, r_d, r_f, sigma, t_vol))
+    if inst.observed_barrier_breached == Some(true) {
+        let pv = match (inst.touch_type, inst.payout_timing) {
+            (TouchType::OneTouch, PayoutTiming::AtHit) | (TouchType::NoTouch, _) => 0.0,
+            (TouchType::OneTouch, PayoutTiming::AtExpiry) => {
+                (-r_d * t).exp() * inst.payout_amount.amount()
+            }
+        };
+        return Money::new(pv, inst.quote_currency);
     }
 
-    fn collect_inputs_expired(
-        &self,
-        inst: &FxTouchOption,
-        curves: &MarketContext,
-        as_of: Date,
-    ) -> Result<(f64, f64, f64, f64, f64)> {
-        let spot = fx_spot(inst, curves, as_of)?;
-        Ok((spot, 0.0, 0.0, 0.0, 0.0))
-    }
+    let price = price_touch(
+        inst,
+        spot,
+        inst.barrier,
+        r_d,
+        r_f,
+        sigma,
+        t,
+        inst.touch_type,
+        inst.barrier_direction,
+        inst.payout_timing,
+        inst.payout_amount.amount(),
+    )?;
+
+    Money::new(price, inst.quote_currency)
 }
 
-/// FX spot (quote currency per unit of base currency) from the market FX matrix.
+/// Resolve the matrix-based spot needed by touch-option metrics.
 pub(crate) fn fx_spot(inst: &FxTouchOption, curves: &MarketContext, as_of: Date) -> Result<f64> {
-    let fx_matrix = curves.fx().ok_or(finstack_quant_core::Error::from(
-        finstack_quant_core::InputError::NotFound {
-            id: "fx_matrix".to_string(),
-        },
-    ))?;
-    Ok(fx_matrix
-        .rate(FxQuery::new(inst.base_currency, inst.quote_currency, as_of))?
-        .rate)
+    crate::instruments::fx::shared::resolve_fx_spot(input_request(inst, curves, as_of))
+}
+
+fn input_request<'a>(
+    inst: &'a FxTouchOption,
+    curves: &'a MarketContext,
+    as_of: Date,
+) -> crate::instruments::fx::shared::FxOptionInputRequest<'a> {
+    use crate::instruments::fx::shared::{FxOptionInputRequest, FxSpotSource};
+    FxOptionInputRequest {
+        market: curves,
+        as_of,
+        base_currency: inst.base_currency,
+        quote_currency: inst.quote_currency,
+        expiry: inst.expiry,
+        day_count: inst.day_count,
+        domestic_discount_curve_id: &inst.domestic_discount_curve_id,
+        foreign_discount_curve_id: &inst.foreign_discount_curve_id,
+        vol_surface_id: inst.vol_surface_id.as_str(),
+        strike: inst.barrier,
+        instrument_pricing_overrides: &inst.instrument_pricing_overrides,
+        spot_source: FxSpotSource::Matrix,
+        rate_context: "FxTouchOption",
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

@@ -52,7 +52,23 @@ impl DependencyGraph {
     /// It does not reject cycles; call [`detect_cycles`](Self::detect_cycles) or
     /// [`evaluate_order`] after construction when an executable order is needed.
     pub fn from_model(model: &FinancialModelSpec) -> Result<Self> {
-        Self::validate_formula_references(model)?;
+        let mut parsed = IndexMap::new();
+        for node in model.nodes.values() {
+            for source in [&node.formula_text, &node.where_text].into_iter().flatten() {
+                if !parsed.contains_key(source) {
+                    parsed.insert(source.clone(), crate::dsl::parse_formula(source)?);
+                }
+            }
+        }
+        Self::from_parsed(model, &parsed)
+    }
+
+    /// Build edges from expressions already parsed during semantic validation.
+    pub(crate) fn from_parsed(
+        model: &FinancialModelSpec,
+        parsed: &IndexMap<String, crate::dsl::ast::StmtExpr>,
+    ) -> Result<Self> {
+        Self::validate_formula_references(model, parsed)?;
 
         let mut dependencies = IndexMap::new();
         let mut dependents = IndexMap::new();
@@ -66,12 +82,12 @@ impl DependencyGraph {
 
         for (node_id, node_spec) in &model.nodes {
             if let Some(formula) = &node_spec.formula_text {
-                let node_deps = extract_dependencies(formula, &all_node_ids)?;
+                let node_deps = extract_dependencies(&parsed[formula], &all_node_ids);
                 add_dependency_edges(node_id, &node_deps, &mut dependencies, &mut dependents);
             }
 
             if let Some(where_clause) = &node_spec.where_text {
-                let node_deps = extract_dependencies(where_clause, &all_node_ids)?;
+                let node_deps = extract_dependencies(&parsed[where_clause], &all_node_ids);
                 add_dependency_edges(node_id, &node_deps, &mut dependencies, &mut dependents);
             }
         }
@@ -85,12 +101,16 @@ impl DependencyGraph {
     /// Validate that all identifier references in formulas exist in the model.
     ///
     /// This catches typos and unknown references at build time instead of runtime.
-    fn validate_formula_references(model: &FinancialModelSpec) -> Result<()> {
+    fn validate_formula_references(
+        model: &FinancialModelSpec,
+        parsed: &IndexMap<String, crate::dsl::ast::StmtExpr>,
+    ) -> Result<()> {
         let valid_identifiers: IndexSet<NodeId> = model.nodes.keys().cloned().collect();
         for (node_id, node_spec) in &model.nodes {
             if let Some(formula) = &node_spec.formula_text {
                 validate_known_identifiers(
                     formula,
+                    &parsed[formula],
                     "formula",
                     "Formula",
                     node_id,
@@ -100,6 +120,7 @@ impl DependencyGraph {
             if let Some(where_clause) = &node_spec.where_text {
                 validate_known_identifiers(
                     where_clause,
+                    &parsed[where_clause],
                     "where clause",
                     "Where clause",
                     node_id,
@@ -289,18 +310,13 @@ pub fn evaluate_order(graph: &DependencyGraph) -> Result<Vec<NodeId>> {
 /// and ignores references inside `lag()` and `shift()` calls, allowing for
 /// temporal cycles (like corkscrews) without blocking the DAG.
 fn extract_dependencies(
-    formula: &str,
+    ast: &crate::dsl::ast::StmtExpr,
     all_node_ids: &IndexSet<NodeId>,
-) -> Result<IndexSet<NodeId>> {
-    let direct_deps = crate::utils::formula::extract_direct_dependencies(formula).map_err(|e| {
-        crate::error::Error::build(format!(
-            "Failed to parse formula for dependency extraction: {e}"
-        ))
-    })?;
-    Ok(direct_deps
+) -> IndexSet<NodeId> {
+    crate::utils::formula::extract_direct_dependencies(ast)
         .into_iter()
         .filter(|id| all_node_ids.contains(id.as_str()))
-        .collect())
+        .collect()
 }
 
 /// Unicode-scalar Levenshtein distance via two-row dynamic programming.
@@ -325,12 +341,15 @@ fn levenshtein(a: &str, b: &str) -> usize {
 
 fn validate_known_identifiers(
     source: &str,
+    ast: &crate::dsl::ast::StmtExpr,
     location: &str,
     label: &str,
     node_id: &NodeId,
     valid_identifiers: &IndexSet<NodeId>,
 ) -> Result<()> {
-    for identifier in crate::utils::formula::extract_all_identifiers(source)? {
+    let mut identifiers = IndexSet::new();
+    crate::utils::formula::collect_identifiers_from_ast(ast, &mut identifiers, false);
+    for identifier in identifiers {
         if identifier.starts_with("cs.") {
             continue;
         }
@@ -499,7 +518,10 @@ mod tests {
             .map(|s| NodeId::new(*s))
             .collect();
 
-        let deps = extract_dependencies("revenue - cogs", &all_nodes).unwrap();
+        let deps = extract_dependencies(
+            &crate::dsl::parse_formula("revenue - cogs").unwrap(),
+            &all_nodes,
+        );
         assert_eq!(deps.len(), 2);
         assert!(deps.contains("revenue"));
         assert!(deps.contains("cogs"));

@@ -235,9 +235,8 @@ fn scaled_l1_tolerance(values: &[f64]) -> (f64, f64, f64) {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct GridPosition {
-    /// Duration-cell label. Cell labels may come from
-    /// [`crate::excess_return::duration_cell_label`], but any string key is
-    /// accepted — this module has no dependency on how cells were built.
+    /// Duration-cell label, such as `"5.0-5.5"` for a duration bucket.
+    /// Any string key is accepted independently of how cells were built.
     pub cell: String,
     /// Sector bucket label within the cell.
     pub sector: String,

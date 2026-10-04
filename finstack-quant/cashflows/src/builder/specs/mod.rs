@@ -64,9 +64,9 @@ pub use coupon::{
     CouponType, FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding, FloatingRateFallback,
     FloatingRateSpec, OvernightIndexConstraintApplication, StepUpCouponSpec,
 };
-pub use default::{DefaultCurve, DefaultModelSpec};
+pub use default::DefaultModelSpec;
 pub use fees::{evaluate_fee_tiers, FeeAccrualBasis, FeeBase, FeeSpec, FeeTier};
-pub use prepayment::{PrepaymentCurve, PrepaymentModelSpec};
+pub use prepayment::PrepaymentModelSpec;
 pub use principal::PrincipalExchange;
 pub use recovery::RecoveryModelSpec;
 pub use schedule::{RollRule, ScheduleParams};

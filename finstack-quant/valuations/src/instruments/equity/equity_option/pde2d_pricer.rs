@@ -7,8 +7,7 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::equity_option::pricing::{
-    collect_inputs_extended, reject_future_discrete_dividends_for_stochastic_vol,
-    resolve_lifecycle_value,
+    collect_inputs, reject_future_discrete_dividends_for_stochastic_vol, resolve_lifecycle_value,
 };
 use crate::instruments::equity::equity_option::types::EquityOption;
 use crate::pricer::{
@@ -96,7 +95,7 @@ impl EquityOptionHestonPdePricer {
             "Heston PDE",
         )?;
 
-        let inputs = collect_inputs_extended(inst, market, as_of).map_err(|e| {
+        let inputs = collect_inputs(inst, market, as_of).map_err(|e| {
             PricingError::model_failure_with_context(
                 e.to_string(),
                 PricingErrorContext::from_instrument(inst).model(ModelKey::PdeAdi2D),

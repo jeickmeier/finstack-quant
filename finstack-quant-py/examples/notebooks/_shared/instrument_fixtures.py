@@ -397,8 +397,8 @@ def _structured_credit_spec(iid: str, deal_type: str, idx: int) -> dict:
             "instrument_pricing_overrides": {"market_quotes": {"quoted_clean_price_pct": 98.5}},
             "calendar_id": "nyse",
             "attributes": {"tags": [deal_type.lower()], "meta": {}},
-            "prepayment_spec": {"cpr": 0.15, "curve": None},
-            "default_spec": {"cdr": 0.025, "curve": None},
+            "prepayment_spec": {"cpr": 0.15, "curve": "constant"},
+            "default_spec": {"cdr": 0.025, "curve": "constant"},
             "recovery_spec": {"rate": 0.4, "recovery_lag": 18},
             "market_conditions": {
                 "refi_rate": 0.04,

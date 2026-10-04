@@ -6,8 +6,7 @@
 //! is required.
 
 use super::pricing::{
-    collect_inputs_extended, has_future_discrete_dividends, require_european,
-    resolve_lifecycle_value,
+    collect_inputs, has_future_discrete_dividends, require_european, resolve_lifecycle_value,
 };
 use super::types::EquityOption;
 use crate::instruments::common_impl::parameters::OptionType;
@@ -103,7 +102,7 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
             )
         })?;
 
-        // W-31: `collect_inputs_extended` applies the escrowed-dividend model
+        // W-31: `collect_inputs` applies the escrowed-dividend model
         // (spot shift + `q = 0`) when `discrete_dividends` is non-empty. The
         // escrowed-dividend identity holds only under Black-Scholes; under the
         // rough Heston stochastic-vol dynamics it is invalid, so feeding the
@@ -123,7 +122,7 @@ impl crate::pricer::Pricer for EquityOptionRoughHestonMcPricer {
             ));
         }
 
-        let inputs = collect_inputs_extended(equity_option, market, as_of).map_err(|e| {
+        let inputs = collect_inputs(equity_option, market, as_of).map_err(|e| {
             crate::pricer::PricingError::model_failure_with_context(
                 e.to_string(),
                 crate::pricer::PricingErrorContext::from_instrument(equity_option)

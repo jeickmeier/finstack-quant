@@ -1,4 +1,5 @@
 use super::*;
+use crate::cashflow::builder::DefaultModelSpec;
 
 /// Source of pool-level prepayment/default/recovery assumptions for each period.
 pub(crate) trait PoolFlowSource {
@@ -77,15 +78,12 @@ fn surviving_balance_fraction(state: &SimulationState) -> f64 {
 /// rows and constant curves keep the pool-level rate. Cumulative-loss and
 /// timing default curves are stated on the pool's life and stay pool-level.
 fn asset_seasoned_rates(request: &PoolFlowRequest<'_, '_>) -> Result<AssetSeasonedRates> {
-    use crate::cashflow::builder::{DefaultCurve, PrepaymentCurve};
+    use crate::cashflow::builder::PrepaymentModelSpec;
     let model = &request.instrument.credit_model;
-    let prepay_seasoned = !matches!(
-        model.prepayment_spec.curve,
-        None | Some(PrepaymentCurve::Constant)
-    );
+    let prepay_seasoned = !matches!(model.prepayment_spec, PrepaymentModelSpec::Constant { .. });
     let default_seasoned = matches!(
-        model.default_spec.curve,
-        Some(DefaultCurve::Sda { .. }) | Some(DefaultCurve::Vector { .. })
+        model.default_spec,
+        DefaultModelSpec::Sda { .. } | DefaultModelSpec::Vector { .. }
     );
     if !(prepay_seasoned || default_seasoned) {
         return Ok(AssetSeasonedRates::default());
@@ -172,9 +170,9 @@ pub(super) fn base_period_rates(request: &PoolFlowRequest<'_, '_>) -> Result<Bas
         .as_ref()
         .filter(|_| {
             matches!(
-                request.instrument.credit_model.default_spec.curve,
-                Some(crate::cashflow::builder::DefaultCurve::CumulativeLoss { .. })
-                    | Some(crate::cashflow::builder::DefaultCurve::Timing { .. })
+                request.instrument.credit_model.default_spec,
+                crate::cashflow::builder::DefaultModelSpec::CumulativeLoss { .. }
+                    | crate::cashflow::builder::DefaultModelSpec::Timing { .. }
             )
         })
         .map(|model| {

@@ -1620,21 +1620,64 @@ export type CorrelationStructure =
  * constructing the full model.
  */
 export type StochasticDefaultSpec =
-  | {
-      /**
-       * CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).
-       *
-       * This field is **ignored** when any curve other than
-       * [`DefaultCurve::Constant`] is active: the monthly rate is then derived
-       * entirely from the curve.
-       */
-      cdr: number;
-      /**
-       * Optional curve shape (default: constant)
-       */
-      curve?: DefaultCurve | null;
-      model: "deterministic";
-    }
+  | (
+      | {
+          model: "deterministic";
+          /**
+           * Annual decimal CDR in `[0, 1]`.
+           */
+          cdr: number;
+          curve: "constant";
+          [k: string]: unknown;
+        }
+      | {
+          model: "deterministic";
+          curve: "sda";
+          /**
+           * Speed multiplier (1.0 = 100% SDA)
+           */
+          speed_multiplier: number;
+          [k: string]: unknown;
+        }
+      | {
+          model: "deterministic";
+          curve: "vector";
+          /**
+           * Annual CDR per month of seasoning as decimals, month 1 first.
+           */
+          monthly_cdr: number[];
+          [k: string]: unknown;
+        }
+      | {
+          model: "deterministic";
+          /**
+           * Cumulative net loss in percent of the original balance per month
+           * of seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the
+           * last value is held.
+           */
+          cumulative_net_loss_pct: number[];
+          curve: "cumulative_loss";
+          /**
+           * Loss severity as a decimal fraction of defaulted par in `(0, 1]`.
+           */
+          severity: number;
+          [k: string]: unknown;
+        }
+      | {
+          model: "deterministic";
+          /**
+           * Share of lifetime defaults occurring in each year of seasoning, in
+           * percent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100.
+           */
+          annual_pct: number[];
+          /**
+           * Lifetime defaults as a decimal fraction of the original balance.
+           */
+          cumulative_default_rate: number;
+          curve: "timing";
+          [k: string]: unknown;
+        }
+    )
   | {
       /**
        * Base annual CDR
@@ -1689,57 +1732,6 @@ export type StochasticDefaultSpec =
       model: "factor_correlated";
     };
 /**
- * Default curve shape.
- */
-export type DefaultCurve =
-  | {
-      curve: "constant";
-      [k: string]: unknown;
-    }
-  | {
-      curve: "sda";
-      /**
-       * Speed multiplier (1.0 = 100% SDA)
-       */
-      speed_multiplier: number;
-      [k: string]: unknown;
-    }
-  | {
-      curve: "vector";
-      /**
-       * Annual CDR per month of seasoning as decimals, month 1 first.
-       */
-      monthly_cdr: number[];
-      [k: string]: unknown;
-    }
-  | {
-      /**
-       * Cumulative net loss in percent of the original balance per month
-       * of seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the
-       * last value is held.
-       */
-      cumulative_net_loss_pct: number[];
-      curve: "cumulative_loss";
-      /**
-       * Loss severity as a decimal fraction of defaulted par in `(0, 1]`.
-       */
-      severity: number;
-      [k: string]: unknown;
-    }
-  | {
-      /**
-       * Share of lifetime defaults occurring in each year of seasoning, in
-       * percent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100.
-       */
-      annual_pct: number[];
-      /**
-       * Lifetime defaults as a decimal fraction of the original balance.
-       */
-      cumulative_default_rate: number;
-      curve: "timing";
-      [k: string]: unknown;
-    };
-/**
  * Copula model specification for configuration and serialization.
  *
  * Allows copula selection without constructing the full model,
@@ -1773,22 +1765,58 @@ export type CopulaSpec =
  * constructing the full model, enabling serialization and deferred construction.
  */
 export type StochasticPrepaySpec =
-  | {
-      /**
-       * CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
-       *
-       * This field is **ignored** when [`PrepaymentCurve::Psa`],
-       * [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
-       * monthly rate is then derived entirely from the curve. It IS used by
-       * [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
-       */
-      cpr: number;
-      /**
-       * Optional curve shape (default: constant)
-       */
-      curve?: PrepaymentCurve | null;
-      model: "deterministic";
-    }
+  | (
+      | {
+          model: "deterministic";
+          /**
+           * Annual decimal CPR in `[0, 1]`.
+           */
+          cpr: number;
+          curve: "constant";
+          [k: string]: unknown;
+        }
+      | {
+          model: "deterministic";
+          curve: "psa";
+          /**
+           * Speed multiplier (1.0 = 100% PSA)
+           */
+          speed_multiplier: number;
+          [k: string]: unknown;
+        }
+      | {
+          model: "deterministic";
+          curve: "cmbs_lockout";
+          /**
+           * Number of months with zero prepayment (e.g., 60 for 5-year lockout)
+           */
+          lockout_months: number;
+          /**
+           * Annual decimal CPR after lockout, in `[0, 1]`.
+           */
+          post_lockout_cpr: number;
+          [k: string]: unknown;
+        }
+      | {
+          model: "deterministic";
+          curve: "abs";
+          /**
+           * Monthly prepayment as a decimal fraction of the original balance
+           * (`0.015` = 1.5% ABS).
+           */
+          speed: number;
+          [k: string]: unknown;
+        }
+      | {
+          model: "deterministic";
+          curve: "vector";
+          /**
+           * Annual CPR per month of seasoning as decimals, month 1 first.
+           */
+          monthly_cpr: number[];
+          [k: string]: unknown;
+        }
+    )
   | {
       /**
        * Base deterministic prepayment specification
@@ -1857,47 +1885,6 @@ export type StochasticPrepaySpec =
        * Transition probability: low -> high (per month)
        */
       transition_up: number;
-    };
-/**
- * Prepayment curve shape.
- */
-export type PrepaymentCurve =
-  | {
-      curve: "constant";
-      [k: string]: unknown;
-    }
-  | {
-      curve: "psa";
-      /**
-       * Speed multiplier (1.0 = 100% PSA)
-       */
-      speed_multiplier: number;
-      [k: string]: unknown;
-    }
-  | {
-      curve: "cmbs_lockout";
-      /**
-       * Number of months with zero prepayment (e.g., 60 for 5-year lockout)
-       */
-      lockout_months: number;
-      [k: string]: unknown;
-    }
-  | {
-      curve: "abs";
-      /**
-       * Monthly prepayment as a decimal fraction of the original balance
-       * (`0.015` = 1.5% ABS).
-       */
-      speed: number;
-      [k: string]: unknown;
-    }
-  | {
-      curve: "vector";
-      /**
-       * Annual CPR per month of seasoning as decimals, month 1 first.
-       */
-      monthly_cpr: number[];
-      [k: string]: unknown;
     };
 /**
  * Recovery model specification for configuration and serialization.
@@ -9411,6 +9398,18 @@ export interface DollarRoll {
  *   `docs/REFERENCES.md#bloomberg-swpm`
  */
 export interface InterestRateSwap {
+  /**
+   * Adjust fixed coupon accrual boundaries using the fixed leg's calendar and
+   * business-day convention. Defaults to false (contractual unadjusted accrual);
+   * payment-date adjustment and payment lag are independent.
+   */
+  adjust_fixed_accrual_dates?: boolean;
+  /**
+   * Adjust floating coupon accrual boundaries using the floating leg's calendar
+   * and business-day convention, for term and overnight coupons alike. Defaults
+   * to false; reset lag is applied to the resulting accrual start.
+   */
+  adjust_float_accrual_dates?: boolean;
   /**
    * Attributes for scenario selection and tagging
    */

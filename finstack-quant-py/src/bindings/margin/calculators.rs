@@ -1,7 +1,7 @@
 //! Python wrappers for margin calculators (VM + IM result types).
 
 use super::types::{PyCsaSpec, PyImMethodology};
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_rows_to_dataframe_with_schema, ColumnSchema,
 };
@@ -193,7 +193,7 @@ fn extract_dated_exposures(
     };
     items
         .iter()
-        .map(|(date, amount)| Ok((extract_date(date)?, money_from_amount(*amount, currency)?)))
+        .map(|(date, amount)| Ok((py_to_date(date)?, money_from_amount(*amount, currency)?)))
         .collect()
 }
 
@@ -248,7 +248,7 @@ impl PyVmCalculator {
         let ccy: Currency = currency.parse().map_err(crate::errors::core_to_py)?;
         let exp = money_from_amount(exposure, ccy)?;
         let posted = money_from_amount(posted_collateral, ccy)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let result = self
             .inner
             .calculate(exp, posted, as_of)
@@ -343,7 +343,7 @@ impl PyVmCalculator {
     ) -> PyResult<Vec<Bound<'py, PyAny>>> {
         let dates = self
             .inner
-            .margin_call_dates(extract_date(start)?, extract_date(end)?)
+            .margin_call_dates(py_to_date(start)?, py_to_date(end)?)
             .map_err(core_to_py)?;
         crate::bindings::pandas_utils::dates_to_pylist(py, &dates)
     }

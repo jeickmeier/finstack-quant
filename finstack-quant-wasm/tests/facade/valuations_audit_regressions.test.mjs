@@ -716,8 +716,8 @@ for (const [endDate, periodDays] of [
       fixture.as_of = spec.closing_date = '2024-01-02';
       spec.first_payment_date = '2024-04-02';
       spec.maturity = spec.pool.assets[0].maturity = endDate;
-      spec.prepayment_spec = { cpr: 0.36, curve: null };
-      spec.default_spec = { cdr: 0, curve: null };
+      spec.prepayment_spec = { cpr: 0.36, curve: 'constant' };
+      spec.default_spec = { cdr: 0, curve: 'constant' };
       Object.assign(spec.tranches.tranches[0], {
         seniority: 'equity',
         coupon: { fixed: { rate: 0 } },

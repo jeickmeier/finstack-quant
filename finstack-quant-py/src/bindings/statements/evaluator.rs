@@ -4,7 +4,7 @@ use super::capital_structure::PyCapitalStructureCashflows;
 use super::monte_carlo::{extract_config, PyMonteCarloResults};
 use super::parse_period_id;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::{extract_market_ref, extract_model_ref};
 use crate::bindings::pandas_utils::{
     selected_table_to_dataframe, table_to_dataframe, values_to_series,
@@ -598,7 +598,7 @@ impl PyEvaluator {
         market: &Bound<'_, PyAny>,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyStatementResult> {
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let model = extract_model_ref(model)?;
         let market = extract_market_ref(py, market)?;
         let model_inner: &finstack_quant_statements::FinancialModelSpec = &model;

@@ -3,7 +3,7 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::{core_to_py, value_error};
 use finstack_quant_core::types::InstrumentId;
@@ -149,7 +149,7 @@ impl PyCreditDefaultSwap {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<f64> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         self.inner.par_spread(&market, as_of).map_err(core_to_py)
     }
 
@@ -562,7 +562,7 @@ impl PyCreditDefaultSwapBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         cds_set!(
             slf,
             protection_effective_date,

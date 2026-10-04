@@ -55,7 +55,7 @@ fn test_roll_forward_pattern_arr() -> Result<()> {
         "arr",
         &["new_arr"],
         &["churn_arr"],
-    )?
+    )
     .build()?;
 
     let mut evaluator = Evaluator::new();
@@ -144,7 +144,7 @@ fn test_vintage_buildup_pattern_revenue() -> Result<()> {
         "revenue",
         "new_sales",
         &decay_curve,
-    )?
+    )
     .build()?;
 
     let mut evaluator = Evaluator::new();

@@ -35,7 +35,7 @@
 //!   "config": {
 //!     "factors": [],
 //!     "covariance": { "n": 0, "factor_ids": [], "data": [] },
-//!     "matching": { "mapping_table": [] },
+//!     "matching": { "mapping_table": [] }
 //!   },
 //!   "issuer_betas": [],
 //!   "anchor_state": { "pc": 0.0, "by_level": [] },

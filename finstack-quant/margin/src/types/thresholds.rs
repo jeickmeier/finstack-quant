@@ -433,50 +433,6 @@ impl ImParameters {
         Self::from_registry_defaults(methodology, currency, registry)
     }
 
-    /// Create IM parameters using ISDA SIMM methodology.
-    ///
-    /// Thin convenience wrapper around [`Self::for_methodology`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the embedded margin registry cannot be loaded.
-    pub fn simm_standard(currency: Currency) -> Result<Self> {
-        Self::for_methodology(ImMethodology::Simm, currency)
-    }
-
-    /// Create IM parameters using schedule-based methodology.
-    ///
-    /// Thin convenience wrapper around [`Self::for_methodology`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the embedded margin registry cannot be loaded.
-    pub fn schedule_based(currency: Currency) -> Result<Self> {
-        Self::for_methodology(ImMethodology::Schedule, currency)
-    }
-
-    /// Create IM parameters for cleared trades (CCP methodology).
-    ///
-    /// Thin convenience wrapper around [`Self::for_methodology`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the embedded margin registry cannot be loaded.
-    pub fn cleared(currency: Currency) -> Result<Self> {
-        Self::for_methodology(ImMethodology::ClearingHouse, currency)
-    }
-
-    /// Create IM parameters for repos using haircut methodology.
-    ///
-    /// Thin convenience wrapper around [`Self::for_methodology`].
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the embedded margin registry cannot be loaded.
-    pub fn repo_haircut(currency: Currency) -> Result<Self> {
-        Self::for_methodology(ImMethodology::Haircut, currency)
-    }
-
     /// Create IM parameters using defaults resolved from a config.
     ///
     /// # Errors
@@ -637,7 +593,9 @@ mod tests {
 
     #[test]
     fn im_params_simm_standard() {
-        let params = ImParameters::simm_standard(Currency::EUR).expect("registry should load");
+        let params =
+            ImParameters::for_methodology(crate::types::ImMethodology::Simm, Currency::EUR)
+                .expect("registry should load");
         assert_eq!(params.methodology, ImMethodology::Simm);
         assert_eq!(params.mpor_days, 10);
         assert!(params.segregated);
@@ -645,7 +603,11 @@ mod tests {
 
     #[test]
     fn im_params_cleared() {
-        let params = ImParameters::cleared(Currency::USD).expect("registry should load");
+        let params = ImParameters::for_methodology(
+            crate::types::ImMethodology::ClearingHouse,
+            Currency::USD,
+        )
+        .expect("registry should load");
         assert_eq!(params.methodology, ImMethodology::ClearingHouse);
         assert_eq!(params.mpor_days, 5);
         assert!(!params.segregated);

@@ -21,7 +21,7 @@ use finstack_quant_models::factor::credit::hierarchy::{
 };
 use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
 
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::models::factor::risk::config::extract_vol_horizon;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::{
@@ -369,7 +369,7 @@ fn inputs_from_dataframe(
     let index = spreads.getattr("index")?;
     let dates = index
         .try_iter()?
-        .map(|d| extract_date(&d?))
+        .map(|d| py_to_date(&d?))
         .collect::<PyResult<Vec<_>>>()?;
     let columns = spreads.getattr("columns")?;
     let issuers = columns
@@ -962,7 +962,7 @@ fn decompose_levels(
     let observed_spreads: BTreeMap<IssuerId, f64> =
         py_to_serde_any(py, observed_spreads, "observed_spreads")?;
 
-    let date = extract_date(as_of)?;
+    let date = py_to_date(as_of)?;
 
     let runtime_tags: Option<BTreeMap<IssuerId, IssuerTags>> = match runtime_tags {
         Some(obj) if !obj.is_none() => {

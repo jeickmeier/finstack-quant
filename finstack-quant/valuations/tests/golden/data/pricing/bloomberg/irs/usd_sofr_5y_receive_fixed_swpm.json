@@ -516,10 +516,11 @@
           "meta": {
             "bloomberg_screen": "SWPM",
             "curve_number": "490",
-            "curve_name": "USD SOFR",
-            "schedule_adjust": "acc_and_pay_dates"
+            "curve_name": "USD SOFR"
           }
-        }
+        },
+        "adjust_fixed_accrual_dates": true,
+        "adjust_float_accrual_dates": false
       }
     }
   },

@@ -69,7 +69,7 @@
 //!     period: None,
 //! };
 //!
-//! let mut extension = CreditScorecardExtension::new(config);
+//! let extension = CreditScorecardExtension::new(config);
 //! let report = extension.execute(&model, &results)?;
 //! # let _ = report;
 //! # Ok(())
@@ -313,24 +313,32 @@ impl CreditScorecardExtension {
     /// or missing target period, or an invalid rating-scale/minimum-rating
     /// comparison. Per-metric evaluation errors are reported in `errors`.
     pub fn execute(
-        &mut self,
+        &self,
         model: &FinancialModelSpec,
         results: &StatementResult,
     ) -> Result<ScorecardReport> {
         let _span = tracing::info_span!("statements_analytics.credit_scorecard.execute").entered();
 
-        let config = self.config.clone();
-        Self::validate_config(&config)?;
+        let config = &self.config;
+        Self::validate_config(config)?;
 
-        let target_period = Self::resolve_target_period(&config, model)?.clone();
+        let target_period = Self::resolve_target_period(config, model)?;
 
         let mut scores = Vec::new();
         let mut errors = Vec::new();
         let mut warnings = Vec::new();
         let mut excluded = 0usize;
 
+        let mut base_context = None;
         for metric_config in &config.metrics {
-            match self.evaluate_metric(metric_config, model, results, &config, &target_period) {
+            match self.evaluate_metric(
+                metric_config,
+                model,
+                results,
+                config,
+                target_period,
+                &mut base_context,
+            ) {
                 Ok(evaluation) => {
                     if let Some(warning) = evaluation.warning {
                         warnings.push(warning);
@@ -429,21 +437,12 @@ impl CreditScorecardExtension {
         })
     }
 
-    /// Evaluate a single metric at the target period.
-    ///
-    /// Returns `score: None` (factor excluded from the weighted average, à la
-    /// rating-agency "NM" treatment) when the metric value is non-finite or
-    /// no threshold bucket matches; the remaining factor weights renormalize.
-    fn evaluate_metric(
-        &self,
-        metric: &ScorecardMetric,
+    /// Prepare the immutable history and target-period values once per scorecard.
+    fn prepare_context(
         model: &FinancialModelSpec,
         results: &StatementResult,
-        config: &ScorecardConfig,
         target_period: &finstack_quant_core::dates::Period,
-    ) -> Result<MetricEvaluation> {
-        let expr = finstack_quant_statements::dsl::parse_and_compile(&metric.formula)?;
-
+    ) -> Result<finstack_quant_statements::evaluator::EvaluationContext> {
         let node_to_column: indexmap::IndexMap<finstack_quant_statements::types::NodeId, usize> =
             model
                 .nodes
@@ -487,6 +486,31 @@ impl CreditScorecardExtension {
                 }
             }
         }
+
+        Ok(eval_context)
+    }
+
+    /// Evaluate a single metric at the target period.
+    ///
+    /// Returns `score: None` (factor excluded from the weighted average, à la
+    /// rating-agency "NM" treatment) when the metric value is non-finite or
+    /// no threshold bucket matches; the remaining factor weights renormalize.
+    fn evaluate_metric(
+        &self,
+        metric: &ScorecardMetric,
+        model: &FinancialModelSpec,
+        results: &StatementResult,
+        config: &ScorecardConfig,
+        target_period: &finstack_quant_core::dates::Period,
+        base_context: &mut Option<finstack_quant_statements::evaluator::EvaluationContext>,
+    ) -> Result<MetricEvaluation> {
+        let expr = finstack_quant_statements::dsl::parse_and_compile(&metric.formula)?;
+
+        let context = match base_context {
+            Some(context) => context,
+            None => base_context.insert(Self::prepare_context(model, results, target_period)?),
+        };
+        let mut eval_context = context.clone();
 
         let value = finstack_quant_statements::evaluator::formula::evaluate_formula(
             &expr,

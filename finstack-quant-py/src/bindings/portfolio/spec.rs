@@ -33,7 +33,7 @@ fn run_aggregate_metrics(
     let valuation = extract_valuation_ref(py, valuation)?;
     let ccy = extract_currency(base_currency)?;
     let market = extract_market_ref(py, market)?;
-    let date = crate::bindings::date_utils::extract_date(as_of)?;
+    let date = crate::bindings::date_utils::py_to_date(as_of)?;
     let valuation_ref: &finstack_quant_portfolio::valuation::PortfolioValuation = &valuation;
     let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
     py.detach(|| {

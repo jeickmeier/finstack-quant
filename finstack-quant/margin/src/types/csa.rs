@@ -86,7 +86,7 @@ impl MarginCallTiming {
 ///     id: "USD-CSA-2024".to_string(),
 ///     base_currency: Currency::USD,
 ///     vm_params: VmParameters::regulatory_standard(Currency::USD)?,
-///     im_params: Some(ImParameters::simm_standard(Currency::USD)?),
+///     im_params: Some(ImParameters::for_methodology(finstack_quant_margin::types::ImMethodology::Simm, Currency::USD)?),
 ///     eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,
 ///     call_timing: MarginCallTiming::regulatory_standard()?,
 ///     collateral_curve_id: "USD-OIS".into(),

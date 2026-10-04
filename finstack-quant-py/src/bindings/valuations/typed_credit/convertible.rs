@@ -4,7 +4,7 @@
 use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::serde_to_py;
@@ -620,7 +620,7 @@ impl PyConvertibleBond {
         as_of: &Bound<'py, PyAny>,
     ) -> PyResult<Bound<'py, PyAny>> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let greeks = self
             .inner
             .greeks(&market, None, as_of)
@@ -852,7 +852,7 @@ impl PyConvertibleBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let issue_date = extract_date(value)?;
+        let issue_date = py_to_date(value)?;
         cb_set!(
             slf,
             issue_date,
@@ -877,7 +877,7 @@ impl PyConvertibleBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let maturity = extract_date(value)?;
+        let maturity = py_to_date(value)?;
         cb_set!(
             slf,
             maturity,

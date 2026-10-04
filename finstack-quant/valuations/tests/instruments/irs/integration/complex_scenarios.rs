@@ -61,6 +61,8 @@ fn build_flat_curves(disc_rate: f64, fwd_rate: f64, base_date: Date) -> MarketCo
 
 fn create_swap(as_of: Date, end: Date, fixed_rate: f64, side: PayReceive) -> InterestRateSwap {
     InterestRateSwap {
+        adjust_fixed_accrual_dates: false,
+        adjust_float_accrual_dates: false,
         id: "IRS_INTEGRATION_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side,
@@ -172,6 +174,8 @@ fn test_forward_starting_swap() {
     let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
 
     let swap = InterestRateSwap {
+        adjust_fixed_accrual_dates: false,
+        adjust_float_accrual_dates: false,
         id: "FORWARD_START".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
@@ -295,6 +299,8 @@ fn test_swap_seasoned() {
         .insert_series(fixings);
 
     let swap = InterestRateSwap {
+        adjust_fixed_accrual_dates: false,
+        adjust_float_accrual_dates: false,
         id: "SEASONED_SWAP".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,

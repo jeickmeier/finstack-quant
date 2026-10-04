@@ -2,7 +2,7 @@
 
 use pyo3::prelude::*;
 
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::serde_to_py;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     CallAssumption, CallScope,
@@ -62,7 +62,7 @@ impl PyCallAssumption {
     #[pyo3(signature = (date, price_pct, tranche_id=None))]
     #[pyo3(text_signature = "(date, price_pct, tranche_id=None)")]
     fn new(date: &Bound<'_, PyAny>, price_pct: f64, tranche_id: Option<&str>) -> PyResult<Self> {
-        let date = extract_date(date)?;
+        let date = py_to_date(date)?;
         let inner = match tranche_id {
             Some(id) => CallAssumption::for_tranche(date, price_pct, id),
             None => CallAssumption::new(date, price_pct),

@@ -40,6 +40,8 @@ fn build_market(rate: f64, base_date: Date) -> MarketContext {
 
 fn create_standard_swap(as_of: Date, end: Date, side: PayReceive) -> InterestRateSwap {
     InterestRateSwap {
+        adjust_fixed_accrual_dates: false,
+        adjust_float_accrual_dates: false,
         id: "IRS_CONVEXITY_TEST".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side,

@@ -12,7 +12,7 @@ use super::{extract_money_series, extract_scalar_series, extract_value_series, P
 use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::extract_date;
+use crate::bindings::date_utils::py_to_date;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::{core_to_py, serde_json_to_py, statements_to_py, value_error};
 use finstack_quant_core::dates::{Period, PeriodId};
@@ -784,7 +784,7 @@ impl PyModelBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let parsed = super::extract_period_pairs(availability_dates)?
             .into_iter()
-            .map(|(period, date)| Ok((super::parse_period_id(&period)?, extract_date(&date)?)))
+            .map(|(period, date)| Ok((super::parse_period_id(&period)?, py_to_date(&date)?)))
             .collect::<PyResult<Vec<_>>>()?;
         slf.ready_mut()?
             .try_availability_dates(node_id, &parsed)
@@ -1021,8 +1021,8 @@ impl PyModelBuilder {
         discount_curve_id: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let notional = notional.inner;
-        let issue = extract_date(issue_date)?;
-        let maturity = extract_date(maturity_date)?;
+        let issue = py_to_date(issue_date)?;
+        let maturity = py_to_date(maturity_date)?;
         match slf.inner.as_mut() {
             Some(BuilderState::NeedPeriods(b)) => b.try_add_bond(
                 id,
@@ -1077,8 +1077,8 @@ impl PyModelBuilder {
         forward_curve_id: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let notional = notional.inner;
-        let start = extract_date(start_date)?;
-        let maturity = extract_date(maturity_date)?;
+        let start = py_to_date(start_date)?;
+        let maturity = py_to_date(maturity_date)?;
         let params = SwapParams {
             id: id.to_string(),
             notional,
@@ -1136,8 +1136,8 @@ impl PyModelBuilder {
         discount_curve_id: &str,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let notional = notional.inner;
-        let issue = extract_date(issue_date)?;
-        let maturity = extract_date(maturity_date)?;
+        let issue = py_to_date(issue_date)?;
+        let maturity = py_to_date(maturity_date)?;
         let convention: finstack_quant_valuations::instruments::BondConvention =
             finstack_quant_core::wire::serde_parse(convention).map_err(|e| {
                 value_error(format!(
@@ -1217,8 +1217,8 @@ impl PyModelBuilder {
         business_day_convention: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let notional = notional.inner;
-        let start = extract_date(start_date)?;
-        let maturity = extract_date(maturity_date)?;
+        let start = py_to_date(start_date)?;
+        let maturity = py_to_date(maturity_date)?;
         let fixed_frequency = crate::bindings::core::dates::tenor::extract_tenor(fixed_frequency)?;
         let float_frequency = crate::bindings::core::dates::tenor::extract_tenor(float_frequency)?;
         let fixed_day_count = fixed_day_count.inner;

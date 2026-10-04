@@ -60,9 +60,9 @@ use crate::Error;
 #[derive(Debug)]
 pub struct GaussHermiteQuadrature {
     /// Quadrature points (x-coordinates)
-    pub points: &'static [f64],
+    points: &'static [f64],
     /// Quadrature weights
-    pub weights: &'static [f64],
+    weights: &'static [f64],
 }
 
 impl serde::Serialize for GaussHermiteQuadrature {
@@ -253,6 +253,18 @@ static GAUSS_HERMITE_20_WEIGHTS: &[f64] = &[
 ];
 
 impl GaussHermiteQuadrature {
+    /// Get the immutable physicist's Hermite nodes for this quadrature order.
+    #[must_use]
+    pub fn get_points(&self) -> &'static [f64] {
+        self.points
+    }
+
+    /// Get the immutable weights for `exp(-x²)` integration, paired with the nodes.
+    #[must_use]
+    pub fn get_weights(&self) -> &'static [f64] {
+        self.weights
+    }
+
     /// Create a Gauss-Hermite quadrature with the specified order.
     ///
     /// This is the canonical constructor for Gauss-Hermite quadrature.

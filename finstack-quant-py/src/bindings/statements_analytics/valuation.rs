@@ -1179,7 +1179,7 @@ fn evaluate_dcf<'py>(
     let options = extract_dcf_options(py, options)?;
     let market = extract_market_opt(py, market)?;
     let as_of = as_of
-        .map(crate::bindings::date_utils::extract_date)
+        .map(crate::bindings::date_utils::py_to_date)
         .transpose()?;
 
     let inner = py
@@ -1531,7 +1531,7 @@ fn run_corporate_analysis<'py>(
             .map(|spec| extract_check_suite_spec(py, spec))
             .transpose()?,
         as_of: as_of
-            .map(crate::bindings::date_utils::extract_date)
+            .map(crate::bindings::date_utils::py_to_date)
             .transpose()?,
         ltv_value_node: ltv_value_node.map(str::to_owned),
     };

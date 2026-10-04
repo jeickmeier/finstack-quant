@@ -412,7 +412,7 @@
           "$ref": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json",
           "default": {
             "cdr": 0.02,
-            "curve": null
+            "curve": "constant"
           },
           "description": "Default model specification."
         },
@@ -485,7 +485,7 @@
           "$ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
           "default": {
             "cpr": 0.2,
-            "curve": null
+            "curve": "constant"
           },
           "description": "Prepayment model specification."
         },
@@ -2819,121 +2819,6 @@
         }
       ]
     },
-    "DefaultCurve": {
-      "description": "Default curve shape.",
-      "oneOf": [
-        {
-          "description": "Constant CDR (no seasoning effect)",
-          "properties": {
-            "curve": {
-              "const": "constant",
-              "type": "string"
-            }
-          },
-          "required": [
-            "curve"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "SDA standard curve: ramps to peak then declines",
-          "properties": {
-            "curve": {
-              "const": "sda",
-              "type": "string"
-            },
-            "speed_multiplier": {
-              "description": "Speed multiplier (1.0 = 100% SDA)",
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "curve",
-            "speed_multiplier"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "Explicit annual CDR for each month of seasoning; the last value is\nheld for later months. The `cdr` field is ignored.",
-          "properties": {
-            "curve": {
-              "const": "vector",
-              "type": "string"
-            },
-            "monthly_cdr": {
-              "description": "Annual CDR per month of seasoning as decimals, month 1 first.",
-              "items": {
-                "format": "double",
-                "type": "number"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "curve",
-            "monthly_cdr"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "Cumulative net loss curve (rating-agency ABS convention): losses as a\npercent of the original pool balance by month of seasoning, with a\nconstant loss severity. Defaults in month `t` are\n`Δloss_t / severity` of the original balance; see\n[`DefaultModelSpec::mdr_with_survival`] for the conversion to a\nmonthly rate on the surviving balance. Cumulative defaults may exceed\nthe original balance after replenishment or par build. The `cdr`\nfield is ignored.",
-          "properties": {
-            "cumulative_net_loss_pct": {
-              "description": "Cumulative net loss in percent of the original balance per month\nof seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the\nlast value is held.",
-              "items": {
-                "format": "double",
-                "type": "number"
-              },
-              "type": "array"
-            },
-            "curve": {
-              "const": "cumulative_loss",
-              "type": "string"
-            },
-            "severity": {
-              "description": "Loss severity as a decimal fraction of defaulted par in `(0, 1]`.",
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "curve",
-            "cumulative_net_loss_pct",
-            "severity"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "Rating-agency default timing: a lifetime cumulative default rate\nspread over the years of the pool's life. Defaults within a year\naccrue linearly by month. The `cdr` field is ignored.",
-          "properties": {
-            "annual_pct": {
-              "description": "Share of lifetime defaults occurring in each year of seasoning, in\npercent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100.",
-              "items": {
-                "format": "double",
-                "type": "number"
-              },
-              "type": "array"
-            },
-            "cumulative_default_rate": {
-              "description": "Lifetime defaults as a decimal fraction of the original balance.",
-              "format": "double",
-              "type": "number"
-            },
-            "curve": {
-              "const": "timing",
-              "type": "string"
-            }
-          },
-          "required": [
-            "curve",
-            "cumulative_default_rate",
-            "annual_pct"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "DelinquencyModel": {
       "additionalProperties": false,
       "description": "Roll-rate delinquency model with optional servicer advancing and loan\nmodification.\n\n`roll_rates[b]` and `cure_rates[b]` are monthly transition probabilities\nfor the balance in bucket `b` (bucket 0 = 30 days past due). The balance\nthat neither rolls nor cures stays in its bucket. The roll out of the last\nbucket is the charge-off, so a 30/60/90 model with charge-off at 120 days\nhas three entries.\n\n# Examples\n\n```rust\nuse finstack_quant_valuations::instruments::fixed_income::structured_credit::{\n    AdvancingPolicy, DelinquencyModel,\n};\n\nlet model = DelinquencyModel::new(vec![0.6, 0.7, 0.9], vec![0.3, 0.2, 0.05])\n    .with_advancing(AdvancingPolicy::PrincipalAndInterest {\n        recoverability_cap_pct: 100.0,\n        reimburse_from_collections: false,\n    });\nassert_eq!(model.buckets(), 3);\n```",
@@ -3209,7 +3094,7 @@
       "type": "object"
     },
     "FloatingLegCompounding": {
-      "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::sofr(),\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```",
+      "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```",
       "oneOf": [
         {
           "const": "simple",
@@ -4402,104 +4287,6 @@
       ],
       "type": "object"
     },
-    "PrepaymentCurve": {
-      "description": "Prepayment curve shape.",
-      "oneOf": [
-        {
-          "description": "Constant CPR (no seasoning effect)",
-          "properties": {
-            "curve": {
-              "const": "constant",
-              "type": "string"
-            }
-          },
-          "required": [
-            "curve"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "PSA standard curve: ramps to 6% CPR over 30 months",
-          "properties": {
-            "curve": {
-              "const": "psa",
-              "type": "string"
-            },
-            "speed_multiplier": {
-              "description": "Speed multiplier (1.0 = 100% PSA)",
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "curve",
-            "speed_multiplier"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "CMBS-style lockout: zero prepayment for an initial period, then constant CPR.\n\nCommercial mortgage-backed securities typically have prepayment lockout\nperiods (defeasance/yield maintenance) lasting 5-10 years, after which\nvoluntary prepayment resumes at the specified CPR.",
-          "properties": {
-            "curve": {
-              "const": "cmbs_lockout",
-              "type": "string"
-            },
-            "lockout_months": {
-              "description": "Number of months with zero prepayment (e.g., 60 for 5-year lockout)",
-              "format": "uint32",
-              "minimum": 0,
-              "type": "integer"
-            }
-          },
-          "required": [
-            "curve",
-            "lockout_months"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "ABS speed: each month a constant share of the *original* balance\nprepays, so the single-month mortality rises with seasoning,\n`SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi, *Handbook of Fixed Income\nSecurities*, auto-loan ABS convention). The `cpr` field is ignored.",
-          "properties": {
-            "curve": {
-              "const": "abs",
-              "type": "string"
-            },
-            "speed": {
-              "description": "Monthly prepayment as a decimal fraction of the original balance\n(`0.015` = 1.5% ABS).",
-              "format": "double",
-              "type": "number"
-            }
-          },
-          "required": [
-            "curve",
-            "speed"
-          ],
-          "type": "object"
-        },
-        {
-          "description": "Explicit annual CPR for each month of seasoning; the last value is\nheld for later months. The `cpr` field is ignored.",
-          "properties": {
-            "curve": {
-              "const": "vector",
-              "type": "string"
-            },
-            "monthly_cpr": {
-              "description": "Annual CPR per month of seasoning as decimals, month 1 first.",
-              "items": {
-                "format": "double",
-                "type": "number"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "curve",
-            "monthly_cpr"
-          ],
-          "type": "object"
-        }
-      ]
-    },
     "PrepaymentPenalty": {
       "description": "Prepayment protection on a commercial mortgage.\n\nThe premium a prepayment owes is collected by the trust as interest\n(nothing is charged after `through`); a lockout blocks voluntary\nprepayment outright.",
       "oneOf": [
@@ -5597,34 +5384,133 @@
       "description": "Stochastic default model specification.\n\nAllows default model selection and configuration without\nconstructing the full model.",
       "oneOf": [
         {
-          "additionalProperties": false,
           "description": "Use deterministic default model (no stochastic component).",
-          "properties": {
-            "cdr": {
-              "description": "CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).\n\nThis field is **ignored** when any curve other than\n[`DefaultCurve::Constant`] is active: the monthly rate is then derived\nentirely from the curve.",
-              "format": "double",
-              "type": "number"
-            },
-            "curve": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/DefaultCurve"
+          "oneOf": [
+            {
+              "description": "Constant CDR (no seasoning effect)",
+              "properties": {
+                "cdr": {
+                  "description": "Annual decimal CDR in `[0, 1]`.",
+                  "format": "double",
+                  "type": "number"
                 },
-                {
-                  "type": "null"
+                "curve": {
+                  "const": "constant",
+                  "type": "string"
                 }
+              },
+              "required": [
+                "curve",
+                "cdr"
               ],
-              "default": null,
-              "description": "Optional curve shape (default: constant)"
+              "type": "object"
             },
+            {
+              "description": "SDA standard curve: ramps to peak then declines",
+              "properties": {
+                "curve": {
+                  "const": "sda",
+                  "type": "string"
+                },
+                "speed_multiplier": {
+                  "description": "Speed multiplier (1.0 = 100% SDA)",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "curve",
+                "speed_multiplier"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Explicit annual CDR for each month of seasoning; the last value is\nheld for later months.",
+              "properties": {
+                "curve": {
+                  "const": "vector",
+                  "type": "string"
+                },
+                "monthly_cdr": {
+                  "description": "Annual CDR per month of seasoning as decimals, month 1 first.",
+                  "items": {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "curve",
+                "monthly_cdr"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Cumulative net loss curve (rating-agency ABS convention): losses as a\npercent of the original pool balance by month of seasoning, with a\nconstant loss severity. Defaults in month `t` are\n`Δloss_t / severity` of the original balance; see\n[`DefaultModelSpec::mdr_with_survival`] for the conversion to a\nmonthly rate on the surviving balance. Cumulative defaults may exceed\nthe original balance after replenishment or par build.",
+              "properties": {
+                "cumulative_net_loss_pct": {
+                  "description": "Cumulative net loss in percent of the original balance per month\nof seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the\nlast value is held.",
+                  "items": {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "curve": {
+                  "const": "cumulative_loss",
+                  "type": "string"
+                },
+                "severity": {
+                  "description": "Loss severity as a decimal fraction of defaulted par in `(0, 1]`.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "curve",
+                "cumulative_net_loss_pct",
+                "severity"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Rating-agency default timing: a lifetime cumulative default rate\nspread over the years of the pool's life. Defaults within a year\naccrue linearly by month.",
+              "properties": {
+                "annual_pct": {
+                  "description": "Share of lifetime defaults occurring in each year of seasoning, in\npercent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100.",
+                  "items": {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "cumulative_default_rate": {
+                  "description": "Lifetime defaults as a decimal fraction of the original balance.",
+                  "format": "double",
+                  "type": "number"
+                },
+                "curve": {
+                  "const": "timing",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "curve",
+                "cumulative_default_rate",
+                "annual_pct"
+              ],
+              "type": "object"
+            }
+          ],
+          "properties": {
             "model": {
               "const": "deterministic",
               "type": "string"
             }
           },
           "required": [
-            "model",
-            "cdr"
+            "model"
           ],
           "type": "object"
         },
@@ -5740,34 +5626,122 @@
       "description": "Stochastic prepayment model specification.\n\nAllows prepayment model selection and configuration without\nconstructing the full model, enabling serialization and deferred construction.",
       "oneOf": [
         {
-          "additionalProperties": false,
           "description": "Use deterministic prepayment model (no stochastic component).",
-          "properties": {
-            "cpr": {
-              "description": "CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).\n\nThis field is **ignored** when [`PrepaymentCurve::Psa`],\n[`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the\nmonthly rate is then derived entirely from the curve. It IS used by\n[`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.",
-              "format": "double",
-              "type": "number"
-            },
-            "curve": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/PrepaymentCurve"
+          "oneOf": [
+            {
+              "description": "Constant CPR (no seasoning effect)",
+              "properties": {
+                "cpr": {
+                  "description": "Annual decimal CPR in `[0, 1]`.",
+                  "format": "double",
+                  "type": "number"
                 },
-                {
-                  "type": "null"
+                "curve": {
+                  "const": "constant",
+                  "type": "string"
                 }
+              },
+              "required": [
+                "curve",
+                "cpr"
               ],
-              "default": null,
-              "description": "Optional curve shape (default: constant)"
+              "type": "object"
             },
+            {
+              "description": "PSA standard curve: ramps to 6% CPR over 30 months",
+              "properties": {
+                "curve": {
+                  "const": "psa",
+                  "type": "string"
+                },
+                "speed_multiplier": {
+                  "description": "Speed multiplier (1.0 = 100% PSA)",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "curve",
+                "speed_multiplier"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "CMBS-style lockout: zero prepayment for an initial period, then constant CPR.\n\nCommercial mortgage-backed securities typically have prepayment lockout\nperiods (defeasance/yield maintenance) lasting 5-10 years, after which\nvoluntary prepayment resumes at the specified CPR.",
+              "properties": {
+                "curve": {
+                  "const": "cmbs_lockout",
+                  "type": "string"
+                },
+                "lockout_months": {
+                  "description": "Number of months with zero prepayment (e.g., 60 for 5-year lockout)",
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "post_lockout_cpr": {
+                  "description": "Annual decimal CPR after lockout, in `[0, 1]`.",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "curve",
+                "lockout_months",
+                "post_lockout_cpr"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "ABS speed: each month a constant share of the *original* balance\nprepays, so the single-month mortality rises with seasoning,\n`SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi, *Handbook of Fixed Income\nSecurities*, auto-loan ABS convention).",
+              "properties": {
+                "curve": {
+                  "const": "abs",
+                  "type": "string"
+                },
+                "speed": {
+                  "description": "Monthly prepayment as a decimal fraction of the original balance\n(`0.015` = 1.5% ABS).",
+                  "format": "double",
+                  "type": "number"
+                }
+              },
+              "required": [
+                "curve",
+                "speed"
+              ],
+              "type": "object"
+            },
+            {
+              "description": "Explicit annual CPR for each month of seasoning; the last value is\nheld for later months.",
+              "properties": {
+                "curve": {
+                  "const": "vector",
+                  "type": "string"
+                },
+                "monthly_cpr": {
+                  "description": "Annual CPR per month of seasoning as decimals, month 1 first.",
+                  "items": {
+                    "format": "double",
+                    "type": "number"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "curve",
+                "monthly_cpr"
+              ],
+              "type": "object"
+            }
+          ],
+          "properties": {
             "model": {
               "const": "deterministic",
               "type": "string"
             }
           },
           "required": [
-            "model",
-            "cpr"
+            "model"
           ],
           "type": "object"
         },
@@ -6386,7 +6360,7 @@
           "day_count": "act_360",
           "default_spec": {
             "cdr": 0.02,
-            "curve": null
+            "curve": "constant"
           },
           "discount_curve_id": "USD-OIS",
           "drawn": {
@@ -6401,7 +6375,7 @@
           "maturity": "2030-01-15",
           "prepayment_spec": {
             "cpr": 0.2,
-            "curve": null
+            "curve": "constant"
           },
           "rate": {
             "fixed": {

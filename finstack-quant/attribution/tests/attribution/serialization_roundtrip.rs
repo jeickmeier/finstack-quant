@@ -447,10 +447,10 @@ fn test_model_params_snapshot_structured_credit_roundtrip() {
     } = deserialized
     {
         // Verify prepayment
-        assert_eq!(prepayment_spec.cpr, PrepaymentModelSpec::psa(1.5).cpr);
+        assert_eq!(prepayment_spec, PrepaymentModelSpec::psa(1.5));
 
         // Verify default
-        assert_eq!(default_spec.cdr, 0.02);
+        assert_eq!(default_spec, DefaultModelSpec::constant_cdr(0.02));
 
         // Verify recovery
         assert_eq!(recovery_spec.rate, 0.60);

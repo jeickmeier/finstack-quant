@@ -17,7 +17,7 @@ use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::types::PyAttributes;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::merton_mc::{PyMertonMcConfig, PyMertonMcResult};
@@ -430,8 +430,8 @@ impl PyBond {
             id,
             money_from_py(notional, currency, "notional")?,
             rate_from_py(coupon_rate, "coupon_rate")?,
-            extract_date(issue_date)?,
-            extract_date(maturity)?,
+            py_to_date(issue_date)?,
+            py_to_date(maturity)?,
             stub_kind_from_py(Some(stub), "stub")?,
             discount_curve_id,
         )
@@ -549,8 +549,8 @@ impl PyBond {
             id,
             money_from_py(notional, currency, "notional")?,
             rate_from_py(coupon_rate, "coupon_rate")?,
-            extract_date(issue_date)?,
-            extract_date(maturity)?,
+            py_to_date(issue_date)?,
+            py_to_date(maturity)?,
             bond_convention_from_str(convention)?,
             discount_curve_id,
         )
@@ -641,8 +641,8 @@ impl PyBond {
             money_from_py(notional, currency, "notional")?,
             forward_curve_id,
             bps_value_from_py(spread_bp, "spread_bp")?,
-            extract_date(issue_date)?,
-            extract_date(maturity)?,
+            py_to_date(issue_date)?,
+            py_to_date(maturity)?,
             frequency.inner,
             day_count.inner,
             discount_curve_id,
@@ -731,8 +731,8 @@ impl PyBond {
             money_from_py(notional, currency, "notional")?,
             forward_curve_id,
             bps_value_from_py(spread_bp, "spread_bp")?,
-            extract_date(issue_date)?,
-            extract_date(maturity)?,
+            py_to_date(issue_date)?,
+            py_to_date(maturity)?,
             frequency.inner,
             day_count.inner,
             bond_convention_from_str(convention)?,
@@ -797,8 +797,8 @@ impl PyBond {
         let inner = finstack_quant_valuations::instruments::Bond::zero_coupon(
             id,
             money_from_py(notional, currency, "notional")?,
-            extract_date(issue_date)?,
-            extract_date(maturity)?,
+            py_to_date(issue_date)?,
+            py_to_date(maturity)?,
             discount_curve_id,
         )
         .map_err(core_to_py)?;
@@ -1315,7 +1315,7 @@ impl PyBond {
         discount_rate: f64,
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyMertonMcResult> {
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let bond = self.inner.clone();
         let config = config.inner.clone();
         let result = py
@@ -1421,7 +1421,7 @@ impl PyBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.issue_date(date));
         slf.fields.push(("issue_date", date.to_string()));
@@ -1444,7 +1444,7 @@ impl PyBondBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.maturity(date));
         slf.fields.push(("maturity", date.to_string()));
@@ -2352,7 +2352,7 @@ impl PyTermLoanBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.issue_date(date));
         slf.fields.push(("issue_date", date.to_string()));
@@ -2375,7 +2375,7 @@ impl PyTermLoanBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.maturity(date));
         slf.fields.push(("maturity", date.to_string()));

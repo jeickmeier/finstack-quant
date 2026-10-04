@@ -44,7 +44,7 @@ pub(crate) fn currency_code(obj: &Bound<'_, PyAny>) -> PyResult<String> {
 pub(crate) fn extract_pillar(py: Python<'_>, obj: &Bound<'_, PyAny>) -> PyResult<Value> {
     let pillar: Pillar = if let Ok(text) = obj.extract::<String>() {
         text.parse().map_err(core_to_py)?
-    } else if let Ok(date) = crate::bindings::date_utils::extract_date(obj) {
+    } else if let Ok(date) = crate::bindings::date_utils::py_to_date(obj) {
         Pillar::Date(date)
     } else {
         py_to_serde(py, obj, "pillar")?

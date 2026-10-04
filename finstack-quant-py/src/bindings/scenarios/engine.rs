@@ -430,7 +430,7 @@ fn apply_scenario(
     let mut model = model
         .map(|value| extract_model_ref(value).map(|model| model.into_owned()))
         .transpose()?;
-    let date = crate::bindings::date_utils::extract_date(as_of)?;
+    let date = crate::bindings::date_utils::py_to_date(as_of)?;
     let mut instruments = extract_instruments(instruments)?;
     let config = extract_config(config)?;
 

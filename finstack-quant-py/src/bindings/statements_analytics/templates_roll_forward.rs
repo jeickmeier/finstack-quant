@@ -6,7 +6,6 @@
 //! and returns a typed model specification.
 
 use crate::bindings::statements::types::PyFinancialModelSpec;
-use crate::errors::statements_to_py;
 use finstack_quant_statements_analytics::templates::roll_forward as rust_roll_forward;
 use pyo3::prelude::*;
 
@@ -48,8 +47,7 @@ fn add_roll_forward(
         name,
         &increases_refs,
         &decreases_refs,
-    )
-    .map_err(statements_to_py)?;
+    );
     finish_builder(builder)
 }
 
@@ -91,8 +89,7 @@ fn add_roll_forward_with_opening(
         &increases_refs,
         &decreases_refs,
         opening,
-    )
-    .map_err(statements_to_py)?;
+    );
     finish_builder(builder)
 }
 

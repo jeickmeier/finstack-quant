@@ -234,7 +234,7 @@ impl JsCorkscrewExtension {
     /// @param results - Evaluated `StatementResult` (object or JSON).
     /// @returns `CorkscrewReport`: `status`, `message`, per-account `data`, `warnings` and `errors`.
     /// @throws Error with kind `validation` if an input is malformed, or strict mode (`fail_on_error`) meets a missing or invalid account, change node or period value.
-    pub fn execute(&mut self, model: JsValue, results: JsValue) -> Result<JsValue, JsValue> {
+    pub fn execute(&self, model: JsValue, results: JsValue) -> Result<JsValue, JsValue> {
         let model = parse_model(&model)?;
         let results: StatementResult = from_js_json(&results, "results")?;
         to_js_value(&self.inner.execute(&model, &results).map_err(to_js_err)?)
@@ -304,7 +304,7 @@ impl JsCreditScorecardExtension {
     /// @param results - Evaluated `StatementResult` (object or JSON).
     /// @returns `ScorecardReport`: `status`, `message`, the rating and per-metric scores in `data`, `warnings` and `errors` (per-metric evaluation failures are reported there, not thrown).
     /// @throws Error with kind `validation` if an input is malformed, the configuration is invalid, or the target period is missing.
-    pub fn execute(&mut self, model: JsValue, results: JsValue) -> Result<JsValue, JsValue> {
+    pub fn execute(&self, model: JsValue, results: JsValue) -> Result<JsValue, JsValue> {
         let model = parse_model(&model)?;
         let results: StatementResult = from_js_json(&results, "results")?;
         to_js_value(&self.inner.execute(&model, &results).map_err(to_js_err)?)

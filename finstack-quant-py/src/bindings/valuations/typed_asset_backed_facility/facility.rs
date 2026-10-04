@@ -9,7 +9,7 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::types::PyAttributes;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{
@@ -364,7 +364,7 @@ impl PyAssetBackedFacility {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyFacilityProjection> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let facility = self.inner.clone();
         let inner = py
             .detach(move || facility.project(&market, as_of))
@@ -399,7 +399,7 @@ impl PyAssetBackedFacility {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<f64> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         self.inner.facility_irr(&market, as_of).map_err(core_to_py)
     }
 
@@ -1095,7 +1095,7 @@ impl PyAssetBackedFacilityBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.closing_date(date));
         Ok(slf)
@@ -1122,7 +1122,7 @@ impl PyAssetBackedFacilityBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.revolving_end(date));
         Ok(slf)
@@ -1149,7 +1149,7 @@ impl PyAssetBackedFacilityBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.maturity(date));
         Ok(slf)

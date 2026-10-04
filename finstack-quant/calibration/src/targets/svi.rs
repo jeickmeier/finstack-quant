@@ -200,6 +200,10 @@ impl SviSurfaceTarget {
         }
 
         let mut params_by_expiry = BTreeMap::new();
+        let solver = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
+            .with_tolerance(global_config.solver.tolerance())
+            .with_max_iterations(global_config.solver.max_iterations());
+        let mut solver_iterations = 0;
 
         for (&expiry_key, expiry_quotes) in &quotes_by_expiry {
             if expiry_quotes.len() < 5 {
@@ -216,9 +220,11 @@ impl SviSurfaceTarget {
             let strikes: Vec<f64> = expiry_quotes.iter().map(|(strike, _)| *strike).collect();
             let vols: Vec<f64> = expiry_quotes.iter().map(|(_, vol)| *vol).collect();
 
-            let svi_params = finstack_quant_models::volatility::svi::calibrate_svi(
-                &strikes, &vols, forward, expiry,
-            )?;
+            let (svi_params, iterations) =
+                finstack_quant_models::volatility::svi::calibrate_svi_with_solver(
+                    &strikes, &vols, forward, expiry, &solver,
+                )?;
+            solver_iterations += iterations;
 
             params_by_expiry.insert(expiry_key, svi_params);
         }
@@ -301,7 +307,7 @@ impl SviSurfaceTarget {
         let mut report = CalibrationReport::for_type_with_tolerance(
             "svi_surface",
             residuals,
-            params_by_expiry.len(),
+            solver_iterations,
             global_config.vol_surface.validation_tolerance,
         )
         .with_model_version(crate::versions::SVI_SURFACE);

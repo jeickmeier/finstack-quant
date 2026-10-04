@@ -202,7 +202,7 @@ pub(crate) fn normal_forecast_with_stream(
 
     for period_id in forecast_periods {
         let z = rng.normal(0.0, 1.0);
-        let value = prev + p.mean + p.std_dev * z;
+        let value = normal_step(prev, &p, z);
         if !value.is_finite() {
             return Err(Error::forecast(format!(
                 "Normal forecast produced a non-finite value at period {:?}",
@@ -214,6 +214,27 @@ pub(crate) fn normal_forecast_with_stream(
     }
 
     Ok(results)
+}
+
+fn normal_step(prev: f64, params: &DistributionParams, z: f64) -> f64 {
+    prev + params.mean + params.std_dev * z
+}
+
+fn lognormal_step(prev: f64, params: &DistributionParams, z: f64) -> f64 {
+    const EXP_CLAMP: f64 = 709.0;
+    let log_return = (params.mean - 0.5 * params.std_dev * params.std_dev) + params.std_dev * z;
+    if log_return.abs() > EXP_CLAMP {
+        tracing::warn!(
+            mean = params.mean,
+            std_dev = params.std_dev,
+            "LogNormal exponent clamped to avoid overflow"
+        );
+    }
+    prev * log_return.clamp(-EXP_CLAMP, EXP_CLAMP).exp()
+}
+
+fn mean_reverting_step(prev: f64, params: &MeanRevertingParams, z: f64) -> f64 {
+    prev + params.reversion_speed * (params.long_run_mean - prev) + params.std_dev * z
 }
 
 /// Validate the strictly positive anchor required by a LogNormal path.
@@ -291,19 +312,9 @@ pub(crate) fn lognormal_forecast_with_stream(
     let mut results = IndexMap::new();
     let mut prev = base_value;
 
-    const EXP_CLAMP: f64 = 709.0;
-
     for period_id in forecast_periods {
         let z = rng.normal(0.0, 1.0);
-        let log_return = (p.mean - 0.5 * p.std_dev * p.std_dev) + p.std_dev * z;
-        if log_return.abs() > EXP_CLAMP {
-            tracing::warn!(
-                mean = p.mean,
-                std_dev = p.std_dev,
-                "LogNormal exponent clamped to avoid overflow"
-            );
-        }
-        let value = prev * log_return.clamp(-EXP_CLAMP, EXP_CLAMP).exp();
+        let value = lognormal_step(prev, &p, z);
         if !value.is_finite() {
             return Err(Error::forecast(format!(
                 "LogNormal forecast produced a non-finite value at period {:?}",
@@ -442,7 +453,7 @@ pub(crate) fn mean_reverting_forecast_with_stream(
 
     for period_id in forecast_periods {
         let z = rng.normal(0.0, 1.0);
-        let value = prev + p.reversion_speed * (p.long_run_mean - prev) + p.std_dev * z;
+        let value = mean_reverting_step(prev, &p, z);
         if !value.is_finite() {
             return Err(Error::forecast(format!(
                 "MeanReverting forecast produced a non-finite value at period {:?}",
@@ -860,8 +871,6 @@ pub(crate) fn monte_carlo_correlated_series(
     let mut z_out = IndexMap::new();
     let mut prev = base_value;
 
-    // Clamp kept in sync with `lognormal_forecast_with_stream`.
-    const EXP_CLAMP: f64 = 709.0;
     // sqrt(1 - ρ²) with floor at zero in case of tiny numerical overshoot.
     let indep_weight = (1.0 - rho * rho).max(0.0).sqrt();
 
@@ -879,21 +888,9 @@ pub(crate) fn monte_carlo_correlated_series(
         z_out.insert(*period_id, z);
 
         let value = match &kernel {
-            Kernel::Normal(p) => prev + p.mean + p.std_dev * z,
-            Kernel::LogNormal(p) => {
-                let log_return = (p.mean - 0.5 * p.std_dev * p.std_dev) + p.std_dev * z;
-                if log_return.abs() > EXP_CLAMP {
-                    tracing::warn!(
-                        mean = p.mean,
-                        std_dev = p.std_dev,
-                        "LogNormal correlated exponent clamped to avoid overflow"
-                    );
-                }
-                prev * log_return.clamp(-EXP_CLAMP, EXP_CLAMP).exp()
-            }
-            Kernel::MeanReverting(p) => {
-                prev + p.reversion_speed * (p.long_run_mean - prev) + p.std_dev * z
-            }
+            Kernel::Normal(p) => normal_step(prev, p, z),
+            Kernel::LogNormal(p) => lognormal_step(prev, p, z),
+            Kernel::MeanReverting(p) => mean_reverting_step(prev, p, z),
         };
 
         if !value.is_finite() {

@@ -5,10 +5,13 @@ use super::vector_at;
 /// Prepayment curve shape.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(tag = "curve", rename_all = "snake_case")]
-pub enum PrepaymentCurve {
+#[serde(tag = "curve", rename_all = "snake_case", deny_unknown_fields)]
+pub enum PrepaymentModelSpec {
     /// Constant CPR (no seasoning effect)
-    Constant,
+    Constant {
+        /// Annual decimal CPR in `[0, 1]`.
+        cpr: f64,
+    },
     /// PSA standard curve: ramps to 6% CPR over 30 months
     Psa {
         /// Speed multiplier (1.0 = 100% PSA)
@@ -22,39 +25,24 @@ pub enum PrepaymentCurve {
     CmbsLockout {
         /// Number of months with zero prepayment (e.g., 60 for 5-year lockout)
         lockout_months: u32,
+        /// Annual decimal CPR after lockout, in `[0, 1]`.
+        post_lockout_cpr: f64,
     },
     /// ABS speed: each month a constant share of the *original* balance
     /// prepays, so the single-month mortality rises with seasoning,
     /// `SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi, *Handbook of Fixed Income
-    /// Securities*, auto-loan ABS convention). The `cpr` field is ignored.
+    /// Securities*, auto-loan ABS convention).
     Abs {
         /// Monthly prepayment as a decimal fraction of the original balance
         /// (`0.015` = 1.5% ABS).
         speed: f64,
     },
     /// Explicit annual CPR for each month of seasoning; the last value is
-    /// held for later months. The `cpr` field is ignored.
+    /// held for later months.
     Vector {
         /// Annual CPR per month of seasoning as decimals, month 1 first.
         monthly_cpr: Vec<f64>,
     },
-}
-
-/// Prepayment model specification.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct PrepaymentModelSpec {
-    /// CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
-    ///
-    /// This field is **ignored** when [`PrepaymentCurve::Psa`],
-    /// [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
-    /// monthly rate is then derived entirely from the curve. It IS used by
-    /// [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
-    pub cpr: f64,
-    /// Optional curve shape (default: constant)
-    #[serde(default)]
-    pub curve: Option<PrepaymentCurve>,
 }
 
 impl PrepaymentModelSpec {
@@ -75,7 +63,7 @@ impl PrepaymentModelSpec {
     /// For the CMBS lockout curve:
     ///
     /// - months `<= lockout_months`: `CPR = 0`
-    /// - months `> lockout_months`: `CPR = self.cpr`
+    /// - months `> lockout_months`: `CPR = post_lockout_cpr`
     ///
     /// For the ABS curve the SMM is `speed / (1 − speed·(t − 1))` with
     /// `t = max(seasoning, 1)`, capped at 1.0 once the original balance is
@@ -106,9 +94,9 @@ impl PrepaymentModelSpec {
     ///
     /// - `docs/REFERENCES.md#tuckman-serrat-fixed-income`
     pub fn smm(&self, seasoning_months: u32) -> finstack_quant_core::Result<f64> {
-        let cpr = match &self.curve {
-            None | Some(PrepaymentCurve::Constant) => self.cpr,
-            Some(PrepaymentCurve::Psa { speed_multiplier }) => {
+        let cpr = match self {
+            PrepaymentModelSpec::Constant { cpr } => *cpr,
+            PrepaymentModelSpec::Psa { speed_multiplier } => {
                 if !speed_multiplier.is_finite() || *speed_multiplier < 0.0 {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "PSA speed_multiplier ({speed_multiplier}) must be finite and non-negative"
@@ -116,18 +104,21 @@ impl PrepaymentModelSpec {
                 }
                 super::super::credit_rates::psa_cpr(*speed_multiplier, seasoning_months)
             }
-            Some(PrepaymentCurve::CmbsLockout { lockout_months }) => {
+            PrepaymentModelSpec::CmbsLockout {
+                lockout_months,
+                post_lockout_cpr,
+            } => {
                 // Zero prepayment during lockout, then constant CPR
                 if seasoning_months <= *lockout_months {
                     0.0
                 } else {
-                    self.cpr
+                    *post_lockout_cpr
                 }
             }
-            Some(PrepaymentCurve::Abs { speed }) => {
+            PrepaymentModelSpec::Abs { speed } => {
                 return super::super::credit_rates::abs_to_smm(*speed, seasoning_months);
             }
-            Some(PrepaymentCurve::Vector { monthly_cpr }) => {
+            PrepaymentModelSpec::Vector { monthly_cpr } => {
                 vector_at(monthly_cpr, seasoning_months, "monthly_cpr")?
             }
         };
@@ -152,13 +143,15 @@ impl PrepaymentModelSpec {
     /// outside `[0, 1]`, or a vector curve that is empty or holds a value
     /// outside `[0, 1]`. Post-lockout CPR is checked even during lockout.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
-        if matches!(
-            self.curve,
-            None | Some(PrepaymentCurve::Constant | PrepaymentCurve::CmbsLockout { .. })
-        ) {
-            super::super::credit_rates::cpr_to_smm(self.cpr)?;
+        if let Self::Constant { cpr }
+        | Self::CmbsLockout {
+            post_lockout_cpr: cpr,
+            ..
+        } = self
+        {
+            super::super::credit_rates::cpr_to_smm(*cpr)?;
         }
-        if let Some(PrepaymentCurve::Vector { monthly_cpr }) = &self.curve {
+        if let PrepaymentModelSpec::Vector { monthly_cpr } = self {
             for (index, cpr) in monthly_cpr.iter().enumerate() {
                 if !cpr.is_finite() || !(0.0..=1.0).contains(cpr) {
                     return Err(finstack_quant_core::Error::Validation(format!(
@@ -193,7 +186,7 @@ impl PrepaymentModelSpec {
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn constant_cpr(cpr: f64) -> Self {
-        Self { cpr, curve: None }
+        Self::Constant { cpr }
     }
 
     /// PSA curve with multiplier (1.0 = 100% PSA).
@@ -201,9 +194,7 @@ impl PrepaymentModelSpec {
     /// The implementation uses the standard PSA ramp to a 6% annual CPR over
     /// 30 months, then holds that terminal CPR flat.
     ///
-    /// While the PSA curve is active, the `cpr` field is ignored by
-    /// [`Self::smm`]; the stored value (the 100 PSA terminal CPR) is only a
-    /// serde placeholder. The multiplier is validated at evaluation time:
+    /// The multiplier is validated at evaluation time:
     /// [`Self::smm`] rejects non-finite or negative multipliers and any
     /// multiplier large enough to push the scaled annual CPR above 1.0.
     ///
@@ -229,10 +220,7 @@ impl PrepaymentModelSpec {
     ///
     /// - `docs/REFERENCES.md#tuckman-serrat-fixed-income`
     pub fn psa(speed_multiplier: f64) -> Self {
-        Self {
-            cpr: 0.06, // 100% PSA terminal rate
-            curve: Some(PrepaymentCurve::Psa { speed_multiplier }),
-        }
+        Self::Psa { speed_multiplier }
     }
 
     /// 100% PSA (standard prepayment assumption).
@@ -281,9 +269,9 @@ impl PrepaymentModelSpec {
     ///
     /// - `docs/REFERENCES.md#tuckman-serrat-fixed-income`
     pub fn cmbs_with_lockout(lockout_months: u32, post_lockout_cpr: f64) -> Self {
-        Self {
-            cpr: post_lockout_cpr,
-            curve: Some(PrepaymentCurve::CmbsLockout { lockout_months }),
+        Self::CmbsLockout {
+            lockout_months,
+            post_lockout_cpr,
         }
     }
 
@@ -319,10 +307,7 @@ impl PrepaymentModelSpec {
     /// - Fabozzi, F. J. (ed.), *The Handbook of Fixed Income Securities*,
     ///   auto-loan ABS prepayment conventions.
     pub fn abs(speed: f64) -> Self {
-        Self {
-            cpr: (1.0 - (1.0 - speed).powi(12)).clamp(0.0, 1.0),
-            curve: Some(PrepaymentCurve::Abs { speed }),
-        }
+        Self::Abs { speed }
     }
 
     /// Explicit annual CPR per month of seasoning (the last value is held).
@@ -349,10 +334,7 @@ impl PrepaymentModelSpec {
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn vector(monthly_cpr: Vec<f64>) -> Self {
-        Self {
-            cpr: monthly_cpr.first().copied().unwrap_or(0.0),
-            curve: Some(PrepaymentCurve::Vector { monthly_cpr }),
-        }
+        Self::Vector { monthly_cpr }
     }
 }
 

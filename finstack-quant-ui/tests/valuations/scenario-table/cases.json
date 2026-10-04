@@ -1,6 +1,6 @@
 {
   "instrumentSource": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
-  "instrumentSha256": "3edd86cb88dcd3d1c3f84597475eda01bc79e384690c23475266f57217da4b59",
+  "instrumentSha256": "e9d9d5e91e3fa883e21c003bf92de64bf4bd5e0ed8af881b71bad9b2f1120c5e",
   "marketSource": "finstack-quant-ui/tests/valuations/instruments/pricing-market.json",
   "marketSha256": "d0c6bef9f887a5c0432df1457152262852eb31585863c8099e1c6c8c719799c4",
   "asOf": "2024-01-01",
@@ -135,12 +135,12 @@
             "discount_curve_id": "USD-OIS",
             "attributes": {},
             "prepayment_spec": {
-              "cpr": 0.2,
-              "curve": null
+              "curve": "constant",
+              "cpr": 0.2
             },
             "default_spec": {
-              "cdr": 0.02,
-              "curve": null
+              "curve": "constant",
+              "cdr": 0.02
             },
             "recovery_spec": {
               "rate": 0.6,
@@ -385,12 +385,12 @@
             "discount_curve_id": "USD-OIS",
             "attributes": {},
             "prepayment_spec": {
-              "cpr": 0.2,
-              "curve": null
+              "curve": "constant",
+              "cpr": 0.2
             },
             "default_spec": {
-              "cdr": 0.02,
-              "curve": null
+              "curve": "constant",
+              "cdr": 0.02
             },
             "recovery_spec": {
               "rate": 0.6,

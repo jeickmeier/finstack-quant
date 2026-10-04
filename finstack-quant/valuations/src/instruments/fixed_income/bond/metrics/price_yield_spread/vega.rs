@@ -54,7 +54,7 @@ fn short_rate_sigma(
             Ok((ShortRateSigma::HullWhite { kappa }, sigma))
         }
         TreeModelChoice::BlackDermanToy { sigma } => Ok((ShortRateSigma::BlackDermanToy, sigma)),
-        TreeModelChoice::HoLee => Err(finstack_quant_core::Error::Validation(format!(
+        TreeModelChoice::HoLee { .. } => Err(finstack_quant_core::Error::Validation(format!(
             "bond '{}' vega: the tree selected no short-rate volatility input",
             bond.id
         ))),

@@ -231,11 +231,8 @@
           "pool_id": "MA1234",
           "pool_type": "generic",
           "prepayment_spec": {
-            "cpr": 0.06,
-            "curve": {
-              "curve": "psa",
-              "speed_multiplier": 1.0
-            }
+            "curve": "psa",
+            "speed_multiplier": 1.0
           },
           "servicing_fee_bp": 25.0,
           "wac": 0.045,

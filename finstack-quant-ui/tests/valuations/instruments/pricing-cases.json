@@ -62,7 +62,7 @@
       "type": "agency_mbs_passthrough",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/agency_mbs_passthrough.json",
-        "sha256": "850e5ea25ec14994ed937c22e3fd7015472d1555bb76b8800c739a7f9b48d8f4",
+        "sha256": "08df264a963b321fa82375a6c8bcbfbc7f480ccfb9c5a57a8182bef68de81df2",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -80,16 +80,10 @@
         "marketHistory": null
       },
       "edit": {
-        "path": [
-          "instrument",
-          "spec",
-          "prepayment_spec",
-          "curve",
-          "speed_multiplier"
-        ],
+        "path": ["instrument", "spec", "prepayment_spec", "speed_multiplier"],
         "from": 1,
         "to": 1.1,
-        "description": "Change prepayment_spec.curve.speed_multiplier from 1 to 1.1; native present value must change."
+        "description": "Change prepayment_spec.speed_multiplier from 1 to 1.1; native present value must change."
       },
       "reference": {
         "baseline": {
@@ -182,7 +176,7 @@
       "type": "asset_backed_facility",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/asset_backed_facility.json",
-        "sha256": "c4ec7dafe1fd46bfaf43c21da70bf7cd83cb304819c4ce6549ddab4b61e1818a",
+        "sha256": "d7991e5bf0ee77f68c722f0ac07593d98837ceba824f608e1d84fbdffbbd7b9a",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2240,7 +2234,7 @@
       "type": "interest_rate_swap",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/interest_rate_swap.json",
-        "sha256": "3e8200638c8e1314619b12e381920cdda0845d92e1b71160e46bfadddd0b23a2",
+        "sha256": "2220b6d108a6fb9a6944bedb7f0eb7d9db05b95169d9fb9154f42d34536018b0",
         "pointer": []
       },
       "instrumentPatches": [],
@@ -2670,7 +2664,7 @@
       "type": "structured_credit",
       "instrumentSource": {
         "path": "finstack-quant/valuations/tests/instruments/json_examples/structured_credit.json",
-        "sha256": "3edd86cb88dcd3d1c3f84597475eda01bc79e384690c23475266f57217da4b59",
+        "sha256": "e9d9d5e91e3fa883e21c003bf92de64bf4bd5e0ed8af881b71bad9b2f1120c5e",
         "pointer": []
       },
       "instrumentPatches": [],

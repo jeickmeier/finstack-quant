@@ -170,7 +170,7 @@ pub(crate) fn calculate_pool_stats(
     pool: PyRef<'_, super::PyAssetPool>,
     as_of: &Bound<'_, PyAny>,
 ) -> PyResult<PyPoolStats> {
-    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+    let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     finstack_quant_valuations::instruments::fixed_income::structured_credit::calculate_pool_stats(
         &pool.inner,
         as_of,

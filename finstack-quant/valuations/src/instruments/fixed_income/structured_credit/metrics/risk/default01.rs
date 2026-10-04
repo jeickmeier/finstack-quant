@@ -15,7 +15,6 @@
 //! `cdr`): the multiplier is bumped such that the peak CDR (0.60% at 100% SDA)
 //! shifts by 1bp. `Constant`/no-curve specs bump `cdr` directly.
 
-use crate::cashflow::builder::specs::DefaultCurve;
 use crate::cashflow::builder::DefaultModelSpec;
 use crate::instruments::fixed_income::structured_credit::assumptions::embedded_registry_or_panic;
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
@@ -27,8 +26,8 @@ const DEFAULT_BUMP_CDR: f64 = 0.0001;
 
 /// Build up/down bumped specs and the achieved bump width in annual-CDR terms.
 fn bumped_default_specs(spec: &DefaultModelSpec) -> (DefaultModelSpec, DefaultModelSpec, f64) {
-    match &spec.curve {
-        Some(DefaultCurve::Sda { speed_multiplier }) => {
+    match spec {
+        DefaultModelSpec::Sda { speed_multiplier } => {
             // The SDA curve derives CDR from `speed_multiplier` alone; bump the
             // multiplier so the peak CDR moves by 1bp: Δmult = bump / peak.
             // Peak CDR comes from the same registry the curve itself uses
@@ -38,23 +37,17 @@ fn bumped_default_specs(spec: &DefaultModelSpec) -> (DefaultModelSpec, DefaultMo
             let mult_bump = DEFAULT_BUMP_CDR / sda_peak_cdr;
             let mult_up = speed_multiplier + mult_bump;
             let mult_down = (speed_multiplier - mult_bump).max(0.0);
-            let up = DefaultModelSpec {
-                cdr: spec.cdr,
-                curve: Some(DefaultCurve::Sda {
-                    speed_multiplier: mult_up,
-                }),
+            let up = DefaultModelSpec::Sda {
+                speed_multiplier: mult_up,
             };
-            let down = DefaultModelSpec {
-                cdr: spec.cdr,
-                curve: Some(DefaultCurve::Sda {
-                    speed_multiplier: mult_down,
-                }),
+            let down = DefaultModelSpec::Sda {
+                speed_multiplier: mult_down,
             };
             let achieved = (mult_up - mult_down) * sda_peak_cdr;
             (up, down, achieved)
         }
         // Explicit vectors are bumped additively, entry by entry.
-        Some(DefaultCurve::Vector { monthly_cdr }) => {
+        DefaultModelSpec::Vector { monthly_cdr } => {
             let shifted = |delta: f64| -> Vec<f64> {
                 monthly_cdr
                     .iter()
@@ -65,27 +58,21 @@ fn bumped_default_specs(spec: &DefaultModelSpec) -> (DefaultModelSpec, DefaultMo
             let down_vec = shifted(-DEFAULT_BUMP_CDR);
             let achieved =
                 up_vec.first().copied().unwrap_or(0.0) - down_vec.first().copied().unwrap_or(0.0);
-            let up = DefaultModelSpec {
-                cdr: spec.cdr,
-                curve: Some(DefaultCurve::Vector {
-                    monthly_cdr: up_vec,
-                }),
+            let up = DefaultModelSpec::Vector {
+                monthly_cdr: up_vec,
             };
-            let down = DefaultModelSpec {
-                cdr: spec.cdr,
-                curve: Some(DefaultCurve::Vector {
-                    monthly_cdr: down_vec,
-                }),
+            let down = DefaultModelSpec::Vector {
+                monthly_cdr: down_vec,
             };
             (up, down, achieved)
         }
         // Lifetime curves state defaults as a share of the original balance,
         // so the bump is 1bp of *lifetime* cumulative defaults: the loss
         // curve is scaled so its terminal default fraction moves by the bump.
-        Some(DefaultCurve::CumulativeLoss {
+        DefaultModelSpec::CumulativeLoss {
             cumulative_net_loss_pct,
             severity,
-        }) => {
+        } => {
             let terminal = cumulative_net_loss_pct.last().copied().unwrap_or(0.0);
             let delta_pct = DEFAULT_BUMP_CDR * severity * 100.0;
             let scaled = |delta: f64| -> Vec<f64> {
@@ -112,29 +99,24 @@ fn bumped_default_specs(spec: &DefaultModelSpec) -> (DefaultModelSpec, DefaultMo
             let down = DefaultModelSpec::cumulative_loss(down_vec, *severity);
             (up, down, achieved)
         }
-        Some(DefaultCurve::Timing {
+        DefaultModelSpec::Timing {
             cumulative_default_rate,
             annual_pct,
-        }) => {
+        } => {
             let rate_up = (cumulative_default_rate + DEFAULT_BUMP_CDR).min(1.0);
             let rate_down = (cumulative_default_rate - DEFAULT_BUMP_CDR).max(0.0);
             let up = DefaultModelSpec::timing(rate_up, annual_pct.clone());
             let down = DefaultModelSpec::timing(rate_down, annual_pct.clone());
             (up, down, rate_up - rate_down)
         }
-        // Constant / no curve read `cdr` directly.
-        _ => {
-            let cdr_up = (spec.cdr + DEFAULT_BUMP_CDR).max(0.0);
-            let cdr_down = (spec.cdr - DEFAULT_BUMP_CDR).max(0.0);
-            let up = DefaultModelSpec {
-                cdr: cdr_up,
-                curve: spec.curve.clone(),
-            };
-            let down = DefaultModelSpec {
-                cdr: cdr_down,
-                curve: spec.curve.clone(),
-            };
-            (up, down, cdr_up - cdr_down)
+        DefaultModelSpec::Constant { cdr } => {
+            let up = (cdr + DEFAULT_BUMP_CDR).max(0.0);
+            let down = (cdr - DEFAULT_BUMP_CDR).max(0.0);
+            (
+                DefaultModelSpec::constant_cdr(up),
+                DefaultModelSpec::constant_cdr(down),
+                up - down,
+            )
         }
     }
 }

@@ -103,7 +103,7 @@ export default [
             "day_count": "act_360",
             "default_spec": {
               "cdr": 0.02,
-              "curve": null
+              "curve": "constant"
             },
             "discount_curve_id": "USD-OIS",
             "drawn": {
@@ -118,7 +118,7 @@ export default [
             "maturity": "2030-01-15",
             "prepayment_spec": {
               "cpr": 0.2,
-              "curve": null
+              "curve": "constant"
             },
             "rate": {
               "fixed": {

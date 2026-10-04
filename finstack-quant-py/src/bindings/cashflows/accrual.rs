@@ -10,7 +10,7 @@ use pyo3::types::{PyList, PyModule, PyType};
 use crate::bindings::cashflows::builder::schedule::PyCashFlowSchedule;
 use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 
 /// Accrual method selector (``AccrualMethod.LINEAR`` / ``AccrualMethod.COMPOUNDED``).
@@ -162,7 +162,7 @@ impl PyExCouponRule {
     ) -> PyResult<Bound<'py, PyAny>> {
         let d = self
             .inner
-            .ex_date(extract_date(payment_date)?)
+            .ex_date(py_to_date(payment_date)?)
             .map_err(core_to_py)?;
         date_to_py(py, d)
     }
@@ -196,7 +196,7 @@ impl PyExCouponRule {
         settlement_date: &Bound<'_, PyAny>,
     ) -> PyResult<bool> {
         self.inner
-            .is_ex_coupon(extract_date(payment_date)?, extract_date(settlement_date)?)
+            .is_ex_coupon(py_to_date(payment_date)?, py_to_date(settlement_date)?)
             .map_err(core_to_py)
     }
 
@@ -452,7 +452,7 @@ impl PyAccrualIndex {
     #[pyo3(text_signature = "(self, as_of)")]
     fn accrued_at(&self, as_of: &Bound<'_, PyAny>) -> PyResult<PyMoney> {
         self.inner
-            .accrued_at(extract_date(as_of)?)
+            .accrued_at(py_to_date(as_of)?)
             .and_then(|amount| Money::new(amount, self.currency))
             .map(PyMoney::from_inner)
             .map_err(core_to_py)
@@ -502,7 +502,7 @@ fn py_accrued_interest_amount(
     as_of: &Bound<'_, PyAny>,
     config: Option<PyRef<'_, PyAccrualConfig>>,
 ) -> PyResult<PyMoney> {
-    let as_of = extract_date(as_of)?;
+    let as_of = py_to_date(as_of)?;
     let schedule = schedule.inner.clone();
     let currency = schedule.get_notional().currency();
     let cfg = config.map_or_else(AccrualConfig::default, |c| c.inner.clone());

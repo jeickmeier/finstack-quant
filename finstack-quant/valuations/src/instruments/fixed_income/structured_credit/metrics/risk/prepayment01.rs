@@ -17,7 +17,6 @@
 //! the attribution layer's PSA ≈ 6% terminal-CPR convention). `CmbsLockout`
 //! and `Constant` read `cpr` directly.
 
-use crate::cashflow::builder::specs::PrepaymentCurve;
 use crate::cashflow::builder::PrepaymentModelSpec;
 use crate::instruments::fixed_income::structured_credit::StructuredCredit;
 use crate::metrics::{MetricCalculator, MetricContext};
@@ -33,24 +32,18 @@ const PSA_TERMINAL_CPR: f64 = 0.06;
 fn bumped_prepayment_specs(
     spec: &PrepaymentModelSpec,
 ) -> (PrepaymentModelSpec, PrepaymentModelSpec, f64) {
-    match &spec.curve {
-        Some(PrepaymentCurve::Psa { speed_multiplier }) => {
+    match spec {
+        PrepaymentModelSpec::Psa { speed_multiplier } => {
             // The PSA curve derives CPR from `speed_multiplier` alone; bump the
             // multiplier so the peak CPR moves by 1bp: Δmult = bump / 0.06.
             let mult_bump = PREPAYMENT_BUMP_CPR / PSA_TERMINAL_CPR;
             let mult_up = speed_multiplier + mult_bump;
             let mult_down = (speed_multiplier - mult_bump).max(0.0);
-            let up = PrepaymentModelSpec {
-                cpr: spec.cpr,
-                curve: Some(PrepaymentCurve::Psa {
-                    speed_multiplier: mult_up,
-                }),
+            let up = PrepaymentModelSpec::Psa {
+                speed_multiplier: mult_up,
             };
-            let down = PrepaymentModelSpec {
-                cpr: spec.cpr,
-                curve: Some(PrepaymentCurve::Psa {
-                    speed_multiplier: mult_down,
-                }),
+            let down = PrepaymentModelSpec::Psa {
+                speed_multiplier: mult_down,
             };
             let achieved = (mult_up - mult_down) * PSA_TERMINAL_CPR;
             (up, down, achieved)
@@ -58,7 +51,7 @@ fn bumped_prepayment_specs(
         // ABS speed is a monthly share of the original balance: 1bp of annual
         // CPR is roughly 1/12bp of ABS; the achieved width is reported in
         // annual terms so the metric keeps its per-bp-CPR unit.
-        Some(PrepaymentCurve::Abs { speed }) => {
+        PrepaymentModelSpec::Abs { speed } => {
             let monthly_bump = PREPAYMENT_BUMP_CPR / 12.0;
             let speed_up = (speed + monthly_bump).min(1.0);
             let speed_down = (speed - monthly_bump).max(0.0);
@@ -69,7 +62,7 @@ fn bumped_prepayment_specs(
             )
         }
         // Explicit vectors are bumped additively, entry by entry.
-        Some(PrepaymentCurve::Vector { monthly_cpr }) => {
+        PrepaymentModelSpec::Vector { monthly_cpr } => {
             let shifted = |delta: f64| -> Vec<f64> {
                 monthly_cpr
                     .iter()
@@ -86,19 +79,26 @@ fn bumped_prepayment_specs(
                 achieved,
             )
         }
-        // Constant / CmbsLockout / no curve all read `cpr` directly.
-        _ => {
-            let cpr_up = (spec.cpr + PREPAYMENT_BUMP_CPR).max(0.0);
-            let cpr_down = (spec.cpr - PREPAYMENT_BUMP_CPR).max(0.0);
-            let up = PrepaymentModelSpec {
-                cpr: cpr_up,
-                curve: spec.curve.clone(),
-            };
-            let down = PrepaymentModelSpec {
-                cpr: cpr_down,
-                curve: spec.curve.clone(),
-            };
-            (up, down, cpr_up - cpr_down)
+        PrepaymentModelSpec::Constant { cpr } => {
+            let up = (cpr + PREPAYMENT_BUMP_CPR).max(0.0);
+            let down = (cpr - PREPAYMENT_BUMP_CPR).max(0.0);
+            (
+                PrepaymentModelSpec::constant_cpr(up),
+                PrepaymentModelSpec::constant_cpr(down),
+                up - down,
+            )
+        }
+        PrepaymentModelSpec::CmbsLockout {
+            lockout_months,
+            post_lockout_cpr,
+        } => {
+            let up = (post_lockout_cpr + PREPAYMENT_BUMP_CPR).max(0.0);
+            let down = (post_lockout_cpr - PREPAYMENT_BUMP_CPR).max(0.0);
+            (
+                PrepaymentModelSpec::cmbs_with_lockout(*lockout_months, up),
+                PrepaymentModelSpec::cmbs_with_lockout(*lockout_months, down),
+                up - down,
+            )
         }
     }
 }

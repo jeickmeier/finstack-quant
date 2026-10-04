@@ -4,7 +4,7 @@ use crate::bindings::cashflows::builder::specs::{
     PyDefaultModelSpec, PyPrepaymentModelSpec, PyRecoveryModelSpec,
 };
 use crate::bindings::core::dates::tenor::PyTenor;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{
@@ -172,8 +172,8 @@ impl PyStructuredCredit {
             id,
             pool.inner.clone(),
             tranches.inner.clone(),
-            extract_date(closing_date)?,
-            extract_date(maturity)?,
+            py_to_date(closing_date)?,
+            py_to_date(maturity)?,
             discount_curve_id,
         )
         .map_err(core_to_py)?;
@@ -208,8 +208,8 @@ impl PyStructuredCredit {
             id,
             pool.inner.clone(),
             tranches.inner.clone(),
-            extract_date(closing_date)?,
-            extract_date(maturity)?,
+            py_to_date(closing_date)?,
+            py_to_date(maturity)?,
             discount_curve_id,
         )
         .map_err(core_to_py)?;
@@ -244,8 +244,8 @@ impl PyStructuredCredit {
             id,
             pool.inner.clone(),
             tranches.inner.clone(),
-            extract_date(closing_date)?,
-            extract_date(maturity)?,
+            py_to_date(closing_date)?,
+            py_to_date(maturity)?,
             discount_curve_id,
         )
         .map_err(core_to_py)?;
@@ -280,8 +280,8 @@ impl PyStructuredCredit {
             id,
             pool.inner.clone(),
             tranches.inner.clone(),
-            extract_date(closing_date)?,
-            extract_date(maturity)?,
+            py_to_date(closing_date)?,
+            py_to_date(maturity)?,
             discount_curve_id,
         )
         .map_err(core_to_py)?;
@@ -388,7 +388,7 @@ impl PyStructuredCredit {
         antithetic: Option<bool>,
     ) -> PyResult<PyStochasticPricingResult> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let deal = self.inner.clone();
         let inner = py
             .detach(move || deal.price_stochastic(&market, as_of, num_paths, antithetic))
@@ -429,7 +429,7 @@ impl PyStructuredCredit {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PySimulationDiagnostics> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let deal = self.inner.clone();
         let run = py
             .detach(move || run_simulation_with_diagnostics(&deal, &market, as_of))
@@ -599,7 +599,7 @@ impl PyStructuredCredit {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyTrancheCashflows> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let deal = self.inner.clone();
         let tranche_id = tranche_id.to_string();
         let inner = py
@@ -639,7 +639,7 @@ impl PyStructuredCredit {
         purchase_price_pct: Option<f64>,
     ) -> PyResult<PyEquityMetrics> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let deal = self.inner.clone();
         let inner = py
             .detach(move || calculate_equity_metrics(&deal, &market, as_of, purchase_price_pct))
@@ -1298,7 +1298,7 @@ impl PyStructuredCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.closing_date(date));
         Ok(slf)
@@ -1326,7 +1326,7 @@ impl PyStructuredCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.first_payment_date(date));
         Ok(slf)
@@ -1355,7 +1355,7 @@ impl PyStructuredCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.quote_settlement_date(date));
         Ok(slf)
@@ -1383,7 +1383,7 @@ impl PyStructuredCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.maturity(date));
         Ok(slf)

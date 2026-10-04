@@ -171,10 +171,7 @@ fn example_fixed_coupon() -> finstack_quant_core::Result<crate::builder::FixedCo
 /// Canonical `PrepaymentModelSpec`: a flat 6% annual CPR.
 fn prepayment_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
     serialize_example(
-        &crate::builder::PrepaymentModelSpec {
-            cpr: 0.06,
-            curve: None,
-        },
+        &crate::builder::PrepaymentModelSpec::Constant { cpr: 0.06 },
         "prepayment model spec",
     )
 }
@@ -240,10 +237,7 @@ fn amortization_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>
 /// Canonical `DefaultModelSpec`: a flat 2% annual CDR.
 fn default_model_examples() -> finstack_quant_core::Result<Vec<serde_json::Value>> {
     serialize_example(
-        &crate::builder::DefaultModelSpec {
-            cdr: 0.02,
-            curve: None,
-        },
+        &crate::builder::DefaultModelSpec::Constant { cdr: 0.02 },
         "default model spec",
     )
 }

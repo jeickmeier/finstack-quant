@@ -784,7 +784,7 @@ export type Decimal5 = string;
  *
  * assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
  * assert_eq!(
- *     FloatingLegCompounding::sofr(),
+ *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
  *     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
  * );
  * ```

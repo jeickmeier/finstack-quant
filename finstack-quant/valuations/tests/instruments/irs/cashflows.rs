@@ -1122,3 +1122,73 @@ fn test_irs_npv_parity_at_par_rate() {
         relative_diff * 100.0
     );
 }
+
+#[test]
+fn typed_accrual_flags_control_each_leg_and_annuity() {
+    use finstack_quant_core::cashflow::CFKind;
+    use finstack_quant_valuations::instruments::PricingOptions;
+    use finstack_quant_valuations::metrics::MetricId;
+
+    let as_of = date!(2024 - 01 - 01);
+    let mut swap = test_utils::usd_irs_swap(
+        "IRS-TYPED-ACCRUAL",
+        Money::new(1_000_000.0, Currency::USD).unwrap(),
+        0.05,
+        date!(2024 - 01 - 04),
+        date!(2024 - 07 - 04),
+        PayReceive::Receive,
+    )
+    .unwrap();
+    swap.fixed_leg.frequency = Tenor::semi_annual();
+    swap.float_leg.frequency = Tenor::semi_annual();
+    swap.fixed_leg.day_count = DayCount::Act360;
+    swap.float_leg.day_count = DayCount::Act360;
+    swap.fixed_leg.business_day_convention = BusinessDayConvention::Following;
+    swap.float_leg.business_day_convention = BusinessDayConvention::Following;
+    swap.fixed_leg.calendar_id = Some("usny".into());
+    swap.float_leg.calendar_id = Some("usny".into());
+    swap.float_leg.reset_lag_days = 0;
+    let market = build_test_curves();
+    let totals = |swap: &InterestRateSwap| {
+        let schedule = swap.cashflow_schedule(&market, as_of).unwrap();
+        let fixed = schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
+            .map(|cf| cf.amount.amount())
+            .sum::<f64>();
+        let floating = schedule
+            .get_flows()
+            .iter()
+            .filter(|cf| !matches!(cf.kind, CFKind::Fixed | CFKind::Stub))
+            .map(|cf| cf.amount.amount())
+            .sum::<f64>();
+        (fixed, floating)
+    };
+    let original = totals(&swap);
+    let raw_days = (date!(2024 - 07 - 04) - date!(2024 - 01 - 04)).whole_days() as f64;
+    let adjusted_days = (date!(2024 - 07 - 05) - date!(2024 - 01 - 04)).whole_days() as f64;
+    assert!((original.0 - 1_000_000.0 * 0.05 * raw_days / 360.0).abs() < 1e-8);
+    swap.adjust_fixed_accrual_dates = true;
+    let fixed_adjusted = totals(&swap);
+    assert!((fixed_adjusted.0 - 1_000_000.0 * 0.05 * adjusted_days / 360.0).abs() < 1e-8);
+    assert_eq!(fixed_adjusted.1, original.1);
+    swap.adjust_float_accrual_dates = true;
+    let both_adjusted = totals(&swap);
+    assert_eq!(both_adjusted.0, fixed_adjusted.0);
+    assert!((both_adjusted.1 - original.1).abs() > 1.0);
+    let result = swap
+        .price_with_metrics(
+            &market,
+            as_of,
+            &[MetricId::Annuity, MetricId::PvFixed],
+            PricingOptions::default(),
+        )
+        .unwrap();
+    let annuity = result.measures["annuity"];
+    let fixed_pv = result.measures["pv_fixed"];
+    assert!((annuity * 1_000_000.0 * 0.05 - fixed_pv).abs() < 1e-8);
+    let wire = serde_json::to_value(&swap).unwrap();
+    assert_eq!(wire["adjust_fixed_accrual_dates"], true);
+    assert_eq!(wire["adjust_float_accrual_dates"], true);
+}

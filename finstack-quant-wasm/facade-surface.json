@@ -440,15 +440,9 @@
       "exCouponRuleExDate",
       "exCouponRuleIsExCoupon",
       "feeSpecPeriodicBp",
-      "floatingLegCompoundingEstr",
-      "floatingLegCompoundingFedfunds",
       "floatingLegCompoundingIsOvernight",
-      "floatingLegCompoundingSaron",
-      "floatingLegCompoundingSofr",
       "floatingLegCompoundingSofrObservationShift",
-      "floatingLegCompoundingSonia",
       "floatingLegCompoundingSoniaObservationShift",
-      "floatingLegCompoundingTona",
       "floatingRateSpecEuribor3m",
       "floatingRateSpecSofr",
       "floatingRateSpecSonia",
@@ -634,31 +628,13 @@
   "cashflows.feeSpecPeriodicBp": {
     "kind": "function"
   },
-  "cashflows.floatingLegCompoundingEstr": {
-    "kind": "function"
-  },
-  "cashflows.floatingLegCompoundingFedfunds": {
-    "kind": "function"
-  },
   "cashflows.floatingLegCompoundingIsOvernight": {
-    "kind": "function"
-  },
-  "cashflows.floatingLegCompoundingSaron": {
-    "kind": "function"
-  },
-  "cashflows.floatingLegCompoundingSofr": {
     "kind": "function"
   },
   "cashflows.floatingLegCompoundingSofrObservationShift": {
     "kind": "function"
   },
-  "cashflows.floatingLegCompoundingSonia": {
-    "kind": "function"
-  },
   "cashflows.floatingLegCompoundingSoniaObservationShift": {
-    "kind": "function"
-  },
-  "cashflows.floatingLegCompoundingTona": {
     "kind": "function"
   },
   "cashflows.floatingRateSpecEuribor3m": {
@@ -5401,6 +5377,8 @@
     "statics": ["builder", "example", "fromConventions", "fromJson"],
     "methods": ["free", "marketDependencies", "metric", "price", "toDict", "toJson"],
     "getters": [
+      "adjustFixedAccrualDates",
+      "adjustFloatAccrualDates",
       "attributes",
       "defaultModel",
       "expiry",
@@ -5912,6 +5890,8 @@
     "kind": "class",
     "statics": [],
     "methods": [
+      "adjustFixedAccrualDates",
+      "adjustFloatAccrualDates",
       "attributes",
       "build",
       "fixedLeg",

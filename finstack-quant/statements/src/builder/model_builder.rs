@@ -911,10 +911,10 @@ impl ModelBuilder<Ready> {
                 let metrics_in_namespace = namespace_cache
                     .entry(namespace.to_string())
                     .or_insert_with(|| Self::metric_ids_in_namespace(registry, namespace));
-                Self::qualify_metric_references_with_namespace_set(
+                crate::utils::formula::qualify_identifiers(
                     &stored_metric.definition.formula,
-                    namespace,
                     metrics_in_namespace,
+                    namespace,
                 )
             };
             self.insert_metric_node(qualified_id, stored_metric, formula);
@@ -1012,10 +1012,10 @@ impl ModelBuilder<Ready> {
             if !self.nodes.contains_key(dep_id.as_str()) {
                 let dep_metric = registry.get(&dep_id)?;
 
-                let formula = Self::qualify_metric_references_with_namespace_set(
+                let formula = crate::utils::formula::qualify_identifiers(
                     &dep_metric.definition.formula,
-                    namespace,
                     &metrics_in_namespace,
+                    namespace,
                 );
 
                 self.insert_metric_node(&dep_id, dep_metric, formula);
@@ -1025,10 +1025,10 @@ impl ModelBuilder<Ready> {
         if !self.nodes.contains_key(qualified_id) {
             let stored_metric = registry.get(qualified_id)?;
 
-            let formula = Self::qualify_metric_references_with_namespace_set(
+            let formula = crate::utils::formula::qualify_identifiers(
                 &stored_metric.definition.formula,
-                namespace,
                 &metrics_in_namespace,
+                namespace,
             );
 
             self.insert_metric_node(qualified_id, stored_metric, formula);
@@ -1047,14 +1047,6 @@ impl ModelBuilder<Ready> {
             .namespace(namespace)
             .map(|(id, _)| id.strip_prefix(&prefix).unwrap_or(id).to_string())
             .collect()
-    }
-
-    fn qualify_metric_references_with_namespace_set(
-        formula: &str,
-        namespace: &str,
-        metrics_in_namespace: &IndexSet<String>,
-    ) -> String {
-        crate::utils::formula::qualify_identifiers(formula, metrics_in_namespace, namespace)
     }
 
     /// Build and validate the final financial-model specification.

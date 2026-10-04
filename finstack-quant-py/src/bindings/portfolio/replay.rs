@@ -155,7 +155,7 @@ fn extract_replay_timeline(
         for item in snapshots.try_iter()? {
             let item = item?;
             if let Ok((date, market)) = item.extract::<(Bound<'_, PyAny>, Bound<'_, PyAny>)>() {
-                let date = crate::bindings::date_utils::extract_date(&date)?;
+                let date = crate::bindings::date_utils::py_to_date(&date)?;
                 let market = crate::bindings::extract::extract_market(py, &market)?;
                 entries.push(serde_json::json!({
                     "date": date.to_string(),

@@ -12,7 +12,7 @@
           "#/$defs/d_2c88e4d1e2e4f7c22e02/properties/tags",
           "#/$defs/d_cdb8fddc0106047270c4/properties/times",
           "#/$defs/d_cdb8fddc0106047270c4/properties/values",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr"
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -65,10 +65,11 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
           "#/$defs/d_7e19cc4df9954b864180",
-          "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/cpr",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/speed_multiplier",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/speed",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/0/properties/cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/3/properties/speed",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp",
           "#/$defs/d_91fef53f78d7c50653a0/properties/servicing_fee_bp",
@@ -80,7 +81,7 @@
         ],
         "internal-union": [
           {
-            "pointer": "#/$defs/d_73686c0456fd11c88d3e",
+            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           }
@@ -355,10 +356,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/d_66287e2bb5dfa8d61987/properties/pac_collar",
             "keyword": "anyOf"
           }
@@ -381,7 +378,7 @@
         "uint32": [
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/lockout_months",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
           "#/$defs/d_91fef53f78d7c50653a0/properties/stated_delay_days",
           "#/$defs/d_91fef53f78d7c50653a0/properties/wam_months",
           "#/$defs/d_7c91ed386870962882de/properties/collateral_wam_months",
@@ -418,7 +415,7 @@
           "#/$defs/d_2c88e4d1e2e4f7c22e02/properties/tags",
           "#/$defs/d_cdb8fddc0106047270c4/properties/times",
           "#/$defs/d_cdb8fddc0106047270c4/properties/values",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr"
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -471,10 +468,11 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
           "#/$defs/d_7e19cc4df9954b864180",
-          "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/cpr",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/speed_multiplier",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/speed",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/0/properties/cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/3/properties/speed",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp",
           "#/$defs/d_24b4bd8fabf71247af0b/properties/servicing_fee_bp",
@@ -482,7 +480,7 @@
         ],
         "internal-union": [
           {
-            "pointer": "#/$defs/d_73686c0456fd11c88d3e",
+            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           }
@@ -749,10 +747,6 @@
           {
             "pointer": "#/$defs/d_e49387f97c0f9d510642/properties/reporting_currency",
             "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve",
-            "keyword": "anyOf"
           }
         ],
         "optional-property-record": [
@@ -772,7 +766,7 @@
         "uint32": [
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/lockout_months",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
           "#/$defs/d_24b4bd8fabf71247af0b/properties/stated_delay_days",
           "#/$defs/d_24b4bd8fabf71247af0b/properties/wam_months"
         ],
@@ -806,7 +800,7 @@
           "#/$defs/d_2c88e4d1e2e4f7c22e02/properties/tags",
           "#/$defs/d_cdb8fddc0106047270c4/properties/times",
           "#/$defs/d_cdb8fddc0106047270c4/properties/values",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr"
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "day_count": [
@@ -859,10 +853,11 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
           "#/$defs/d_7e19cc4df9954b864180",
-          "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/cpr",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/speed_multiplier",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/speed",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/0/properties/cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/3/properties/speed",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp",
           "#/$defs/d_038bf279beea6aa9cf48/properties/servicing_fee_bp",
@@ -874,7 +869,7 @@
         "int32": ["#/$defs/d_54049d1588e6ed129bca/properties/settlement_year"],
         "internal-union": [
           {
-            "pointer": "#/$defs/d_73686c0456fd11c88d3e",
+            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           }
@@ -1148,10 +1143,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/d_54049d1588e6ed129bca/properties/prepayment_spec",
             "keyword": "anyOf"
           },
@@ -1185,7 +1176,7 @@
         "uint32": [
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/lockout_months",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
           "#/$defs/d_038bf279beea6aa9cf48/properties/stated_delay_days",
           "#/$defs/d_038bf279beea6aa9cf48/properties/wam_months"
         ],
@@ -1602,17 +1593,17 @@
           "#/$defs/ReinvestmentPeriod/properties/amortizing_tranches",
           "#/$defs/CorrelationStructure/oneOf/2/properties/correlations",
           "#/$defs/CorrelationStructure/oneOf/2/properties/labels",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/2/properties/monthly_cdr",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/cumulative_net_loss_pct",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/annual_pct",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/monthly_cdr",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/cumulative_net_loss_pct",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/annual_pct",
           "#/$defs/DelinquencyModel/properties/cure_rates",
           "#/$defs/DelinquencyModel/properties/roll_rates",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector",
-          "#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr",
-          "#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct",
-          "#/$defs/DefaultCurve/oneOf/4/properties/annual_pct",
-          "#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr"
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr"
         ],
         "business_day_convention": [
           "#/$defs/d_01cd6b2e4ad257352fdb",
@@ -1950,13 +1941,13 @@
           "#/$defs/CorrelationStructure/oneOf/1/properties/intra_sector",
           "#/$defs/CorrelationStructure/oneOf/1/properties/prepay_default",
           "#/$defs/CorrelationStructure/oneOf/2/properties/correlations/items",
-          "#/$defs/d_c367978e081b7093ec11/properties/cdr",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/1/properties/speed_multiplier",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/2/properties/monthly_cdr/items",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/cumulative_net_loss_pct/items",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/severity",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/annual_pct/items",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/cumulative_default_rate",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/0/properties/cdr",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/monthly_cdr/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/cumulative_net_loss_pct/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/severity",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/annual_pct/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/cumulative_default_rate",
           "#/$defs/AdvancingPolicy/oneOf/1/properties/recoverability_cap_pct",
           "#/$defs/DelinquencyModel/properties/cure_rates/items",
           "#/$defs/ModificationSpec/properties/rate_reduction_bp",
@@ -1972,19 +1963,20 @@
           "#/$defs/DealFees/properties/subordinated_mgmt_fee_bp",
           "#/$defs/DealFees/properties/workout_fee_pct",
           "#/$defs/AssetBackedFacility/properties/liquidation_price_pct",
-          "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/cpr",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/speed_multiplier",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/speed",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/0/properties/cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/3/properties/speed",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/rate",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector/items",
-          "#/$defs/StochasticDefaultSpec/oneOf/0/properties/cdr",
-          "#/$defs/DefaultCurve/oneOf/1/properties/speed_multiplier",
-          "#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr/items",
-          "#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct/items",
-          "#/$defs/DefaultCurve/oneOf/3/properties/severity",
-          "#/$defs/DefaultCurve/oneOf/4/properties/annual_pct/items",
-          "#/$defs/DefaultCurve/oneOf/4/properties/cumulative_default_rate",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/0/properties/cdr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/severity",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/cumulative_default_rate",
           "#/$defs/StochasticDefaultSpec/oneOf/1/properties/base_cdr",
           "#/$defs/CopulaSpec/oneOf/1/properties/degrees_of_freedom",
           "#/$defs/CopulaSpec/oneOf/2/properties/loading_volatility",
@@ -1996,10 +1988,11 @@
           "#/$defs/StochasticDefaultSpec/oneOf/2/properties/volatility",
           "#/$defs/StochasticDefaultSpec/oneOf/3/properties/cdr_volatility",
           "#/$defs/StochasticDefaultSpec/oneOf/3/properties/factor_loading",
-          "#/$defs/StochasticPrepaySpec/oneOf/0/properties/cpr",
-          "#/$defs/PrepaymentCurve/oneOf/1/properties/speed_multiplier",
-          "#/$defs/PrepaymentCurve/oneOf/3/properties/speed",
-          "#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/0/properties/cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/3/properties/speed",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/StochasticPrepaySpec/oneOf/1/properties/cpr_volatility",
           "#/$defs/StochasticPrepaySpec/oneOf/1/properties/factor_loading",
           "#/$defs/StochasticPrepaySpec/oneOf/2/properties/base_cpr",
@@ -2071,7 +2064,7 @@
             "discriminators": ["structure"]
           },
           {
-            "pointer": "#/$defs/d_457581f86de0cd986f20",
+            "pointer": "#/$defs/d_c367978e081b7093ec11",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -2081,7 +2074,7 @@
             "discriminators": ["policy"]
           },
           {
-            "pointer": "#/$defs/d_73686c0456fd11c88d3e",
+            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -2091,7 +2084,7 @@
             "discriminators": ["model"]
           },
           {
-            "pointer": "#/$defs/DefaultCurve",
+            "pointer": "#/$defs/StochasticDefaultSpec/oneOf/0",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -2106,7 +2099,7 @@
             "discriminators": ["model"]
           },
           {
-            "pointer": "#/$defs/PrepaymentCurve",
+            "pointer": "#/$defs/StochasticPrepaySpec/oneOf/0",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -2704,10 +2697,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_c367978e081b7093ec11/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/AssetBackedFacility/properties/delinquency",
             "keyword": "anyOf"
           },
@@ -2724,23 +2713,11 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/AssetBackedFacility/properties/stochastic_default_spec",
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/StochasticDefaultSpec/oneOf/0/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/AssetBackedFacility/properties/stochastic_prepay_spec",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/StochasticPrepaySpec/oneOf/0/properties/curve",
             "keyword": "anyOf"
           },
           {
@@ -2844,9 +2821,9 @@
           "#/$defs/RepLine/properties/io_months",
           "#/$defs/RepLine/properties/seasoning_months",
           "#/$defs/ModificationSpec/properties/term_extension_months",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/lockout_months",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
-          "#/$defs/PrepaymentCurve/oneOf/2/properties/lockout_months",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
           "#/$defs/TermOutSpec/properties/months"
         ],
         "unit-union": [
@@ -4255,7 +4232,7 @@
           "#/$defs/TermLoanCovenantEvents/properties/draw_stop_dates",
           "#/$defs/McConfig/properties/correlation_matrix",
           "#/$defs/McConfig/properties/correlation_matrix/items",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr",
           "#/$defs/BermudanSchedule/properties/exercise_dates",
           "#/$defs/CmsSwap/properties/accrual_fractions",
           "#/$defs/CmsSwap/properties/fixing_dates",
@@ -4298,17 +4275,17 @@
           "#/$defs/RangeAccrualTerms/properties/observation_dates",
           "#/$defs/CorrelationStructure/oneOf/2/properties/correlations",
           "#/$defs/CorrelationStructure/oneOf/2/properties/labels",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/2/properties/monthly_cdr",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/cumulative_net_loss_pct",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/annual_pct",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/monthly_cdr",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/cumulative_net_loss_pct",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/annual_pct",
           "#/$defs/DelinquencyModel/properties/cure_rates",
           "#/$defs/DelinquencyModel/properties/roll_rates",
           "#/$defs/ReinvestmentPeriod/properties/amortizing_tranches",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector",
-          "#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr",
-          "#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct",
-          "#/$defs/DefaultCurve/oneOf/4/properties/annual_pct",
-          "#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr",
           "#/$defs/AfcSpec/properties/capped_tranches",
           "#/$defs/ShiftingInterestSpec/properties/triggers",
           "#/$defs/StepDownSpec/properties/triggers",
@@ -4638,10 +4615,11 @@
           "#/$defs/RevolvingCredit/properties/recovery_rate",
           "#/$defs/AgencyMbsPassthrough/properties/coupon",
           "#/$defs/AgencyMbsPassthrough/properties/guarantee_fee_bp",
-          "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/cpr",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/speed_multiplier",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/speed",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/0/properties/cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/3/properties/speed",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/AgencyMbsPassthrough/properties/servicing_fee_bp",
           "#/$defs/AgencyMbsPassthrough/properties/wac",
           "#/$defs/AgencyTba/properties/coupon",
@@ -4853,13 +4831,13 @@
           "#/$defs/CoverageRules/properties/rating_haircuts/additionalProperties",
           "#/$defs/CoverageTestSpec/properties/divert_pct",
           "#/$defs/CoverageTestSpec/properties/trigger_level",
-          "#/$defs/d_c367978e081b7093ec11/properties/cdr",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/1/properties/speed_multiplier",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/2/properties/monthly_cdr/items",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/cumulative_net_loss_pct/items",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/severity",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/annual_pct/items",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/cumulative_default_rate",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/0/properties/cdr",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/monthly_cdr/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/cumulative_net_loss_pct/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/severity",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/annual_pct/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/cumulative_default_rate",
           "#/$defs/AdvancingPolicy/oneOf/1/properties/recoverability_cap_pct",
           "#/$defs/DelinquencyModel/properties/cure_rates/items",
           "#/$defs/ModificationSpec/properties/rate_reduction_bp",
@@ -4924,13 +4902,13 @@
           "#/$defs/AssetPool/properties/reserve_account_rate",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/rate",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector/items",
-          "#/$defs/StochasticDefaultSpec/oneOf/0/properties/cdr",
-          "#/$defs/DefaultCurve/oneOf/1/properties/speed_multiplier",
-          "#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr/items",
-          "#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct/items",
-          "#/$defs/DefaultCurve/oneOf/3/properties/severity",
-          "#/$defs/DefaultCurve/oneOf/4/properties/annual_pct/items",
-          "#/$defs/DefaultCurve/oneOf/4/properties/cumulative_default_rate",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/0/properties/cdr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/severity",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/cumulative_default_rate",
           "#/$defs/StochasticDefaultSpec/oneOf/1/properties/base_cdr",
           "#/$defs/CopulaSpec/oneOf/1/properties/degrees_of_freedom",
           "#/$defs/CopulaSpec/oneOf/2/properties/loading_volatility",
@@ -4942,10 +4920,11 @@
           "#/$defs/StochasticDefaultSpec/oneOf/2/properties/volatility",
           "#/$defs/StochasticDefaultSpec/oneOf/3/properties/cdr_volatility",
           "#/$defs/StochasticDefaultSpec/oneOf/3/properties/factor_loading",
-          "#/$defs/StochasticPrepaySpec/oneOf/0/properties/cpr",
-          "#/$defs/PrepaymentCurve/oneOf/1/properties/speed_multiplier",
-          "#/$defs/PrepaymentCurve/oneOf/3/properties/speed",
-          "#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/0/properties/cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/3/properties/speed",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/StochasticPrepaySpec/oneOf/1/properties/cpr_volatility",
           "#/$defs/StochasticPrepaySpec/oneOf/1/properties/factor_loading",
           "#/$defs/StochasticPrepaySpec/oneOf/2/properties/base_cpr",
@@ -5041,7 +5020,7 @@
         ],
         "internal-union": [
           {
-            "pointer": "#/$defs/d_73686c0456fd11c88d3e",
+            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -5091,7 +5070,7 @@
             "discriminators": ["kind"]
           },
           {
-            "pointer": "#/$defs/d_457581f86de0cd986f20",
+            "pointer": "#/$defs/d_c367978e081b7093ec11",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -5131,7 +5110,7 @@
             "discriminators": ["model"]
           },
           {
-            "pointer": "#/$defs/DefaultCurve",
+            "pointer": "#/$defs/StochasticDefaultSpec/oneOf/0",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -5146,7 +5125,7 @@
             "discriminators": ["model"]
           },
           {
-            "pointer": "#/$defs/PrepaymentCurve",
+            "pointer": "#/$defs/StochasticPrepaySpec/oneOf/0",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -5809,10 +5788,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/AgencyTba/properties/assumed_pool",
             "keyword": "anyOf"
           },
@@ -6449,10 +6424,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_c367978e081b7093ec11/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/StructuredCredit/properties/delinquency",
             "keyword": "anyOf"
           },
@@ -6582,15 +6553,7 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/StochasticDefaultSpec/oneOf/0/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/StructuredCredit/properties/stochastic_prepay_spec",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/StochasticPrepaySpec/oneOf/0/properties/curve",
             "keyword": "anyOf"
           },
           {
@@ -6936,7 +6899,7 @@
           "#/$defs/TermLoan/properties/settlement_days",
           "#/$defs/RevolvingCredit/properties/payment_lag_days",
           "#/$defs/RevolvingCredit/properties/settlement_days",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/lockout_months",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
           "#/$defs/AgencyMbsPassthrough/properties/stated_delay_days",
           "#/$defs/AgencyMbsPassthrough/properties/wam_months",
           "#/$defs/AgencyCmo/properties/collateral_wam_months",
@@ -6962,7 +6925,7 @@
           "#/$defs/RepLine/properties/io_months",
           "#/$defs/RepLine/properties/seasoning_months",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
-          "#/$defs/PrepaymentCurve/oneOf/2/properties/lockout_months",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
           "#/$defs/ShiftingInterestStep/properties/months_from_closing",
           "#/$defs/TermOutSpec/properties/months"
         ],
@@ -15824,7 +15787,7 @@
           "#/$defs/TermLoanCovenantEvents/properties/draw_stop_dates",
           "#/$defs/McConfig/properties/correlation_matrix",
           "#/$defs/McConfig/properties/correlation_matrix/items",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr",
           "#/$defs/BermudanSchedule/properties/exercise_dates",
           "#/$defs/CmsSwap/properties/accrual_fractions",
           "#/$defs/CmsSwap/properties/fixing_dates",
@@ -15867,17 +15830,17 @@
           "#/$defs/RangeAccrualTerms/properties/observation_dates",
           "#/$defs/CorrelationStructure/oneOf/2/properties/correlations",
           "#/$defs/CorrelationStructure/oneOf/2/properties/labels",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/2/properties/monthly_cdr",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/cumulative_net_loss_pct",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/annual_pct",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/monthly_cdr",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/cumulative_net_loss_pct",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/annual_pct",
           "#/$defs/DelinquencyModel/properties/cure_rates",
           "#/$defs/DelinquencyModel/properties/roll_rates",
           "#/$defs/ReinvestmentPeriod/properties/amortizing_tranches",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector",
-          "#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr",
-          "#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct",
-          "#/$defs/DefaultCurve/oneOf/4/properties/annual_pct",
-          "#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr",
           "#/$defs/AfcSpec/properties/capped_tranches",
           "#/$defs/ShiftingInterestSpec/properties/triggers",
           "#/$defs/StepDownSpec/properties/triggers",
@@ -16207,10 +16170,11 @@
           "#/$defs/RevolvingCredit/properties/recovery_rate",
           "#/$defs/AgencyMbsPassthrough/properties/coupon",
           "#/$defs/AgencyMbsPassthrough/properties/guarantee_fee_bp",
-          "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/cpr",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/speed_multiplier",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/speed",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/0/properties/cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/3/properties/speed",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/AgencyMbsPassthrough/properties/servicing_fee_bp",
           "#/$defs/AgencyMbsPassthrough/properties/wac",
           "#/$defs/AgencyTba/properties/coupon",
@@ -16426,13 +16390,13 @@
           "#/$defs/CoverageRules/properties/rating_haircuts/additionalProperties",
           "#/$defs/CoverageTestSpec/properties/divert_pct",
           "#/$defs/CoverageTestSpec/properties/trigger_level",
-          "#/$defs/d_c367978e081b7093ec11/properties/cdr",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/1/properties/speed_multiplier",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/2/properties/monthly_cdr/items",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/cumulative_net_loss_pct/items",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/severity",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/annual_pct/items",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/cumulative_default_rate",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/0/properties/cdr",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/monthly_cdr/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/cumulative_net_loss_pct/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/severity",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/annual_pct/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/cumulative_default_rate",
           "#/$defs/AdvancingPolicy/oneOf/1/properties/recoverability_cap_pct",
           "#/$defs/DelinquencyModel/properties/cure_rates/items",
           "#/$defs/ModificationSpec/properties/rate_reduction_bp",
@@ -16497,13 +16461,13 @@
           "#/$defs/AssetPool/properties/reserve_account_rate",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/rate",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector/items",
-          "#/$defs/StochasticDefaultSpec/oneOf/0/properties/cdr",
-          "#/$defs/DefaultCurve/oneOf/1/properties/speed_multiplier",
-          "#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr/items",
-          "#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct/items",
-          "#/$defs/DefaultCurve/oneOf/3/properties/severity",
-          "#/$defs/DefaultCurve/oneOf/4/properties/annual_pct/items",
-          "#/$defs/DefaultCurve/oneOf/4/properties/cumulative_default_rate",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/0/properties/cdr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/severity",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/cumulative_default_rate",
           "#/$defs/StochasticDefaultSpec/oneOf/1/properties/base_cdr",
           "#/$defs/CopulaSpec/oneOf/1/properties/degrees_of_freedom",
           "#/$defs/CopulaSpec/oneOf/2/properties/loading_volatility",
@@ -16515,10 +16479,11 @@
           "#/$defs/StochasticDefaultSpec/oneOf/2/properties/volatility",
           "#/$defs/StochasticDefaultSpec/oneOf/3/properties/cdr_volatility",
           "#/$defs/StochasticDefaultSpec/oneOf/3/properties/factor_loading",
-          "#/$defs/StochasticPrepaySpec/oneOf/0/properties/cpr",
-          "#/$defs/PrepaymentCurve/oneOf/1/properties/speed_multiplier",
-          "#/$defs/PrepaymentCurve/oneOf/3/properties/speed",
-          "#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/0/properties/cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/3/properties/speed",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/StochasticPrepaySpec/oneOf/1/properties/cpr_volatility",
           "#/$defs/StochasticPrepaySpec/oneOf/1/properties/factor_loading",
           "#/$defs/StochasticPrepaySpec/oneOf/2/properties/base_cpr",
@@ -16610,7 +16575,7 @@
         ],
         "internal-union": [
           {
-            "pointer": "#/$defs/d_73686c0456fd11c88d3e",
+            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -16660,7 +16625,7 @@
             "discriminators": ["kind"]
           },
           {
-            "pointer": "#/$defs/d_457581f86de0cd986f20",
+            "pointer": "#/$defs/d_c367978e081b7093ec11",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -16700,7 +16665,7 @@
             "discriminators": ["model"]
           },
           {
-            "pointer": "#/$defs/DefaultCurve",
+            "pointer": "#/$defs/StochasticDefaultSpec/oneOf/0",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -16715,7 +16680,7 @@
             "discriminators": ["model"]
           },
           {
-            "pointer": "#/$defs/PrepaymentCurve",
+            "pointer": "#/$defs/StochasticPrepaySpec/oneOf/0",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -17378,10 +17343,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/AgencyTba/properties/assumed_pool",
             "keyword": "anyOf"
           },
@@ -18018,10 +17979,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_c367978e081b7093ec11/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/StructuredCredit/properties/delinquency",
             "keyword": "anyOf"
           },
@@ -18151,15 +18108,7 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/StochasticDefaultSpec/oneOf/0/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/StructuredCredit/properties/stochastic_prepay_spec",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/StochasticPrepaySpec/oneOf/0/properties/curve",
             "keyword": "anyOf"
           },
           {
@@ -18505,7 +18454,7 @@
           "#/$defs/TermLoan/properties/settlement_days",
           "#/$defs/RevolvingCredit/properties/payment_lag_days",
           "#/$defs/RevolvingCredit/properties/settlement_days",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/lockout_months",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
           "#/$defs/AgencyMbsPassthrough/properties/stated_delay_days",
           "#/$defs/AgencyMbsPassthrough/properties/wam_months",
           "#/$defs/AgencyCmo/properties/collateral_wam_months",
@@ -18531,7 +18480,7 @@
           "#/$defs/RepLine/properties/io_months",
           "#/$defs/RepLine/properties/seasoning_months",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
-          "#/$defs/PrepaymentCurve/oneOf/2/properties/lockout_months",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
           "#/$defs/ShiftingInterestStep/properties/months_from_closing",
           "#/$defs/TermOutSpec/properties/months"
         ],
@@ -20579,7 +20528,7 @@
           "#/$defs/d_2c88e4d1e2e4f7c22e02/properties/tags",
           "#/$defs/d_cdb8fddc0106047270c4/properties/times",
           "#/$defs/d_cdb8fddc0106047270c4/properties/values",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr"
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr"
         ],
         "date": ["#/$defs/d_1b2ccb88c9229e7463e8"],
         "decimal-or-pattern-string": ["#/$defs/d_bdf84b73c34f6ec51af5"],
@@ -20617,10 +20566,11 @@
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/vol_bump_decimal",
           "#/$defs/d_1d0c1815f8dd0715bd12/properties/ytm_bump_bp",
           "#/$defs/d_7e19cc4df9954b864180",
-          "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/cpr",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/speed_multiplier",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/speed",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/0/properties/cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/3/properties/speed",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_price_shock_decimal",
           "#/$defs/d_f80c8a31d359e1cb5dd4/properties/scenario_spread_shock_bp"
         ],
@@ -20630,7 +20580,7 @@
         ],
         "internal-union": [
           {
-            "pointer": "#/$defs/d_73686c0456fd11c88d3e",
+            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           }
@@ -20906,10 +20856,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/d_05625cf1aa46e3810fc5/properties/repo_curve_id",
             "keyword": "anyOf"
           },
@@ -20939,7 +20885,7 @@
         "uint32": [
           "#/$defs/d_5c13df5a55f1da604df2/oneOf/2/properties/periodic",
           "#/$defs/d_7dd9bdea4c4382f447f9/properties/count",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/lockout_months"
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months"
         ],
         "uint8": [
           "#/$defs/d_05625cf1aa46e3810fc5/properties/back_settlement_month",
@@ -36207,9 +36153,9 @@
           "#/$defs/d_2c88e4d1e2e4f7c22e02/properties/tags",
           "#/$defs/CorrelationStructure/oneOf/2/properties/correlations",
           "#/$defs/CorrelationStructure/oneOf/2/properties/labels",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/2/properties/monthly_cdr",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/cumulative_net_loss_pct",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/annual_pct",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/monthly_cdr",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/cumulative_net_loss_pct",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/annual_pct",
           "#/$defs/DelinquencyModel/properties/cure_rates",
           "#/$defs/DelinquencyModel/properties/roll_rates",
           "#/$defs/d_cdb8fddc0106047270c4/properties/times",
@@ -36222,12 +36168,12 @@
           "#/$defs/McConfig/properties/correlation_matrix/items",
           "#/$defs/TermLoanCovenantEvents/properties/draw_stop_dates",
           "#/$defs/ReinvestmentPeriod/properties/amortizing_tranches",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector",
-          "#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr",
-          "#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct",
-          "#/$defs/DefaultCurve/oneOf/4/properties/annual_pct",
-          "#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr",
           "#/$defs/AfcSpec/properties/capped_tranches",
           "#/$defs/ShiftingInterestSpec/properties/triggers",
           "#/$defs/StepDownSpec/properties/triggers"
@@ -36462,13 +36408,13 @@
           "#/$defs/CoverageRules/properties/rating_haircuts/additionalProperties",
           "#/$defs/CoverageTestSpec/properties/divert_pct",
           "#/$defs/CoverageTestSpec/properties/trigger_level",
-          "#/$defs/d_c367978e081b7093ec11/properties/cdr",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/1/properties/speed_multiplier",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/2/properties/monthly_cdr/items",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/cumulative_net_loss_pct/items",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/severity",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/annual_pct/items",
-          "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/cumulative_default_rate",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/0/properties/cdr",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/monthly_cdr/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/cumulative_net_loss_pct/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/severity",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/annual_pct/items",
+          "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/cumulative_default_rate",
           "#/$defs/AdvancingPolicy/oneOf/1/properties/recoverability_cap_pct",
           "#/$defs/DelinquencyModel/properties/cure_rates/items",
           "#/$defs/ModificationSpec/properties/rate_reduction_bp",
@@ -36610,19 +36556,20 @@
           "#/$defs/RepLine/properties/recovery_rate",
           "#/$defs/RepLine/properties/spread_bp",
           "#/$defs/AssetPool/properties/reserve_account_rate",
-          "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/cpr",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/speed_multiplier",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/speed",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/0/properties/cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/1/properties/speed_multiplier",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/3/properties/speed",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/rate",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector/items",
-          "#/$defs/StochasticDefaultSpec/oneOf/0/properties/cdr",
-          "#/$defs/DefaultCurve/oneOf/1/properties/speed_multiplier",
-          "#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr/items",
-          "#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct/items",
-          "#/$defs/DefaultCurve/oneOf/3/properties/severity",
-          "#/$defs/DefaultCurve/oneOf/4/properties/annual_pct/items",
-          "#/$defs/DefaultCurve/oneOf/4/properties/cumulative_default_rate",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/0/properties/cdr",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/severity",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct/items",
+          "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/cumulative_default_rate",
           "#/$defs/StochasticDefaultSpec/oneOf/1/properties/base_cdr",
           "#/$defs/CopulaSpec/oneOf/1/properties/degrees_of_freedom",
           "#/$defs/CopulaSpec/oneOf/2/properties/loading_volatility",
@@ -36634,10 +36581,11 @@
           "#/$defs/StochasticDefaultSpec/oneOf/2/properties/volatility",
           "#/$defs/StochasticDefaultSpec/oneOf/3/properties/cdr_volatility",
           "#/$defs/StochasticDefaultSpec/oneOf/3/properties/factor_loading",
-          "#/$defs/StochasticPrepaySpec/oneOf/0/properties/cpr",
-          "#/$defs/PrepaymentCurve/oneOf/1/properties/speed_multiplier",
-          "#/$defs/PrepaymentCurve/oneOf/3/properties/speed",
-          "#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr/items",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/0/properties/cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/post_lockout_cpr",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/3/properties/speed",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr/items",
           "#/$defs/StochasticPrepaySpec/oneOf/1/properties/cpr_volatility",
           "#/$defs/StochasticPrepaySpec/oneOf/1/properties/factor_loading",
           "#/$defs/StochasticPrepaySpec/oneOf/2/properties/base_cpr",
@@ -36712,7 +36660,7 @@
             "discriminators": ["kind"]
           },
           {
-            "pointer": "#/$defs/d_457581f86de0cd986f20",
+            "pointer": "#/$defs/d_c367978e081b7093ec11",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -36752,7 +36700,7 @@
             "discriminators": ["kind"]
           },
           {
-            "pointer": "#/$defs/d_73686c0456fd11c88d3e",
+            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -36762,7 +36710,7 @@
             "discriminators": ["model"]
           },
           {
-            "pointer": "#/$defs/DefaultCurve",
+            "pointer": "#/$defs/StochasticDefaultSpec/oneOf/0",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -36777,7 +36725,7 @@
             "discriminators": ["model"]
           },
           {
-            "pointer": "#/$defs/PrepaymentCurve",
+            "pointer": "#/$defs/StochasticPrepaySpec/oneOf/0",
             "keyword": "oneOf",
             "discriminators": ["curve"]
           },
@@ -37144,10 +37092,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_c367978e081b7093ec11/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/StructuredCredit/properties/delinquency",
             "keyword": "anyOf"
           },
@@ -37495,10 +37439,6 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/StructuredCredit/properties/quote_settlement_date",
             "keyword": "anyOf"
           },
@@ -37507,15 +37447,7 @@
             "keyword": "anyOf"
           },
           {
-            "pointer": "#/$defs/StochasticDefaultSpec/oneOf/0/properties/curve",
-            "keyword": "anyOf"
-          },
-          {
             "pointer": "#/$defs/StructuredCredit/properties/stochastic_prepay_spec",
-            "keyword": "anyOf"
-          },
-          {
-            "pointer": "#/$defs/StochasticPrepaySpec/oneOf/0/properties/curve",
             "keyword": "anyOf"
           },
           {
@@ -37745,9 +37677,9 @@
           "#/$defs/RepLine/properties/amortization_term_months",
           "#/$defs/RepLine/properties/io_months",
           "#/$defs/RepLine/properties/seasoning_months",
-          "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/lockout_months",
+          "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
           "#/$defs/d_6f4088f89d6bfc98e242/properties/recovery_lag",
-          "#/$defs/PrepaymentCurve/oneOf/2/properties/lockout_months",
+          "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
           "#/$defs/ShiftingInterestStep/properties/months_from_closing"
         ],
         "uint8": [

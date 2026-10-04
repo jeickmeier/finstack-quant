@@ -4,6 +4,7 @@
 //! prepayment and default modeling for structured credit instruments.
 
 use super::{DealType, StructuredCredit};
+use crate::cashflow::builder::DefaultModelSpec;
 use crate::cashflow::builder::PrepaymentModelSpec;
 use crate::instruments::fixed_income::structured_credit::pricing::stochastic::calibrations::{
     abs_auto_correlation_structure, clo_correlation_structure, clo_default_spec, clo_prepay_spec,
@@ -76,7 +77,9 @@ impl StructuredCredit {
     ///
     /// # Errors
     ///
-    /// Returns an error if an embedded deal-type correlation preset is invalid.
+    /// Returns an error if an embedded deal-type correlation preset is invalid,
+    /// or an ABS/auto/card deal has a nonconstant default model that cannot supply
+    /// the flat annual CDR required by its Gaussian-copula preset.
     pub fn enable_stochastic(&mut self) -> Result<&mut Self> {
         let (prepay, default, corr) = match self.deal_type {
             DealType::Rmbs => (
@@ -103,7 +106,12 @@ impl StructuredCredit {
                     0.30,
                     0.15,
                 ),
-                StochasticDefaultSpec::gaussian_copula(self.credit_model.default_spec.cdr, 0.10),
+                StochasticDefaultSpec::gaussian_copula(match &self.credit_model.default_spec {
+                    DefaultModelSpec::Constant { cdr } => *cdr,
+                    _ => return Err(finstack_quant_core::Error::Validation(
+                        "ABS/auto/card Gaussian-copula preset requires a constant default model; configure a stochastic default specification explicitly for a seasoning curve".into()
+                    )),
+                }, 0.10),
                 abs_auto_correlation_structure()?,
             ),
         };

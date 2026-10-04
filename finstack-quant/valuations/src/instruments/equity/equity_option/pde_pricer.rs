@@ -5,7 +5,7 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::equity_option::pricing::{
-    collect_inputs_extended, has_future_discrete_dividends, resolve_lifecycle_value,
+    collect_inputs, has_future_discrete_dividends, resolve_lifecycle_value,
 };
 use crate::instruments::equity::equity_option::types::EquityOption;
 use crate::instruments::ExerciseStyle;
@@ -71,7 +71,7 @@ impl EquityOptionPdePricer {
                 PricingErrorContext::from_instrument(inst).model(ModelKey::PdeCrankNicolson1D),
             ));
         }
-        let inputs = collect_inputs_extended(inst, market, as_of).map_err(|e| {
+        let inputs = collect_inputs(inst, market, as_of).map_err(|e| {
             PricingError::model_failure_with_context(
                 e.to_string(),
                 PricingErrorContext::from_instrument(inst).model(ModelKey::PdeCrankNicolson1D),

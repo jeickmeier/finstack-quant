@@ -7,15 +7,12 @@
 //! instrument definitions.
 
 mod black;
-mod inputs;
-
-#[cfg(test)]
-pub(crate) use inputs::collect_inputs;
+pub(crate) mod inputs;
 
 pub use black::EquityOptionGreeks;
 pub(crate) use black::{compute_greeks, compute_pv, SimpleEquityOptionBlackPricer};
 pub(crate) use inputs::{
-    collect_inputs_extended, has_future_discrete_dividends,
+    collect_inputs, has_future_discrete_dividends,
     reject_future_discrete_dividends_for_stochastic_vol, require_european, resolve_lifecycle_value,
 };
 
@@ -101,7 +98,7 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
             "Heston Fourier",
         )?;
 
-        let inputs = collect_inputs_extended(equity_option, market, as_of).map_err(|e| {
+        let inputs = collect_inputs(equity_option, market, as_of).map_err(|e| {
             crate::pricer::PricingError::model_failure_with_context(
                 e.to_string(),
                 crate::pricer::PricingErrorContext::from_instrument(equity_option)
@@ -453,9 +450,8 @@ mod tests {
         );
 
         // And it must NOT equal the naive rho that holds S* fixed.
-        let inputs =
-            collect_inputs_extended(&opt, &market(as_of, 100.0, 0.20, base_rate, 0.0), as_of)
-                .expect("inputs");
+        let inputs = collect_inputs(&opt, &market(as_of, 100.0, 0.20, base_rate, 0.0), as_of)
+            .expect("inputs");
         let naive = bs_greeks_unchecked(
             inputs.spot,
             opt.strike,
@@ -533,7 +529,7 @@ mod tests {
         let tree_greeks = compute_greeks(&american, &curves, as_of).expect("tree greeks");
 
         // Analytic European gamma with the same inputs.
-        let inputs = collect_inputs_extended(&american, &curves, as_of).expect("inputs");
+        let inputs = collect_inputs(&american, &curves, as_of).expect("inputs");
         let analytic = bs_greeks_unchecked(
             inputs.spot,
             american.strike,
@@ -583,7 +579,13 @@ mod tests {
         assert!(american_pv.amount().is_finite());
         // Exercise dominance compares the same discretization. LR's finite
         // European approximation can lie either side of the analytic value.
-        let (spot, rate, q, sigma, t) = collect_inputs(&european, &curves, as_of).expect("inputs");
+        let inputs::EquityOptionInputs {
+            spot,
+            r: rate,
+            q,
+            sigma,
+            t_vol: t,
+        } = collect_inputs(&european, &curves, as_of).expect("inputs");
         let mut params = crate::instruments::common_impl::parameters::OptionMarketParams::call(
             spot,
             european.strike,
@@ -647,7 +649,7 @@ mod tests {
         .map(|greeks| greeks.theta)
         .expect("theta")
         .expect("supported");
-        let inputs = collect_inputs_extended(&option, &curves, as_of).expect("inputs");
+        let inputs = collect_inputs(&option, &curves, as_of).expect("inputs");
         let expected = bs_greeks_unchecked(
             inputs.spot,
             option.strike,

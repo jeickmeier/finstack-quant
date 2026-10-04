@@ -77,12 +77,12 @@ mod tests {
         // Cleared OIS compounds plain in-arrears (payment delay only); the
         // ARRC 2bd / BoE 5bd lookbacks are FRN conventions, not OIS.
         for preset in [
-            FloatingLegCompounding::sofr(),
-            FloatingLegCompounding::sonia(),
-            FloatingLegCompounding::estr(),
-            FloatingLegCompounding::tona(),
-            FloatingLegCompounding::saron(),
-            FloatingLegCompounding::fedfunds(),
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         ] {
             assert_eq!(
                 preset,
@@ -95,8 +95,8 @@ mod tests {
     fn test_serde_roundtrip() {
         let methods = vec![
             FloatingLegCompounding::Simple,
-            FloatingLegCompounding::sofr(),
-            FloatingLegCompounding::sonia(),
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         ];
 
         for method in methods {

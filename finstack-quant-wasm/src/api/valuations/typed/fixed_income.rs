@@ -349,7 +349,7 @@ setters!(JsTermLoanBuilder, "TermLoanBuilder", {
         /// @param value - Amortization as the serde name of a unit variant (`"none"`) or an `AmortizationSpec` plain object / JSON string.
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
-        amortization as amortization => json_or_name,
+        amortization as amortization => js_wire,
         /// Set the coupon type.
         /// @param value - Coupon type (serde string). `"cash"` (default), `"pik"`, ...
         /// @returns The builder, for chaining.

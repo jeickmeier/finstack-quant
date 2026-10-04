@@ -21,8 +21,6 @@
 //! - Hull, J. C. (2018). *Options, Futures, and Other Derivatives*. Chapter 7. `docs/REFERENCES.md#hull-options-futures`
 //! - Kahan, W. (1965). "Further Remarks on Reducing Truncation Errors." `docs/REFERENCES.md#kahan-1965`
 
-use crate::instruments::common_impl::numeric::decimal_to_f64;
-use crate::instruments::common_impl::pricing::swap_legs::LegPeriod;
 use crate::instruments::common_impl::pricing::time::relative_df_discount_curve;
 
 use crate::instruments::rates::irs::{InterestRateSwap, PayReceive};
@@ -108,7 +106,7 @@ impl InterestRateSwap {
     ///
     /// Uses Kahan compensated summation for accurate PV calculation on
     /// long-dated swaps with many periods (30Y+ = 60+ semi-annual payments).
-    /// Delegates to the shared swap leg pricing infrastructure.
+    /// Discounts the amounts and payment dates emitted by the fixed-leg schedule.
     ///
     /// # Errors
     ///
@@ -121,41 +119,20 @@ impl InterestRateSwap {
     ) -> finstack_quant_core::Result<f64> {
         let sched = crate::instruments::rates::irs::cashflow::fixed_leg_schedule(self)?;
 
-        // Convert cashflow schedule to LegPeriod iterator for shared pricing.
-        //
-        // `fixed_leg_schedule` delegates to the cashflow builder, whose emitted
-        // fixed coupon `date` is already the adjusted payment date. The shared
-        // fixed-leg pricer expects that date in `accrual_end`, so pass
-        // `payment_lag_days = 0` below to avoid applying the lag twice.
-        let periods = sched
-            .get_flows()
-            .iter()
-            .filter(|cf| {
-                cf.kind == crate::cashflow::primitives::CFKind::Fixed
-                    || cf.kind == crate::cashflow::primitives::CFKind::Stub
-            })
-            .map(|cf| LegPeriod {
-                accrual_start: cf.date, // Not used by fixed-leg pricer
-                accrual_end: cf.date,   // Accrual-end date; used for payment delay
-                reset_date: None,
-                year_fraction: cf.accrual_factor,
-            });
-
-        let params = crate::instruments::common_impl::pricing::swap_legs::FixedLegParams {
-            rate: decimal_to_f64(self.fixed_leg.rate, "fixed leg rate")?,
-            day_count: self.fixed_leg.day_count,
-            payment_lag_days: 0,
-            calendar_id: self.fixed_leg.calendar_id.clone(),
-        };
-
-        // Use shared pricing function
-        crate::instruments::common_impl::pricing::swap_legs::pv_fixed_leg(
-            periods,
-            self.notional.amount(),
-            &params,
-            disc,
-            as_of,
-        )
+        let mut pv = NeumaierAccumulator::new();
+        for flow in sched.get_flows() {
+            if flow.date > as_of
+                && matches!(
+                    flow.kind,
+                    crate::cashflow::primitives::CFKind::Fixed
+                        | crate::cashflow::primitives::CFKind::Stub
+                )
+            {
+                let discount = relative_df_discount_curve(disc, as_of, flow.date)?;
+                pv.add(flow.amount.amount() * discount);
+            }
+        }
+        Ok(pv.total())
     }
 
     /// Compute PV of floating leg (helper for value calculation).
@@ -191,7 +168,7 @@ impl InterestRateSwap {
     ///
     /// Uses Kahan compensated summation for accurate PV calculation on
     /// long-dated swaps with many periods (30Y+ = 120+ quarterly payments).
-    /// Delegates to the shared swap leg pricing infrastructure.
+    /// Discounts the amounts and payment dates emitted by the fixed-leg schedule.
     ///
     /// # Errors
     ///
@@ -356,7 +333,8 @@ mod tests {
 
         // Turn it into an OIS-style swap: use overnight compounding and align
         // the floating index with the fixed-leg discount curve.
-        irs.float_leg.compounding = FloatingLegCompounding::sofr();
+        irs.float_leg.compounding =
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 };
         irs.float_leg.forward_curve_id = irs.fixed_leg.discount_curve_id.clone();
 
         assert!(
@@ -464,7 +442,7 @@ mod tests {
                     fixing_calendar_id: None,
                     start,
                     end,
-                    compounding: FloatingLegCompounding::fedfunds(),
+                    compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
@@ -552,7 +530,7 @@ mod tests {
                     reset_lag_days: 0,
                     start,
                     end,
-                    compounding: FloatingLegCompounding::fedfunds(), // lookback=0
+                    compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }, // lookback=0
                     fixing_calendar_id: None,
                     payment_lag_days: 0,
                     end_of_month: false,
@@ -639,7 +617,7 @@ mod tests {
                     reset_lag_days: 0,
                     start,
                     end,
-                    compounding: FloatingLegCompounding::sofr(),
+                    compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
                     // This calendar ID does not exist in the registry
                     fixing_calendar_id: Some("NONEXISTENT-CALENDAR-XYZ".into()),
                     payment_lag_days: 0,
@@ -721,7 +699,7 @@ mod tests {
                     reset_lag_days: 0,
                     start,
                     end,
-                    compounding: FloatingLegCompounding::sofr(),
+                    compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
                     // No fixing_calendar_id - intentional weekday stepping
                     fixing_calendar_id: None,
                     payment_lag_days: 0,
@@ -807,7 +785,7 @@ mod tests {
                     fixing_calendar_id: None,
                     start,
                     end,
-                    compounding: FloatingLegCompounding::sofr(),
+                    compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
@@ -879,7 +857,7 @@ mod tests {
                     fixing_calendar_id: None,
                     start,
                     end,
-                    compounding: FloatingLegCompounding::sofr(),
+                    compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
                     payment_lag_days: 0,
                     end_of_month: false,
                 },
@@ -893,6 +871,15 @@ mod tests {
         assert!(
             diff < 1e-8,
             "canonical IRS schedule should support single-curve compounded OIS, diff={diff}"
+        );
+        let mut lagged = swap;
+        lagged.fixed_leg.payment_lag_days = 3;
+        lagged.float_leg.payment_lag_days = 3;
+        let lagged_pv = compute_pv_raw(&lagged, &ctx, as_of).expect("lagged leg-pricer pv");
+        let schedule_pv = discount_irs_schedule(&lagged, &ctx, as_of).expect("lagged schedule pv");
+        assert!(
+            (lagged_pv - schedule_pv).abs() < 1e-8,
+            "payment lag must be applied once and fixed coupons must retain contractual accrual"
         );
     }
 
@@ -971,7 +958,7 @@ mod tests {
                     fixing_calendar_id: None,
                     start,
                     end,
-                    compounding: FloatingLegCompounding::fedfunds(),
+                    compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
                     payment_lag_days: 0,
                     end_of_month: false,
                 },

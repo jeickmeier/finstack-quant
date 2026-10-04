@@ -162,6 +162,11 @@ where
 
 /// Exact discretization for multi-factor GBM with correlation.
 ///
+/// For engine pricing, prefer [`ExactMultiGbm`], which uses the correlation
+/// declared by the process. This adapter accepts independent shocks for direct
+/// stepping and uses its own matrix, overriding any process matrix. The engine
+/// therefore skips its correlation transform when this adapter is selected.
+///
 /// Handles correlated Brownian motions by applying pivoted Cholesky decomposition
 /// to transform independent shocks into correlated ones before applying
 /// the exact GBM formula.
@@ -245,45 +250,10 @@ impl Discretization<MultiGbmProcess> for ExactMultiGbmCorrelated {
         let dim = process.dim();
         assert_eq!(dim, self.dim, "Process dimension must match discretization");
 
-        // Split work buffer: [drift_vec | diff_vec | z_corr | subnormal probe buffers]
-        let (drift_vec, rest) = work.split_at_mut(dim);
-        let (diff_vec, z_corr) = rest.split_at_mut(dim);
-        let (z_corr, rest) = z_corr.split_at_mut(dim);
-        let (probe_state, rest) = rest.split_at_mut(dim);
-        let (probe_drift, probe_diffusion) = rest.split_at_mut(dim);
-
-        process.drift(_t, x, drift_vec);
-        process.diffusion(_t, x, diff_vec);
-        let mut recovery_ctx = RateRecoveryContext {
-            process,
-            t: _t,
-            probe_state,
-            probe_drift,
-            probe_diffusion,
-        };
-
-        // Apply Cholesky factor to get correlated shocks in original asset order.
-        // Dimensions are guaranteed by construction: cholesky_factor is dim×dim and
-        // work_size() allocates 3*dim so z_corr has length dim.
-        let _ = self.cholesky_factor.apply(z, z_corr);
-
-        // S_i(t+dt) = S_i(t) exp((μ_i - ½σ_i²)dt + σ_i√dt Z_corr_i)
-        let sqrt_dt = dt.sqrt();
-        for i in 0..dim {
-            // Zero is an absorbing boundary for multiplicative GBM dynamics, so
-            // skip the rate reconstruction that would otherwise evaluate 0 / 0.
-            if x[i] == 0.0 {
-                continue;
-            }
-
-            let (mu, sigma) =
-                recover_rate_coefficients(&mut recovery_ctx, x, drift_vec[i], diff_vec[i], i);
-
-            let drift_term = (mu - 0.5 * sigma * sigma) * dt;
-            let diffusion_term = sigma * sqrt_dt * z_corr[i];
-
-            x[i] *= (drift_term + diffusion_term).exp();
-        }
+        let (correlated_shocks, exact_work) = work.split_at_mut(dim);
+        // The adapter owns shock correlation; the exact transition remains shared.
+        let _ = self.cholesky_factor.apply(z, correlated_shocks);
+        ExactMultiGbm.step(process, _t, dt, x, correlated_shocks, exact_work);
     }
 
     fn work_size(&self, process: &MultiGbmProcess) -> usize {

@@ -1,6 +1,8 @@
 {
   "instrument": {
     "spec": {
+      "adjust_fixed_accrual_dates": false,
+      "adjust_float_accrual_dates": false,
       "attributes": {},
       "fixed_leg": {
         "business_day_convention": "modified_following",

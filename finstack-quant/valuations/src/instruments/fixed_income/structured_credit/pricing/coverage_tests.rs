@@ -446,7 +446,13 @@ fn rate_and_accrual(tranche: &Tranche, context: &TestContext<'_>) -> Result<(f64
             market,
         )?
     } else {
-        tranche.coupon.current_rate(context.as_of)
+        match &tranche.coupon {
+            crate::instruments::fixed_income::loan_terms::RateSpec::Fixed { rate } => *rate,
+            crate::instruments::fixed_income::loan_terms::RateSpec::Floating(spec) => {
+                use rust_decimal::prelude::ToPrimitive;
+                spec.spread_bp.to_f64().unwrap_or_default() / 10_000.0
+            }
+        }
     };
     // A floating coupon rides the simulated rate path (shift-then-floor,
     // matching the engine's interest-due kernel). Fixed coupons are contractual.

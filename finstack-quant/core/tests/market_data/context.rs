@@ -441,6 +441,27 @@ fn generic_curve_replace_rebinds_credit_index_dependencies() {
 }
 
 #[test]
+fn generic_cross_type_curve_replacement_invalidates_dependent_credit_index() {
+    let hazard = sample_hazard_curve("CDX");
+    let correlation = sample_base_correlation_curve("CDX-BC");
+    let index = CreditIndexData::builder()
+        .num_constituents(125)
+        .recovery_rate(0.4)
+        .index_credit_curve(Arc::new(hazard.clone()))
+        .base_correlation_curve(Arc::new(correlation.clone()))
+        .build()
+        .expect("valid index");
+    let market = MarketContext::new()
+        .insert(hazard)
+        .insert(correlation)
+        .insert_credit_index("CDX-IG", index)
+        .expect("valid canonical index")
+        .insert(sample_discount_curve("CDX"));
+    assert!(market.get_discount("CDX").is_ok());
+    assert!(market.get_credit_index("CDX-IG").is_err());
+}
+
+#[test]
 fn credit_index_insert_uses_canonical_dependencies_before_roundtrip_or_other_inserts() {
     use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, HazardCurve};
     use std::collections::BTreeMap;

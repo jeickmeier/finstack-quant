@@ -134,6 +134,7 @@ pub(super) mod get {
 pub(super) mod arg {
     use super::*;
     use crate::utils::input::{from_js_json, js_bool, js_f64, js_uint};
+    pub(crate) use crate::utils::wire::js_wire;
     use serde::de::DeserializeOwned;
 
     fn invalid(label: &str, error: impl std::fmt::Display) -> JsValue {
@@ -150,23 +151,6 @@ pub(super) mod arg {
     /// A plain string.
     pub(crate) fn text(value: &JsValue, label: &str) -> Result<String, JsValue> {
         js_string(value, label)
-    }
-
-    /// A nested spec, or the serde name of one of its unit variants.
-    ///
-    /// A string that does not start a JSON document (`{`, `[` or `"`) is the
-    /// variant name itself, so `"bullet"` and `{"linear": {...}}` both work.
-    pub(crate) fn json_or_name<T: DeserializeOwned>(
-        value: &JsValue,
-        label: &str,
-    ) -> Result<T, JsValue> {
-        match value.as_string() {
-            Some(name) if !name.trim_start().starts_with(['{', '[', '"']) => {
-                serde_json::from_value(serde_json::Value::String(name))
-                    .map_err(|error| invalid(label, error))
-            }
-            _ => from_js_json(value, label),
-        }
     }
 
     /// An ISO-8601 date string.

@@ -59,7 +59,7 @@
 //!     fail_on_error: false,
 //! };
 //!
-//! let mut extension = CorkscrewExtension::new(config);
+//! let extension = CorkscrewExtension::new(config);
 //! let report = extension.execute(&model, &results)?;
 //! assert_eq!(report.status, finstack_quant_statements_analytics::extensions::CorkscrewStatus::Success);
 //! # Ok(())
@@ -229,13 +229,13 @@ impl CorkscrewExtension {
     /// encounters a missing/invalid account, period value, change node, or
     /// balance-sheet articulation input.
     pub fn execute(
-        &mut self,
+        &self,
         model: &FinancialModelSpec,
         results: &StatementResult,
     ) -> Result<CorkscrewReport> {
         let _span = tracing::info_span!("statements_analytics.corkscrew.execute").entered();
 
-        let config = self.config.clone();
+        let config = &self.config;
         if !config.tolerance.is_finite() || config.tolerance < 0.0 {
             return Err(finstack_quant_statements::error::Error::invalid_input(
                 "Corkscrew tolerance must be finite and non-negative",
@@ -281,7 +281,7 @@ impl CorkscrewExtension {
             }
         }
 
-        match self.check_articulation(model, results, &config, config.tolerance) {
+        match self.check_articulation(model, results, config, config.tolerance) {
             Ok(Some(articulation_result)) => {
                 if !articulation_result.is_balanced {
                     let msg = format!(
@@ -391,8 +391,27 @@ impl CorkscrewExtension {
                 ))
             })?;
 
-            // Identity: expected = prev + Σ changes − Σ decreases.
-            let mut expected_balance = prev_balance;
+            // A missing beginning-balance period value is a hard error,
+            // consistent with the other missing-value checks above —
+            // silently falling back to `prev_balance` could mask a real
+            // roll-forward break.
+            let mut expected_balance = if let Some(beginning_node) = &account.beginning_balance_node
+            {
+                let beginning_values = results.nodes.get(beginning_node).ok_or_else(|| {
+                    finstack_quant_statements::error::Error::missing_data(format!(
+                        "Beginning-balance node '{beginning_node}' for account '{}' not found in results",
+                        account.node_id
+                    ))
+                })?;
+                let beginning = beginning_values.get(curr_period).ok_or_else(|| {
+                    finstack_quant_statements::error::Error::missing_data(format!(
+                        "Beginning-balance node '{beginning_node}' has no value for period '{curr_period}'"
+                    ))
+                })?;
+                *beginning
+            } else {
+                prev_balance
+            };
 
             // A missing change/decrease node or value is a configuration
             // error: silently skipping it understates the expected balance
@@ -415,26 +434,6 @@ impl CorkscrewExtension {
                 curr_period,
                 results,
             )?;
-
-            // A missing beginning-balance period value is a hard error,
-            // consistent with the other missing-value checks above —
-            // silently falling back to `prev_balance` could mask a real
-            // roll-forward break.
-            if let Some(beginning_node) = &account.beginning_balance_node {
-                let beginning_values = results.nodes.get(beginning_node).ok_or_else(|| {
-                    finstack_quant_statements::error::Error::missing_data(format!(
-                        "Beginning-balance node '{beginning_node}' for account '{}' not found in results",
-                        account.node_id
-                    ))
-                })?;
-                let beginning = beginning_values.get(curr_period).ok_or_else(|| {
-                    finstack_quant_statements::error::Error::missing_data(format!(
-                        "Beginning-balance node '{beginning_node}' has no value for period '{curr_period}'"
-                    ))
-                })?;
-                expected_balance = beginning + expected_balance - prev_balance;
-            }
-
             let error = (curr_balance - expected_balance).abs();
             require_finite(error)?;
             validation.max_error = validation.max_error.max(error);
@@ -607,7 +606,7 @@ mod tests {
             fail_on_error: false,
         };
 
-        let mut extension = CorkscrewExtension::new(config);
+        let extension = CorkscrewExtension::new(config);
         let report = extension
             .execute(&model, &results)
             .expect("empty accounts should succeed");
@@ -680,7 +679,7 @@ mod tests {
             fail_on_error: true,
         };
 
-        let mut extension = CorkscrewExtension::new(config);
+        let extension = CorkscrewExtension::new(config);
         let report = extension
             .execute(&model, &results)
             .expect("extension should execute");
@@ -712,7 +711,7 @@ mod tests {
             fail_on_error: false,
         };
 
-        let mut extension = CorkscrewExtension::new(config);
+        let extension = CorkscrewExtension::new(config);
         let report = extension
             .execute(&model, &results)
             .expect("extension should execute");
@@ -727,6 +726,40 @@ mod tests {
             "break must surface as a warning, got {:?}",
             report.warnings
         );
+    }
+
+    #[test]
+    fn explicit_beginning_balance_preserves_small_movements() {
+        let (model, mut results) = broken_rollforward_model();
+        let q1 = PeriodId::quarter(2025, 1).expect("valid period");
+        let q2 = PeriodId::quarter(2025, 2).expect("valid period");
+        results.nodes.insert(
+            "cash".into(),
+            indexmap::IndexMap::from([(q1, 1e18), (q2, 1.0)]),
+        );
+        results
+            .nodes
+            .insert("inflows".into(), indexmap::IndexMap::from([(q2, 1.0)]));
+        results
+            .nodes
+            .insert("cash_beg".into(), indexmap::IndexMap::from([(q2, 0.0)]));
+        let extension = CorkscrewExtension::new(CorkscrewConfig {
+            accounts: vec![],
+            tolerance: 0.01,
+            fail_on_error: false,
+        });
+        let account = CorkscrewAccount {
+            node_id: "cash".into(),
+            account_type: AccountType::Asset,
+            changes: vec!["inflows".into()],
+            decreases: vec![],
+            beginning_balance_node: Some("cash_beg".into()),
+        };
+        let validation = extension
+            .validate_account(&account, &model, &results, 0.01)
+            .expect("complete roll-forward");
+        assert!(validation.is_valid);
+        assert_eq!(validation.max_error, 0.0);
     }
 
     #[test]
@@ -753,7 +786,7 @@ mod tests {
             fail_on_error: false,
         };
 
-        let mut extension = CorkscrewExtension::new(config);
+        let extension = CorkscrewExtension::new(config);
         let report = extension
             .execute(&model, &results)
             .expect("extension should execute in lenient mode");
@@ -800,7 +833,7 @@ mod tests {
             fail_on_error: false,
         };
 
-        let mut extension = CorkscrewExtension::new(config);
+        let extension = CorkscrewExtension::new(config);
         let report = extension
             .execute(&model, &results)
             .expect("extension should execute");
@@ -876,7 +909,7 @@ mod tests {
             fail_on_error: true,
         };
 
-        let mut extension = CorkscrewExtension::new(config);
+        let extension = CorkscrewExtension::new(config);
         let report = extension
             .execute(&model, &results)
             .expect("extension should execute");
@@ -950,7 +983,7 @@ mod tests {
             fail_on_error: true,
         };
 
-        let mut extension = CorkscrewExtension::new(config);
+        let extension = CorkscrewExtension::new(config);
         let report = extension
             .execute(&model, &results)
             .expect("extension should execute");
@@ -1029,7 +1062,7 @@ mod tests {
             fail_on_error: false,
         };
 
-        let mut extension = CorkscrewExtension::new(config);
+        let extension = CorkscrewExtension::new(config);
         let report = extension
             .execute(&model, &results)
             .expect("extension should execute");

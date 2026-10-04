@@ -91,8 +91,8 @@ def pool_deal(
 def _with_calendar(envelope: dict[str, object]) -> dict[str, object]:
     spec = envelope["instrument"]["spec"]
     spec["calendar_id"] = "nyse"
-    spec["prepayment_spec"] = {"cpr": 0.0, "curve": None}
-    spec["default_spec"] = {"cdr": 0.0, "curve": None}
+    spec["prepayment_spec"] = {"cpr": 0.0, "curve": "constant"}
+    spec["default_spec"] = {"cdr": 0.0, "curve": "constant"}
     return envelope
 
 

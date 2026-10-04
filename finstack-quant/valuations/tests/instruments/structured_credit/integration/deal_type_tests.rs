@@ -7,8 +7,8 @@ use finstack_quant_core::dates::{Date, Tenor};
 use finstack_quant_core::money::Money;
 use finstack_quant_valuations::instruments::fixed_income::loan_terms::RateSpec;
 use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
-    AssetPool, DealType, PoolAsset, PrepaymentCurve, PrepaymentModelSpec, StructuredCredit,
-    Tranche, TrancheSeniority, TrancheStructure,
+    AssetPool, DealType, PoolAsset, PrepaymentModelSpec, StructuredCredit, Tranche,
+    TrancheSeniority, TrancheStructure,
 };
 use time::Month;
 
@@ -75,14 +75,16 @@ fn test_clo_default_prepayment_model() {
     .expect("valid structured-credit dates");
 
     // Assert: CLO should use constant CPR
-    assert_eq!(clo.credit_model.prepayment_spec.cpr, 0.20); // 20% CPR standard
     assert!(
-        clo.credit_model.prepayment_spec.curve.is_none()
-            || matches!(
-                clo.credit_model.prepayment_spec.curve,
-                Some(PrepaymentCurve::Constant)
-            )
-    );
+        (clo.credit_model.prepayment_spec.smm(36).unwrap()
+            - finstack_quant_cashflows::builder::cpr_to_smm(0.20).unwrap())
+        .abs()
+            < 1e-12
+    ); // 20% CPR standard
+    assert!(matches!(
+        clo.credit_model.prepayment_spec,
+        PrepaymentModelSpec::Constant { .. }
+    ));
 }
 
 #[test]
@@ -99,9 +101,19 @@ fn test_clo_default_assumptions() {
     .expect("valid structured-credit dates");
 
     // Assert: CLO standard assumptions
-    assert_eq!(clo.credit_model.default_spec.cdr, 0.02); // 2% CDR
+    assert!(
+        (clo.credit_model.default_spec.mdr(36).unwrap()
+            - finstack_quant_cashflows::builder::cdr_to_mdr(0.02).unwrap())
+        .abs()
+            < 1e-12
+    ); // 2% CDR
     assert_eq!(clo.credit_model.recovery_spec.rate, 0.60); // 60% recovery
-    assert_eq!(clo.credit_model.prepayment_spec.cpr, 0.20); // 20% CPR
+    assert!(
+        (clo.credit_model.prepayment_spec.smm(36).unwrap()
+            - finstack_quant_cashflows::builder::cpr_to_smm(0.20).unwrap())
+        .abs()
+            < 1e-12
+    ); // 20% CPR
 }
 
 // ABS-specific Tests
@@ -137,7 +149,12 @@ fn test_abs_default_assumptions() {
     .expect("valid structured-credit dates");
 
     // Assert: Auto ABS standard assumptions
-    assert_eq!(abs.credit_model.default_spec.cdr, 0.02); // 2% CDR
+    assert!(
+        (abs.credit_model.default_spec.mdr(36).unwrap()
+            - finstack_quant_cashflows::builder::cdr_to_mdr(0.02).unwrap())
+        .abs()
+            < 1e-12
+    ); // 2% CDR
     assert_eq!(abs.credit_model.recovery_spec.rate, 0.45); // 45% recovery (updated)
     assert!(
         (abs.credit_model
@@ -183,9 +200,14 @@ fn test_rmbs_default_prepayment_model() {
     .expect("valid structured-credit dates");
 
     // Assert: RMBS should use PSA model
-    assert_eq!(rmbs.credit_model.prepayment_spec.cpr, 0.06); // 100% PSA terminal = 6% CPR
-    match rmbs.credit_model.prepayment_spec.curve {
-        Some(PrepaymentCurve::Psa { speed_multiplier }) => {
+    assert!(
+        (rmbs.credit_model.prepayment_spec.smm(36).unwrap()
+            - finstack_quant_cashflows::builder::cpr_to_smm(0.06).unwrap())
+        .abs()
+            < 1e-12
+    ); // 100% PSA terminal = 6% CPR
+    match rmbs.credit_model.prepayment_spec {
+        PrepaymentModelSpec::Psa { speed_multiplier } => {
             assert_eq!(speed_multiplier, 1.0); // 100% PSA
         }
         _ => panic!("Expected PSA curve for RMBS"),
@@ -206,7 +228,12 @@ fn test_rmbs_default_assumptions() {
     .expect("valid structured-credit dates");
 
     // Assert: RMBS standard assumptions
-    assert_eq!(rmbs.credit_model.default_spec.cdr, 0.006); // 0.6% CDR
+    assert!(
+        (rmbs.credit_model.default_spec.mdr(36).unwrap()
+            - finstack_quant_cashflows::builder::cdr_to_mdr(0.006).unwrap())
+        .abs()
+            < 1e-12
+    ); // 0.6% CDR
     assert_eq!(rmbs.credit_model.recovery_spec.rate, 0.60); // 60% recovery
     assert_eq!(
         rmbs.credit_model.prepayment_spec,
@@ -247,9 +274,19 @@ fn test_cmbs_default_assumptions() {
     .expect("valid structured-credit dates");
 
     // Assert: CMBS standard assumptions
-    assert_eq!(cmbs.credit_model.default_spec.cdr, 0.005); // 0.5% CDR
+    assert!(
+        (cmbs.credit_model.default_spec.mdr(36).unwrap()
+            - finstack_quant_cashflows::builder::cdr_to_mdr(0.005).unwrap())
+        .abs()
+            < 1e-12
+    ); // 0.5% CDR
     assert_eq!(cmbs.credit_model.recovery_spec.rate, 0.65); // 65% recovery
-    assert_eq!(cmbs.credit_model.prepayment_spec.cpr, 0.10); // 10% CPR
+    assert!(
+        (cmbs.credit_model.prepayment_spec.smm(121).unwrap()
+            - finstack_quant_cashflows::builder::cpr_to_smm(0.10).unwrap())
+        .abs()
+            < 1e-12
+    ); // 10% CPR
 }
 
 // Cross-Instrument Consistency Tests

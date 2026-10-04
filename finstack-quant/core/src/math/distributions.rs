@@ -82,100 +82,6 @@
 
 use super::random::RandomNumberGenerator;
 
-/// Generate the complete binomial distribution P(X=k) for k = 0, 1, ..., n.
-///
-/// Returns a normalized probability vector where `dist[k]` = P(X = k).
-/// Uses log-space arithmetic to prevent overflow for large n.
-///
-/// # Mathematical Definition
-///
-/// ```text
-/// dist[k] = P(X = k) = C(n,k) * p^k * (1-p)^(n-k)
-/// ```
-///
-/// # Arguments
-///
-/// * `n` - Number of independent trials (≥ 0)
-/// * `p` - Probability of success on each trial (0 ≤ p ≤ 1)
-///
-/// # Returns
-///
-/// Vector of probabilities `[P(X=0), P(X=1), ..., P(X=n)]` with length n+1.
-/// The vector sums to 1.0 (normalized).
-///
-/// # Use Cases
-///
-/// - **Credit modeling**: Loss distribution for homogeneous pool of n obligors
-/// - **Portfolio analytics**: Number of defaults given conditional default probability
-/// - **Structured credit**: Default distribution for CDO/CLO tranches
-///
-/// # Errors
-///
-/// Returns [`Error::Validation`](crate::Error::Validation) if `p` is NaN.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_core::math::distributions::binomial_distribution;
-///
-/// // Fair coin: distribution of heads in 10 flips
-/// let dist = binomial_distribution(10, 0.5).unwrap();
-/// assert_eq!(dist.len(), 11); // P(X=0), P(X=1), ..., P(X=10)
-/// assert!((dist[5] - 0.24609375).abs() < 1e-6); // P(X=5)
-///
-/// // Credit portfolio: default distribution with 5% PD
-/// let loss_dist = binomial_distribution(100, 0.05).unwrap();
-/// assert_eq!(loss_dist.len(), 101);
-/// // Most probability mass around 5 defaults
-/// assert!(loss_dist[5] > loss_dist[0]);
-/// assert!(loss_dist[5] > loss_dist[20]);
-/// ```
-///
-/// # References
-///
-/// - Johnson, N. L., Kotz, S., & Kemp, A. W. (1993). *Univariate Discrete Distributions*
-///   (2nd ed.). Wiley. Chapter 3. `docs/REFERENCES.md#press-numerical-recipes`
-pub fn binomial_distribution(n: usize, p: f64) -> crate::Result<Vec<f64>> {
-    use statrs::distribution::{Binomial, Discrete};
-
-    // NaN must surface as a validation error, not a silent point mass at 0.
-    if p.is_nan() {
-        return Err(crate::Error::Validation(
-            "binomial_distribution: success probability p must not be NaN".to_string(),
-        ));
-    }
-
-    if p <= 0.0 {
-        // All probability on k=0
-        let mut dist = vec![0.0; n + 1];
-        dist[0] = 1.0;
-        return Ok(dist);
-    }
-    if p >= 1.0 {
-        // All probability on k=n
-        let mut dist = vec![0.0; n + 1];
-        dist[n] = 1.0;
-        return Ok(dist);
-    }
-
-    let mut dist = Binomial::new(p, n as u64)
-        .map(|binom| (0..=n as u64).map(|k| binom.pmf(k)).collect::<Vec<_>>())
-        .map_err(|e| {
-            crate::Error::Validation(format!(
-                "binomial_distribution: invalid parameters n={n}, p={p}: {e}"
-            ))
-        })?;
-
-    // Renormalize when floating-point PMF mass drifts off 1.
-    let sum: f64 = dist.iter().sum();
-    if sum > 0.0 && (sum - 1.0).abs() > 1e-10 {
-        for prob in &mut dist {
-            *prob /= sum;
-        }
-    }
-    Ok(dist)
-}
-
 /// Calculate binomial probability P(X = k) where X ~ Binomial(n, p).
 ///
 /// Computes the probability mass function for the binomial distribution using
@@ -337,6 +243,13 @@ pub fn binomial_pmf_all_into(out: &mut Vec<f64>, n: usize, p: f64) -> crate::Res
     for k in 0..n {
         log_prob += ((n - k) as f64).ln() - ((k + 1) as f64).ln() + log_ratio;
         out[k + 1] = log_prob.exp();
+    }
+    // Keep the full distribution normalized when log-recursion rounding accumulates.
+    let mass: f64 = out.iter().sum();
+    if mass > 0.0 && (mass - 1.0).abs() > 1e-10 {
+        for probability in out.iter_mut() {
+            *probability /= mass;
+        }
     }
     Ok(())
 }
@@ -927,9 +840,9 @@ mod tests {
     }
 
     #[test]
-    fn test_binomial_distribution() {
+    fn test_binomial_pmf_all() {
         // Test basic distribution
-        let dist = binomial_distribution(10, 0.5).unwrap();
+        let dist = binomial_pmf_all(10, 0.5).unwrap();
         assert_eq!(dist.len(), 11);
 
         // Test P(X=5) for fair coin
@@ -963,34 +876,34 @@ mod tests {
     #[test]
     fn test_binomial_distribution_edge_cases() {
         // p = 0: all probability on k=0
-        let dist_zero = binomial_distribution(5, 0.0).unwrap();
+        let dist_zero = binomial_pmf_all(5, 0.0).unwrap();
         assert!((dist_zero[0] - 1.0).abs() < 1e-10);
         for val in dist_zero.iter().skip(1) {
             assert!(*val < 1e-10);
         }
 
         // p = 1: all probability on k=n
-        let dist_one = binomial_distribution(5, 1.0).unwrap();
+        let dist_one = binomial_pmf_all(5, 1.0).unwrap();
         assert!((dist_one[5] - 1.0).abs() < 1e-10);
         for val in dist_one.iter().take(5) {
             assert!(*val < 1e-10);
         }
 
         // n = 0: single element
-        let dist_n0 = binomial_distribution(0, 0.5).unwrap();
+        let dist_n0 = binomial_pmf_all(0, 0.5).unwrap();
         assert_eq!(dist_n0.len(), 1);
         assert!((dist_n0[0] - 1.0).abs() < 1e-10);
     }
 
     #[test]
     fn test_binomial_distribution_rejects_nan_p() {
-        assert!(binomial_distribution(10, f64::NAN).is_err());
+        assert!(binomial_pmf_all(10, f64::NAN).is_err());
     }
 
     #[test]
     fn test_binomial_distribution_credit_portfolio() {
         // Typical credit portfolio: 100 names with 5% PD
-        let dist = binomial_distribution(100, 0.05).unwrap();
+        let dist = binomial_pmf_all(100, 0.05).unwrap();
         assert_eq!(dist.len(), 101);
 
         // Expected number of defaults = n * p = 5
@@ -1049,6 +962,19 @@ mod tests {
             mode > 0.0,
             "mode probability should be positive for n=2000, p=0.5"
         );
+    }
+
+    #[test]
+    fn binomial_pmf_matches_independent_distribution_at_extreme_probabilities() {
+        use statrs::distribution::{Binomial, Discrete};
+        for (n, p) in [(2_000, 0.001), (2_000, 0.5), (2_000, 0.999)] {
+            let reference = Binomial::new(p, n as u64).expect("valid distribution");
+            let values = binomial_pmf_all(n, p).expect("valid probability");
+            assert!((values.iter().sum::<f64>() - 1.0).abs() < 1e-10);
+            for (k, actual) in values.into_iter().enumerate() {
+                assert!((actual - reference.pmf(k as u64)).abs() < 1e-10);
+            }
+        }
     }
 
     #[test]

@@ -44,7 +44,7 @@
 //! whose value can be below the optimal Bermudan value.
 
 use super::super::results::MoneyEstimate;
-use super::lsq::{regression_coefficients_with_basis, regression_with_basis};
+use super::lsq::regression_coefficients_with_basis;
 use crate::monte_carlo::discretization::exact::ExactGbm;
 use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::pricer::basis::{build_lsmc_basis, BasisFunctions, BasisKind, LsmcBasis};
@@ -796,108 +796,15 @@ impl LsmcPricer {
         E: ImmediateExercise,
         B: BasisFunctions + ?Sized,
     {
-        let num_paths = paths.num_paths();
-        let dt = time_to_maturity / num_steps as f64;
-
-        let mut cashflows = vec![0.0; num_paths];
-        let mut exercise_times = vec![time_to_maturity; num_paths];
-
-        for (i, cf) in cashflows.iter_mut().enumerate() {
-            let terminal_spot = paths.row(i)[num_steps];
-            *cf = exercise.exercise_value(terminal_spot);
-        }
-
-        let mut sorted_exercise_dates = self.config.exercise_dates.clone();
-        sorted_exercise_dates.sort_unstable();
-        sorted_exercise_dates.reverse();
-
-        let valid_exercise_count = sorted_exercise_dates
-            .iter()
-            .filter(|&&step| step > 0 && step < num_steps)
-            .count();
-        if valid_exercise_count == 0 {
-            tracing::warn!(
-                num_steps,
-                exercise_dates = ?self.config.exercise_dates,
-                "No exercise date is inside the simulated horizon (0 < step < num_steps); \
-                 option priced as European (terminal exercise only)"
-            );
-        }
-
-        let mut regression_x = Vec::with_capacity(num_paths / 2);
-        let mut regression_y = Vec::with_capacity(num_paths / 2);
-        let mut regression_indices = Vec::with_capacity(num_paths / 2);
-
-        for &exercise_step in &sorted_exercise_dates {
-            // Drop guards against:
-            //   - exercise_step == 0: pre-simulation exercise, nonsensical.
-            //   - exercise_step >= num_steps: past/at the terminal where the
-            //     European payoff is already seeded in `cashflows`.
-            if exercise_step == 0 || exercise_step >= num_steps {
-                continue;
-            }
-
-            let t = exercise_step as f64 * dt;
-
-            regression_x.clear();
-            regression_y.clear();
-            regression_indices.clear();
-
-            for i in 0..num_paths {
-                let path = paths.row(i);
-                let spot = path[exercise_step];
-                let immediate = exercise.exercise_value(spot);
-
-                // Only regress on ITM paths
-                if immediate > 0.0 {
-                    let time_to_cashflow = exercise_times[i] - t;
-                    let discounted_cf = cashflows[i] * (-discount_rate * time_to_cashflow).exp();
-
-                    regression_x.push(spot);
-                    regression_y.push(discounted_cf);
-                    regression_indices.push(i);
-                }
-            }
-
-            if regression_x.len() <= basis.num_basis() + 10 {
-                // Too few ITM paths for stable regression.
-                // Preserve existing continuation cashflows instead of forcing early exercise.
-                tracing::debug!(
-                    exercise_step,
-                    itm_paths = regression_x.len(),
-                    min_required = basis.num_basis() + 10,
-                    "LSMC: insufficient ITM paths for regression, preserving continuation values"
-                );
-                continue;
-            }
-            match regression_with_basis(&regression_x, &regression_y, basis) {
-                Ok(continuation_values) => {
-                    for (j, &i) in regression_indices.iter().enumerate() {
-                        let spot = paths.row(i)[exercise_step];
-                        let immediate = exercise.exercise_value(spot);
-                        let continuation = continuation_values[j];
-
-                        if immediate > continuation {
-                            cashflows[i] = immediate;
-                            exercise_times[i] = t;
-                        }
-                    }
-                }
-                Err(err) => {
-                    return Err(finstack_quant_core::Error::Validation(format!(
-                        "LSMC regression failed at step {exercise_step} with {} ITM paths: {err}",
-                        regression_x.len()
-                    )));
-                }
-            }
-        }
-
-        let mut present_values = vec![0.0; num_paths];
-        for i in 0..num_paths {
-            present_values[i] = cashflows[i] * (-discount_rate * exercise_times[i]).exp();
-        }
-
-        Ok(present_values)
+        let (values, _) = self.train_exercise_policy(
+            paths,
+            exercise,
+            basis,
+            discount_rate,
+            time_to_maturity,
+            num_steps,
+        )?;
+        Ok(values)
     }
 
     /// Two-pass step 1: fit a frozen exercise policy on a training path set.
@@ -1126,6 +1033,31 @@ impl LsmcPricer {
         E: ImmediateExercise,
         B: BasisFunctions + ?Sized,
     {
+        let (_, policy) = self.train_exercise_policy(
+            paths,
+            exercise,
+            basis,
+            discount_rate,
+            time_to_maturity,
+            num_steps,
+        )?;
+        Ok(policy)
+    }
+
+    /// Fit continuation coefficients and retain the training-path values.
+    fn train_exercise_policy<E, B>(
+        &self,
+        paths: &PathMatrix,
+        exercise: &E,
+        basis: &B,
+        discount_rate: f64,
+        time_to_maturity: f64,
+        num_steps: usize,
+    ) -> Result<(Vec<f64>, ExercisePolicy)>
+    where
+        E: ImmediateExercise,
+        B: BasisFunctions + ?Sized,
+    {
         let num_paths = paths.num_paths();
         let dt = time_to_maturity / num_steps as f64;
 
@@ -1205,19 +1137,27 @@ impl LsmcPricer {
 
         coefficients_by_date.sort_by_key(|(step, _)| *step);
 
+        let present_values: Vec<f64> = cashflows
+            .iter()
+            .zip(&exercise_times)
+            .map(|(&cashflow, &time)| cashflow * (-discount_rate * time).exp())
+            .collect();
         let mut continuation = OnlineStats::new();
-        for (&cashflow, &time) in cashflows.iter().zip(&exercise_times) {
-            continuation.update(cashflow * (-discount_rate * time).exp());
+        for &value in &present_values {
+            continuation.update(value);
         }
         let exercise_at_start = self.config.exercise_dates.contains(&0)
             && exercise.exercise_value(paths.row(0)[0]) >= continuation.mean();
 
-        Ok(ExercisePolicy {
-            exercise_at_start,
-            coefficients_by_date,
-            num_basis: basis.num_basis(),
-            num_steps,
-        })
+        Ok((
+            present_values,
+            ExercisePolicy {
+                exercise_at_start,
+                coefficients_by_date,
+                num_basis: basis.num_basis(),
+                num_steps,
+            },
+        ))
     }
 
     /// Apply a frozen exercise policy forward in time on independent paths.

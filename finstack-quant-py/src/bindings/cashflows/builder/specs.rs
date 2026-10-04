@@ -22,7 +22,7 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
 use crate::bindings::core::money::{decimal_from_py, decimal_to_py, is_python_decimal, PyMoney};
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::repr_support::{enum_repr_from_serde as enum_repr, repr_from_serde};
 use crate::errors::core_to_py;
@@ -60,7 +60,7 @@ pub(crate) fn date_decimal_pairs(
 ) -> PyResult<Vec<(Date, Decimal)>> {
     items
         .iter()
-        .map(|(d, v)| Ok((extract_date(d)?, decimal_from_any(v)?)))
+        .map(|(d, v)| Ok((py_to_date(d)?, decimal_from_any(v)?)))
         .collect()
 }
 
@@ -68,7 +68,7 @@ pub(crate) fn date_decimal_pairs(
 fn date_money_pairs(items: Vec<(Bound<'_, PyAny>, PyMoney)>) -> PyResult<Vec<(Date, Money)>> {
     items
         .iter()
-        .map(|(d, m)| Ok((extract_date(d)?, m.inner)))
+        .map(|(d, m)| Ok((py_to_date(d)?, m.inner)))
         .collect()
 }
 
@@ -360,60 +360,6 @@ impl PyFloatingLegCompounding {
     fn compounded_with_observation_shift(shift_days: u32) -> Self {
         Self {
             inner: FloatingLegCompounding::CompoundedWithObservationShift { shift_days },
-        }
-    }
-
-    /// USD SOFR OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::sofr``).
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn sofr() -> Self {
-        Self {
-            inner: FloatingLegCompounding::sofr(),
-        }
-    }
-
-    /// USD Fed Funds / EFFR OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::fedfunds``).
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn fedfunds() -> Self {
-        Self {
-            inner: FloatingLegCompounding::fedfunds(),
-        }
-    }
-
-    /// GBP SONIA OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::sonia``).
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn sonia() -> Self {
-        Self {
-            inner: FloatingLegCompounding::sonia(),
-        }
-    }
-
-    /// EUR €STR OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::estr``).
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn estr() -> Self {
-        Self {
-            inner: FloatingLegCompounding::estr(),
-        }
-    }
-
-    /// JPY TONA OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::tona``).
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn tona() -> Self {
-        Self {
-            inner: FloatingLegCompounding::tona(),
-        }
-    }
-
-    /// CHF SARON OIS convention: plain compounded in arrears (Rust ``FloatingLegCompounding::saron``).
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn saron() -> Self {
-        Self {
-            inner: FloatingLegCompounding::saron(),
         }
     }
 
@@ -1484,8 +1430,8 @@ impl PyAmortizationSpec {
     fn linear_between(start: &Bound<'_, PyAny>, end: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self {
             inner: AmortizationSpec::LinearBetween {
-                start: extract_date(start)?,
-                end: extract_date(end)?,
+                start: py_to_date(start)?,
+                end: py_to_date(end)?,
             },
         })
     }
@@ -1828,7 +1774,7 @@ impl PyFeeSpec {
     fn fixed(date: &Bound<'_, PyAny>, amount: PyMoney) -> PyResult<Self> {
         Ok(Self {
             inner: FeeSpec::Fixed {
-                date: extract_date(date)?,
+                date: py_to_date(date)?,
                 amount: amount.inner,
             },
         })
@@ -2005,7 +1951,7 @@ impl PyFeeSpec {
 /// Examples
 /// --------
 /// >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
-/// >>> PrepaymentModelSpec.constant_cpr(0.06).cpr
+/// >>> PrepaymentModelSpec.constant_cpr(0.06).curve["cpr"]
 /// 0.06
 #[pyclass(
     name = "PrepaymentModelSpec",
@@ -2096,17 +2042,10 @@ impl PyPrepaymentModelSpec {
         self.inner.validate().map_err(core_to_py)
     }
 
-    /// Annual constant prepayment rate (decimal).
-    #[getter]
-    fn cpr(&self) -> f64 {
-        self.inner.cpr
-    }
-
-    /// Seasoning curve in its JSON wire form (``"constant"``, ``{"psa": ...}``,
-    /// ``{"cmbs_lockout": ...}``), or ``None`` when no curve is set.
+    /// Active prepayment model and its parameters in the canonical JSON wire form.
     #[getter]
     fn curve<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.curve)
+        serde_to_py(py, &self.inner)
     }
 
     /// Single-month mortality for the supplied seasoning.
@@ -2132,7 +2071,7 @@ impl PyPrepaymentModelSpec {
 /// Examples
 /// --------
 /// >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-/// >>> DefaultModelSpec.cdr_2pct().cdr
+/// >>> DefaultModelSpec.cdr_2pct().curve["cdr"]
 /// 0.02
 #[pyclass(
     name = "DefaultModelSpec",
@@ -2222,16 +2161,10 @@ impl PyDefaultModelSpec {
         self.inner.validate().map_err(core_to_py)
     }
 
-    /// Annual constant default rate (decimal).
-    #[getter]
-    fn cdr(&self) -> f64 {
-        self.inner.cdr
-    }
-
-    /// Seasoning curve in its JSON wire form, or ``None`` when no curve is set.
+    /// Active default model and its parameters in the canonical JSON wire form.
     #[getter]
     fn curve<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        serde_to_py(py, &self.inner.curve)
+        serde_to_py(py, &self.inner)
     }
 
     /// Monthly default rate for the supplied seasoning.

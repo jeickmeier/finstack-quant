@@ -40,7 +40,7 @@ impl ContractSpecRegistry {
             .iter()
             .find(|record| has_id(&record.ids, id))
             .ok_or_else(|| not_found("repo default spec", id))?;
-        record.to_specs()
+        Ok(record.to_specs())
     }
 
     fn validate(&self) -> Result<()> {
@@ -131,8 +131,8 @@ struct RepoDefaultRecord {
     effective_date: String,
     haircut: f64,
     calendar_id: String,
-    day_count: String,
-    business_day_convention: String,
+    day_count: DayCount,
+    business_day_convention: BusinessDayConvention,
     triparty: bool,
 }
 
@@ -155,37 +155,17 @@ impl RepoDefaultRecord {
             &self.calendar_id,
             "repo default calendar id",
         )?;
-        self.parse_day_count()?;
-        self.parse_business_day_convention()?;
         Ok(())
     }
 
-    fn to_specs(&self) -> Result<RepoDefaultSpecs> {
-        Ok(RepoDefaultSpecs {
+    fn to_specs(&self) -> RepoDefaultSpecs {
+        RepoDefaultSpecs {
             haircut: self.haircut,
             calendar_id: self.calendar_id.clone(),
-            day_count: self.parse_day_count()?,
-            business_day_convention: self.parse_business_day_convention()?,
+            day_count: self.day_count,
+            business_day_convention: self.business_day_convention,
             triparty: self.triparty,
-        })
-    }
-
-    fn parse_day_count(&self) -> Result<DayCount> {
-        self.day_count.parse().map_err(|err| {
-            Error::Validation(format!(
-                "contract-spec registry has invalid repo default day_count '{}': {err}",
-                self.day_count
-            ))
-        })
-    }
-
-    fn parse_business_day_convention(&self) -> Result<BusinessDayConvention> {
-        self.business_day_convention.parse().map_err(|err| {
-            Error::Validation(format!(
-                "contract-spec registry has invalid repo default business_day_convention '{}': {err}",
-                self.business_day_convention
-            ))
-        })
+        }
     }
 }
 

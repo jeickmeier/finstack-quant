@@ -15185,47 +15185,11 @@ export interface CashflowsNamespace {
    */
   feeSpecPeriodicBp(fields: Record<string, unknown>): generated.cashflows.FeeSpec;
 
-  /**
-   * USD SOFR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::sofr`).
-   *
-   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
-   */
-  floatingLegCompoundingSofr(): generated.cashflows.FloatingLegCompounding;
 
-  /**
-   * USD Fed Funds / EFFR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::fedfunds`).
-   *
-   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
-   */
-  floatingLegCompoundingFedfunds(): generated.cashflows.FloatingLegCompounding;
 
-  /**
-   * GBP SONIA OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::sonia`).
-   *
-   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
-   */
-  floatingLegCompoundingSonia(): generated.cashflows.FloatingLegCompounding;
 
-  /**
-   * EUR €STR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::estr`).
-   *
-   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
-   */
-  floatingLegCompoundingEstr(): generated.cashflows.FloatingLegCompounding;
 
-  /**
-   * JPY TONA OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::tona`).
-   *
-   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
-   */
-  floatingLegCompoundingTona(): generated.cashflows.FloatingLegCompounding;
 
-  /**
-   * CHF SARON OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::saron`).
-   *
-   * @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
-   */
-  floatingLegCompoundingSaron(): generated.cashflows.FloatingLegCompounding;
 
   /**
    * USD SOFR FRN compounding convention: ISDA 2021 observation shift of 2 business days (Rust `FloatingLegCompounding::sofr_observation_shift`).
@@ -19009,6 +18973,20 @@ export interface InterestRateSwap extends WasmOwned {
    * @throws Error - Throws with kind `validation` if the market JSON, `asOf`, `model` or `metricId` is invalid or the metric is not defined for this instrument; kind `not_found` if required market data is missing; and kind `computation` if the calculation fails.
    */
   metric(marketJson: JsonInput, asOf: string, metricId: string, model?: string | null): number;
+  /**
+   * Whether fixed accrual boundaries use the leg's calendar and business-day convention.
+   * @returns True for adjusted accrual dates; false for contractual dates (default).
+   * @throws This property does not throw.
+   */
+  readonly adjustFixedAccrualDates: boolean;
+
+  /**
+   * Whether floating accrual boundaries use the leg's calendar and business-day convention.
+   * @returns True for adjusted accrual dates; false for contractual dates (default).
+   * @throws This property does not throw.
+   */
+  readonly adjustFloatAccrualDates: boolean;
+
 }
 
 /**
@@ -19170,6 +19148,22 @@ export interface InterestRateSwapBuilder extends WasmOwned {
    * @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
    */
   attributes(value: generated.valuations.InterestRateSwap['attributes']): InterestRateSwapBuilder;
+  /**
+   * Select fixed accrual-date adjustment independently of payment dates.
+   * @param value - True applies the fixed leg's calendar and business-day convention; false (default) retains contractual boundaries.
+   * @returns The builder for chaining.
+   * @throws Throws for a non-boolean value or an already consumed builder.
+   */
+  adjustFixedAccrualDates(value: boolean): InterestRateSwapBuilder;
+
+  /**
+   * Select floating accrual-date adjustment independently of payment dates.
+   * @param value - True applies the floating leg's calendar and business-day convention; false (default) retains contractual boundaries.
+   * @returns The builder for chaining.
+   * @throws Throws for a non-boolean value or an already consumed builder.
+   */
+  adjustFloatAccrualDates(value: boolean): InterestRateSwapBuilder;
+
 }
 
 /**
@@ -34363,9 +34357,9 @@ export interface StatementsAnalyticsNamespace {
    * @param model - `FinancialModelSpec` to extend (object or JSON).
    * @param name - Identifier of the outstanding-balance node to create.
    * @param newVolumeNode - Existing node holding each period's new volume.
-   * @param decayCurve - Fraction of a cohort still outstanding `lag` periods after origination, as decimals starting at lag 0 (e.g. `[1.0, 0.8, 0.5]`).
+   * @param decayCurve - Fraction of a cohort still outstanding `lag` periods after origination, as decimals starting at lag 0 (e.g. `[1.0, 0.8, 0.5]`). Existing generated node identifiers are replaced.
    * @returns The extended `FinancialModelSpec` plain object.
-   * @throws Error - Throws with kind `validation` if the model is malformed, a node identifier is invalid or duplicated, or the generated formula does not compile.
+   * @throws Error - Throws with kind `validation` if the model is malformed, a node identifier is invalid, or the generated formula does not compile.
    */
   addVintageBuildup(
     model: JsonInput,
@@ -34383,9 +34377,9 @@ export interface StatementsAnalyticsNamespace {
    * @param model - `FinancialModelSpec` to extend (object or JSON).
    * @param name - Prefix of the generated `<name>_beg` and `<name>_end` nodes.
    * @param increases - Existing nodes added to the balance each period.
-   * @param decreases - Existing nodes subtracted from the balance each period.
+   * @param decreases - Existing nodes subtracted from the balance each period. Existing generated node identifiers are replaced.
    * @returns The extended `FinancialModelSpec` plain object.
-   * @throws Error - Throws with kind `validation` if the model is malformed, a node identifier is invalid or duplicated, or a generated formula does not compile.
+   * @throws Error - Throws with kind `validation` if the model is malformed, a node identifier is invalid, or a generated formula does not compile.
    */
   addRollForward(
     model: JsonInput,
@@ -34402,9 +34396,9 @@ export interface StatementsAnalyticsNamespace {
    * @param name - Prefix of the generated `<name>_beg` and `<name>_end` nodes.
    * @param increases - Existing nodes added to the balance each period.
    * @param decreases - Existing nodes subtracted from the balance each period.
-   * @param opening - Opening balance of the first period, in the balance's own units.
+   * @param opening - Opening balance of the first period, in the balance's own units. Existing generated node identifiers are replaced.
    * @returns The extended `FinancialModelSpec` plain object.
-   * @throws Error - Throws with kind `validation` if the model is malformed, a node identifier is invalid or duplicated, or a generated formula does not compile.
+   * @throws Error - Throws with kind `validation` if the model is malformed, a node identifier is invalid, or a generated formula does not compile.
    */
   addRollForwardWithOpening(
     model: JsonInput,
@@ -34422,9 +34416,9 @@ export interface StatementsAnalyticsNamespace {
    * @param revenueNodes - Existing revenue line nodes summed into the total.
    * @param totalExpensesNode - Identifier of the total-expenses node to create.
    * @param expenseNodes - Existing operating-expense line nodes summed into the total.
-   * @param noiNode - Identifier of the NOI node to create (`total revenue - total expenses`).
+   * @param noiNode - Identifier of the NOI node to create (`total revenue - total expenses`). Existing generated node identifiers are replaced.
    * @returns The extended `FinancialModelSpec` plain object.
-   * @throws Error - Throws with kind `validation` if the model is malformed, a node list is empty, a node identifier is invalid or duplicated, or a generated formula does not compile.
+   * @throws Error - Throws with kind `validation` if the model is malformed, a node list is empty, a node identifier is invalid, or a generated formula does not compile.
    */
   addNoiBuildup(
     model: JsonInput,
@@ -34441,9 +34435,9 @@ export interface StatementsAnalyticsNamespace {
    * @param model - `FinancialModelSpec` to extend (object or JSON).
    * @param noiNode - Existing NOI node.
    * @param capexNodes - Existing capital-expenditure nodes subtracted from NOI; an empty list makes NCF equal NOI.
-   * @param ncfNode - Identifier of the NCF node to create.
+   * @param ncfNode - Identifier of the NCF node to create. Existing generated node identifiers are replaced.
    * @returns The extended `FinancialModelSpec` plain object.
-   * @throws Error - Throws with kind `validation` if the model is malformed, a node identifier is invalid or duplicated, or the generated formula does not compile.
+   * @throws Error - Throws with kind `validation` if the model is malformed, a node identifier is invalid, or the generated formula does not compile.
    */
   addNcfBuildup(
     model: JsonInput,
@@ -34457,7 +34451,7 @@ export interface StatementsAnalyticsNamespace {
    * Twin of Python `add_rent_roll` (Rust `add_rent_roll`).
    * @param model - `FinancialModelSpec` to extend (object or JSON).
    * @param leases - Array of `LeaseSpec` objects, at least one (array or JSON).
-   * @param nodes - Optional `RentRollOutputNodes` naming the generated total nodes; omitted uses the Rust default names (object or JSON).
+   * @param nodes - Optional `RentRollOutputNodes` naming the generated total nodes; omitted uses the Rust default names (object or JSON). Existing generated node identifiers are replaced.
    * @returns The extended `FinancialModelSpec` plain object.
    * @throws Error - Throws with kind `validation` if an input is malformed, `leases` is empty, a lease fails validation, or a generated node identifier or formula is invalid.
    */
@@ -34477,7 +34471,7 @@ export interface StatementsAnalyticsNamespace {
    * @param opexNodes - Existing operating-expense nodes; omitted means none.
    * @param capexNodes - Existing capital-expenditure nodes; omitted means none.
    * @param managementFee - Optional `ManagementFeeSpec` (`rate` as a decimal of its `base`); omitted adds no fee (object or JSON).
-   * @param nodes - Optional `PropertyTemplateNodes` naming the generated nodes; omitted uses the Rust default names (object or JSON).
+   * @param nodes - Optional `PropertyTemplateNodes` naming the generated nodes; omitted uses the Rust default names (object or JSON). Existing generated node identifiers are replaced.
    * @returns The extended `FinancialModelSpec` plain object.
    * @throws Error - Throws with kind `validation` if an input is malformed, `leases` is empty, a lease fails validation, or a generated node identifier or formula is invalid.
    */

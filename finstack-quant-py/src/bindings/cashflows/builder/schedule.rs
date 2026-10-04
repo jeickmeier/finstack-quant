@@ -14,7 +14,7 @@ use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::periods::PyPeriod;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::errors::core_to_py;
 
 use super::orchestrator::PyCashFlowBuilder;
@@ -96,8 +96,8 @@ impl PyCashFlowMeta {
                 representation: parse_representation(representation)?,
                 calendar_ids: calendar_ids.unwrap_or_default(),
                 commitment: commitment.map(|m| m.inner),
-                issue_date: issue_date.map(extract_date).transpose()?,
-                maturity: maturity.map(extract_date).transpose()?,
+                issue_date: issue_date.map(py_to_date).transpose()?,
+                maturity: maturity.map(py_to_date).transpose()?,
             },
         })
     }
@@ -296,7 +296,7 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
             let amount: f64 = amounts[i].extract()?;
             let currency = extract_currency(&currencies[i])?;
             let reset = match resets.as_ref().map(|r| &r[i]) {
-                Some(r) if !is_missing(r)? => Some(extract_date(r)?),
+                Some(r) if !is_missing(r)? => Some(py_to_date(r)?),
                 _ => None,
             };
             let accrual_factor: f64 = factors[i].extract()?;
@@ -305,7 +305,7 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
                 _ => None,
             };
             let mut flow = CashFlow::new(
-                extract_date(date)?,
+                py_to_date(date)?,
                 reset,
                 Money::new(amount, currency).map_err(crate::errors::core_to_py)?,
                 extract_cf_kind(&kinds[i])?,
@@ -315,7 +315,7 @@ pub(crate) fn extract_flows(obj: &Bound<'_, PyAny>) -> PyResult<Vec<CashFlow>> {
             flow.accrual = optional_json_field(obj, &accruals, i, "CashFlowAccrual")?;
             flow.principal_delta = optional_json_field(obj, &deltas, i, "principal_delta")?;
             flow.principal_date = match principal_dates.as_ref().map(|dates| &dates[i]) {
-                Some(date) if !is_missing(date)? => Some(extract_date(date)?),
+                Some(date) if !is_missing(date)? => Some(py_to_date(date)?),
                 _ => None,
             };
             flows.push(flow);
@@ -562,7 +562,7 @@ impl PyCashFlowSchedule {
     ///     calculation fails. No future repayments returns zero.
     #[pyo3(text_signature = "(self, as_of)")]
     fn wal(&self, as_of: &Bound<'_, PyAny>) -> PyResult<f64> {
-        self.inner.wal(extract_date(as_of)?).map_err(core_to_py)
+        self.inner.wal(py_to_date(as_of)?).map_err(core_to_py)
     }
 
     /// Outstanding balance path as ``[(date, Money), ...]``.
@@ -631,7 +631,7 @@ impl PyCashFlowSchedule {
         let periods: Vec<finstack_quant_core::dates::Period> =
             periods.iter().map(|p| p.inner.clone()).collect();
         let market = crate::bindings::extract::extract_market(py, market)?;
-        let base = extract_date(base)?;
+        let base = py_to_date(base)?;
         let day_count = day_count.map(|d| d.inner);
         let disc_id = CurveId::from(disc_curve_id);
         let hazard_id = credit_curve_id.map(CurveId::from);

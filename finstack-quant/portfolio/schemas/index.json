@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/duration_cell_table.schema.json",
-      "bytes": 4934,
+      "bytes": 4913,
       "kind": "output",
       "path": "schemas/portfolio/1/duration_cell_table.schema.json",
       "summary": "A full duration-cell base-return curve built from a reference universe.",
@@ -155,7 +155,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_position.schema.json",
-      "bytes": 1287,
+      "bytes": 1234,
       "kind": "input",
       "path": "schemas/portfolio/1/grid_position.schema.json",
       "summary": "One position (or pre-aggregated bucket) in a duration-cell x sector grid, for one period and one side (portfolio or benchmark).",

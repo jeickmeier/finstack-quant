@@ -347,7 +347,7 @@ fn partial_replay_clips_weekend_weight_without_changing_fixing_tenor() {
 fn weekend_only_window_preserves_the_same_fixing_as_a_longer_prefix() {
     for method in [
         FloatingLegCompounding::SimpleAverage,
-        FloatingLegCompounding::sofr(),
+        FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
         FloatingLegCompounding::CompoundedInArrears { lookback_days: 2 },
     ] {
         let short =
@@ -394,7 +394,10 @@ fn weekend_only_window_preserves_the_same_fixing_as_a_longer_prefix() {
 fn overflow_and_wrong_schedule_fail_without_changing_accumulated_state() {
     for (method, rate) in [
         (FloatingLegCompounding::SimpleAverage, f64::MAX),
-        (FloatingLegCompounding::sofr(), 1e150),
+        (
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
+            1e150,
+        ),
     ] {
         let schedule =
             OvernightObservationSchedule::compile(january(6), january(13), method, &WEEKENDS_ONLY)

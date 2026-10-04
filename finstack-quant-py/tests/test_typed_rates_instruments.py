@@ -312,3 +312,27 @@ class TestFloatLegSpecTyped:
             end_of_month=False,
         )
         assert "spread_bp=0" in repr(leg)
+
+
+def test_irs_accrual_flags_round_trip_and_builder() -> None:
+    from tests.tests_typed_helpers import irs_legs
+
+    original = _payer_swap()
+    assert original.adjust_fixed_accrual_dates is False
+    assert original.adjust_float_accrual_dates is False
+    fixed, floating = irs_legs()
+    adjusted = (
+        InterestRateSwap
+        .builder()
+        .id("IRS-ACCRUAL-FLAGS")
+        .notional(original.notional)
+        .side(original.side)
+        .fixed_leg(fixed)
+        .float_leg(floating)
+        .adjust_fixed_accrual_dates(True)
+        .adjust_float_accrual_dates(False)
+        .build()
+    )
+    restored = InterestRateSwap.from_json(adjusted.to_json())
+    assert restored.adjust_fixed_accrual_dates is True
+    assert restored.adjust_float_accrual_dates is False

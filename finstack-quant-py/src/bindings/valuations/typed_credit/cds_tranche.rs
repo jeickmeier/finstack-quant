@@ -8,7 +8,7 @@ use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -129,7 +129,7 @@ impl PyCdsTrancheParams {
             attach_pct,
             detach_pct,
             money_from_py(notional, None, "notional")?,
-            extract_date(maturity)?,
+            py_to_date(maturity)?,
             bps_from_py(coupon_bp, "coupon_bp")?,
         )
         .with_realized_loss(realized_loss)
@@ -185,7 +185,7 @@ impl PyCdsTrancheParams {
                 index_name,
                 series,
                 money_from_py(notional, None, "notional")?,
-                extract_date(maturity)?,
+                py_to_date(maturity)?,
                 bps_from_py(coupon_bp, "coupon_bp")?,
             ),
         })
@@ -239,7 +239,7 @@ impl PyCdsTrancheParams {
                 index_name,
                 series,
                 money_from_py(notional, None, "notional")?,
-                extract_date(maturity)?,
+                py_to_date(maturity)?,
                 bps_from_py(coupon_bp, "coupon_bp")?,
             ),
         })
@@ -489,7 +489,7 @@ impl PyCdsTranche {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<f64> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         self.inner
             .jump_to_default(&market, as_of)
             .map_err(core_to_py)
@@ -825,7 +825,7 @@ impl PyCdsTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let maturity = extract_date(value)?;
+        let maturity = py_to_date(value)?;
         tranche_set!(
             slf,
             maturity,
@@ -1071,7 +1071,7 @@ impl PyCdsTrancheBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let start_date = extract_date(value)?;
+        let start_date = py_to_date(value)?;
         tranche_set!(
             slf,
             start_date,

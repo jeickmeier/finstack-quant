@@ -284,8 +284,11 @@ fn constrained_public_margin_values_serialize_and_round_trip() {
         default_haircut: Some(0.25),
         rehypothecation_allowed: false,
     };
-    let im =
-        ImParameters::simm_standard(Currency::USD).expect("embedded margin registry should load");
+    let im = ImParameters::for_methodology(
+        finstack_quant_margin::types::ImMethodology::Simm,
+        Currency::USD,
+    )
+    .expect("embedded margin registry should load");
     let timing = MarginCallTiming {
         notification_deadline_hours: 13,
         response_deadline_hours: 2,
@@ -330,8 +333,11 @@ fn constrained_public_margin_values_fail_serialization_with_field_names() {
     };
     assert_serialization_rejects(&schedule, "default_haircut");
 
-    let mut im =
-        ImParameters::simm_standard(Currency::USD).expect("embedded margin registry should load");
+    let mut im = ImParameters::for_methodology(
+        finstack_quant_margin::types::ImMethodology::Simm,
+        Currency::USD,
+    )
+    .expect("embedded margin registry should load");
     im.mpor_days = 0;
     assert_serialization_rejects(&im, "mpor_days");
 

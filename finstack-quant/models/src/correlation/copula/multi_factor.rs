@@ -52,8 +52,8 @@ pub struct MultiFactorCopula {
 
 impl Clone for MultiFactorCopula {
     fn clone(&self) -> Self {
-        let order =
-            u8::try_from(self.quadrature.points.len()).unwrap_or(MULTI_FACTOR_QUADRATURE_ORDER);
+        let order = u8::try_from(self.quadrature.get_points().len())
+            .unwrap_or(MULTI_FACTOR_QUADRATURE_ORDER);
         Self {
             sector_fraction: self.sector_fraction,
             quadrature: select_quadrature(order),
@@ -144,9 +144,9 @@ impl MultiFactorCopula {
         // without the quadrature driver's closure keeping a borrow.
         let nodes: Vec<(f64, f64)> = self
             .quadrature
-            .points
+            .get_points()
             .iter()
-            .zip(self.quadrature.weights.iter())
+            .zip(self.quadrature.get_weights().iter())
             .map(|(&z, &w)| (SQRT_2 * z, w))
             .collect();
         let mut acc = 0.0_f64;

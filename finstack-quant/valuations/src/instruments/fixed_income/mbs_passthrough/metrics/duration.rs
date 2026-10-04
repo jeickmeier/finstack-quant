@@ -4,7 +4,7 @@
 //! to parallel shifts in interest rates, accounting for the change in
 //! prepayment behavior as rates change.
 
-use crate::cashflow::builder::specs::{PrepaymentCurve, PrepaymentModelSpec};
+use crate::cashflow::builder::specs::PrepaymentModelSpec;
 use crate::instruments::fixed_income::mbs_passthrough::pricer::price_mbs;
 use crate::instruments::fixed_income::mbs_passthrough::AgencyMbsPassthrough;
 use finstack_quant_core::dates::{Date, DateExt, DayCountContext};
@@ -25,26 +25,29 @@ use super::PREPAY_RATE_SENSITIVITY;
 /// annual `cpr` is scaled.
 fn rate_shift_prepayment(model: &PrepaymentModelSpec, rate_shift: f64) -> PrepaymentModelSpec {
     let multiplier = (-PREPAY_RATE_SENSITIVITY * rate_shift).exp();
-    match &model.curve {
-        Some(PrepaymentCurve::Psa { speed_multiplier }) => PrepaymentModelSpec {
-            cpr: model.cpr,
-            curve: Some(PrepaymentCurve::Psa {
-                speed_multiplier: (speed_multiplier * multiplier).max(0.0),
-            }),
+    match model {
+        PrepaymentModelSpec::Psa { speed_multiplier } => PrepaymentModelSpec::Psa {
+            speed_multiplier: (speed_multiplier * multiplier).max(0.0),
         },
-        Some(PrepaymentCurve::Abs { speed }) => {
+        PrepaymentModelSpec::Abs { speed } => {
             PrepaymentModelSpec::abs((speed * multiplier).clamp(0.0, 1.0))
         }
-        Some(PrepaymentCurve::Vector { monthly_cpr }) => PrepaymentModelSpec::vector(
+        PrepaymentModelSpec::Vector { monthly_cpr } => PrepaymentModelSpec::vector(
             monthly_cpr
                 .iter()
                 .map(|cpr| (cpr * multiplier).clamp(0.0, 1.0))
                 .collect(),
         ),
-        _ => PrepaymentModelSpec {
-            cpr: (model.cpr * multiplier).max(0.0),
-            curve: model.curve.clone(),
-        },
+        PrepaymentModelSpec::Constant { cpr } => {
+            PrepaymentModelSpec::constant_cpr((cpr * multiplier).clamp(0.0, 1.0))
+        }
+        PrepaymentModelSpec::CmbsLockout {
+            lockout_months,
+            post_lockout_cpr,
+        } => PrepaymentModelSpec::cmbs_with_lockout(
+            *lockout_months,
+            (post_lockout_cpr * multiplier).clamp(0.0, 1.0),
+        ),
     }
 }
 

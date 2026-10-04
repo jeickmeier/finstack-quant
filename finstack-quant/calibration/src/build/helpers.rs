@@ -1,14 +1,9 @@
 //! Shared helpers for quote-to-instrument builders.
 
 use finstack_quant_core::dates::{
-    adjust, calendar_by_id_strict, BusinessDayConvention, Date, DateExt, HolidayCalendar,
+    adjust, calendar_by_id_strict, BusinessDayConvention, Date, DateExt,
 };
 use finstack_quant_core::Result;
-
-/// Resolve a holiday calendar by ID from the global registry.
-pub(crate) fn resolve_calendar(id: &str) -> Result<&'static dyn HolidayCalendar> {
-    calendar_by_id_strict(id)
-}
 
 /// Resolve the spot date given settlement lag and market conventions.
 pub(crate) fn resolve_spot_date(
@@ -17,7 +12,7 @@ pub(crate) fn resolve_spot_date(
     settlement_days: i32,
     business_day_convention: BusinessDayConvention,
 ) -> Result<Date> {
-    let cal = resolve_calendar(calendar_id)?;
+    let cal = calendar_by_id_strict(calendar_id)?;
     let spot = as_of.add_business_days(settlement_days, cal)?;
     adjust(spot, business_day_convention, cal)
 }

@@ -489,7 +489,6 @@ crate::impl_empty_cashflow_provider!(
 mod validation_tests {
     use super::*;
     use crate::instruments::Attributes;
-    use crate::metrics::HasExpiry;
     use finstack_quant_core::currency::Currency;
     use finstack_quant_core::dates::DayCount;
 
@@ -569,19 +568,25 @@ mod validation_tests {
     }
 
     #[test]
-    fn has_expiry_returns_explicit_expiry_field() {
+    fn instrument_expiry_returns_explicit_expiry_field() {
         // After construction the explicit expiry, not the last reset date,
         // is the contract maturity.
         let opt = CliquetOption::example().expect("example builds");
-        assert_eq!(HasExpiry::expiry(&opt), opt.expiry);
+        assert_eq!(
+            crate::instruments::Instrument::expiry(&opt),
+            Some(opt.expiry)
+        );
     }
 
     #[test]
-    fn has_expiry_does_not_panic_on_empty_reset_dates() {
+    fn instrument_expiry_does_not_panic_on_empty_reset_dates() {
         // Construct via builder (validated) then mutate to simulate corrupted
         // state from an unsanitised JSON path. expiry() must not panic.
         let mut opt = CliquetOption::example().expect("example builds");
         opt.reset_dates.clear();
-        let _ = HasExpiry::expiry(&opt);
+        assert_eq!(
+            crate::instruments::Instrument::expiry(&opt),
+            Some(opt.expiry)
+        );
     }
 }

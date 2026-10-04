@@ -310,12 +310,15 @@ export type DB556Bbeb1Ecf96C44C5A =
  */
 export type Id2 = string;
 /**
- * Prepayment curve shape.
+ * Prepayment model specification.
  */
-export type D_73686C0456Fd11C88D3E =
+export type PrepaymentModelSpec =
   | {
+      /**
+       * Annual decimal CPR in `[0, 1]`.
+       */
+      cpr: number;
       curve: "constant";
-      [k: string]: unknown;
     }
   | {
       curve: "psa";
@@ -323,7 +326,6 @@ export type D_73686C0456Fd11C88D3E =
        * Speed multiplier (1.0 = 100% PSA)
        */
       speed_multiplier: number;
-      [k: string]: unknown;
     }
   | {
       curve: "cmbs_lockout";
@@ -331,7 +333,10 @@ export type D_73686C0456Fd11C88D3E =
        * Number of months with zero prepayment (e.g., 60 for 5-year lockout)
        */
       lockout_months: number;
-      [k: string]: unknown;
+      /**
+       * Annual decimal CPR after lockout, in `[0, 1]`.
+       */
+      post_lockout_cpr: number;
     }
   | {
       curve: "abs";
@@ -340,7 +345,6 @@ export type D_73686C0456Fd11C88D3E =
        * (`0.015` = 1.5% ABS).
        */
       speed: number;
-      [k: string]: unknown;
     }
   | {
       curve: "vector";
@@ -348,7 +352,6 @@ export type D_73686C0456Fd11C88D3E =
        * Annual CPR per month of seasoning as decimals, month 1 first.
        */
       monthly_cpr: number[];
-      [k: string]: unknown;
     };
 /**
  * Discount curve identifier.
@@ -358,6 +361,50 @@ export type Id3 = string;
  * Unique instrument identifier.
  */
 export type Id4 = string;
+/**
+ * Cashflow prepayment-model specification.
+ */
+export type PrepaymentModelSpec1 =
+  | {
+      /**
+       * Annual decimal CPR in `[0, 1]`.
+       */
+      cpr: number;
+      curve: "constant";
+    }
+  | {
+      curve: "psa";
+      /**
+       * Speed multiplier (1.0 = 100% PSA)
+       */
+      speed_multiplier: number;
+    }
+  | {
+      curve: "cmbs_lockout";
+      /**
+       * Number of months with zero prepayment (e.g., 60 for 5-year lockout)
+       */
+      lockout_months: number;
+      /**
+       * Annual decimal CPR after lockout, in `[0, 1]`.
+       */
+      post_lockout_cpr: number;
+    }
+  | {
+      curve: "abs";
+      /**
+       * Monthly prepayment as a decimal fraction of the original balance
+       * (`0.015` = 1.5% ABS).
+       */
+      speed: number;
+    }
+  | {
+      curve: "vector";
+      /**
+       * Annual CPR per month of seasoning as decimals, month 1 first.
+       */
+      monthly_cpr: number[];
+    };
 /**
  * SIFMA MBS settlement class.
  *
@@ -1896,24 +1943,6 @@ export interface Money1 {
     | "ZWL";
 }
 /**
- * Prepayment model specification.
- */
-export interface PrepaymentModelSpec {
-  /**
-   * CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
-   *
-   * This field is **ignored** when [`PrepaymentCurve::Psa`],
-   * [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
-   * monthly rate is then derived entirely from the curve. It IS used by
-   * [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
-   */
-  cpr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: D_73686C0456Fd11C88D3E | null;
-}
-/**
  * Scenario-only pricing adjustments.
  */
 export interface ScenarioPricingOverrides {
@@ -2168,24 +2197,6 @@ export interface Money2 {
     | "ZAR"
     | "ZMW"
     | "ZWL";
-}
-/**
- * Cashflow prepayment-model specification.
- */
-export interface PrepaymentModelSpec1 {
-  /**
-   * CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).
-   *
-   * This field is **ignored** when [`PrepaymentCurve::Psa`],
-   * [`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the
-   * monthly rate is then derived entirely from the curve. It IS used by
-   * [`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.
-   */
-  cpr: number;
-  /**
-   * Optional curve shape (default: constant)
-   */
-  curve?: D_73686C0456Fd11C88D3E | null;
 }
 /**
  * Scenario-only pricing adjustments.

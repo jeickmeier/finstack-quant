@@ -231,18 +231,15 @@ impl StochasticPrepaySpec {
 
     /// Get the base SMM (single monthly mortality rate) for this specification.
     ///
-    /// Returns the baseline SMM before factor shocks are applied. A
+    /// Returns the first-month baseline SMM before factor shocks are applied. A
     /// regime-switching model starts in its low regime at origination; use
     /// [`StochasticPrepayment::expected_smm`] for its seasoning-dependent mean.
     pub fn base_smm(&self) -> f64 {
         match self {
-            StochasticPrepaySpec::Deterministic(spec) => {
-                // Convert annual CPR to monthly SMM
-                clamped_cpr_to_smm(spec.cpr)
-            }
-            StochasticPrepaySpec::FactorCorrelated { base_spec, .. } => {
-                clamped_cpr_to_smm(base_spec.cpr)
-            }
+            StochasticPrepaySpec::Deterministic(spec)
+            | StochasticPrepaySpec::FactorCorrelated {
+                base_spec: spec, ..
+            } => spec.smm(1).unwrap_or(0.0),
             StochasticPrepaySpec::RichardRoll { base_cpr, .. } => clamped_cpr_to_smm(*base_cpr),
             StochasticPrepaySpec::RegimeSwitching { low_cpr, .. } => clamped_cpr_to_smm(*low_cpr),
         }

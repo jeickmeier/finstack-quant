@@ -513,3 +513,26 @@ test('VaR inventory applies the whole-input byte limit', () => {
     (error) => error.kind === 'validation'
   );
 });
+
+test('IRS accrual flags use typed independent fields', () => {
+  const original = valuations.instruments.InterestRateSwap.example();
+  assert.equal(original.adjustFixedAccrualDates, false);
+  assert.equal(original.adjustFloatAccrualDates, false);
+  const wire = JSON.parse(original.toJson());
+  wire.instrument.spec.adjust_fixed_accrual_dates = true;
+  wire.instrument.spec.adjust_float_accrual_dates = false;
+  const restored = valuations.instruments.InterestRateSwap.fromJson(JSON.stringify(wire));
+  assert.equal(restored.adjustFixedAccrualDates, true);
+  assert.equal(restored.adjustFloatAccrualDates, false);
+  const built = valuations.instruments.InterestRateSwap.builder()
+    .id('IRS-FLAGS')
+    .notional(original.notional)
+    .side(original.side)
+    .fixedLeg(original.fixedLeg)
+    .floatLeg(original.floatLeg)
+    .adjustFixedAccrualDates(false)
+    .adjustFloatAccrualDates(true)
+    .build();
+  assert.equal(built.adjustFixedAccrualDates, false);
+  assert.equal(built.adjustFloatAccrualDates, true);
+});

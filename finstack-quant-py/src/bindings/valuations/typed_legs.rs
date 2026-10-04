@@ -14,7 +14,7 @@ use crate::bindings::cashflows::builder::specs::PyRollRule;
 use crate::bindings::core::dates::daycount::PyDayCount;
 use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::errors::{core_to_py, display_to_py};
 
@@ -162,8 +162,8 @@ par_method=None, payment_lag_days=0, end_of_month=False)"
             )?,
             calendar_id: calendar_id.map(Into::into),
             stub: stub_kind_from_py(stub, "stub")?,
-            start: extract_date(start)?,
-            end: extract_date(end)?,
+            start: py_to_date(start)?,
+            end: py_to_date(end)?,
             par_method: par_method
                 .map(|value| enum_from_str(value, "par_method"))
                 .transpose()?,
@@ -474,8 +474,8 @@ reset_lag_days=0, fixing_calendar_id=None, compounding='simple', payment_lag_day
             stub: stub_kind_from_py(stub, "stub")?,
             reset_lag_days,
             fixing_calendar_id: fixing_calendar_id.map(Into::into),
-            start: extract_date(start)?,
-            end: extract_date(end)?,
+            start: py_to_date(start)?,
+            end: py_to_date(end)?,
             compounding,
             payment_lag_days,
             end_of_month,
@@ -757,8 +757,8 @@ stub='short_front', business_day_convention='modified_following', calendar_id=No
         let coupon_bp = bps_from_py(coupon_bp, "coupon_bp")?;
         let inner = finstack_quant_valuations::instruments::PremiumLegSpec {
             roll_rule: roll_rule.inner,
-            start: extract_date(start)?,
-            end: extract_date(end)?,
+            start: py_to_date(start)?,
+            end: py_to_date(end)?,
             frequency: frequency.inner,
             stub: stub_kind_from_py(stub, "stub")?,
             business_day_convention: super::convert::bdc_from_str(

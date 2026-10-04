@@ -326,7 +326,7 @@ impl PyMarketHistory {
         window_days: u32,
         scenarios: &Bound<'_, PyAny>,
     ) -> PyResult<Self> {
-        let base_date = crate::bindings::date_utils::extract_date(base_date)?;
+        let base_date = crate::bindings::date_utils::py_to_date(base_date)?;
         let scenarios: Vec<MarketScenario> = py_to_serde(py, scenarios, "scenarios")?;
         Ok(Self {
             inner: MarketHistory::new(base_date, window_days, scenarios),

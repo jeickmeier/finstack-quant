@@ -154,7 +154,7 @@ impl PyFactorModel {
     ) -> PyResult<PySensitivityMatrix> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
         let market = extract_market_ref(py, market)?;
-        let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+        let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let (portfolio, market) = (&*portfolio, &*market);
         let base_currency = portfolio.base_currency;
         let inner = &self.inner;
@@ -196,7 +196,7 @@ impl PyFactorModel {
     ) -> PyResult<PyRiskDecomposition> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
         let market = extract_market_ref(py, market)?;
-        let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+        let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let (portfolio, market) = (&*portfolio, &*market);
         let inner = &self.inner;
         py.detach(move || inner.analyze(portfolio, market, as_of))
@@ -241,7 +241,7 @@ impl PyFactorModel {
     ) -> PyResult<PyWhatIfResult> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
         let market = extract_market_ref(py, market)?;
-        let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+        let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let changes = parse_position_changes(py, changes)?;
         let (portfolio, market) = (&*portfolio, &*market);
         let inner = &self.inner;
@@ -287,7 +287,7 @@ impl PyFactorModel {
     ) -> PyResult<PyStressResult> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
         let market = extract_market_ref(py, market)?;
-        let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+        let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let stresses = to_stresses(stresses);
         let (portfolio, market) = (&*portfolio, &*market);
         let inner = &self.inner;
@@ -333,7 +333,7 @@ impl PyFactorModel {
     ) -> PyResult<PyStressPnl> {
         let portfolio = extract_portfolio_ref(py, portfolio)?;
         let market = extract_market_ref(py, market)?;
-        let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+        let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let stresses = to_stresses(stresses);
         let (portfolio, market) = (&*portfolio, &*market);
         let inner = &self.inner;

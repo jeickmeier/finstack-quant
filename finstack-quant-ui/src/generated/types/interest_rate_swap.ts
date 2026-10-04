@@ -628,6 +628,18 @@ export interface D_82E945D156136Cf3819C {
  *   `docs/REFERENCES.md#bloomberg-swpm`
  */
 export interface DBbf36E9Ad6Eb27Fdf758 {
+  /**
+   * Adjust fixed coupon accrual boundaries using the fixed leg's calendar and
+   * business-day convention. Defaults to false (contractual unadjusted accrual);
+   * payment-date adjustment and payment lag are independent.
+   */
+  adjust_fixed_accrual_dates?: boolean;
+  /**
+   * Adjust floating coupon accrual boundaries using the floating leg's calendar
+   * and business-day convention, for term and overnight coupons alike. Defaults
+   * to false; reset lag is applied to the resulting accrual start.
+   */
+  adjust_float_accrual_dates?: boolean;
   attributes: Attributes;
   fixed_leg: DDccff34D4D8A7A8Ae68B;
   float_leg: D_02A84814797C76E9A7Fc;

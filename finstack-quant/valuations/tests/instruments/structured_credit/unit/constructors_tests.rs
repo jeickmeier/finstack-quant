@@ -82,7 +82,12 @@ fn test_apply_deal_defaults_sets_expected_assumptions() {
 
         assert_eq!(sc.deal_type, deal_type);
         assert_eq!(sc.frequency, expected_frequency);
-        assert!((sc.credit_model.default_spec.cdr - expected_cdr).abs() < 1e-12);
+        assert!(
+            (sc.credit_model.default_spec.mdr(1).unwrap()
+                - finstack_quant_cashflows::builder::cdr_to_mdr(expected_cdr).unwrap())
+            .abs()
+                < 1e-12
+        );
     }
 }
 

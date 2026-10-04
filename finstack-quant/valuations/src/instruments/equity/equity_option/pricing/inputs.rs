@@ -121,24 +121,6 @@ pub(crate) struct EquityOptionInputs {
     pub(crate) t_vol: f64,
 }
 
-/// Collect standard inputs (spot, risk-free, dividend yield, vol, time to expiry).
-///
-/// **Day Count Convention Handling:**
-/// - Discount factors use the discount curve's own day count
-/// - Vol surface lookups and model time use the configured model day count (ACT/365F by default)
-///
-/// This separation ensures consistent pricing when discount curves use different
-/// conventions (e.g., OIS curves with ACT/360) than the vol surface.
-pub(crate) fn collect_inputs(
-    inst: &EquityOption,
-    curves: &MarketContext,
-    as_of: Date,
-) -> Result<(f64, f64, f64, f64, f64)> {
-    let inputs = collect_inputs_extended(inst, curves, as_of)?;
-    // Return t_vol as the primary time for the simplified interface
-    Ok((inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol))
-}
-
 /// Collect inputs with curve-native discounting and the configured model time.
 ///
 /// The curve's day count is consumed by its date-to-date discount-factor
@@ -209,7 +191,7 @@ pub(crate) fn future_dividends(
     Ok(divs)
 }
 
-pub(crate) fn collect_inputs_extended(
+pub(crate) fn collect_inputs(
     inst: &EquityOption,
     curves: &MarketContext,
     as_of: Date,
@@ -303,7 +285,7 @@ pub(crate) fn early_exercise_market_params(
     curves: &MarketContext,
     as_of: Date,
 ) -> Result<(OptionMarketParams, Vec<(f64, f64)>)> {
-    let inputs = collect_inputs_extended(inst, curves, as_of)?;
+    let inputs = collect_inputs(inst, curves, as_of)?;
     let dividends = future_dividend_amounts(inst, as_of)?;
     let spot = if dividends.is_empty() {
         inputs.spot

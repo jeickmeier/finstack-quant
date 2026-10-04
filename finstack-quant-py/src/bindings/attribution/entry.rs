@@ -7,7 +7,7 @@ use crate::bindings::attribution::return_contribution::{
 };
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::extract_date;
+use crate::bindings::date_utils::py_to_date;
 use crate::bindings::extract::{extract_instrument_json, extract_market_ref};
 use crate::bindings::module_utils::py_to_json_value;
 use crate::bindings::pandas_utils::serde_rows_to_dataframe_with_schema;
@@ -53,8 +53,8 @@ fn build_inputs(
         MarketContextState::try_from(&*extract_market_ref(py, market_t0)?).map_err(core_to_py)?;
     let market_t1 =
         MarketContextState::try_from(&*extract_market_ref(py, market_t1)?).map_err(core_to_py)?;
-    let as_of_t0 = extract_date(as_of_t0)?;
-    let as_of_t1 = extract_date(as_of_t1)?;
+    let as_of_t0 = py_to_date(as_of_t0)?;
+    let as_of_t1 = py_to_date(as_of_t1)?;
     let method: AttributionMethod = serde_json::from_value(py_to_json_value(py, method, "method")?)
         .map_err(|e| serde_json_to_py(e, "invalid attribution method"))?;
     let config: Option<AttributionConfig> = options
@@ -383,8 +383,8 @@ pub(crate) fn pnl_bridge(
         );
     let market_t0 = extract_market_ref(py, market_t0)?;
     let market_t1 = extract_market_ref(py, market_t1)?;
-    let as_of_t0 = extract_date(as_of_t0)?;
-    let as_of_t1 = extract_date(as_of_t1)?;
+    let as_of_t0 = py_to_date(as_of_t0)?;
+    let as_of_t1 = py_to_date(as_of_t1)?;
     let currency = extract_currency(target_currency)?;
     let m0: &finstack_quant_core::market_data::context::MarketContext = &market_t0;
     let m1: &finstack_quant_core::market_data::context::MarketContext = &market_t1;

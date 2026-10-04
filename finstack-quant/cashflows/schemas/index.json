@@ -29,7 +29,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
-      "bytes": 77814,
+      "bytes": 77848,
       "kind": "input",
       "path": "schemas/cashflow/1/cashflow_schedule_build_spec.schema.json",
       "summary": "Notional, dates, coupon program, fees and principal events that build a schedule.",
@@ -47,7 +47,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json",
-      "bytes": 5090,
+      "bytes": 4168,
       "kind": "component",
       "path": "schemas/cashflow/1/default_model_spec.schema.json",
       "summary": "Hazard or CDR assumption driving credit losses.",
@@ -65,7 +65,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/floating_coupon_spec.schema.json",
-      "bytes": 30066,
+      "bytes": 30100,
       "kind": "component",
       "path": "schemas/cashflow/1/floating_coupon_spec.schema.json",
       "summary": "Index, spread, caps and floors, reset rules and schedule for one floating leg.",
@@ -83,7 +83,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
-      "bytes": 4361,
+      "bytes": 3618,
       "kind": "component",
       "path": "schemas/cashflow/1/prepayment_model_spec.schema.json",
       "summary": "CPR, PSA or custom vector driving voluntary prepayments.",

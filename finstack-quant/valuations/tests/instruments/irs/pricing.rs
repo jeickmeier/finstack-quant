@@ -27,6 +27,8 @@ fn test_irs_at_par_npv_zero() {
     let market = usd_swap_market(as_of, 0.05);
 
     let swap = InterestRateSwap {
+        adjust_fixed_accrual_dates: false,
+        adjust_float_accrual_dates: false,
         id: "SWAP_PAR".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
@@ -87,6 +89,8 @@ fn test_irs_receive_fixed_below_market() {
     let market = usd_swap_market(as_of, 0.05);
 
     let swap = InterestRateSwap {
+        adjust_fixed_accrual_dates: false,
+        adjust_float_accrual_dates: false,
         id: "SWAP_OFF_MARKET".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
@@ -146,6 +150,8 @@ fn test_irs_receive_fixed_above_market() {
     let market = usd_swap_market(as_of, 0.05);
 
     let swap = InterestRateSwap {
+        adjust_fixed_accrual_dates: false,
+        adjust_float_accrual_dates: false,
         id: "SWAP_ABOVE_MARKET".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
@@ -239,6 +245,8 @@ fn test_irs_pay_vs_receive_opposite_signs() {
     };
 
     let swap_receive = InterestRateSwap {
+        adjust_fixed_accrual_dates: false,
+        adjust_float_accrual_dates: false,
         id: "SWAP_RECEIVE".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
@@ -252,6 +260,8 @@ fn test_irs_pay_vs_receive_opposite_signs() {
     };
 
     let swap_pay = InterestRateSwap {
+        adjust_fixed_accrual_dates: false,
+        adjust_float_accrual_dates: false,
         id: "SWAP_PAY".into(),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Pay,

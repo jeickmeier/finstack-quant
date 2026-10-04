@@ -231,6 +231,10 @@ fn svi_surface_grid_is_calendar_monotone_under_nonflat_curve() {
         report.success,
         "SVI surface calibration must converge; report: {report:?}"
     );
+    assert!(
+        report.iterations > true_slices().len(),
+        "iteration count must report solver work rather than expiry slice count"
+    );
 
     let context =
         MarketContext::try_from(result.result.final_market).expect("restore market context");

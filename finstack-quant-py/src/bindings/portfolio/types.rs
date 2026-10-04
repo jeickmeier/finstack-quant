@@ -16,7 +16,7 @@ use pyo3::types::{PyDict, PyModule};
 
 use crate::bindings::core::currency::extract_currency;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_instrument_json;
 use crate::bindings::module_utils::{py_to_json_value, py_to_serde};
 use crate::bindings::pandas_utils::{dict_to_dataframe, serde_to_py, table_to_dataframe};
@@ -96,7 +96,7 @@ impl PyPortfolio {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyPortfolioBuilder> {
         let ccy = extract_currency(base_currency)?;
-        let date = extract_date(as_of)?;
+        let date = py_to_date(as_of)?;
         Ok(PyPortfolioBuilder {
             inner: Some(PortfolioBuilder::new(id).base_currency(ccy).as_of(date)),
         })
@@ -1266,7 +1266,7 @@ impl PyPortfolioCashflows {
     > {
         let market = crate::bindings::extract::extract_market_ref(py, market)?;
         let ccy = extract_currency(base_currency)?;
-        let as_of_date = extract_date(as_of)?;
+        let as_of_date = py_to_date(as_of)?;
         let curves = extract_discount_curve_map(discount_curves)?;
         let market_ref: &finstack_quant_core::market_data::context::MarketContext = &market;
         let cashflows = &self.inner;

@@ -9,7 +9,7 @@
 
 use super::engine::{extract_metric_frame, PyCovenantEngine};
 use super::spec::PyCovenantSpec;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe_with_schema, ColumnSchema};
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, display_to_py};
@@ -80,7 +80,7 @@ impl PyCovenantForecastConfig {
             volatility,
             random_seed,
             antithetic,
-            reference_date: reference_date.map(extract_date).transpose()?,
+            reference_date: reference_date.map(py_to_date).transpose()?,
             breach_probability_threshold,
         }))
     }

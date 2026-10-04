@@ -20,42 +20,12 @@ struct RateIndexConventionsRecord {
     default_payment_lag_days: i32,
     default_reset_lag_days: i32,
     #[serde(default)]
-    ois_compounding: Option<OisCompoundingSpec>,
+    ois_compounding: Option<FloatingLegCompounding>,
     market_calendar_id: String,
     market_settlement_days: i32,
     market_business_day_convention: BusinessDayConvention,
     default_fixed_leg_day_count: DayCount,
     default_fixed_leg_frequency: String,
-}
-
-#[derive(Debug, Clone, serde::Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum OisCompoundingSpec {
-    Sofr,
-    Sonia,
-    Estr,
-    Tona,
-    Fedfunds,
-    Saron,
-    CompoundedInArrears { lookback_days: u32 },
-}
-
-impl OisCompoundingSpec {
-    fn to_compounding(&self) -> FloatingLegCompounding {
-        match self {
-            Self::Sofr => FloatingLegCompounding::sofr(),
-            Self::Sonia => FloatingLegCompounding::sonia(),
-            Self::Estr => FloatingLegCompounding::estr(),
-            Self::Tona => FloatingLegCompounding::tona(),
-            Self::Fedfunds => FloatingLegCompounding::fedfunds(),
-            Self::Saron => FloatingLegCompounding::saron(),
-            Self::CompoundedInArrears { lookback_days } => {
-                FloatingLegCompounding::CompoundedInArrears {
-                    lookback_days: *lookback_days,
-                }
-            }
-        }
-    }
 }
 
 impl RateIndexConventionsRecord {
@@ -87,7 +57,7 @@ impl RateIndexConventionsRecord {
                 ))
             })?;
 
-        let ois_compounding = self.ois_compounding.as_ref().map(|s| s.to_compounding());
+        let ois_compounding = self.ois_compounding;
 
         // Basic invariants
         match self.kind {
@@ -170,7 +140,7 @@ mod tests {
 
         assert_eq!(
             chf_saron.ois_compounding,
-            Some(FloatingLegCompounding::saron())
+            Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 })
         );
     }
 
@@ -181,7 +151,10 @@ mod tests {
             .get(&IndexId::new("USD-SOFR"))
             .expect("USD-SOFR conventions");
 
-        assert_eq!(sofr.ois_compounding, Some(FloatingLegCompounding::sofr()));
+        assert_eq!(
+            sofr.ois_compounding,
+            Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 })
+        );
     }
 
     #[test]

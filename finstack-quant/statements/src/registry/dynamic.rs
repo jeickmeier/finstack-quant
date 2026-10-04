@@ -4,7 +4,6 @@ use crate::error::{Error, Result};
 use crate::registry::schema::{MetricDefinition, MetricRegistry};
 use crate::registry::validation::validate_metric_definition;
 use indexmap::{IndexMap, IndexSet};
-use std::collections::HashSet;
 
 /// Dynamic registry for metric definitions.
 ///
@@ -24,9 +23,6 @@ use std::collections::HashSet;
 pub struct Registry {
     /// Map of fully-qualified metric ID → metric definition
     metrics: IndexMap<String, StoredMetric>,
-
-    /// Set of all namespaces
-    namespaces: HashSet<String>,
 }
 
 /// Stored metric.
@@ -44,7 +40,6 @@ impl Registry {
     pub fn new() -> Self {
         Self {
             metrics: IndexMap::new(),
-            namespaces: HashSet::new(),
         }
     }
 
@@ -192,7 +187,6 @@ impl Registry {
             ));
         }
 
-        self.namespaces.insert(namespace);
         for (qualified_id, stored) in staged {
             self.metrics.insert(qualified_id, stored);
         }
@@ -330,7 +324,8 @@ impl Registry {
         }
 
         for (metric_id, metric) in &metric_map {
-            let deps = self.extract_metric_dependencies(&metric.formula, &all_metric_ids)?;
+            let deps =
+                crate::utils::formula::extract_identifiers(&metric.formula, &all_metric_ids)?;
             dependencies.insert(metric_id.to_owned(), deps);
         }
 
@@ -354,17 +349,6 @@ impl Registry {
             .collect::<std::result::Result<Vec<_>, _>>()?;
 
         Ok(sorted)
-    }
-
-    /// Extract dependencies from a metric formula.
-    ///
-    /// Returns the set of metric IDs (unqualified) that this formula references.
-    fn extract_metric_dependencies(
-        &self,
-        formula: &str,
-        all_metric_ids: &IndexSet<String>,
-    ) -> Result<IndexSet<String>> {
-        crate::utils::formula::extract_identifiers(formula, all_metric_ids)
     }
 
     /// Get a metric's transitive dependencies in insertion order.
@@ -413,7 +397,10 @@ impl Registry {
             })
             .collect();
 
-        let deps = self.extract_metric_dependencies(&metric.definition.formula, &all_metric_ids)?;
+        let deps = crate::utils::formula::extract_identifiers(
+            &metric.definition.formula,
+            &all_metric_ids,
+        )?;
 
         for dep_id in deps {
             let dep_qualified = format!("{}.{}", namespace, dep_id);

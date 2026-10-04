@@ -131,37 +131,6 @@ pub trait OptionGreeksProvider: Send + Sync {
     ) -> finstack_quant_core::Result<OptionGreeks>;
 }
 
-/// Implement standard equity-exotic trait boilerplate for instruments with
-/// `day_count` fields.
-///
-/// For types with custom `HasExpiry`, use the internal `@mc_daycount` arm
-/// directly and implement `HasExpiry` manually.
-macro_rules! impl_equity_exotic_traits {
-    ($ty:ty) => {
-        $crate::instruments::common_impl::traits::impl_equity_exotic_traits!(@inner $ty);
-    };
-
-    (@inner $ty:ty) => {
-        $crate::instruments::common_impl::traits::impl_equity_exotic_traits!(@mc_daycount $ty);
-
-        impl $crate::metrics::HasExpiry for $ty {
-            fn expiry(&self) -> finstack_quant_core::dates::Date {
-                self.expiry
-            }
-        }
-    };
-
-    (@mc_daycount $ty:ty) => {
-        impl $crate::metrics::HasDayCount for $ty {
-            fn day_count(&self) -> finstack_quant_core::dates::DayCount {
-                self.day_count
-            }
-        }
-    };
-}
-
-pub(crate) use impl_equity_exotic_traits;
-
 #[cfg(test)]
 mod tests {
     use super::*;

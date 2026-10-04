@@ -355,8 +355,9 @@ impl MarketContext {
     {
         let curve: CurveStorage = curve.into();
         let id = curve.id().to_owned();
+        let affects_credit_indices = self.curve_affects_credit_indices(&id);
         Arc::make_mut(&mut self.curves).insert(id, curve);
-        if !self.credit_indices.is_empty() {
+        if affects_credit_indices {
             let _invalidated = self.rebind_all_credit_indices();
         }
         self

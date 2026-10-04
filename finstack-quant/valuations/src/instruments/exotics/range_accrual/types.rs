@@ -537,21 +537,6 @@ impl crate::instruments::common_impl::traits::Instrument for RangeAccrual {
     crate::instruments::common_impl::traits::impl_focused_pricing_overrides!();
 }
 
-impl crate::metrics::HasExpiry for RangeAccrual {
-    fn expiry(&self) -> finstack_quant_core::dates::Date {
-        self.terms
-            .payment_date
-            .or_else(|| self.terms.observation_dates.last().copied())
-            .unwrap_or(Date::MIN)
-    }
-}
-
-impl crate::metrics::HasDayCount for RangeAccrual {
-    fn day_count(&self) -> finstack_quant_core::dates::DayCount {
-        self.terms.day_count
-    }
-}
-
 crate::impl_empty_cashflow_provider!(
     RangeAccrual,
     crate::cashflow::builder::CashflowRepresentation::Placeholder

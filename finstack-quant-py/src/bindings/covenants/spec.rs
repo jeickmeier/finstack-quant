@@ -6,7 +6,7 @@
 //! modified copy, mirroring the consuming Rust builders.
 
 use crate::bindings::core::dates::tenor::{extract_tenor, PyTenor};
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, display_to_py};
 use finstack_quant_covenants::{
@@ -298,7 +298,7 @@ impl PyCovenantConsequence {
     #[pyo3(text_signature = "(new_maturity)")]
     fn accelerate_maturity(new_maturity: &Bound<'_, PyAny>) -> PyResult<Self> {
         Ok(Self::from_inner(CovenantConsequence::AccelerateMaturity {
-            new_maturity: extract_date(new_maturity)?,
+            new_maturity: py_to_date(new_maturity)?,
         }))
     }
 
@@ -662,7 +662,7 @@ impl PyThresholdSchedule {
     fn new(entries: Vec<(Bound<'_, PyAny>, f64)>) -> PyResult<Self> {
         let entries = entries
             .iter()
-            .map(|(date, value)| Ok((extract_date(date)?, *value)))
+            .map(|(date, value)| Ok((py_to_date(date)?, *value)))
             .collect::<PyResult<Vec<_>>>()?;
         ThresholdSchedule::new(entries)
             .map(Self::from_inner)
@@ -702,7 +702,7 @@ impl PyThresholdSchedule {
     /// effective date.
     #[pyo3(text_signature = "(test_date)")]
     fn threshold_for(&self, test_date: &Bound<'_, PyAny>) -> PyResult<Option<f64>> {
-        Ok(self.inner.threshold_for(extract_date(test_date)?))
+        Ok(self.inner.threshold_for(py_to_date(test_date)?))
     }
 
     fn __len__(&self) -> usize {
@@ -762,8 +762,8 @@ impl PyCovenantWaiver {
     ) -> PyResult<Self> {
         Ok(Self::from_inner(CovenantWaiver {
             covenant_id,
-            effective_date: extract_date(effective_date)?,
-            expiry_date: expiry_date.map(extract_date).transpose()?,
+            effective_date: py_to_date(effective_date)?,
+            expiry_date: expiry_date.map(py_to_date).transpose()?,
             amended_threshold,
             description,
         }))

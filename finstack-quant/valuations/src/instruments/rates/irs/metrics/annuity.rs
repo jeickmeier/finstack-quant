@@ -66,15 +66,9 @@ impl MetricCalculator for AnnuityCalculator {
             .get_discount(&irs.fixed_leg.discount_curve_id)?;
 
         let fixed = irs.resolved_fixed_leg()?;
-        let periods = crate::cashflow::builder::periods::build_periods(fixed.schedule_params(
-            matches!(
-                irs.attributes.get_meta("schedule_adjust"),
-                Some("acc_and_pay_dates")
-            ) || matches!(
-                irs.attributes.get_meta("adjust_accrual_dates"),
-                Some("true")
-            ),
-        ))?;
+        let periods = crate::cashflow::builder::periods::build_periods(
+            fixed.schedule_params(irs.adjust_fixed_accrual_dates),
+        )?;
         if periods.is_empty() {
             return Ok(0.0);
         }

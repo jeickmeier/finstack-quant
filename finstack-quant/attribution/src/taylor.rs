@@ -2229,7 +2229,16 @@ mod tests {
                     prepayment_spec, ..
                 } => {
                     let mut clone = self.clone();
-                    clone.model_cpr = Some(prepayment_spec.cpr);
+                    clone.model_cpr = Some(match prepayment_spec {
+                        finstack_quant_cashflows::builder::PrepaymentModelSpec::Constant {
+                            cpr,
+                        } => *cpr,
+                        _ => {
+                            return Err(finstack_quant_core::Error::Validation(
+                                "MockInstrument requires a constant CPR model".into(),
+                            ))
+                        }
+                    });
                     Ok(Box::new(clone))
                 }
                 ModelParamsSnapshot::Convertible { .. } => {

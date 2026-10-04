@@ -894,8 +894,8 @@ mod builder_credit_model_tests {
             .prepayment_spec(prepayment.clone())
             .default_spec(default.clone());
         let staged = builder.credit_model.as_ref().expect("staged credit model");
-        assert_eq!(staged.prepayment_spec.cpr, prepayment.cpr);
-        assert_eq!(staged.default_spec.cdr, default.cdr);
+        assert_eq!(staged.prepayment_spec, prepayment);
+        assert_eq!(staged.default_spec, default);
         // The fields that were not set keep the defaults.
         assert_eq!(
             staged.recovery_spec.rate,
@@ -909,9 +909,8 @@ mod builder_credit_model_tests {
                 .credit_model
                 .as_ref()
                 .expect("credit model")
-                .prepayment_spec
-                .cpr,
-            CreditModelConfig::default().prepayment_spec.cpr
+                .prepayment_spec,
+            CreditModelConfig::default().prepayment_spec
         );
     }
 }

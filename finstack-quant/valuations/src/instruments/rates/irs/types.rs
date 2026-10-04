@@ -150,6 +150,18 @@ pub struct InterestRateSwap {
     pub fixed_leg: FixedLegSpec,
     /// Floating leg specification.
     pub float_leg: FloatLegSpec,
+    /// Adjust fixed coupon accrual boundaries using the fixed leg's calendar and
+    /// business-day convention. Defaults to false (contractual unadjusted accrual);
+    /// payment-date adjustment and payment lag are independent.
+    #[builder(default)]
+    #[serde(default)]
+    pub adjust_fixed_accrual_dates: bool,
+    /// Adjust floating coupon accrual boundaries using the floating leg's calendar
+    /// and business-day convention, for term and overnight coupons alike. Defaults
+    /// to false; reset lag is applied to the resulting accrual start.
+    #[builder(default)]
+    #[serde(default)]
+    pub adjust_float_accrual_dates: bool,
     /// Optional OTC margin specification for VM/IM.
     ///
     /// When present, enables margin calculation using SIMM or schedule-based

@@ -2,7 +2,6 @@
 
 use finstack_quant_core::math::ZERO_TOLERANCE;
 use finstack_quant_statements::builder::{ModelBuilder, Ready};
-use finstack_quant_statements::error::Result;
 use finstack_quant_statements::types::{NodeId, NodeSpec, NodeType};
 
 /// Add a vintage buildup (cohort analysis) structure.
@@ -22,16 +21,16 @@ use finstack_quant_statements::types::{NodeId, NodeSpec, NodeType};
 ///   index `k` is the cohort `k` model periods later. On a quarterly model,
 ///   `k = 1` is the next quarter.
 ///
-/// # Errors
+/// # Returns
 ///
-/// Propagates model-builder errors for invalid or duplicate node IDs, an
-/// unavailable new-volume node, or generated convolution formulas.
+/// Builder with the generated nodes inserted. Existing nodes with the same
+/// identifiers are overwritten; final `build()` validates formulas and references.
 pub fn add_vintage_buildup(
     mut builder: ModelBuilder<Ready>,
     name: &str,
     new_volume_node: &str,
     decay_curve: &[f64],
-) -> Result<ModelBuilder<Ready>> {
+) -> ModelBuilder<Ready> {
     let mut terms = Vec::new();
 
     for (lag, &rate) in decay_curve.iter().enumerate() {
@@ -69,5 +68,5 @@ pub fn add_vintage_buildup(
 
     builder.insert_node(NodeId::from(name), node);
 
-    Ok(builder)
+    builder
 }

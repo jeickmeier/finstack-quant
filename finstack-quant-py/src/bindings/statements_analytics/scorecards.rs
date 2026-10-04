@@ -484,7 +484,7 @@ impl PyCreditScorecardExtension {
 
     /// Run the scorecard against a model and pre-computed statement results.
     fn execute(
-        &mut self,
+        &self,
         model: &Bound<'_, PyAny>,
         results: &Bound<'_, PyAny>,
     ) -> PyResult<PyScorecardReport> {

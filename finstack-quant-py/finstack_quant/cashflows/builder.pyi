@@ -1812,7 +1812,7 @@ class DefaultModelSpec:
     Examples
     --------
     >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-    >>> DefaultModelSpec.cdr_2pct().cdr
+    >>> DefaultModelSpec.cdr_2pct().curve["cdr"]
     0.02
     """
 
@@ -1838,7 +1838,7 @@ class DefaultModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> DefaultModelSpec.constant_cdr(0.02).cdr
+        >>> DefaultModelSpec.constant_cdr(0.02).curve["cdr"]
         0.02
         """
         ...
@@ -1887,25 +1887,8 @@ class DefaultModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import DefaultModelSpec
-        >>> DefaultModelSpec.cdr_2pct().cdr
+        >>> DefaultModelSpec.cdr_2pct().curve["cdr"]
         0.02
-        """
-        ...
-
-    @property
-    def cdr(self) -> float:
-        """
-        Annual constant default rate.
-
-        Returns
-        -------
-        float
-            The configured annual CDR, ignored when a seasoning curve
-            supplies its own terminal rate.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
         """
         ...
 
@@ -2116,12 +2099,12 @@ class DefaultModelSpec:
     @property
     def curve(self) -> Any:
         """
-        Seasoning curve in its JSON wire form or ``None``.
+        Selected model and its active parameters in canonical JSON wire form.
 
         Returns
         -------
         Any
-            Seasoning curve in its JSON wire form or ``None``.
+            Selected model and its active parameters in canonical JSON wire form.
 
         Notes
         -----
@@ -3881,7 +3864,7 @@ class FloatingLegCompounding:
     Examples
     --------
     >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
-    >>> FloatingLegCompounding.sofr() == FloatingLegCompounding.compounded_in_arrears(0)
+    >>> FloatingLegCompounding.compounded_in_arrears(0).is_overnight()
     True
     >>> FloatingLegCompounding.SIMPLE.is_overnight()
     False
@@ -3944,156 +3927,6 @@ class FloatingLegCompounding:
         --------
         >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
         >>> FloatingLegCompounding.compounded_with_observation_shift(2) is not None
-        True
-        """
-        ...
-
-    @staticmethod
-    def sofr() -> FloatingLegCompounding:
-        """
-        USD SOFR OIS convention: plain compounded in arrears.
-
-        Mirrors Rust ``FloatingLegCompounding::sofr``. The preset sets only the compounding method;
-        the leg's day count is configured separately.
-
-        Returns
-        -------
-        FloatingLegCompounding
-            The market-standard convention, equal to ``compounded_in_arrears(0)``.
-
-        Notes
-        -----
-        This constructor does not raise.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
-        >>> FloatingLegCompounding.sofr() == FloatingLegCompounding.compounded_in_arrears(0)
-        True
-        """
-        ...
-
-    @staticmethod
-    def fedfunds() -> FloatingLegCompounding:
-        """
-        USD Fed Funds / EFFR OIS convention: plain compounded in arrears.
-
-        Mirrors Rust ``FloatingLegCompounding::fedfunds``. The preset sets only the compounding method;
-        the leg's day count is configured separately.
-
-        Returns
-        -------
-        FloatingLegCompounding
-            The market-standard convention, equal to ``compounded_in_arrears(0)``.
-
-        Notes
-        -----
-        This constructor does not raise.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
-        >>> FloatingLegCompounding.fedfunds() == FloatingLegCompounding.compounded_in_arrears(0)
-        True
-        """
-        ...
-
-    @staticmethod
-    def sonia() -> FloatingLegCompounding:
-        """
-        GBP SONIA OIS convention: plain compounded in arrears.
-
-        Mirrors Rust ``FloatingLegCompounding::sonia``. The preset sets only the compounding method;
-        the leg's day count is configured separately.
-
-        Returns
-        -------
-        FloatingLegCompounding
-            The market-standard convention, equal to ``compounded_in_arrears(0)``.
-
-        Notes
-        -----
-        This constructor does not raise.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
-        >>> FloatingLegCompounding.sonia() == FloatingLegCompounding.compounded_in_arrears(0)
-        True
-        """
-        ...
-
-    @staticmethod
-    def estr() -> FloatingLegCompounding:
-        """
-        EUR €STR OIS convention: plain compounded in arrears.
-
-        Mirrors Rust ``FloatingLegCompounding::estr``. The preset sets only the compounding method;
-        the leg's day count is configured separately.
-
-        Returns
-        -------
-        FloatingLegCompounding
-            The market-standard convention, equal to ``compounded_in_arrears(0)``.
-
-        Notes
-        -----
-        This constructor does not raise.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
-        >>> FloatingLegCompounding.estr() == FloatingLegCompounding.compounded_in_arrears(0)
-        True
-        """
-        ...
-
-    @staticmethod
-    def tona() -> FloatingLegCompounding:
-        """
-        JPY TONA OIS convention: plain compounded in arrears.
-
-        Mirrors Rust ``FloatingLegCompounding::tona``. The preset sets only the compounding method;
-        the leg's day count is configured separately.
-
-        Returns
-        -------
-        FloatingLegCompounding
-            The market-standard convention, equal to ``compounded_in_arrears(0)``.
-
-        Notes
-        -----
-        This constructor does not raise.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
-        >>> FloatingLegCompounding.tona() == FloatingLegCompounding.compounded_in_arrears(0)
-        True
-        """
-        ...
-
-    @staticmethod
-    def saron() -> FloatingLegCompounding:
-        """
-        CHF SARON OIS convention: plain compounded in arrears.
-
-        Mirrors Rust ``FloatingLegCompounding::saron``. The preset sets only the compounding method;
-        the leg's day count is configured separately.
-
-        Returns
-        -------
-        FloatingLegCompounding
-            The market-standard convention, equal to ``compounded_in_arrears(0)``.
-
-        Notes
-        -----
-        This constructor does not raise.
-
-        Examples
-        --------
-        >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
-        >>> FloatingLegCompounding.saron() == FloatingLegCompounding.compounded_in_arrears(0)
         True
         """
         ...
@@ -4202,7 +4035,7 @@ class FloatingLegCompounding:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import FloatingLegCompounding
-        >>> FloatingLegCompounding.sofr().is_overnight(), FloatingLegCompounding.SIMPLE.is_overnight()
+        >>> FloatingLegCompounding.compounded_in_arrears(0).is_overnight(), FloatingLegCompounding.SIMPLE.is_overnight()
         (True, False)
         """
         ...
@@ -4237,7 +4070,7 @@ class PrepaymentModelSpec:
     Examples
     --------
     >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
-    >>> PrepaymentModelSpec.constant_cpr(0.06).cpr
+    >>> PrepaymentModelSpec.constant_cpr(0.06).curve["cpr"]
     0.06
     """
 
@@ -4263,7 +4096,7 @@ class PrepaymentModelSpec:
         Examples
         --------
         >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
-        >>> PrepaymentModelSpec.constant_cpr(0.06).cpr
+        >>> PrepaymentModelSpec.constant_cpr(0.06).curve["cpr"]
         0.06
         """
         ...
@@ -4344,23 +4177,6 @@ class PrepaymentModelSpec:
         >>> from finstack_quant.cashflows.builder import PrepaymentModelSpec
         >>> PrepaymentModelSpec.cmbs_with_lockout(24, 0.10) is not None
         True
-        """
-        ...
-
-    @property
-    def cpr(self) -> float:
-        """
-        Annual constant prepayment rate.
-
-        Returns
-        -------
-        float
-            The configured annual CPR, ignored when the PSA curve supplies
-            its own terminal rate.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
         """
         ...
 

@@ -127,7 +127,7 @@ fn calculate_var_with_pricing(
     let history = extract_history(py, history)?;
     let config = extract_config(py, config)?;
     let market = extract_market(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+    let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
     let model = model.to_owned();
     py.detach(move || {
         let parsed = envelopes

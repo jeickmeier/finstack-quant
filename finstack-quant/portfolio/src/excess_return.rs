@@ -81,8 +81,8 @@ pub struct ReferenceReturn {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct CellReturn {
-    /// Human-readable cell label, e.g. `"5.0-5.5"` (see
-    /// [`duration_cell_label`]). In an inbound [`DurationCellTable`] consumed
+    /// Human-readable duration-cell label, e.g. `"5.0-5.5"`.
+    /// In an inbound [`DurationCellTable`] consumed
     /// by [`excess_returns`], labels must be non-empty and unique.
     pub label: String,
     /// Cell lower bound (inclusive), in years.

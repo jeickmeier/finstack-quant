@@ -95,7 +95,8 @@
           "pool_id": "MA1234",
           "pool_type": "generic",
           "prepayment_spec": {
-            "cpr": 0.0
+            "cpr": 0.0,
+            "curve": "constant"
           },
           "servicing_fee_bp": 25.0,
           "wac": 0.045,
@@ -188,7 +189,8 @@
           "pool_id": "MA1234",
           "pool_type": "generic",
           "prepayment_spec": {
-            "cpr": 0.0
+            "cpr": 0.0,
+            "curve": "constant"
           },
           "servicing_fee_bp": 25.0,
           "wac": 0.045,
@@ -230,7 +232,8 @@
         "pool_id": "MA1234",
         "pool_type": "generic",
         "prepayment_spec": {
-          "cpr": 0.0
+          "cpr": 0.0,
+          "curve": "constant"
         },
         "servicing_fee_bp": 25.0,
         "wac": 0.045,

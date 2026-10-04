@@ -407,9 +407,9 @@ impl StructuredCredit {
             // A charge-off curve is inverted through the roll rates to size
             // the bucket entries; a bucket that never rolls cannot be.
             let charge_off_curve = matches!(
-                self.credit_model.default_spec.curve,
-                Some(crate::cashflow::builder::DefaultCurve::CumulativeLoss { .. })
-                    | Some(crate::cashflow::builder::DefaultCurve::Timing { .. })
+                self.credit_model.default_spec,
+                crate::cashflow::builder::DefaultModelSpec::CumulativeLoss { .. }
+                    | crate::cashflow::builder::DefaultModelSpec::Timing { .. }
             );
             if charge_off_curve && model.roll_rates.iter().any(|roll| *roll <= 0.0) {
                 return Err(invalid(

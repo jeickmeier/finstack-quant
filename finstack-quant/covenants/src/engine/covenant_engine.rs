@@ -214,7 +214,7 @@ impl CovenantEngine {
         self.evaluate_specs(&applicable_specs, context, test_date)
     }
 
-    fn evaluate_specs(
+    pub(crate) fn evaluate_specs(
         &self,
         specs: &[&CovenantSpec],
         context: &dyn CovenantMetricSource,

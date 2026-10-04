@@ -67,7 +67,7 @@ pub(crate) fn register_rates_pricers(
 
     // Cap/Floor
     registry.register(
-        crate::instruments::rates::cap_floor::pricing::pricer::SimpleCapFloorBlackPricer::default(),
+        crate::instruments::rates::cap_floor::pricing::pricer::SimpleCapFloorBlackPricer,
     )?;
 
     registry.register(crate::instruments::rates::swaption::pricer::SimpleSwaptionBlackPricer)?;

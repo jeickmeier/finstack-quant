@@ -290,19 +290,36 @@ pub fn evaluate_dcf_with_market(
     market: Option<&MarketContext>,
     as_of: Option<Date>,
 ) -> Result<CorporateValuationResult> {
-    let result = evaluate_dcf_impl(
+    // Market is for statement evaluation (curve-dependent CS nodes), not
+    // DCF discounting. Require as_of whenever a market is supplied so
+    // curves cannot be silently dropped.
+    let context = DcfEvalContext {
+        net_debt_override,
+        options,
+        market,
+    };
+    let mut evaluator = Evaluator::new();
+    let results = match (context.market, as_of) {
+        (Some(market), Some(as_of)) => evaluator.evaluate_with_market(model, market, as_of)?,
+        (Some(_), None) => {
+            return Err(finstack_quant_statements::error::Error::Eval(
+                "evaluate_dcf_with_market requires as_of when a market context is provided; \
+                 market is used for statement evaluation, not DCF discounting"
+                    .into(),
+            ));
+        }
+        (None, _) => evaluator.evaluate(model)?,
+    };
+
+    evaluate_dcf_from_results_impl(
         model,
+        &results,
         wacc,
         terminal_value,
         ufcf_node,
-        DcfEvalContext {
-            net_debt_override,
-            options,
-            market,
-        },
+        context,
         as_of,
-    )?;
-    Ok(result)
+    )
 }
 
 /// Tornado parameter id for the discount-rate shock.
@@ -717,42 +734,6 @@ pub fn wacc(
     }
 
     Ok(equity_weight * cost_of_equity + debt_weight * cost_of_debt * (1.0 - tax_rate))
-}
-
-/// Core implementation shared by all `evaluate_dcf*` entry points.
-fn evaluate_dcf_impl(
-    model: &FinancialModelSpec,
-    wacc: f64,
-    terminal_value: TerminalValueSpec,
-    ufcf_node: &str,
-    context: DcfEvalContext<'_>,
-    as_of: Option<Date>,
-) -> Result<CorporateValuationResult> {
-    // Market is for statement evaluation (curve-dependent CS nodes), not
-    // DCF discounting. Require as_of whenever a market is supplied so
-    // curves cannot be silently dropped.
-    let mut evaluator = Evaluator::new();
-    let results = match (context.market, as_of) {
-        (Some(market), Some(as_of)) => evaluator.evaluate_with_market(model, market, as_of)?,
-        (Some(_), None) => {
-            return Err(finstack_quant_statements::error::Error::Eval(
-                "evaluate_dcf_with_market requires as_of when a market context is provided; \
-                 market is used for statement evaluation, not DCF discounting"
-                    .into(),
-            ));
-        }
-        (None, _) => evaluator.evaluate(model)?,
-    };
-
-    evaluate_dcf_from_results_impl(
-        model,
-        &results,
-        wacc,
-        terminal_value,
-        ufcf_node,
-        context,
-        as_of,
-    )
 }
 
 pub(crate) fn evaluate_dcf_from_results_impl(

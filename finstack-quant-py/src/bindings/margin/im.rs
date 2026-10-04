@@ -8,7 +8,7 @@ use super::frame::sensitivity_rows;
 use super::im_curvature::PySimmCurvatureSensitivity;
 use super::types::{extract_asset_class, PyEligibleCollateralSchedule};
 use crate::bindings::core::config::PyFinstackConfig;
-use crate::bindings::date_utils::extract_date;
+use crate::bindings::date_utils::py_to_date;
 use crate::bindings::module_utils::parse_currency;
 use crate::errors::core_to_py;
 use finstack_quant_margin as fm;
@@ -486,7 +486,7 @@ impl PySimmCalculator {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyImResult> {
         let ccy = parse_currency(currency)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let inner = py
             .detach(|| {
                 self.inner
@@ -605,7 +605,7 @@ impl PyScheduleImCalculator {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyImResult> {
         let ccy = parse_currency(currency)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let asset_class = parse_schedule_asset_class(asset_class)?;
         Ok(PyImResult::from_inner(
             self.inner
@@ -642,7 +642,7 @@ impl PyScheduleImCalculator {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<Option<PyImResult>> {
         let ccy = parse_currency(currency)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let money_positions: Vec<_> = positions
             .into_iter()
             .map(|(mtm, notional, asset_class, maturity)| {
@@ -780,7 +780,7 @@ impl PyHaircutImCalculator {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyImResult> {
         let ccy = parse_currency(currency)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         Ok(PyImResult::from_inner(
             self.inner
                 .calculate_for_collateral(

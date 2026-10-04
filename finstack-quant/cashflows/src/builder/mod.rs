@@ -72,11 +72,11 @@ pub use periods::SchedulePeriod;
 pub use rate_helpers::{project_floating_rate, FloatingRateParams};
 pub use schedule::{CashFlowMeta, CashFlowSchedule, CashflowRepresentation, PvCreditAdjustment};
 pub use specs::{
-    evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultCurve, DefaultModelSpec,
-    FeeAccrualBasis, FeeBase, FeeSpec, FeeTier, FixedCouponSpec, FloatingCouponSpec,
-    FloatingLegCompounding, FloatingRateFallback, FloatingRateSpec, Notional,
-    OvernightIndexConstraintApplication, PrepaymentCurve, PrepaymentModelSpec, PrincipalExchange,
-    RecoveryModelSpec, RollRule, ScheduleParams, StepUpCouponSpec,
+    evaluate_fee_tiers, AmortizationSpec, CouponType, DefaultModelSpec, FeeAccrualBasis, FeeBase,
+    FeeSpec, FeeTier, FixedCouponSpec, FloatingCouponSpec, FloatingLegCompounding,
+    FloatingRateFallback, FloatingRateSpec, Notional, OvernightIndexConstraintApplication,
+    PrepaymentModelSpec, PrincipalExchange, RecoveryModelSpec, RollRule, ScheduleParams,
+    StepUpCouponSpec,
 };
 
 pub use credit_rates::{

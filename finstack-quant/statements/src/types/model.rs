@@ -15,6 +15,23 @@ use finstack_quant_valuations::instruments::{
 use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 
+/// Products of one semantic-validation pass; consumed by evaluation preparation.
+pub(crate) struct SemanticAnalysis {
+    pub(crate) compiled: IndexMap<NodeId, finstack_quant_core::expr::Expr>,
+    pub(crate) graph: Result<crate::evaluator::DependencyGraph>,
+}
+
+/// Parse each source once within this validation run.
+fn parse_cached<'a>(
+    parsed: &'a mut IndexMap<String, crate::dsl::ast::StmtExpr>,
+    source: &str,
+) -> Result<&'a crate::dsl::ast::StmtExpr> {
+    match parsed.entry(source.to_owned()) {
+        indexmap::map::Entry::Occupied(entry) => Ok(entry.into_mut()),
+        indexmap::map::Entry::Vacant(entry) => Ok(entry.insert(crate::dsl::parse_formula(source)?)),
+    }
+}
+
 /// Persistence contract for [`FinancialModelSpec`].
 pub const FINANCIAL_MODEL_CONTRACT: ContractDescriptor =
     ContractDescriptor::new("finstack_quant.financial_model");
@@ -444,6 +461,13 @@ impl FinancialModelSpec {
     /// registry metrics; callers should treat that warning as a likely model
     /// authoring error and resolve it before production use.
     pub fn validate_semantics(&mut self) -> Result<()> {
+        self.analyze_semantics().map(|_| ())
+    }
+
+    /// Validate the mutable model and retain expressions and the dependency graph.
+    pub(crate) fn analyze_semantics(&mut self) -> Result<SemanticAnalysis> {
+        let mut parsed = IndexMap::new();
+        let mut compiled = IndexMap::new();
         if self.periods.is_empty() {
             return Err(Error::build("Model must have at least one period"));
         }
@@ -521,11 +545,11 @@ impl FinancialModelSpec {
                     let formula = node.formula_text.as_deref().ok_or_else(|| {
                         Error::build(format!("Formula node '{node_id}' has no formula"))
                     })?;
-                    let ast = crate::dsl::parse_formula(formula).map_err(|error| {
+                    let ast = parse_cached(&mut parsed, formula).map_err(|error| {
                         Error::build(format!("Invalid formula on node '{node_id}': {error}"))
                     })?;
                     crate::dsl::compiler::infer_value_type(
-                        &ast,
+                        ast,
                         &node_value_types,
                         capital_structure_currency,
                         &instrument_currencies,
@@ -560,11 +584,11 @@ impl FinancialModelSpec {
 
         for (node_id, node) in &self.nodes {
             if let Some(formula) = &node.formula_text {
-                let ast = crate::dsl::parse_formula(formula).map_err(|e| {
+                let ast = parse_cached(&mut parsed, formula).map_err(|e| {
                     Error::build(format!("Invalid formula on node '{}': {}", node_id, e))
                 })?;
                 if let Some(inferred) = crate::dsl::compiler::infer_value_type(
-                    &ast,
+                    ast,
                     &node_value_types,
                     capital_structure_currency,
                     &instrument_currencies,
@@ -580,17 +604,18 @@ impl FinancialModelSpec {
                         )));
                     }
                 }
-                crate::dsl::compile(&ast).map_err(|e| {
+                let expression = crate::dsl::compile(ast).map_err(|e| {
                     Error::build(format!("Invalid formula on node '{}': {}", node_id, e))
                 })?;
+                compiled.insert(node_id.clone(), expression);
             }
 
             if let Some(where_text) = &node.where_text {
-                let ast = crate::dsl::parse_formula(where_text).map_err(|e| {
+                let ast = parse_cached(&mut parsed, where_text).map_err(|e| {
                     Error::build(format!("Invalid where clause on node '{}': {}", node_id, e))
                 })?;
                 let where_type = crate::dsl::compiler::infer_value_type(
-                    &ast,
+                    ast,
                     &node_value_types,
                     capital_structure_currency,
                     &instrument_currencies,
@@ -603,9 +628,10 @@ impl FinancialModelSpec {
                         "Where clause on node '{node_id}' must return a scalar condition"
                     )));
                 }
-                crate::dsl::compile(&ast).map_err(|e| {
+                let expression = crate::dsl::compile(ast).map_err(|e| {
                     Error::build(format!("Invalid where clause on node '{}': {}", node_id, e))
                 })?;
+                compiled.insert(NodeId::new(format!("__where__{node_id}")), expression);
             }
         }
 
@@ -613,7 +639,8 @@ impl FinancialModelSpec {
             cs.validate()?;
         }
 
-        match crate::evaluator::DependencyGraph::from_model(self) {
+        let graph = crate::evaluator::DependencyGraph::from_parsed(self, &parsed);
+        match &graph {
             Ok(graph) => graph.detect_cycles()?,
             Err(e) => {
                 // The graph fails to build when a formula references an unknown
@@ -633,7 +660,7 @@ impl FinancialModelSpec {
             }
         }
 
-        Ok(())
+        Ok(SemanticAnalysis { compiled, graph })
     }
 }
 

@@ -29,8 +29,10 @@ fn abs_speed_follows_the_fabozzi_convention() {
     }
     // 1 − 0.015 × 66 = 0.01 ≤ speed: the original balance is gone.
     assert_eq!(spec.smm(67).unwrap(), 1.0);
-    // The placeholder CPR is the annualized month-1 rate.
-    assert!((spec.cpr - (1.0 - 0.985_f64.powi(12))).abs() < TOL);
+    assert_eq!(
+        serde_json::to_value(&spec).unwrap(),
+        serde_json::json!({"curve": "abs", "speed": 0.015})
+    );
     assert!(PrepaymentModelSpec::abs(1.2).validate().is_err());
 }
 
@@ -57,7 +59,6 @@ fn vector_curves_hold_the_last_value() {
     assert_eq!(prepay.smm(1).unwrap(), cpr_to_smm(0.02).unwrap());
     assert_eq!(prepay.smm(2).unwrap(), cpr_to_smm(0.04).unwrap());
     assert_eq!(prepay.smm(120).unwrap(), cpr_to_smm(0.04).unwrap());
-    assert_eq!(prepay.cpr, 0.02);
 
     let default = DefaultModelSpec::vector(vec![0.01, 0.03]);
     assert_eq!(default.mdr(1).unwrap(), cpr_to_smm(0.01).unwrap());

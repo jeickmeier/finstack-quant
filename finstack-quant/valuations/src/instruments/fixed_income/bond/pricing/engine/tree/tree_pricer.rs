@@ -174,8 +174,8 @@ impl TreePricer {
     fn uses_deterministic_short_rate(&self) -> bool {
         match &self.config.tree_model {
             TreeModelChoice::HullWhite { sigma, .. }
-            | TreeModelChoice::BlackDermanToy { sigma, .. } => *sigma == 0.0,
-            TreeModelChoice::HoLee => self.config.volatility == 0.0,
+            | TreeModelChoice::BlackDermanToy { sigma, .. }
+            | TreeModelChoice::HoLee { sigma } => *sigma == 0.0,
         }
     }
 
@@ -565,10 +565,10 @@ impl TreePricer {
                     time_to_maturity,
                 }
             }
-            TreeModelChoice::HoLee => {
+            TreeModelChoice::HoLee { sigma } => {
                 let tree_config = ShortRateTreeConfig {
                     steps: self.config.tree_steps,
-                    volatility: self.config.volatility,
+                    volatility: sigma,
                     mean_reversion: 0.0,
                     compounding: self.config.tree_compounding,
                     ..Default::default()

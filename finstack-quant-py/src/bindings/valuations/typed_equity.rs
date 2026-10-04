@@ -4,7 +4,7 @@
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId, PriceId};
@@ -174,7 +174,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         }
         let option_params = EquityOptionParams::new(
             strike,
-            extract_date(expiry)?,
+            py_to_date(expiry)?,
             enum_from_str(option_type, "option_type")?,
             quantity,
             currency_from_py(currency, "currency")?,
@@ -228,7 +228,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         target_price: f64,
     ) -> PyResult<f64> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         self.inner
             .implied_vol(&market, as_of, target_price)
             .map_err(core_to_py)
@@ -715,7 +715,7 @@ impl PyEquityOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let expiry = extract_date(value)?;
+        let expiry = py_to_date(value)?;
         eq_set!(
             slf,
             expiry,
@@ -807,9 +807,9 @@ impl PyEquityOptionBuilder {
         exercised: bool,
     ) -> PyResult<PyRefMut<'py, Self>> {
         let exercise = finstack_quant_valuations::instruments::equity::EquityOptionExercise::new(
-            extract_date(date)?,
+            py_to_date(date)?,
             spot,
-            extract_date(settlement_date)?,
+            py_to_date(settlement_date)?,
             exercised,
         );
         let shown = format!(
@@ -989,7 +989,7 @@ impl PyEquityOptionBuilder {
     ) -> PyResult<PyRefMut<'py, Self>> {
         let dividends = value
             .into_iter()
-            .map(|(date, amount)| Ok((extract_date(&date)?, amount)))
+            .map(|(date, amount)| Ok((py_to_date(&date)?, amount)))
             .collect::<PyResult<Vec<_>>>()?;
         let shown = format!(
             "[{}]",
@@ -1024,10 +1024,7 @@ impl PyEquityOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: Vec<Bound<'py, PyAny>>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let dates = value
-            .iter()
-            .map(extract_date)
-            .collect::<PyResult<Vec<_>>>()?;
+        let dates = value.iter().map(py_to_date).collect::<PyResult<Vec<_>>>()?;
         let shown = format!(
             "[{}]",
             dates

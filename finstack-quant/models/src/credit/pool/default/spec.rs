@@ -193,13 +193,19 @@ impl StochasticDefaultSpec {
         }
     }
 
-    /// Get the base CDR/hazard rate.
+    /// Get the first-month annualized CDR, or the configured hazard rate.
     pub fn base_rate(&self) -> f64 {
         match self {
-            StochasticDefaultSpec::Deterministic(spec) => spec.cdr,
+            StochasticDefaultSpec::Deterministic(spec)
+            | StochasticDefaultSpec::FactorCorrelated {
+                base_spec: spec, ..
+            } => spec
+                .mdr(1)
+                .ok()
+                .and_then(|mdr| finstack_quant_cashflows::builder::mdr_to_cdr(mdr).ok())
+                .unwrap_or(0.0),
             StochasticDefaultSpec::Copula { base_cdr, .. } => *base_cdr,
             StochasticDefaultSpec::IntensityProcess { base_hazard, .. } => *base_hazard,
-            StochasticDefaultSpec::FactorCorrelated { base_spec, .. } => base_spec.cdr,
         }
     }
 

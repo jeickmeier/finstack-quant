@@ -45,8 +45,7 @@ impl MetricCalculator for DividendRiskCalculator {
         for (date, amount) in future {
             dividend_pv += amount * discount.df_between_dates(context.as_of, *date)?;
         }
-        let inputs =
-            super::super::pricing::collect_inputs_extended(option, &context.curves, context.as_of)?;
+        let inputs = super::super::pricing::collect_inputs(option, &context.curves, context.as_of)?;
         let raw_spot = inputs.spot + dividend_pv;
         if dividend_pv <= 0.0 || inputs.spot <= 0.0 || !dividend_pv.is_finite() {
             return Err(finstack_quant_core::Error::Validation(

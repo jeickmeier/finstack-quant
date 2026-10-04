@@ -188,7 +188,7 @@ fn test_scorecard_ttm_formula_uses_full_history() {
         min_rating: None,
         period: None,
     };
-    let mut extension = CreditScorecardExtension::new(config);
+    let extension = CreditScorecardExtension::new(config);
     let report = extension
         .execute(&model, &results)
         .expect("scorecard should succeed");
@@ -255,7 +255,7 @@ fn test_scorecard_warns_when_thresholds_do_not_cover_metric_value() {
         period: None,
     };
 
-    let mut extension = CreditScorecardExtension::new(config);
+    let extension = CreditScorecardExtension::new(config);
     let report = extension
         .execute(&model, &results)
         .expect("scorecard should succeed");

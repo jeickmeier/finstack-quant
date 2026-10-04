@@ -144,7 +144,7 @@ fn create_ois_swap(tenor_years: i32) -> InterestRateSwap {
             reset_lag_days: 0,
             start,
             end,
-            compounding: FloatingLegCompounding::sofr(), // Compounded in arrears
+            compounding: FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }, // Compounded in arrears
             fixing_calendar_id: None,
             payment_lag_days: 2,
             end_of_month: false,

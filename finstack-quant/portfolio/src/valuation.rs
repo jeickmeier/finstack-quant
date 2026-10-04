@@ -410,29 +410,16 @@ pub fn value_portfolio_at(
     options: &PortfolioValuationOptions,
     as_of: Date,
 ) -> Result<PortfolioValuation> {
-    value_portfolio_with_execution_at(
-        portfolio,
-        market,
-        config,
-        options,
-        as_of,
-        crate::evaluation::PositionExecution::Auto,
-    )
-}
-
-fn value_portfolio_with_execution_at(
-    portfolio: &Portfolio,
-    market: &MarketContext,
-    config: &FinstackConfig,
-    options: &PortfolioValuationOptions,
-    as_of: Date,
-    execution: crate::evaluation::PositionExecution,
-) -> Result<PortfolioValuation> {
     let mut plan = crate::evaluation::PortfolioEvaluationPlan::new(config);
     let market_state = plan.register_market(market, as_of);
     let portfolio_state = plan.register_portfolio(portfolio);
     let profile = crate::evaluation::EvaluationProfile::from_options(options);
-    let evaluation = plan.register_evaluation(market_state, portfolio_state, profile, execution)?;
+    let evaluation = plan.register_evaluation(
+        market_state,
+        portfolio_state,
+        profile,
+        crate::evaluation::PositionExecution::Auto,
+    )?;
     plan.execute().take_valuation(evaluation)
 }
 

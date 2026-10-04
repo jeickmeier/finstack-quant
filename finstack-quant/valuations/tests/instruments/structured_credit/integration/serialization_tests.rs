@@ -190,11 +190,10 @@ fn test_prepayment_spec_json_format() {
     let json = serde_json::to_string(&spec).unwrap();
 
     // Assert: Check JSON structure (wire format stability)
-    assert!(json.contains("\"cpr\""));
-    assert!(json.contains("\"curve\""));
-    assert!(json.contains("\"psa\""));
-    assert!(json.contains("\"speed_multiplier\""));
-    assert!(json.contains("150"));
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&json).unwrap(),
+        serde_json::json!({"curve": "psa", "speed_multiplier": 150.0})
+    );
 }
 
 #[test]

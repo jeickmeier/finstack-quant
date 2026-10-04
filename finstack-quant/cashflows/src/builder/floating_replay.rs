@@ -784,7 +784,7 @@ mod tests {
                 schedule: OvernightObservationSchedule::compile(
                     date!(2025 - 01 - 06),
                     date!(2025 - 01 - 13),
-                    FloatingLegCompounding::sofr(),
+                    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
                     &WEEKENDS_ONLY,
                 )
                 .expect("observations"),

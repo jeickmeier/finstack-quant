@@ -3,7 +3,7 @@
 
 use super::{LookbackReturns, Performance};
 use crate::aggregation::{
-    group_by_period, group_by_period_dated, period_stats_from_grouped, PeriodStats, PeriodicReturn,
+    group_by_period_dated, group_period_buckets, period_stats_inner, PeriodStats, PeriodicReturn,
 };
 use crate::correlation::{
     nearest_correlation_matrix, validate_correlation_matrix, NearestCorrelationOpts,
@@ -307,13 +307,13 @@ impl Performance {
         fiscal_config: Option<FiscalConfig>,
     ) -> crate::Result<PeriodStats> {
         self.ensure_ticker_idx(ticker_idx)?;
-        let grouped = group_by_period(
+        let grouped = group_period_buckets(
             self.active_dates_for_ticker_unchecked(ticker_idx),
             self.active_returns(ticker_idx),
             aggregation_frequency,
             fiscal_config,
         );
-        Ok(period_stats_from_grouped(&grouped))
+        Ok(period_stats_inner(grouped.into_iter().map(|(_, _, r)| r)))
     }
 
     /// Calendar-bucketed compounded returns per ticker.

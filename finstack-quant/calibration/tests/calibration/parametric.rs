@@ -513,7 +513,10 @@ fn parametric_delivered_curve_reprices_ois_with_payment_lag_analytically() {
         .expect("OIS contract");
         let fixed = &swap.fixed_leg;
         let float = &swap.float_leg;
-        assert_eq!(float.compounding, FloatingLegCompounding::sofr());
+        assert_eq!(
+            float.compounding,
+            FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
+        );
         assert_eq!(
             (fixed.start, fixed.end, fixed.frequency),
             (float.start, float.end, float.frequency)

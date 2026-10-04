@@ -369,11 +369,9 @@ impl StructuredCredit {
         // surviving balance; curves stated against the original balance and
         // severities by month of default are deterministic-only.
         if matches!(
-            model.default_spec.curve,
-            Some(
-                crate::cashflow::builder::DefaultCurve::CumulativeLoss { .. }
-                    | crate::cashflow::builder::DefaultCurve::Timing { .. }
-            )
+            model.default_spec,
+            crate::cashflow::builder::DefaultModelSpec::CumulativeLoss { .. }
+                | crate::cashflow::builder::DefaultModelSpec::Timing { .. }
         ) {
             return Err(finstack_quant_core::Error::Validation(
                 "stochastic pricing supports constant, SDA and vector default curves; \

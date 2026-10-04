@@ -162,7 +162,7 @@ impl From<RawFixedCouponSpec> for FixedCouponSpec {
 ///
 /// assert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);
 /// assert_eq!(
-///     FloatingLegCompounding::sofr(),
+///     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },
 ///     FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }
 /// );
 /// ```
@@ -220,46 +220,8 @@ pub enum FloatingLegCompounding {
     },
 }
 
-/// Market-standard compounding presets for common RFR **swaps** (cleared OIS).
-///
-/// Cleared OIS compounds the overnight rate plain in arrears with only a
-/// payment delay. The ARRC 2-business-day and BoE 5-business-day lookbacks
-/// are FRN coupon conventions; use
-/// [`FloatingLegCompounding::CompoundedInArrears`] with an explicit lookback or
-/// the `*_observation_shift` presets for them. The presets set only the
-/// compounding method: the leg's day count (ACT/360 for SOFR / EFFR / €STR /
-/// SARON, ACT/365F for SONIA and TONA) is configured separately.
+/// Overnight compounding conventions with explicit observation mechanics.
 impl FloatingLegCompounding {
-    /// USD SOFR OIS convention (plain compounded in arrears).
-    pub fn sofr() -> Self {
-        Self::CompoundedInArrears { lookback_days: 0 }
-    }
-
-    /// USD Fed Funds / EFFR OIS convention (no lookback).
-    pub fn fedfunds() -> Self {
-        Self::CompoundedInArrears { lookback_days: 0 }
-    }
-
-    /// GBP SONIA OIS convention (plain compounded in arrears).
-    pub fn sonia() -> Self {
-        Self::CompoundedInArrears { lookback_days: 0 }
-    }
-
-    /// EUR €STR OIS convention (plain compounded in arrears).
-    pub fn estr() -> Self {
-        Self::CompoundedInArrears { lookback_days: 0 }
-    }
-
-    /// JPY TONA OIS convention (plain compounded in arrears).
-    pub fn tona() -> Self {
-        Self::CompoundedInArrears { lookback_days: 0 }
-    }
-
-    /// CHF SARON OIS convention (plain compounded in arrears).
-    pub fn saron() -> Self {
-        Self::CompoundedInArrears { lookback_days: 0 }
-    }
-
     /// USD SOFR with ISDA 2021 observation shift (2-day shift).
     pub fn sofr_observation_shift() -> Self {
         Self::CompoundedWithObservationShift { shift_days: 2 }
@@ -727,7 +689,7 @@ impl FloatingRateSpec {
     ///
     /// let spec = FloatingRateSpec::sofr(dec!(50));
     /// assert_eq!(spec.forward_curve_id.as_str(), "USD-SOFR");
-    /// assert_eq!(spec.compounding, Some(FloatingLegCompounding::sofr()));
+    /// assert_eq!(spec.compounding, Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }));
     /// assert!(spec.validate().is_ok());
     /// ```
     ///
@@ -736,7 +698,7 @@ impl FloatingRateSpec {
     /// - `docs/REFERENCES.md#arrc-sofr-users-guide`
     pub fn sofr(spread_bp: Decimal) -> Self {
         Self {
-            compounding: Some(FloatingLegCompounding::sofr()),
+            compounding: Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }),
             overnight_basis: Some(DayCount::Act360),
             ..Self::preset("USD-SOFR", spread_bp, Tenor::quarterly(), None, 0, "sofr")
         }
@@ -767,7 +729,7 @@ impl FloatingRateSpec {
     /// ```
     pub fn sonia(spread_bp: Decimal) -> Self {
         Self {
-            compounding: Some(FloatingLegCompounding::sofr()),
+            compounding: Some(FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }),
             overnight_basis: Some(DayCount::Act365F),
             ..Self::preset("GBP-SONIA", spread_bp, Tenor::annual(), None, 0, "gblo")
         }

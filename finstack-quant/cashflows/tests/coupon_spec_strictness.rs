@@ -110,7 +110,7 @@ fn prepayment_model_spec_rejects_unknown_field() {
     use finstack_quant_cashflows::builder::PrepaymentModelSpec;
 
     let error = serde_json::from_str::<PrepaymentModelSpec>(
-        r#"{"cpr": 0.06, "curve": {"curve": "psa", "speed_multiplier": 1.0}, "speed_multipler": 2.0}"#,
+        r#"{"curve": "psa", "speed_multiplier": 1.0, "speed_multipler": 2.0}"#,
     )
     .expect_err("unknown fields must be rejected");
     assert!(
@@ -123,8 +123,10 @@ fn prepayment_model_spec_rejects_unknown_field() {
 fn default_model_spec_rejects_unknown_field() {
     use finstack_quant_cashflows::builder::DefaultModelSpec;
 
-    let error = serde_json::from_str::<DefaultModelSpec>(r#"{"cdr": 0.02, "sda_multiplier": 1.5}"#)
-        .expect_err("unknown fields must be rejected");
+    let error = serde_json::from_str::<DefaultModelSpec>(
+        r#"{"curve": "constant", "cdr": 0.02, "sda_multiplier": 1.5}"#,
+    )
+    .expect_err("unknown fields must be rejected");
     assert!(
         error.to_string().contains("sda_multiplier"),
         "error must name the offending key: {error}"

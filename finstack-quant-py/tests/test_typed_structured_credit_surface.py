@@ -264,7 +264,7 @@ def test_tranche_builder_sets_every_seasoned_field() -> None:
 def test_deal_builder_setters_land_in_the_wire_form_and_getters() -> None:
     deal = _clo()
     spec = json.loads(deal.to_json())["instrument"]["spec"]
-    assert spec["prepayment_spec"] == {"cpr": 0.1, "curve": None}
+    assert spec["prepayment_spec"] == {"cpr": 0.1, "curve": "constant"}
     assert spec["coverage_triggers"][0]["kind"] == "oc"
     assert spec["coverage_rules"]["ccc_bucket"]["threshold_pct"] == 7.5
     assert spec["call_assumption"] == {"date": "2028-01-01", "price_pct": 100.0, "scope": "deal"}
@@ -273,8 +273,8 @@ def test_deal_builder_setters_land_in_the_wire_form_and_getters() -> None:
     assert spec["loss_allocation"] == "par_preserving"
     assert spec["principal_covers_senior_interest"] is True
 
-    assert deal.prepayment_spec.cpr == 0.1
-    assert deal.default_spec.cdr == 0.02
+    assert deal.prepayment_spec.curve["cpr"] == 0.1
+    assert deal.default_spec.curve["cdr"] == 0.02
     assert deal.recovery_spec.recovery_lag == 12
     assert deal.credit_model["recovery_spec"]["rate"] == 0.4
     assert deal.stochastic_prepay_spec is None
@@ -301,8 +301,8 @@ def test_deal_builder_setters_land_in_the_wire_form_and_getters() -> None:
 
 def test_credit_model_can_be_replaced_whole_and_then_refined() -> None:
     whole = {
-        "prepayment_spec": {"cpr": 0.05, "curve": None},
-        "default_spec": {"cdr": 0.01, "curve": None},
+        "prepayment_spec": {"cpr": 0.05, "curve": "constant"},
+        "default_spec": {"cdr": 0.01, "curve": "constant"},
         "recovery_spec": {"rate": 0.5, "recovery_lag": 6},
     }
     pool = AssetPool("P", "abs", USD).with_assets(_loans())
@@ -324,7 +324,7 @@ def test_credit_model_can_be_replaced_whole_and_then_refined() -> None:
         .delinquency({"roll_rates": [0.5, 0.6, 1.0], "cure_rates": [0.2, 0.1, 0.0], "advancing": {"policy": "none"}})
         .build()
     )
-    assert deal.prepayment_spec.cpr == 0.05
+    assert deal.prepayment_spec.curve["cpr"] == 0.05
     assert deal.default_spec.curve["curve"] == "cumulative_loss"
     assert deal.recovery_spec.recovery_lag == 6
     assert deal.delinquency["roll_rates"] == [0.5, 0.6, 1.0]

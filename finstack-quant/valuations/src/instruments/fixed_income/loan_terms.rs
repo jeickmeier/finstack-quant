@@ -33,7 +33,6 @@ use crate::cashflow::builder::FloatingRateSpec;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::Rate;
-use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
 /// Contractual coupon of a loan facility or note: a fixed all-in rate or a
@@ -74,22 +73,6 @@ impl RateSpec {
     pub fn fixed_rate(rate: Rate) -> Self {
         Self::Fixed {
             rate: rate.as_decimal(),
-        }
-    }
-
-    /// Current rate for a date without an index lookup, as a decimal.
-    ///
-    /// Returns the fixed rate, or only the spread of a floating spec (use
-    /// [`Self::try_rate_for_period`] for the projected all-in rate).
-    ///
-    /// # Arguments
-    ///
-    /// * `_date` - Date the rate is wanted for; unused because neither arm
-    ///   reads market data.
-    pub fn current_rate(&self, _date: Date) -> f64 {
-        match self {
-            Self::Fixed { rate } => *rate,
-            Self::Floating(spec) => spec.spread_bp.to_f64().unwrap_or_default() / 10_000.0,
         }
     }
 

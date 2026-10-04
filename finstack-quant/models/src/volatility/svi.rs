@@ -396,6 +396,37 @@ pub fn calibrate_svi(
     forward: f64,
     expiry: f64,
 ) -> finstack_quant_core::Result<SviParams> {
+    let solver = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
+        .with_tolerance(1e-12)
+        .with_max_iterations(300);
+    calibrate_svi_with_solver(strikes, vols, forward, expiry, &solver).map(|(params, _)| params)
+}
+
+/// Fit an SVI slice with an explicit solver and return the actual iteration count.
+///
+/// # Arguments
+///
+/// * `strikes` - At least five finite, positive strikes for this expiry.
+/// * `vols` - Positive decimal Black-Scholes implied volatilities, aligned with `strikes`.
+/// * `forward` - Finite, positive forward price in the strike units.
+/// * `expiry` - Finite, positive time to expiry in years.
+/// * `solver` - Levenberg-Marquardt settings, including stopping tolerance and iteration limit.
+///
+/// # Returns
+///
+/// Calibrated parameters and the solver's executed iteration count.
+///
+/// # Errors
+///
+/// Rejects invalid inputs or solver settings, failed convergence, invalid parameters,
+/// and fits exceeding the SVI slice quality threshold.
+pub fn calibrate_svi_with_solver(
+    strikes: &[f64],
+    vols: &[f64],
+    forward: f64,
+    expiry: f64,
+    solver: &finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver,
+) -> finstack_quant_core::Result<(SviParams, usize)> {
     const MAX_VOL_RMSE: f64 = 0.005;
 
     if strikes.len() != vols.len() {
@@ -493,10 +524,6 @@ pub fn calibrate_svi(
         sigma_init.ln(),
     ];
 
-    let solver = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
-        .with_tolerance(1e-12)
-        .with_max_iterations(300);
-
     let result = solver.solve_system_with_dim_stats(residuals, &x0, n_points);
 
     let sol = result.map_err(|e| {
@@ -544,7 +571,7 @@ pub fn calibrate_svi(
         )));
     }
 
-    Ok(params)
+    Ok((params, sol.stats.iterations))
 }
 
 #[cfg(test)]
@@ -710,8 +737,17 @@ mod tests {
             })
             .collect();
 
-        let calibrated =
-            calibrate_svi(&strikes, &vols, forward, expiry).expect("calibration should succeed");
+        let solver = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
+            .with_tolerance(1e-12)
+            .with_max_iterations(300);
+        let (calibrated, iterations) =
+            calibrate_svi_with_solver(&strikes, &vols, forward, expiry, &solver)
+                .expect("calibration should succeed");
+        assert!(iterations > 1 && iterations <= 300);
+        let limited = finstack_quant_core::math::solver_multi::LevenbergMarquardtSolver::new()
+            .with_tolerance(1e-12)
+            .with_max_iterations(1);
+        assert!(calibrate_svi_with_solver(&strikes, &vols, forward, expiry, &limited).is_err());
 
         for (&k, &mkt_vol) in strikes.iter().zip(vols.iter()) {
             let log_k = (k / forward).ln();

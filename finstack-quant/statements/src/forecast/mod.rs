@@ -94,7 +94,6 @@ pub(crate) fn apply_forecast_for_node(
     node_id: &str,
 ) -> Result<indexmap::IndexMap<PeriodId, f64>> {
     use crate::types::ForecastMethod;
-    use statistical::{parse_seed_json, stable_hash_u64};
 
     let mut results = match spec.method {
         // Stochastic (seeded) methods get the node-seed mix. Correlation
@@ -115,7 +114,7 @@ pub(crate) fn apply_forecast_for_node(
                      (only Monte Carlo honors it); this node's draws are independent here"
                 );
             }
-            let params = mix_node_seed(&spec.params, node_id, parse_seed_json, stable_hash_u64);
+            let params = mix_node_seed(&spec.params, node_id);
             let spec = ForecastSpec {
                 method: spec.method,
                 params,
@@ -161,8 +160,7 @@ fn apply_forecast_internal(
     use crate::types::ForecastMethod;
     use statistical::{
         bootstrap_forecast_with_stream, lognormal_forecast_with_stream,
-        mean_reverting_forecast_with_stream, normal_forecast_with_stream, parse_seed_json,
-        stable_hash_u64,
+        mean_reverting_forecast_with_stream, normal_forecast_with_stream,
     };
 
     // Single dispatch point for every method, so an unknown key cannot slip
@@ -171,15 +169,15 @@ fn apply_forecast_internal(
 
     match (spec.method, seed_ctx) {
         (ForecastMethod::Normal, Some((seed_offset, node_id))) => {
-            let params = mix_node_seed(&spec.params, node_id, parse_seed_json, stable_hash_u64);
+            let params = mix_node_seed(&spec.params, node_id);
             normal_forecast_with_stream(base_value, forecast_periods, &params, Some(seed_offset))
         }
         (ForecastMethod::LogNormal, Some((seed_offset, node_id))) => {
-            let params = mix_node_seed(&spec.params, node_id, parse_seed_json, stable_hash_u64);
+            let params = mix_node_seed(&spec.params, node_id);
             lognormal_forecast_with_stream(base_value, forecast_periods, &params, Some(seed_offset))
         }
         (ForecastMethod::MeanReverting, Some((seed_offset, node_id))) => {
-            let params = mix_node_seed(&spec.params, node_id, parse_seed_json, stable_hash_u64);
+            let params = mix_node_seed(&spec.params, node_id);
             mean_reverting_forecast_with_stream(
                 base_value,
                 forecast_periods,
@@ -188,7 +186,7 @@ fn apply_forecast_internal(
             )
         }
         (ForecastMethod::Bootstrap, Some((seed_offset, node_id))) => {
-            let params = mix_node_seed(&spec.params, node_id, parse_seed_json, stable_hash_u64);
+            let params = mix_node_seed(&spec.params, node_id);
             bootstrap_forecast_with_stream(base_value, forecast_periods, &params, Some(seed_offset))
         }
         (ForecastMethod::ForwardFill, _) => forward_fill(base_value, forecast_periods),
@@ -461,18 +459,16 @@ pub(crate) fn validate_params(
 fn mix_node_seed(
     params: &indexmap::IndexMap<String, serde_json::Value>,
     node_id: &str,
-    parse_seed: fn(&serde_json::Value) -> Option<u64>,
-    hash_node: fn(&str) -> u64,
 ) -> indexmap::IndexMap<String, serde_json::Value> {
     let mut params = params.clone();
     if let Some(seed_val) = params.get_mut("seed") {
-        if let Some(seed) = parse_seed(seed_val) {
+        if let Some(seed) = statistical::parse_seed_json(seed_val) {
             // SplitMix64-style combine: a plain XOR can cancel bits when the
             // user seed and node hash overlap (worst case yielding seed 0);
             // multiply-add by the golden-ratio constant decorrelates them.
             let effective_seed = seed
                 .wrapping_mul(0x9E37_79B9_7F4A_7C15)
-                .wrapping_add(hash_node(node_id));
+                .wrapping_add(statistical::stable_hash_u64(node_id));
             *seed_val = serde_json::json!(effective_seed);
         }
     }

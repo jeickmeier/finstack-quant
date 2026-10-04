@@ -5,17 +5,20 @@ use super::vector_at;
 /// Default curve shape.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(tag = "curve", rename_all = "snake_case")]
-pub enum DefaultCurve {
+#[serde(tag = "curve", rename_all = "snake_case", deny_unknown_fields)]
+pub enum DefaultModelSpec {
     /// Constant CDR (no seasoning effect)
-    Constant,
+    Constant {
+        /// Annual decimal CDR in `[0, 1]`.
+        cdr: f64,
+    },
     /// SDA standard curve: ramps to peak then declines
     Sda {
         /// Speed multiplier (1.0 = 100% SDA)
         speed_multiplier: f64,
     },
     /// Explicit annual CDR for each month of seasoning; the last value is
-    /// held for later months. The `cdr` field is ignored.
+    /// held for later months.
     Vector {
         /// Annual CDR per month of seasoning as decimals, month 1 first.
         monthly_cdr: Vec<f64>,
@@ -26,8 +29,7 @@ pub enum DefaultCurve {
     /// `Δloss_t / severity` of the original balance; see
     /// [`DefaultModelSpec::mdr_with_survival`] for the conversion to a
     /// monthly rate on the surviving balance. Cumulative defaults may exceed
-    /// the original balance after replenishment or par build. The `cdr`
-    /// field is ignored.
+    /// the original balance after replenishment or par build.
     CumulativeLoss {
         /// Cumulative net loss in percent of the original balance per month
         /// of seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the
@@ -38,7 +40,7 @@ pub enum DefaultCurve {
     },
     /// Rating-agency default timing: a lifetime cumulative default rate
     /// spread over the years of the pool's life. Defaults within a year
-    /// accrue linearly by month. The `cdr` field is ignored.
+    /// accrue linearly by month.
     Timing {
         /// Lifetime defaults as a decimal fraction of the original balance.
         cumulative_default_rate: f64,
@@ -46,22 +48,6 @@ pub enum DefaultCurve {
         /// percent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100.
         annual_pct: Vec<f64>,
     },
-}
-
-/// Default model specification.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-#[serde(deny_unknown_fields)]
-pub struct DefaultModelSpec {
-    /// CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).
-    ///
-    /// This field is **ignored** when any curve other than
-    /// [`DefaultCurve::Constant`] is active: the monthly rate is then derived
-    /// entirely from the curve.
-    pub cdr: f64,
-    /// Optional curve shape (default: constant)
-    #[serde(default)]
-    pub curve: Option<DefaultCurve>,
 }
 
 impl DefaultModelSpec {
@@ -165,9 +151,9 @@ impl DefaultModelSpec {
         seasoning_months: u32,
         surviving_balance_fraction: Option<f64>,
     ) -> finstack_quant_core::Result<f64> {
-        let cdr = match &self.curve {
-            None | Some(DefaultCurve::Constant) => self.cdr,
-            Some(DefaultCurve::Sda { speed_multiplier }) => {
+        let cdr = match self {
+            DefaultModelSpec::Constant { cdr } => *cdr,
+            DefaultModelSpec::Sda { speed_multiplier } => {
                 if !speed_multiplier.is_finite() || *speed_multiplier < 0.0 {
                     return Err(finstack_quant_core::Error::Validation(format!(
                         "SDA speed_multiplier ({speed_multiplier}) must be finite and non-negative"
@@ -195,10 +181,10 @@ impl DefaultModelSpec {
                 };
                 base * speed_multiplier
             }
-            Some(DefaultCurve::Vector { monthly_cdr }) => {
+            DefaultModelSpec::Vector { monthly_cdr } => {
                 vector_at(monthly_cdr, seasoning_months, "monthly_cdr")?
             }
-            Some(DefaultCurve::CumulativeLoss { .. } | DefaultCurve::Timing { .. }) => {
+            DefaultModelSpec::CumulativeLoss { .. } | DefaultModelSpec::Timing { .. } => {
                 let month = seasoning_months.max(1);
                 let before = self.cumulative_default_fraction_checked(month - 1)?;
                 let after = self.cumulative_default_fraction_checked(month)?;
@@ -232,8 +218,8 @@ impl DefaultModelSpec {
     ///
     /// # Returns
     ///
-    /// `Some(fraction)` for [`DefaultCurve::CumulativeLoss`] and
-    /// [`DefaultCurve::Timing`], `None` for rate-based curves. A cumulative-loss
+    /// `Some(fraction)` for [`DefaultModelSpec::CumulativeLoss`] and
+    /// [`DefaultModelSpec::Timing`], `None` for rate-based curves. A cumulative-loss
     /// curve may return a fraction above 1.0 when replenishment or par build
     /// makes cumulative defaults larger than the original balance.
     ///
@@ -245,8 +231,8 @@ impl DefaultModelSpec {
         &self,
         seasoning_months: u32,
     ) -> finstack_quant_core::Result<Option<f64>> {
-        match &self.curve {
-            Some(DefaultCurve::CumulativeLoss { .. } | DefaultCurve::Timing { .. }) => {
+        match self {
+            DefaultModelSpec::CumulativeLoss { .. } | DefaultModelSpec::Timing { .. } => {
                 self.validate()?;
                 Ok(Some(
                     self.cumulative_default_fraction_checked(seasoning_months)?,
@@ -261,11 +247,11 @@ impl DefaultModelSpec {
         seasoning_months: u32,
     ) -> finstack_quant_core::Result<f64> {
         let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
-        match &self.curve {
-            Some(DefaultCurve::CumulativeLoss {
+        match self {
+            DefaultModelSpec::CumulativeLoss {
                 cumulative_net_loss_pct,
                 severity,
-            }) => {
+            } => {
                 if !severity.is_finite() || *severity <= 0.0 || *severity > 1.0 {
                     return Err(invalid(format!(
                         "cumulative-loss severity ({severity}) must be a decimal in (0, 1]"
@@ -287,10 +273,10 @@ impl DefaultModelSpec {
                 }
                 Ok(defaults)
             }
-            Some(DefaultCurve::Timing {
+            DefaultModelSpec::Timing {
                 cumulative_default_rate,
                 annual_pct,
-            }) => {
+            } => {
                 if !cumulative_default_rate.is_finite()
                     || !(0.0..=1.0).contains(cumulative_default_rate)
                 {
@@ -331,8 +317,8 @@ impl DefaultModelSpec {
     /// `[0, 1]`.
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         let invalid = |msg: String| finstack_quant_core::Error::Validation(msg);
-        match &self.curve {
-            Some(DefaultCurve::Vector { monthly_cdr }) => {
+        match self {
+            DefaultModelSpec::Vector { monthly_cdr } => {
                 for (index, cdr) in monthly_cdr.iter().enumerate() {
                     if !cdr.is_finite() || !(0.0..=1.0).contains(cdr) {
                         return Err(invalid(format!(
@@ -341,10 +327,10 @@ impl DefaultModelSpec {
                     }
                 }
             }
-            Some(DefaultCurve::CumulativeLoss {
+            DefaultModelSpec::CumulativeLoss {
                 cumulative_net_loss_pct,
                 ..
-            }) => {
+            } => {
                 let mut previous = 0.0_f64;
                 for (index, loss) in cumulative_net_loss_pct.iter().enumerate() {
                     if !loss.is_finite() || *loss < previous {
@@ -357,7 +343,7 @@ impl DefaultModelSpec {
                 let last = cumulative_net_loss_pct.len() as u32;
                 self.cumulative_default_fraction_checked(last.max(1))?;
             }
-            Some(DefaultCurve::Timing { annual_pct, .. }) => {
+            DefaultModelSpec::Timing { annual_pct, .. } => {
                 let total: f64 = annual_pct.iter().sum();
                 if (total - 100.0).abs() > 1e-6 {
                     return Err(invalid(format!(
@@ -395,7 +381,7 @@ impl DefaultModelSpec {
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn constant_cdr(cdr: f64) -> Self {
-        Self { cdr, curve: None }
+        Self::Constant { cdr }
     }
 
     /// SDA curve with multiplier (1.0 = 100% SDA).
@@ -405,9 +391,7 @@ impl DefaultModelSpec {
     /// declines linearly to a 0.03% terminal annual CDR at month 120, and is
     /// flat thereafter.
     ///
-    /// While the SDA curve is active, the `cdr` field is ignored by
-    /// [`Self::mdr`]; the stored value (the 100 SDA terminal CDR) is only a
-    /// serde placeholder. The multiplier is validated at evaluation time:
+    /// The multiplier is validated at evaluation time:
     /// [`Self::mdr`] rejects non-finite or negative multipliers and any
     /// multiplier large enough to push the scaled annual CDR above 1.0.
     ///
@@ -434,10 +418,7 @@ impl DefaultModelSpec {
     /// - `docs/REFERENCES.md#isda-cds-standard-model`
     /// - `docs/REFERENCES.md#tuckman-serrat-fixed-income`
     pub fn sda(speed_multiplier: f64) -> Self {
-        Self {
-            cdr: 0.0003, // 100% SDA terminal annual CDR
-            curve: Some(DefaultCurve::Sda { speed_multiplier }),
-        }
+        Self::Sda { speed_multiplier }
     }
 
     /// 2% CDR (common baseline).
@@ -452,7 +433,7 @@ impl DefaultModelSpec {
     /// use finstack_quant_cashflows::builder::DefaultModelSpec;
     ///
     /// let spec = DefaultModelSpec::cdr_2pct();
-    /// assert_eq!(spec.cdr, 0.02);
+    /// assert_eq!(spec, DefaultModelSpec::Constant { cdr: 0.02 });
     /// ```
     pub fn cdr_2pct() -> Self {
         Self::constant_cdr(0.02)
@@ -482,10 +463,7 @@ impl DefaultModelSpec {
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn vector(monthly_cdr: Vec<f64>) -> Self {
-        Self {
-            cdr: monthly_cdr.first().copied().unwrap_or(0.0),
-            curve: Some(DefaultCurve::Vector { monthly_cdr }),
-        }
+        Self::Vector { monthly_cdr }
     }
 
     /// Cumulative net loss curve with a constant severity.
@@ -518,12 +496,9 @@ impl DefaultModelSpec {
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn cumulative_loss(cumulative_net_loss_pct: Vec<f64>, severity: f64) -> Self {
-        Self {
-            cdr: 0.0,
-            curve: Some(DefaultCurve::CumulativeLoss {
-                cumulative_net_loss_pct,
-                severity,
-            }),
+        Self::CumulativeLoss {
+            cumulative_net_loss_pct,
+            severity,
         }
     }
 
@@ -552,12 +527,9 @@ impl DefaultModelSpec {
     /// # Ok::<(), finstack_quant_core::Error>(())
     /// ```
     pub fn timing(cumulative_default_rate: f64, annual_pct: Vec<f64>) -> Self {
-        Self {
-            cdr: 0.0,
-            curve: Some(DefaultCurve::Timing {
-                cumulative_default_rate,
-                annual_pct,
-            }),
+        Self::Timing {
+            cumulative_default_rate,
+            annual_pct,
         }
     }
 }

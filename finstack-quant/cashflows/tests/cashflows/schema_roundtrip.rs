@@ -9,8 +9,8 @@
 
 use finstack_quant_cashflows::builder::specs::{
     AmortizationSpec, CouponType, DefaultModelSpec, FeeSpec, FeeTier, FixedCouponSpec,
-    FloatingCouponSpec, FloatingRateSpec, Notional, PrepaymentCurve, PrepaymentModelSpec,
-    RecoveryModelSpec, ScheduleParams, StepUpCouponSpec,
+    FloatingCouponSpec, FloatingRateSpec, Notional, PrepaymentModelSpec, RecoveryModelSpec,
+    ScheduleParams, StepUpCouponSpec,
 };
 use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount};
 use rust_decimal::prelude::ToPrimitive;
@@ -522,16 +522,16 @@ fn test_prepayment_model_psa_100() {
         serde_json::from_str(json).expect("Failed to deserialize");
     let spec = &envelope.payload.prepayment_model_spec;
 
-    // CPR should be 6% (100% PSA terminal rate)
+    // At month 30 the PSA ramp reaches its 6% terminal CPR.
     assert!(
-        (spec.cpr - 0.06).abs() < 1e-10,
-        "PSA 100 CPR should be 6%, got {}",
-        spec.cpr
+        (spec.smm(30).unwrap() - finstack_quant_cashflows::builder::cpr_to_smm(0.06).unwrap())
+            .abs()
+            < 1e-10
     );
 
     // Should have PSA curve with 1.0 multiplier
-    match &spec.curve {
-        Some(PrepaymentCurve::Psa { speed_multiplier }) => {
+    match spec {
+        PrepaymentModelSpec::Psa { speed_multiplier } => {
             assert!(
                 (*speed_multiplier - 1.0).abs() < 1e-10,
                 "PSA 100 speed multiplier should be 1.0, got {}",

@@ -2,7 +2,6 @@
 
 use super::fmt_f64;
 use finstack_quant_statements::builder::ModelBuilder;
-use finstack_quant_statements::error::Result;
 use finstack_quant_statements::types::{NodeId, NodeSpec, NodeType};
 
 /// Add a roll-forward structure to the model with a zero opening balance.
@@ -17,16 +16,16 @@ use finstack_quant_statements::types::{NodeId, NodeSpec, NodeType};
 /// * `increases` - List of node IDs that increase the balance
 /// * `decreases` - List of node IDs that decrease the balance
 ///
-/// # Errors
+/// # Returns
 ///
-/// Propagates model-builder errors while creating the beginning and ending
-/// balance nodes and their formulas.
+/// Builder with the generated nodes inserted. Existing nodes with the same
+/// identifiers are overwritten; final `build()` validates formulas and references.
 pub fn add_roll_forward<State>(
     builder: ModelBuilder<State>,
     name: &str,
     increases: &[&str],
     decreases: &[&str],
-) -> Result<ModelBuilder<State>> {
+) -> ModelBuilder<State> {
     add_roll_forward_with_opening(builder, name, increases, decreases, 0.0)
 }
 
@@ -46,17 +45,17 @@ pub fn add_roll_forward<State>(
 /// * `opening` - Opening balance used in the first period (no prior ending
 ///   balance exists); emitted as `coalesce(lag({name}_end, 1), {opening})`
 ///
-/// # Errors
+/// # Returns
 ///
-/// Propagates model-builder errors for invalid/duplicate node IDs, referenced
-/// input nodes, or generated formulas.
+/// Builder with the generated nodes inserted. Existing nodes with the same
+/// identifiers are overwritten; final `build()` validates formulas and references.
 pub fn add_roll_forward_with_opening<State>(
     mut builder: ModelBuilder<State>,
     name: &str,
     increases: &[&str],
     decreases: &[&str],
     opening: f64,
-) -> Result<ModelBuilder<State>> {
+) -> ModelBuilder<State> {
     let beg_node_id = format!("{}_beg", name);
     let end_node_id = format!("{}_end", name);
 
@@ -88,5 +87,5 @@ pub fn add_roll_forward_with_opening<State>(
     builder.insert_node(NodeId::from(beg_node_id), beg_node);
     builder.insert_node(NodeId::from(end_node_id), end_node);
 
-    Ok(builder)
+    builder
 }

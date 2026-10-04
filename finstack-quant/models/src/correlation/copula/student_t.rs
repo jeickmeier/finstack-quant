@@ -409,13 +409,13 @@ impl Copula for StudentTCopula {
         for &(w_val, w_weight) in &self.gamma_quadrature {
             let mut inner_first = 0.0;
             let mut inner_second = 0.0;
-            for (i, &z) in self.inner_quadrature.points.iter().enumerate() {
+            for (i, &z) in self.inner_quadrature.get_points().iter().enumerate() {
                 if error.borrow().is_some() {
                     break;
                 }
                 match f(&[sqrt_2 * z, w_val]) {
                     Ok((a, b)) => {
-                        let weight = self.inner_quadrature.weights[i];
+                        let weight = self.inner_quadrature.get_weights()[i];
                         inner_first += weight * a;
                         inner_second += weight * b;
                     }

@@ -2166,8 +2166,8 @@ export interface CellReturn {
    */
   base_return: number;
   /**
-   * Human-readable cell label, e.g. `"5.0-5.5"` (see
-   * [`duration_cell_label`]). In an inbound [`DurationCellTable`] consumed
+   * Human-readable duration-cell label, e.g. `"5.0-5.5"`.
+   * In an inbound [`DurationCellTable`] consumed
    * by [`excess_returns`], labels must be non-empty and unique.
    */
   label: string;
@@ -3431,9 +3431,8 @@ export interface GridCarinoLinkedResult {
  */
 export interface GridPosition {
   /**
-   * Duration-cell label. Cell labels may come from
-   * [`crate::excess_return::duration_cell_label`], but any string key is
-   * accepted — this module has no dependency on how cells were built.
+   * Duration-cell label, such as `"5.0-5.5"` for a duration bucket.
+   * Any string key is accepted independently of how cells were built.
    */
   cell: string;
   /**

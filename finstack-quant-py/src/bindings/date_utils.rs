@@ -1,7 +1,7 @@
 //! Date conversion helpers shared by the Python bindings.
 //!
 //! Every Python↔`time::Date` conversion lives here: date-like objects
-//! (`py_to_date` / `date_to_py`), ISO-8601 strings (`extract_date` /
+//! (`py_to_date` / `date_to_py`), ISO-8601 strings (`py_to_date` /
 //! `extract_date_iso`), and calendar parts (`month_from_u8` / `date_from_ymd`).
 
 use pyo3::prelude::*;
@@ -56,27 +56,7 @@ pub(crate) fn date_from_ymd(year: i32, month: u8, day: u8) -> PyResult<time::Dat
         .map_err(crate::errors::core_to_py)
 }
 
-/// Accept either an ISO 8601 string or a Python date-like object.
-///
-/// Date-valued parameters split into two historically disjoint groups: typed
-/// constructors take `datetime.date` (via [`py_to_date`]) while `as_of`
-/// parameters took only strings. Quants hit that seam constantly, because the
-/// object they already hold is whichever one the *other* group wanted. This
-/// accepts both.
-///
-/// The string extraction is attempted first because it is a cheap type check,
-/// not a parse: a `datetime.date`, `datetime.datetime` or `pandas.Timestamp`
-/// fails it immediately and falls through to the attribute probe.
-///
-/// # Errors
-///
-/// Returns `TypeError` when `obj` is neither a string nor date-like, and
-/// `ValueError` when a string is not valid ISO 8601.
-pub(crate) fn extract_date(obj: &Bound<'_, PyAny>) -> PyResult<time::Date> {
-    py_to_date(obj)
-}
-
-/// Like [`extract_date`], but yields the ISO 8601 string the canonical crate
+/// Like [`py_to_date`], but yields the ISO 8601 string the canonical crate
 /// entry points take.
 ///
 /// A string argument is validated and passed through unchanged, so the only

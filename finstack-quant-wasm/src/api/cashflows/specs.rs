@@ -43,54 +43,6 @@ pub fn fee_spec_periodic_bp(fields: JsValue) -> Result<JsValue, JsValue> {
 
 // --- Floating-rate conventions ----------------------------------------------
 
-/// USD SOFR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::sofr`).
-///
-/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
-#[wasm_bindgen(js_name = floatingLegCompoundingSofr)]
-pub fn floating_leg_compounding_sofr() -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingLegCompounding::sofr())
-}
-
-/// USD Fed Funds / EFFR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::fedfunds`).
-///
-/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
-#[wasm_bindgen(js_name = floatingLegCompoundingFedfunds)]
-pub fn floating_leg_compounding_fedfunds() -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingLegCompounding::fedfunds())
-}
-
-/// GBP SONIA OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::sonia`).
-///
-/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
-#[wasm_bindgen(js_name = floatingLegCompoundingSonia)]
-pub fn floating_leg_compounding_sonia() -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingLegCompounding::sonia())
-}
-
-/// EUR €STR OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::estr`).
-///
-/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
-#[wasm_bindgen(js_name = floatingLegCompoundingEstr)]
-pub fn floating_leg_compounding_estr() -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingLegCompounding::estr())
-}
-
-/// JPY TONA OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::tona`).
-///
-/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
-#[wasm_bindgen(js_name = floatingLegCompoundingTona)]
-pub fn floating_leg_compounding_tona() -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingLegCompounding::tona())
-}
-
-/// CHF SARON OIS compounding convention: plain compounded in arrears (Rust `FloatingLegCompounding::saron`).
-///
-/// @returns `FloatingLegCompounding` wire value `{ compounded_in_arrears: { lookback_days: 0 } }`.
-#[wasm_bindgen(js_name = floatingLegCompoundingSaron)]
-pub fn floating_leg_compounding_saron() -> Result<JsValue, JsValue> {
-    to_js_value(&FloatingLegCompounding::saron())
-}
-
 /// USD SOFR FRN compounding convention: ISDA 2021 observation shift of 2 business days (Rust `FloatingLegCompounding::sofr_observation_shift`).
 ///
 /// @returns `FloatingLegCompounding` wire value `{ compounded_with_observation_shift: { shift_days: 2 } }`.

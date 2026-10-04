@@ -13,7 +13,7 @@
   ],
   "properties": {
     "cell": {
-      "description": "Duration-cell label. Cell labels may come from\n[`crate::excess_return::duration_cell_label`], but any string key is\naccepted — this module has no dependency on how cells were built.",
+      "description": "Duration-cell label, such as `\"5.0-5.5\"` for a duration bucket.\nAny string key is accepted independently of how cells were built.",
       "type": "string"
     },
     "sector": {

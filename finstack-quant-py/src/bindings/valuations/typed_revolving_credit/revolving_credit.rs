@@ -8,7 +8,7 @@ use crate::bindings::core::dates::schedule::PyStubKind;
 use crate::bindings::core::dates::tenor::PyTenor;
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::core::types::PyAttributes;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::valuations::convert::{
@@ -347,7 +347,7 @@ impl PyRevolvingCredit {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyEnhancedMonteCarloResult> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let facility = self.inner.clone();
         let inner = py
             .detach(move || RevolvingCreditPricer::price_with_paths(&facility, &market, as_of))
@@ -386,7 +386,7 @@ impl PyRevolvingCredit {
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<PyCashFlowSchedule> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         let facility = self.inner.clone();
         let schedule = py
             .detach(move || facility.raw_cashflow_schedule(&market, as_of))
@@ -784,7 +784,7 @@ impl PyRevolvingCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.issue_date(date));
         slf.fields.push(("issue_date", date.to_string()));
@@ -812,7 +812,7 @@ impl PyRevolvingCreditBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let date = extract_date(value)?;
+        let date = py_to_date(value)?;
         let b = crate::bindings::valuations::convert::take_builder(&mut slf.inner)?;
         slf.inner = Some(b.maturity(date));
         slf.fields.push(("maturity", date.to_string()));

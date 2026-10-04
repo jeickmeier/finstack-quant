@@ -119,7 +119,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/margin/1/margin.schema.json",
-      "bytes": 54248,
+      "bytes": 54301,
       "kind": "input",
       "path": "schemas/margin/1/margin.schema.json",
       "summary": "One of three closed root shapes: an OTC margin spec, a CSA spec, or a margin call.",

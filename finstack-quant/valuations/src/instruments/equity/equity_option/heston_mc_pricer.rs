@@ -6,7 +6,7 @@
 
 use crate::instruments::common_impl::traits::Instrument;
 use crate::instruments::equity::equity_option::pricing::{
-    collect_inputs_extended, require_european, resolve_lifecycle_value,
+    collect_inputs, require_european, resolve_lifecycle_value,
 };
 use crate::instruments::equity::equity_option::types::EquityOption;
 use crate::pricer::{
@@ -16,7 +16,6 @@ use crate::results::ValuationResult;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::closed_form::heston::HestonPricingParams;
 use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
@@ -55,7 +54,7 @@ impl EquityOptionHestonMcPricer {
         if let Some(value) = resolve_lifecycle_value(inst, market, as_of)? {
             return Ok((value, 0.0));
         }
-        // The escrowed-dividend identity used by `collect_inputs_extended`
+        // The escrowed-dividend identity used by `collect_inputs`
         // is Black-Scholes-specific; reject it for Heston stochastic vol.
         if inst
             .discrete_dividends
@@ -72,7 +71,7 @@ impl EquityOptionHestonMcPricer {
             ));
         }
 
-        let inputs = collect_inputs_extended(inst, market, as_of)?;
+        let inputs = collect_inputs(inst, market, as_of)?;
         let (spot, r, q, _sigma, t) = (inputs.spot, inputs.r, inputs.q, inputs.sigma, inputs.t_vol);
         let ccy = inst.currency;
 
@@ -93,17 +92,8 @@ impl EquityOptionHestonMcPricer {
         // representative SPX defaults. The canonical `HestonPricingParams::new`
         // enforces positive κ/θ/σᵥ/v₀ and ρ ∈ (−1, 1) for both Monte Carlo and
         // Fourier paths.
-        let cf_params = crate::instruments::equity::equity_option::heston_market::heston_params_from_market_strict(market, r, q)?;
-        let heston_params = HestonPricingParams::new(
-            cf_params.r,
-            cf_params.q,
-            cf_params.kappa,
-            cf_params.theta,
-            cf_params.sigma_v,
-            cf_params.rho,
-            cf_params.v0,
-        )?;
-        let process = HestonProcess::new(heston_params);
+        let params = crate::instruments::equity::equity_option::heston_market::heston_params_from_market_strict(market, r, q)?;
+        let process = HestonProcess::new(params);
         let discretization = QeHeston::new();
 
         let num_steps = ((t * self.steps_per_year).round() as usize).max(10);
@@ -132,7 +122,7 @@ impl EquityOptionHestonMcPricer {
         let discount_factor = (-r * t).exp();
 
         // Initial state: [spot, v0]
-        let initial_state = [spot, cf_params.v0];
+        let initial_state = [spot, params.v0];
 
         let result = match inst.option_type {
             crate::instruments::common_impl::parameters::OptionType::Call => {

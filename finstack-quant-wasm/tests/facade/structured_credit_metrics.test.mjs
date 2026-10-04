@@ -17,8 +17,8 @@ function fixture() {
     )
   );
   const spec = f.instrument.instrument.spec;
-  spec.prepayment_spec = { cpr: 0, curve: null };
-  spec.default_spec = { cdr: 0, curve: null };
+  spec.prepayment_spec = { cpr: 0, curve: 'constant' };
+  spec.default_spec = { cdr: 0, curve: 'constant' };
   return f;
 }
 

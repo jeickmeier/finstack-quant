@@ -289,6 +289,8 @@ fn test_expired_swap_handling() {
     let market = MarketContext::new().insert(disc_curve).insert(fwd_curve);
 
     let swap = InterestRateSwap {
+        adjust_fixed_accrual_dates: false,
+        adjust_float_accrual_dates: false,
         id: InstrumentId::new("EXPIRED_SWAP"),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,
@@ -369,6 +371,8 @@ fn test_very_short_swap_1_month() {
 
     // Use manual construction for very short swap since quarterly frequency won't work
     let swap = InterestRateSwap {
+        adjust_fixed_accrual_dates: false,
+        adjust_float_accrual_dates: false,
         id: InstrumentId::new("SHORT_SWAP"),
         notional: Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
         side: PayReceive::Receive,

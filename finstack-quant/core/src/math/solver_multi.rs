@@ -98,9 +98,11 @@ pub trait AnalyticalDerivatives {
     /// Compute the gradient of the objective function.
     ///
     /// # Arguments
-    /// * `params` - Current parameter values
-    /// * `gradient` - Output buffer for gradient (must be same length as params)
-    fn gradient(&self, params: &[f64], gradient: &mut [f64]);
+    /// * `_params` - Current parameter values
+    /// * `_gradient` - Output buffer for gradient (must be same length as params)
+    fn gradient(&self, _params: &[f64], _gradient: &mut [f64]) -> Option<()> {
+        None
+    }
 
     /// Compute the Jacobian matrix for a system of equations.
     ///
@@ -111,16 +113,6 @@ pub trait AnalyticalDerivatives {
     /// Default implementation returns None, indicating Jacobian is not available.
     fn jacobian(&self, _params: &[f64], _jacobian: &mut [Vec<f64>]) -> Option<()> {
         None
-    }
-
-    /// Returns true if analytical gradient is available.
-    fn has_gradient(&self) -> bool {
-        true
-    }
-
-    /// Returns true if analytical Jacobian is available.
-    fn has_jacobian(&self) -> bool {
-        false
     }
 
     /// Number of residual equations for Jacobian-based system solves, if known.
@@ -577,9 +569,8 @@ impl LevenbergMarquardtSolver {
         D: AnalyticalDerivatives,
     {
         if let Some(deriv) = derivatives {
-            if deriv.has_gradient() {
-                let mut gradient = vec![0.0; params.len()];
-                deriv.gradient(params, &mut gradient);
+            let mut gradient = vec![0.0; params.len()];
+            if deriv.gradient(params, &mut gradient).is_some() {
                 return gradient;
             }
         }
@@ -943,9 +934,7 @@ impl LevenbergMarquardtSolver {
         let mut jac_params_plus = initial.to_vec();
         let mut jac_params_minus = initial.to_vec();
         let jacobian_func = |p: &[f64], _r: &[f64], _eval_counter: &mut usize, out: &mut [f64]| {
-            if derivatives.has_gradient() {
-                derivatives.gradient(p, out);
-            } else {
+            if derivatives.gradient(p, out).is_none() {
                 self.compute_jacobian_into(
                     &objective,
                     p,
@@ -1053,18 +1042,16 @@ impl LevenbergMarquardtSolver {
         let mut jac_2d = vec![vec![0.0; n_params]; n_residuals];
 
         let jacobian_func = |p: &[f64], _r: &[f64], eval_counter: &mut usize, out: &mut [f64]| {
-            if derivatives.has_jacobian() {
-                for row in jac_2d.iter_mut() {
-                    row.fill(0.0);
-                }
-                if derivatives.jacobian(p, &mut jac_2d).is_some() {
-                    for (i, row) in jac_2d.iter().enumerate() {
-                        for (j, &v) in row.iter().enumerate() {
-                            out[i * p.len() + j] = v;
-                        }
+            for row in jac_2d.iter_mut() {
+                row.fill(0.0);
+            }
+            if derivatives.jacobian(p, &mut jac_2d).is_some() {
+                for (i, row) in jac_2d.iter().enumerate() {
+                    for (j, &v) in row.iter().enumerate() {
+                        out[i * p.len() + j] = v;
                     }
-                    return;
                 }
+                return;
             }
             self.compute_jacobian_system_into(
                 &residuals,
@@ -1167,9 +1154,10 @@ mod tests {
     fn test_minimize_rejects_invalid_initial_bounds_before_evaluation() {
         struct QuarticDerivatives;
         impl AnalyticalDerivatives for QuarticDerivatives {
-            fn gradient(&self, params: &[f64], gradient: &mut [f64]) {
+            fn gradient(&self, params: &[f64], gradient: &mut [f64]) -> Option<()> {
                 let x = params[0];
                 gradient[0] = 2.0 * (x - 0.5) * (x - 2.0) * (2.0 * x - 2.5);
+                Some(())
             }
         }
         let solver = LevenbergMarquardtSolver::new();
@@ -1208,15 +1196,7 @@ mod tests {
     #[test]
     fn test_minimize_bounded_finite_differences_stay_feasible() {
         struct FiniteDifferences;
-        impl AnalyticalDerivatives for FiniteDifferences {
-            fn gradient(&self, _params: &[f64], _gradient: &mut [f64]) {
-                panic!("finite-difference fallback must not request an analytical gradient");
-            }
-
-            fn has_gradient(&self) -> bool {
-                false
-            }
-        }
+        impl AnalyticalDerivatives for FiniteDifferences {}
 
         let solver = LevenbergMarquardtSolver::new();
         for (lo, hi) in [(0.0, 1.0), (0.0, 1e-7)] {
@@ -1324,8 +1304,9 @@ mod tests {
     fn test_minimize_with_derivatives_errors_on_max_iterations() {
         struct QuadraticDerivatives;
         impl AnalyticalDerivatives for QuadraticDerivatives {
-            fn gradient(&self, params: &[f64], gradient: &mut [f64]) {
+            fn gradient(&self, params: &[f64], gradient: &mut [f64]) -> Option<()> {
                 gradient[0] = 2.0 * (params[0] - 2.0);
+                Some(())
             }
         }
 
@@ -1467,10 +1448,11 @@ mod tests {
         struct QuadraticDerivatives;
 
         impl AnalyticalDerivatives for QuadraticDerivatives {
-            fn gradient(&self, params: &[f64], gradient: &mut [f64]) {
+            fn gradient(&self, params: &[f64], gradient: &mut [f64]) -> Option<()> {
                 // f(x,y) = (x-2)^2 + (y-3)^2
                 gradient[0] = 2.0 * (params[0] - 2.0);
                 gradient[1] = 2.0 * (params[1] - 3.0);
+                Some(())
             }
         }
 
@@ -1498,10 +1480,6 @@ mod tests {
         struct CircleLineJacobian;
 
         impl AnalyticalDerivatives for CircleLineJacobian {
-            fn gradient(&self, _params: &[f64], _gradient: &mut [f64]) {
-                // Not used for this test
-            }
-
             fn jacobian(&self, params: &[f64], jacobian: &mut [Vec<f64>]) -> Option<()> {
                 let x = params[0];
                 let y = params[1];
@@ -1512,14 +1490,6 @@ mod tests {
                 jacobian[1][1] = -1.0; // df2/dy
 
                 Some(())
-            }
-
-            fn has_jacobian(&self) -> bool {
-                true
-            }
-
-            fn has_gradient(&self) -> bool {
-                false
             }
 
             fn residual_count(&self) -> Option<usize> {
@@ -1647,10 +1617,11 @@ mod tests {
         // Test that analytic and finite-difference derivatives converge equivalently.
         struct SimpleGradient;
         impl AnalyticalDerivatives for SimpleGradient {
-            fn gradient(&self, params: &[f64], gradient: &mut [f64]) {
+            fn gradient(&self, params: &[f64], gradient: &mut [f64]) -> Option<()> {
                 // f(x,y) = (x-2)^2 + (y-3)^2
                 gradient[0] = 2.0 * (params[0] - 2.0);
                 gradient[1] = 2.0 * (params[1] - 3.0);
+                Some(())
             }
         }
 
@@ -1694,17 +1665,11 @@ mod tests {
         struct TallJacobian;
 
         impl AnalyticalDerivatives for TallJacobian {
-            fn gradient(&self, _params: &[f64], _gradient: &mut [f64]) {}
-
             fn jacobian(&self, _params: &[f64], jacobian: &mut [Vec<f64>]) -> Option<()> {
                 for row in jacobian.iter_mut() {
                     row[0] = 1.0;
                 }
                 Some(())
-            }
-
-            fn has_jacobian(&self) -> bool {
-                true
             }
 
             fn residual_count(&self) -> Option<usize> {
@@ -1734,17 +1699,11 @@ mod tests {
         struct MissingCountJacobian;
 
         impl AnalyticalDerivatives for MissingCountJacobian {
-            fn gradient(&self, _params: &[f64], _gradient: &mut [f64]) {}
-
             fn jacobian(&self, _params: &[f64], jacobian: &mut [Vec<f64>]) -> Option<()> {
                 for row in jacobian.iter_mut() {
                     row[0] = 1.0;
                 }
                 Some(())
-            }
-
-            fn has_jacobian(&self) -> bool {
-                true
             }
         }
 

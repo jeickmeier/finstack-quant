@@ -53,7 +53,7 @@
 //!     .periods("2025Q1..2025Q4", None)?
 //!     .value("additions", values)
 //!     .value("disposals", values);
-//! let model = add_roll_forward(builder, "inventory", &["additions"], &["disposals"])?.build()?;
+//! let model = add_roll_forward(builder, "inventory", &["additions"], &["disposals"]).build()?;
 //! # let _ = model;
 //! # Ok(())
 //! # }

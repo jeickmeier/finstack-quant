@@ -21,7 +21,7 @@ export default [
             "deal_type": "clo",
             "default_spec": {
               "cdr": 0.02,
-              "curve": null
+              "curve": "constant"
             },
             "discount_curve_id": "USD-OIS",
             "first_payment_date": "2024-04-01",
@@ -102,7 +102,7 @@ export default [
             },
             "prepayment_spec": {
               "cpr": 0.2,
-              "curve": null
+              "curve": "constant"
             },
             "recovery_spec": {
               "rate": 0.6,

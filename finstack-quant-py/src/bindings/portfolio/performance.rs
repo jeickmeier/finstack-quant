@@ -229,7 +229,7 @@ fn extract_dated_pairs(
         let Ok((date, amount)) = item.extract::<(Bound<'_, PyAny>, f64)>() else {
             return Ok(None);
         };
-        pairs.push((crate::bindings::date_utils::extract_date(&date)?, amount));
+        pairs.push((crate::bindings::date_utils::py_to_date(&date)?, amount));
     }
     Ok(Some(pairs))
 }

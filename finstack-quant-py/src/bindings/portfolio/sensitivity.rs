@@ -326,7 +326,7 @@ fn compute_factor_sensitivities(
     let factors_json = crate::bindings::extract::extract_records_json(py, factors_json, "factors")?;
     let factors_json: &str = &factors_json;
     let market = extract_market(py, market)?;
-    let date = crate::bindings::date_utils::extract_date(as_of)?;
+    let date = crate::bindings::date_utils::py_to_date(as_of)?;
     let base_currency = base_currency
         .parse::<finstack_quant_core::currency::Currency>()
         .map_err(core_to_py)?;
@@ -397,7 +397,7 @@ fn compute_pnl_profiles(
     let factors_json = crate::bindings::extract::extract_records_json(py, factors_json, "factors")?;
     let factors_json: &str = &factors_json;
     let market = extract_market(py, market)?;
-    let date = crate::bindings::date_utils::extract_date(as_of)?;
+    let date = crate::bindings::date_utils::py_to_date(as_of)?;
     let base_currency = base_currency
         .parse::<finstack_quant_core::currency::Currency>()
         .map_err(core_to_py)?;

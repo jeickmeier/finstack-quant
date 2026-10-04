@@ -1,6 +1,5 @@
 //! Main evaluator implementation.
 
-use crate::dsl;
 use crate::error::{Error, Result};
 use crate::evaluator::context::EvaluationContext;
 use crate::evaluator::dag::{evaluate_order, DependencyGraph};
@@ -804,14 +803,12 @@ impl Evaluator {
         // builder. Revalidate formulas and infer units before compiling, rather
         // than trusting a validation that preceded the caller's last mutation.
         let mut validated = model.clone();
-        validated.validate_semantics()?;
-        self.compiled_cache = std::sync::Arc::new(IndexMap::new());
+        let analysis = validated.analyze_semantics()?;
+        self.compiled_cache = std::sync::Arc::new(analysis.compiled);
         self.forecast_cache.clear();
         self.visibility_cutoff = None;
-        let dag = DependencyGraph::from_model(model)?;
-        dag.detect_cycles()?;
+        let dag = analysis.graph?;
         let eval_order = evaluate_order(&dag)?;
-        self.compile_formulas(model)?;
         let node_to_column = std::sync::Arc::new(
             eval_order
                 .iter()
@@ -845,17 +842,6 @@ impl Evaluator {
         results.populate_value_types(&prepared.node_value_types);
         if let Some(suite) = &self.check_suite {
             results.check_report = Some(suite.run(model, results)?);
-        }
-        Ok(())
-    }
-
-    /// Compile all formulas in the model.
-    fn compile_formulas(&mut self, model: &FinancialModelSpec) -> Result<()> {
-        let cache = std::sync::Arc::make_mut(&mut self.compiled_cache);
-        for (node_id, node_spec) in &model.nodes {
-            compile_text_into_cache(cache, node_id.clone(), &node_spec.formula_text)?;
-            let where_key = NodeId::new(format!("__where__{}", node_id));
-            compile_text_into_cache(cache, where_key, &node_spec.where_text)?;
         }
         Ok(())
     }
@@ -999,20 +985,6 @@ impl Default for Evaluator {
     fn default() -> Self {
         Self::new()
     }
-}
-
-fn compile_text_into_cache(
-    cache: &mut IndexMap<NodeId, Expr>,
-    key: NodeId,
-    text: &Option<String>,
-) -> Result<()> {
-    if let Some(t) = text {
-        if !cache.contains_key(&key) {
-            let expr = dsl::parse_and_compile(t)?;
-            cache.insert(key, expr);
-        }
-    }
-    Ok(())
 }
 
 #[cfg(test)]

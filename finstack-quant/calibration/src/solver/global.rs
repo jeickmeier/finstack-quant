@@ -710,12 +710,6 @@ where
     impl<'a, T: GlobalSolveTarget> finstack_quant_core::math::solver_multi::AnalyticalDerivatives
         for TargetDerivatives<'a, T>
     {
-        fn gradient(&self, _params: &[f64], _gradient: &mut [f64]) {}
-
-        fn has_gradient(&self) -> bool {
-            false
-        }
-
         fn jacobian(&self, params: &[f64], jacobian: &mut [Vec<f64>]) -> Option<()> {
             let mut params_to_use = Vec::new();
             let params_ref = if self.lb.is_some() || self.ub.is_some() {
@@ -748,10 +742,6 @@ where
                 }
             }
             Some(())
-        }
-
-        fn has_jacobian(&self) -> bool {
-            true
         }
 
         fn residual_count(&self) -> Option<usize> {

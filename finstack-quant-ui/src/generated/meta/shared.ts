@@ -1106,7 +1106,7 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AssetBackedFacility/properties/default_spec",
     "default": {
       "cdr": 0.02,
-      "curve": null
+      "curve": "constant"
     },
     "description": "Default model specification.",
     "ref": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json",
@@ -1213,7 +1213,7 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/AssetBackedFacility/properties/prepayment_spec",
     "default": {
       "cpr": 0.2,
-      "curve": null
+      "curve": "constant"
     },
     "description": "Prepayment model specification.",
     "ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
@@ -9084,7 +9084,7 @@ export default [
   {
     "path": "#/$defs/CsaSpec",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/CsaSpec",
-    "description": "Credit Support Annex specification (ISDA standard).\n\nThe CSA governs the exchange of collateral between counterparties\nfor OTC derivatives. This specification captures all key commercial\nterms needed for margin calculation and management.\n\n# ISDA Documentation\n\nThis type represents terms from:\n- ISDA 2016 Credit Support Annex for Variation Margin (VM CSA)\n- ISDA 2018 Credit Support Annex for Initial Margin (IM CSA)\n\n# References\n\n- ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`\n- ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`\n- BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`\n\n# Example\n\n```\nuse finstack_quant_margin::{\n    CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule,\n    MarginCallTiming, ImMethodology, MarginTenor,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet csa = CsaSpec {\n    id: \"USD-CSA-2024\".to_string(),\n    base_currency: Currency::USD,\n    vm_params: VmParameters::regulatory_standard(Currency::USD)?,\n    im_params: Some(ImParameters::simm_standard(Currency::USD)?),\n    eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,\n    call_timing: MarginCallTiming::regulatory_standard()?,\n    collateral_curve_id: \"USD-OIS\".into(),\n    calendar_id: \"usny\".into(),\n};\n# Ok(())\n# }\n```"
+    "description": "Credit Support Annex specification (ISDA standard).\n\nThe CSA governs the exchange of collateral between counterparties\nfor OTC derivatives. This specification captures all key commercial\nterms needed for margin calculation and management.\n\n# ISDA Documentation\n\nThis type represents terms from:\n- ISDA 2016 Credit Support Annex for Variation Margin (VM CSA)\n- ISDA 2018 Credit Support Annex for Initial Margin (IM CSA)\n\n# References\n\n- ISDA 2016 VM CSA: `docs/REFERENCES.md#isda-vm-csa-2016`\n- ISDA 2018 IM CSA: `docs/REFERENCES.md#isda-im-csa-2018`\n- BCBS-IOSCO uncleared margin framework: `docs/REFERENCES.md#bcbs-iosco-uncleared-margin`\n\n# Example\n\n```\nuse finstack_quant_margin::{\n    CsaSpec, VmParameters, ImParameters, EligibleCollateralSchedule,\n    MarginCallTiming, ImMethodology, MarginTenor,\n};\nuse finstack_quant_core::currency::Currency;\nuse finstack_quant_core::money::Money;\n\n# fn main() -> finstack_quant_core::Result<()> {\nlet csa = CsaSpec {\n    id: \"USD-CSA-2024\".to_string(),\n    base_currency: Currency::USD,\n    vm_params: VmParameters::regulatory_standard(Currency::USD)?,\n    im_params: Some(ImParameters::for_methodology(finstack_quant_margin::types::ImMethodology::Simm, Currency::USD)?),\n    eligible_collateral: EligibleCollateralSchedule::bcbs_standard()?,\n    call_timing: MarginCallTiming::regulatory_standard()?,\n    collateral_curve_id: \"USD-OIS\".into(),\n    calendar_id: \"usny\".into(),\n};\n# Ok(())\n# }\n```"
   },
   {
     "path": "#/$defs/CsaSpec/properties/base_currency",
@@ -9921,109 +9921,6 @@ export default [
     "description": "CDS IMM dates: 20th of Mar/Jun/Sep/Dec with post-Big-Bang front accrual."
   },
   {
-    "path": "#/$defs/d_457581f86de0cd986f20",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve",
-    "description": "Default curve shape."
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/0",
-    "description": "Constant CDR (no seasoning effect)"
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/0/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/0/properties/curve",
-    "const": "constant"
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/1",
-    "description": "SDA standard curve: ramps to peak then declines"
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/1/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/1/properties/curve",
-    "const": "sda"
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/1/properties/speed_multiplier",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/1/properties/speed_multiplier",
-    "description": "Speed multiplier (1.0 = 100% SDA)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/2",
-    "description": "Explicit annual CDR for each month of seasoning; the last value is\nheld for later months. The `cdr` field is ignored."
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/2/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/2/properties/curve",
-    "const": "vector"
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/2/properties/monthly_cdr",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr",
-    "description": "Annual CDR per month of seasoning as decimals, month 1 first."
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/2/properties/monthly_cdr/items",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr/items",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/3",
-    "description": "Cumulative net loss curve (rating-agency ABS convention): losses as a\npercent of the original pool balance by month of seasoning, with a\nconstant loss severity. Defaults in month `t` are\n`Δloss_t / severity` of the original balance; see\n[`DefaultModelSpec::mdr_with_survival`] for the conversion to a\nmonthly rate on the surviving balance. Cumulative defaults may exceed\nthe original balance after replenishment or par build. The `cdr`\nfield is ignored."
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/cumulative_net_loss_pct",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct",
-    "description": "Cumulative net loss in percent of the original balance per month\nof seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the\nlast value is held."
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/cumulative_net_loss_pct/items",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct/items",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/3/properties/curve",
-    "const": "cumulative_loss"
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/3/properties/severity",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/3/properties/severity",
-    "description": "Loss severity as a decimal fraction of defaulted par in `(0, 1]`.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/4",
-    "description": "Rating-agency default timing: a lifetime cumulative default rate\nspread over the years of the pool's life. Defaults within a year\naccrue linearly by month. The `cdr` field is ignored."
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/annual_pct",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/4/properties/annual_pct",
-    "description": "Share of lifetime defaults occurring in each year of seasoning, in\npercent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100."
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/annual_pct/items",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/4/properties/annual_pct/items",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/cumulative_default_rate",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/4/properties/cumulative_default_rate",
-    "description": "Lifetime defaults as a decimal fraction of the original balance.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_457581f86de0cd986f20/oneOf/4/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve/oneOf/4/properties/curve",
-    "const": "timing"
-  },
-  {
     "path": "#/$defs/d_46455be5cce6b8020e50",
     "source": "https://finstack_quant.dev/schemas/common/1/instrument_pricing_overrides.schema.json#/$defs/AssetDynamics",
     "description": "Asset dynamics specification for the Merton model.\n\nControls the stochastic process assumed for the firm's asset value."
@@ -10650,90 +10547,6 @@ export default [
   {
     "path": "#/$defs/d_6f4088f89d6bfc98e242/properties/severity_vector/items",
     "source": "https://finstack_quant.dev/schemas/cashflow/1/recovery_model_spec.schema.json#/properties/severity_vector/items",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve",
-    "description": "Prepayment curve shape."
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/0",
-    "description": "Constant CPR (no seasoning effect)"
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/0/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/0/properties/curve",
-    "const": "constant"
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/1",
-    "description": "PSA standard curve: ramps to 6% CPR over 30 months"
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/1/properties/curve",
-    "const": "psa"
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/1/properties/speed_multiplier",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/1/properties/speed_multiplier",
-    "description": "Speed multiplier (1.0 = 100% PSA)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/2",
-    "description": "CMBS-style lockout: zero prepayment for an initial period, then constant CPR.\n\nCommercial mortgage-backed securities typically have prepayment lockout\nperiods (defeasance/yield maintenance) lasting 5-10 years, after which\nvoluntary prepayment resumes at the specified CPR."
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/2/properties/curve",
-    "const": "cmbs_lockout"
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/2/properties/lockout_months",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/2/properties/lockout_months",
-    "description": "Number of months with zero prepayment (e.g., 60 for 5-year lockout)",
-    "format": "uint32",
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/3",
-    "description": "ABS speed: each month a constant share of the *original* balance\nprepays, so the single-month mortality rises with seasoning,\n`SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi, *Handbook of Fixed Income\nSecurities*, auto-loan ABS convention). The `cpr` field is ignored."
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/3/properties/curve",
-    "const": "abs"
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/3/properties/speed",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/3/properties/speed",
-    "description": "Monthly prepayment as a decimal fraction of the original balance\n(`0.015` = 1.5% ABS).",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/4",
-    "description": "Explicit annual CPR for each month of seasoning; the last value is\nheld for later months. The `cpr` field is ignored."
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/4/properties/curve",
-    "const": "vector"
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr",
-    "description": "Annual CPR per month of seasoning as decimals, month 1 first."
-  },
-  {
-    "path": "#/$defs/d_73686c0456fd11c88d3e/oneOf/4/properties/monthly_cpr/items",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr/items",
     "format": "double"
   },
   {
@@ -11989,32 +11802,101 @@ export default [
     "examples": [
       {
         "cpr": 0.06,
-        "curve": null
+        "curve": "constant"
       }
     ],
     "title": "PrepaymentModelSpec"
   },
   {
-    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/cpr",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/properties/cpr",
-    "description": "CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).\n\nThis field is **ignored** when [`PrepaymentCurve::Psa`],\n[`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the\nmonthly rate is then derived entirely from the curve. It IS used by\n[`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.",
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/0",
+    "description": "Constant CPR (no seasoning effect)"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/0/properties/cpr",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/0/properties/cpr",
+    "description": "Annual decimal CPR in `[0, 1]`.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/properties/curve",
-    "default": null,
-    "description": "Optional curve shape (default: constant)"
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/0/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/0/properties/curve",
+    "const": "constant"
   },
   {
-    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/properties/curve/anyOf/0",
-    "ref": "#/$defs/PrepaymentCurve",
-    "resolvedRef": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/$defs/PrepaymentCurve"
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/1",
+    "description": "PSA standard curve: ramps to 6% CPR over 30 months"
   },
   {
-    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/properties/curve/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/properties/curve/anyOf/1"
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/1/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/1/properties/curve",
+    "const": "psa"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/1/properties/speed_multiplier",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/1/properties/speed_multiplier",
+    "description": "Speed multiplier (1.0 = 100% PSA)",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/2",
+    "description": "CMBS-style lockout: zero prepayment for an initial period, then constant CPR.\n\nCommercial mortgage-backed securities typically have prepayment lockout\nperiods (defeasance/yield maintenance) lasting 5-10 years, after which\nvoluntary prepayment resumes at the specified CPR."
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/2/properties/curve",
+    "const": "cmbs_lockout"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/lockout_months",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/2/properties/lockout_months",
+    "description": "Number of months with zero prepayment (e.g., 60 for 5-year lockout)",
+    "format": "uint32",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/2/properties/post_lockout_cpr",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/2/properties/post_lockout_cpr",
+    "description": "Annual decimal CPR after lockout, in `[0, 1]`.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/3",
+    "description": "ABS speed: each month a constant share of the *original* balance\nprepays, so the single-month mortality rises with seasoning,\n`SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi, *Handbook of Fixed Income\nSecurities*, auto-loan ABS convention)."
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/3/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/3/properties/curve",
+    "const": "abs"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/3/properties/speed",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/3/properties/speed",
+    "description": "Monthly prepayment as a decimal fraction of the original balance\n(`0.015` = 1.5% ABS).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/4",
+    "description": "Explicit annual CPR for each month of seasoning; the last value is\nheld for later months."
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/4/properties/curve",
+    "const": "vector"
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/4/properties/monthly_cpr",
+    "description": "Annual CPR per month of seasoning as decimals, month 1 first."
+  },
+  {
+    "path": "#/$defs/d_a1f0b2382a0ae4ef0e72/oneOf/4/properties/monthly_cpr/items",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json#/oneOf/4/properties/monthly_cpr/items",
+    "format": "double"
   },
   {
     "path": "#/$defs/d_a561434dff1275f40d83",
@@ -14247,32 +14129,114 @@ export default [
     "examples": [
       {
         "cdr": 0.02,
-        "curve": null
+        "curve": "constant"
       }
     ],
     "title": "DefaultModelSpec"
   },
   {
-    "path": "#/$defs/d_c367978e081b7093ec11/properties/cdr",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/properties/cdr",
-    "description": "CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).\n\nThis field is **ignored** when any curve other than\n[`DefaultCurve::Constant`] is active: the monthly rate is then derived\nentirely from the curve.",
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/0",
+    "description": "Constant CDR (no seasoning effect)"
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/0/properties/cdr",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/0/properties/cdr",
+    "description": "Annual decimal CDR in `[0, 1]`.",
     "format": "double"
   },
   {
-    "path": "#/$defs/d_c367978e081b7093ec11/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/properties/curve",
-    "default": null,
-    "description": "Optional curve shape (default: constant)"
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/0/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/0/properties/curve",
+    "const": "constant"
   },
   {
-    "path": "#/$defs/d_c367978e081b7093ec11/properties/curve/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/properties/curve/anyOf/0",
-    "ref": "#/$defs/DefaultCurve",
-    "resolvedRef": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/$defs/DefaultCurve"
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/1",
+    "description": "SDA standard curve: ramps to peak then declines"
   },
   {
-    "path": "#/$defs/d_c367978e081b7093ec11/properties/curve/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/properties/curve/anyOf/1"
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/1/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/1/properties/curve",
+    "const": "sda"
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/1/properties/speed_multiplier",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/1/properties/speed_multiplier",
+    "description": "Speed multiplier (1.0 = 100% SDA)",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/2",
+    "description": "Explicit annual CDR for each month of seasoning; the last value is\nheld for later months."
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/2/properties/curve",
+    "const": "vector"
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/monthly_cdr",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/2/properties/monthly_cdr",
+    "description": "Annual CDR per month of seasoning as decimals, month 1 first."
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/2/properties/monthly_cdr/items",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/2/properties/monthly_cdr/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/3",
+    "description": "Cumulative net loss curve (rating-agency ABS convention): losses as a\npercent of the original pool balance by month of seasoning, with a\nconstant loss severity. Defaults in month `t` are\n`Δloss_t / severity` of the original balance; see\n[`DefaultModelSpec::mdr_with_survival`] for the conversion to a\nmonthly rate on the surviving balance. Cumulative defaults may exceed\nthe original balance after replenishment or par build."
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/cumulative_net_loss_pct",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/3/properties/cumulative_net_loss_pct",
+    "description": "Cumulative net loss in percent of the original balance per month\nof seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the\nlast value is held."
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/cumulative_net_loss_pct/items",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/3/properties/cumulative_net_loss_pct/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/3/properties/curve",
+    "const": "cumulative_loss"
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/3/properties/severity",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/3/properties/severity",
+    "description": "Loss severity as a decimal fraction of defaulted par in `(0, 1]`.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/4",
+    "description": "Rating-agency default timing: a lifetime cumulative default rate\nspread over the years of the pool's life. Defaults within a year\naccrue linearly by month."
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/annual_pct",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/4/properties/annual_pct",
+    "description": "Share of lifetime defaults occurring in each year of seasoning, in\npercent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100."
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/annual_pct/items",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/4/properties/annual_pct/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/cumulative_default_rate",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/4/properties/cumulative_default_rate",
+    "description": "Lifetime defaults as a decimal fraction of the original balance.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/d_c367978e081b7093ec11/oneOf/4/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json#/oneOf/4/properties/curve",
+    "const": "timing"
   },
   {
     "path": "#/$defs/d_cc8ed166abbb10ad4451",
@@ -14858,109 +14822,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DealType/oneOf/6",
     "const": "card",
     "description": "Credit Card ABS"
-  },
-  {
-    "path": "#/$defs/DefaultCurve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve",
-    "description": "Default curve shape."
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/0",
-    "description": "Constant CDR (no seasoning effect)"
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/0/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/0/properties/curve",
-    "const": "constant"
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/1",
-    "description": "SDA standard curve: ramps to peak then declines"
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/1/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/1/properties/curve",
-    "const": "sda"
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/1/properties/speed_multiplier",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/1/properties/speed_multiplier",
-    "description": "Speed multiplier (1.0 = 100% SDA)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/2",
-    "description": "Explicit annual CDR for each month of seasoning; the last value is\nheld for later months. The `cdr` field is ignored."
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/2/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/2/properties/curve",
-    "const": "vector"
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr",
-    "description": "Annual CDR per month of seasoning as decimals, month 1 first."
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr/items",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/2/properties/monthly_cdr/items",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/3",
-    "description": "Cumulative net loss curve (rating-agency ABS convention): losses as a\npercent of the original pool balance by month of seasoning, with a\nconstant loss severity. Defaults in month `t` are\n`Δloss_t / severity` of the original balance; see\n[`DefaultModelSpec::mdr_with_survival`] for the conversion to a\nmonthly rate on the surviving balance. Cumulative defaults may exceed\nthe original balance after replenishment or par build. The `cdr`\nfield is ignored."
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct",
-    "description": "Cumulative net loss in percent of the original balance per month\nof seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the\nlast value is held."
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct/items",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/3/properties/cumulative_net_loss_pct/items",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/3/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/3/properties/curve",
-    "const": "cumulative_loss"
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/3/properties/severity",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/3/properties/severity",
-    "description": "Loss severity as a decimal fraction of defaulted par in `(0, 1]`.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/4",
-    "description": "Rating-agency default timing: a lifetime cumulative default rate\nspread over the years of the pool's life. Defaults within a year\naccrue linearly by month. The `cdr` field is ignored."
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/4/properties/annual_pct",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/4/properties/annual_pct",
-    "description": "Share of lifetime defaults occurring in each year of seasoning, in\npercent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100."
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/4/properties/annual_pct/items",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/4/properties/annual_pct/items",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/4/properties/cumulative_default_rate",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/4/properties/cumulative_default_rate",
-    "description": "Lifetime defaults as a decimal fraction of the original balance.",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/DefaultCurve/oneOf/4/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve/oneOf/4/properties/curve",
-    "const": "timing"
   },
   {
     "path": "#/$defs/DefaultedValuation",
@@ -17346,7 +17207,7 @@ export default [
   {
     "path": "#/$defs/FloatingLegCompounding",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/FloatingLegCompounding",
-    "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::sofr(),\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```"
+    "description": "How the fixings of one accrual period combine into the period rate.\n\nOne canonical enum for every floating leg and coupon: swaps, basis and\ncross-currency legs, TRS financing, IR futures, FRN / loan / structured\ncredit coupons.\n\n| Variant | Period rate | Typical use |\n|---------|-------------|-------------|\n| `simple` | One term fixing / forward over the period | EURIBOR, Term SOFR, legacy IBOR |\n| `simple_average` | `(Σ rᵢ·dᵢ) / D` of daily overnight fixings | Averaged overnight loans, Fed-Funds futures |\n| `compounded_in_arrears` | `[∏(1 + rᵢ·dᵢ/B) − 1]·B/D` | SOFR / SONIA / €STR / TONA OIS (lookback 0) |\n| `compounded_with_observation_shift` | as above, observations and weights shifted | ISDA 2021 observation shift |\n| `compounded_with_rate_cutoff` | as above, last fixings frozen | ARRC lockout / SWPM \"Rate Cut-Off Days\" |\n\nDay counts are business days and must be non-negative.\n\n# References\n\n- ISDA 2021 Definitions, compounded RFR conventions `docs/REFERENCES.md#isda-2021-definitions`\n- ARRC (2020). \"SOFR: A User's Guide.\" `docs/REFERENCES.md#arrc-sofr-users-guide`\n- BoE SONIA conventions `docs/REFERENCES.md#boe-sonia-key-features`\n\n# Examples\n\n```\nuse finstack_quant_cashflows::builder::FloatingLegCompounding;\n\nassert_eq!(FloatingLegCompounding::default(), FloatingLegCompounding::Simple);\nassert_eq!(\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 },\n    FloatingLegCompounding::CompoundedInArrears { lookback_days: 0 }\n);\n```"
   },
   {
     "path": "#/$defs/FloatingLegCompounding/oneOf/0",
@@ -22447,6 +22308,18 @@ export default [
     "description": "Interest rate swap with fixed and floating legs.\n\nRepresents a standard interest rate swap where one party pays\na fixed rate and the other pays a floating rate plus spread.\n\n# Market Standards & Citations\n\n## ISDA Definitions\n\nCurrent RFR and term-rate contracts are represented under the **ISDA 2021\nInterest Rate Derivatives Definitions**. Legacy transactions may retain\nterms from the 2006 Definitions, including historical IBOR reset conventions.\nFixed/floating day counts, calendars, lags, compounding, and payment rules\nare explicit leg terms or are resolved from the rate-index convention registry.\n\n## USD Market Convention\n\nThe canonical legacy USD term-index example uses:\n- **Fixed Leg:** Semi-annual, 30/360, Modified Following\n- **Floating Leg:** Quarterly, ACT/360, Modified Following\n- **Reset Lag:** T-2 (2 business days before period start)\n- **Discounting:** OIS curve under the collateral agreement\n\n## Day-Count Convention Notes\n\nThe USD standard uses different day-count conventions for different purposes:\n- **Fixed leg accrual:** 30/360 (Bond Basis)\n- **Floating leg accrual:** ACT/360 (Money Market)\n- **Discount curve:** Typically ACT/365F or ACT/360 depending on construction\n\nThis day-count mismatch between accrual and discounting is market-standard\nand reflects the different conventions used in bond vs money markets.\nThe impact on par rates is typically < 0.5bp for USD swaps.\n\n## Validation\n\nUse [`InterestRateSwap::validate()`] to check swaps constructed via\nthe builder pattern.\n\n## References\n\n- ISDA 2021 Interest Rate Derivatives Definitions (current contract framework) `docs/REFERENCES.md#isda-2021-definitions`\n- ISDA 2006 Definitions (legacy transactions) `docs/REFERENCES.md#isda-2006-definitions`\n- Sadr, A. *Interest Rate Swaps and Their Derivatives*.\n  `docs/REFERENCES.md#sadr-2009-irs`\n- Bloomberg SWPM screen conventions.\n  `docs/REFERENCES.md#bloomberg-swpm`"
   },
   {
+    "path": "#/$defs/InterestRateSwap/properties/adjust_fixed_accrual_dates",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InterestRateSwap/properties/adjust_fixed_accrual_dates",
+    "default": false,
+    "description": "Adjust fixed coupon accrual boundaries using the fixed leg's calendar and\nbusiness-day convention. Defaults to false (contractual unadjusted accrual);\npayment-date adjustment and payment lag are independent."
+  },
+  {
+    "path": "#/$defs/InterestRateSwap/properties/adjust_float_accrual_dates",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InterestRateSwap/properties/adjust_float_accrual_dates",
+    "default": false,
+    "description": "Adjust floating coupon accrual boundaries using the floating leg's calendar\nand business-day convention, for term and overnight coupons alike. Defaults\nto false; reset lag is applied to the resulting accrual start."
+  },
+  {
     "path": "#/$defs/InterestRateSwap/properties/attributes",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/InterestRateSwap/properties/attributes",
     "description": "Attributes for scenario selection and tagging",
@@ -24963,90 +24836,6 @@ export default [
     "description": "Stub convention",
     "ref": "#/$defs/StubKind",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StubKind"
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve",
-    "description": "Prepayment curve shape."
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/0",
-    "description": "Constant CPR (no seasoning effect)"
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/0/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/0/properties/curve",
-    "const": "constant"
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/1",
-    "description": "PSA standard curve: ramps to 6% CPR over 30 months"
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/1/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/1/properties/curve",
-    "const": "psa"
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/1/properties/speed_multiplier",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/1/properties/speed_multiplier",
-    "description": "Speed multiplier (1.0 = 100% PSA)",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/2",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/2",
-    "description": "CMBS-style lockout: zero prepayment for an initial period, then constant CPR.\n\nCommercial mortgage-backed securities typically have prepayment lockout\nperiods (defeasance/yield maintenance) lasting 5-10 years, after which\nvoluntary prepayment resumes at the specified CPR."
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/2/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/2/properties/curve",
-    "const": "cmbs_lockout"
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/2/properties/lockout_months",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/2/properties/lockout_months",
-    "description": "Number of months with zero prepayment (e.g., 60 for 5-year lockout)",
-    "format": "uint32",
-    "minimum": 0
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/3",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/3",
-    "description": "ABS speed: each month a constant share of the *original* balance\nprepays, so the single-month mortality rises with seasoning,\n`SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi, *Handbook of Fixed Income\nSecurities*, auto-loan ABS convention). The `cpr` field is ignored."
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/3/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/3/properties/curve",
-    "const": "abs"
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/3/properties/speed",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/3/properties/speed",
-    "description": "Monthly prepayment as a decimal fraction of the original balance\n(`0.015` = 1.5% ABS).",
-    "format": "double"
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/4",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/4",
-    "description": "Explicit annual CPR for each month of seasoning; the last value is\nheld for later months. The `cpr` field is ignored."
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/4/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/4/properties/curve",
-    "const": "vector"
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr",
-    "description": "Annual CPR per month of seasoning as decimals, month 1 first."
-  },
-  {
-    "path": "#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr/items",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve/oneOf/4/properties/monthly_cpr/items",
-    "format": "double"
   },
   {
     "path": "#/$defs/PrepaymentPenalty",
@@ -28573,26 +28362,108 @@ export default [
     "description": "Use deterministic default model (no stochastic component)."
   },
   {
-    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/properties/cdr",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/properties/cdr",
-    "description": "CDR: Constant Default Rate (annual, e.g., 0.02 for 2%).\n\nThis field is **ignored** when any curve other than\n[`DefaultCurve::Constant`] is active: the monthly rate is then derived\nentirely from the curve.",
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/0",
+    "description": "Constant CDR (no seasoning effect)"
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/0/properties/cdr",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/0/properties/cdr",
+    "description": "Annual decimal CDR in `[0, 1]`.",
     "format": "double"
   },
   {
-    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/properties/curve",
-    "default": null,
-    "description": "Optional curve shape (default: constant)"
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/0/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/0/properties/curve",
+    "const": "constant"
   },
   {
-    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/properties/curve/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/properties/curve/anyOf/0",
-    "ref": "#/$defs/DefaultCurve",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve"
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/1",
+    "description": "SDA standard curve: ramps to peak then declines"
   },
   {
-    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/properties/curve/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/properties/curve/anyOf/1"
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/1/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/1/properties/curve",
+    "const": "sda"
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+    "description": "Speed multiplier (1.0 = 100% SDA)",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2",
+    "description": "Explicit annual CDR for each month of seasoning; the last value is\nheld for later months."
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/curve",
+    "const": "vector"
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr",
+    "description": "Annual CDR per month of seasoning as decimals, month 1 first."
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr/items",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/2/properties/monthly_cdr/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3",
+    "description": "Cumulative net loss curve (rating-agency ABS convention): losses as a\npercent of the original pool balance by month of seasoning, with a\nconstant loss severity. Defaults in month `t` are\n`Δloss_t / severity` of the original balance; see\n[`DefaultModelSpec::mdr_with_survival`] for the conversion to a\nmonthly rate on the surviving balance. Cumulative defaults may exceed\nthe original balance after replenishment or par build."
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct",
+    "description": "Cumulative net loss in percent of the original balance per month\nof seasoning (`1.5` = 1.5%), non-decreasing, month 1 first; the\nlast value is held."
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct/items",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/cumulative_net_loss_pct/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/curve",
+    "const": "cumulative_loss"
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/severity",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/3/properties/severity",
+    "description": "Loss severity as a decimal fraction of defaulted par in `(0, 1]`.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4",
+    "description": "Rating-agency default timing: a lifetime cumulative default rate\nspread over the years of the pool's life. Defaults within a year\naccrue linearly by month."
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct",
+    "description": "Share of lifetime defaults occurring in each year of seasoning, in\npercent (e.g. `[15, 30, 30, 15, 10]`); must sum to 100."
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct/items",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/annual_pct/items",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/cumulative_default_rate",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/cumulative_default_rate",
+    "description": "Lifetime defaults as a decimal fraction of the original balance.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticDefaultSpec/oneOf/0/oneOf/4/properties/curve",
+    "const": "timing"
   },
   {
     "path": "#/$defs/StochasticDefaultSpec/oneOf/0/properties/model",
@@ -28709,26 +28580,95 @@ export default [
     "description": "Use deterministic prepayment model (no stochastic component)."
   },
   {
-    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/properties/cpr",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/properties/cpr",
-    "description": "CPR: Constant Prepayment Rate (annual, e.g., 0.06 for 6%).\n\nThis field is **ignored** when [`PrepaymentCurve::Psa`],\n[`PrepaymentCurve::Abs`] or [`PrepaymentCurve::Vector`] is active: the\nmonthly rate is then derived entirely from the curve. It IS used by\n[`PrepaymentCurve::CmbsLockout`] as the post-lockout CPR.",
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/0",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/0",
+    "description": "Constant CPR (no seasoning effect)"
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/0/properties/cpr",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/0/properties/cpr",
+    "description": "Annual decimal CPR in `[0, 1]`.",
     "format": "double"
   },
   {
-    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/properties/curve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/properties/curve",
-    "default": null,
-    "description": "Optional curve shape (default: constant)"
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/0/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/0/properties/curve",
+    "const": "constant"
   },
   {
-    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/properties/curve/anyOf/0",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/properties/curve/anyOf/0",
-    "ref": "#/$defs/PrepaymentCurve",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve"
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/1",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/1",
+    "description": "PSA standard curve: ramps to 6% CPR over 30 months"
   },
   {
-    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/properties/curve/anyOf/1",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/properties/curve/anyOf/1"
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/1/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/1/properties/curve",
+    "const": "psa"
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/1/properties/speed_multiplier",
+    "description": "Speed multiplier (1.0 = 100% PSA)",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2",
+    "description": "CMBS-style lockout: zero prepayment for an initial period, then constant CPR.\n\nCommercial mortgage-backed securities typically have prepayment lockout\nperiods (defeasance/yield maintenance) lasting 5-10 years, after which\nvoluntary prepayment resumes at the specified CPR."
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/curve",
+    "const": "cmbs_lockout"
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/lockout_months",
+    "description": "Number of months with zero prepayment (e.g., 60 for 5-year lockout)",
+    "format": "uint32",
+    "minimum": 0
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/post_lockout_cpr",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/2/properties/post_lockout_cpr",
+    "description": "Annual decimal CPR after lockout, in `[0, 1]`.",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/3",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/3",
+    "description": "ABS speed: each month a constant share of the *original* balance\nprepays, so the single-month mortality rises with seasoning,\n`SMM_t = ABS / (1 − ABS·(t − 1))` (Fabozzi, *Handbook of Fixed Income\nSecurities*, auto-loan ABS convention)."
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/3/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/3/properties/curve",
+    "const": "abs"
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/3/properties/speed",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/3/properties/speed",
+    "description": "Monthly prepayment as a decimal fraction of the original balance\n(`0.015` = 1.5% ABS).",
+    "format": "double"
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4",
+    "description": "Explicit annual CPR for each month of seasoning; the last value is\nheld for later months."
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/curve",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/curve",
+    "const": "vector"
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr",
+    "description": "Annual CPR per month of seasoning as decimals, month 1 first."
+  },
+  {
+    "path": "#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr/items",
+    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/0/oneOf/4/properties/monthly_cpr/items",
+    "format": "double"
   },
   {
     "path": "#/$defs/StochasticPrepaySpec/oneOf/0/properties/model",
@@ -29039,7 +28979,7 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit/properties/default_spec",
     "default": {
       "cdr": 0.02,
-      "curve": null
+      "curve": "constant"
     },
     "description": "Default model specification.",
     "ref": "https://finstack_quant.dev/schemas/cashflow/1/default_model_spec.schema.json",
@@ -29191,7 +29131,7 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StructuredCredit/properties/prepayment_spec",
     "default": {
       "cpr": 0.2,
-      "curve": null
+      "curve": "constant"
     },
     "description": "Prepayment model specification.",
     "ref": "https://finstack_quant.dev/schemas/cashflow/1/prepayment_model_spec.schema.json",
@@ -32282,12 +32222,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DealType"
   },
   {
-    "path": "#/properties/DefaultCurve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/DefaultCurve",
-    "ref": "#/$defs/DefaultCurve",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/DefaultCurve"
-  },
-  {
     "path": "#/properties/DefaultedValuation",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/DefaultedValuation",
     "ref": "#/$defs/DefaultedValuation",
@@ -33156,12 +33090,6 @@ export default [
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/PremiumLegSpec",
     "ref": "#/$defs/PremiumLegSpec",
     "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PremiumLegSpec"
-  },
-  {
-    "path": "#/properties/PrepaymentCurve",
-    "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/properties/PrepaymentCurve",
-    "ref": "#/$defs/PrepaymentCurve",
-    "resolvedRef": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/PrepaymentCurve"
   },
   {
     "path": "#/properties/PrepaymentPenalty",

@@ -39,6 +39,12 @@ getters!(JsInterestRateSwap, "InterestRateSwap", |i| {
         /// Floating leg specification.
         /// @returns The floating leg.
         float_leg as floatLeg => json(i.float_leg),
+        /// Whether fixed accrual boundaries use the leg's calendar and business-day convention.
+        /// @returns True for adjusted accrual dates; false for contractual unadjusted dates (default).
+        adjust_fixed_accrual_dates as adjustFixedAccrualDates => json(i.adjust_fixed_accrual_dates),
+        /// Whether floating accrual boundaries use the leg's calendar and business-day convention.
+        /// @returns True for adjusted accrual dates; false for contractual unadjusted dates (default).
+        adjust_float_accrual_dates as adjustFloatAccrualDates => json(i.adjust_float_accrual_dates),
         /// OTC margin (CSA / initial-margin) specification in serde form.
         /// @returns The spec plain object, or `null`.
         margin_spec as marginSpec => json(i.margin_spec),
@@ -102,6 +108,16 @@ setters!(JsInterestRateSwapBuilder, "InterestRateSwapBuilder", {
         /// @returns The builder, for chaining.
         /// @throws Error - Throws with kind `invalid_type` if `value` has the wrong JavaScript type, and kind `validation` if it cannot be converted or the builder was already consumed by `build()`.
         float_leg as floatLeg => json,
+        /// Select fixed accrual-date adjustment independently of payment dates.
+        /// @param value - True applies the fixed leg's calendar and business-day convention; false (default) retains contractual accrual boundaries.
+        /// @returns The builder for chaining.
+        /// @throws Error - Throws for a non-boolean value or an already consumed builder.
+        adjust_fixed_accrual_dates as adjustFixedAccrualDates => flag,
+        /// Select floating accrual-date adjustment independently of payment dates.
+        /// @param value - True applies the floating leg's calendar and business-day convention; false (default) retains contractual accrual boundaries.
+        /// @returns The builder for chaining.
+        /// @throws Error - Throws for a non-boolean value or an already consumed builder.
+        adjust_float_accrual_dates as adjustFloatAccrualDates => flag,
         /// Set the OTC margin (CSA / initial-margin) specification.
         /// @param value - Rust `OtcMarginSpec` in serde form (plain object or JSON string), e.g. the `margin_spec` value of a margined swap's `toDict()`.
         /// @returns The builder, for chaining.

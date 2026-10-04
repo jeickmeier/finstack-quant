@@ -12,7 +12,7 @@ use pyo3::types::PyDict;
 
 use crate::bindings::core::currency::PyCurrency;
 use crate::bindings::core::money::PyMoney;
-use crate::bindings::date_utils::{date_to_py, extract_date};
+use crate::bindings::date_utils::{date_to_py, py_to_date};
 use crate::bindings::extract::extract_market;
 use crate::errors::core_to_py;
 use finstack_quant_core::types::{CurveId, InstrumentId};
@@ -528,7 +528,7 @@ end_of_month=False)"
             InstrumentId::new(id.to_string()),
             base,
             quote,
-            extract_date(trade_date)?,
+            py_to_date(trade_date)?,
             tenor_from_py(tenor, "tenor")?,
             super::convert::money_from_py(notional, Some(base.as_ref()), "notional")?,
             CurveId::new(domestic_discount_curve_id.to_string()),
@@ -672,7 +672,7 @@ end_of_month=False)"
         as_of: &Bound<'_, PyAny>,
     ) -> PyResult<f64> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         self.inner
             .market_forward_rate(&market, as_of)
             .map_err(core_to_py)
@@ -892,7 +892,7 @@ impl PyFxForwardBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let maturity = extract_date(value)?;
+        let maturity = py_to_date(value)?;
         fx_forward_set!(
             slf,
             maturity,
@@ -1286,7 +1286,7 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
             base,
             quote,
             strike,
-            extract_date(expiry)?,
+            py_to_date(expiry)?,
             super::convert::money_from_py(notional, Some(base.as_ref()), "notional")?,
             CurveId::new(vol_surface_id.to_string()),
             enum_from_str(option_type, "option_type")?,
@@ -1329,7 +1329,7 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         target_price: f64,
     ) -> PyResult<f64> {
         let market = extract_market(py, market)?;
-        let as_of = extract_date(as_of)?;
+        let as_of = py_to_date(as_of)?;
         self.inner
             .implied_vol(&market, as_of, target_price)
             .map_err(core_to_py)
@@ -1899,7 +1899,7 @@ impl PyFxOptionBuilder {
         mut slf: PyRefMut<'py, Self>,
         value: &Bound<'_, PyAny>,
     ) -> PyResult<PyRefMut<'py, Self>> {
-        let expiry = extract_date(value)?;
+        let expiry = py_to_date(value)?;
         fx_option_set!(slf, expiry, date_repr(expiry), |b: FxOptionBuilderInner| b
             .expiry(expiry))
     }

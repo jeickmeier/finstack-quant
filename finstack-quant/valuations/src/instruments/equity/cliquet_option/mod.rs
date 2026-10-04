@@ -38,7 +38,6 @@
 pub(crate) mod metrics;
 pub(crate) mod monte_carlo;
 pub(crate) mod pricer;
-pub(crate) mod traits;
 pub(crate) mod types;
 
 pub use types::{CliquetOption, CliquetPayoffType};

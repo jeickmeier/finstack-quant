@@ -42,7 +42,7 @@
 //! # See Also
 //!
 //! - [`FxTouchOption`] for the instrument struct
-//! - `pricer::FxTouchOptionCalculator` for pricing calculations
+//! - `pricer::compute_pv` for pricing calculations
 
 /// FX touch option risk metrics
 pub(crate) mod metrics;

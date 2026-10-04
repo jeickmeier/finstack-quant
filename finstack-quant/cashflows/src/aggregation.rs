@@ -465,7 +465,6 @@ pub(crate) fn pv_by_period_cashflows_sorted_checked(
     periods: &[Period],
     disc: &dyn Discounting,
     date_ctx: DateContext<'_>,
-    hazard: Option<&dyn Survival>,
 ) -> finstack_quant_core::Result<IndexMap<PeriodId, IndexMap<Currency, Money>>> {
     validate_periods(periods)?;
     let mut out: IndexMap<PeriodId, IndexMap<Currency, Money>> =
@@ -480,12 +479,12 @@ pub(crate) fn pv_by_period_cashflows_sorted_checked(
 
         per_currency.clear();
         for flow in flows_in_period {
-            let (df, sp) = discount_survival(flow.date, disc, hazard, &date_ctx)?;
+            let (df, _) = discount_survival(flow.date, disc, None, &date_ctx)?;
             let ccy = flow.amount.currency();
             let pv = if !is_cash_settlement_kind(flow.kind) || flow.date <= date_ctx.base {
                 0.0
             } else {
-                flow.amount.amount() * df * sp
+                flow.amount.amount() * df
             };
             per_currency.entry(ccy).or_default().add(pv);
         }
@@ -1469,7 +1468,6 @@ mod period_contract_tests {
             &periods,
             &disc,
             DateContext::new(base, DayCount::Act365F, DayCountContext::default()),
-            None,
         );
         let err = result.expect_err("NaN df must error, not panic");
         assert!(format!("{err}").contains("non-finite"), "got: {err}");
@@ -1514,7 +1512,6 @@ mod period_contract_tests {
             &periods,
             &disc,
             DateContext::new(base, DayCount::Act365F, DayCountContext::default()),
-            None,
         )
         .expect("pv aggregation succeeds");
 

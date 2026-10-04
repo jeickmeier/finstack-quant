@@ -595,7 +595,7 @@ impl PyRebalanceRule {
     fn dates(dates: Vec<Bound<'_, PyAny>>) -> PyResult<Self> {
         let dates = dates
             .iter()
-            .map(crate::bindings::date_utils::extract_date)
+            .map(crate::bindings::date_utils::py_to_date)
             .collect::<PyResult<Vec<_>>>()?;
         let inner = RebalanceRule::Dates { dates };
         inner.validate().map_err(core_to_py)?;
@@ -637,10 +637,10 @@ impl PyRebalanceRule {
         end: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
         let inner = RebalanceRule::Calendar {
-            start: crate::bindings::date_utils::extract_date(start)?,
+            start: crate::bindings::date_utils::py_to_date(start)?,
             end: end
                 .filter(|value| !value.is_none())
-                .map(crate::bindings::date_utils::extract_date)
+                .map(crate::bindings::date_utils::py_to_date)
                 .transpose()?,
             frequency: crate::bindings::core::dates::tenor::extract_tenor(frequency)?,
             calendar_id: calendar_id.to_string(),
@@ -924,7 +924,7 @@ impl PyCompositeSpec {
         history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyCompositeRebalanceResult> {
         let market = extract_market(py, market)?;
-        let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+        let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let history = observations_from_py(py, history, "composite market history")?;
         self.inner
             .initialize(
@@ -1179,7 +1179,7 @@ impl PyCompositeInstrument {
         history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyCompositeRebalanceResult> {
         let market = extract_market(py, market)?;
-        let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+        let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let history = observations_from_py(py, history, "composite market history")?;
         self.inner
             .rebalance(
@@ -1221,7 +1221,7 @@ impl PyCompositeInstrument {
         metrics: Option<Vec<String>>,
     ) -> PyResult<PyCompositeExposureReport> {
         let market = extract_market(py, market)?;
-        let as_of = crate::bindings::date_utils::extract_date(as_of)?;
+        let as_of = crate::bindings::date_utils::py_to_date(as_of)?;
         let metrics = metrics
             .unwrap_or_default()
             .into_iter()

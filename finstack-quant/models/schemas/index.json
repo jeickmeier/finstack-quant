@@ -749,7 +749,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/stochastic_default_spec.schema.json",
-      "bytes": 11823,
+      "bytes": 14771,
       "kind": "input",
       "path": "schemas/models/1/stochastic_default_spec.schema.json",
       "summary": "Stochastic default model specification.",
@@ -758,7 +758,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/stochastic_prepay_spec.schema.json",
-      "bytes": 9567,
+      "bytes": 11934,
       "kind": "input",
       "path": "schemas/models/1/stochastic_prepay_spec.schema.json",
       "summary": "Stochastic prepayment model specification.",

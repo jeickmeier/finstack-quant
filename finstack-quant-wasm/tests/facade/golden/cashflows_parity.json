@@ -3387,47 +3387,35 @@
   "specs.default_model": {
     "models": [
       {
-        "cdr": 0.03,
-        "curve": null
+        "curve": "constant",
+        "cdr": 0.03
       },
       {
-        "cdr": 0.0003,
-        "curve": {
-          "curve": "sda",
-          "speed_multiplier": 1.5
-        }
+        "curve": "sda",
+        "speed_multiplier": 1.5
       },
       {
-        "cdr": 0.02,
-        "curve": null
+        "curve": "constant",
+        "cdr": 0.02
       },
       {
-        "cdr": 0.01,
-        "curve": {
-          "curve": "vector",
-          "monthly_cdr": [0.01, 0.02, 0.04]
-        }
+        "curve": "vector",
+        "monthly_cdr": [0.01, 0.02, 0.04]
       },
       {
-        "cdr": 0,
-        "curve": {
-          "curve": "cumulative_loss",
-          "cumulative_net_loss_pct": [0.5, 1.5, 2],
-          "severity": 0.4
-        }
+        "curve": "cumulative_loss",
+        "cumulative_net_loss_pct": [0.5, 1.5, 2],
+        "severity": 0.4
       },
       {
-        "cdr": 0,
-        "curve": {
-          "curve": "timing",
-          "cumulative_default_rate": 0.1,
-          "annual_pct": [15, 30, 30, 15, 10]
-        }
+        "curve": "timing",
+        "cumulative_default_rate": 0.1,
+        "annual_pct": [15, 30, 30, 15, 10]
       }
     ],
     "mdr": [
       [0.0025350486138367213, 0.0025350486138367213, 0.0025350486138367213, 0.0025350486138367213],
-      [2.500343815899557e-5, 0.0003004961414970192, 0.0007531116566323619, 0.0003946052978783281],
+      [0.00002500343815899557, 0.0003004961414970192, 0.0007531116566323619, 0.0003946052978783281],
       [0.0016821425527395358, 0.0016821425527395358, 0.0016821425527395358, 0.0016821425527395358],
       [0.0008371773591205603, 0.0033960531989175907, 0.0033960531989175907, 0.0033960531989175907],
       [0.012499999999999999, 0, 0, 0],
@@ -3437,43 +3425,29 @@
   "specs.prepayment_model": {
     "models": [
       {
-        "cpr": 0.06,
-        "curve": null
+        "curve": "constant",
+        "cpr": 0.06
       },
       {
-        "cpr": 0.06,
-        "curve": {
-          "curve": "psa",
-          "speed_multiplier": 1.5
-        }
+        "curve": "psa",
+        "speed_multiplier": 1.5
       },
       {
-        "cpr": 0.06,
-        "curve": {
-          "curve": "psa",
-          "speed_multiplier": 1
-        }
+        "curve": "psa",
+        "speed_multiplier": 1
       },
       {
-        "cpr": 0.1,
-        "curve": {
-          "curve": "cmbs_lockout",
-          "lockout_months": 60
-        }
+        "curve": "cmbs_lockout",
+        "lockout_months": 60,
+        "post_lockout_cpr": 0.1
       },
       {
-        "cpr": 0.1658680316591229,
-        "curve": {
-          "curve": "abs",
-          "speed": 0.015
-        }
+        "curve": "abs",
+        "speed": 0.015
       },
       {
-        "cpr": 0.02,
-        "curve": {
-          "curve": "vector",
-          "monthly_cpr": [0.02, 0.05, 0.08]
-        }
+        "curve": "vector",
+        "monthly_cpr": [0.02, 0.05, 0.08]
       }
     ],
     "smm": [
