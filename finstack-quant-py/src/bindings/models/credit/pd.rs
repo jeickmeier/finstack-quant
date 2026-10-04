@@ -1,5 +1,6 @@
 //! Python bindings for `finstack_quant_models::credit::pd` (calibration subset).
 
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use finstack_quant_models::credit::pd::{
     apply_basel_irb_pd_floor as core_apply_basel_irb_pd_floor,
     central_tendency as core_central_tendency, pit_to_ttc as core_pit_to_ttc,
@@ -14,7 +15,7 @@ use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
     ColumnSchema,
 };
-use crate::errors::{core_to_py, pd_calibration_to_py, serde_json_to_py};
+use crate::errors::{core_to_py, pd_calibration_to_py};
 
 /// Column schema shared by `MasterScaleResult.to_dataframe` and
 /// `MasterScale.map_pds`.
@@ -178,32 +179,13 @@ impl PyMasterScaleGrade {
         self.inner.central_pd
     }
 
-    /// Deserialize a grade from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid MasterScaleGrade JSON"))?,
-        })
-    }
-
-    /// Serialize this grade to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "MasterScaleGrade serialization failed"))
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("MasterScaleGrade", &self.inner)
     }
 }
+
+wire_methods!(PyMasterScaleGrade, MasterScaleGrade, "MasterScaleGrade");
 
 /// Result of mapping a PD onto a master scale.
 #[pyclass(
@@ -220,26 +202,6 @@ pub struct PyMasterScaleResult {
 
 #[pymethods]
 impl PyMasterScaleResult {
-    /// Deserialize a mapped-grade result from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|err| serde_json_to_py(err, "invalid MasterScaleResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this result to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "MasterScaleResult serialization failed"))
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Label of the grade the PD mapped into.
     #[getter]
     fn grade(&self) -> &str {
@@ -279,18 +241,10 @@ impl PyMasterScaleResult {
     fn __repr__(&self) -> String {
         crate::bindings::repr_support::repr_from_serde("MasterScaleResult", &self.inner)
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(PyMasterScaleResult, MasterScaleResult, "MasterScaleResult");
+impl_repr_html_via_dataframe!(PyMasterScaleResult);
 
 /// Ordered PD bands mapping a continuous PD onto discrete rating grades.
 ///
@@ -456,27 +410,6 @@ impl PyMasterScale {
         )
     }
 
-    /// Deserialize a master scale from canonical JSON (re-validated on load).
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid MasterScale JSON"))?,
-        })
-    }
-
-    /// Serialize this scale to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "MasterScale serialization failed"))
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     fn __len__(&self) -> usize {
         self.inner.n_grades()
     }
@@ -495,6 +428,8 @@ impl PyMasterScale {
         )
     }
 }
+
+wire_methods!(PyMasterScale, MasterScale, "MasterScale");
 
 /// Build the `finstack_quant.models.credit.pd` submodule.
 pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {

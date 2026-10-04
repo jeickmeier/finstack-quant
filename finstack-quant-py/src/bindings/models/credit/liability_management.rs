@@ -1,7 +1,8 @@
 //! Python bindings for `finstack_quant_models::credit::liability_management`.
 
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::serde_object_to_single_row_dataframe_with_schema;
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_models::credit::liability_management::{
     self as lm, ExchangeOfferAnalysis, ExchangeType, LeverageImpact, LmeAnalysis, LmeType,
     TENDER_RECOMMENDATION_HURDLE,
@@ -82,27 +83,6 @@ impl PyExchangeOfferAnalysis {
         self.inner.tender_recommended
     }
 
-    /// Deserialize from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid ExchangeOfferAnalysis JSON"))?,
-        })
-    }
-
-    /// Serialize to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "ExchangeOfferAnalysis serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Export as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``exchange_type``, ``old_npv``, ``new_npv``, ``consent_fee``,
@@ -154,18 +134,14 @@ impl PyExchangeOfferAnalysis {
             self.inner.tender_recommended
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(
+    PyExchangeOfferAnalysis,
+    ExchangeOfferAnalysis,
+    "ExchangeOfferAnalysis"
+);
+impl_repr_html_via_dataframe!(PyExchangeOfferAnalysis);
 
 /// Gross-leverage impact of a liability management exercise.
 #[pyclass(
@@ -212,27 +188,6 @@ impl PyLeverageImpact {
         self.inner.leverage_reduction
     }
 
-    /// Deserialize from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid LeverageImpact JSON"))?,
-        })
-    }
-
-    /// Serialize to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "LeverageImpact serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Export as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``pre_total_debt``, ``post_total_debt``, ``pre_leverage``,
@@ -258,6 +213,8 @@ impl PyLeverageImpact {
         )
     }
 }
+
+wire_methods!(PyLeverageImpact, LeverageImpact, "LeverageImpact");
 
 /// Issuer-side economics of a liability management exercise.
 ///
@@ -323,27 +280,6 @@ impl PyLmeAnalysis {
             .map(|inner| PyLeverageImpact { inner })
     }
 
-    /// Deserialize from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid LmeAnalysis JSON"))?,
-        })
-    }
-
-    /// Serialize to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "LmeAnalysis serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Export as a single-row pandas ``DataFrame``.
     ///
     /// Columns: ``lme_type``, ``cost``, ``notional_reduction``,
@@ -406,18 +342,10 @@ impl PyLmeAnalysis {
             self.inner.discount_capture
         )
     }
-
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
 }
+
+wire_methods!(PyLmeAnalysis, LmeAnalysis, "LmeAnalysis");
+impl_repr_html_via_dataframe!(PyLmeAnalysis);
 
 /// Compare hold-versus-tender economics for a distressed exchange offer.
 ///

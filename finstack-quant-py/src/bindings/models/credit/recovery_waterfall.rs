@@ -1,10 +1,11 @@
 //! Python bindings for `finstack_quant_models::credit::recovery_waterfall`.
 
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
     ColumnSchema,
 };
-use crate::errors::{core_to_py, serde_json_to_py};
+use crate::errors::core_to_py;
 use finstack_quant_models::credit::recovery_waterfall::{
     self as waterfall, RecoveryAllocation, RecoveryClaim, RecoveryWaterfallResult,
 };
@@ -150,27 +151,6 @@ impl PyRecoveryClaim {
         self.inner.total_claim()
     }
 
-    /// Deserialize from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid RecoveryClaim JSON"))?,
-        })
-    }
-
-    /// Serialize to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "RecoveryClaim serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Identify this value in notebooks and logs.
     fn __repr__(&self) -> String {
         format!(
@@ -182,6 +162,8 @@ impl PyRecoveryClaim {
         )
     }
 }
+
+wire_methods!(PyRecoveryClaim, RecoveryClaim, "RecoveryClaim");
 
 /// Recovery allocated to one claim.
 #[pyclass(
@@ -252,27 +234,6 @@ impl PyRecoveryAllocation {
         self.inner.deficiency
     }
 
-    /// Deserialize from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        Ok(Self {
-            inner: serde_json::from_str(json)
-                .map_err(|err| serde_json_to_py(err, "invalid RecoveryAllocation JSON"))?,
-        })
-    }
-
-    /// Serialize to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "RecoveryAllocation serialization failed"))
-    }
-
-    /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Export as a single-row pandas ``DataFrame`` with the same columns as
     /// ``RecoveryWaterfallResult.to_dataframe``.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
@@ -290,6 +251,12 @@ impl PyRecoveryAllocation {
     }
 }
 
+wire_methods!(
+    PyRecoveryAllocation,
+    RecoveryAllocation,
+    "RecoveryAllocation"
+);
+
 /// Result of allocating a distributable estate across claims.
 #[pyclass(
     name = "RecoveryWaterfallResult",
@@ -304,26 +271,6 @@ pub struct PyRecoveryWaterfallResult {
 
 #[pymethods]
 impl PyRecoveryWaterfallResult {
-    /// Deserialize a waterfall result from canonical JSON.
-    #[staticmethod]
-    fn from_json(json: &str) -> PyResult<Self> {
-        let inner = serde_json::from_str(json)
-            .map_err(|err| serde_json_to_py(err, "invalid RecoveryWaterfallResult JSON"))?;
-        Ok(Self { inner })
-    }
-
-    /// Serialize this result to compact canonical JSON.
-    fn to_json(&self) -> PyResult<String> {
-        serde_json::to_string(&self.inner)
-            .map_err(|err| serde_json_to_py(err, "RecoveryWaterfallResult serialization failed"))
-    }
-
-    /// Support pickle through the canonical JSON representation.
-    fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-        let from_json = py.get_type::<Self>().getattr("from_json")?;
-        crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
-    }
-
     /// Sum of every claim's `total_recovery`.
     #[getter]
     fn total_distributed(&self) -> f64 {
@@ -375,17 +322,6 @@ impl PyRecoveryWaterfallResult {
         serde_rows_to_dataframe_with_schema(py, &self.inner.allocations, ALLOCATION_COLUMNS)
     }
 
-    /// Render as an HTML table in Jupyter notebooks.
-    ///
-    /// Delegates to the frame from `to_dataframe`, so pandas' own row/column
-    /// truncation applies and a large result stays a small repr. Returns
-    /// `None` if the frame cannot be built, which makes IPython fall back to
-    /// `__repr__` instead of raising from the display hook.
-    fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-        let frame = self.to_dataframe(py).ok()?;
-        frame.call_method0("_repr_html_").ok()?.extract().ok()
-    }
-
     /// Identify this value in notebooks and logs.
     ///
     /// Rendered from the wire representation, so the fields shown are the
@@ -395,6 +331,13 @@ impl PyRecoveryWaterfallResult {
         crate::bindings::repr_support::repr_from_serde("RecoveryWaterfallResult", &self.inner)
     }
 }
+
+wire_methods!(
+    PyRecoveryWaterfallResult,
+    RecoveryWaterfallResult,
+    "RecoveryWaterfallResult"
+);
+impl_repr_html_via_dataframe!(PyRecoveryWaterfallResult);
 
 /// Allocate an estate, inclusive of collateral, across recovery claims.
 ///
