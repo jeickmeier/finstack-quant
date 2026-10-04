@@ -23,45 +23,14 @@
 
 use pyo3::prelude::*;
 
-/// `to_json` / `from_json` / `to_dict` / pickle for a serde-backed wrapper
-/// whose Rust type carries strict field names.
+/// `to_json` / `from_json` / pickle (via `wire_methods!`) plus `to_dict` for a
+/// serde-backed wrapper whose Rust type carries strict field names.
 macro_rules! sc_wire_methods {
     ($py_type:ident, $rust_type:ty, $name:literal) => {
+        $crate::bindings::macros::wire_methods!($py_type, $rust_type, $name);
+
         #[pymethods]
         impl $py_type {
-            /// Deserialize from the JSON produced by ``to_json``.
-            ///
-            /// Parameters
-            /// ----------
-            /// json : str
-            ///     JSON-encoded value (the shape ``to_json`` writes).
-            ///
-            /// Raises
-            /// ------
-            /// ValueError
-            ///     If ``json`` is malformed, carries unknown fields, or violates the
-            ///     Rust type's validated reconstruction constraints.
-            #[staticmethod]
-            #[pyo3(text_signature = "(json)")]
-            fn from_json(json: &str) -> PyResult<Self> {
-                serde_json::from_str::<$rust_type>(json)
-                    .map(|inner| Self { inner })
-                    .map_err(|e| {
-                        crate::errors::serde_json_to_py(e, concat!("invalid ", $name, " JSON"))
-                    })
-            }
-
-            /// Serialize to the JSON shape ``from_json`` accepts.
-            ///
-            /// Raises
-            /// ------
-            /// ValueError
-            ///     If the value cannot be serialized.
-            #[pyo3(text_signature = "($self)")]
-            fn to_json(&self) -> PyResult<String> {
-                serde_json::to_string(&self.inner).map_err(crate::errors::display_to_py)
-            }
-
             /// Return every field as a plain ``dict`` (canonical serde shape).
             ///
             /// Raises
@@ -71,12 +40,6 @@ macro_rules! sc_wire_methods {
             #[pyo3(text_signature = "($self)")]
             fn to_dict<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
                 crate::bindings::pandas_utils::serde_to_py(py, &self.inner)
-            }
-
-            /// Support ``pickle`` through the ``to_json`` / ``from_json`` round-trip.
-            fn __reduce__<'py>(&self, py: Python<'py>) -> PyResult<(Bound<'py, PyAny>, (String,))> {
-                let from_json = py.get_type::<Self>().getattr("from_json")?;
-                crate::bindings::pickle_support::reduce_via_json(from_json, self.to_json()?)
             }
         }
     };

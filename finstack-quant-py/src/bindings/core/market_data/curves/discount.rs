@@ -8,12 +8,12 @@ use pyo3::prelude::*;
 
 use super::forward::PyForwardCurve;
 use super::helpers::{
-    columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods,
-    impl_repr_html_via_dataframe, parse_compounding, parse_extrapolation, parse_interp_style,
-    TimePoint,
+    columns_to_dataframe, extract_time_point, impl_arc_serde_pymethods, parse_compounding,
+    parse_extrapolation, parse_interp_style, TimePoint,
 };
 use crate::bindings::core::dates::daycount::extract_day_count;
 use crate::bindings::date_utils::{date_to_py, py_to_date};
+use crate::bindings::macros::impl_repr_html_via_dataframe;
 use crate::errors::core_to_py;
 
 /// Discount factor curve for present-value calculations.

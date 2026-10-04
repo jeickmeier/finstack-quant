@@ -7,9 +7,8 @@ use finstack_quant_core::market_data::term_structures::{BaseCorrelationCurve, Cr
 use pyo3::prelude::*;
 
 use super::hazard::PyHazardCurve;
-use super::helpers::{
-    columns_to_dataframe, impl_arc_serde_pymethods, impl_repr_html_via_dataframe,
-};
+use super::helpers::{columns_to_dataframe, impl_arc_serde_pymethods};
+use crate::bindings::macros::impl_repr_html_via_dataframe;
 use crate::errors::core_to_py;
 
 /// Base-correlation curve for synthetic credit index tranche pricing.

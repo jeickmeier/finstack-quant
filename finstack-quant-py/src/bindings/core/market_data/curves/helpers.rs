@@ -175,21 +175,3 @@ macro_rules! impl_arc_serde_pymethods {
     };
 }
 pub(super) use impl_arc_serde_pymethods;
-
-/// Generate `_repr_html_` delegating to the wrapper's `to_dataframe`.
-macro_rules! impl_repr_html_via_dataframe {
-    ($py_ty:ident) => {
-        #[pymethods]
-        impl $py_ty {
-            /// Render as an HTML table in Jupyter notebooks.
-            ///
-            /// Delegates to the frame from ``to_dataframe``; returns ``None`` if the
-            /// frame cannot be built so IPython falls back to ``__repr__``.
-            fn _repr_html_(&self, py: Python<'_>) -> Option<String> {
-                let frame = self.to_dataframe(py).ok()?;
-                frame.call_method0("_repr_html_").ok()?.extract().ok()
-            }
-        }
-    };
-}
-pub(super) use impl_repr_html_via_dataframe;
