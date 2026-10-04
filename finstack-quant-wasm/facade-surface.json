@@ -2192,7 +2192,6 @@
       "SimmCalculator",
       "SimmSensitivities",
       "VmCalculator",
-      "calculateVm",
       "clearingStatusCleared",
       "collateralAssetClassFromStr",
       "collateralAssetClassFxAddon",
@@ -2200,7 +2199,6 @@
       "computeBilateralXva",
       "computeMva",
       "constants",
-      "csaEurRegulatoryJson",
       "csaSpecApplyImTerms",
       "csaSpecEurRegulatory",
       "csaSpecRegulatory",
@@ -2209,7 +2207,6 @@
       "csaSpecValidate",
       "csaSpecWithIm",
       "csaSpecWithVmThreshold",
-      "csaUsdRegulatoryJson",
       "eligibleCollateralScheduleBcbsStandard",
       "eligibleCollateralScheduleCashOnly",
       "eligibleCollateralScheduleCheckConcentrationLimits",
@@ -2252,22 +2249,9 @@
       "saCcrNettingSetConfigValidate",
       "saccrEad",
       "schema",
-      "validateCsaJson",
       "vmResultNetMargin",
       "vmResultRequiresCall"
     ]
-  },
-  "margin.csaUsdRegulatoryJson": {
-    "kind": "function"
-  },
-  "margin.csaEurRegulatoryJson": {
-    "kind": "function"
-  },
-  "margin.validateCsaJson": {
-    "kind": "function"
-  },
-  "margin.calculateVm": {
-    "kind": "function"
   },
   "margin.computeBilateralXva": {
     "kind": "function"
@@ -2317,15 +2301,8 @@
   "margin.HaircutImCalculator": {
     "kind": "class",
     "statics": ["bcbsStandard", "fromSchedule", "usTreasuries"],
-    "methods": [
-      "calculateForCollateral",
-      "free",
-      "haircutFor",
-      "withCollateralTerms",
-      "withDefaultAssetClass",
-      "withPostedCollateralCurrency"
-    ],
-    "getters": ["defaultAssetClass", "eligibleCollateral", "mporDays", "postedCollateralCurrency"]
+    "methods": ["calculateForCollateral", "free", "haircutFor", "withCollateralTerms"],
+    "getters": ["eligibleCollateral", "mporDays"]
   },
   "margin.SaCcrEngine": {
     "kind": "class",
@@ -2336,15 +2313,8 @@
   "margin.ScheduleImCalculator": {
     "kind": "class",
     "statics": ["bcbsStandard", "fromFinstackConfig", "fromRegistryId"],
-    "methods": [
-      "calculateForNotional",
-      "calculateNettingSetWithNgr",
-      "free",
-      "rate",
-      "withAssetClass",
-      "withMaturity"
-    ],
-    "getters": ["defaultAssetClass", "defaultMaturityYears", "mporDays"]
+    "methods": ["calculateForNotional", "calculateNettingSetWithNgr", "free", "rate"],
+    "getters": ["mporDays"]
   },
   "margin.SimmCalculator": {
     "kind": "class",

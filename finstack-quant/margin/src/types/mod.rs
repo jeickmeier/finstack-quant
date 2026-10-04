@@ -55,9 +55,11 @@ pub use repo_cashflows::{
 pub use repo_margin::{RepoMarginSpec, RepoMarginType};
 pub use simm_curvature::SimmCurvatureSensitivity;
 pub use simm_types::{
-    commodity_bucket_id, ordered_credit_sector_pair, ordered_risk_class_pair, ordered_tenor_pair,
-    SimmCreditSector, SimmRiskClass, SimmSensitivities, SimmSensitivitiesJson,
+    commodity_bucket_id, SimmCreditSector, SimmRiskClass, SimmSensitivities, SimmSensitivitiesJson,
     SIMM_COMMODITY_BUCKET_COUNT, SIMM_TENORS,
+};
+pub(crate) use simm_types::{
+    ordered_credit_sector_pair, ordered_risk_class_pair, ordered_tenor_pair,
 };
 pub use thresholds::{ImCollateralResult, ImParameters, VmParameters};
 

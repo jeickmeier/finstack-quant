@@ -19193,16 +19193,6 @@
           "$ref": "#/$defs/CsaSpec",
           "description": "Full CSA specification (for bilateral trades)\n\nFor cleared trades, this represents the terms with the CCP."
         },
-        "im_methodology": {
-          "$ref": "#/$defs/ImMethodology",
-          "description": "Initial margin calculation methodology\n\n- Bilateral: SIMM or Schedule\n- Cleared: ClearingHouse (CCP-specific)"
-        },
-        "settlement_lag": {
-          "description": "Settlement lag for margin transfers (business days)",
-          "format": "uint32",
-          "minimum": 0,
-          "type": "integer"
-        },
         "simm_credit_classification": {
           "anyOf": [
             {
@@ -19213,18 +19203,11 @@
             }
           ],
           "description": "Explicit SIMM credit classification for credit-sensitive instruments.\n\nRequired when a credit product uses `ImMethodology::Simm`; leave `None`\nfor non-credit instruments and non-SIMM margin methodologies."
-        },
-        "vm_frequency": {
-          "$ref": "#/$defs/MarginTenor",
-          "description": "Variation margin exchange frequency"
         }
       },
       "required": [
         "csa",
-        "clearing_status",
-        "im_methodology",
-        "vm_frequency",
-        "settlement_lag"
+        "clearing_status"
       ],
       "type": "object"
     },

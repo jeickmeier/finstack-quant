@@ -53,7 +53,6 @@ use crate::registry::{
 use crate::regulatory::frtb::aggregation::{correlated_norm, inter_bucket_pairwise};
 use crate::traits::Marginable;
 use crate::types::ImMethodology;
-use crate::types::SimmCurvatureSensitivity;
 use crate::types::{
     ordered_credit_sector_pair, ordered_risk_class_pair, ordered_tenor_pair, SimmCreditSector,
     SimmRiskClass, SimmSensitivities,
@@ -314,18 +313,19 @@ impl IrTenorCorrelationMatrix {
 #[derive(Debug, Clone)]
 pub struct SimmCalculator {
     /// SIMM parameters (risk weights, correlations, thresholds)
-    pub params: SimmParams,
+    params: SimmParams,
     ir_corr_matrix: IrTenorCorrelationMatrix,
 }
 
-impl Default for SimmCalculator {
-    #[allow(clippy::expect_used)] // Embedded margin registry is a compile-time asset.
-    fn default() -> Self {
-        Self::new(SimmVersion::V2_6).expect("embedded margin registry is a compile-time asset")
-    }
-}
-
 impl SimmCalculator {
+    /// Inspect the validated parameters resolved when this calculator was built.
+    ///
+    /// The shared borrow cannot mutate parameters or invalidate cached correlations.
+    #[must_use]
+    pub fn get_params(&self) -> &SimmParams {
+        &self.params
+    }
+
     /// Create a new SIMM calculator with the specified version.
     ///
     /// # Arguments
@@ -429,7 +429,7 @@ impl SimmCalculator {
     /// # Arguments
     ///
     /// * `ir_delta` - Map of (currency, tenor) to DV01 sensitivity
-    pub fn calculate_ir_delta_multi_currency(
+    fn calculate_ir_delta_multi_currency(
         &self,
         ir_delta: &HashMap<(Currency, String), f64>,
     ) -> f64 {
@@ -514,74 +514,8 @@ impl SimmCalculator {
     /// # Arguments
     ///
     /// * `ir_vega` - Map of (currency, tenor) to signed IR vega sensitivity.
-    pub fn calculate_ir_vega_multi_currency(
-        &self,
-        ir_vega: &HashMap<(Currency, String), f64>,
-    ) -> f64 {
+    fn calculate_ir_vega_multi_currency(&self, ir_vega: &HashMap<(Currency, String), f64>) -> f64 {
         self.aggregate_ir(ir_vega, true)
-    }
-
-    /// Calculate IR delta margin for a single currency from DV01-style sensitivities.
-    ///
-    /// Uses intra-bucket tenor correlations per ISDA SIMM methodology:
-    /// `K = sqrt(sum_i sum_j rho(i,j) * WS_i * WS_j)`
-    ///
-    /// # Arguments
-    ///
-    /// * `dv01_by_tenor` - Map of tenor bucket to signed currency DV01 per 1bp move
-    ///
-    /// # Returns
-    ///
-    /// The interest-rate delta margin contribution in the caller's implicit currency units.
-    pub fn calculate_ir_delta(&self, dv01_by_tenor: &HashMap<String, f64>) -> f64 {
-        let sensitivities = dv01_by_tenor
-            .iter()
-            .map(|(tenor, amount)| ((Currency::USD, tenor.clone()), *amount))
-            .collect();
-        self.calculate_ir_delta_multi_currency(&sensitivities)
-    }
-
-    /// Calculate credit non-qualifying delta margin from aggregate CS01.
-    ///
-    /// # Arguments
-    ///
-    /// * `cs01` - Signed currency CS01 per 1bp par-spread move for explicitly
-    ///   non-qualifying exposures.
-    ///
-    /// # Returns
-    ///
-    /// The non-qualifying credit delta margin after the registry risk weight.
-    pub fn calculate_credit_non_qualifying_delta(&self, cs01: f64) -> f64 {
-        (cs01
-            * self.params.cnq_delta_weight
-            * concentration(
-                cs01,
-                self.params.concentration_thresholds[&SimmRiskClass::CreditNonQualifying],
-            ))
-        .abs()
-    }
-
-    /// Calculate credit non-qualifying vega margin from aggregate vega.
-    ///
-    /// Mirrors [`Self::calculate_credit_non_qualifying_delta`]: the pooled
-    /// signed vega is weighted by the credit-non-qualifying vega risk weight
-    /// and reported as a magnitude.
-    ///
-    /// # Arguments
-    ///
-    /// * `vega` - Signed currency vega for explicitly non-qualifying exposures.
-    ///
-    /// # Returns
-    ///
-    /// The non-qualifying credit vega margin after the registry risk weight.
-    pub fn calculate_credit_non_qualifying_vega(&self, vega: f64) -> f64 {
-        (vega
-            * self.params.cnq_vega_weight
-            * concentration(
-                vega,
-                self.params.vega_concentration_thresholds[&SimmRiskClass::CreditNonQualifying],
-            ))
-        .abs()
     }
 
     /// Calculate credit qualifying delta margin with bucket-level aggregation.
@@ -610,7 +544,7 @@ impl SimmCalculator {
     /// # Returns
     ///
     /// The credit qualifying delta margin after bucket diversification.
-    pub fn calculate_credit_qualifying_delta(
+    fn calculate_credit_qualifying_delta(
         &self,
         bucketed_delta: &HashMap<(SimmCreditSector, String, String), f64>,
     ) -> f64 {
@@ -638,7 +572,7 @@ impl SimmCalculator {
     /// # Returns
     ///
     /// The credit-qualifying vega margin after bucket diversification.
-    pub fn calculate_credit_qualifying_vega(
+    fn calculate_credit_qualifying_vega(
         &self,
         bucketed_vega: &HashMap<(SimmCreditSector, String, String), f64>,
     ) -> f64 {
@@ -716,7 +650,7 @@ impl SimmCalculator {
     /// # Returns
     ///
     /// The weighted equity delta margin contribution.
-    pub fn calculate_equity_delta(&self, equity_delta: f64) -> f64 {
+    fn calculate_equity_delta(&self, equity_delta: f64) -> f64 {
         (equity_delta
             * self.params.equity_delta_weight
             * self.concentration_factor(SimmRiskClass::Equity, equity_delta))
@@ -729,7 +663,7 @@ impl SimmCalculator {
     /// independently, then aggregated with the SIMM FX intra-bucket correlation
     /// between distinct currency risk factors. This prevents opposite-signed
     /// currency deltas from receiving full rho=1 offset.
-    pub fn calculate_fx_delta_bucketed(&self, fx_delta: &HashMap<Currency, f64>) -> f64 {
+    fn calculate_fx_delta_bucketed(&self, fx_delta: &HashMap<Currency, f64>) -> f64 {
         let mut entries: Vec<_> = fx_delta
             .iter()
             .filter(|(currency, _)| **currency != Currency::USD)
@@ -770,7 +704,7 @@ impl SimmCalculator {
     /// # Returns
     ///
     /// The commodity delta margin contribution after bucket weighting and inter-bucket correlation.
-    pub fn calculate_commodity_delta(&self, delta_by_bucket: &HashMap<String, f64>) -> f64 {
+    fn calculate_commodity_delta(&self, delta_by_bucket: &HashMap<String, f64>) -> f64 {
         self.aggregate_commodity(delta_by_bucket, false)
     }
 
@@ -788,7 +722,7 @@ impl SimmCalculator {
     /// # Returns
     ///
     /// The commodity vega margin contribution after inter-bucket correlation.
-    pub fn calculate_commodity_vega(&self, vega_by_bucket: &HashMap<String, f64>) -> f64 {
+    fn calculate_commodity_vega(&self, vega_by_bucket: &HashMap<String, f64>) -> f64 {
         self.aggregate_commodity(vega_by_bucket, true)
     }
 
@@ -835,39 +769,14 @@ impl SimmCalculator {
         })
     }
 
-    /// Calculate IR vega margin from tenor-bucketed vega sensitivities.
-    ///
-    /// # Arguments
-    ///
-    /// * `vega_by_tenor` - Signed currency vega amounts keyed by SIMM tenor label
-    ///
-    /// # Returns
-    ///
-    /// The interest-rate vega margin contribution.
-    pub fn calculate_ir_vega(&self, vega_by_tenor: &HashMap<String, f64>) -> f64 {
-        let sensitivities = vega_by_tenor
-            .iter()
-            .map(|(tenor, amount)| ((Currency::USD, tenor.clone()), *amount))
-            .collect();
-        self.calculate_ir_vega_multi_currency(&sensitivities)
-    }
-
     /// Calculate equity vega margin from a signed currency vega amount.
-    pub fn calculate_equity_vega(&self, total_vega: f64) -> f64 {
+    fn calculate_equity_vega(&self, total_vega: f64) -> f64 {
         let raw = total_vega * self.params.equity_historical_volatility_ratio;
         (raw * self.params.equity_vega_weight
             * concentration(
                 raw,
                 self.params.vega_concentration_thresholds[&SimmRiskClass::Equity],
             ))
-        .abs()
-    }
-
-    /// Calculate FX vega margin from a signed currency vega amount.
-    pub fn calculate_fx_vega(&self, total_vega: f64) -> f64 {
-        let raw = total_vega * self.params.fx_historical_volatility_ratio;
-        (raw * self.params.fx_vega_weight
-            * concentration(raw, self.params.fx_vega_concentration_thresholds["1_1"]))
         .abs()
     }
 
@@ -926,25 +835,6 @@ impl SimmCalculator {
         correlated_norm(&ws, |i, j| {
             self.params.credit_residual_correlation * cf[i].min(cf[j]) / cf[i].max(cf[j])
         })
-    }
-
-    /// Calculate curvature-only margin using historical SIMM v2.6 paragraph 11.
-    ///
-    /// Expiry scaling precedes factor netting. Within-bucket and cross-bucket
-    /// correlations are squared; theta/lambda are calculated separately per
-    /// risk class, with residual buckets additive and IR divided by HVR squared.
-    ///
-    /// # Arguments
-    ///
-    /// * `sensitivities` - Expiry-resolved `sigma * dPV/dsigma` inputs in USD,
-    ///   before SF, HVR, vega risk weights or concentration.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error for invalid factor/bucket/tenor combinations,
-    /// non-finite input or overflow during aggregation.
-    pub fn calculate_curvature(&self, sensitivities: &[SimmCurvatureSensitivity]) -> Result<f64> {
-        Ok(self.aggregate_risk_classes(&self.curvature_by_risk_class(sensitivities)?))
     }
 
     /// Calculate concentration add-on for a risk class.
@@ -1227,7 +1117,7 @@ impl SimmCalculator {
     /// Aggregate risk class margins with the SIMM inter-risk-class correlation matrix.
     ///
     /// `Total = sqrt(sum_i sum_j rho(i,j) * K_i * K_j)`
-    pub fn aggregate_risk_classes(&self, risk_class_margins: &HashMap<SimmRiskClass, f64>) -> f64 {
+    fn aggregate_risk_classes(&self, risk_class_margins: &HashMap<SimmRiskClass, f64>) -> f64 {
         // Reduce in a canonical risk-class order so the f64 quadratic form is
         // bit-reproducible across runs, independent of `HashMap` iteration order
         // (mirrors `calculate_curvature`).
@@ -1260,14 +1150,22 @@ impl ImCalculator for SimmCalculator {
         );
         Ok(result)
     }
-
-    fn methodology(&self) -> ImMethodology {
-        ImMethodology::Simm
-    }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::types::SimmCurvatureSensitivity;
+    fn usd_tenors(values: &HashMap<String, f64>) -> HashMap<(Currency, String), f64> {
+        values
+            .iter()
+            .map(|(tenor, amount)| ((Currency::USD, tenor.clone()), *amount))
+            .collect()
+    }
+    fn single_credit(amount: f64) -> HashMap<(String, String), f64> {
+        [(("NAME".to_string(), "5Y".to_string()), amount)]
+            .into_iter()
+            .collect()
+    }
     use super::*;
     use crate::traits::Marginable;
 
@@ -1325,33 +1223,10 @@ mod tests {
         .into_iter()
         .collect();
 
-        let ir_margin = calc.calculate_ir_delta(&dv01_by_tenor);
+        let ir_margin = calc.calculate_ir_delta_multi_currency(&usd_tenors(&dv01_by_tenor));
 
         // ISDA SIMM v2.6 D.1 p14: regular-currency 5Y weight is 60bp.
         assert!((ir_margin - 100_000.0 * 60.0).abs() < 1.0);
-    }
-
-    #[test]
-    fn ir_delta_tenor_lookup_uses_canonical_simm_case() {
-        let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
-
-        let canonical: HashMap<String, f64> = [("5Y".to_string(), 100_000.0)].into_iter().collect();
-        let noncanonical: HashMap<String, f64> =
-            [("5y".to_string(), 100_000.0)].into_iter().collect();
-
-        let canonical_margin = calc.calculate_ir_delta(&canonical);
-        let noncanonical_margin = calc.calculate_ir_delta(&noncanonical);
-
-        assert!(canonical_margin > 0.0, "canonical tenor must be recognized");
-        assert_eq!(noncanonical_margin, 0.0);
-
-        // Vega path shares the same tenor index lookup.
-        let canonical_vega: HashMap<String, f64> =
-            [("5Y".to_string(), 50_000.0)].into_iter().collect();
-        let noncanonical_vega: HashMap<String, f64> =
-            [("5y".to_string(), 50_000.0)].into_iter().collect();
-        assert!(calc.calculate_ir_vega(&canonical_vega) > 0.0);
-        assert_eq!(calc.calculate_ir_vega(&noncanonical_vega), 0.0);
     }
 
     #[test]
@@ -1359,7 +1234,7 @@ mod tests {
         let calc = SimmCalculator::new(SimmVersion::V2_6).expect("registry should load");
 
         let cs01 = 50_000.0;
-        let cnq_margin = calc.calculate_credit_non_qualifying_delta(cs01);
+        let cnq_margin = calc.non_qualifying_margin(&single_credit(cs01), false);
 
         // ISDA SIMM v2.6 F.1 p18: unclassified non-qualifying credit
         // uses the 1300bp residual weight, below the USD500K/bp threshold.
@@ -1395,7 +1270,7 @@ mod tests {
 
     #[test]
     fn aggregation() {
-        let calc = SimmCalculator::default();
+        let calc = SimmCalculator::new(SimmVersion::default()).expect("embedded registry");
 
         let risk_class_margins: HashMap<SimmRiskClass, f64> = [
             (SimmRiskClass::InterestRate, 1_000_000.0),
@@ -1449,7 +1324,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let ir_margin = calc.calculate_ir_delta(&dv01_by_tenor);
+        let ir_margin = calc.calculate_ir_delta_multi_currency(&usd_tenors(&dv01_by_tenor));
 
         // ws_5y = 100K*51 = 5.1M, ws_10y = -80K*51 = -4.08M
         // With high tenor correlation (~0.96), the hedge offsets most of the risk
@@ -1465,7 +1340,7 @@ mod tests {
         let vega_by_tenor: HashMap<String, f64> =
             [("5Y".to_string(), 500_000.0)].into_iter().collect();
 
-        let ir_vega_margin = calc.calculate_ir_vega(&vega_by_tenor);
+        let ir_vega_margin = calc.calculate_ir_vega_multi_currency(&usd_tenors(&vega_by_tenor));
         // D.1 paragraph 35: single tenor uses VRW 0.23; no IR vega HVR.
         assert!((ir_vega_margin - 115_000.0).abs() < 1.0);
     }
@@ -1485,8 +1360,9 @@ mod tests {
             .expect("M-15: IR vega margin should be present")
             .amount();
 
-        let single_currency_margin =
-            calc.calculate_ir_vega(&[("5Y".to_string(), 500_000.0)].into_iter().collect());
+        let single_currency_margin = calc.calculate_ir_vega_multi_currency(&usd_tenors(
+            &[("5Y".to_string(), 500_000.0)].into_iter().collect(),
+        ));
         assert!(
             ir_vega_margin > single_currency_margin,
             "M-15: same-tenor multi-currency IR vega must not collapse to one exposure"
@@ -1518,7 +1394,8 @@ mod tests {
         let ir = 500.0 * z2 / 0.47_f64.powi(2);
         let equity = 250.0 * z2;
         let expected = (ir * ir + equity * equity + 2.0 * 0.07 * ir * equity).sqrt();
-        let actual = calc.calculate_curvature(&inputs).expect("curvature");
+        let actual =
+            calc.aggregate_risk_classes(&calc.curvature_by_risk_class(&inputs).expect("curvature"));
         assert!((actual - expected).abs() < 1e-9, "{actual} != {expected}");
     }
 
@@ -1977,7 +1854,7 @@ mod tests {
             calc.calculate_credit_qualifying_vega(&HashMap::default()),
             0.0
         );
-        assert_eq!(calc.calculate_credit_non_qualifying_vega(0.0), 0.0);
+        assert_eq!(calc.non_qualifying_margin(&single_credit(0.0), true), 0.0);
         assert_eq!(calc.calculate_commodity_vega(&HashMap::default()), 0.0);
     }
 
@@ -2000,9 +1877,13 @@ mod tests {
         assert!((calc.calculate_credit_qualifying_vega(&cq) - expected_cq).abs() < 1e-6);
 
         let expected_cnq = 15_000.0 * calc.params.cnq_vega_weight;
-        assert!((calc.calculate_credit_non_qualifying_vega(15_000.0) - expected_cnq).abs() < 1e-6);
         assert!(
-            (calc.calculate_credit_non_qualifying_vega(-15_000.0) - expected_cnq).abs() < 1e-6,
+            (calc.non_qualifying_margin(&single_credit(15_000.0), true) - expected_cnq).abs()
+                < 1e-6
+        );
+        assert!(
+            (calc.non_qualifying_margin(&single_credit(-15_000.0), true) - expected_cnq).abs()
+                < 1e-6,
             "vega margin is sign-insensitive, matching the delta path"
         );
 

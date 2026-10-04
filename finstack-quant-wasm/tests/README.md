@@ -45,7 +45,7 @@ the bindings exercise the typed Rust helpers instead.
 | `wasm_features.rs`                | panel feature transforms                                                     |
 | `wasm_fixed_income.rs`            | the typed `Bond` / `TermLoan` classes                                        |
 | `wasm_implied_vol.rs`             | implied-volatility adapters                                                  |
-| `wasm_margin.rs`                  | `calculate_vm`                                                               |
+| `src/api/margin/tests.rs`         | `VmCalculator` and canonical CSA roundtrips                                  |
 | `wasm_math.rs`                    | linear algebra, statistics, summation wrappers                               |
 | `wasm_metric_keys.rs`             | canonical valuation metric-key validation                                    |
 | `wasm_models_analytic.rs`         | closed-form and COS option kernels                                           |

@@ -15,3 +15,6 @@ mod regulatory_determinism;
 mod schema_parity;
 #[path = "simm_schedule_parity.rs"]
 mod simm_schedule_parity;
+
+#[path = "simplification_contracts.rs"]
+mod simplification_contracts;

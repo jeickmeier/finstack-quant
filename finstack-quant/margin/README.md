@@ -59,7 +59,7 @@ let csa = CsaSpec::usd_regulatory()?;
 let spec = OtcMarginSpec::bilateral_simm(csa);
 
 assert!(spec.csa.requires_im());
-assert_eq!(spec.vm_frequency.to_string(), "daily");
+assert_eq!(spec.csa.vm_params.frequency.to_string(), "daily");
 # Ok::<(), finstack_quant_core::Error>(())
 ```
 
@@ -221,7 +221,7 @@ currency-safety, and serde rules.
 | `VmCalculator` | `calculate(exposure, posted, as_of)` | Applies CSA threshold, MTA, rounding, and settlement dating. `generate_margin_calls` and `margin_call_dates` cover schedules. |
 | `SimmCalculator` | `calculate_from_sensitivities` | Indicative historical v2.6 parameters from the registry; USD inputs only and results explicitly approximate. Risk-class aggregation reduces in a canonical order so the quadratic form is bit-reproducible. |
 | `ScheduleImCalculator` | `calculate_for_notional` | BCBS-IOSCO grid (`BCBS_IOSCO_SCHEDULE_ID = "bcbs_iosco"`); the `ImCalculator` path uses `im_exposure_base`. |
-| `ClearingHouseImCalculator` | `calculate_conservative`, `with_input_source` | Accepts an external CCP value via `ExternalImSource`, or scales an exposure base by registry-backed proxy rates (`lch_swapclear`, `ice_clear_credit`, `cme`, `generic_var`). |
+| `ClearingHouseImCalculator` | `calculate_conservative`, `with_input_source` | Accepts an external CCP value via `ExternalImSource`, or scales an exposure base by registry-backed proxy rates (`lch_swapclear`, `ice_clear_credit`, `cme`, `generic_proxy`). |
 | `HaircutImCalculator` | `calculate_for_collateral` | Uses `with_collateral_terms` to match maturity/rating eligibility and the matching entry’s haircut and FX add-on; rejects ineligible or negative collateral. |
 
 Repo margining rules are separate from the haircut IM engine: `RepoMarginSpec`

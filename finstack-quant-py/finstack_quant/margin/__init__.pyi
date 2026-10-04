@@ -36,6 +36,8 @@ __all__ = [
     "VmResult",
     "VmCalculator",
     "ImResult",
+    "ImCollateralResult",
+    "SimmCurvatureSensitivity",
     "SimmSensitivities",
     "SimmCalculator",
     "ScheduleImCalculator",
@@ -4199,93 +4201,6 @@ class ScheduleImCalculator:
         """
         ...
 
-    def with_asset_class(self, asset_class: str) -> ScheduleImCalculator:
-        """
-        Return a copy with a new default schedule asset class.
-
-        Parameters
-        ----------
-        asset_class : str
-            Lower-case schedule asset class label: ``"interest_rate"``,
-            ``"credit"``, ``"equity"``, ``"commodity"``, ``"fx"``,
-            ``"other"``, or ``"custom_<name>"`` for a registry-defined class.
-
-        Returns
-        -------
-        ScheduleImCalculator
-            Copy of this calculator with the default asset class changed.
-
-        Raises
-        ------
-        ValueError
-            If the asset class is unknown, maturity is negative/non-finite, or
-            the selected rate is outside the finite [0, 1] range.
-        """
-        ...
-
-    def with_maturity(self, years: float) -> ScheduleImCalculator:
-        """
-        Return a copy with a new default maturity.
-
-        Parameters
-        ----------
-        years : float
-            Representative remaining maturity in years.
-
-        Returns
-        -------
-        ScheduleImCalculator
-            Copy of this calculator with the default maturity changed.
-
-        Notes
-        -----
-        This builder returns a copy with the field set and does not raise.
-
-        """
-        ...
-
-    @property
-    def default_asset_class(self) -> str:
-        """
-        Default asset class label used by trait-based calculations.
-
-        Returns
-        -------
-        str
-            Lower-case label such as ``'interest_rate'`` (``'custom_<name>'`` for registry-defined classes).
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> ScheduleImCalculator.bcbs_standard().with_asset_class("credit").default_asset_class
-        'credit'
-        """
-        ...
-
-    @property
-    def default_maturity_years(self) -> float:
-        """
-        Default remaining maturity in years used by trait-based calculations.
-
-        Returns
-        -------
-        float
-            Maturity in years.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> ScheduleImCalculator.bcbs_standard().with_maturity(7.0).default_maturity_years
-        7.0
-        """
-        ...
-
     @property
     def mpor_days(self) -> int:
         """
@@ -4520,56 +4435,6 @@ class HaircutImCalculator:
         """
         ...
 
-    def with_default_asset_class(self, asset_class: CollateralAssetClass | str) -> HaircutImCalculator:
-        """
-        Return a copy configured with a default collateral asset class.
-
-        Parameters
-        ----------
-        asset_class : CollateralAssetClass | str
-            Asset class (or its lower-case wire label) used by trait-based
-            calculations.
-
-        Returns
-        -------
-        HaircutImCalculator
-            Copy of this calculator with the default asset class changed.
-
-        Raises
-        ------
-        ValueError
-            If a string label is not a collateral asset class.
-
-        Examples
-        --------
-        >>> calc = HaircutImCalculator.bcbs_standard().with_default_asset_class("government_bonds")
-        >>> calc.default_asset_class
-        CollateralAssetClass(government_bonds)
-        """
-        ...
-
-    def with_posted_collateral_currency(self, currency: str) -> HaircutImCalculator:
-        """
-        Return a copy configured with a posted-collateral currency.
-
-        Parameters
-        ----------
-        currency : str
-            Currency code used to detect FX mismatch in trait-based
-            calculations.
-
-        Returns
-        -------
-        HaircutImCalculator
-            Copy of this calculator with the collateral currency configured.
-
-        Raises
-        ------
-        ValueError
-            If ``currency`` is not a known currency code.
-        """
-        ...
-
     @property
     def eligible_collateral(self) -> EligibleCollateralSchedule:
         """
@@ -4588,48 +4453,6 @@ class HaircutImCalculator:
         --------
         >>> HaircutImCalculator.bcbs_standard().eligible_collateral.eligible_count > 0
         True
-        """
-        ...
-
-    @property
-    def default_asset_class(self) -> CollateralAssetClass:
-        """
-        Default collateral asset class assumed by trait-based calculations.
-
-        Returns
-        -------
-        CollateralAssetClass
-            Asset class (cash unless overridden).
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> HaircutImCalculator.bcbs_standard().default_asset_class
-        CollateralAssetClass(government_bonds)
-        """
-        ...
-
-    @property
-    def posted_collateral_currency(self) -> str | None:
-        """
-        Declared posted-collateral currency code, or ``None``.
-
-        Returns
-        -------
-        str | None
-            ISO-4217 code, or ``None`` when not declared.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-
-        Examples
-        --------
-        >>> HaircutImCalculator.bcbs_standard().with_posted_collateral_currency("EUR").posted_collateral_currency
-        'EUR'
         """
         ...
 
@@ -5487,7 +5310,7 @@ class XvaResult:
     --------
     >>> doc = (
     ...     '{"cva":1.0,"total_xva":1.0,"epe_profile":[[0.0,2.0]],'
-    ...     '"ene_profile":[[0.0,0.0]],"pfe_profile":[[0.0,2.0]],"max_pfe":2.0,'
+    ...     '"ene_profile":[[0.0,0.0]],"max_epe":2.0,'
     ...     '"effective_epe_profile":[[0.0,2.0]],"effective_epe":2.0}'
     ... )
     >>> result = XvaResult.from_json(doc)
@@ -5519,11 +5342,11 @@ class XvaResult:
         --------
         >>> doc = (
         ...     '{"cva":1.0,"total_xva":1.0,"epe_profile":[[0.0,2.0]],'
-        ...     '"ene_profile":[[0.0,0.0]],"pfe_profile":[[0.0,2.0]],"max_pfe":2.0,'
+        ...     '"ene_profile":[[0.0,0.0]],"max_epe":2.0,'
         ...     '"effective_epe_profile":[[0.0,2.0]],"effective_epe":2.0}'
         ... )
         >>> result = XvaResult.from_json(doc)
-        >>> (result.max_pfe, result.effective_epe)
+        >>> (result.max_epe, result.effective_epe)
         (2.0, 2.0)
         """
         ...
@@ -5631,14 +5454,14 @@ class XvaResult:
         ...
 
     @property
-    def max_pfe(self) -> float:
+    def max_epe(self) -> float:
         """
-        Maximum PFE across the profile.
+        Maximum expected positive exposure across the profile, in reporting currency.
 
         Returns
         -------
         float
-            Maximum PFE across the profile.
+            Maximum expected positive exposure across the profile, in reporting currency.
 
         Notes
         -----
@@ -5695,22 +5518,6 @@ class XvaResult:
         ...
 
     @property
-    def pfe_profile(self) -> list[tuple[float, float]]:
-        """
-        PFE profile as list of (time, value) tuples.
-
-        Returns
-        -------
-        list[tuple[float, float]]
-            (time, PFE) pairs.
-
-        Notes
-        -----
-        This accessor does not raise; it returns the stored value.
-        """
-        ...
-
-    @property
     def effective_epe_profile(self) -> list[tuple[float, float]]:
         """
         Effective EPE profile as list of (time, value) tuples.
@@ -5746,7 +5553,7 @@ class XvaResult:
         --------
         >>> doc = (
         ...     '{"cva":1.0,"total_xva":1.0,"epe_profile":[[0.0,2.0]],'
-        ...     '"ene_profile":[[0.0,0.0]],"pfe_profile":[[0.0,2.0]],"max_pfe":2.0,'
+        ...     '"ene_profile":[[0.0,0.0]],"max_epe":2.0,'
         ...     '"effective_epe_profile":[[0.0,2.0]],"effective_epe":2.0}'
         ... )
         >>> "numeric_mode" in XvaResult.from_json(doc).meta
@@ -5759,7 +5566,7 @@ class XvaResult:
         Export the XVA components as a single-row pandas DataFrame.
 
         Columns: ``cva``, ``dva``, ``fva``, ``mva``, ``total_xva``,
-        ``max_pfe``, ``effective_epe`` -- all in the netting set's currency
+        ``max_epe``, ``effective_epe`` -- all in the netting set's currency
         units, matching the properties of the same name. Uncomputed legs
         (``dva`` / ``fva`` / ``mva``) are ``NaN`` rather than absent, so the
         frame keeps its schema across netting sets.
@@ -5784,7 +5591,7 @@ class XvaResult:
         """
         Export exposure profiles as a pandas DataFrame.
 
-        Columns: ``epe``, ``ene``, ``pfe``, ``effective_epe`` -- indexed
+        Columns: ``epe``, ``ene``, ``effective_epe`` -- indexed
         by time in years.
 
         Returns
@@ -7323,7 +7130,7 @@ class FrtbSensitivities:
     Examples
     --------
     >>> sens = FrtbSensitivities("USD")
-    >>> sens.add_girr_delta("5Y", 100_000.0)
+    >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
     """
 
     def __init__(self, base_currency: str) -> None:
@@ -7368,7 +7175,7 @@ class FrtbSensitivities:
         --------
         >>> from finstack_quant.margin import FrtbSensitivities
         >>> original = FrtbSensitivities("USD")
-        >>> original.add_girr_delta("5Y", 100_000.0)
+        >>> original.add_girr_delta("USD", "5Y", 100_000.0)
         >>> restored = FrtbSensitivities.from_json(original.to_json())
         >>> restored.base_currency
         'USD'
@@ -7406,7 +7213,7 @@ class FrtbSensitivities:
         frame : pd.DataFrame
             Columns ``risk_class``, ``kind``, ``issuer``, ``bucket``,
             ``tenor``, ``amount`` (plus ``sector``, ``seniority``,
-            ``asset_type``, ``maturity_years``, ``pnl_adjustment`` on ``drc``
+            ``maturity_years``, ``pnl_adjustment`` on ``drc``
             rows) encoded as ``to_dataframe`` documents.
             ``curvature_up`` / ``curvature_down`` rows are recombined into
             pairs; ``rrao`` rows carry ``exotic_notional`` /
@@ -7434,8 +7241,16 @@ class FrtbSensitivities:
         Examples
         --------
         >>> original = FrtbSensitivities("USD")
-        >>> original.add_girr_delta("5Y", 100_000.0)
-        >>> original.add_drc_position("ACME", 1_000_000.0, 3, "corporate", "senior_unsecured", "corporate", 1.0)
+        >>> original.add_girr_delta("USD", "5Y", 100_000.0)
+        >>> original.add_drc_position({
+        ...     "issuer": "ACME",
+        ...     "jtd_amount": 1_000_000.0,
+        ...     "rating_bucket": 3,
+        ...     "sector": "corporate",
+        ...     "seniority": "senior_unsecured",
+        ...     "maturity_years": 1.0,
+        ...     "pnl_adjustment": 0.0,
+        ... })
         >>> restored = FrtbSensitivities.from_dataframe(original.to_dataframe(), "USD")
         >>> restored.to_json() == original.to_json()
         True
@@ -7463,12 +7278,12 @@ class FrtbSensitivities:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("5Y", 100_000.0)
+        >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
         >>> sens.validate()
         """
         ...
 
-    def add_girr_delta(self, tenor: str, amount: float, currency: str | None = None) -> None:
+    def add_girr_delta(self, currency: str, tenor: str, amount: float) -> None:
         """
         Add a GIRR delta sensitivity (currency P&L per 1 percentage-point move).
 
@@ -7478,17 +7293,17 @@ class FrtbSensitivities:
             GIRR tenor bucket, such as ``"5Y"``.
         amount : float
             Signed sensitivity amount per 1 percentage-point move (``100 * DV01``).
-        currency : str, optional
-            Currency code; defaults to the base currency.
+        currency : str
+            Currency code; identifies the shocked risk factor.
 
         Raises
         ------
         ValueError
-            If a supplied ``currency`` is not a recognized ISO currency code.
+            If ``currency`` is not a recognized ISO currency code.
         """
         ...
 
-    def add_girr_inflation_delta(self, amount: float, currency: str | None = None) -> None:
+    def add_girr_inflation_delta(self, currency: str, amount: float) -> None:
         """
         Add a GIRR inflation delta sensitivity.
 
@@ -7496,22 +7311,22 @@ class FrtbSensitivities:
         ----------
         amount : float
             Base-currency P&L per 1 percentage point of inflation shift.
-        currency : str, optional
-            Currency of the inflation curve; defaults to the base currency.
+        currency : str
+            Currency of the inflation curve; identifies the shocked risk factor.
         Raises
         ------
         ValueError
-            If a supplied ``currency`` is not a recognized ISO currency code.
+            If ``currency`` is not a recognized ISO currency code.
 
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_inflation_delta(1_000.0)
+        >>> sens.add_girr_inflation_delta("USD", 1_000.0)
         >>> sens.validate()
         """
         ...
 
-    def add_girr_xccy_basis_delta(self, amount: float, currency: str | None = None) -> None:
+    def add_girr_xccy_basis_delta(self, currency: str, amount: float) -> None:
         """
         Add a GIRR cross-currency basis delta sensitivity.
 
@@ -7519,17 +7334,17 @@ class FrtbSensitivities:
         ----------
         amount : float
             Base-currency P&L per 1 percentage point of basis shift.
-        currency : str, optional
-            Currency whose basis moves; defaults to the base currency.
+        currency : str
+            Currency whose basis moves; identifies the shocked risk factor.
         Raises
         ------
         ValueError
-            If a supplied ``currency`` is not a recognized ISO currency code.
+            If ``currency`` is not a recognized ISO currency code.
 
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_xccy_basis_delta(500.0, "EUR")
+        >>> sens.add_girr_xccy_basis_delta("EUR", 500.0)
         >>> sens.validate()
         """
         ...
@@ -7935,13 +7750,7 @@ class FrtbSensitivities:
         """
         ...
 
-    def add_girr_vega(
-        self,
-        option_maturity: str,
-        underlying_tenor: str,
-        amount: float,
-        currency: str | None = None,
-    ) -> None:
+    def add_girr_vega(self, currency: str, option_maturity: str, underlying_tenor: str, amount: float) -> None:
         """
         Add a GIRR vega sensitivity.
 
@@ -7953,13 +7762,13 @@ class FrtbSensitivities:
             Underlying swap tenor label such as ``"5Y"``.
         amount : float
             Base-currency P&L as volatility-scaled vega (sigma times dV/dsigma).
-        currency : str, optional
-            Currency code; defaults to the base currency.
+        currency : str
+            Currency code; identifies the shocked risk factor.
 
         Raises
         ------
         ValueError
-            If a supplied ``currency`` is not a recognized ISO currency code.
+            If ``currency`` is not a recognized ISO currency code.
         """
         ...
 
@@ -8006,7 +7815,7 @@ class FrtbSensitivities:
         """
         ...
 
-    def add_girr_curvature(self, cvr_up: float, cvr_down: float, currency: str | None = None) -> None:
+    def add_girr_curvature(self, currency: str, cvr_up: float, cvr_down: float) -> None:
         """
         Add a GIRR curvature sensitivity.
 
@@ -8018,13 +7827,13 @@ class FrtbSensitivities:
         cvr_down : float
             Curvature risk position under the downward rate shock, in base
             currency.
-        currency : str, optional
-            Currency code; defaults to the base currency.
+        currency : str
+            Currency code; identifies the shocked risk factor.
 
         Raises
         ------
         ValueError
-            If a supplied ``currency`` is not a recognized ISO currency code.
+            If ``currency`` is not a recognized ISO currency code.
         """
         ...
 
@@ -8071,57 +7880,24 @@ class FrtbSensitivities:
         """
         ...
 
-    def add_drc_position(
-        self,
-        issuer: str,
-        jtd_amount: float,
-        rating_bucket: int,
-        sector: str,
-        seniority: str,
-        asset_type: str,
-        maturity_years: float,
-        pnl_adjustment: float = 0.0,
-    ) -> None:
-        """
-        Add a Default Risk Charge position.
+    def add_drc_position(self, position: dict[str, Any]) -> None:
+        """Add the canonical Rust DrcPosition object.
 
         Parameters
         ----------
-        issuer : str
-            Issuer identifier; long and short JTD net per issuer at charge
-            time.
-        jtd_amount : float
-            Signed jump-to-default **notional** in base currency (positive =
-            long, negative = short), before the seniority LGD.
-        rating_bucket : int
-            Credit-rating bucket, 1 (AAA) to 9 (defaulted) per MAR22.24.
-        sector : str
-            ``"corporate"``, ``"sovereign"`` or ``"local_government"``.
-        seniority : str
-            ``"senior_unsecured"``, ``"subordinated"``, ``"equity"`` or
-            ``"covered_bond"`` (selects the LGD).
-        asset_type : str
-            ``"corporate"``, ``"sovereign"``, ``"local_government"`` or
-            ``"equity"``.
-        maturity_years : float
-            Finite nonnegative residual maturity. JTD scales by maturity
-            clipped to [0.25, 1.0] years. Securitization DRC is unsupported.
-        pnl_adjustment : float, default 0.0
-            Mark-to-market adjustment per MAR22.9 (negative for a long
-            position carrying an unrealised loss).
+        position : dict[str, Any]
+            issuer, signed jtd_amount in reporting currency before LGD,
+            rating_bucket (1..9), sector (sovereign, corporate, local_government),
+            seniority (covered_bond, senior_unsecured, subordinated, equity),
+            non-negative maturity_years and optional pnl_adjustment (default 0).
+            Equity requires corporate sector; securitisations are unsupported.
 
         Raises
         ------
         ValueError
-            If ``sector``, ``seniority`` or ``asset_type`` is not one of the
-            labels above.
-
-        Examples
-        --------
-        >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_drc_position("ACME", 1e6, 3, "corporate", "senior_unsecured", "corporate", 1.0)
-        >>> frtb_sba_charge(sens).drc > 0.0
-        True
+            For malformed or unknown fields, or invalid Rust position terms.
+        TypeError
+            If the position contains values that cannot be converted to JSON.
         """
         ...
 
@@ -8177,9 +7953,9 @@ class FrtbSensitivities:
 
         Columns: ``risk_class``, ``bucket``, ``tenor``, ``issuer``, ``kind``,
         ``amount``, then the DRC columns ``sector``, ``seniority``,
-        ``asset_type``, ``maturity_years``, ``pnl_adjustment`` (``None`` /
+        ``maturity_years``, ``pnl_adjustment`` (``None`` /
         ``NaN`` on non-DRC rows). One row per populated bucket; an empty
-        container still carries all eleven columns. Long format is used
+        container still carries all ten columns. Long format is used
         deliberately - a column per bucket would give a different schema for
         every portfolio.
 
@@ -8246,7 +8022,7 @@ class FrtbSbaEngine:
     --------
     >>> from finstack_quant.margin import FrtbSbaEngine, FrtbSensitivities
     >>> sensitivities = FrtbSensitivities("USD")
-    >>> sensitivities.add_girr_delta("5Y", 100_000.0)
+    >>> sensitivities.add_girr_delta("USD", "5Y", 100_000.0)
     >>> round(FrtbSbaEngine(scenarios=["medium"]).calculate(sensitivities).total, 2)
     110000.0
     """
@@ -8342,7 +8118,7 @@ class FrtbSbaEngine:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("5Y", 100_000.0)
+        >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
         >>> FrtbSbaEngine().calculate(sens).binding_scenario
         'low'
         """
@@ -8361,7 +8137,7 @@ class FrtbSbaResult:
     --------
     >>> from finstack_quant.margin import FrtbSensitivities, frtb_sba_charge
     >>> sens = FrtbSensitivities("USD")
-    >>> sens.add_girr_delta("5Y", 100_000.0)
+    >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
     >>> result = frtb_sba_charge(sens)
     >>> result.total > 0.0
     True
@@ -8564,7 +8340,7 @@ class FrtbSbaResult:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("5Y", 1.0)
+        >>> sens.add_girr_delta("USD", "5Y", 1.0)
         >>> result = frtb_sba_charge(sens)
         >>> "numeric_mode" in result.meta
         True
@@ -8625,7 +8401,7 @@ class FrtbSbaResult:
         Examples
         --------
         >>> sens = FrtbSensitivities("USD")
-        >>> sens.add_girr_delta("5Y", 100_000.0)
+        >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
         >>> frtb_sba_charge(sens).to_scenario_dataframe()["scenario"].tolist()
         ['low', 'medium', 'high']
         """
@@ -8952,17 +8728,17 @@ class SaCcrTrade:
         Current mark-to-market in the reporting currency.
     is_option : bool
         Whether the trade is an option (required, as in the wire form).
-    option_type : str | None, optional
+    option_type : str
         ``"call_long"``, ``"call_short"``, ``"put_long"`` or
         ``"put_short"``; required when ``is_option`` is ``True``.
 
-    supervisory_category : str | None, optional
+    supervisory_category : str
         Required for credit, equity and commodity; absent for IR/FX. Labels:
         ``credit_aa``, ``credit_a``, ``credit_bbb``, ``credit_bb``, ``credit_b``,
         ``credit_ccc``, ``credit_index_ig``, ``credit_index_hy``,
         ``equity_single_name``, ``equity_index``, ``commodity_electricity``,
         ``commodity_other``. Selects the supervisory factor and correlation.
-    option_maturity_date : datetime.date | str | None, optional
+    option_maturity_date : datetime.date | str
         Required option expiry, at or before the underlying end date. Absent
         for linear trades. Separates option maturity from underlying duration.
 
@@ -9030,7 +8806,7 @@ class SaCcrTrade:
             ``credit_ccc``, ``credit_index_ig``, ``credit_index_hy``,
             ``equity_single_name``, ``equity_index``, ``commodity_electricity``,
             ``commodity_other``. Selects the supervisory factor and correlation.
-        option_maturity_date : datetime.date | str | None, optional
+        option_maturity_date : datetime.date | str
             Required option expiry, at or before the underlying end date. Absent
             for linear trades. Separates option maturity from underlying duration.
 
@@ -10070,7 +9846,7 @@ def frtb_sba_charge(sensitivities: FrtbSensitivities, correlation_scenario: str 
     Examples
     --------
     >>> sens = FrtbSensitivities("USD")
-    >>> sens.add_girr_delta("5Y", 100_000.0)
+    >>> sens.add_girr_delta("USD", "5Y", 100_000.0)
     >>> result = frtb_sba_charge(sens)
     >>> result.total > 0.0
     True

@@ -130,12 +130,12 @@ def simm_sensitivities() -> SimmSensitivities:
 
 def frtb_sensitivities() -> FrtbSensitivities:
     sens = FrtbSensitivities("USD")
-    sens.add_girr_delta("5Y", 100_000.0)
-    sens.add_girr_delta("10Y", -40_000.0, "EUR")
-    sens.add_girr_inflation_delta(5_000.0)
-    sens.add_girr_xccy_basis_delta(2_000.0, "EUR")
-    sens.add_girr_vega("1Y", "5Y", 3_000.0)
-    sens.add_girr_curvature(-1_500.0, -2_500.0)
+    sens.add_girr_delta("USD", "5Y", 100_000.0)
+    sens.add_girr_delta("EUR", "10Y", -40_000.0)
+    sens.add_girr_inflation_delta("USD", 5_000.0)
+    sens.add_girr_xccy_basis_delta("EUR", 2_000.0)
+    sens.add_girr_vega("USD", "1Y", "5Y", 3_000.0)
+    sens.add_girr_curvature("USD", -1_500.0, -2_500.0)
     sens.add_csr_nonsec_delta("ACME", 3, "5Y", "bond", 5_000.0)
     sens.add_csr_nonsec_vega("ACME", 3, "1Y", 700.0)
     sens.add_csr_nonsec_curvature("ACME", 3, -300.0, -500.0)
@@ -155,8 +155,24 @@ def frtb_sensitivities() -> FrtbSensitivities:
     sens.add_commodity_delta("WTI", 2, "1Y", "cushing", 2_000.0)
     sens.add_commodity_vega("WTI", 2, "1Y", 250.0)
     sens.add_commodity_curvature("WTI", 2, -100.0, -180.0)
-    sens.add_drc_position("ACME", 1_000_000.0, 4, "corporate", "senior_unsecured", "corporate", 2.0)
-    sens.add_drc_position("ACME", -250_000.0, 4, "corporate", "subordinated", "corporate", 0.5, -1_000.0)
+    sens.add_drc_position({
+        "issuer": "ACME",
+        "jtd_amount": 1_000_000.0,
+        "rating_bucket": 4,
+        "sector": "corporate",
+        "seniority": "senior_unsecured",
+        "maturity_years": 2.0,
+        "pnl_adjustment": 0.0,
+    })
+    sens.add_drc_position({
+        "issuer": "ACME",
+        "jtd_amount": -250_000.0,
+        "rating_bucket": 4,
+        "sector": "corporate",
+        "seniority": "subordinated",
+        "maturity_years": 0.5,
+        "pnl_adjustment": -1_000.0,
+    })
     sens.add_rrao_position("EXOTIC_1", 1_000_000.0, True)
     sens.add_rrao_position("GAP_1", 2_000_000.0, False)
     return sens
@@ -350,12 +366,8 @@ def compute() -> dict[str, Any]:
     out["schedule_im"] = {
         "rate": schedule.rate("interest_rate", 5.0),
         "defaults": {
-            "asset_class": schedule.default_asset_class,
-            "maturity_years": schedule.default_maturity_years,
             "mpor_days": schedule.mpor_days,
         },
-        "with_asset_class": schedule.with_asset_class("credit").default_asset_class,
-        "with_maturity": schedule.with_maturity(2.0).default_maturity_years,
         "from_registry_rate": ScheduleImCalculator.from_registry_id(CONSTANTS["BCBS_IOSCO_SCHEDULE_ID"]).rate(
             "credit", 3.0
         ),
@@ -371,12 +383,6 @@ def compute() -> dict[str, Any]:
     haircut = HaircutImCalculator.bcbs_standard()
     out["haircut_im"] = {
         "haircut_for_cash": haircut.haircut_for("cash"),
-        "default_asset_class": str(haircut.default_asset_class),
-        "with_default_asset_class": str(haircut.with_default_asset_class("government_bonds").default_asset_class),
-        "posted_collateral_currency": [
-            haircut.posted_collateral_currency,
-            haircut.with_posted_collateral_currency("EUR").posted_collateral_currency,
-        ],
         "mpor_days": haircut.mpor_days,
         "treasuries_terms_haircut": HaircutImCalculator
         .us_treasuries()

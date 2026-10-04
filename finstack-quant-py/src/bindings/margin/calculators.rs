@@ -175,7 +175,6 @@ impl PyVmResult {
 #[derive(Clone)]
 pub struct PyVmCalculator {
     inner: fm::VmCalculator,
-    csa: fm::CsaSpec,
 }
 
 /// Convert ``list[tuple[date-like, float]] | pandas.Series`` into dated
@@ -205,7 +204,6 @@ impl PyVmCalculator {
     fn new(csa: &PyCsaSpec) -> Self {
         Self {
             inner: fm::VmCalculator::new(csa.inner.clone()),
-            csa: csa.inner.clone(),
         }
     }
 
@@ -213,7 +211,7 @@ impl PyVmCalculator {
     #[getter]
     fn csa(&self) -> PyCsaSpec {
         PyCsaSpec {
-            inner: self.csa.clone(),
+            inner: self.inner.get_csa().clone(),
         }
     }
 
@@ -296,7 +294,7 @@ impl PyVmCalculator {
             ("mta_applied", "float64"),
             ("currency", "str"),
         ];
-        let currency = self.csa.base_currency;
+        let currency = self.inner.get_csa().base_currency;
         let exposures = extract_dated_exposures(exposures, currency)?;
         let initial = money_from_amount(initial_collateral, currency)?;
         let calls = self
@@ -353,11 +351,11 @@ impl PyVmCalculator {
     fn __repr__(&self) -> String {
         format!(
             "VmCalculator(csa={:?}, currency={}, threshold={:.2}, mta={:.2}, frequency={})",
-            self.csa.id,
-            self.csa.base_currency,
-            self.csa.vm_threshold().amount(),
-            self.csa.vm_params.mta.amount(),
-            self.csa.vm_params.frequency,
+            self.inner.get_csa().id,
+            self.inner.get_csa().base_currency,
+            self.inner.get_csa().vm_threshold().amount(),
+            self.inner.get_csa().vm_params.mta.amount(),
+            self.inner.get_csa().vm_params.frequency,
         )
     }
 }
@@ -492,14 +490,18 @@ impl PyImResult {
     /// Breakdown components do not generally sum to ``amount``: SIMM and
     /// other methodologies aggregate risk classes with correlations.
     fn to_breakdown_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut entries: Vec<(&String, &Money)> = self.inner.breakdown.iter().collect();
-        entries.sort_by_key(|(risk_class, _)| *risk_class);
-
-        let risk_classes: Vec<String> = entries.iter().map(|(key, _)| (*key).clone()).collect();
-        let amounts: Vec<f64> = entries.iter().map(|(_, money)| money.amount()).collect();
-        let currencies: Vec<String> = entries
-            .iter()
-            .map(|(_, money)| money.currency().to_string())
+        let risk_classes: Vec<String> = self.inner.breakdown.keys().cloned().collect();
+        let amounts: Vec<f64> = self
+            .inner
+            .breakdown
+            .values()
+            .map(|money| money.amount())
+            .collect();
+        let currencies: Vec<String> = self
+            .inner
+            .breakdown
+            .values()
+            .map(|money| money.currency().to_string())
             .collect();
 
         let data = PyDict::new(py);

@@ -8,25 +8,7 @@ export type BuiltInScheduleAssetClass = "interest_rate" | "credit" | "equity" | 
  * CCP methodology type.
  */
 export type CcpMethodology =
-  | "lch_swap_clear"
-  | "lch_cds_clear"
-  | "cme"
-  | "ice_clear_credit"
-  | "ice_clear_us"
-  | "jscc"
-  | "eurex"
-  | {
-      generic_var: {
-        /**
-         * Confidence level (e.g., 0.99 for 99%)
-         */
-        confidence: number;
-        /**
-         * Lookback period in days
-         */
-        lookback_days: number;
-      };
-    };
+  "lch_swap_clear" | "lch_cds_clear" | "cme" | "ice_clear_credit" | "ice_clear_us" | "jscc" | "eurex" | "generic_proxy";
 /**
  * Clearing status for OTC derivatives.
  *
@@ -288,17 +270,13 @@ export type MarginTenor = "daily" | "weekly" | "monthly" | "on_demand";
  */
 export type DateWire = string;
 /**
- * DRC asset type.
- */
-export type DrcAssetType = "corporate" | "sovereign" | "local_government" | "securitization" | "equity";
-/**
  * DRC sector classification.
  */
 export type DrcSector = "sovereign" | "corporate" | "local_government";
 /**
  * DRC seniority for LGD assignment.
  */
-export type DrcSeniority = "covered_bond" | "senior_unsecured" | "subordinated" | "equity" | "securitization";
+export type DrcSeniority = "covered_bond" | "senior_unsecured" | "subordinated" | "equity";
 /**
  * Rounding modes supported by the library.
  *
@@ -825,22 +803,17 @@ export interface VmParameters {
  * reflected in the trading-book valuation (e.g. an underwater long bond
  * has a small negative `P&L` that reduces the exposed JTD). `jtd_amount`
  * represents the signed *notional* (positive = long, negative = short);
- * [`drc_charge`](super::drc::drc_charge) multiplies by [`DrcSeniority`]
+ * `FrtbSbaEngine` multiplies by [`DrcSeniority`]
  * LGD and then applies the `pnl_adjustment` and the sign-preserving floor.
  */
 export interface DrcPosition {
-  /**
-   * Asset sub-type: corporate, sovereign, local government, or equity.
-   * Securitizations are rejected because they require a separate DRC model.
-   */
-  asset_type: DrcAssetType;
   /**
    * Issuer identifier.
    */
   issuer: string;
   /**
    * Signed JTD *notional* (positive = long, negative = short). Does
-   * **not** include the LGD multiplier — [`super::drc::drc_charge`] applies LGD.
+   * **not** include the LGD multiplier — `FrtbSbaEngine` applies LGD.
    */
   jtd_amount: number;
   /**
@@ -867,7 +840,6 @@ export interface DrcPosition {
    * Seniority for LGD determination.
    */
   seniority: DrcSeniority;
-  [k: string]: unknown;
 }
 /**
  * SA-CCR Exposure at Default result.
@@ -1482,27 +1454,12 @@ export interface OtcMarginSpec {
    */
   csa: CsaSpec;
   /**
-   * Initial margin calculation methodology
-   *
-   * - Bilateral: SIMM or Schedule
-   * - Cleared: ClearingHouse (CCP-specific)
-   */
-  im_methodology: ImMethodology;
-  /**
-   * Settlement lag for margin transfers (business days)
-   */
-  settlement_lag: number;
-  /**
    * Explicit SIMM credit classification for credit-sensitive instruments.
    *
    * Required when a credit product uses `ImMethodology::Simm`; leave `None`
    * for non-credit instruments and non-SIMM margin methodologies.
    */
   simm_credit_classification?: SimmCreditClassification | null;
-  /**
-   * Variation margin exchange frequency
-   */
-  vm_frequency: MarginTenor;
 }
 /**
  * Margin funding cost result.
@@ -1751,129 +1708,6 @@ export interface SimmCurvatureSensitivity {
   volatility_weighted_vega: number;
 }
 /**
- * SIMM sensitivity inputs organized by risk class.
- */
-export interface SimmSensitivities {
-  /**
-   * Base currency for the sensitivities.
-   *
-   * This is the currency context in which the sensitivity set was produced.
-   * It does not force the output currency of the eventual margin result.
-   */
-  base_currency: Currency;
-  /**
-   * Commodity delta P&L per 1% relative price increase by bucket.
-   *
-   * Bucket labels should match the SIMM commodity bucket naming expected by
-   * the calculator's registry-backed lookup table.
-   */
-  commodity_delta: {
-    [k: string]: number;
-  };
-  /**
-   * Commodity vega by bucket.
-   *
-   * Bucket labels follow the same SIMM commodity bucket naming as
-   * [`commodity_delta`](Self::commodity_delta); the single commodity vega
-   * risk weight replaces the per-bucket delta weights.
-   */
-  commodity_vega: {
-    [k: string]: number;
-  };
-  /**
-   * Credit non-qualifying delta by (issuer/index, tenor bucket).
-   *
-   * For securitizations and exposures explicitly classified as non-qualifying.
-   */
-  credit_non_qualifying_delta: {
-    [k: string]: number;
-  };
-  /**
-   * Credit non-qualifying vega by `(issuer/index, tenor bucket)`.
-   *
-   * Pooled like [`credit_non_qualifying_delta`](Self::credit_non_qualifying_delta)
-   * and weighted by the credit-non-qualifying vega risk weight.
-   */
-  credit_non_qualifying_vega: {
-    [k: string]: number;
-  };
-  /**
-   * Credit qualifying delta by `(sector, issuer/index, tenor bucket)`.
-   *
-   * Sector assignment is mandatory so the calculator can apply ISDA SIMM
-   * intra- and inter-bucket aggregation without a scalar approximation.
-   */
-  credit_qualifying_delta: {
-    [k: string]: number;
-  };
-  /**
-   * Credit qualifying vega by `(sector, issuer/index, tenor bucket)`.
-   *
-   * Bucketed exactly like [`credit_qualifying_delta`](Self::credit_qualifying_delta)
-   * so ISDA SIMM applies the same intra- and inter-bucket aggregation to the
-   * vega risk class, weighted by the single credit-qualifying vega risk
-   * weight rather than the per-bucket delta weights.
-   */
-  credit_qualifying_vega: {
-    [k: string]: number;
-  };
-  /**
-   * Expiry-resolved signed `sigma * dPV/dsigma` inputs before SF, HVR,
-   * vega risk weights or concentration. Entries are retained separately
-   * until expiry scaling, so opposite vegas at different expiries do not
-   * incorrectly cancel curvature.
-   */
-  curvature: SimmCurvatureSensitivity[];
-  /**
-   * Equity delta by underlier.
-   *
-   * Values are signed currency P&L per 1% relative equity-price increase.
-   */
-  equity_delta: {
-    [k: string]: number;
-  };
-  /**
-   * Equity vega by underlier.
-   */
-  equity_vega: {
-    [k: string]: number;
-  };
-  /**
-   * FX delta by currency.
-   *
-   * Values are signed currency P&L per 1% relative FX-price increase,
-   * before risk weighting or concentration. USD is the calculation currency.
-   */
-  fx_delta: {
-    [k: string]: number;
-  };
-  /**
-   * FX vega by currency pair.
-   */
-  fx_vega: {
-    [k: string]: number;
-  };
-  /**
-   * Interest rate delta by (currency, tenor bucket).
-   *
-   * Tenor buckets follow SIMM specification: 2W, 1M, 3M, 6M, 1Y, 2Y, 3Y, 5Y, 10Y, 15Y, 20Y, 30Y
-   */
-  ir_delta: {
-    [k: string]: number;
-  };
-  /**
-   * Interest rate vega by `(currency, tenor bucket)`.
-   *
-   * Values are sigma times dPV/dsigma in currency before VRW or concentration.
-   * This legacy two-dimensional vega input collapses underlying-maturity detail;
-   * curvature has the separate full expiry-resolved input.
-   */
-  ir_vega: {
-    [k: string]: number;
-  };
-  [k: string]: unknown;
-}
-/**
  * JSON-friendly representation of `SimmSensitivities`.
  */
 export interface SimmSensitivitiesJson {
@@ -2037,14 +1871,9 @@ export interface XvaResult {
    */
   fva?: number | null;
   /**
-   * Maximum PFE across the profile (`max_t PFE(t)`).
-   *
-   * In the deterministic engine this equals `max_t EPE(t)` by
-   * construction (see [`Self::pfe_profile`]). Used for coarse credit
-   * limit monitoring where a Monte Carlo tail quantile is not
-   * available.
+   * Maximum expected positive exposure across the profile, in reporting currency.
    */
-  max_pfe: number;
+  max_epe: number;
   /**
    * Policy metadata stamped by the computing layer: numeric mode, active
    * rounding context, any applied FX policy, and the parallel-execution
@@ -2066,19 +1895,6 @@ export interface XvaResult {
    * - Green, A. (2015). *XVA*. Wiley. Chapter 10. `docs/REFERENCES.md#green-xva`
    */
   mva?: number | null;
-  /**
-   * Potential Future Exposure profile: `(time, PFE(t))`.
-   *
-   * **IMPORTANT** — the deterministic CVA engine has a single path,
-   * so the distribution of exposures collapses to a point mass at
-   * `max(V(t), 0)`. In that degenerate case every quantile (and the
-   * mean) equals `EPE(t)`, and this field holds the EPE path, not a
-   * tail quantile. The name is retained so downstream systems keep
-   * their column bindings; supply a profile from a Monte Carlo exposure
-   * simulation when a true 97.5%-quantile PFE is required for limit
-   * monitoring.
-   */
-  pfe_profile: [unknown, unknown][];
   /**
    * All-in valuation adjustment: `CVA − DVA + FVA + MVA`.
    *

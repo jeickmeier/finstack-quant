@@ -13,6 +13,9 @@ mod sa_ccr;
 mod types;
 mod xva;
 
+#[cfg(all(test, target_arch = "wasm32"))]
+mod tests;
+
 use crate::api::core::market_data::{JsDiscountCurve, JsHazardCurve};
 use crate::utils::input::{js_f64, js_string, json_text, opt_json_text};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
@@ -39,99 +42,6 @@ fn base_money(csa: &finstack_quant_margin::CsaSpec, amount: f64) -> Result<Money
 /// An ISO-8601 date argument.
 fn js_date(value: &JsValue, label: &str) -> Result<Date, JsValue> {
     parse_iso_date(&js_string(value, label)?)
-}
-
-fn serialize_csa(csa: &finstack_quant_margin::CsaSpec) -> Result<String, JsValue> {
-    serde_json::to_string(csa).map_err(to_js_err)
-}
-
-/// Create a standard USD regulatory CSA specification as JSON.
-///
-/// Returns the canonical ISDA-compliant CSA for USD OTC derivatives.
-///
-/// # Errors
-///
-/// Rejects if the embedded margin registry cannot be loaded or the resulting
-/// CSA cannot be serialized to JSON.
-#[wasm_bindgen(js_name = csaUsdRegulatoryJson)]
-pub fn csa_usd_regulatory_json() -> Result<String, JsValue> {
-    let csa = finstack_quant_margin::CsaSpec::usd_regulatory().map_err(to_js_err)?;
-    serialize_csa(&csa)
-}
-
-/// Create a standard EUR regulatory CSA specification as JSON.
-///
-/// # Errors
-///
-/// Rejects if the embedded margin registry cannot be loaded or the resulting
-/// CSA cannot be serialized to JSON.
-#[wasm_bindgen(js_name = csaEurRegulatoryJson)]
-pub fn csa_eur_regulatory_json() -> Result<String, JsValue> {
-    let csa = finstack_quant_margin::CsaSpec::eur_regulatory().map_err(to_js_err)?;
-    serialize_csa(&csa)
-}
-
-/// Validate a CSA specification JSON string.
-///
-/// Checks the JSON schema and canonical CSA semantics, including currencies,
-/// monetary bounds and calendar lookup. Returns canonical JSON on success.
-///
-/// # Errors
-///
-/// Rejects malformed or schema-incompatible `json`, or failure to serialize
-/// the decoded CSA specification; also rejects invalid CSA terms or calendar identifiers.
-/// @param json - CSA specification JSON to validate and normalize into canonical form.
-#[wasm_bindgen(js_name = validateCsaJson)]
-pub fn validate_csa_json(json: JsValue) -> Result<String, JsValue> {
-    let json: &str = &json_text(&json, "json")?;
-    let csa: finstack_quant_margin::CsaSpec = serde_json::from_str(json).map_err(to_js_err)?;
-    csa.validate().map_err(to_js_err)?;
-    serialize_csa(&csa)
-}
-
-/// Calculate variation margin given exposure, posted collateral, and CSA JSON.
-///
-/// Returns the Rust `VmResult` in its canonical serde form (the same wire
-/// Python `VmResult.to_json()` emits): `date`, `gross_exposure`,
-/// `net_exposure`, `post_amount`, `collect_amount` (each a Money object
-/// `{amount, currency}` with a decimal-string amount) and `settlement_date`.
-///
-/// @param csa_json - CSA specification JSON governing thresholds, minimum transfer, and timing.
-/// @param exposure - Signed mark-to-market in the supplied currency: positive means the counterparty owes the desk.
-/// @param posted_collateral - Signed collateral balance: positive held, negative posted, including pending agreed calls.
-/// @param currency - ISO-4217 currency code shared by exposure and collateral amounts.
-/// @param as_of - ISO-8601 VM calculation date.
-/// @returns The canonical `VmResult` as a plain object.
-///
-/// # Errors
-///
-/// Rejects malformed or schema-incompatible `csa_json`, an unknown `currency`,
-/// non-finite exposure or collateral amounts, an invalid calendar date, a
-/// currency mismatch with the CSA, invalid VM parameters, calendar lookup or
-/// settlement-date adjustment failures, or failure to serialize the result.
-#[wasm_bindgen(js_name = calculateVm)]
-pub fn calculate_vm(
-    csa_json: JsValue,
-    exposure: JsValue,
-    posted_collateral: JsValue,
-    currency: JsValue,
-    as_of: JsValue,
-) -> Result<JsValue, JsValue> {
-    let exposure = js_f64(&exposure, "exposure")?;
-    let posted_collateral = js_f64(&posted_collateral, "postedCollateral")?;
-    let csa_json: &str = &json_text(&csa_json, "csaJson")?;
-    let currency: &str = &js_string(&currency, "currency")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
-    let csa: finstack_quant_margin::CsaSpec = serde_json::from_str(csa_json).map_err(to_js_err)?;
-    let ccy: finstack_quant_core::currency::Currency = currency.parse().map_err(to_js_err)?;
-    let exp = finstack_quant_core::money::Money::new(exposure, ccy).map_err(to_js_err)?;
-    let posted =
-        finstack_quant_core::money::Money::new(posted_collateral, ccy).map_err(to_js_err)?;
-    let as_of = parse_iso_date(as_of)?;
-
-    let calc = finstack_quant_margin::VmCalculator::new(csa);
-    let result = calc.calculate(exp, posted, as_of).map_err(to_js_err)?;
-    to_js_value(&result)
 }
 
 /// Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
@@ -214,45 +124,4 @@ pub fn compute_bilateral_xva(
     .map_err(to_js_err)?;
 
     to_js_value(&result)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::Value;
-
-    fn assert_csa_json_shape(json: &str, expected_base_currency: &str) {
-        let Ok(v) = serde_json::from_str::<Value>(json) else {
-            panic!("CSA JSON should parse");
-        };
-        let Some(obj) = v.as_object() else {
-            panic!("CSA JSON should be an object");
-        };
-        assert!(obj.contains_key("id"));
-        assert!(obj.contains_key("base_currency"));
-        assert!(obj.contains_key("vm_params"));
-        assert!(obj.contains_key("eligible_collateral"));
-        assert!(obj.contains_key("call_timing"));
-        assert!(obj.contains_key("collateral_curve_id"));
-        assert_eq!(
-            obj.get("base_currency").and_then(Value::as_str),
-            Some(expected_base_currency)
-        );
-    }
-
-    #[test]
-    fn csa_usd_regulatory_json_shape() {
-        let Ok(json) = csa_usd_regulatory_json() else {
-            panic!("csa_usd_regulatory should succeed");
-        };
-        assert_csa_json_shape(&json, "USD");
-    }
-
-    #[test]
-    fn csa_eur_regulatory_json_shape() {
-        let Ok(json) = csa_eur_regulatory_json() else {
-            panic!("csa_eur_regulatory should succeed");
-        };
-        assert_csa_json_shape(&json, "EUR");
-    }
 }

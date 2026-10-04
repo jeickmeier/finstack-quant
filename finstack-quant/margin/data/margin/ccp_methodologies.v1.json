@@ -31,12 +31,10 @@
       "record": { "mpor_days": 5, "conservative_rate": 0.03 }
     },
     {
-      "ids": ["generic_var", "default"],
+      "ids": ["generic_proxy", "default"],
       "record": {
         "mpor_days": 5,
         "conservative_rate": 0.05,
-        "generic_var_confidence": 0.99,
-        "generic_var_lookback_days": 250,
         "is_default": true
       }
     }

@@ -11,7 +11,7 @@
 //! - Rates and haircuts are stored as decimal fractions, not basis points.
 //! - Thresholds, MTAs, and independent amounts are stored as raw currency
 //!   amounts before conversion into [`finstack_quant_core::money::Money`].
-//! - `mpor_days` and settlement lags are stored in calendar days.
+//! - `mpor_days` and VM settlement lags are stored in business days.
 //! - Schedule maturities are stored as year fractions.
 use std::sync::OnceLock;
 
@@ -22,9 +22,7 @@ use serde_json::Value;
 use tracing::{debug, info};
 
 mod validation;
-use validation::{
-    to_validation, validate_haircut, validate_non_negative, validate_probability, validate_rate,
-};
+use validation::{to_validation, validate_haircut, validate_non_negative, validate_rate};
 
 use crate::calculators::im::schedule::{MaturityBucket, ScheduleAssetClass};
 use crate::calculators::im::simm::SimmVersion;
@@ -57,8 +55,6 @@ pub struct MarginRegistry {
     pub ccp: HashMap<String, CcpParams>,
     /// Resolved default CCP conservative fallback parameters.
     pub ccp_default_params: CcpParams,
-    /// Resolved generic VaR fallback metadata for unknown CCP names.
-    pub ccp_generic_var_defaults: GenericVarDefaults,
     /// SIMM parameter sets keyed by registry id such as `"v2_6"`.
     pub simm: HashMap<String, SimmParams>,
 }
@@ -89,7 +85,7 @@ pub struct VmDefaults {
     pub independent_amount: f64,
     /// Margin-call frequency.
     pub frequency: MarginTenor,
-    /// Settlement lag in calendar days.
+    /// Settlement lag in business days.
     pub settlement_lag: u32,
 }
 
@@ -137,7 +133,7 @@ pub struct TimingDefaults {
 pub struct ClearedSettlementDefaults {
     /// Settlement rounding amount in base-currency units before conversion to [`finstack_quant_core::money::Money`].
     pub rounding: f64,
-    /// Settlement lag in calendar days.
+    /// Settlement lag in business days.
     pub settlement_lag: u32,
 }
 
@@ -187,19 +183,9 @@ pub struct CcpParams {
     pub conservative_rate: f64,
 }
 
-/// Generic VaR metadata used for unknown CCP-name fallbacks.
-#[derive(Debug, Clone)]
-pub struct GenericVarDefaults {
-    /// VaR confidence level as a decimal probability.
-    pub confidence: f64,
-    /// Historical lookback window in calendar days.
-    pub lookback_days: u32,
-}
-
 struct ParsedCcpRegistry {
     ccp: HashMap<String, CcpParams>,
     ccp_default_params: CcpParams,
-    ccp_generic_var_defaults: GenericVarDefaults,
 }
 
 /// Registry-backed SIMM parameter set.
@@ -391,7 +377,6 @@ pub fn build_registry(overlay: Option<&Value>) -> Result<MarginRegistry> {
         collateral_schedules,
         ccp: parsed_ccp.ccp,
         ccp_default_params: parsed_ccp.ccp_default_params,
-        ccp_generic_var_defaults: parsed_ccp.ccp_generic_var_defaults,
         simm,
     })
 }
@@ -580,39 +565,8 @@ fn parse_ccp(value: Option<&Value>) -> Result<ParsedCcpRegistry> {
     let file: wire::CcpFile = serde_json::from_value(val.clone()).map_err(to_validation)?;
     let mut map = HashMap::default();
     let mut default_params: Option<CcpParams> = None;
-    let mut generic_var_defaults: Option<GenericVarDefaults> = None;
     for entry in file.entries {
         validate_rate("ccp.conservative_rate", entry.record.conservative_rate)?;
-        let generic_confidence = entry.record.generic_var_confidence;
-        let generic_lookback_days = entry.record.generic_var_lookback_days;
-        match (generic_confidence, generic_lookback_days) {
-            (Some(confidence), Some(lookback_days)) => {
-                validate_probability("ccp.generic_var_confidence", confidence)?;
-                if lookback_days == 0 {
-                    return Err(Error::Validation(
-                        "ccp.generic_var_lookback_days must be positive".to_string(),
-                    ));
-                }
-                if generic_var_defaults
-                    .replace(GenericVarDefaults {
-                        confidence,
-                        lookback_days,
-                    })
-                    .is_some()
-                {
-                    return Err(Error::Validation(
-                        "duplicate ccp generic_var defaults".to_string(),
-                    ));
-                }
-            }
-            (None, None) => {}
-            _ => {
-                return Err(Error::Validation(
-                    "ccp generic_var defaults require both confidence and lookback_days"
-                        .to_string(),
-                ));
-            }
-        }
         let record = CcpParams {
             mpor_days: entry.record.mpor_days,
             conservative_rate: entry.record.conservative_rate,
@@ -637,15 +591,9 @@ fn parse_ccp(value: Option<&Value>) -> Result<ParsedCcpRegistry> {
     let Some(default_params) = default_params else {
         return Err(Error::Validation("ccp default entry missing".to_string()));
     };
-    let Some(generic_var_defaults) = generic_var_defaults else {
-        return Err(Error::Validation(
-            "ccp generic_var defaults missing".to_string(),
-        ));
-    };
     Ok(ParsedCcpRegistry {
         ccp: map,
         ccp_default_params: default_params,
-        ccp_generic_var_defaults: generic_var_defaults,
     })
 }
 
@@ -1579,14 +1527,6 @@ mod tests {
         assert!(
             registry.ccp_default_params.mpor_days > 0,
             "ccp default params should be resolved"
-        );
-        assert!(
-            registry.ccp_generic_var_defaults.confidence > 0.0,
-            "generic VaR confidence should be resolved"
-        );
-        assert!(
-            registry.ccp_generic_var_defaults.lookback_days > 0,
-            "generic VaR lookback should be resolved"
         );
         assert!(
             registry.defaults.im.simm.mpor_days > 0,

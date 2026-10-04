@@ -616,14 +616,14 @@ async function main() {
     w.bsPrice(100, 100, 0.05, 0.0, 0.2, 1.0, true);
   });
 
-  const csaCanonical = w.csaUsdRegulatoryJson();
+  const csaCanonical = w.csaSpecUsdRegulatory();
 
-  bench('margin', 'csaUsdRegulatoryJson', 2000, () => {
-    w.csaUsdRegulatoryJson();
+  bench('margin', 'csaSpecUsdRegulatory', 2000, () => {
+    w.csaSpecUsdRegulatory();
   });
 
-  bench('margin', 'validateCsaJson', 2000, () => {
-    w.validateCsaJson(csaCanonical);
+  bench('margin', 'csaSpecValidate', 2000, () => {
+    w.csaSpecValidate(csaCanonical);
   });
 
   bench('statements', 'validateFinancialModelJson', 1500, () => {
@@ -851,12 +851,12 @@ async function main() {
     w.bsPrice(100, 100, 0.05, 0.0, 0.2, 1.0, false);
   });
 
-  bench('margin', 'csaEurRegulatoryJson', 2000, () => {
-    w.csaEurRegulatoryJson();
+  bench('margin', 'csaSpecEurRegulatory', 2000, () => {
+    w.csaSpecEurRegulatory();
   });
 
-  benchTry('margin', 'calculateVm', 3000, () => {
-    w.calculateVm(csaCanonical, 1000000.0, 800000.0, 'USD', '2024-06-15');
+  benchTry('margin', 'VmCalculator.calculate', 3000, () => {
+    new w.VmCalculator(csaCanonical).calculate(1000000.0, 800000.0, 'USD', '2024-06-15');
   });
 
   benchTry('statements_analytics', 'runVariance', 800, () => {

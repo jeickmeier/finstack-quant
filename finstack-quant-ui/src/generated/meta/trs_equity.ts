@@ -2025,20 +2025,6 @@ export default [
     "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/CsaSpec"
   },
   {
-    "path": "#/$defs/d_814830ab7e82884f46f8/properties/im_methodology",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/OtcMarginSpec/properties/im_methodology",
-    "description": "Initial margin calculation methodology\n\n- Bilateral: SIMM or Schedule\n- Cleared: ClearingHouse (CCP-specific)",
-    "ref": "#/$defs/ImMethodology",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/ImMethodology"
-  },
-  {
-    "path": "#/$defs/d_814830ab7e82884f46f8/properties/settlement_lag",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/OtcMarginSpec/properties/settlement_lag",
-    "description": "Settlement lag for margin transfers (business days)",
-    "format": "uint32",
-    "minimum": 0
-  },
-  {
     "path": "#/$defs/d_814830ab7e82884f46f8/properties/simm_credit_classification",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/OtcMarginSpec/properties/simm_credit_classification",
     "description": "Explicit SIMM credit classification for credit-sensitive instruments.\n\nRequired when a credit product uses `ImMethodology::Simm`; leave `None`\nfor non-credit instruments and non-SIMM margin methodologies."
@@ -2052,13 +2038,6 @@ export default [
   {
     "path": "#/$defs/d_814830ab7e82884f46f8/properties/simm_credit_classification/anyOf/1",
     "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/OtcMarginSpec/properties/simm_credit_classification/anyOf/1"
-  },
-  {
-    "path": "#/$defs/d_814830ab7e82884f46f8/properties/vm_frequency",
-    "source": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/OtcMarginSpec/properties/vm_frequency",
-    "description": "Variation margin exchange frequency",
-    "ref": "#/$defs/MarginTenor",
-    "resolvedRef": "https://finstack_quant.dev/schemas/instrument/1/equity/trs_equity.schema.json#/$defs/MarginTenor"
   },
   {
     "path": "#/$defs/d_8a837e6f142b34e8cfd4",

@@ -10,11 +10,14 @@ use super::{MarginCall, RepoMarginSpec};
 ///
 /// # Arguments
 ///
-/// * `spec` - Repo margin specification
-/// * `cash_amount` - Cash amount of the repo
-/// * `valuations` - Time series of (date, collateral_value) pairs
+/// * `spec` - Collateralisation ratio (1.02 means 102%), relative call-trigger
+///   threshold, margining election and business-day settlement lag.
+/// * `cash_amount` - Contractual repo cash amount; its settlement currency
+///   determines the currency of every returned cashflow.
+/// * `valuations` - Valuation/call dates paired with unadjusted collateral
+///   market values in the settlement-currency units carried by `cash_amount`.
+///   Processed in supplied order; the caller selects the call dates.
 /// * `calendar` - Contractual calendar used for the business-day settlement lag.
-/// * `currency` - Currency for cashflows
 ///
 /// # Returns
 ///
@@ -24,14 +27,9 @@ pub fn generate_margin_cashflows(
     spec: &RepoMarginSpec,
     cash_amount: Money,
     valuations: &[(Date, f64)],
-    currency: finstack_quant_core::currency::Currency,
     calendar: &dyn HolidayCalendar,
 ) -> finstack_quant_core::Result<Vec<CashFlow>> {
-    if cash_amount.currency() != currency {
-        return Err(finstack_quant_core::Error::Validation(
-            "repo margin cash currency mismatch".into(),
-        ));
-    }
+    let currency = cash_amount.currency();
     let lag = i32::try_from(spec.settlement_lag).map_err(|_| {
         finstack_quant_core::Error::Validation("repo settlement lag exceeds supported range".into())
     })?;
@@ -202,7 +200,6 @@ mod tests {
             &spec,
             cash,
             &valuations,
-            Currency::USD,
             finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
         )
         .expect("valid margin cashflows fixture");
@@ -222,7 +219,6 @@ mod tests {
             &spec,
             cash,
             &valuations,
-            Currency::USD,
             finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
         )
         .expect("valid margin cashflows fixture");
@@ -248,7 +244,6 @@ mod tests {
             &spec,
             cash,
             &valuations,
-            Currency::USD,
             finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
         )
         .expect("valid margin cashflows fixture");
@@ -271,7 +266,6 @@ mod tests {
             &spec,
             cash,
             &valuations,
-            Currency::USD,
             finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
         )
         .expect("valid margin cashflows fixture");
@@ -294,7 +288,6 @@ mod tests {
             &spec,
             cash,
             &valuations,
-            Currency::USD,
             finstack_quant_core::dates::calendar_by_id("usny").expect("calendar"),
         )
         .expect("valid margin cashflows fixture");

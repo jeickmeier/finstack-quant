@@ -306,10 +306,6 @@ impl ImCalculator for HaircutImCalculator {
             as_of,
         )
     }
-
-    fn methodology(&self) -> ImMethodology {
-        ImMethodology::Haircut
-    }
 }
 
 #[cfg(test)]

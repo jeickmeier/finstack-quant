@@ -123,7 +123,6 @@ import type {
   ConcentrationBreach,
   CorrelationScenario,
   CsaSpec,
-  DrcAssetType,
   DrcSector,
   DrcSeniority,
   EadResult,
@@ -364,7 +363,6 @@ export type {
   ConcentrationBreach,
   CorrelationScenario,
   CsaSpec,
-  DrcAssetType,
   DrcSector,
   DrcSeniority,
   EadResult,
@@ -12885,31 +12883,10 @@ export interface VmCalculatorConstructor {
  */
 export interface ScheduleImCalculator extends WasmOwned {
   /**
-   * Default schedule asset class label used when a trade does not name one.
-   */
-  readonly defaultAssetClass: string;
-  /**
-   * Default remaining maturity in years used for the schedule-rate lookup.
-   */
-  readonly defaultMaturityYears: number;
-  /**
    * Margin period of risk in business days stamped on every result.
    */
   readonly mporDays: number;
-  /**
-   * Copy with a new default schedule asset class.
-   * @param assetClass - Lower-case schedule asset class label: `"interest_rate"`, `"credit"`, `"equity"`, `"commodity"`, `"fx"`, `"other"`, or `"custom_<name>"` for a registry-defined class.
-   * @returns A new `ScheduleImCalculator` handle.
-   * @throws Error - Throws if the asset class label is unknown.
-   */
-  withAssetClass(assetClass: string): ScheduleImCalculator;
-  /**
-   * Copy with a new default maturity.
-   * @param years - Representative remaining maturity in years; finite and non-negative.
-   * @returns A new `ScheduleImCalculator` handle.
-   * @throws Error - Throws if `years` is negative or non-finite.
-   */
-  withMaturity(years: number): ScheduleImCalculator;
+
   /**
    * Look up a schedule rate.
    * @param assetClass - Lower-case schedule asset class label such as `"interest_rate"`.
@@ -13018,32 +12995,12 @@ export interface HaircutImCalculator extends WasmOwned {
    * @throws Error - Throws if the schedule cannot be converted to a JavaScript value.
    */
   readonly eligibleCollateral: EligibleCollateralSchedule;
-  /**
-   * Default `CollateralAssetClass` wire label.
-   */
-  readonly defaultAssetClass: CollateralAssetClass;
-  /**
-   * ISO-4217 posted-collateral currency, or `undefined` when none is configured.
-   */
-  readonly postedCollateralCurrency: string | undefined;
+
   /**
    * Margin period of risk in business days stamped on every result (`HAIRCUT_MPOR_DAYS`).
    */
   readonly mporDays: number;
-  /**
-   * Copy with a default collateral asset class.
-   * @param assetClass - `CollateralAssetClass` wire label such as `"government_bonds"`.
-   * @returns A new `HaircutImCalculator` handle.
-   * @throws Error - Throws if the label is not a collateral asset class.
-   */
-  withDefaultAssetClass(assetClass: CollateralAssetClass): HaircutImCalculator;
-  /**
-   * Copy with a posted-collateral currency, used to detect FX mismatch.
-   * @param currency - ISO-4217 currency of the posted collateral.
-   * @returns A new `HaircutImCalculator` handle.
-   * @throws Error - Throws if `currency` is not a known currency code.
-   */
-  withPostedCollateralCurrency(currency: string): HaircutImCalculator;
+
   /**
    * Copy configured to select an eligible entry by collateral maturity and rating.
    * @param remainingYears - Residual collateral maturity in years; finite and non-negative.
@@ -13140,7 +13097,7 @@ export interface HaircutImCalculatorConstructor {
  * import init, { margin } from "finstack-quant-wasm";
  * await init();
  * const sens = new margin.FrtbSensitivities("USD");
- * sens.addGirrDelta("5Y", 100_000);
+ * sens.addGirrDelta("USD", "5Y", 100_000);
  * margin.frtbSbaCharge(sens).total; // capital charge in USD
  * ```
  */
@@ -13167,24 +13124,24 @@ export interface FrtbSensitivities extends WasmOwned {
    * Add a GIRR delta sensitivity.
    * @param tenor - GIRR tenor bucket, such as `"5Y"`.
    * @param amount - Signed base-currency P&L per 1 percentage point of curve shift (`100 * DV01`).
-   * @param currency - ISO-4217 currency of the curve; omitted uses the base currency.
-   * @throws Error - Throws if a supplied currency is not a known ISO-4217 code.
+   * @param currency - ISO-4217 currency of the curve of the shocked risk factor.
+   * @throws Error - Throws if the currency is not a known ISO-4217 code.
    */
-  addGirrDelta(tenor: string, amount: number, currency?: string | null): void;
+  addGirrDelta(currency: string, tenor: string, amount: number): void;
   /**
    * Add a GIRR inflation delta sensitivity.
    * @param amount - Base-currency P&L per 1 percentage point of inflation shift.
-   * @param currency - ISO-4217 currency of the inflation curve; omitted uses the base currency.
-   * @throws Error - Throws if a supplied currency is not a known ISO-4217 code.
+   * @param currency - ISO-4217 currency of the inflation curve of the shocked risk factor.
+   * @throws Error - Throws if the currency is not a known ISO-4217 code.
    */
-  addGirrInflationDelta(amount: number, currency?: string | null): void;
+  addGirrInflationDelta(currency: string, amount: number): void;
   /**
    * Add a GIRR cross-currency basis delta sensitivity.
    * @param amount - Base-currency P&L per 1 percentage point of basis shift.
-   * @param currency - ISO-4217 currency whose basis moves; omitted uses the base currency.
-   * @throws Error - Throws if a supplied currency is not a known ISO-4217 code.
+   * @param currency - ISO-4217 currency whose basis moves of the shocked risk factor.
+   * @throws Error - Throws if the currency is not a known ISO-4217 code.
    */
-  addGirrXccyBasisDelta(amount: number, currency?: string | null): void;
+  addGirrXccyBasisDelta(currency: string, amount: number): void;
   /**
    * Add a CSR non-securitisation delta sensitivity.
    * @param issuer - Issuer or reference-entity identifier.
@@ -13350,14 +13307,14 @@ export interface FrtbSensitivities extends WasmOwned {
    * @param optionMaturity - Option maturity label such as `"1Y"`.
    * @param underlyingTenor - Underlying swap tenor label such as `"5Y"`.
    * @param amount - Volatility-scaled vega (sigma times dV/dsigma) in the base currency.
-   * @param currency - ISO-4217 currency of the curve; omitted uses the base currency.
-   * @throws Error - Throws if a supplied currency is not a known ISO-4217 code.
+   * @param currency - ISO-4217 currency of the curve of the shocked risk factor.
+   * @throws Error - Throws if the currency is not a known ISO-4217 code.
    */
   addGirrVega(
+    currency: string,
     optionMaturity: string,
     underlyingTenor: string,
-    amount: number,
-    currency?: string | null
+    amount: number
   ): void;
   /**
    * Add an equity vega sensitivity.
@@ -13381,10 +13338,10 @@ export interface FrtbSensitivities extends WasmOwned {
    * Add a GIRR curvature pair.
    * @param cvrUp - Curvature risk position under the upward rate shock, in the base currency.
    * @param cvrDown - Curvature risk position under the downward rate shock, in the base currency.
-   * @param currency - ISO-4217 currency of the curve; omitted uses the base currency.
-   * @throws Error - Throws if a supplied currency is not a known ISO-4217 code.
+   * @param currency - ISO-4217 currency of the curve of the shocked risk factor.
+   * @throws Error - Throws if the currency is not a known ISO-4217 code.
    */
-  addGirrCurvature(cvrUp: number, cvrDown: number, currency?: string | null): void;
+  addGirrCurvature(currency: string, cvrUp: number, cvrDown: number): void;
   /**
    * Add an equity curvature pair.
    * @param underlier - Equity underlier or index identifier.
@@ -13404,27 +13361,11 @@ export interface FrtbSensitivities extends WasmOwned {
    */
   addFxCurvature(ccy1: string, ccy2: string, cvrUp: number, cvrDown: number): void;
   /**
-   * Add a Default Risk Charge position.
-   * @param issuer - Issuer identifier; long and short JTD net per issuer at charge time.
-   * @param jtdAmount - Signed jump-to-default notional in the base currency (positive long, negative short), before the seniority LGD.
-   * @param ratingBucket - Credit-rating bucket, 1 (AAA) to 9 (defaulted) per MAR22.24.
-   * @param sector - `"corporate"`, `"sovereign"` or `"local_government"`.
-   * @param seniority - `"senior_unsecured"`, `"subordinated"`, `"equity"` or `"covered_bond"`; selects the LGD.
-   * @param assetType - DRC asset type label such as `"corporate"`, `"sovereign"`, `"local_government"` or `"equity"`.
-   * @param maturityYears - Residual maturity in years, finite and non-negative; JTD scales by maturity clipped to `[0.25, 1.0]`.
-   * @param pnlAdjustment - Mark-to-market adjustment per MAR22.9 (negative for a long position carrying an unrealised loss); defaults to `0`.
-   * @throws Error - Throws if `sector`, `seniority` or `asset_type` is not a known label, or `rating_bucket` is not an integer in `0..=255`.
+   * Add a canonical non-securitisation DRC position.
+   * @param position - DrcPosition object or JSON: issuer, signed jtd_amount in reporting currency before LGD, rating_bucket 1..9, sector, seniority, non-negative maturity_years and optional pnl_adjustment (default 0). Equity seniority requires corporate sector; securitisations are unsupported.
+   * @throws Error - If fields are unknown, malformed or fail Rust position validation.
    */
-  addDrcPosition(
-    issuer: string,
-    jtdAmount: number,
-    ratingBucket: number,
-    sector: DrcSector,
-    seniority: DrcSeniority,
-    assetType: DrcAssetType,
-    maturityYears: number,
-    pnlAdjustment?: number | null
-  ): void;
+  addDrcPosition(position: FrtbSensitivitiesWire['drc_positions'][number] | string): void;
   /**
    * Add a Residual Risk Add-On position.
    * @param instrumentId - Instrument identifier.
@@ -13455,7 +13396,7 @@ export interface FrtbSensitivities extends WasmOwned {
  * import init, { margin } from "finstack-quant-wasm";
  * await init();
  * const sens = new margin.FrtbSensitivities("USD");
- * sens.addGirrDelta("5Y", 100_000);
+ * sens.addGirrDelta("USD", "5Y", 100_000);
  * margin.frtbSbaCharge(sens).total; // capital charge in USD
  * ```
  */
@@ -13493,7 +13434,7 @@ export interface FrtbSensitivitiesConstructor {
  * const engine = new margin.FrtbSbaEngine(["low", "high"], ["girr", "fx"]);
  * engine.scenarios; // ["low", "high"]
  * const sens = new margin.FrtbSensitivities("USD");
- * sens.addGirrDelta("5Y", 100_000);
+ * sens.addGirrDelta("USD", "5Y", 100_000);
  * engine.calculate(sens).binding_scenario;
  * ```
  */
@@ -13530,7 +13471,7 @@ export interface FrtbSbaEngine extends WasmOwned {
  * const engine = new margin.FrtbSbaEngine(["low", "high"], ["girr", "fx"]);
  * engine.scenarios; // ["low", "high"]
  * const sens = new margin.FrtbSensitivities("USD");
- * sens.addGirrDelta("5Y", 100_000);
+ * sens.addGirrDelta("USD", "5Y", 100_000);
  * engine.calculate(sens).binding_scenario;
  * ```
  */
@@ -13628,8 +13569,8 @@ export interface SaCcrEngineConstructor {
  * ```typescript
  * import init, { margin } from "finstack-quant-wasm";
  * await init();
- * const csa = margin.csaUsdRegulatoryJson();
- * const vm = margin.calculateVm(csa, 1_000_000, 0, "USD", "2026-01-02");
+ * const csa = margin.csaSpecUsdRegulatory();
+ * const vm = new margin.VmCalculator(csa).calculate( 1_000_000, 0, "USD", "2026-01-02");
  * console.log(vm.collect_amount.amount); // exact decimal string
  * ```
  */
@@ -13638,53 +13579,7 @@ export interface MarginNamespace {
    * Registry of the JSON Schemas this crate publishes (`index` / `get` / `validate`).
    */
   schema: SchemaRegistryNamespace;
-  /**
-   * Create a standard USD regulatory CSA specification as JSON.
-   *
-   * Returns the canonical ISDA-compliant CSA for USD OTC derivatives.
-   * @returns Canonical ISDA USD regulatory CSA JSON.
-   * @throws Error - Rejects if the embedded margin registry cannot be loaded or the resulting CSA cannot be serialized to JSON.
-   */
-  csaUsdRegulatoryJson(): string;
-  /**
-   * Create a standard EUR regulatory CSA specification as JSON.
-   * @returns Canonical ISDA EUR regulatory CSA JSON.
-   * @throws Error - Rejects if the embedded margin registry cannot be loaded or the resulting CSA cannot be serialized to JSON.
-   */
-  csaEurRegulatoryJson(): string;
-  /**
-   * Validate a CSA specification JSON string.
-   *
-   * Validates the JSON schema and CSA semantics, including amount currencies,
-   * monetary bounds and calendar lookup. Returns canonical JSON on success.
-   * @returns Canonical CSA JSON after schema validation.
-   * @param json - CSA specification JSON to validate and normalize into canonical form.
-   * @throws Error - Rejects malformed or schema-incompatible `json`, or failure to serialize the decoded CSA specification; also rejects invalid CSA terms or calendar identifiers.
-   */
-  validateCsaJson(json: JsonInput): string;
-  /**
-   * Calculate variation margin given exposure, posted collateral, and CSA JSON.
-   *
-   * Returns the Rust `VmResult` in its canonical serde form (the same wire
-   * Python `VmResult.to_json()` emits): `date`, `gross_exposure`,
-   * `net_exposure`, `post_amount`, `collect_amount` (each a Money object
-   * `{amount, currency}` with a decimal-string amount) and `settlement_date`.
-   *
-   * @param csaJson - CSA specification JSON governing thresholds, minimum transfer, and timing.
-   * @param exposure - Signed mark-to-market in the supplied currency: positive means the counterparty owes the desk.
-   * @param postedCollateral - Signed collateral balance: positive held, negative posted, including pending agreed calls.
-   * @param currency - ISO-4217 currency code shared by exposure and collateral amounts.
-   * @param asOf - ISO-8601 VM calculation date.
-   * @returns The canonical `VmResult` as a plain object.
-   * @throws Error - Rejects malformed or schema-incompatible `csa_json`, an unknown `currency`, non-finite exposure or collateral amounts, an invalid calendar date, a currency mismatch with the CSA, invalid VM parameters, calendar lookup or settlement-date adjustment failures, or failure to serialize the result.
-   */
-  calculateVm(
-    csaJson: JsonInput,
-    exposure: number,
-    postedCollateral: number,
-    currency: string,
-    asOf: string
-  ): VmResult;
+
   /**
    * Compute bilateral XVA: CVA, DVA, FVA, MVA, and the all-in adjustment.
    *
