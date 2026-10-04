@@ -790,3 +790,11 @@ def test_structured_credit_reports_the_effective_policies() -> None:
     stochastic = clo.enable_stochastic()
     assert stochastic.is_stochastic
     assert not stochastic.disable_stochastic().is_stochastic
+
+
+def test_cashflow_frame_rejects_mixed_currency_components() -> None:
+    document = json.loads(_clo().tranche_cashflows("A", _market(), CLOSE).to_json())
+    document["interest_flows"][0][1]["currency"] = "EUR"
+    mixed = TrancheCashflows.from_json(json.dumps(document))
+    with pytest.raises(ValueError, match="Currency mismatch"):
+        mixed.to_dataframe()

@@ -23,6 +23,20 @@ use std::sync::Arc;
 /// so a multi-gigabyte file can never cause an OOM allocation.
 pub const MAX_JSON_BYTES: usize = 16 * 1024 * 1024; // 16 MiB
 
+/// Map bounded loading diagnostics into the ordinary pricing error surface.
+pub(crate) fn instrument_load_error(error: ContractError) -> finstack_quant_core::Error {
+    let message = match error {
+        ContractError::Report(report) if !report.diagnostics.is_empty() => report
+            .diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.message.as_str())
+            .collect::<Vec<_>>()
+            .join("; "),
+        error => error.to_string(),
+    };
+    finstack_quant_core::Error::Validation(format!("invalid instrument envelope JSON: {message}"))
+}
+
 /// Persistence contract for [`InstrumentEnvelope`].
 pub const INSTRUMENT_CONTRACT: ContractDescriptor =
     ContractDescriptor::new("finstack_quant.instrument");
@@ -266,7 +280,7 @@ macro_rules! define_instrument_json {
                     use super::super::*;
 
                     #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+                    #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
                     #[serde(
                         rename_all = "snake_case",
                         tag = "type",
@@ -286,7 +300,7 @@ macro_rules! define_instrument_json {
                     use super::super::*;
 
                     #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+                    #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
                     #[serde(
                         rename_all = "snake_case",
                         tag = "type",
@@ -302,78 +316,24 @@ macro_rules! define_instrument_json {
             )*
         }
 
-        #[derive(Deserialize)]
-        #[serde(
-            rename_all = "snake_case",
-            tag = "type",
-            content = "spec",
-            deny_unknown_fields
-        )]
-        enum InstrumentJsonWire {
+        /// Canonical tagged union of all supported instrument serde types.
+        #[derive(Debug, Clone, Serialize, Deserialize)]
+        #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+        #[serde(tag = "type", content = "spec", rename_all = "snake_case", deny_unknown_fields)]
+        #[non_exhaustive]
+        pub enum InstrumentJson {
             $(
+                #[doc = concat!("Canonical `", $tag, "` instrument payload.")]
                 #[serde(rename = $tag)]
                 $variant($ty),
             )*
             $(
+                #[doc = concat!("Canonical `", $boxed_tag, "` instrument payload.")]
                 #[serde(rename = $boxed_tag)]
                 $boxed_variant(Box<$boxed_ty>),
             )*
         }
 
-        /// Canonical tagged union of all supported instrument serde types.
-        #[derive(Debug, Clone)]
-        #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
-        #[cfg_attr(
-            feature = "json-schema",
-            serde(tag = "type", content = "spec", deny_unknown_fields)
-        )]
-        #[non_exhaustive]
-        pub enum InstrumentJson {
-            $(
-                #[doc = concat!("Canonical `", $tag, "` instrument payload.")]
-                #[cfg_attr(feature = "json-schema", serde(rename = $tag))]
-                $variant($ty),
-            )*
-            $(
-                #[doc = concat!("Canonical `", $boxed_tag, "` instrument payload.")]
-                #[cfg_attr(feature = "json-schema", serde(rename = $boxed_tag))]
-                $boxed_variant(Box<$boxed_ty>),
-            )*
-        }
-
-        impl Serialize for InstrumentJson {
-            fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-            where
-                S: serde::Serializer,
-            {
-                match self {
-                    $(Self::$variant(instrument) => {
-                        instrument_variant::$variant::Wire::Instrument(
-                            std::borrow::Cow::Borrowed(instrument),
-                        )
-                        .serialize(serializer)
-                    })*
-                    $(Self::$boxed_variant(instrument) => {
-                        instrument_variant::$boxed_variant::Wire::Instrument(
-                            std::borrow::Cow::Borrowed(instrument.as_ref()),
-                        )
-                        .serialize(serializer)
-                    })*
-                }
-            }
-        }
-
-        impl<'de> Deserialize<'de> for InstrumentJson {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-            where
-                D: serde::Deserializer<'de>,
-            {
-                match InstrumentJsonWire::deserialize(deserializer)? {
-                    $(InstrumentJsonWire::$variant(instrument) => Ok(Self::$variant(instrument)),)*
-                    $(InstrumentJsonWire::$boxed_variant(instrument) => Ok(Self::$boxed_variant(instrument)),)*
-                }
-            }
-        }
     };
 }
 
@@ -722,11 +682,11 @@ impl InstrumentJson {
     /// Returns an error if spec validation fails during conversion.
     pub fn into_boxed(self) -> Result<Box<dyn Instrument>> {
         self.validate_for_pricing()?;
-        self.into_boxed_assuming_validated()
+        self.into_boxed_unchecked()
     }
 
-    /// Box a payload that has already passed [`Self::validate_for_pricing`].
-    pub(crate) fn into_boxed_assuming_validated(self) -> Result<Box<dyn Instrument>> {
+    /// Box a payload without domain validation; callers must validate before pricing.
+    pub(crate) fn into_boxed_unchecked(self) -> Result<Box<dyn Instrument>> {
         with_instrument_json_registry!(instrument_json_into_boxed_match, self)
     }
 
@@ -784,6 +744,22 @@ impl InstrumentEnvelope {
         finstack_quant_core::canonical::content_hash(self)
     }
 
+    /// Decode an envelope under one byte/depth/structure policy before domain validation.
+    pub(crate) fn decode_bytes(
+        bytes: &[u8],
+        limits: &LoadLimits,
+    ) -> std::result::Result<Self, ContractError> {
+        Self::decode_value(parse_json_value(bytes, limits)?, limits)
+    }
+
+    /// Decode a parsed envelope using the same strict structure policy.
+    pub(crate) fn decode_value(
+        value: serde_json::Value,
+        limits: &LoadLimits,
+    ) -> std::result::Result<Self, ContractError> {
+        deserialize_json_value(value, limits)
+    }
+
     /// Load a persisted instrument envelope under strict contract policy.
     ///
     /// # Arguments
@@ -801,8 +777,7 @@ impl InstrumentEnvelope {
         bytes: &[u8],
         limits: &LoadLimits,
     ) -> std::result::Result<(Box<dyn Instrument>, ValidationReport), ContractError> {
-        let value = parse_json_value(bytes, limits)?;
-        let envelope: Self = deserialize_json_value(value, limits)?;
+        let envelope = Self::decode_bytes(bytes, limits)?;
         let instrument = envelope.into_boxed()?;
         Ok((instrument, ValidationReport::default()))
     }
@@ -819,11 +794,10 @@ impl InstrumentEnvelope {
     ///
     /// * `value` - Parsed canonical instrument envelope JSON.
     pub fn from_value(value: serde_json::Value) -> Result<Box<dyn Instrument>> {
-        let envelope: Self = serde_json::from_value(value).map_err(|e| {
-            finstack_quant_core::Error::Validation(format!(
-                "Failed to parse instrument envelope JSON: {e}"
-            ))
-        })?;
+        let limits = LoadLimits::default().with_max_bytes(MAX_JSON_BYTES);
+        let bytes = serde_json::to_vec(&value)
+            .map_err(|error| finstack_quant_core::Error::Validation(error.to_string()))?;
+        let envelope = Self::decode_bytes(&bytes, &limits).map_err(instrument_load_error)?;
         envelope.into_boxed()
     }
 
@@ -869,10 +843,9 @@ impl InstrumentEnvelope {
             )));
         }
 
-        let value: serde_json::Value = serde_json::from_slice(&buf).map_err(|e| {
-            finstack_quant_core::Error::Validation(format!("Failed to parse JSON: {e}"))
-        })?;
-        Self::from_value(value)
+        Self::decode_bytes(&buf, &LoadLimits::default().with_max_bytes(MAX_JSON_BYTES))
+            .map_err(instrument_load_error)?
+            .into_boxed()
     }
 
     /// Load an instrument from a JSON string.

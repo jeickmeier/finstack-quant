@@ -325,56 +325,6 @@ impl Swaption {
         })
     }
 
-    /// Create a Bermudan-style swaption example for testing and documentation.
-    ///
-    /// Returns a 5NC1 payer swaption (5-year swap, Bermudan exercise after 1 year)
-    /// with physical settlement, Normal vol model, and SABR parameters populated.
-    /// Exercise dates are semi-annual, aligned with swap coupon dates.
-    pub fn example_bermudan() -> finstack_quant_core::Result<Self> {
-        let swap_start = time::macros::date!(2027 - 01 - 17);
-        let swap_end = time::macros::date!(2032 - 01 - 17);
-        // First exercise 1 year after swap start
-        let first_exercise = time::macros::date!(2028 - 01 - 17);
-        let strike = Decimal::try_from(0.035).map_err(|e: rust_decimal::Error| {
-            finstack_quant_core::Error::Validation(e.to_string())
-        })?;
-        let (underlying_fixed_leg, underlying_float_leg) =
-            vanilla_underlier(VanillaSwaptionUnderlier {
-                fixed_day_count: DayCount::Act360,
-                ..VanillaSwaptionUnderlier::standard(
-                    strike,
-                    swap_start,
-                    swap_end,
-                    CurveId::new("USD-OIS"),
-                    CurveId::new("USD-OIS"),
-                )
-            });
-        Ok(Self {
-            id: InstrumentId::new("SWPN-5NC1-BERM-USD"),
-            option_type: OptionType::Call,
-            notional: Money::from((10_000_000_i64, Currency::USD)),
-            expiry: first_exercise,
-            exercise_style: ExerciseStyle::Bermudan,
-            settlement: SettlementType::Physical,
-            cash_settlement_method: CashSettlementMethod::default(),
-            vol_model: VolatilityModel::Normal,
-            vol_surface_id: CurveId::new("USD-SWPNVOL"),
-            underlying_fixed_leg,
-            underlying_float_leg,
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            sabr_params: Some(SabrParameters {
-                alpha: 0.025,
-                beta: 0.5,
-                nu: 0.40,
-                rho: -0.30,
-                shift: None,
-            }),
-            attributes: Attributes::new(),
-        })
-    }
-
     /// Create a European swaption from a [`SwaptionParams`] specification.
     ///
     /// The payer/receiver side comes from `params.side`

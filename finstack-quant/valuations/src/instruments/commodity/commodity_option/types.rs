@@ -802,6 +802,36 @@ impl Instrument for CommodityOption {
 }
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for CommodityOption {
+    fn option_greeks(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
+    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
+        let mut greeks = crate::instruments::common_impl::traits::OptionGreeks::default();
+        match request.greek {
+            crate::instruments::common_impl::traits::OptionGreekKind::Delta => {
+                greeks.delta = self.option_delta(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Gamma => {
+                greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Vega => {
+                greeks.vega = self.option_vega(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Vanna => {
+                greeks.vanna = self.option_vanna(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Volga => {
+                greeks.volga =
+                    self.option_volga(market, as_of, request.require_base_pv()?, request.bumps)?
+            }
+            _ => {}
+        }
+        Ok(greeks)
+    }
+}
+impl CommodityOption {
     fn option_delta(
         &self,
         market: &MarketContext,
@@ -871,51 +901,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         };
         Ok(Some(delta_unit * self.quantity * self.multiplier))
     }
-
-    fn option_vega(
-        &self,
-        market: &MarketContext,
-        as_of: Date,
-        _bumps: crate::instruments::common_impl::traits::GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        use finstack_quant_core::math::special_functions::norm_pdf;
-
-        if as_of > self.expiry {
-            return Ok(Some(0.0));
-        }
-        if !matches!(self.exercise_style, ExerciseStyle::European) {
-            return Err(finstack_quant_core::Error::Validation(
-                "CommodityOption analytical Greeks support European exercise only".to_string(),
-            ));
-        }
-
-        let t = self
-            .day_count
-            .year_fraction(as_of, self.expiry, DayCountContext::default())?
-            .max(0.0);
-        if t <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
-            &self.instrument_pricing_overrides.market_quotes,
-            market,
-            self.vol_surface_id.as_str(),
-            t,
-            self.strike,
-        )?;
-        if sigma <= 0.0 {
-            return Ok(Some(0.0));
-        }
-
-        let forward = self.forward_price(market, as_of)?;
-        let disc = market.get_discount(self.discount_curve_id.as_str())?;
-        let df = disc.df_between_dates(as_of, self.expiry)?;
-        let d1 = finstack_quant_models::d1_black76(forward, self.strike, sigma, t);
-        let vega_abs = df * forward * norm_pdf(d1) * t.sqrt();
-        Ok(Some(vega_abs * 0.01 * self.quantity * self.multiplier))
-    }
-
     fn option_gamma(
         &self,
         market: &MarketContext,
@@ -1017,7 +1002,49 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             (pv_up - 2.0 * pv_base + pv_down) / (bump_size * bump_size),
         ))
     }
+    fn option_vega(
+        &self,
+        market: &MarketContext,
+        as_of: Date,
+        _bumps: crate::instruments::common_impl::traits::GreekBumps,
+    ) -> finstack_quant_core::Result<Option<f64>> {
+        use finstack_quant_core::math::special_functions::norm_pdf;
 
+        if as_of > self.expiry {
+            return Ok(Some(0.0));
+        }
+        if !matches!(self.exercise_style, ExerciseStyle::European) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CommodityOption analytical Greeks support European exercise only".to_string(),
+            ));
+        }
+
+        let t = self
+            .day_count
+            .year_fraction(as_of, self.expiry, DayCountContext::default())?
+            .max(0.0);
+        if t <= 0.0 {
+            return Ok(Some(0.0));
+        }
+
+        let sigma = crate::instruments::common_impl::vol_resolution::resolve_sigma_at(
+            &self.instrument_pricing_overrides.market_quotes,
+            market,
+            self.vol_surface_id.as_str(),
+            t,
+            self.strike,
+        )?;
+        if sigma <= 0.0 {
+            return Ok(Some(0.0));
+        }
+
+        let forward = self.forward_price(market, as_of)?;
+        let disc = market.get_discount(self.discount_curve_id.as_str())?;
+        let df = disc.df_between_dates(as_of, self.expiry)?;
+        let d1 = finstack_quant_models::d1_black76(forward, self.strike, sigma, t);
+        let vega_abs = df * forward * norm_pdf(d1) * t.sqrt();
+        Ok(Some(vega_abs * 0.01 * self.quantity * self.multiplier))
+    }
     fn option_vanna(
         &self,
         market: &MarketContext,
@@ -1124,7 +1151,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             (pv_up_up - pv_up_dn - pv_dn_up + pv_dn_dn) / (4.0 * fwd_bump_size * width_vol_points),
         ))
     }
-
     fn option_volga(
         &self,
         market: &MarketContext,

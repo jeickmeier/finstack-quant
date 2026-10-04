@@ -389,9 +389,11 @@ mod tests {
             .expect("actual nodes need no spot mapping");
         assert!((vega - 10.0).abs() < 1e-9, "{vega}");
         assert_eq!(
-            context.computed_matrix[&MetricId::BucketedVega]
-                .values
-                .len(),
+            context
+                .computed
+                .keys()
+                .filter(|key| key.decode_components(&MetricId::BucketedVega).is_some())
+                .count(),
             1
         );
     }
@@ -452,12 +454,10 @@ mod tests {
             "raw total={vega}, expected={}",
             (first_coefficient + second_coefficient) * 0.01
         );
-        let matrix = context
-            .computed_matrix
-            .get(&MetricId::BucketedVega)
-            .expect("bucket matrix");
-        assert!((matrix.values[0][0] - first_coefficient * 0.01).abs() < 1e-9);
-        assert!((matrix.values[1][0] - second_coefficient * 0.01).abs() < 1e-9);
+        let first = MetricId::composite(&MetricId::BucketedVega, &["VOL-A::1y", "100"]);
+        let second = MetricId::composite(&MetricId::BucketedVega, &["VOL-B::1y", "100"]);
+        assert!((context.computed[&first] - first_coefficient * 0.01).abs() < 1e-9);
+        assert!((context.computed[&second] - second_coefficient * 0.01).abs() < 1e-9);
         assert!(context.computed[&MetricId::BucketedVegaResidual].abs() < 1e-9);
     }
 }

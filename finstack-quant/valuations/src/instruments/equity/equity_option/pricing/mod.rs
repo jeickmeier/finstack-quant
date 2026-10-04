@@ -634,12 +634,17 @@ mod tests {
         let expiry = date(2026, 1, 1);
         let curves = market(as_of, 100.0, 0.20, 0.03, 0.0);
         let option = option(expiry, OptionType::Call, ExerciseStyle::European);
-        let theta = crate::instruments::common_impl::traits::OptionGreeksProvider::option_theta(
+        let theta = crate::instruments::common_impl::traits::OptionGreeksProvider::option_greeks(
             &option,
             &curves,
             as_of,
-            crate::instruments::GreekBumps::default(),
+            &crate::instruments::OptionGreeksRequest {
+                greek: crate::instruments::OptionGreekKind::Theta,
+                base_pv: None,
+                bumps: crate::instruments::GreekBumps::default(),
+            },
         )
+        .map(|greeks| greeks.theta)
         .expect("theta")
         .expect("supported");
         let inputs = collect_inputs_extended(&option, &curves, as_of).expect("inputs");

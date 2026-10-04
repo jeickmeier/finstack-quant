@@ -242,7 +242,7 @@ mod tests {
 
     #[test]
     fn every_standard_metric_classifies_and_wire_names_round_trip() {
-        for metric in MetricId::ALL_STANDARD {
+        for metric in MetricId::get_standard() {
             let unit = metric.unit();
             let json = serde_json::to_string(&unit).expect("serialize");
             assert_eq!(json.trim_matches('"'), unit.as_str());

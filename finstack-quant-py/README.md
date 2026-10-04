@@ -68,7 +68,7 @@ Domains that mirror a nested Rust module tree expose it as nested packages:
 - `finstack_quant.models.{credit, correlation, factor, liquidity, monte_carlo,
   rates, volatility}`, with `models.credit.{scoring, pd, lgd, migration,
   recovery_waterfall, liability_management}` and `models.rates.dtsm`.
-- `finstack_quant.valuations.{instruments, credit_derivatives, composite,
+- `finstack_quant.valuations.{instruments, composite,
   market, envelope, schema}`.
 - `finstack_quant.cashflows.{accrual, aggregation, builder, primitives,
   schema}`.

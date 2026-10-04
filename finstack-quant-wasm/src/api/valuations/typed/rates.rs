@@ -220,10 +220,7 @@ factories!(JsSwaption, "Swaption", finstack_quant_valuations::instruments::Swapt
         /// @returns The example swaption.
         /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
         example as example,
-        /// Bermudan-exercise variant of the example (mirrors Rust `Swaption::example_bermudan`).
-        /// @returns The example swaption with `exercise_style == "bermudan"`.
-        /// @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
-        example_bermudan as exampleBermudan,
+
 });
 
 market_metrics!(JsSwaption, "Swaption", {

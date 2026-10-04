@@ -15,10 +15,9 @@ use crate::instruments::fixed_income::revolving_credit::types::{
 use finstack_quant_core::cashflow::{CFKind, CashFlow};
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::math::stats::OnlineStats;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{HashMap, Result};
-use finstack_quant_models::monte_carlo::estimate::Estimate;
+use finstack_quant_models::monte_carlo::estimate::{independent_estimator_stats, Estimate};
 use finstack_quant_models::monte_carlo::results::{MoneyEstimate, MonteCarloResult};
 
 /// Accumulator for one expected flow across Monte Carlo paths.
@@ -39,17 +38,7 @@ struct ExpectedFlow {
 /// 95% mean interval uses Student-t critical values with `n - 1` degrees of
 /// freedom and assumes approximately Gaussian estimator means.
 fn path_estimate(values: &[f64], antithetic: bool) -> Result<Estimate> {
-    let multiplicity = if antithetic { 2 } else { 1 };
-    if !values.len().is_multiple_of(multiplicity) || values.len() / multiplicity < 2 {
-        return Err(finstack_quant_core::Error::Validation(
-            "stochastic revolving-credit pricing requires at least 2 complete independent estimators"
-                .into(),
-        ));
-    }
-    let mut stats = OnlineStats::new();
-    for paths in values.chunks_exact(multiplicity) {
-        stats.update(paths.iter().sum::<f64>() / multiplicity as f64);
-    }
+    let stats = independent_estimator_stats(values, antithetic)?;
     Ok(Estimate::new(
         stats.mean(),
         stats.stderr(),

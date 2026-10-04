@@ -1,5 +1,7 @@
 //! Stochastic structured-credit scenario waterfall pricing engine.
 
+use finstack_quant_models::monte_carlo::estimate::independent_estimator_stats;
+
 use super::config::{StochasticPricerConfig, StructuredCreditPricingMode};
 use super::result::{StochasticPricingResult, TranchePricingResult};
 use crate::cashflow::builder::schedule::weighted_average_life_from_principal;
@@ -1558,7 +1560,7 @@ impl ScenarioCollector {
         pricer: &StochasticPricer,
         pricing_mode: StructuredCreditPricingMode,
     ) -> Result<StochasticPricingResult> {
-        let pv_stats = deal_pv_estimator_stats(&self.deal_pvs, self.antithetic)?;
+        let pv_stats = independent_estimator_stats(&self.deal_pvs, self.antithetic)?;
         let mean_pv = pv_stats.mean();
         let mean_loss = self.deal_loss_stats.mean();
         // Welford population variance avoids catastrophic cancellation when
@@ -1622,35 +1624,6 @@ impl ScenarioCollector {
 
         Ok(result)
     }
-}
-
-/// Accumulate independent deal-PV estimators for canonical sampling statistics.
-///
-/// Each complete antithetic pair contributes its mean as one observation.
-/// At least two observations are required for a sample standard error and
-/// Student-t confidence interval. Incomplete pairs are invalid.
-fn deal_pv_estimator_stats(deal_pvs: &[f64], antithetic: bool) -> Result<OnlineStats> {
-    if antithetic && !deal_pvs.len().is_multiple_of(2) {
-        return Err(finstack_quant_core::Error::Validation(
-            "Monte Carlo statistics require complete antithetic pairs".to_string(),
-        ));
-    }
-    let mut stats = OnlineStats::new();
-    if antithetic {
-        for pair in deal_pvs.chunks_exact(2) {
-            stats.update(0.5 * pair[0] + 0.5 * pair[1]);
-        }
-    } else {
-        for &pv in deal_pvs {
-            stats.update(pv);
-        }
-    }
-    if stats.count() < 2 {
-        return Err(finstack_quant_core::Error::Validation(
-            "Monte Carlo statistics require at least two independent estimators".to_string(),
-        ));
-    }
-    Ok(stats)
 }
 
 fn expected_shortfall(losses: &mut [f64], confidence: f64) -> f64 {
@@ -1878,10 +1851,10 @@ mod tests {
 
     #[test]
     fn deal_pv_statistics_reject_insufficient_or_incomplete_estimators() {
-        assert!(deal_pv_estimator_stats(&[], false).is_err());
-        assert!(deal_pv_estimator_stats(&[1.0], false).is_err());
-        assert!(deal_pv_estimator_stats(&[1.0, 3.0], true).is_err());
-        assert!(deal_pv_estimator_stats(&[1.0, 3.0, 2.0], true).is_err());
+        assert!(independent_estimator_stats(&[], false).is_err());
+        assert!(independent_estimator_stats(&[1.0], false).is_err());
+        assert!(independent_estimator_stats(&[1.0, 3.0], true).is_err());
+        assert!(independent_estimator_stats(&[1.0, 3.0, 2.0], true).is_err());
     }
 
     #[test]
@@ -2016,7 +1989,7 @@ mod tests {
 
         // Plain i.i.d. estimator treats all 1000 paths as independent: it
         // sees per-path population variance = 25 and reports a non-zero SE.
-        let iid_se = deal_pv_estimator_stats(&pvs, false)
+        let iid_se = independent_estimator_stats(&pvs, false)
             .expect("valid observations")
             .stderr();
         assert!(
@@ -2026,7 +1999,7 @@ mod tests {
 
         // Pair-aware estimator: every pair averages to exactly 1e7, so the
         // pair-mean variance — and therefore the SE — is zero.
-        let pair_se = deal_pv_estimator_stats(&pvs, true)
+        let pair_se = independent_estimator_stats(&pvs, true)
             .expect("complete pairs")
             .stderr();
         assert!(
@@ -2061,7 +2034,7 @@ mod tests {
             pvs.push(pair_mean - spread);
         }
 
-        let reported = deal_pv_estimator_stats(&pvs, true)
+        let reported = independent_estimator_stats(&pvs, true)
             .expect("complete pairs")
             .stderr();
 
@@ -2081,7 +2054,7 @@ mod tests {
 
         // The i.i.d. estimator sees the huge ±100 per-path swing and reports a
         // far larger SE; antithetic mode must NOT inflate variance beyond it.
-        let iid = deal_pv_estimator_stats(&pvs, false)
+        let iid = independent_estimator_stats(&pvs, false)
             .expect("valid observations")
             .stderr();
         assert!(

@@ -209,3 +209,60 @@ mod tests {
         assert_eq!(cashflows.total_principal.amount(), 200_000.0);
     }
 }
+
+/// One date of projected cashflows, with absent components filled by zero.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct TrancheCashflowRow {
+    /// Payment date as an ISO-8601 string.
+    pub date: String,
+    /// Cashflow in the result currency, as a decimal amount.
+    pub cashflow: f64,
+    /// Interest in the result currency, as a decimal amount.
+    pub interest: f64,
+    /// Principal in the result currency, as a decimal amount.
+    pub principal: f64,
+    /// Pik in the result currency, as a decimal amount.
+    pub pik: f64,
+    /// Deferred in the result currency, as a decimal amount.
+    pub deferred: f64,
+    /// Writedown in the result currency, as a decimal amount.
+    pub writedown: f64,
+}
+
+impl TrancheCashflows {
+    /// Project cashflows into date-ordered rows for tabular presentation.
+    ///
+    /// Amounts use the result currency; missing components are zero. Total
+    /// cashflows retain the recorded payments rather than recomputing component sums.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::CurrencyMismatch` if any component has a different currency.
+    pub fn get_cashflow_rows(&self) -> finstack_quant_core::Result<Vec<TrancheCashflowRow>> {
+        let rows = crate::instruments::common_impl::cashflow_export::cashflow_columns(
+            [
+                &self.cashflows,
+                &self.interest_flows,
+                &self.principal_flows,
+                &self.pik_flows,
+                &self.deferred_flows,
+                &self.writedown_flows,
+            ],
+            self.final_balance.currency(),
+        )?;
+        Ok(rows
+            .into_iter()
+            .map(|(date, values)| TrancheCashflowRow {
+                date: date.to_string(),
+                cashflow: values[0].amount(),
+                interest: values[1].amount(),
+                principal: values[2].amount(),
+                pik: values[3].amount(),
+                deferred: values[4].amount(),
+                writedown: values[5].amount(),
+            })
+            .collect())
+    }
+}

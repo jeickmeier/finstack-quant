@@ -163,30 +163,15 @@ pub(crate) fn compute_pv(
 
     // Compute price based on averaging method
     let price = match inst.averaging_method {
-        AveragingMethod::Geometric => {
-            if hist_count > 0 {
-                // Seasoned geometric: use adjusted strike method.
-                // K_adj = (K^n / exp(hist_prod_log))^(1/m) where m = future fixings
-                price_seasoned_geometric_commodity(
-                    &future_forwards,
-                    inst.strike,
-                    sigma,
-                    df,
-                    inst.option_type,
-                    hist_prod_log,
-                    hist_count,
-                    total_fixings,
-                )
-            } else {
-                price_geometric_kv_commodity(
-                    &future_forwards,
-                    inst.strike,
-                    sigma,
-                    df,
-                    inst.option_type,
-                )
-            }
-        }
+        AveragingMethod::Geometric => price_geometric_commodity(
+            &future_forwards,
+            inst.strike,
+            sigma,
+            df,
+            inst.option_type,
+            hist_prod_log,
+            total_fixings,
+        ),
         AveragingMethod::Arithmetic => price_arithmetic_tw_commodity(
             &future_forwards,
             inst.strike,
@@ -199,105 +184,6 @@ pub(crate) fn compute_pv(
     };
 
     Money::new(price * inst.quantity, inst.underlying.currency)
-}
-
-/// Geometric Asian pricing with commodity forwards (Kemna-Vorst adapted).
-///
-/// For commodity forwards, the geometric average of forwards has a lognormal
-/// distribution. We compute the adjusted forward and volatility from the
-/// forward prices directly.
-///
-/// # Lognormal Moments (Kemna-Vorst drift correction)
-///
-/// Each forward is a martingale under its own delivery measure, so
-/// `ln F_i(t_i) ~ N(ln F_i(0) − σ²t_i/2, σ²t_i)`. For the geometric average
-/// `G = exp((1/m) Σ ln F_i(t_i))`:
-///
-/// ```text
-/// E[ln G]   = ln(geo_mean) − (σ²/2m) Σ t_i
-/// Var[ln G] = (σ²/m²) ΣΣ min(t_i, t_j)
-/// E[G]      = geo_mean · exp(½·Var[ln G] − (σ²/2m) Σ t_i)
-/// ```
-///
-/// Black-76 is then applied with forward `F_G = E[G]`. Using the raw
-/// geometric mean as the forward (no drift correction) overstates `E[G]` by
-/// `exp((σ²/2)(Σt/m − ΣΣmin/m²))` — several percent of an ATM premium.
-///
-/// # Variance Calculation
-///
-/// Uses the exact variance formula for non-equally-spaced observation times:
-/// ```text
-/// sigma_G^2 = (1/m^2) * sum_i sum_j sigma^2 * min(t_i, t_j)
-/// ```
-/// This correctly handles irregular fixing schedules (different month lengths,
-/// business day adjustments) unlike the simplified equally-spaced formula.
-fn price_geometric_kv_commodity(
-    future_forwards: &[(f64, f64)], // (time, forward_price)
-    strike: f64,
-    sigma: f64,
-    df: f64,
-    option_type: OptionType,
-) -> f64 {
-    let n = future_forwards.len() as f64;
-    if n == 0.0 {
-        return 0.0;
-    }
-
-    // Geometric mean of forwards: G = exp((1/n) Σ ln(F_i))
-    let log_sum: f64 = future_forwards.iter().map(|(_, f)| f.ln()).sum();
-    let geo_mean_fwd = (log_sum / n).exp();
-
-    // Adjusted volatility using exact variance for non-equally-spaced observations:
-    // sigma_G^2 = (1/n^2) * sum_i sum_j sigma^2 * min(t_i, t_j)
-    let mut var_sum = 0.0;
-    for (t_i, _) in future_forwards.iter() {
-        for (t_j, _) in future_forwards.iter() {
-            var_sum += sigma * sigma * t_i.min(*t_j);
-        }
-    }
-    let vol_adj_sq = var_sum / (n * n);
-    let vol_adj = vol_adj_sq.sqrt();
-
-    // Kemna-Vorst mean-log drift: E[ln G] = ln(geo_mean) − (σ²/2m) Σ t_i
-    let sum_t: f64 = future_forwards.iter().map(|(t, _)| *t).sum();
-    let mean_log_drift = -0.5 * sigma * sigma * sum_t / n;
-
-    // Time to last fixing
-    let t_last = future_forwards
-        .iter()
-        .map(|(t, _)| *t)
-        .fold(0.0_f64, f64::max);
-
-    if vol_adj <= 0.0 || t_last <= 0.0 {
-        let intrinsic = match option_type {
-            OptionType::Call => (geo_mean_fwd - strike).max(0.0),
-            OptionType::Put => (strike - geo_mean_fwd).max(0.0),
-        };
-        return intrinsic * df;
-    }
-
-    // Black-76 with the expected geometric average as the forward:
-    // F_G = E[G] = geo_mean · exp(mean_log_drift + ½·vol_adj_sq).
-    let fwd_g = geo_mean_fwd * (mean_log_drift + 0.5 * vol_adj_sq).exp();
-
-    // Use vol_adj_sq directly (it represents total variance) rather than vol_adj * sqrt(t)
-    let total_vol = vol_adj_sq.sqrt();
-    // d1/d2 intentionally inline: Pre-computed adjusted variance, not decomposable into sigma,t
-    let d1 = ((fwd_g / strike).ln() + 0.5 * vol_adj_sq) / total_vol;
-    let d2 = d1 - total_vol;
-
-    let price = match option_type {
-        OptionType::Call => {
-            fwd_g * finstack_quant_core::math::norm_cdf(d1)
-                - strike * finstack_quant_core::math::norm_cdf(d2)
-        }
-        OptionType::Put => {
-            strike * finstack_quant_core::math::norm_cdf(-d2)
-                - fwd_g * finstack_quant_core::math::norm_cdf(-d1)
-        }
-    };
-
-    price * df
 }
 
 /// Seasoned geometric Asian pricing on commodity forwards.
@@ -315,7 +201,7 @@ fn price_geometric_kv_commodity(
 /// Pricing a *fresh* geometric Asian on `G_fut` (power `1`) with an adjusted
 /// strike — as a naive strike transform does — overstates the remaining
 /// volatility by a factor of `n/m` and uses the wrong moneyness. This
-/// formulation reduces continuously to [`price_geometric_kv_commodity`] as
+/// formulation covers unseasoned options with zero historical log sum as
 /// `m → n` (no realized fixings), preserving hedge ratios across fixings.
 ///
 /// # References
@@ -323,15 +209,13 @@ fn price_geometric_kv_commodity(
 /// Kemna, A. G. Z., & Vorst, A. C. F. (1990). "A Pricing Method for Options
 /// Based on Average Asset Values." *Journal of Banking & Finance*, 14(1),
 /// 113-129 — partially-averaged (seasoned) geometric options. `docs/REFERENCES.md#kemna-vorst-1990`
-#[allow(clippy::too_many_arguments)]
-fn price_seasoned_geometric_commodity(
+fn price_geometric_commodity(
     future_forwards: &[(f64, f64)], // (time, forward_price)
     strike: f64,
     sigma: f64,
     df: f64,
     option_type: OptionType,
     hist_prod_log: f64,
-    _hist_count: usize,
     total_fixings: usize,
 ) -> f64 {
     let n = total_fixings as f64;
@@ -938,7 +822,8 @@ mod tests {
         let fwds = [(0.25_f64, 80.0_f64), (0.5, 82.0), (0.75, 84.0), (1.0, 86.0)];
         let (strike, sigma, df) = (83.0_f64, 0.30_f64, 0.97_f64);
 
-        let analytic = price_geometric_kv_commodity(&fwds, strike, sigma, df, OptionType::Call);
+        let analytic =
+            price_geometric_commodity(&fwds, strike, sigma, df, OptionType::Call, 0.0, fwds.len());
 
         // Kemna-Vorst lognormal moments of G.
         let m = fwds.len() as f64;
@@ -982,32 +867,6 @@ mod tests {
         );
     }
 
-    /// Seasoned geometric Asian must reduce to the unseasoned Kemna-Vorst price
-    /// when no fixings are realized (m = n, A = 1): the seasoning is continuous,
-    /// with no jump in price/hedge as fixings begin to season.
-    #[test]
-    fn seasoned_geometric_reduces_to_unseasoned_when_no_history() {
-        let fwds = [(0.25_f64, 80.0_f64), (0.5, 82.0), (0.75, 84.0), (1.0, 86.0)];
-        let (strike, sigma, df) = (83.0_f64, 0.30_f64, 0.97_f64);
-
-        let fresh = price_geometric_kv_commodity(&fwds, strike, sigma, df, OptionType::Call);
-        // hist_prod_log = 0, total_fixings = m  =>  A = 1, ratio = 1.
-        let seasoned = price_seasoned_geometric_commodity(
-            &fwds,
-            strike,
-            sigma,
-            df,
-            OptionType::Call,
-            0.0,
-            0,
-            fwds.len(),
-        );
-        assert!(
-            (fresh - seasoned).abs() < 1e-10,
-            "seasoned must equal unseasoned at m=n: fresh={fresh} seasoned={seasoned}"
-        );
-    }
-
     /// The seasoned geometric price must match a direct numerical integration of
     /// `E[df·max(A·G_fut^(m/n) − K, 0)]` under the same lognormal model the pricer
     /// assumes for `G_fut`. This validates the (forward, variance) moments of
@@ -1022,14 +881,13 @@ mod tests {
         let hist_prod_log: f64 = [77.0_f64.ln(), 79.0_f64.ln(), 76.0_f64.ln()].iter().sum();
         let total_fixings = 6usize;
 
-        let analytic = price_seasoned_geometric_commodity(
+        let analytic = price_geometric_commodity(
             &fwds,
             strike,
             sigma,
             df,
             OptionType::Call,
             hist_prod_log,
-            3,
             total_fixings,
         );
 
@@ -1074,12 +932,40 @@ mod tests {
 
         // The corrected price must differ materially from the old naive transform.
         let k_adj = ((n * strike.ln() - hist_prod_log) / m).exp();
-        let old_naive = price_geometric_kv_commodity(&fwds, k_adj, sigma, df, OptionType::Call);
+        let old_naive =
+            price_geometric_commodity(&fwds, k_adj, sigma, df, OptionType::Call, 0.0, fwds.len());
         assert!(
             (analytic - old_naive).abs() / numeric.max(1.0) > 0.05,
             "fix must materially change the price vs the naive transform: \
              corrected={analytic} naive={old_naive}"
         );
+    }
+
+    #[test]
+    fn geometric_zero_vol_calls_and_puts_preserve_seasoning() {
+        let forwards = [(0.15_f64, 70.0_f64), (0.8, 80.0)];
+        for (historical_log, total_count) in [(0.0, 2), (60.0_f64.ln(), 3)] {
+            let average =
+                ((historical_log + 70.0_f64.ln() + 80.0_f64.ln()) / total_count as f64).exp();
+            for strike in [average - 5.0, average, average + 5.0] {
+                for kind in [OptionType::Call, OptionType::Put] {
+                    let payoff = match kind {
+                        OptionType::Call => (average - strike).max(0.0),
+                        OptionType::Put => (strike - average).max(0.0),
+                    };
+                    let value = price_geometric_commodity(
+                        &forwards,
+                        strike,
+                        0.0,
+                        0.96,
+                        kind,
+                        historical_log,
+                        total_count,
+                    );
+                    assert!((value - 0.96 * payoff).abs() < 1e-10);
+                }
+            }
+        }
     }
 
     #[test]

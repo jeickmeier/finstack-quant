@@ -837,16 +837,17 @@ fn price_instrument(
     metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
     market_history: Option<&Bound<'_, PyAny>>,
 ) -> PyResult<PyValuationResult> {
-    super::instruments::price_typed_envelope(
-        py,
-        extract_instrument_json(instrument)?,
-        market,
-        as_of,
-        model,
-        metrics,
-        metric_pricing_overrides,
-        market_history,
-    )
+    let overrides = metric_pricing_overrides_json(py, metric_pricing_overrides)?;
+    let json = extract_instrument_json(instrument)?;
+    let prepared = py
+        .detach(move || {
+            finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
+                &json,
+                overrides.as_deref(),
+            )
+        })
+        .map_err(core_to_py)?;
+    super::instruments::price_prepared(py, prepared, market, as_of, model, metrics, market_history)
 }
 
 /// List all metric IDs in the standard metric registry.

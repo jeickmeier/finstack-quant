@@ -448,7 +448,10 @@ test('instrumentEnvelopeFromSpec wraps a bare spec and rejects tagged payloads',
 test('CdsOption is a typed class matching the Python wrapper', () => {
   const { CdsOption } = valuations.instruments;
   const option = CdsOption.example();
-  assert.equal(option.toJson(), valuations.creditDerivatives.cdsOptionExampleJson());
+  assert.equal(
+    valuations.instruments.CdsOption.fromJson(option.toJson()).toJson(),
+    option.toJson()
+  );
   assert.deepEqual(option.strike, { spread: '0.01' });
   assert.equal(option.optionType, 'call');
   assert.equal(option.expiry, '2025-06-20');

@@ -238,13 +238,15 @@ pub(super) fn market_dependencies(instrument: &dyn Instrument) -> Js {
 /// One scalar metric of a typed instrument, through the `metric_value` path
 /// shared with `priceInstrument`.
 pub(super) fn metric_value(
-    envelope: &str,
+    instrument: Box<dyn finstack_quant_valuations::instruments::Instrument>,
     market_json: &JsValue,
     as_of: &JsValue,
     model: Option<&JsValue>,
     metric_id: &str,
 ) -> Result<f64, JsValue> {
-    let instrument = super::pricing::parse_pricing_instrument_json(envelope, None)?;
+    let instrument =
+        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)
+            .map_err(to_js_err)?;
     let market = market(market_json)?;
     let as_of = js_string(as_of, "asOf")?;
     let model = crate::utils::input::js_opt_string(model, "model")?;

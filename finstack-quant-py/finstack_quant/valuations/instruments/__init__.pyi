@@ -6483,7 +6483,7 @@ class Swaption:
     Typed wrapper for the canonical Rust ``Swaption`` instrument.
 
     Construct via :meth:`Swaption.builder`, :meth:`Swaption.example` /
-    :meth:`Swaption.example_bermudan` or :meth:`Swaption.from_json`. Every
+    :meth:`Swaption.from_json`. Every
     public Rust field is readable as a property; ``get_strike`` /
     ``get_underlying_start_date`` / ``get_underlying_maturity`` / ``forward_swap_rate`` mirror the
     Rust accessors and :meth:`Swaption.price` / :meth:`Swaption.metric` run
@@ -6541,29 +6541,6 @@ class Swaption:
         >>> from finstack_quant.valuations.instruments import Swaption
         >>> Swaption.example().settlement
         'cash'
-        """
-        ...
-    @staticmethod
-    def example_bermudan() -> Swaption:
-        """
-        Bermudan-exercise variant of the example (mirrors Rust
-        ``Swaption::example_bermudan``).
-
-        Returns
-        -------
-        Swaption
-            The example swaption with ``exercise_style == "bermudan"``.
-
-        Raises
-        ------
-        ValueError
-            If the example instrument fails validation.
-
-        Examples
-        --------
-        >>> from finstack_quant.valuations.instruments import Swaption
-        >>> Swaption.example_bermudan().exercise_style
-        'bermudan'
         """
         ...
     @classmethod
@@ -24552,7 +24529,7 @@ class TrancheCashflows:
         Raises
         ------
         ValueError
-            If the rows cannot be serialized.
+            If a component carries a different currency from the tranche, or the rows cannot be serialized.
         """
         ...
 
@@ -30450,7 +30427,7 @@ class FacilityProjection:
         Raises
         ------
         ValueError
-            If two lender flows on one date carry different currencies, or the
+            If a component carries a different currency from the facility, or the
             rows cannot be serialized.
         """
         ...

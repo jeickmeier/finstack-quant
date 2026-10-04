@@ -448,7 +448,16 @@ fn commodity_option_zero_vol_delta_matches_resolved_forward_payoff(
                     .clone()
                     .insert(flat_price_curve("CL-FWD", as_of, f, 2.0));
                 let delta = option
-                    .option_delta(&market, as_of, GreekBumps::default())?
+                    .option_greeks(
+                        &market,
+                        as_of,
+                        &finstack_quant_valuations::instruments::OptionGreeksRequest {
+                            greek: finstack_quant_valuations::instruments::OptionGreekKind::Delta,
+                            base_pv: None,
+                            bumps: GreekBumps::default(),
+                        },
+                    )?
+                    .delta
                     .expect("delta");
                 let df = market
                     .get_discount("USD-OIS")?
@@ -490,7 +499,17 @@ fn commodity_option_zero_vol_delta_matches_resolved_forward_payoff(
                         .market_quotes
                         .implied_volatility = Some(1e-10);
                     let limit = option
-                        .option_delta(&market, as_of, GreekBumps::default())?
+                        .option_greeks(
+                            &market,
+                            as_of,
+                            &finstack_quant_valuations::instruments::OptionGreeksRequest {
+                                greek:
+                                    finstack_quant_valuations::instruments::OptionGreekKind::Delta,
+                                base_pv: None,
+                                bumps: GreekBumps::default(),
+                            },
+                        )?
+                        .delta
                         .expect("limit");
                     assert!((limit - delta).abs() < 1e-9);
                 }

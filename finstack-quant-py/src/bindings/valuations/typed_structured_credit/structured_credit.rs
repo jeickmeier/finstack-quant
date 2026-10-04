@@ -23,8 +23,7 @@ use finstack_quant_valuations::instruments::{Instrument, InstrumentJson};
 
 use super::super::instruments::{
     enum_from_str, instrument_default_model, instrument_expiry, instrument_market_dependencies,
-    metric_typed_envelope, parse_typed_instrument_json, price_typed_envelope,
-    serialize_typed_instrument_json,
+    metric_typed, parse_typed_instrument_json, price_typed, serialize_typed_instrument_json,
 };
 use super::hedge_swap::hedge_swaps_from_py;
 use super::{
@@ -1005,9 +1004,9 @@ impl PyStructuredCredit {
         metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
         market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        price_typed_envelope(
+        price_typed(
             py,
-            self.envelope_json()?,
+            Box::new(self.inner.clone()),
             market,
             as_of,
             model,
@@ -1056,7 +1055,14 @@ impl PyStructuredCredit {
         metric_id: &str,
         model: &str,
     ) -> PyResult<f64> {
-        metric_typed_envelope(py, self.envelope_json()?, market, as_of, metric_id, model)
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            metric_id,
+            model,
+        )
     }
 
     /// Market-data dependencies (discount and forward curves, fixing

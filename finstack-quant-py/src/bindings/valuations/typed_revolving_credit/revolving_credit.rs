@@ -16,9 +16,8 @@ use crate::bindings::valuations::convert::{
     enum_to_py_string, money_from_py, money_repr, money_to_py, tenor_from_py,
 };
 use crate::bindings::valuations::instruments::{
-    instrument_default_model, instrument_expiry, instrument_market_dependencies,
-    metric_typed_envelope, parse_typed_instrument_json, price_typed_envelope,
-    serialize_typed_instrument_json, stub_kind_from_py,
+    instrument_default_model, instrument_expiry, instrument_market_dependencies, metric_typed,
+    parse_typed_instrument_json, price_typed, serialize_typed_instrument_json, stub_kind_from_py,
 };
 use crate::bindings::valuations::PyValuationResult;
 use crate::errors::{core_to_py, serde_json_to_py, value_error};
@@ -256,9 +255,9 @@ impl PyRevolvingCredit {
         metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
         market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        price_typed_envelope(
+        price_typed(
             py,
-            self.envelope_json()?,
+            Box::new(self.inner.clone()),
             market,
             as_of,
             model,
@@ -304,7 +303,14 @@ impl PyRevolvingCredit {
         metric_id: &str,
         model: &str,
     ) -> PyResult<f64> {
-        metric_typed_envelope(py, self.envelope_json()?, market, as_of, metric_id, model)
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            metric_id,
+            model,
+        )
     }
 
     /// Run the stochastic Monte Carlo valuation and keep every path.

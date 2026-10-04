@@ -8,12 +8,11 @@ use finstack_quant_core::dates::{BusinessDayConvention, DayCount, StubKind, Teno
 use finstack_quant_core::Error;
 use finstack_quant_core::HashMap;
 use std::str::FromStr;
-use strum::IntoEnumIterator;
 
 /// Parsed CDS convention tables used to build [`ConventionRegistry`].
 #[derive(Debug)]
 pub(crate) struct CdsRegistryTables {
-    /// Explicit `{currency}:{clause}` rows, plus `ANY` expansions.
+    /// Explicit `{currency}:{clause}` rows.
     pub entries: HashMap<CdsConventionKey, CdsConventionSpec>,
     /// Loader-only `ANY:{family}` fallback rows.
     pub any: HashMap<CdsConvention, CdsConventionSpec>,
@@ -66,10 +65,10 @@ fn parse_doc_clause(clause_str: &str) -> Result<CdsDocClause, Error> {
 
 /// Load the CDS conventions from the embedded JSON registry.
 ///
-/// This loader expands `ANY:<Clause>` IDs across all ISO currencies, allowing the embedded
+/// This loader retains `ANY:<Clause>` defaults by family, allowing the embedded
 /// registry to define catch-all conventions that apply to any currency not explicitly
-/// overridden. Explicit currency IDs (e.g., `USD:isda_na`) take precedence over expanded
-/// `ANY` entries and become that currency's primary schedule family.
+/// overridden. Explicit currency IDs (e.g., `USD:isda_na`) take precedence over family
+/// `ANY` fallback entries and become that currency's primary schedule family.
 pub(crate) fn load_registry() -> Result<CdsRegistryTables, Error> {
     let json = include_str!("../../../../data/conventions/cds_conventions.json");
     load_registry_from_str(json)
@@ -86,7 +85,6 @@ fn load_registry_from_str(json: &str) -> Result<CdsRegistryTables, Error> {
     let mut entries: HashMap<CdsConventionKey, CdsConventionSpec> = HashMap::default();
     let mut any: HashMap<CdsConvention, CdsConventionSpec> = HashMap::default();
     let mut primary_family: HashMap<Currency, CdsConvention> = HashMap::default();
-    let mut any_clauses: Vec<(CdsDocClause, CdsConventionSpec)> = Vec::new();
     let mut seen_ids: HashMap<String, ()> = HashMap::default();
 
     for entry in file.entries {
@@ -122,7 +120,6 @@ fn load_registry_from_str(json: &str) -> Result<CdsRegistryTables, Error> {
                     )));
                 }
                 any.insert(spec.family, spec.clone());
-                any_clauses.push((clause, spec.clone()));
             } else if let Ok(currency) = prefix.parse::<Currency>() {
                 let clause = parse_doc_clause(clause_str)?;
                 if clause != entry.record.doc_clause {
@@ -145,16 +142,6 @@ fn load_registry_from_str(json: &str) -> Result<CdsRegistryTables, Error> {
                     key_str, prefix
                 )));
             }
-        }
-    }
-
-    for (clause, spec) in any_clauses {
-        for currency in Currency::iter() {
-            let key = CdsConventionKey {
-                currency,
-                doc_clause: clause,
-            };
-            entries.entry(key).or_insert_with(|| spec.clone());
         }
     }
 

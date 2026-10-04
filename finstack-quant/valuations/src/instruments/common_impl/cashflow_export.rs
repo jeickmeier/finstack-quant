@@ -989,3 +989,50 @@ mod tests {
     // per-flow PV formula here is byte-identical to the one validated by
     // `period_pv.rs::test_periodized_pv_credit_adjusted_matches_detailed_engine`.
 }
+
+/// Aggregate dated cashflow columns in one currency, filling absent cells with zero.
+///
+/// # Arguments
+///
+/// * `columns` - Dated component flows; duplicate dates sum within each column.
+/// * `currency` - Required currency for every amount, including zero-filled cells.
+pub(crate) fn cashflow_columns<const N: usize>(
+    columns: [&[(Date, Money)]; N],
+    currency: Currency,
+) -> Result<std::collections::BTreeMap<Date, [Money; N]>> {
+    let mut rows = std::collections::BTreeMap::new();
+    for (index, flows) in columns.iter().enumerate() {
+        for &(date, amount) in *flows {
+            let row = rows
+                .entry(date)
+                .or_insert([Money::from((0_i64, currency)); N]);
+            row[index] = row[index].checked_add(amount)?;
+        }
+    }
+    Ok(rows)
+}
+
+#[cfg(test)]
+mod cashflow_column_tests {
+    use super::cashflow_columns;
+    use finstack_quant_core::{currency::Currency, money::Money};
+    use time::macros::date;
+
+    #[test]
+    fn duplicate_dates_preserve_money_and_fill_missing_components() {
+        let first = date!(2025 - 01 - 01);
+        let second = date!(2025 - 02 - 01);
+        let payments = [
+            (first, Money::from((3_i64, Currency::USD))),
+            (first, Money::from((7_i64, Currency::USD))),
+        ];
+        let components = [(second, Money::from((5_i64, Currency::USD)))];
+        let rows = cashflow_columns([&payments, &components], Currency::USD).expect("one currency");
+        assert_eq!(rows[&first][0].amount(), 10.0);
+        assert_eq!(rows[&first][1].amount(), 0.0);
+        assert_eq!(rows[&second][0].amount(), 0.0);
+        assert_eq!(rows[&second][1].amount(), 5.0);
+        let wrong_currency = [(second, Money::from((5_i64, Currency::EUR)))];
+        assert!(cashflow_columns([&payments, &wrong_currency], Currency::USD).is_err());
+    }
+}

@@ -188,7 +188,7 @@ impl ConventionRegistry {
     /// # Arguments
     ///
     /// * `currency` - ISO-4217 currency whose explicit `cds_conventions.json`
-    ///   regional row is returned. Currencies present only via `ANY` expansion
+    ///   regional row is returned. Currencies resolved only via `ANY` fallback
     ///   yield `None`.
     #[must_use]
     pub fn primary_cds_family(&self, currency: Currency) -> Option<CdsConvention> {
@@ -351,6 +351,52 @@ impl CdsConvention {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn family_fallback_matches_expanded_conventions_for_every_currency_and_clause() {
+        use strum::IntoEnumIterator;
+        let tables = super::super::loaders::cds::load_registry().expect("conventions");
+        let mut expanded = tables.entries.clone();
+        for currency in Currency::iter() {
+            for (family, spec) in &tables.any {
+                expanded
+                    .entry(CdsConventionKey {
+                        currency,
+                        doc_clause: family.as_doc_clause(),
+                    })
+                    .or_insert_with(|| spec.clone());
+            }
+        }
+        let registry = ConventionRegistry::try_global().expect("registry");
+        for currency in Currency::iter() {
+            for clause in [
+                CdsDocClause::Cr14,
+                CdsDocClause::Mr14,
+                CdsDocClause::Mm14,
+                CdsDocClause::Xr14,
+                CdsDocClause::IsdaNa,
+                CdsDocClause::IsdaEu,
+                CdsDocClause::IsdaAs,
+                CdsDocClause::IsdaAu,
+                CdsDocClause::IsdaNz,
+                CdsDocClause::Custom,
+            ] {
+                let key = CdsConventionKey {
+                    currency,
+                    doc_clause: clause,
+                };
+                let old = expanded
+                    .get(&registry.cds_schedule_key(&key))
+                    .expect("expanded row");
+                let current = registry.resolve_cds(&key).expect("resolved row");
+                assert_eq!(
+                    serde_json::to_value(old).expect("old spec"),
+                    serde_json::to_value(current).expect("current spec"),
+                    "{currency} {clause:?}"
+                );
+            }
+        }
+    }
+
     use super::*;
 
     #[test]

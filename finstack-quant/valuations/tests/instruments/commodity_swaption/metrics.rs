@@ -113,7 +113,16 @@ fn commodity_swaption_zero_vol_delta_matches_parallel_price_shift(
                     option.fixed_price = option.forward_swap_rate(&market, as_of)?;
                 }
                 let delta = option
-                    .option_delta(&market, as_of, GreekBumps::default())?
+                    .option_greeks(
+                        &market,
+                        as_of,
+                        &finstack_quant_valuations::instruments::OptionGreeksRequest {
+                            greek: finstack_quant_valuations::instruments::OptionGreekKind::Delta,
+                            base_pv: None,
+                            bumps: GreekBumps::default(),
+                        },
+                    )?
+                    .delta
                     .expect("delta");
                 if f == 3.5 {
                     assert_eq!(delta, 0.0);
@@ -139,7 +148,17 @@ fn commodity_swaption_zero_vol_delta_matches_parallel_price_shift(
                         .market_quotes
                         .implied_volatility = Some(1e-10);
                     let limit = option
-                        .option_delta(&market, as_of, GreekBumps::default())?
+                        .option_greeks(
+                            &market,
+                            as_of,
+                            &finstack_quant_valuations::instruments::OptionGreeksRequest {
+                                greek:
+                                    finstack_quant_valuations::instruments::OptionGreekKind::Delta,
+                                base_pv: None,
+                                bumps: GreekBumps::default(),
+                            },
+                        )?
+                        .delta
                         .expect("limit");
                     assert!((limit - delta).abs() < 1e-8);
                 }

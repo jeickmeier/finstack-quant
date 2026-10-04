@@ -648,7 +648,9 @@ pub(crate) fn compute_metrics_dyn(
         .iter()
         .filter_map(|(metric_id, value)| {
             if (metric_id.is_custom()
-                || metric_id == &crate::metrics::MetricId::BucketedVegaResidual)
+                || metric_id == &crate::metrics::MetricId::BucketedVegaResidual
+                || metric_id == &crate::metrics::MetricId::ThetaPeriodDays
+                || metric_id == &crate::metrics::MetricId::CarryDecompositionDegenerate)
                 && !measures.contains_key(metric_id)
             {
                 Some((metric_id, *value))

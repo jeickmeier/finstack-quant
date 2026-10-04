@@ -1,7 +1,5 @@
 //! Typed projected cashflows of one tranche (`TrancheCashflows`).
 
-use std::collections::BTreeMap;
-
 use pyo3::prelude::*;
 
 use crate::bindings::core::money::PyMoney;
@@ -175,37 +173,13 @@ impl PyTrancheCashflows {
     /// Raises
     /// ------
     /// ValueError
-    ///     If the rows cannot be serialized.
+    ///     If a component carries a different currency from the tranche, or the rows cannot be serialized.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let mut by_date: BTreeMap<Date, [f64; 6]> = BTreeMap::new();
-        let columns: [&[(Date, Money)]; 6] = [
-            &self.inner.cashflows,
-            &self.inner.interest_flows,
-            &self.inner.principal_flows,
-            &self.inner.pik_flows,
-            &self.inner.deferred_flows,
-            &self.inner.writedown_flows,
-        ];
-        for (index, flows) in columns.iter().enumerate() {
-            for (date, amount) in flows.iter() {
-                by_date.entry(*date).or_default()[index] += amount.amount();
-            }
-        }
-        let rows: Vec<serde_json::Value> = by_date
-            .iter()
-            .map(|(date, values)| {
-                serde_json::json!({
-                    "date": date.to_string(),
-                    "cashflow": values[0],
-                    "interest": values[1],
-                    "principal": values[2],
-                    "pik": values[3],
-                    "deferred": values[4],
-                    "writedown": values[5],
-                })
-            })
-            .collect();
+        let rows = self
+            .inner
+            .get_cashflow_rows()
+            .map_err(crate::errors::core_to_py)?;
         serde_rows_to_dataframe_with_schema(
             py,
             &rows,

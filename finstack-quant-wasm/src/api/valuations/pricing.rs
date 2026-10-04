@@ -409,6 +409,26 @@ impl PriceRequest {
             instrument_json,
             self.metric_pricing_overrides.as_deref(),
         )?;
+        self.price_prepared(instrument)
+    }
+
+    /// Prepare a native Rust instrument before market conversion.
+    pub(super) fn price_typed(
+        self,
+        instrument: Box<dyn finstack_quant_valuations::instruments::Instrument>,
+    ) -> Result<JsValue, JsValue> {
+        let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+            instrument,
+            self.metric_pricing_overrides.as_deref(),
+        )
+        .map_err(to_js_err)?;
+        self.price_prepared(instrument)
+    }
+
+    fn price_prepared(
+        self,
+        instrument: finstack_quant_valuations::pricer::ParsedInstrument,
+    ) -> Result<JsValue, JsValue> {
         let market = parse_market_json(&self.market_json)?;
         let result = price_result_with_context(
             &instrument,

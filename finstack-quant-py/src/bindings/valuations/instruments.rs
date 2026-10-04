@@ -162,7 +162,7 @@ pub(crate) fn bps_value_from_py(
 /// # Arguments
 ///
 /// * `py` - GIL token; parsing and pricing run with the GIL released.
-/// * `envelope_json` - Canonical `finstack_quant.instrument/1` envelope.
+/// * `instrument` - Owned native Rust instrument, validated before pricing.
 /// * `market` - `MarketContext` object or market-context JSON string.
 /// * `as_of` - Valuation date (date-like or ISO 8601 string).
 /// * `model` - Model key (`"default"` selects the instrument-native model).
@@ -174,9 +174,9 @@ pub(crate) fn bps_value_from_py(
 ///   the historical risk metrics (`hvar`, `expected_shortfall`).
 // PyO3 binding helper: mirrors the keyword surface of `price_instrument`.
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn price_typed_envelope(
+pub(crate) fn price_typed(
     py: Python<'_>,
-    envelope_json: String,
+    instrument: Box<dyn Instrument>,
     market: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
     model: &str,
@@ -186,12 +186,33 @@ pub(crate) fn price_typed_envelope(
 ) -> PyResult<PyValuationResult> {
     let overrides = metric_pricing_overrides_json(py, metric_pricing_overrides)?;
     let instrument = py.detach(move || {
-        finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
-            &envelope_json,
+        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+            instrument,
             overrides.as_deref(),
         )
         .map_err(core_to_py)
     })?;
+    price_prepared(
+        py,
+        instrument,
+        market,
+        as_of,
+        model,
+        metrics,
+        market_history,
+    )
+}
+/// Price a prepared instrument after host market/date conversion.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn price_prepared(
+    py: Python<'_>,
+    instrument: finstack_quant_valuations::pricer::ParsedInstrument,
+    market: &Bound<'_, PyAny>,
+    as_of: &Bound<'_, PyAny>,
+    model: &str,
+    metrics: Option<Vec<String>>,
+    market_history: Option<&Bound<'_, PyAny>>,
+) -> PyResult<PyValuationResult> {
     let market = extract_market(py, market)?;
     let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
     let model = model.to_owned();
@@ -213,10 +234,10 @@ pub(crate) fn price_typed_envelope(
     Ok(PyValuationResult { inner })
 }
 
-/// Compute one scalar metric for a typed instrument envelope.
-pub(crate) fn metric_typed_envelope(
+/// Compute one scalar metric for a native Rust instrument.
+pub(crate) fn metric_typed(
     py: Python<'_>,
-    envelope_json: String,
+    instrument: Box<dyn Instrument>,
     market: &Bound<'_, PyAny>,
     as_of: &Bound<'_, PyAny>,
     metric_id: &str,
@@ -227,10 +248,8 @@ pub(crate) fn metric_typed_envelope(
     let model = model.to_owned();
     let metric_id = metric_id.to_owned();
     py.detach(move || {
-        let instrument = finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
-            &envelope_json,
-            None,
-        )?;
+        let instrument =
+            finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)?;
         finstack_quant_valuations::pricer::metric_value(
             &instrument,
             &market,
@@ -1023,9 +1042,9 @@ impl PyBond {
         metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
         market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        price_typed_envelope(
+        price_typed(
             py,
-            self.envelope_json()?,
+            Box::new(self.inner.clone()),
             market,
             as_of,
             model,
@@ -1075,7 +1094,14 @@ impl PyBond {
         metric_id: &str,
         model: &str,
     ) -> PyResult<f64> {
-        metric_typed_envelope(py, self.envelope_json()?, market, as_of, metric_id, model)
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            metric_id,
+            model,
+        )
     }
 
     /// Return a copy with a minimum MOIC return floor on early redemption.
@@ -1993,9 +2019,9 @@ impl PyTermLoan {
         metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
         market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        price_typed_envelope(
+        price_typed(
             py,
-            self.envelope_json()?,
+            Box::new(self.inner.clone()),
             market,
             as_of,
             model,
@@ -2041,7 +2067,14 @@ impl PyTermLoan {
         metric_id: &str,
         model: &str,
     ) -> PyResult<f64> {
-        metric_typed_envelope(py, self.envelope_json()?, market, as_of, metric_id, model)
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            metric_id,
+            model,
+        )
     }
 
     /// Instrument identifier.

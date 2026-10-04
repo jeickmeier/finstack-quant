@@ -11,10 +11,7 @@
 //! the same instrument JSON is bit-reproducible. Callers needing a distinct
 //! deterministic stream set that label inside the instrument JSON.
 
-use super::pricing::{
-    metric_value_with_context, parse_market_json, parse_pricing_instrument_json,
-    standard_option_greeks_with_context,
-};
+use super::pricing::{parse_market_json, standard_option_greeks_with_context};
 use crate::utils::input::{from_js_json, js_f64, js_opt_string, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_valuations::instruments::{InstrumentEnvelope, InstrumentJson};
@@ -39,36 +36,20 @@ fn envelope_json(instrument: impl Into<InstrumentJson>) -> Result<String, JsValu
     serde_json::to_string(&InstrumentEnvelope::new(instrument.into())).map_err(to_js_err)
 }
 
-fn metric_value(
-    json: &str,
-    market_json: &str,
-    as_of: &str,
-    model: Option<String>,
-    metric: &str,
-) -> Result<f64, JsValue> {
-    let instrument = parse_pricing_instrument_json(json, None)?;
-    let market = parse_market_json(market_json)?;
-    metric_value_with_context(
-        &instrument,
-        &market,
-        as_of,
-        model.as_deref().unwrap_or("default"),
-        metric,
-    )
-}
-
 /// Shared body for the `greeks` method emitted by the FX-option macro.
 ///
 /// Prices the Rust-ordered subset of `STANDARD_OPTION_GREEKS` that applies to
 /// the instrument and returns a JS object whose keys keep that order.
 /// Non-finite Greeks are rejected by Rust rather than serialized.
 fn option_greeks_object(
-    instrument_json: &str,
+    instrument: Box<dyn finstack_quant_valuations::instruments::Instrument>,
     market_json: &str,
     as_of: &str,
     model: Option<&str>,
 ) -> Result<JsValue, JsValue> {
-    let instrument = parse_pricing_instrument_json(instrument_json, None)?;
+    let instrument =
+        finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(instrument, None)
+            .map_err(to_js_err)?;
     let market = parse_market_json(market_json)?;
     let pairs = standard_option_greeks_with_context(
         &instrument,
@@ -188,7 +169,7 @@ macro_rules! fx_class {
                     metric_pricing_overrides.as_ref(),
                     market_history.as_ref(),
                 )?
-                .price(&self.envelope_json()?)
+                .price_typed(Box::new(self.inner.clone()))
             }
 
             /// Compute one metric of the instrument against a market JSON snapshot.
@@ -214,11 +195,14 @@ macro_rules! fx_class {
                 metric_id: JsValue,
                 model: Option<JsValue>,
             ) -> Result<f64, JsValue> {
-                let market_json: &str = &json_text(&market_json, "marketJson")?;
-                let as_of: &str = &js_string(&as_of, "asOf")?;
-                let metric_id: &str = &js_string(&metric_id, "metricId")?;
-                let model = js_opt_string(model.as_ref(), "model")?;
-                metric_value(&self.envelope_json()?, market_json, as_of, model, metric_id)
+                let metric_id = js_string(&metric_id, "metricId")?;
+                super::typed::metric_value(
+                    Box::new(self.inner.clone()),
+                    &market_json,
+                    &as_of,
+                    model.as_ref(),
+                    &metric_id,
+                )
             }
         }
     };
@@ -269,10 +253,7 @@ macro_rules! fx_option_class {
                     as_of: JsValue,
                     model: Option<JsValue>,
                 ) -> Result<f64, JsValue> {
-                    let market_json: &str = &json_text(&market_json, "marketJson")?;
-                    let as_of: &str = &js_string(&as_of, "asOf")?;
-                    let model = js_opt_string(model.as_ref(), "model")?;
-                    metric_value(&self.envelope_json()?, market_json, as_of, model, $metric)
+                    super::typed::metric_value(Box::new(self.inner.clone()), &market_json, &as_of, model.as_ref(), $metric)
                 }
             )+
 
@@ -299,7 +280,7 @@ macro_rules! fx_option_class {
                 let market_json: &str = &json_text(&market_json, "marketJson")?;
                 let as_of: &str = &js_string(&as_of, "asOf")?;
                 let model = js_opt_string(model.as_ref(), "model")?;
-                option_greeks_object(&self.envelope_json()?, market_json, as_of, model.as_deref())
+                option_greeks_object(Box::new(self.inner.clone()), market_json, as_of, model.as_deref())
             }
         }
     };
@@ -783,18 +764,13 @@ mod tests {
         assert!(super::super::pricing::tests::not_a_market_request()
             .price("{}")
             .is_err());
-        assert!(metric_value(
-            "{}",
+        assert!(option_greeks_object(
+            Box::new(fxi::FxOption::example().expect("example")),
             "not-market-json",
             "not-a-date",
-            Some("not-a-model".to_string()),
-            "not-a-metric",
+            Some("not-a-model"),
         )
         .is_err());
-        assert!(
-            option_greeks_object("{}", "not-market-json", "not-a-date", Some("not-a-model"),)
-                .is_err()
-        );
     }
 
     /// The Greeks the registry computes for `instrument_type`, in

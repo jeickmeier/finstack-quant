@@ -6,6 +6,46 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Accumulate independent estimators from simulated path values.
+///
+/// # Arguments
+///
+/// * `values` - Discounted path values in one common numeric unit, ordered with
+///   adjacent antithetic partners when pairing is enabled.
+/// * `antithetic` - Whether each adjacent pair contributes its mean as one
+///   independent observation. Otherwise each path is one observation.
+///
+/// # Errors
+///
+/// Returns a validation error for incomplete pairs or fewer than two independent
+/// observations, which cannot support a sample standard error.
+pub fn independent_estimator_stats(
+    values: &[f64],
+    antithetic: bool,
+) -> finstack_quant_core::Result<finstack_quant_core::math::stats::OnlineStats> {
+    if antithetic && !values.len().is_multiple_of(2) {
+        return Err(finstack_quant_core::Error::Validation(
+            "Monte Carlo statistics require complete antithetic pairs".into(),
+        ));
+    }
+    let mut stats = finstack_quant_core::math::stats::OnlineStats::new();
+    if antithetic {
+        for pair in values.chunks_exact(2) {
+            stats.update(0.5 * pair[0] + 0.5 * pair[1]);
+        }
+    } else {
+        for &value in values {
+            stats.update(value);
+        }
+    }
+    if stats.count() < 2 {
+        return Err(finstack_quant_core::Error::Validation(
+            "Monte Carlo statistics require at least two independent estimators".into(),
+        ));
+    }
+    Ok(stats)
+}
+
 /// Numeric Monte Carlo estimate for discounted path values.
 ///
 /// All fields are unitless `f64` values in the same numeric unit as the
@@ -147,6 +187,21 @@ impl std::fmt::Display for Estimate {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn independent_pair_statistics() {
+        let stats =
+            independent_estimator_stats(&[10.0, 14.0, 20.0, 24.0], true).expect("complete pairs");
+        assert_eq!(stats.count(), 2);
+        assert_eq!(stats.mean(), 17.0);
+        assert!((stats.stderr() - 5.0).abs() < 1e-12);
+        assert!(independent_estimator_stats(&[1.0, 2.0, 3.0], true).is_err());
+        assert!(independent_estimator_stats(&[1.0, 2.0], true).is_err());
+        assert!(independent_estimator_stats(&[1.0], false).is_err());
+        let large = independent_estimator_stats(&[f64::MAX, f64::MAX, f64::MAX, f64::MAX], true)
+            .expect("finite pairs");
+        assert!(large.mean().is_finite());
+    }
 
     #[test]
     fn test_estimate_creation() {

@@ -651,10 +651,8 @@ def test_instrument_envelope_dict_is_accepted_by_instrument_entry_points() -> No
 
 
 def test_cds_option_typed_wrapper_round_trips_and_matches_example_json() -> None:
-    from finstack_quant.valuations.credit_derivatives import cds_option_example_json
 
     option = CdsOption.example()
-    assert option.to_json() == cds_option_example_json()
     assert CdsOption.from_json(option.to_json()).to_json() == option.to_json()
     assert pickle.loads(pickle.dumps(option)).to_json() == option.to_json()  # noqa: S301
     assert option.strike == {"spread": "0.01"}

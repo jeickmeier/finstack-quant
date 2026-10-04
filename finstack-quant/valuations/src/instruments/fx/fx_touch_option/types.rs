@@ -334,6 +334,32 @@ impl crate::instruments::common_impl::traits::Instrument for FxTouchOption {
 // analytical Greeks unreliable near the barrier).
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOption {
+    fn option_greeks(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
+    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
+        let mut greeks = crate::instruments::common_impl::traits::OptionGreeks::default();
+        match request.greek {
+            crate::instruments::common_impl::traits::OptionGreekKind::Delta => {
+                greeks.delta = self.option_delta(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Gamma => {
+                greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Vega => {
+                greeks.vega = self.option_vega(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Rho => {
+                greeks.rho_bp = self.option_rho_bp(market, as_of, request.bumps)?
+            }
+            _ => {}
+        }
+        Ok(greeks)
+    }
+}
+impl FxTouchOption {
     fn option_delta(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -400,7 +426,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
 
         Ok(Some((pv_up - pv_dn) / (2.0 * bump_size)))
     }
-
     fn option_gamma(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -465,7 +490,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
             (pv_up - 2.0 * base_pv + pv_dn) / (bump_size * bump_size),
         ))
     }
-
     fn option_vega(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -526,7 +550,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxTouchOp
         let width = 2.0 * vol_bump * crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
         Ok(Some((pv_up - pv_down) / width))
     }
-
     fn option_rho_bp(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -784,12 +807,17 @@ mod tests {
             .rate;
 
         // Running the FD gamma exercises the bump-and-rebuild path.
-        let _gamma = OptionGreeksProvider::option_gamma(
+        let _gamma = OptionGreeksProvider::option_greeks(
             &touch,
             &market,
             as_of,
-            crate::instruments::GreekBumps::default(),
+            &crate::instruments::OptionGreeksRequest {
+                greek: crate::instruments::OptionGreekKind::Gamma,
+                base_pv: None,
+                bumps: crate::instruments::GreekBumps::default(),
+            },
         )
+        .map(|greeks| greeks.gamma)
         .expect("gamma");
 
         let spot_after = market
@@ -828,12 +856,17 @@ mod tests {
         let expected_vega = (touch.value(&up, as_of).expect("up pv").amount()
             - touch.value(&down, as_of).expect("down pv").amount())
             / (2.0 * vol_bump * crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL);
-        let vega = OptionGreeksProvider::option_vega(
+        let vega = OptionGreeksProvider::option_greeks(
             &touch,
             &market,
             as_of,
-            crate::instruments::GreekBumps::default(),
+            &crate::instruments::OptionGreeksRequest {
+                greek: crate::instruments::OptionGreekKind::Vega,
+                base_pv: None,
+                bumps: crate::instruments::GreekBumps::default(),
+            },
         )
+        .map(|greeks| greeks.vega)
         .expect("vega")
         .expect("touch vega");
         assert!(

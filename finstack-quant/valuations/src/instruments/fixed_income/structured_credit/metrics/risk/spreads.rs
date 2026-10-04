@@ -148,9 +148,6 @@ impl MetricCalculator for Cs01Calculator {
                 })
             })?;
 
-        // Bump spread by 1bp
-        let bumped_spread = base_spread + ONE_BASIS_POINT;
-
         let flows = context.cashflows.as_ref().ok_or_else(|| {
             finstack_quant_core::Error::from(finstack_quant_core::InputError::NotFound {
                 id: "context.cashflows".to_string(),
@@ -168,34 +165,7 @@ impl MetricCalculator for Cs01Calculator {
             context.instrument_as::<StructuredCredit>()?,
             context.as_of,
         )?;
-        let day_count =
-            crate::instruments::fixed_income::structured_credit::metrics::METRIC_TIME_BASIS;
-
-        // CS01 must be marginal: PV(z) - PV(z + 1bp), not PV(0) - PV(z + 1bp).
-        // Compute both base PV (at Z-spread) and bumped PV (at Z-spread + 1bp).
-        // Discount from `as_of` to stay consistent with the z-spread that fed it.
-        let mut base_npv_acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-        let mut bumped_npv_acc = finstack_quant_core::math::summation::NeumaierAccumulator::new();
-
-        for (date, amount) in flows {
-            if *date <= as_of {
-                continue;
-            }
-
-            let t = day_count.year_fraction(as_of, *date, DayCountContext::default())?;
-            let df = disc.df_between_dates(as_of, *date)?;
-            let amt = amount.amount();
-
-            let df_base = df * (-base_spread * t).exp();
-            base_npv_acc.add(amt * df_base);
-
-            let df_bumped = df * (-bumped_spread * t).exp();
-            bumped_npv_acc.add(amt * df_bumped);
-        }
-
-        let cs01 = bumped_npv_acc.total() - base_npv_acc.total();
-
-        Ok(cs01)
+        calculate_tranche_cs01(flows, disc.as_ref(), base_spread, as_of)
     }
 
     fn dependencies(&self) -> &[MetricId] {

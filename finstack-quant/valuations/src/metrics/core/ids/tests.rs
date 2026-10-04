@@ -55,7 +55,7 @@ fn test_parse_strict_error_includes_available_metrics() {
             assert!(!available.is_empty());
             assert!(available.len() <= MAX_METRIC_SUGGESTIONS);
             for name in &available {
-                assert!(MetricId::ALL_STANDARD.iter().any(|m| m.as_str() == name));
+                assert!(MetricId::get_standard().iter().any(|m| m.as_str() == name));
             }
         }
         _ => panic!("Expected UnknownMetric error"),
@@ -100,14 +100,14 @@ fn test_custom_metric_creation() {
     assert!(custom.is_custom());
     assert_eq!(custom.as_str(), "my_metric");
 
-    // Custom metrics not in ALL_STANDARD
-    assert!(!MetricId::ALL_STANDARD.contains(&custom));
+    // Custom metrics not in get_standard()
+    assert!(!MetricId::get_standard().contains(&custom));
 }
 
 #[test]
 fn test_all_standard_metrics_parseable_strict() {
     // Every standard metric should be parseable via parse_strict
-    for metric in MetricId::ALL_STANDARD {
+    for metric in MetricId::get_standard() {
         let parsed = MetricId::parse_strict(metric.as_str()).unwrap();
         assert_eq!(&parsed, metric);
         assert!(!parsed.is_custom());
@@ -123,7 +123,7 @@ fn test_carry_decomposition_metrics_are_standard_and_parseable() {
         "roll_down",
         "funding_cost",
     ] {
-        assert!(MetricId::ALL_STANDARD
+        assert!(MetricId::get_standard()
             .iter()
             .any(|metric| metric.as_str() == name));
 
@@ -148,8 +148,8 @@ fn spread_equivalent_metrics_are_unique_and_standard() {
             m.as_str()
         );
         assert!(
-            MetricId::ALL_STANDARD.contains(m),
-            "spread-equivalent metric missing from ALL_STANDARD: {}",
+            MetricId::get_standard().contains(m),
+            "spread-equivalent metric missing from get_standard(): {}",
             m.as_str()
         );
     }
@@ -195,10 +195,10 @@ fn test_every_standard_metric_in_exactly_one_group() {
             );
         }
     }
-    for metric in MetricId::ALL_STANDARD {
+    for metric in MetricId::get_standard() {
         assert!(
             grouped.contains(metric.as_str()),
-            "metric '{}' from ALL_STANDARD is not assigned to any MetricGroup",
+            "metric '{}' from get_standard() is not assigned to any MetricGroup",
             metric.as_str(),
         );
     }
@@ -211,11 +211,14 @@ fn test_group_union_equals_all_standard() {
         .flat_map(|g| g.metrics().iter().map(|m| m.as_str()))
         .collect();
     from_groups.sort();
-    let mut from_all: Vec<&str> = MetricId::ALL_STANDARD.iter().map(|m| m.as_str()).collect();
+    let mut from_all: Vec<&str> = MetricId::get_standard()
+        .iter()
+        .map(|m| m.as_str())
+        .collect();
     from_all.sort();
     assert_eq!(
         from_groups, from_all,
-        "union of all MetricGroup arrays must equal ALL_STANDARD"
+        "union of all MetricGroup arrays must equal get_standard()"
     );
 }
 
@@ -366,7 +369,11 @@ fn retired_recovery01_spelling_is_rejected() {
 fn metric_groups_start_and_end_at_their_first_and_last_members() {
     let bounds = [
         (MetricGroup::Pricing, MetricId::DirtyPrice, MetricId::Basis),
-        (MetricGroup::Carry, MetricId::Theta, MetricId::Breakeven),
+        (
+            MetricGroup::Carry,
+            MetricId::Theta,
+            MetricId::CarryDecompositionDegenerate,
+        ),
         (
             MetricGroup::Sensitivity,
             MetricId::Dv01,
@@ -413,4 +420,20 @@ fn expected_exercise_time_is_a_standard_rates_metric_in_years() {
     assert!(MetricGroup::Rates
         .metrics()
         .contains(&MetricId::ExpectedExerciseTime));
+}
+
+#[test]
+fn diagnostics_are_standard_dimensionless_carry_metrics() {
+    for metric in [
+        MetricId::ThetaPeriodDays,
+        MetricId::CarryDecompositionDegenerate,
+    ] {
+        assert_eq!(
+            MetricId::parse_strict(metric.as_str()).expect("known diagnostic"),
+            metric
+        );
+        assert_eq!(metric.unit(), super::MetricUnit::Dimensionless);
+        assert!(MetricGroup::Carry.metrics().contains(&metric));
+        assert!(!metric.is_custom());
+    }
 }

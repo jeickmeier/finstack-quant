@@ -30,7 +30,6 @@ Everything supported is re-exported from `crate::metrics`. `risk` is public.
 | `MetricContext` | Instrument, `MarketContext`, `as_of`, base PV, and the `computed` / series / matrix caches |
 | `MetricRegistry` | Calculator store with dependency resolution and strict, fail-fast errors |
 | `standard_registry()` | Process-wide registry with all built-in calculators registered |
-| `Structured2D` | Row/column labelled matrix for 2-D metrics |
 | `bump_surface_vol_absolute` | Absolute vol-point surface bump helper |
 | `STANDARD_BUCKETS_YEARS`, `STANDARD_BUCKET_LABELS`, `format_bucket_label` | Canonical key-rate bucket grid and labels |
 | `CrossFactorCalculator`, `CrossFactorPair` | Cross-gamma style two-factor sensitivities |
@@ -42,11 +41,11 @@ Everything supported is re-exported from `crate::metrics`. `risk` is public.
 ## MetricId
 
 Standard IDs live in [`core/ids/`](core/ids/) and are enumerated by
-`MetricId::ALL_STANDARD` — **209 metrics** partitioned across the ten
+`MetricId::get_standard()` — **218 metrics** partitioned across the ten
 `MetricGroup` values (`Pricing`, `Carry`, `Sensitivity`, `Greeks`, `Credit`,
 `Rates`, `Fx`, `Equity`, `StructuredCredit`, `Alternatives`). Every standard
 metric belongs to exactly one group, and the union of the group slices equals
-`ALL_STANDARD` (enforced by a test in `core/ids/tests.rs`).
+`get_standard()` (enforced by a test in `core/ids/tests.rs`).
 
 Units, sign conventions, and bump definitions are documented per-ID in
 `core/ids/` and in the instrument-specific metric modules. Measures are raw
@@ -66,7 +65,7 @@ Discovery:
 - Python: `finstack_quant.valuations.instruments.list_standard_metrics_grouped()`
 
 At API boundaries, parse user-supplied names with `MetricId::parse_strict`,
-which rejects anything not in `ALL_STANDARD`.
+which rejects anything not in `get_standard()`.
 
 ## Dependencies
 
@@ -84,8 +83,8 @@ will be missing whenever the caller did not request it earlier in the list.
 
 - 1-D: `MetricContext::store_bucketed_series` — key-rate DV01, bucketed CS01.
   Read back with `get_series`.
-- 2-D: `MetricContext::store_matrix2d` — vega by expiry x strike. Read back with
-  `get_matrix2d`; shape mismatches return a `Validation` error.
+- 2-D: `MetricContext::store_matrix2d` — vega by expiry x strike. Read cells from
+  `computed` using their composite keys; shape mismatches return a `Validation` error.
 
 Both also flatten every cell into `computed` under a stable composite key built
 by `MetricId::composite` — `base::bucket` for a series, `base::row::col` for a
@@ -111,10 +110,9 @@ public item from `finite_difference.rs` is `bump_surface_vol_absolute`.
 
 ## Adding a metric
 
-1. Add the `MetricId` constant in `core/ids/`, assign it to a `MetricGroup`, and
-   add it to `ALL_STANDARD` when it belongs to the cross-language contract.
-   Group ranges in `core/ids/group.rs` are index ranges into `ALL_STANDARD` and
-   must be updated together with it.
+1. Add the `MetricId` constant in `core/ids/`, assign it to a `MetricGroup`, in
+   `core/ids/group.rs`. `get_standard()` derives the discovery catalogue from
+   those named group slices.
 2. Implement `MetricCalculator`, usually under
    `../instruments/<asset_class>/<instrument>/metrics/`.
 3. Register it in that instrument's `register_<name>_metrics` function, which is

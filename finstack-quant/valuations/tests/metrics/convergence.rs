@@ -418,28 +418,19 @@ fn test_bucketed_vega_reports_raw_total_and_residual() {
     let total_vega = *results.get(&MetricId::Vega).unwrap();
     let reported_bucket_total = *results.get(&MetricId::BucketedVega).unwrap();
 
-    // BucketedVega must be wired end-to-end: the KeyRateVega calculator is
-    // registered for EquityOption and must populate the 2D matrix store.
-    let matrix = context
-        .computed_matrix
-        .get(&MetricId::BucketedVega)
-        .expect("BucketedVega must be registered for EquityOption and store a 2D matrix");
-
-    // The matrix grid must be non-empty (expiry rows x strike cols).
+    let buckets: Vec<_> = context
+        .computed
+        .iter()
+        .filter(|(key, _)| key.decode_components(&MetricId::BucketedVega).is_some())
+        .collect();
     assert!(
-        !matrix.values.is_empty() && matrix.values.iter().all(|row| !row.is_empty()),
-        "BucketedVega matrix must have a populated expiry/strike grid"
+        !buckets.is_empty(),
+        "BucketedVega must publish expiry/strike coordinates"
     );
-    assert_eq!(
-        matrix.values.len(),
-        matrix.rows.len(),
-        "BucketedVega matrix row count must match row labels"
-    );
-
-    let sum_bucketed: f64 = matrix.values.iter().flatten().sum();
+    let sum_bucketed: f64 = buckets.iter().map(|(_, value)| **value).sum();
 
     assert!((sum_bucketed - reported_bucket_total).abs() < 1e-10);
-    let residual = context.computed[&MetricId::custom("bucketed_vega_residual")];
+    let residual = context.computed[&MetricId::BucketedVegaResidual];
     assert!(
         (sum_bucketed + residual - total_vega).abs() < 1e-10,
         "raw buckets plus uncovered residual must reconcile to parallel vega"

@@ -115,153 +115,6 @@ pub struct OptionGreeks {
 /// requested [`OptionGreekKind`]. Callers should interpret `None` as "not
 /// supported for this instrument" rather than as a zero-valued greek.
 pub trait OptionGreeksProvider: Send + Sync {
-    /// Return cash delta per instrument conventions.
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
-    ///   bumped repricing.
-    /// * `as_of` - Valuation date.
-    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
-    ///   rather than hard-coded constants.
-    fn option_delta(
-        &self,
-        _market: &MarketContext,
-        _as_of: Date,
-        _bumps: GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(None)
-    }
-
-    /// Return cash gamma per instrument conventions.
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
-    ///   bumped repricing.
-    /// * `as_of` - Valuation date.
-    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
-    ///   rather than hard-coded constants.
-    fn option_gamma(
-        &self,
-        _market: &MarketContext,
-        _as_of: Date,
-        _bumps: GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(None)
-    }
-
-    /// Return cash vega per instrument conventions (1 vol point).
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
-    ///   bumped repricing.
-    /// * `as_of` - Valuation date.
-    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
-    ///   rather than hard-coded constants.
-    fn option_vega(
-        &self,
-        _market: &MarketContext,
-        _as_of: Date,
-        _bumps: GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(None)
-    }
-
-    /// Return theta per instrument conventions.
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
-    ///   bumped repricing.
-    /// * `as_of` - Valuation date.
-    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
-    ///   rather than hard-coded constants.
-    fn option_theta(
-        &self,
-        _market: &MarketContext,
-        _as_of: Date,
-        _bumps: GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(None)
-    }
-
-    /// Return domestic rho per instrument conventions (per 1bp).
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
-    ///   bumped repricing.
-    /// * `as_of` - Valuation date.
-    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
-    ///   rather than hard-coded constants.
-    fn option_rho_bp(
-        &self,
-        _market: &MarketContext,
-        _as_of: Date,
-        _bumps: GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(None)
-    }
-
-    /// Return foreign/dividend rho per instrument conventions (per 1bp).
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
-    ///   bumped repricing.
-    /// * `as_of` - Valuation date.
-    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
-    ///   rather than hard-coded constants.
-    fn option_foreign_rho_bp(
-        &self,
-        _market: &MarketContext,
-        _as_of: Date,
-        _bumps: GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(None)
-    }
-
-    /// Return vanna per instrument conventions.
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
-    ///   bumped repricing.
-    /// * `as_of` - Valuation date.
-    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
-    ///   rather than hard-coded constants.
-    fn option_vanna(
-        &self,
-        _market: &MarketContext,
-        _as_of: Date,
-        _bumps: GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(None)
-    }
-
-    /// Return volga per instrument conventions.
-    ///
-    /// # Arguments
-    ///
-    /// * `market` - Market data (curves, surfaces, spot scalars) used for base and
-    ///   bumped repricing.
-    /// * `as_of` - Valuation date.
-    /// * `base_pv` - Unbumped present value in instrument currency, reused as the
-    ///   centre of the second difference.
-    /// * `bumps` - Resolved finite-difference bump sizes; providers must use these
-    ///   rather than hard-coded constants.
-    fn option_volga(
-        &self,
-        _market: &MarketContext,
-        _as_of: Date,
-        _base_pv: f64,
-        _bumps: GreekBumps,
-    ) -> finstack_quant_core::Result<Option<f64>> {
-        Ok(None)
-    }
-
     /// Return the requested greek in a sparse [`OptionGreeks`] payload.
     ///
     /// # Arguments
@@ -275,26 +128,7 @@ pub trait OptionGreeksProvider: Send + Sync {
         market: &MarketContext,
         as_of: Date,
         request: &OptionGreeksRequest,
-    ) -> finstack_quant_core::Result<OptionGreeks> {
-        let mut greeks = OptionGreeks::default();
-        let bumps = request.bumps;
-        match request.greek {
-            OptionGreekKind::Delta => greeks.delta = self.option_delta(market, as_of, bumps)?,
-            OptionGreekKind::Gamma => greeks.gamma = self.option_gamma(market, as_of, bumps)?,
-            OptionGreekKind::Vega => greeks.vega = self.option_vega(market, as_of, bumps)?,
-            OptionGreekKind::Theta => greeks.theta = self.option_theta(market, as_of, bumps)?,
-            OptionGreekKind::Rho => greeks.rho_bp = self.option_rho_bp(market, as_of, bumps)?,
-            OptionGreekKind::ForeignRho => {
-                greeks.foreign_rho_bp = self.option_foreign_rho_bp(market, as_of, bumps)?;
-            }
-            OptionGreekKind::Vanna => greeks.vanna = self.option_vanna(market, as_of, bumps)?,
-            OptionGreekKind::Volga => {
-                greeks.volga =
-                    self.option_volga(market, as_of, request.require_base_pv()?, bumps)?;
-            }
-        }
-        Ok(greeks)
-    }
+    ) -> finstack_quant_core::Result<OptionGreeks>;
 }
 
 /// Implement standard equity-exotic trait boilerplate for instruments with
@@ -311,7 +145,6 @@ macro_rules! impl_equity_exotic_traits {
     (@inner $ty:ty) => {
         $crate::impl_equity_exotic_traits!(@mc_daycount $ty);
 
-
         impl $crate::metrics::HasExpiry for $ty {
             fn expiry(&self) -> finstack_quant_core::dates::Date {
                 self.expiry
@@ -320,7 +153,6 @@ macro_rules! impl_equity_exotic_traits {
     };
 
     (@mc_daycount $ty:ty) => {
-
         impl $crate::metrics::HasDayCount for $ty {
             fn day_count(&self) -> finstack_quant_core::dates::DayCount {
                 self.day_count
@@ -337,6 +169,21 @@ mod tests {
     struct DeltaOnlyProvider;
 
     impl OptionGreeksProvider for DeltaOnlyProvider {
+        fn option_greeks(
+            &self,
+            market: &finstack_quant_core::market_data::context::MarketContext,
+            as_of: finstack_quant_core::dates::Date,
+            request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
+        ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::OptionGreeks>
+        {
+            let mut greeks = crate::instruments::common_impl::traits::OptionGreeks::default();
+            if request.greek == OptionGreekKind::Delta {
+                greeks.delta = self.option_delta(market, as_of, request.bumps)?;
+            }
+            Ok(greeks)
+        }
+    }
+    impl DeltaOnlyProvider {
         fn option_delta(
             &self,
             _market: &MarketContext,
@@ -348,7 +195,7 @@ mod tests {
     }
 
     #[test]
-    fn provider_trait_dispatches_individual_greek_methods() {
+    fn provider_returns_requested_sparse_greek() {
         let market = MarketContext::new();
         let as_of = Date::from_calendar_date(2026, time::Month::January, 1).expect("valid date");
         let greeks = DeltaOnlyProvider

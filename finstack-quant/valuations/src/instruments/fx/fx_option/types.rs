@@ -542,7 +542,8 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption 
             }),
         }
     }
-
+}
+impl FxOption {
     fn option_vanna(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -602,7 +603,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxOption 
         let width = 2.0 * delta_sigma * crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
         Ok(Some((delta_up - delta_dn) / width))
     }
-
     fn option_volga(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,

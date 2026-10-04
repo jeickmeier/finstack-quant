@@ -470,8 +470,8 @@ test('structured-credit deal analytics match Python', () => {
 test('Merton Monte Carlo bond pricing matches Python', () => {
   const merton = golden.merton;
   const config = new instruments.MertonMcConfig(merton.model, 0.4)
-    .pikSchedule(instruments.pikScheduleUniform(instruments.pikModePik()))
-    .barrierCrossing(instruments.barrierCrossingDiscrete())
+    .pikSchedule({ uniform: 'pik' })
+    .barrierCrossing('discrete')
     .stepsPerYear(12);
   same(JSON.parse(config.toJson()), merton.config, 'config');
   assert.equal(instruments.MertonMcConfig.fromJson(config.toJson()).toJson(), config.toJson());
@@ -507,26 +507,19 @@ test('Merton Monte Carlo bond pricing matches Python', () => {
 test('instrument data-type constructors match Python', () => {
   const data = golden.data;
   const usd = (amount) => ({ amount: String(amount), currency: 'USD' });
+  same(['discrete', 'brownian_bridge'], data.barrier_crossing, 'BarrierCrossing');
   same(
-    [instruments.barrierCrossingDiscrete(), instruments.barrierCrossingBrownianBridge()],
-    data.barrier_crossing,
-    'BarrierCrossing'
-  );
-  same(
-    plain([
-      instruments.pikModeCash(),
-      instruments.pikModePik(),
-      instruments.pikModeSplit(0.6, 0.4),
-      instruments.pikModeToggle(),
-    ]),
+    plain(['cash', 'pik', { split: { cash_fraction: 0.6, pik_fraction: 0.4 } }, 'toggle']),
     data.pik_mode,
     'PikMode'
   );
-  same(plain(instruments.pikScheduleUniform('pik')), data.pik_schedule_uniform, 'uniform');
-  const stepped = instruments.pikScheduleStepped([
-    [0.0, 'pik'],
-    [2.0, 'cash'],
-  ]);
+  same(plain({ uniform: 'pik' }), data.pik_schedule_uniform, 'uniform');
+  const stepped = {
+    stepped: [
+      [0.0, 'pik'],
+      [2.0, 'cash'],
+    ],
+  };
   same(plain(stepped), data.pik_schedule_stepped, 'stepped');
   same(
     plain([
@@ -573,19 +566,19 @@ test('instrument data-type constructors match Python', () => {
     ),
   ];
   same(plain(assets), data.pool_assets, 'pool assets');
-  same(plain(instruments.assetPoolWithAssets(data.pool, assets)), data.pool_with_assets, 'assets');
+  same(plain({ ...data.pool, assets }), data.pool_with_assets, 'assets');
   same(
-    plain(instruments.assetPoolWithRepLines(data.pool, data.pool_with_rep_lines.rep_lines)),
+    plain({ ...data.pool, rep_lines: data.pool_with_rep_lines.rep_lines }),
     data.pool_with_rep_lines,
     'rep lines'
   );
   same(
-    plain(instruments.assetPoolWithInstruments(data.pool, data.pool_with_instruments.instruments)),
+    plain({ ...data.pool, instruments: data.pool_with_instruments.instruments }),
     data.pool_with_instruments,
     'instruments'
   );
   same(
-    plain(instruments.assetPoolWithReinvestmentPeriod(data.pool, data.reinvestment_period)),
+    plain({ ...data.pool, reinvestment_period: data.reinvestment_period }),
     data.pool_with_reinvestment_period,
     'reinvestment period'
   );

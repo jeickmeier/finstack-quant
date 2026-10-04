@@ -35,7 +35,9 @@ pub use metrics::{
     AbfAdvanceRateUtilizationCalculator, AbfBorrowingBaseCalculator,
     AbfBorrowingBaseCushionCalculator, AbfFacilityIrrCalculator, AbfResidualIrrCalculator,
 };
-pub use pricing::{FacilityProjection, FACILITY_TRANCHE_ID, RESIDUAL_TRANCHE_ID};
+pub use pricing::{
+    FacilityCashflowRow, FacilityProjection, FACILITY_TRANCHE_ID, RESIDUAL_TRANCHE_ID,
+};
 pub use types::{AmortizationEvent, AssetBackedFacility, AssetBackedFacilityBuilder, TermOutSpec};
 
 pub use crate::instruments::fixed_income::structured_credit::{

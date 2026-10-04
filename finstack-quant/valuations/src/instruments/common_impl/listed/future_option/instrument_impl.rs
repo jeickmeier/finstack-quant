@@ -171,40 +171,23 @@ macro_rules! impl_future_option_instrument {
         }
 
         impl crate::instruments::OptionGreeksProvider for $ty {
-            fn option_delta(
+            fn option_greeks(
                 &self,
                 market: &finstack_quant_core::market_data::context::MarketContext,
                 as_of: finstack_quant_core::dates::Date,
-                _bumps: crate::instruments::common_impl::traits::GreekBumps,
-            ) -> finstack_quant_core::Result<Option<f64>> {
-                Ok(Some(self.cash_delta(market, as_of)?))
-            }
+                request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
+            ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
+                use crate::instruments::common_impl::traits::{OptionGreekKind, OptionGreeks};
 
-            fn option_gamma(
-                &self,
-                market: &finstack_quant_core::market_data::context::MarketContext,
-                as_of: finstack_quant_core::dates::Date,
-                _bumps: crate::instruments::common_impl::traits::GreekBumps,
-            ) -> finstack_quant_core::Result<Option<f64>> {
-                Ok(Some(self.cash_gamma(market, as_of)?))
-            }
-
-            fn option_vega(
-                &self,
-                market: &finstack_quant_core::market_data::context::MarketContext,
-                as_of: finstack_quant_core::dates::Date,
-                _bumps: crate::instruments::common_impl::traits::GreekBumps,
-            ) -> finstack_quant_core::Result<Option<f64>> {
-                Ok(Some(self.cash_vega(market, as_of)?))
-            }
-
-            fn option_theta(
-                &self,
-                market: &finstack_quant_core::market_data::context::MarketContext,
-                as_of: finstack_quant_core::dates::Date,
-                _bumps: crate::instruments::common_impl::traits::GreekBumps,
-            ) -> finstack_quant_core::Result<Option<f64>> {
-                Ok(Some(self.cash_theta(market, as_of)?))
+                let mut greeks = OptionGreeks::default();
+                match request.greek {
+                    OptionGreekKind::Delta => greeks.delta = Some(self.cash_delta(market, as_of)?),
+                    OptionGreekKind::Gamma => greeks.gamma = Some(self.cash_gamma(market, as_of)?),
+                    OptionGreekKind::Vega => greeks.vega = Some(self.cash_vega(market, as_of)?),
+                    OptionGreekKind::Theta => greeks.theta = Some(self.cash_theta(market, as_of)?),
+                    _ => {}
+                }
+                Ok(greeks)
             }
         }
 

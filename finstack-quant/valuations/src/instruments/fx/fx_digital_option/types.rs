@@ -251,6 +251,35 @@ impl crate::instruments::common_impl::traits::Instrument for FxDigitalOption {
 }
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxDigitalOption {
+    fn option_greeks(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
+    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
+        let mut greeks = crate::instruments::common_impl::traits::OptionGreeks::default();
+        match request.greek {
+            crate::instruments::common_impl::traits::OptionGreekKind::Delta => {
+                greeks.delta = self.option_delta(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Gamma => {
+                greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Vega => {
+                greeks.vega = self.option_vega(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Theta => {
+                greeks.theta = self.option_theta(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Rho => {
+                greeks.rho_bp = self.option_rho_bp(market, as_of, request.bumps)?
+            }
+            _ => {}
+        }
+        Ok(greeks)
+    }
+}
+impl FxDigitalOption {
     fn option_delta(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -259,7 +288,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxDigital
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(pricer::compute_greeks(self, market, as_of)?.delta))
     }
-
     fn option_gamma(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -268,7 +296,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxDigital
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(pricer::compute_greeks(self, market, as_of)?.gamma))
     }
-
     fn option_vega(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -277,7 +304,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxDigital
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(pricer::compute_greeks(self, market, as_of)?.vega))
     }
-
     fn option_theta(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -286,7 +312,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxDigital
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(pricer::compute_greeks(self, market, as_of)?.theta))
     }
-
     fn option_rho_bp(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,

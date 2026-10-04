@@ -320,8 +320,11 @@ impl JsEquityOption {
         as_of: JsValue,
         model: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
-        let instrument =
-            crate::api::valuations::pricing::parse_pricing_instrument_json(&self.to_json()?, None)?;
+        let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+            Box::new(self.inner.clone()),
+            None,
+        )
+        .map_err(to_js_err)?;
         let market = super::market(&market_json)?;
         let as_of = js_string(&as_of, "asOf")?;
         let model = crate::utils::input::js_opt_string(model.as_ref(), "model")?;

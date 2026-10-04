@@ -24,7 +24,6 @@
 
 pub(crate) mod assumptions;
 pub(crate) mod metrics;
-pub(crate) mod pricer;
 pub(crate) mod pricing;
 pub(crate) mod types;
 pub(crate) mod utils;
@@ -47,9 +46,9 @@ pub use types::{
     RoundingConvention, ShiftMode, ShiftingInterestSpec, ShiftingInterestStep,
     SpecialServicingSpec, StepDownSpec, StepDownTrigger, StructuredCredit, StructuredCreditBuilder,
     SwapNotional, SwapPriority, TargetOcSpec, TemplateFees, Tranche, TrancheAccrualPeriod,
-    TrancheBuilder, TrancheCashflows, TrancheDraw, TrancheReadvance, TrancheSeniority,
-    TrancheStructure, TrancheValuation, TriggerConsequence, Waterfall, WaterfallBuilder,
-    WaterfallDistribution, WaterfallRules, WaterfallTier,
+    TrancheBuilder, TrancheCashflowRow, TrancheCashflows, TrancheDraw, TrancheReadvance,
+    TrancheSeniority, TrancheStructure, TrancheValuation, TriggerConsequence, Waterfall,
+    WaterfallBuilder, WaterfallDistribution, WaterfallRules, WaterfallTier,
 };
 pub use types::{
     DefaultModelSpec, MarketConditions, PrepaymentModelSpec, RecoveryModelSpec,

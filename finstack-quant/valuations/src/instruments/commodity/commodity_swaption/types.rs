@@ -554,6 +554,29 @@ impl crate::instruments::common_impl::traits::Instrument for CommoditySwaption {
 }
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for CommoditySwaption {
+    fn option_greeks(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
+    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
+        let mut greeks = crate::instruments::common_impl::traits::OptionGreeks::default();
+        match request.greek {
+            crate::instruments::common_impl::traits::OptionGreekKind::Delta => {
+                greeks.delta = self.option_delta(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Gamma => {
+                greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Vega => {
+                greeks.vega = self.option_vega(market, as_of, request.bumps)?
+            }
+            _ => {}
+        }
+        Ok(greeks)
+    }
+}
+impl CommoditySwaption {
     fn option_delta(
         &self,
         market: &MarketContext,
@@ -602,7 +625,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
         };
         Ok(Some(delta_unit * self.quantity))
     }
-
     fn option_gamma(
         &self,
         market: &MarketContext,
@@ -654,7 +676,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for Commodity
             (pv_up - 2.0 * pv_base + pv_down) / (bump_size * bump_size),
         ))
     }
-
     fn option_vega(
         &self,
         market: &MarketContext,
@@ -719,7 +740,7 @@ crate::impl_empty_cashflow_provider!(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::instruments::common_impl::traits::{Instrument, OptionGreeksProvider};
+    use crate::instruments::common_impl::traits::Instrument;
 
     // Validation tests
 

@@ -84,23 +84,18 @@ pub trait MetricCalculator: Send + Sync {
 /// Rows and columns are labeled; values are a rectangular matrix of size
 /// `rows.len() x cols.len()`.
 #[derive(Debug, Clone)]
-pub struct Structured2D {
+struct Structured2D {
     /// Row labels (e.g., expiries, tenors)
-    pub rows: Vec<String>,
+    rows: Vec<String>,
     /// Column labels (e.g., strikes, bumps)
-    pub cols: Vec<String>,
+    cols: Vec<String>,
     /// Matrix values; `values[r][c]` corresponds to `rows[r]`, `cols[c]`
-    pub values: Vec<Vec<f64>>,
+    values: Vec<Vec<f64>>,
 }
 
 impl Structured2D {
-    /// Validates that `values` is a rectangular matrix matching label sizes.
-    pub fn validate_shape(&self) -> bool {
-        self.shape_error().is_none()
-    }
-
     /// Describes why the matrix shape is invalid.
-    pub fn shape_error(&self) -> Option<String> {
+    fn shape_error(&self) -> Option<String> {
         if self.rows.is_empty() || self.cols.is_empty() {
             return Some(format!(
                 "2D structured metric must have non-empty rows and columns (rows={}, cols={})",
@@ -189,11 +184,6 @@ pub struct MetricContext {
     ///
     /// Example: `MetricId::BucketedDv01` -> [("1m", v1), ("3m", v2), ...]
     pub computed_series: finstack_quant_core::HashMap<MetricId, Vec<(String, f64)>>,
-
-    /// Previously computed 2D structured metrics (by ID).
-    ///
-    /// Example: vega surface with rows=expiries, cols=strikes
-    pub computed_matrix: finstack_quant_core::HashMap<MetricId, Structured2D>,
 
     /// Cached cashflows for the instrument.
     pub cashflows: Option<Vec<(Date, Money)>>,
@@ -290,7 +280,6 @@ impl MetricContext {
             risk_rebuild: RiskRebuildWorkspace::default(),
             computed: finstack_quant_core::HashMap::default(),
             computed_series: finstack_quant_core::HashMap::default(),
-            computed_matrix: finstack_quant_core::HashMap::default(),
             cashflows: None,
             tagged_cashflows: None,
             internal_schedule: None,
@@ -696,18 +685,12 @@ impl MetricContext {
                 self.computed.insert(key, matrix.values[r_idx][c_idx]);
             }
         }
-        self.computed_matrix.insert(base_metric_id, matrix);
         Ok(())
     }
 
     /// Retrieves a previously stored 1D bucketed series.
     pub fn get_series(&self, id: &MetricId) -> Option<&[(String, f64)]> {
         self.computed_series.get(id).map(|v| v.as_slice())
-    }
-
-    /// Retrieves a previously stored 2D structured metric.
-    pub fn get_matrix2d(&self, id: &MetricId) -> Option<&Structured2D> {
-        self.computed_matrix.get(id)
     }
 }
 

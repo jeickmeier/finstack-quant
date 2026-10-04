@@ -17,8 +17,8 @@ use crate::bindings::valuations::convert::{
     tenor_from_py,
 };
 use crate::bindings::valuations::instruments::{
-    instrument_default_model, instrument_market_dependencies, metric_typed_envelope,
-    parse_typed_instrument_json, price_typed_envelope, serialize_typed_instrument_json,
+    instrument_default_model, instrument_market_dependencies, metric_typed,
+    parse_typed_instrument_json, price_typed, serialize_typed_instrument_json,
 };
 use crate::bindings::valuations::typed_structured_credit::{
     PyAssetPool, PySimulationDiagnostics, PyStructuredCredit, PyTrancheCashflows,
@@ -243,9 +243,9 @@ impl PyAssetBackedFacility {
         metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
         market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        price_typed_envelope(
+        price_typed(
             py,
-            self.envelope_json()?,
+            Box::new(self.inner.clone()),
             market,
             as_of,
             model,
@@ -290,7 +290,14 @@ impl PyAssetBackedFacility {
         metric_id: &str,
         model: &str,
     ) -> PyResult<f64> {
-        metric_typed_envelope(py, self.envelope_json()?, market, as_of, metric_id, model)
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            metric_id,
+            model,
+        )
     }
 
     /// Borrowing base on the closing collateral.
@@ -808,50 +815,14 @@ impl PyFacilityProjection {
     /// Raises
     /// ------
     /// ValueError
-    ///     If two lender flows on one date carry different currencies, or the
+    ///     If a component carries a different currency from the facility, or the
     ///     rows cannot be serialized.
     #[pyo3(text_signature = "($self)")]
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        use std::collections::BTreeMap;
-        let lender_total: BTreeMap<finstack_quant_core::dates::Date, f64> = self
+        let rows = self
             .inner
-            .lender_cashflows()
-            .map_err(core_to_py)?
-            .into_iter()
-            .map(|(date, amount)| (date, amount.amount()))
-            .collect();
-        // Every lender-flow date gets a row, even when no component list has it.
-        let mut by_date: BTreeMap<finstack_quant_core::dates::Date, [f64; 5]> =
-            lender_total.keys().map(|date| (*date, [0.0; 5])).collect();
-        for (index, flows) in [
-            &self.inner.facility.interest_flows,
-            &self.inner.facility.principal_flows,
-            &self.inner.commitment_fees,
-            &self.inner.residual.cashflows,
-            &self.inner.draws,
-        ]
-        .into_iter()
-        .enumerate()
-        {
-            for (date, amount) in flows {
-                by_date.entry(*date).or_default()[index] += amount.amount();
-            }
-        }
-        let rows: Vec<serde_json::Value> = by_date
-            .iter()
-            .map(|(date, values)| {
-                serde_json::json!({
-                    "date": date.to_string(),
-                    "interest": values[0],
-                    "principal": values[1],
-                    "commitment_fee": values[2],
-                    "draw": values[4],
-                    // A date with only residual flows carries no lender cash.
-                    "lender_total": lender_total.get(date).copied().unwrap_or(0.0),
-                    "residual": values[3],
-                })
-            })
-            .collect();
+            .get_cashflow_rows()
+            .map_err(crate::errors::core_to_py)?;
         serde_rows_to_dataframe_with_schema(
             py,
             &rows,

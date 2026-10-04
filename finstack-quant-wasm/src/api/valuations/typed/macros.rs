@@ -138,7 +138,7 @@ macro_rules! instrument_pricing {
                     metric_pricing_overrides.as_ref(),
                     market_history.as_ref(),
                 )?
-                .price(&self.to_json()?)
+                .price_typed(Box::new(self.inner.clone()))
             }
 
             /// Compute one metric of the instrument against a market snapshot.
@@ -159,7 +159,7 @@ macro_rules! instrument_pricing {
             ) -> Result<f64, JsValue> {
                 let metric_id = crate::utils::input::js_string(&metric_id, "metricId")?;
                 $crate::api::valuations::typed::metric_value(
-                    &self.to_json()?,
+                    Box::new(self.inner.clone()),
                     &market_json,
                     &as_of,
                     model.as_ref(),
@@ -269,7 +269,7 @@ macro_rules! greek_methods {
                     model: Option<JsValue>,
                 ) -> Result<f64, JsValue> {
                     $crate::api::valuations::typed::metric_value(
-                        &self.to_json()?,
+                        Box::new(self.inner.clone()),
                         &market_json,
                         &as_of,
                         model.as_ref(),

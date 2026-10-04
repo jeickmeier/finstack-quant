@@ -1,12 +1,12 @@
 //! Typed FX instruments: `FxForward` and `FxOption`.
 //! Mirrors the `PyInterestRateSwap` pattern in `typed_rates.rs`.
 //!
-//! This module also hosts the pricing helpers shared by every typed
-//! instrument wrapper (`envelope_metric_value`,
-//! `envelope_option_greeks`) and the `instrument_pricing_methods!` macro that
+//! This module also hosts the standard option Greek presentation helper
+//! (`typed_option_greeks`) and the `instrument_pricing_methods!` macro that
 //! stamps the common `price` / `metric` / `market_dependencies` /
 //! `default_model` / `attributes` / `to_dict` surface onto a wrapper.
 
+use super::instruments::metric_typed;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
@@ -27,46 +27,7 @@ use super::convert::{
 };
 use super::instruments::{enum_from_str, serialize_typed_instrument_json};
 
-/// Compute one scalar metric for a typed instrument envelope.
-///
-/// # Arguments
-///
-/// * `py` - GIL token; the pricer runs with the GIL released.
-/// * `envelope_json` - Canonical `finstack_quant.instrument/1` envelope.
-/// * `market` - `MarketContext` object or market-context JSON string.
-/// * `as_of` - Valuation date (date-like or ISO string).
-/// * `model` - Model key (`"default"` selects the instrument-native model).
-/// * `metric` - Fully qualified metric identifier (`"dv01"`, `"cs01"`, …).
-pub(crate) fn envelope_metric_value(
-    py: Python<'_>,
-    envelope_json: String,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-    model: &str,
-    metric: &str,
-) -> PyResult<f64> {
-    let market = extract_market(py, market)?;
-    let as_of = crate::bindings::date_utils::extract_date_iso(as_of)?;
-    let model = model.to_owned();
-    let metric = metric.to_owned();
-    py.detach(move || {
-        let instrument = finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
-            &envelope_json,
-            None,
-        )?;
-        finstack_quant_valuations::pricer::metric_value(
-            &instrument,
-            &market,
-            &as_of,
-            &model,
-            &metric,
-            finstack_quant_calibration::recalibration::pricing_options(),
-        )
-    })
-    .map_err(core_to_py)
-}
-
-/// Compute the standard option Greek set for a typed instrument envelope.
+/// Compute the standard option Greek set for a native Rust instrument.
 ///
 /// Mirrors the WASM `greeks` method: non-finite Greeks are rejected rather
 /// than returned, so both hosts fail identically instead of one silently
@@ -75,13 +36,13 @@ pub(crate) fn envelope_metric_value(
 /// # Arguments
 ///
 /// * `py` - GIL token; the pricer runs with the GIL released.
-/// * `envelope_json` - Canonical `finstack_quant.instrument/1` envelope.
+/// * `instrument` - Owned native Rust instrument, validated before pricing.
 /// * `market` - `MarketContext` object or market-context JSON string.
 /// * `as_of` - Valuation date (date-like or ISO string).
 /// * `model` - Model key (`"default"` selects the instrument-native model).
-pub(crate) fn envelope_option_greeks<'py>(
+pub(crate) fn typed_option_greeks<'py>(
     py: Python<'py>,
-    envelope_json: String,
+    instrument: Box<dyn finstack_quant_valuations::instruments::Instrument>,
     market: &Bound<'py, PyAny>,
     as_of: &Bound<'py, PyAny>,
     model: &str,
@@ -91,9 +52,8 @@ pub(crate) fn envelope_option_greeks<'py>(
     let model = model.to_owned();
     let pairs = py
         .detach(move || {
-            let instrument = finstack_quant_valuations::pricer::parse_boxed_instrument_from_json(
-                &envelope_json,
-                None,
+            let instrument = finstack_quant_valuations::pricer::ParsedInstrument::from_instrument(
+                instrument, None,
             )?;
             finstack_quant_valuations::pricer::present_standard_option_greeks(
                 &instrument,
@@ -172,9 +132,9 @@ macro_rules! instrument_pricing_methods {
                 metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
                 market_history: Option<&Bound<'_, PyAny>>,
             ) -> PyResult<$crate::bindings::valuations::PyValuationResult> {
-                $crate::bindings::valuations::instruments::price_typed_envelope(
+                $crate::bindings::valuations::instruments::price_typed(
                     py,
-                    self.envelope_json()?,
+                    Box::new(self.inner.clone()),
                     market,
                     as_of,
                     model,
@@ -226,13 +186,13 @@ macro_rules! instrument_pricing_methods {
                 metric_id: &str,
                 model: &str,
             ) -> PyResult<f64> {
-                $crate::bindings::valuations::typed_fx::envelope_metric_value(
+                $crate::bindings::valuations::instruments::metric_typed(
                     py,
-                    self.envelope_json()?,
+                    Box::new(self.inner.clone()),
                     market,
                     as_of,
-                    model,
                     metric_id,
+                    model,
                 )
             }
 
@@ -1407,7 +1367,14 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "delta")
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            "delta",
+            model,
+        )
     }
 
     /// Spot gamma of the option.
@@ -1430,7 +1397,14 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "gamma")
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            "gamma",
+            model,
+        )
     }
 
     /// Vega of the option.
@@ -1453,7 +1427,14 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "vega")
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            "vega",
+            model,
+        )
     }
 
     /// Theta of the option.
@@ -1476,7 +1457,14 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "theta")
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            "theta",
+            model,
+        )
     }
 
     /// Domestic-rate rho of the option.
@@ -1499,7 +1487,14 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "rho")
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            "rho",
+            model,
+        )
     }
 
     /// Foreign-rate rho of the option.
@@ -1522,13 +1517,13 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(
+        metric_typed(
             py,
-            self.envelope_json()?,
+            Box::new(self.inner.clone()),
             market,
             as_of,
-            model,
             "foreign_rho",
+            model,
         )
     }
 
@@ -1552,7 +1547,14 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "vanna")
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            "vanna",
+            model,
+        )
     }
 
     /// Volga of the option.
@@ -1575,7 +1577,14 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "volga")
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            "volga",
+            model,
+        )
     }
 
     /// Compute the standard FX option Greek set as a dict.
@@ -1602,7 +1611,7 @@ vol_surface_id, option_type, delta_convention_kind, premium_currency, venue)"
         as_of: &Bound<'py, PyAny>,
         model: &str,
     ) -> PyResult<Bound<'py, PyDict>> {
-        envelope_option_greeks(py, self.envelope_json()?, market, as_of, model)
+        typed_option_greeks(py, Box::new(self.inner.clone()), market, as_of, model)
     }
 
     /// Base (foreign) currency; the notional currency.

@@ -19,8 +19,7 @@ use super::convert::{
 };
 use super::instruments::{enum_from_str, serialize_typed_instrument_json};
 use super::typed_fx::{
-    envelope_metric_value, envelope_option_greeks, instrument_envelope_methods,
-    instrument_pricing_methods, take_builder,
+    instrument_envelope_methods, instrument_pricing_methods, take_builder, typed_option_greeks,
 };
 
 type EquityOptionBuilderInner =
@@ -254,7 +253,14 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "delta")
+        crate::bindings::valuations::instruments::metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            "delta",
+            model,
+        )
     }
 
     /// Gamma of the option.
@@ -277,7 +283,14 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "gamma")
+        crate::bindings::valuations::instruments::metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            "gamma",
+            model,
+        )
     }
 
     /// Vega of the option (per 1% vol).
@@ -300,7 +313,14 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "vega")
+        crate::bindings::valuations::instruments::metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            "vega",
+            model,
+        )
     }
 
     /// Theta of the option (per day on ``metric_pricing_overrides.theta_day_basis``, calendar days by default).
@@ -323,7 +343,14 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "theta")
+        crate::bindings::valuations::instruments::metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            "theta",
+            model,
+        )
     }
 
     /// Rho of the option.
@@ -346,7 +373,14 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         as_of: &Bound<'_, PyAny>,
         model: &str,
     ) -> PyResult<f64> {
-        envelope_metric_value(py, self.envelope_json()?, market, as_of, model, "rho")
+        crate::bindings::valuations::instruments::metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            "rho",
+            model,
+        )
     }
 
     /// Compute the standard option Greek set as a dict.
@@ -373,7 +407,7 @@ spot_id='EQUITY-SPOT', vol_surface_id='EQUITY-VOL', div_yield_id='EQUITY-DIVYIEL
         as_of: &Bound<'py, PyAny>,
         model: &str,
     ) -> PyResult<Bound<'py, PyDict>> {
-        envelope_option_greeks(py, self.envelope_json()?, market, as_of, model)
+        typed_option_greeks(py, Box::new(self.inner.clone()), market, as_of, model)
     }
 
     /// Underlying equity ticker.

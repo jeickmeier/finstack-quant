@@ -175,14 +175,14 @@ Reachable from both host languages under the `valuations` namespace:
 
 - Python: `finstack_quant.valuations` — `ValuationResult`,
   `instrument_cashflows`, the exotic-rates coupon helpers, plus the
-  `valuations.instruments`, `valuations.credit_derivatives`,
+  `valuations.instruments`,
   `valuations.composite`, `valuations.market`, and `valuations.schema`
   submodules. Reusable engines live under `finstack_quant.models`;
   calibration (`calibrate`, `CalibrationResult`) is the sibling
   `finstack_quant.calibration` package.
 - WASM/JS: `valuations` from `finstack-quant-wasm` —
   `validateValuationResultJson`, the `valuationResult*` accessors, the
-  exotic-rates coupon helpers, and the `instruments`, `creditDerivatives`,
+  exotic-rates coupon helpers, and the `instruments`,
   `composite`, `market`, `fx`, and `schema` namespaces. Reusable engines live
   under the sibling `models` namespace, and `calibrate` /
   `validateCalibrationJson` under the sibling `calibration` namespace.

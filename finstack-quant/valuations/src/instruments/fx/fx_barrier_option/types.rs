@@ -263,6 +263,39 @@ impl FxBarrierOption {
 // Option risk metric providers (metrics adapters)
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrierOption {
+    fn option_greeks(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
+    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
+        let mut greeks = crate::instruments::common_impl::traits::OptionGreeks::default();
+        match request.greek {
+            crate::instruments::common_impl::traits::OptionGreekKind::Delta => {
+                greeks.delta = self.option_delta(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Gamma => {
+                greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Vega => {
+                greeks.vega = self.option_vega(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Rho => {
+                greeks.rho_bp = self.option_rho_bp(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Vanna => {
+                greeks.vanna = self.option_vanna(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Volga => {
+                greeks.volga =
+                    self.option_volga(market, as_of, request.require_base_pv()?, request.bumps)?
+            }
+            _ => {}
+        }
+        Ok(greeks)
+    }
+}
+impl FxBarrierOption {
     fn option_delta(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -291,7 +324,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
             bumps.spot_bump_decimal,
         )?))
     }
-
     fn option_gamma(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -333,7 +365,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
             (pv_up - 2.0 * base_pv + pv_down) / (bump_size * bump_size),
         ))
     }
-
     fn option_vega(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -367,7 +398,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         let width = 2.0 * vol_bump * crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
         Ok(Some((pv_up - pv_down) / width))
     }
-
     fn option_rho_bp(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -395,7 +425,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         let pv_bumped = self.value(&bumped, as_of)?.amount();
         Ok(Some((pv_bumped - base_pv) / bump_bp))
     }
-
     fn option_vanna(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -462,7 +491,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for FxBarrier
         let width = 2.0 * vol_bump * crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
         Ok(Some((delta_vol_up - delta_vol_dn) / width))
     }
-
     fn option_volga(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,

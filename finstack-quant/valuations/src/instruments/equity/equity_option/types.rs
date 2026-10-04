@@ -613,6 +613,42 @@ impl EquityOption {
 }
 
 impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOption {
+    fn option_greeks(
+        &self,
+        market: &finstack_quant_core::market_data::context::MarketContext,
+        as_of: finstack_quant_core::dates::Date,
+        request: &crate::instruments::common_impl::traits::OptionGreeksRequest,
+    ) -> finstack_quant_core::Result<crate::instruments::common_impl::traits::OptionGreeks> {
+        let mut greeks = crate::instruments::common_impl::traits::OptionGreeks::default();
+        match request.greek {
+            crate::instruments::common_impl::traits::OptionGreekKind::Delta => {
+                greeks.delta = self.option_delta(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Gamma => {
+                greeks.gamma = self.option_gamma(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Vega => {
+                greeks.vega = self.option_vega(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Theta => {
+                greeks.theta = self.option_theta(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Rho => {
+                greeks.rho_bp = self.option_rho_bp(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Vanna => {
+                greeks.vanna = self.option_vanna(market, as_of, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::Volga => {
+                greeks.volga =
+                    self.option_volga(market, as_of, request.require_base_pv()?, request.bumps)?
+            }
+            crate::instruments::common_impl::traits::OptionGreekKind::ForeignRho => {}
+        }
+        Ok(greeks)
+    }
+}
+impl EquityOption {
     fn option_delta(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -621,7 +657,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(self.greeks(market, as_of)?.delta))
     }
-
     fn option_gamma(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -630,7 +665,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(self.greeks(market, as_of)?.gamma))
     }
-
     fn option_vega(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -639,7 +673,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(self.greeks(market, as_of)?.vega))
     }
-
     fn option_theta(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -648,7 +681,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(self.greeks(market, as_of)?.theta))
     }
-
     fn option_rho_bp(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -657,7 +689,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
     ) -> finstack_quant_core::Result<Option<f64>> {
         Ok(Some(self.greeks(market, as_of)?.rho))
     }
-
     fn option_vanna(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,
@@ -750,7 +781,6 @@ impl crate::instruments::common_impl::traits::OptionGreeksProvider for EquityOpt
         let width = 2.0 * vol_bump_abs * crate::metrics::VOL_POINTS_PER_ABSOLUTE_VOL;
         Ok(Some((delta_up - delta_dn) / width))
     }
-
     fn option_volga(
         &self,
         market: &finstack_quant_core::market_data::context::MarketContext,

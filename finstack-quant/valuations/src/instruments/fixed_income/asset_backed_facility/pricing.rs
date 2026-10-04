@@ -506,3 +506,61 @@ impl Instrument for AssetBackedFacility {
 
     crate::impl_focused_pricing_overrides!();
 }
+
+/// One date of projected cashflows, with absent components filled by zero.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
+pub struct FacilityCashflowRow {
+    /// Payment date as an ISO-8601 string.
+    pub date: String,
+    /// Interest in the result currency, as a decimal amount.
+    pub interest: f64,
+    /// Principal in the result currency, as a decimal amount.
+    pub principal: f64,
+    /// Commitment fee in the result currency, as a decimal amount.
+    pub commitment_fee: f64,
+    /// Draw in the result currency, as a decimal amount.
+    pub draw: f64,
+    /// Lender total in the result currency, as a decimal amount.
+    pub lender_total: f64,
+    /// Residual in the result currency, as a decimal amount.
+    pub residual: f64,
+}
+
+impl FacilityProjection {
+    /// Project cashflows into date-ordered rows for tabular presentation.
+    ///
+    /// Amounts use the result currency; missing components are zero. Facility
+    /// draws are positive advances, while lender totals subtract those advances.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::CurrencyMismatch` if any component has a different currency.
+    pub fn get_cashflow_rows(&self) -> finstack_quant_core::Result<Vec<FacilityCashflowRow>> {
+        let lender = self.lender_cashflows()?;
+        let rows = crate::instruments::common_impl::cashflow_export::cashflow_columns(
+            [
+                &self.facility.interest_flows,
+                &self.facility.principal_flows,
+                &self.commitment_fees,
+                &self.draws,
+                &lender,
+                &self.residual.cashflows,
+            ],
+            self.facility.final_balance.currency(),
+        )?;
+        Ok(rows
+            .into_iter()
+            .map(|(date, values)| FacilityCashflowRow {
+                date: date.to_string(),
+                interest: values[0].amount(),
+                principal: values[1].amount(),
+                commitment_fee: values[2].amount(),
+                draw: values[3].amount(),
+                lender_total: values[4].amount(),
+                residual: values[5].amount(),
+            })
+            .collect())
+    }
+}

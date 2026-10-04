@@ -6,13 +6,15 @@
 //! the caller-selected registry or the shared standard registry.
 
 use super::{shared_standard_registry, ModelKey};
-use crate::instruments::json_loader::MAX_JSON_BYTES;
+use crate::instruments::json_loader::{instrument_load_error, MAX_JSON_BYTES};
 use crate::instruments::{Instrument, InstrumentEnvelope, InstrumentJson, MetricPricingOverrides};
 use crate::metrics::MetricId;
 use crate::results::ValuationResult;
+use finstack_quant_core::contract::{parse_json_value, LoadLimits};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::Error;
 use serde_json::Value;
+#[cfg(test)]
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -39,8 +41,40 @@ pub struct ParsedInstrument {
 }
 
 impl ParsedInstrument {
-    fn new(instrument: Box<dyn Instrument>) -> Self {
-        Self { instrument }
+    /// Prepare a typed instrument for host pricing, merging overrides before validation.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument` - Owned instrument in its native Rust representation.
+    /// * `metric_pricing_overrides` - Optional JSON object patch. Omitted fields
+    ///   retain stored controls, nested bump fields merge, and explicit null
+    ///   clears optional controls. Rates and bumps use the canonical Rust units.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for malformed overrides, unsupported controls,
+    /// or invalid instrument state after merging.
+    pub fn from_instrument(
+        mut instrument: Box<dyn Instrument>,
+        metric_pricing_overrides: Option<&str>,
+    ) -> finstack_quant_core::Result<Self> {
+        if let Some(patch) = metric_pricing_overrides {
+            let id = instrument.id().to_owned();
+            let current = instrument
+                .get_metric_pricing_overrides_mut()
+                .ok_or_else(|| {
+                    Error::Validation(format!(
+                        "instrument does not support metric pricing overrides [instrument={id}]"
+                    ))
+                })?;
+            let mut value =
+                serde_json::to_value(&*current).map_err(|e| Error::Validation(e.to_string()))?;
+            merge_metric_patch(&mut value, patch, Some(&id))?;
+            *current =
+                serde_json::from_value(value).map_err(|e| Error::Validation(e.to_string()))?;
+        }
+        instrument.validate_for_pricing()?;
+        Ok(Self { instrument })
     }
 
     /// Borrow the validated instrument trait object.
@@ -73,14 +107,11 @@ impl ParsedInstrument {
 /// carries an unsupported envelope schema, does not match a supported tagged
 /// instrument shape, or fails domain validation.
 pub fn parse_instrument_from_json(json: &str) -> finstack_quant_core::Result<InstrumentJson> {
-    if json.len() > MAX_JSON_BYTES {
-        return Err(Error::Validation(format!(
-            "Instrument JSON input exceeds the {} MiB size limit",
-            MAX_JSON_BYTES / (1024 * 1024)
-        )));
-    }
-    let envelope: InstrumentEnvelope = serde_json::from_str(json)
-        .map_err(|error| Error::Validation(format!("invalid instrument envelope JSON: {error}")))?;
+    let envelope = InstrumentEnvelope::decode_bytes(
+        json.as_bytes(),
+        &LoadLimits::default().with_max_bytes(MAX_JSON_BYTES),
+    )
+    .map_err(instrument_load_error)?;
     let instrument = envelope.instrument;
     instrument.validate_for_pricing()?;
     Ok(instrument)
@@ -227,9 +258,9 @@ pub fn validate_instrument_json(
     json: &str,
     metric_pricing_overrides: Option<&str>,
 ) -> finstack_quant_core::Result<String> {
-    let effective_json = instrument_json_for_pricing(json, metric_pricing_overrides)?;
-    let instrument = parse_instrument_from_json(effective_json.as_ref())?;
-    serde_json::to_string(&InstrumentEnvelope::new(instrument))
+    let envelope = decode_pricing_envelope(json, metric_pricing_overrides)?;
+    envelope.instrument.validate_for_pricing()?;
+    serde_json::to_string(&envelope)
         .map_err(|e| Error::Validation(format!("invalid instrument JSON: {e}")))
 }
 
@@ -384,11 +415,8 @@ pub fn parse_boxed_instrument_from_json(
     instrument_json: &str,
     metric_pricing_overrides: Option<&str>,
 ) -> finstack_quant_core::Result<ParsedInstrument> {
-    let effective_json = instrument_json_for_pricing(instrument_json, metric_pricing_overrides)?;
-    let instrument = parse_instrument_from_json(effective_json.as_ref())?;
-    Ok(ParsedInstrument::new(
-        instrument.into_boxed_assuming_validated()?,
-    ))
+    let envelope = decode_pricing_envelope(instrument_json, metric_pricing_overrides)?;
+    ParsedInstrument::from_instrument(envelope.instrument.into_boxed_unchecked()?, None)
 }
 
 /// Parse a JSON array of canonical instrument envelopes into validated
@@ -412,17 +440,19 @@ pub fn parse_boxed_instrument_from_json(
 pub fn parse_boxed_instruments_from_json(
     json: &str,
 ) -> finstack_quant_core::Result<Vec<Box<dyn Instrument>>> {
-    if json.len() > MAX_JSON_BYTES {
-        return Err(Error::Validation(format!(
-            "Instrument JSON input exceeds the {} MiB size limit",
-            MAX_JSON_BYTES / (1024 * 1024)
-        )));
-    }
-    let envelopes: Vec<InstrumentEnvelope> = serde_json::from_str(json)
-        .map_err(|error| Error::Validation(format!("invalid instrument envelope JSON: {error}")))?;
-    envelopes
-        .into_iter()
-        .map(InstrumentEnvelope::into_boxed)
+    let limits = LoadLimits::default().with_max_bytes(MAX_JSON_BYTES);
+    let value = parse_json_value(json.as_bytes(), &limits).map_err(instrument_load_error)?;
+    let values = value.as_array().ok_or_else(|| {
+        Error::Validation("invalid instrument envelope JSON: expected array".into())
+    })?;
+    values
+        .iter()
+        .cloned()
+        .map(|value| {
+            InstrumentEnvelope::decode_value(value, &limits)
+                .map_err(instrument_load_error)?
+                .into_boxed()
+        })
         .collect()
 }
 
@@ -662,21 +692,6 @@ pub fn present_standard_option_greeks(
     Ok(pairs)
 }
 
-/// Best-effort extraction of `instrument.spec.id` from an envelope.
-///
-/// Used purely to enrich error messages so an analyst running a batch can
-/// identify the offending row. Returns `None` when the JSON is malformed or
-/// the `id` field is absent — callers must not depend on the id being present.
-fn extract_spec_id_lossy(instrument_json: &str) -> Option<String> {
-    let value: Value = serde_json::from_str(instrument_json).ok()?;
-    value
-        .get("instrument")?
-        .get("spec")?
-        .get("id")?
-        .as_str()
-        .map(ToString::to_string)
-}
-
 /// Suffix `[instrument=<id>]` to an error message when an id is known.
 fn with_id_suffix(message: String, id: Option<&str>) -> String {
     match id {
@@ -685,17 +700,11 @@ fn with_id_suffix(message: String, id: Option<&str>) -> String {
     }
 }
 
-fn instrument_json_for_pricing<'a>(
-    instrument_json: &'a str,
-    metric_pricing_overrides: Option<&str>,
-) -> finstack_quant_core::Result<Cow<'a, str>> {
-    let Some(overrides_json) = metric_pricing_overrides else {
-        return Ok(Cow::Borrowed(instrument_json));
-    };
-
-    let instrument_id = extract_spec_id_lossy(instrument_json);
-    let id = instrument_id.as_deref();
-
+fn merge_metric_patch(
+    current: &mut Value,
+    overrides_json: &str,
+    id: Option<&str>,
+) -> finstack_quant_core::Result<()> {
     let pricing_patch: Value = serde_json::from_str(overrides_json).map_err(|e| {
         Error::Validation(with_id_suffix(
             format!("invalid metric_pricing_overrides JSON: {e}"),
@@ -710,31 +719,15 @@ fn instrument_json_for_pricing<'a>(
             id,
         ))
     })?;
-    let mut document: Value = serde_json::from_str(instrument_json).map_err(|e| {
-        Error::Validation(with_id_suffix(format!("invalid instrument JSON: {e}"), id))
-    })?;
     let patch = pricing_patch.as_object().cloned().ok_or_else(|| {
         Error::Validation(with_id_suffix(
-            "metric pricing overrides must be an object".to_string(),
+            "metric pricing overrides must be an object".into(),
             id,
         ))
     })?;
-    let spec = document
-        .get_mut("instrument")
-        .and_then(|instrument| instrument.get_mut("spec"))
-        .and_then(Value::as_object_mut)
-        .ok_or_else(|| {
-            Error::Validation(with_id_suffix(
-                "instrument envelope must contain an object instrument.spec".into(),
-                id,
-            ))
-        })?;
-    let metric_pricing_overrides = spec
-        .entry("metric_pricing_overrides".to_string())
-        .or_insert_with(|| Value::Object(Default::default()));
-    let metric_pricing_overrides = metric_pricing_overrides.as_object_mut().ok_or_else(|| {
+    let metric_pricing_overrides = current.as_object_mut().ok_or_else(|| {
         Error::Validation(with_id_suffix(
-            "instrument.spec.metric_pricing_overrides must be an object".to_string(),
+            "instrument.spec.metric_pricing_overrides must be an object".into(),
             id,
         ))
     })?;
@@ -752,10 +745,66 @@ fn instrument_json_for_pricing<'a>(
         }
         metric_pricing_overrides.insert(key, value);
     }
+    Ok(())
+}
 
-    serde_json::to_string(&document)
-        .map(Cow::Owned)
-        .map_err(|e| Error::Validation(with_id_suffix(format!("invalid instrument JSON: {e}"), id)))
+fn pricing_document(
+    instrument_json: &str,
+    metric_pricing_overrides: Option<&str>,
+) -> finstack_quant_core::Result<Value> {
+    let mut document = parse_json_value(
+        instrument_json.as_bytes(),
+        &LoadLimits::default().with_max_bytes(MAX_JSON_BYTES),
+    )
+    .map_err(instrument_load_error)?;
+    if let Some(patch) = metric_pricing_overrides {
+        let instrument_id = document
+            .get("instrument")
+            .and_then(|v| v.get("spec"))
+            .and_then(|v| v.get("id"))
+            .and_then(Value::as_str)
+            .map(ToString::to_string);
+        let id = instrument_id.as_deref();
+        let spec = document
+            .get_mut("instrument")
+            .and_then(|v| v.get_mut("spec"))
+            .and_then(Value::as_object_mut)
+            .ok_or_else(|| {
+                Error::Validation(with_id_suffix(
+                    "instrument envelope must contain an object instrument.spec".into(),
+                    id,
+                ))
+            })?;
+        let current = spec
+            .entry("metric_pricing_overrides".to_string())
+            .or_insert_with(|| Value::Object(Default::default()));
+        merge_metric_patch(current, patch, id)?;
+    }
+    Ok(document)
+}
+
+fn decode_pricing_envelope(
+    json: &str,
+    metric_pricing_overrides: Option<&str>,
+) -> finstack_quant_core::Result<InstrumentEnvelope> {
+    InstrumentEnvelope::decode_value(
+        pricing_document(json, metric_pricing_overrides)?,
+        &LoadLimits::default().with_max_bytes(MAX_JSON_BYTES),
+    )
+    .map_err(instrument_load_error)
+}
+
+#[cfg(test)]
+fn instrument_json_for_pricing<'a>(
+    instrument_json: &'a str,
+    metric_pricing_overrides: Option<&str>,
+) -> finstack_quant_core::Result<Cow<'a, str>> {
+    serde_json::to_string(&pricing_document(
+        instrument_json,
+        metric_pricing_overrides,
+    )?)
+    .map(Cow::Owned)
+    .map_err(|e| Error::Validation(e.to_string()))
 }
 
 #[cfg(test)]
@@ -1305,6 +1354,71 @@ mod tests {
     }
 
     #[test]
+    fn native_and_wire_preparation_merge_and_validate_identically() {
+        let envelope = InstrumentEnvelope::decode_bytes(
+            bond_instrument_json().as_bytes(),
+            &LoadLimits::default(),
+        )
+        .expect("fixture");
+        let InstrumentJson::Bond(mut bond) = envelope.instrument else {
+            panic!("bond fixture")
+        };
+        bond.metric_pricing_overrides = serde_json::from_value(serde_json::json!({
+            "theta_period": {"count": 1, "unit": "weeks"},
+            "bump_config": {"rate_bump_bp": -2.0, "vol_bump_decimal": 0.02}
+        }))
+        .expect("stored controls");
+        assert!(ParsedInstrument::from_instrument(Box::new(bond.clone()), None).is_err());
+        let wire = envelope_json(InstrumentJson::Bond(bond.clone()));
+        let patch = r#"{"bump_config":{"rate_bump_bp":3.0},"theta_period":null}"#;
+        let native = ParsedInstrument::from_instrument(Box::new(bond), Some(patch))
+            .expect("repair before validation");
+        let decoded =
+            parse_boxed_instrument_from_json(&wire, Some(patch)).expect("same wire preparation");
+        let native_controls = native
+            .as_instrument()
+            .get_metric_pricing_overrides()
+            .expect("controls");
+        let wire_controls = decoded
+            .as_instrument()
+            .get_metric_pricing_overrides()
+            .expect("controls");
+        assert_eq!(
+            serde_json::to_value(native_controls).expect("serde"),
+            serde_json::to_value(wire_controls).expect("serde")
+        );
+        assert_eq!(native_controls.bump_config.rate_bump_bp, Some(3.0));
+        assert_eq!(native_controls.bump_config.vol_bump_decimal, Some(0.02));
+        assert_eq!(native_controls.theta_period, None);
+        let market = market_context();
+        let as_of = "2025-01-01";
+        let metrics = vec!["theta".to_owned(), "dv01".to_owned()];
+        let native_result = price_instrument(
+            &native,
+            &market,
+            as_of,
+            "default",
+            &metrics,
+            None,
+            Default::default(),
+        )
+        .expect("native price");
+        let wire_result = price_instrument(
+            &decoded,
+            &market,
+            as_of,
+            "default",
+            &metrics,
+            None,
+            Default::default(),
+        )
+        .expect("wire price");
+        assert_eq!(native_result.value, wire_result.value);
+        assert_eq!(native_result.measures, wire_result.measures);
+        assert!(native_result.measures.contains_key("theta_period_days"));
+    }
+
+    #[test]
     fn instrument_inventory_parses_envelopes_in_order_and_shares_error_text() {
         let json = bond_instrument_json();
         let inventory =
@@ -1335,7 +1449,7 @@ mod tests {
             .err()
             .expect("oversized inventory must be rejected")
             .to_string();
-        assert!(error.contains("size limit"), "{error}");
+        assert!(error.contains("input exceeds limit: bytes"), "{error}");
     }
 
     #[test]
@@ -1348,7 +1462,10 @@ mod tests {
 
         let oversized = " ".repeat(MAX_JSON_BYTES + 1);
         let error = parse_instrument_from_json(&oversized).expect_err("oversized payload fails");
-        assert!(error.to_string().contains("size limit"), "{error}");
+        assert!(
+            error.to_string().contains("input exceeds limit: bytes"),
+            "{error}"
+        );
     }
 
     #[test]

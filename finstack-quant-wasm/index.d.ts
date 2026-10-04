@@ -19511,12 +19511,6 @@ export interface SwaptionConstructor {
    * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
    */
   example(): Swaption;
-  /**
-   * Bermudan-exercise variant of the example (mirrors Rust `Swaption::example_bermudan`).
-   * @returns The example swaption with `exercise_style == "bermudan"`.
-   * @throws Error - Throws if the canonical example fails validation (does not occur for a released build).
-   */
-  exampleBermudan(): Swaption;
 }
 
 /**
@@ -24718,60 +24712,7 @@ export interface ValuationInstrumentsNamespace {
    * Merton Monte Carlo configuration class (see `MertonMcConfigConstructor`).
    */
   MertonMcConfig: MertonMcConfigConstructor;
-  /**
-   * `BarrierCrossing::Discrete`: default is checked only on the simulation grid.
-   * @returns The `BarrierCrossing` value `"discrete"`.
-   * @throws Error - Throws if the value cannot be converted to JavaScript.
-   */
-  barrierCrossingDiscrete(): generated.valuations.BarrierCrossing;
-  /**
-   * `BarrierCrossing::BrownianBridge`: corrects for crossings between grid points.
-   * @returns The `BarrierCrossing` value `"brownian_bridge"`.
-   * @throws Error - Throws if the value cannot be converted to JavaScript.
-   */
-  barrierCrossingBrownianBridge(): generated.valuations.BarrierCrossing;
-  /**
-   * `PikMode::Cash`: the coupon is paid in cash.
-   * @returns The `PikMode` value.
-   * @throws Error - Throws if the value cannot be converted to JavaScript.
-   */
-  pikModeCash(): generated.valuations.PikMode;
-  /**
-   * `PikMode::Pik`: the coupon accretes to the notional.
-   * @returns The `PikMode` value.
-   * @throws Error - Throws if the value cannot be converted to JavaScript.
-   */
-  pikModePik(): generated.valuations.PikMode;
-  /**
-   * `PikMode::Split`: part of the coupon is paid in cash and part accretes.
-   * @param cashFraction - Fraction of the coupon paid in cash, in `[0, 1]`.
-   * @param pikFraction - Fraction of the coupon accreted, in `[0, 1]`.
-   * @returns The `PikMode` value.
-   * @throws Error - Throws with kind `invalid_type` if a fraction is not a number.
-   */
-  pikModeSplit(cashFraction: number, pikFraction: number): generated.valuations.PikMode;
-  /**
-   * `PikMode::Toggle`: the issuer elects cash or PIK each period under the toggle model.
-   * @returns The `PikMode` value.
-   * @throws Error - Throws if the value cannot be converted to JavaScript.
-   */
-  pikModeToggle(): generated.valuations.PikMode;
-  /**
-   * `PikSchedule::Uniform`: one PIK mode for the life of the bond.
-   * @param mode - `PikMode` plain value or JSON string.
-   * @returns The `PikSchedule` plain object.
-   * @throws Error - Throws with kind `validation` if `mode` does not match the `PikMode` schema.
-   */
-  pikScheduleUniform(mode: generated.valuations.PikMode): generated.valuations.PikSchedule;
-  /**
-   * `PikSchedule::Stepped`: the PIK mode changes at given times.
-   * @param steps - `[timeInYears, PikMode]` pairs in increasing time order; each mode applies from its time on.
-   * @returns The `PikSchedule` plain object.
-   * @throws Error - Throws with kind `validation` if `steps` is not an array of `[number, PikMode]` pairs.
-   */
-  pikScheduleStepped(
-    steps: [number, generated.valuations.PikMode][] | string
-  ): generated.valuations.PikSchedule;
+
   /**
    * The PIK mode in force at a time (mirrors Rust `PikSchedule::mode_at`).
    * @param schedule - `PikSchedule` plain object or JSON string.
@@ -24836,39 +24777,7 @@ export interface ValuationInstrumentsNamespace {
     maturity: string,
     dayCount: generated.valuations.PoolAsset['day_count']
   ): generated.valuations.PoolAsset;
-  /**
-   * Return a copy of a pool with its representative lines replaced.
-   * @param pool - `AssetPool` plain object or JSON string.
-   * @param repLines - `RepLine` plain objects (or a JSON array string).
-   * @returns A new `AssetPool` plain object carrying `rep_lines`.
-   * @throws Error - Throws with kind `validation` if `pool` or `repLines` does not match its schema.
-   */
-  assetPoolWithRepLines(
-    pool: generated.valuations.AssetPool | string,
-    repLines: generated.valuations.RepLine[] | string
-  ): generated.valuations.AssetPool;
-  /**
-   * Return a copy of a pool with its loan-level assets replaced.
-   * @param pool - `AssetPool` plain object or JSON string.
-   * @param value - `PoolAsset` plain objects (or a JSON array string).
-   * @returns A new `AssetPool` plain object carrying `assets`.
-   * @throws Error - Throws with kind `validation` if `pool` or `value` does not match its schema.
-   */
-  assetPoolWithAssets(
-    pool: generated.valuations.AssetPool | string,
-    value: generated.valuations.PoolAsset[] | string
-  ): generated.valuations.AssetPool;
-  /**
-   * Return a copy of a pool collateralized by typed instruments.
-   * @param pool - `AssetPool` plain object or JSON string.
-   * @param collateral - `InstrumentCollateral` plain object: `bonds`, `term_loans` and `revolvers` instrument specs plus the optional `call_exercise`, `put_exercise` and `overrides` exercise policies.
-   * @returns A new `AssetPool` plain object carrying `instruments`.
-   * @throws Error - Throws with kind `validation` if `pool` or `collateral` does not match its schema.
-   */
-  assetPoolWithInstruments(
-    pool: generated.valuations.AssetPool | string,
-    collateral: generated.valuations.InstrumentCollateral | string
-  ): generated.valuations.AssetPool;
+
   /**
    * Return a copy of a pool with its reserve account configured.
    * @param pool - `AssetPool` plain object or JSON string.
@@ -24887,17 +24796,7 @@ export interface ValuationInstrumentsNamespace {
     reserveInterestDestination?:
       generated.valuations.AssetPool['reserve_interest_destination'] | null
   ): generated.valuations.AssetPool;
-  /**
-   * Return a copy of a pool with a reinvestment period.
-   * @param pool - `AssetPool` plain object or JSON string.
-   * @param value - `ReinvestmentPeriod` plain object or JSON string: end date, active flag and reinvestment criteria.
-   * @returns A new `AssetPool` plain object carrying `reinvestment_period`.
-   * @throws Error - Throws with kind `validation` if `pool` or `value` does not match its schema.
-   */
-  assetPoolWithReinvestmentPeriod(
-    pool: generated.valuations.AssetPool | string,
-    value: generated.valuations.ReinvestmentPeriod | string
-  ): generated.valuations.AssetPool;
+
   /**
    * Return a copy of a pool with seasoned account balances.
    * @param pool - `AssetPool` plain object or JSON string.
@@ -28849,43 +28748,6 @@ export interface ModelCreditNamespace {
 }
 
 /**
- * Namespaced TypeScript entry points for credit derivatives calculations and types.
- * @example
- * ```typescript
- * import init, { valuations } from "finstack-quant-wasm";
- * await init();
- * const cds = JSON.parse(valuations.creditDerivatives.creditDefaultSwapExampleJson());
- * console.log(cds.instrument.type);
- * ```
- */
-export interface CreditDerivativesNamespace {
-  /**
-   * Example tagged `CreditDefaultSwap` instrument JSON.
-   * @returns Example tagged `CreditDefaultSwap` instrument JSON.
-   * @throws Error - Throws a JavaScript exception if the example instrument fails validation or the example envelope cannot be serialized to JSON.
-   */
-  creditDefaultSwapExampleJson(): string;
-  /**
-   * Example tagged `CdsIndex` instrument JSON.
-   * @returns Example tagged `CdsIndex` instrument JSON.
-   * @throws Error - Throws a JavaScript exception if the example instrument fails validation or the example envelope cannot be serialized to JSON.
-   */
-  cdsIndexExampleJson(): string;
-  /**
-   * Example tagged `CdsTranche` instrument JSON.
-   * @returns Example tagged `CdsTranche` instrument JSON.
-   * @throws Error - Throws a JavaScript exception if the example instrument fails validation or the example envelope cannot be serialized to JSON.
-   */
-  cdsTrancheExampleJson(): string;
-  /**
-   * Example tagged `CdsOption` instrument JSON.
-   * @returns Example tagged `CdsOption` instrument JSON.
-   * @throws Error - Throws a JavaScript exception if the example option cannot be constructed or its envelope cannot be serialized to JSON.
-   */
-  cdsOptionExampleJson(): string;
-}
-
-/**
  * A structured input: JSON text, or the equivalent plain object or array.
  *
  * Objects are written to JSON by the binding before Rust parses them, so the
@@ -31938,10 +31800,6 @@ export interface ValuationsNamespace {
    * for both fixed and dynamic weighting; there is no `initializeFixed` export.
    */
   composite: CompositeNamespace;
-  /**
-   * CDS-family example instrument payload factories.
-   */
-  creditDerivatives: CreditDerivativesNamespace;
   /**
    * Direct FX instrument wrappers.
    */

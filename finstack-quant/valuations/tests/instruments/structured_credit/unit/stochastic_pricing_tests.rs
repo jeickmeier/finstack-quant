@@ -16,9 +16,7 @@ use finstack_quant_valuations::instruments::fixed_income::structured_credit::{
     scenario_table, AssetPool, DealType, HedgeSwap, OasConfig, PoolAsset, ScenarioGrid,
     StructuredCredit, StructuredCreditPricingMode, Tranche, TrancheSeniority, TrancheStructure,
 };
-use finstack_quant_valuations::instruments::{
-    Instrument, PricingOptions, ScenarioPricingOverrides,
-};
+use finstack_quant_valuations::instruments::{Instrument, ScenarioPricingOverrides};
 use time::Month;
 
 fn closing_date() -> Date {
@@ -275,25 +273,22 @@ fn enable_stochastic_populates_specs_for_each_deal_family() {
 }
 
 #[test]
-fn price_with_metrics_standalone_returns_base_value_when_no_metrics_or_hedges() {
+fn price_with_metrics_returns_base_value_when_no_metrics_or_hedges() {
     let sc = build_sc("ABS-STANDALONE", 1_000_000.0).with_calendar_id("nyse");
     let mut market = MarketContext::new();
     market = market.insert(discount_curve(closing_date()));
 
     let result = sc
-        .price_with_metrics_standalone(&market, closing_date(), &[])
+        .price_with_metrics(&market, closing_date(), &[], Default::default())
         .expect("standalone pricing");
-    let canonical = sc
-        .price_with_metrics(&market, closing_date(), &[], PricingOptions::default())
-        .expect("canonical pricing");
+    let expected_value = sc.value(&market, closing_date()).expect("base value");
 
     assert_eq!(result.instrument_id, "ABS-STANDALONE");
     assert!(result.value.amount().is_finite());
     assert_eq!(result.value.currency(), Currency::USD);
     assert!(result.measures.is_empty());
-    assert_eq!(result.value, canonical.value);
-    assert_eq!(result.as_of, canonical.as_of);
-    assert_eq!(result.measures, canonical.measures);
+    assert_eq!(result.value, expected_value);
+    assert_eq!(result.as_of, closing_date());
 }
 
 #[test]
@@ -301,7 +296,7 @@ fn standalone_pricing_applies_scenario_price_shock_once() {
     let mut sc = build_sc("ABS-STANDALONE-SCENARIO", 1_000_000.0);
     let market = MarketContext::new().insert(discount_curve(closing_date()));
     let baseline = sc
-        .price_with_metrics_standalone(&market, closing_date(), &[])
+        .price_with_metrics(&market, closing_date(), &[], Default::default())
         .expect("baseline standalone pricing")
         .value
         .amount();
@@ -309,7 +304,7 @@ fn standalone_pricing_applies_scenario_price_shock_once() {
         ScenarioPricingOverrides::default().with_scenario_price_shock_decimal(-0.10);
 
     let shocked = sc
-        .price_with_metrics_standalone(&market, closing_date(), &[])
+        .price_with_metrics(&market, closing_date(), &[], Default::default())
         .expect("shocked standalone pricing")
         .value
         .amount();
@@ -421,7 +416,7 @@ fn structured_credit_pricing_conveniences_validate_before_market_access() {
         scenario_table(&sc, "missing", &market, closing_date(), &grid)
             .expect_err("invalid scenario table")
             .to_string(),
-        sc.price_with_metrics_standalone(&market, closing_date(), &[])
+        sc.price_with_metrics(&market, closing_date(), &[], Default::default())
             .expect_err("invalid metric pricing")
             .to_string(),
         sc.price_stochastic(&market, closing_date(), None, None)
@@ -456,7 +451,12 @@ fn hedge_pricing_validates_nested_swap_before_market_access() {
     let sc = build_sc("ABS-INVALID-HEDGE", 1_000_000.0).with_hedge_swap(HedgeSwap::new(swap));
 
     let err = sc
-        .price_with_metrics_standalone(&MarketContext::new(), closing_date(), &[])
+        .price_with_metrics(
+            &MarketContext::new(),
+            closing_date(),
+            &[],
+            Default::default(),
+        )
         .expect_err("invalid nested hedge must fail before missing curves");
     let message = err.to_string();
     assert!(

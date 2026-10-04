@@ -140,7 +140,7 @@ impl MetricId {
                 s,
                 closest_metric_names(
                     s,
-                    Self::ALL_STANDARD.iter().map(MetricId::as_str),
+                    Self::get_standard().iter().map(MetricId::as_str),
                     MAX_METRIC_SUGGESTIONS,
                 ),
             ))
@@ -166,8 +166,8 @@ static METRIC_LOOKUP: OnceLock<HashMap<String, MetricId>> = OnceLock::new();
 fn metric_lookup() -> &'static HashMap<String, MetricId> {
     METRIC_LOOKUP.get_or_init(|| {
         let mut map = HashMap::default();
-        map.reserve(MetricId::ALL_STANDARD.len());
-        for m in MetricId::ALL_STANDARD {
+        map.reserve(MetricId::get_standard().len());
+        for m in MetricId::get_standard() {
             // Names are already lower snake_case
             map.insert(m.as_str().to_string(), m.clone());
         }

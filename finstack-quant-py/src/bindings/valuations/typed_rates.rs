@@ -27,9 +27,9 @@ use super::convert::{
 };
 use super::instruments::{
     builder_repr, decimal_from_f64, enum_from_str, instrument_default_model, instrument_expiry,
-    instrument_market_dependencies, metric_typed_envelope, money_repr, opt_serde_to_py,
-    parse_typed_instrument_json, price_typed_envelope, serialize_typed_instrument_json,
-    spec_from_py, stub_kind_from_py,
+    instrument_market_dependencies, metric_typed, money_repr, opt_serde_to_py,
+    parse_typed_instrument_json, price_typed, serialize_typed_instrument_json, spec_from_py,
+    stub_kind_from_py,
 };
 use super::typed_legs::{PyFixedLegSpec, PyFloatLegSpec};
 use super::PyValuationResult;
@@ -330,9 +330,9 @@ impl PyInterestRateSwap {
         metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
         market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        price_typed_envelope(
+        price_typed(
             py,
-            self.envelope_json()?,
+            Box::new(self.inner.clone()),
             market,
             as_of,
             model,
@@ -378,7 +378,14 @@ impl PyInterestRateSwap {
         metric_id: &str,
         model: &str,
     ) -> PyResult<f64> {
-        metric_typed_envelope(py, self.envelope_json()?, market, as_of, metric_id, model)
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            metric_id,
+            model,
+        )
     }
 
     /// Instrument identifier.
@@ -711,7 +718,7 @@ impl PyInterestRateSwapBuilder {
 /// Typed wrapper for the Rust `Swaption` instrument.
 ///
 /// Construct via ``Swaption.builder()``, ``Swaption.example()`` /
-/// ``Swaption.example_bermudan()`` or ``Swaption.from_json``. Every public
+/// ``Swaption.from_json``. Every public
 /// Rust field is readable as a property; ``get_strike`` / ``get_underlying_start_date``
 /// / ``get_underlying_maturity`` / ``forward_swap_rate`` mirror the Rust accessors and
 /// ``price`` / ``metric`` run the same pricer as ``price_instrument``.
@@ -781,33 +788,6 @@ impl PySwaption {
     fn example() -> PyResult<Self> {
         Ok(Self {
             inner: finstack_quant_valuations::instruments::Swaption::example()
-                .map_err(core_to_py)?,
-        })
-    }
-
-    /// Bermudan-exercise variant of the example (mirrors Rust
-    /// ``Swaption::example_bermudan``).
-    ///
-    /// Returns
-    /// -------
-    /// Swaption
-    ///     The example swaption with ``exercise_style == "bermudan"``.
-    ///
-    /// Raises
-    /// ------
-    /// ValueError
-    ///     If the example instrument fails validation.
-    ///
-    /// Examples
-    /// --------
-    /// >>> from finstack_quant.valuations.instruments import Swaption
-    /// >>> Swaption.example_bermudan().exercise_style
-    /// 'bermudan'
-    #[staticmethod]
-    #[pyo3(text_signature = "()")]
-    fn example_bermudan() -> PyResult<Self> {
-        Ok(Self {
-            inner: finstack_quant_valuations::instruments::Swaption::example_bermudan()
                 .map_err(core_to_py)?,
         })
     }
@@ -923,9 +903,9 @@ impl PySwaption {
         metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
         market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        price_typed_envelope(
+        price_typed(
             py,
-            self.envelope_json()?,
+            Box::new(self.inner.clone()),
             market,
             as_of,
             model,
@@ -971,7 +951,14 @@ impl PySwaption {
         metric_id: &str,
         model: &str,
     ) -> PyResult<f64> {
-        metric_typed_envelope(py, self.envelope_json()?, market, as_of, metric_id, model)
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            metric_id,
+            model,
+        )
     }
 
     /// Forward swap rate of the underlying (mirrors Rust ``Swaption::forward_swap_rate``).
@@ -1737,9 +1724,9 @@ impl PyCapFloor {
         metric_pricing_overrides: Option<&Bound<'_, PyAny>>,
         market_history: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<PyValuationResult> {
-        price_typed_envelope(
+        price_typed(
             py,
-            self.envelope_json()?,
+            Box::new(self.inner.clone()),
             market,
             as_of,
             model,
@@ -1785,7 +1772,14 @@ impl PyCapFloor {
         metric_id: &str,
         model: &str,
     ) -> PyResult<f64> {
-        metric_typed_envelope(py, self.envelope_json()?, market, as_of, metric_id, model)
+        metric_typed(
+            py,
+            Box::new(self.inner.clone()),
+            market,
+            as_of,
+            metric_id,
+            model,
+        )
     }
 
     /// Instrument identifier.

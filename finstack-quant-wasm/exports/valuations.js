@@ -1,6 +1,5 @@
 import * as wasm from '../pkg/finstack_quant_wasm.js';
 import { composite } from './valuations/composite.js';
-import { creditDerivatives } from './valuations/creditDerivatives.js';
 import { fx } from './valuations/fx.js';
 import { instruments } from './valuations/instruments.js';
 import { market } from './valuations/market.js';
@@ -8,7 +7,6 @@ import { schema } from './valuations/schema.js';
 
 export const valuations = {
   composite,
-  creditDerivatives,
   fx,
   instruments,
   market,
