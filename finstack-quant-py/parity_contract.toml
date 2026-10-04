@@ -315,7 +315,7 @@ note = "Typed submodules (primitives/builder/accrual/aggregation) plus the JSON 
 [crates.cashflows.modules]
 fixings = { python = "finstack_quant.cashflows.fixings", status = "exists", note = "Typed raw rate/FX observations and atomic crossed-fixing materialization. Scenario rolls invoke the same Rust helper; WASM binds it as cashflows.materializeFixings over CashFlowSchedule handles or schedule JSON." }
 json        = { python = "finstack_quant.cashflows",             status = "exists", note = "JSON bridge exposes the canonical coupon_program and payment_program builder surface. Naming note: the free function validate_cashflow_schedule_json binds Rust json::validate_cashflow_schedule_json 1:1; its typed twin is CashFlowSchedule.validate() on the builder surface." }
-accrual     = { python = "finstack_quant.cashflows.accrual",     status = "exists", note = "Typed accrual engine; accrued_interest remains on the JSON bridge" }
+accrual     = { python = "finstack_quant.cashflows.accrual",     status = "exists", note = "Typed accrual engine" }
 aggregation = { python = "finstack_quant.cashflows.aggregation", status = "exists", note = "Typed period rollups and currency-checked totals. Rust-only (deliberately unbound): credit_adjusted_cashflow_pvs and DateContext — a borrow-parameterized PV kernel consumed by valuations pricers, not a host-facing API." }
 builder     = { python = "finstack_quant.cashflows.builder",     status = "exists", note = "Typed spec + builder + schedule surface; the JSON program bridge remains available on finstack_quant.cashflows" }
 primitives  = { python = "finstack_quant.cashflows.primitives",  status = "exists", note = "Typed CashFlow/CFKind primitives; CashFlow rows also travel inside schedule JSON" }

@@ -25,6 +25,13 @@ fn date(s: &str) -> cf::Date {
         .expect("date")
         .issue_date
 }
+fn accrued_json(raw: &str, as_of: &str, config: Option<&str>) -> finstack_quant_core::Result<f64> {
+    let schedule: CashFlowSchedule = serde_json::from_str(raw).expect("schedule JSON");
+    let config = config.map_or_else(cf::AccrualConfig::default, |json| {
+        serde_json::from_str(json).expect("accrual config JSON")
+    });
+    cf::accrued_interest_amount(&schedule, date(as_of), &config)
+}
 fn close(actual: f64, expected: f64) {
     assert!(
         (actual - expected).abs() < 1e-8,
@@ -370,23 +377,20 @@ fn accrued_and_ex_coupon_follow_payment_date() {
     v["coupon_program"][0]["spec"]["payment_lag_days"] = json!(2);
     let raw = serde_json::to_string(&build(v)).expect("serialize");
     close(
-        cf::accrued_interest(&raw, "2025-07-02", None).expect("AI"),
+        accrued_json(&raw, "2025-07-02", None).expect("AI"),
         100000.0 * 181.0 / 360.0,
     );
-    close(
-        cf::accrued_interest(&raw, "2025-07-03", None).expect("AI"),
-        0.0,
-    );
+    close(accrued_json(&raw, "2025-07-03", None).expect("AI"), 0.0);
     let ex=json!({"method":"linear","ex_coupon":{"days_before_coupon":7,"calendar_id":null},"include_pik":true,"frequency":null}).to_string();
     close(
-        cf::accrued_interest(&raw, "2025-06-25", Some(&ex)).expect("cum"),
+        accrued_json(&raw, "2025-06-25", Some(&ex)).expect("cum"),
         100000.0 * 175.0 / 360.0,
     );
     close(
-        cf::accrued_interest(&raw, "2025-06-26", Some(&ex)).expect("record date"),
+        accrued_json(&raw, "2025-06-26", Some(&ex)).expect("record date"),
         100000.0 * 176.0 / 360.0,
     );
-    assert!(cf::accrued_interest(&raw, "2025-06-27", Some(&ex)).expect("ex") < 0.0);
+    assert!(accrued_json(&raw, "2025-06-27", Some(&ex)).expect("ex") < 0.0);
 }
 #[test]
 fn bus252_accrual_retains_calendar() {
@@ -395,7 +399,7 @@ fn bus252_accrual_retains_calendar() {
     let raw = serde_json::to_string(&build(v)).expect("serialize");
     // January 2025 has 23 weekdays under the explicitly weekends-only calendar.
     close(
-        cf::accrued_interest(&raw, "2025-02-01", None).expect("calendar retained"),
+        accrued_json(&raw, "2025-02-01", None).expect("calendar retained"),
         100000.0 * 23.0 / 252.0,
     );
 }
@@ -640,7 +644,7 @@ fn accrued_interest_preserves_icma_long_stub_reference_on_roundtrip() {
             100_000.0 * 90.0 / 182.0 / 2.0
         };
         close(
-            cf::accrued_interest(&raw, as_of, Some(&cfg)).expect("accrued"),
+            accrued_json(&raw, as_of, Some(&cfg)).expect("accrued"),
             expected,
         );
     }
@@ -654,15 +658,15 @@ fn accrued_interest_preserves_february_termination_on_roundtrip() {
     v["coupon_program"][0]["spec"]["payment_lag_days"] = json!(2);
     let raw = serde_json::to_string(&build(v)).expect("serialize");
     close(
-        cf::accrued_interest(&raw, "2025-01-31", None).expect("accrued"),
+        accrued_json(&raw, "2025-01-31", None).expect("accrued"),
         100_000.0 * 150.0 / 360.0,
     );
     close(
-        cf::accrued_interest(&raw, "2025-02-28", None).expect("unpaid coupon"),
+        accrued_json(&raw, "2025-02-28", None).expect("unpaid coupon"),
         100_000.0 * 178.0 / 360.0,
     );
     close(
-        cf::accrued_interest(&raw, "2025-03-04", None).expect("paid coupon"),
+        accrued_json(&raw, "2025-03-04", None).expect("paid coupon"),
         0.0,
     );
 }

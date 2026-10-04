@@ -27,7 +27,6 @@ export const cashflows = {
   CashFlowBuilder: wasm.CashFlowBuilder,
   CashFlowSchedule: wasm.CashFlowSchedule,
   absToSmm: wasm.absToSmm,
-  accruedInterest: wasm.accruedInterest,
   accruedInterestAmount: wasm.accruedInterestAmount,
   aggregateByPeriod: wasm.aggregateByPeriod,
   aggregateCashflowsChecked: wasm.aggregateCashflowsChecked,

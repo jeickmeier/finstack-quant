@@ -453,7 +453,7 @@ fn cashflows_dts_matches_json_bridge_surface() {
     assert!(!dts.contains("buildCashflowScheduleEnvelopeJson"));
     assert!(!dts.contains("validateCashflowScheduleEnvelopeJson"));
     assert!(dts.contains("datedFlowsJson(scheduleJson: JsonInput): string;"));
-    assert!(dts.contains("accruedInterest("));
+    assert!(!dts.contains("accruedInterest("));
     let cashflows_start = dts.find("export interface CashflowsNamespace").unwrap();
     let cashflows_end = dts[cashflows_start..]
         .find("export declare const cashflows")

@@ -26,7 +26,6 @@ schedule_from_classified_flows = _cashflows.schedule_from_classified_flows
 schedule_from_dated_flows = _cashflows.schedule_from_dated_flows
 validate_cashflow_schedule_json = _cashflows.validate_cashflow_schedule_json
 dated_flows_json = _cashflows.dated_flows_json
-accrued_interest = _cashflows.accrued_interest
 
 abs_to_smm = _cashflows.abs_to_smm
 cpr_to_smm = _cashflows.cpr_to_smm
@@ -38,7 +37,6 @@ __all__: list[str] = [
     "ScheduleBuildOpts",
     "abs_to_smm",
     "accrual",
-    "accrued_interest",
     "aggregation",
     "build_cashflow_schedule",
     "build_cashflow_schedule_json",

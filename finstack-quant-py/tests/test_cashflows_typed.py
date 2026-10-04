@@ -1041,7 +1041,6 @@ class TestAccrual:
 
     @pytest.mark.parametrize("coupon_rate", ["-2", "-4"])
     def test_compounded_accrual_rejects_invalid_period_rate(self, coupon_rate: str) -> None:
-        from finstack_quant.cashflows import accrued_interest
         from finstack_quant.cashflows.accrual import AccrualConfig, AccrualIndex, AccrualMethod, accrued_interest_amount
         from finstack_quant.cashflows.builder import CashFlowSchedule, FixedCouponSpec, ScheduleParams
 
@@ -1058,13 +1057,10 @@ class TestAccrual:
             index.accrued_at("2025-04-01")
         with pytest.raises(ValueError, match="compounded period rate"):
             accrued_interest_amount(schedule, "2025-04-01", config)
-        with pytest.raises(ValueError, match="compounded period rate"):
-            accrued_interest(schedule.to_json(), "2025-04-01", config.to_json())
 
     def test_compounded_accrual_accepts_valid_negative_period_rate(self) -> None:
         from math import sqrt
 
-        from finstack_quant.cashflows import accrued_interest
         from finstack_quant.cashflows.accrual import AccrualConfig, AccrualIndex, AccrualMethod, accrued_interest_amount
         from finstack_quant.cashflows.builder import CashFlowSchedule, FixedCouponSpec, ScheduleParams
 
@@ -1079,7 +1075,6 @@ class TestAccrual:
         expected = 100.0 * (sqrt(0.8) - 1.0)
         assert AccrualIndex.build(schedule, config).accrued_at("2025-04-01").amount == pytest.approx(expected)
         assert accrued_interest_amount(schedule, "2025-04-01", config).amount == pytest.approx(expected)
-        assert accrued_interest(schedule.to_json(), "2025-04-01", config.to_json()) == pytest.approx(expected)
 
     def test_accrual_method_is_hashable(self) -> None:
         from finstack_quant.cashflows.accrual import AccrualMethod
@@ -1242,14 +1237,14 @@ class TestAggregation:
 
 
 class TestTypedJsonEquivalence:
-    def test_typed_accrual_matches_json_bridge(self) -> None:
-        from finstack_quant.cashflows import accrued_interest
+    def test_typed_accrual_survives_schedule_json_roundtrip(self) -> None:
         from finstack_quant.cashflows.accrual import accrued_interest_amount
+        from finstack_quant.cashflows.builder import CashFlowSchedule
 
         schedule = TestAccrual._semiannual_bond()
         typed = accrued_interest_amount(schedule, dt.date(2025, 4, 15))
-        via_json = accrued_interest(schedule.to_json(), "2025-04-15")
-        assert typed.amount == pytest.approx(via_json, abs=1e-9)
+        roundtrip = accrued_interest_amount(CashFlowSchedule.from_json(schedule.to_json()), "2025-04-15")
+        assert typed.amount == pytest.approx(roundtrip.amount, abs=1e-9)
         assert typed.currency.code == "USD"
         assert typed.amount == pytest.approx(12_500.0, abs=1e-6)
 

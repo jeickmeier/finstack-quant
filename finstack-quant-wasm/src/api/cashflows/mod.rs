@@ -12,7 +12,7 @@ pub mod primitives;
 pub mod schedule;
 pub mod specs;
 
-use crate::utils::input::{js_f64, js_string, js_uint, json_text, opt_json_text};
+use crate::utils::input::{js_f64, js_uint, json_text, opt_json_text};
 use crate::utils::to_js_err;
 use wasm_bindgen::prelude::*;
 
@@ -86,32 +86,6 @@ pub fn validate_cashflow_schedule_json(schedule_json: JsValue) -> Result<String,
 pub fn dated_flows_json(schedule_json: JsValue) -> Result<String, JsValue> {
     let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
     finstack_quant_cashflows::dated_flows_json(schedule_json).map_err(to_js_err)
-}
-
-/// Compute accrued interest from a cashflow schedule JSON string as of a given date.
-///
-/// @param schedule_json - JSON-encoded `CashFlowSchedule`.
-/// @param as_of - ISO-8601 date (YYYY-MM-DD) for the accrual snapshot.
-/// @param config_json - Optional JSON-encoded `AccrualConfig` overriding defaults.
-/// @returns Accrued interest in the schedule's settlement currency as a JS
-///   number. The Rust engine computes from the canonical schedule and then
-///   crosses the WASM boundary as `f64`; for large notionals, compare with an
-///   absolute tolerance scaled to the schedule notional rather than expecting
-///   decimal-string equality.
-/// @throws If any JSON input is malformed, a compounded period rate is
-///   non-finite or at or below -1, or the accrual computation fails or produces
-///   a non-finite result.
-#[wasm_bindgen(js_name = accruedInterest)]
-pub fn accrued_interest(
-    schedule_json: JsValue,
-    as_of: JsValue,
-    config_json: Option<JsValue>,
-) -> Result<f64, JsValue> {
-    let schedule_json: &str = &json_text(&schedule_json, "scheduleJson")?;
-    let as_of: &str = &js_string(&as_of, "asOf")?;
-    let config_json = opt_json_text(config_json.as_ref(), "configJson")?;
-    finstack_quant_cashflows::accrued_interest(schedule_json, as_of, config_json.as_deref())
-        .map_err(to_js_err)
 }
 
 /// Convert an annual CPR (constant prepayment rate) to a monthly SMM.

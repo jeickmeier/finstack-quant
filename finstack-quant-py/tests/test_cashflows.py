@@ -10,13 +10,20 @@ import math
 import pytest
 
 from finstack_quant.cashflows import (
-    accrued_interest,
     build_cashflow_schedule,
     build_cashflow_schedule_json,
     dated_flows_json,
     validate_cashflow_schedule_json,
 )
+from finstack_quant.cashflows.accrual import AccrualConfig, accrued_interest_amount
+from finstack_quant.cashflows.builder import CashFlowSchedule
 from finstack_quant.valuations.instruments import bond_from_cashflows_json, price_instrument
+
+
+def accrued_interest(schedule_json: str, as_of: object, config_json: str | None = None) -> float:
+    """Accrue a schedule JSON payload through the typed accrual engine."""
+    config = AccrualConfig.from_json(config_json) if config_json is not None else None
+    return accrued_interest_amount(CashFlowSchedule.from_json(schedule_json), as_of, config).amount
 
 
 def test_typed_build_runtime_doc_example() -> None:
@@ -305,7 +312,7 @@ def test_cashflows_accrued_interest_rejects_unknown_config_json_fields() -> None
         "strict_issue_date": True,
     })
 
-    with pytest.raises(ValueError, match="invalid accrual config JSON"):
+    with pytest.raises(ValueError, match="invalid AccrualConfig JSON"):
         accrued_interest(schedule_json, "2025-02-28", config_json)
 
 

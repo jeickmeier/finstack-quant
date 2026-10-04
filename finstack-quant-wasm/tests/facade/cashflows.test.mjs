@@ -36,6 +36,17 @@ const { cashflows, valuations } = facade;
 
 await init({ module_or_path: readFileSync(WASM_BG) });
 
+/** Accrue a schedule JSON payload through the typed accrual engine. */
+function accruedInterest(scheduleJson, asOf, configJson) {
+  const schedule = cashflows.CashFlowSchedule.fromJson(scheduleJson);
+  try {
+    const config = configJson == null ? undefined : JSON.parse(configJson);
+    return Number(cashflows.accruedInterestAmount(schedule, asOf, config).amount);
+  } finally {
+    schedule.free();
+  }
+}
+
 // Same fixture as finstack-quant-py/tests/test_cashflows.py::_cashflow_spec().
 const cashflowSpec = JSON.stringify({
   notional: {
@@ -67,7 +78,6 @@ const EXPORTED_KEYS = [
   'CashFlowBuilder',
   'CashFlowSchedule',
   'absToSmm',
-  'accruedInterest',
   'accruedInterestAmount',
   'aggregateByPeriod',
   'aggregateCashflowsChecked',
@@ -232,7 +242,7 @@ test('cashflows end-to-end build/validate/flows/accrual from JSON spec', () => {
   const flows = JSON.parse(cashflows.datedFlowsJson(scheduleJson));
   assert.equal(flows.length, schedule.flows.length);
 
-  const accrued = cashflows.accruedInterest(scheduleJson, '2025-02-28', null);
+  const accrued = accruedInterest(scheduleJson, '2025-02-28', null);
   assert.equal(typeof accrued, 'number');
   assert.ok(Number.isFinite(accrued));
   assert.ok(accrued > 0);
@@ -486,7 +496,7 @@ test('cashflows rejects invalid compounded rates and supports valid negative rat
     spec.coupon_program[0].spec.rate = rate;
     const schedule = cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null);
     assert.throws(
-      () => cashflows.accruedInterest(schedule, '2025-04-01', config),
+      () => accruedInterest(schedule, '2025-04-01', config),
       (error) => {
         assert.ok(error instanceof Error);
         assert.equal(error.name, 'FinstackError');
@@ -498,7 +508,7 @@ test('cashflows rejects invalid compounded rates and supports valid negative rat
   }
   spec.coupon_program[0].spec.rate = '-0.4';
   const schedule = cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null);
-  const accrued = cashflows.accruedInterest(schedule, '2025-04-01', config);
+  const accrued = accruedInterest(schedule, '2025-04-01', config);
   assert.ok(Math.abs(accrued - 1000000 * (Math.sqrt(0.8) - 1)) < 1e-8);
 });
 
@@ -532,7 +542,7 @@ test('cashflows preserves principal deltas and accrual calendars through JSON', 
     'weekends_only'
   );
   assert.ok(
-    Math.abs(cashflows.accruedInterest(raw, '2025-02-01', null) - (100000 * 23) / 252) < 1e-8
+    Math.abs(accruedInterest(raw, '2025-02-01', null) - (100000 * 23) / 252) < 1e-8
   );
 });
 
@@ -549,9 +559,9 @@ test('cashflows retains earned accrual until the delayed payment', () => {
   });
   const raw = cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null);
   assert.ok(
-    Math.abs(cashflows.accruedInterest(raw, '2025-07-02', null) - (100000 * 181) / 360) < 1e-8
+    Math.abs(accruedInterest(raw, '2025-07-02', null) - (100000 * 181) / 360) < 1e-8
   );
-  assert.equal(cashflows.accruedInterest(raw, '2025-07-03', null), 0);
+  assert.equal(accruedInterest(raw, '2025-07-03', null), 0);
 });
 
 test('cashflows accrual preserves ICMA reference periods and ISDA termination dates', () => {
@@ -577,6 +587,6 @@ test('cashflows accrual preserves ICMA reference periods and ISDA termination da
       include_pik: true,
       frequency: { count: 6, unit: 'months' },
     });
-    assert.ok(Math.abs(cashflows.accruedInterest(raw, asOf, cfg) - expected) < 1e-8);
+    assert.ok(Math.abs(accruedInterest(raw, asOf, cfg) - expected) < 1e-8);
   }
 });

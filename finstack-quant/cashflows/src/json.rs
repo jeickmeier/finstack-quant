@@ -4,13 +4,12 @@
 //! stable string-based surface while preserving the Rust builder and schedule
 //! types as the canonical schema.
 
-use crate::accrual::{accrued_interest_amount, AccrualConfig};
 use crate::builder::{
     CashFlowSchedule, CouponType, FeeSpec, FixedCouponSpec, FloatingCouponSpec, Notional,
     PrincipalExchange, StepUpCouponSpec,
 };
 use crate::primitives::CFKind;
-use finstack_quant_core::dates::{parse_iso_date, Date};
+use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::{Error, Result};
@@ -554,79 +553,6 @@ pub fn dated_flows_json(schedule_json: &str) -> Result<String> {
         .map(|(date, amount)| DatedFlowJson { date, amount })
         .collect();
     serialize_json(&flows, "dated flows")
-}
-
-/// Compute accrued interest from a schedule JSON payload.
-///
-/// The schedule is parsed as [`CashFlowSchedule`], `as_of` is parsed as an
-/// ISO-8601 date, and `config_json` is parsed as [`AccrualConfig`] when
-/// supplied. When `config_json` is `None`, [`AccrualConfig::default`] is used.
-///
-/// # Arguments
-///
-/// * `schedule_json` - JSON-encoded [`CashFlowSchedule`].
-/// * `as_of` - ISO-8601 date string such as `"2025-02-28"`.
-/// * `config_json` - Optional JSON-encoded [`AccrualConfig`].
-///
-/// # Returns
-///
-/// Finite scalar accrued-interest amount in the schedule's currency space.
-///
-/// # Errors
-///
-/// Returns an error if the schedule, as-of date, or optional accrual config JSON
-/// cannot be parsed or validated, a day-count or ex-coupon calculation fails,
-/// a compounded coupon-period rate is non-finite or at or below `-1`, or the
-/// accrued-interest formula or accumulated result is non-finite. Valid negative
-/// compounded period rates in `(-1, 0)` remain supported.
-///
-/// # Examples
-///
-/// ```rust
-/// use finstack_quant_cashflows::{accrued_interest, build_cashflow_schedule_json};
-///
-/// let spec_json = r#"{
-///   "notional": {
-///     "initial": { "amount": "1000000", "currency": "USD" },
-///     "amort": "none"
-///   },
-///   "issue_date": "2024-08-31",
-///   "maturity": "2025-08-31",
-///   "coupon_program": [{
-///     "kind": "fixed",
-///     "spec": {
-///       "coupon_type": "cash",
-///       "rate": "0.06",
-///       "frequency": { "count": 12, "unit": "months" },
-///       "day_count": "30_360",
-///       "business_day_convention": "following",
-///       "calendar_id": "weekends_only",
-///       "stub": "none",
-///       "end_of_month": false,
-///       "payment_lag_days": 0
-///     }
-///   }]
-/// }"#;
-///
-/// let schedule_json = build_cashflow_schedule_json(spec_json, None)?;
-/// let accrued = accrued_interest(&schedule_json, "2025-02-28", None)?;
-/// assert!(accrued > 0.0);
-/// # Ok::<(), finstack_quant_core::Error>(())
-/// ```
-pub fn accrued_interest(
-    schedule_json: &str,
-    as_of: &str,
-    config_json: Option<&str>,
-) -> Result<f64> {
-    let schedule = parse_schedule(schedule_json)?;
-    schedule.validate()?;
-    let as_of = parse_iso_date(as_of)?;
-    let config = match config_json {
-        Some(json) => serde_json::from_str::<AccrualConfig>(json)
-            .map_err(|err| Error::Validation(format!("invalid accrual config JSON: {err}")))?,
-        None => AccrualConfig::default(),
-    };
-    accrued_interest_amount(&schedule, as_of, &config)
 }
 
 fn parse_schedule(schedule_json: &str) -> Result<CashFlowSchedule> {

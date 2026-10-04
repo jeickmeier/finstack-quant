@@ -531,10 +531,6 @@ test('typed and JSON schedule builders agree', () => {
       cashflows.datedFlows(schedule),
       JSON.parse(cashflows.datedFlowsJson(schedule.toJson()))
     );
-    assert.equal(
-      Number(cashflows.accruedInterestAmount(schedule, '2025-04-15').amount),
-      cashflows.accruedInterest(schedule.toJson(), '2025-04-15')
-    );
     assert.equal(schedule.validate(), undefined);
   });
 });

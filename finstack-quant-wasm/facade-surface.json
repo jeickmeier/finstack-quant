@@ -411,7 +411,6 @@
       "CashFlowBuilder",
       "CashFlowSchedule",
       "absToSmm",
-      "accruedInterest",
       "accruedInterestAmount",
       "aggregateByPeriod",
       "aggregateCashflowsChecked",
@@ -536,9 +535,6 @@
     "getters": []
   },
   "cashflows.absToSmm": {
-    "kind": "function"
-  },
-  "cashflows.accruedInterest": {
     "kind": "function"
   },
   "cashflows.accruedInterestAmount": {

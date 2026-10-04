@@ -37,7 +37,6 @@ __all__ = [
     "ScheduleBuildOpts",
     "abs_to_smm",
     "accrual",
-    "accrued_interest",
     "aggregation",
     "build_cashflow_schedule",
     "build_cashflow_schedule_json",
@@ -450,56 +449,6 @@ def dated_flows_json(schedule_json: str) -> str:
     >>> import json
     >>> from finstack_quant.cashflows import dated_flows_json
     >>> len(json.loads(dated_flows_json(schedule.to_json()))) == len(schedule.get_flows())
-    True
-
-    """
-
-def accrued_interest(schedule_json: str, as_of: datetime.date | str, config_json: str | None = None) -> float:
-    """
-    Compute accrued interest for a schedule as of a valuation date.
-
-    Parameters
-    ----------
-    schedule_json : str
-        JSON-encoded ``CashFlowSchedule``.
-    as_of : datetime.date | str
-        Accrual snapshot date, either a date-like object or an ISO 8601 string.
-    config_json : str, optional
-        JSON-encoded ``AccrualConfig`` overriding default accrual conventions.
-
-    Returns
-    -------
-    float
-        Accrued interest in the schedule settlement currency. The Rust engine
-        computes from the canonical schedule and crosses the binding boundary as
-        ``f64``; for large notionals, compare with an absolute tolerance scaled
-        to the schedule notional rather than expecting decimal-string equality.
-        Returns ``0.0`` when ``as_of`` is outside all coupon periods.
-
-    Raises
-    ------
-    ValueError
-        If the schedule JSON or accrual configuration is invalid, compounded
-        accrual has a non-finite period rate or a rate at or below -100%, or
-        the resulting accrued interest is non-finite.
-    KeyError
-        If an ex-coupon calendar is unknown.
-
-    Examples
-    --------
-    >>> import datetime
-    >>> from decimal import Decimal
-    >>> from finstack_quant.cashflows.builder import CashFlowSchedule, FixedCouponSpec, ScheduleParams
-    >>> from finstack_quant.core.money import Money
-    >>> schedule = (
-    ...     CashFlowSchedule
-    ...     .builder()
-    ...     .principal(Money(1_000_000.0, "USD"), datetime.date(2025, 1, 15), datetime.date(2026, 1, 15))
-    ...     .fixed_cf(FixedCouponSpec(rate=Decimal("0.05"), schedule=ScheduleParams.semiannual_30360()))
-    ...     .build()
-    ... )
-    >>> from finstack_quant.cashflows import accrued_interest
-    >>> accrued_interest(schedule.to_json(), "2025-04-15") > 0.0
     True
 
     """

@@ -14779,17 +14779,6 @@ export interface CashflowsNamespace {
   datedFlowsJson(scheduleJson: JsonInput): string;
 
   /**
-   * Compute accrued interest from a cashflow schedule JSON string as of a given date.
-   *
-   * @param scheduleJson - JSON-encoded `CashFlowSchedule`.
-   * @param asOf - ISO-8601 date (YYYY-MM-DD) for the accrual snapshot.
-   * @param configJson - Optional JSON-encoded `AccrualConfig` overriding defaults.
-   * @returns Accrued interest in the schedule's settlement currency as a JS number. The Rust engine computes from the canonical schedule and then crosses the WASM boundary as `f64`; for large notionals, compare with an absolute tolerance scaled to the schedule notional rather than expecting decimal-string equality.
-   * @throws If any JSON input is malformed, a compounded period rate is non-finite or at or below -1, or the accrual computation fails or produces a non-finite result.
-   */
-  accruedInterest(scheduleJson: JsonInput, asOf: string, configJson?: JsonInput | null): number;
-
-  /**
    * Convert an annual CPR (constant prepayment rate) to a monthly SMM.
    *
    * Uses the standard relationship `SMM = 1 - (1 - CPR)^(1/12)`.
@@ -14976,9 +14965,6 @@ export interface CashflowsNamespace {
 
   /**
    * Accrued interest of a schedule as of a date.
-   *
-   * Typed twin of `accruedInterest`, which takes schedule JSON and returns a
-   * number.
    *
    * @param schedule - `CashFlowSchedule` handle.
    * @param asOf - ISO-8601 accrual snapshot date; interest accrues through accrual end and stays accrued until payment.
