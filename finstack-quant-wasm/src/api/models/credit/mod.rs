@@ -13,12 +13,12 @@ pub mod scoring;
 
 use std::sync::Arc;
 
-use super::serde_tag;
 use crate::api::core::market_data::JsHazardCurve;
 use crate::utils::input::{from_js_json, js_bool, js_f64, js_f64_seq, js_string, js_u64, js_uint};
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::dates::DayCount;
 use finstack_quant_core::types::CreditRating;
+use finstack_quant_core::wire::serde_tag;
 use finstack_quant_models::credit::{
     self as credit, AssetDynamics, CreditState, CreditStateVariable, DynamicRecoverySpec,
     EndogenousHazardSpec, MertonBarrierType, MertonModel, RatingFactorTable, SimulatedPaths,
@@ -952,7 +952,7 @@ impl JsDynamicRecoverySpec {
     /// `"linear_decline"`.
     #[wasm_bindgen(getter)]
     pub fn kind(&self) -> Result<String, JsValue> {
-        serde_tag(self.inner.model())
+        serde_tag(self.inner.model()).map_err(to_js_err)
     }
 
     /// Base (reference) recovery rate `R0`, as a fraction from 0 through 1.
@@ -1072,7 +1072,7 @@ impl JsEndogenousHazardSpec {
     /// `"tabular"`.
     #[wasm_bindgen(getter)]
     pub fn kind(&self) -> Result<String, JsValue> {
-        serde_tag(self.inner.leverage_hazard_map())
+        serde_tag(self.inner.leverage_hazard_map()).map_err(to_js_err)
     }
 
     /// Base (reference) hazard rate, annualized, as a decimal.
@@ -1249,7 +1249,7 @@ impl JsToggleExerciseModel {
     /// `"optimal_exercise"` (the canonical serde tag).
     #[wasm_bindgen(getter)]
     pub fn kind(&self) -> Result<String, JsValue> {
-        serde_tag(&self.inner)
+        serde_tag(&self.inner).map_err(to_js_err)
     }
 
     /// Parameters of the active rule as a plain object in canonical JSON form.

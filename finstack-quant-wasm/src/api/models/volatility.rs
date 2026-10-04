@@ -7,8 +7,7 @@
 
 use crate::api::core::surfaces::{JsFxDeltaVolSurface, JsVolCube};
 use crate::utils::input::{
-    from_js_json, invalid_type, js_bool, js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_string,
-    js_uint,
+    from_js_json, invalid_type, js_bool, js_f64, js_f64_matrix, js_f64_seq, js_opt_f64, js_uint,
 };
 use crate::utils::wire::js_wire;
 use crate::utils::{to_js_err, to_js_value};
@@ -28,6 +27,8 @@ use wasm_bindgen::prelude::*;
 pub struct JsSabrParameters {
     pub(crate) inner: SabrParameters,
 }
+
+json_round_trip!(JsSabrParameters, SabrParameters);
 
 #[wasm_bindgen(js_class = SabrParameters)]
 impl JsSabrParameters {
@@ -223,32 +224,6 @@ impl JsSabrParameters {
         let rho = js_f64(&rho, "rho")?;
         let shift = js_f64(&shift, "shift")?;
         SabrParameters::shifted_lognormal(alpha, nu, rho, shift)
-            .map(Self::from_inner)
-            .map_err(to_js_err)
-    }
-
-    /// Serialize to the Rust `SabrParameters` JSON wire form.
-    ///
-    /// @returns JSON text with `alpha`, `beta`, `nu`, `rho` and, when set, `shift`.
-    /// @throws If serialization fails (not expected).
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
-    }
-
-    /// Deserialize from the Rust `SabrParameters` JSON wire form produced by `toJson`.
-    ///
-    /// # Arguments
-    ///
-    /// * `json` - JSON text with `alpha`, `beta`, `nu`, `rho` and an optional
-    ///   `shift`; unknown fields are rejected and every field is range-checked.
-    ///
-    /// @returns The parsed `SabrParameters` handle.
-    /// @throws `TypeError` if `json` is not a string; `FinstackError` (kind
-    /// `validation`) on malformed JSON, an unknown field, or a parameter outside its domain.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsSabrParameters, JsValue> {
-        serde_json::from_str(&js_string(&json, "json")?)
             .map(Self::from_inner)
             .map_err(to_js_err)
     }

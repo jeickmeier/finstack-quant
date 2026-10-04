@@ -2,16 +2,11 @@ use pyo3::prelude::*;
 use pyo3::types::PyType;
 
 use finstack_quant_models::factor::credit::VolHorizon;
-use finstack_quant_models::factor::risk::{DecompositionConfig, DecompositionMethod};
+use finstack_quant_models::factor::risk::DecompositionConfig;
 
 use crate::bindings::pickle_support::reduce_via_json;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::{core_to_py, serde_json_to_py, value_error};
-
-/// Serde name of a [`DecompositionMethod`] (`"parametric"` / `"historical"`).
-pub(super) fn decomposition_method_label(method: DecompositionMethod) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(&method).map_err(core_to_py)
-}
 
 /// Extract a [`VolHorizon`] from either a `VolHorizon` instance or a
 /// descriptor string (`"one_step"`, `"unconditional"`, `'{"n_steps": N}'`,
@@ -284,7 +279,7 @@ impl PyDecompositionConfig {
     /// Decomposition method: ``"parametric"`` or ``"historical"``.
     #[getter]
     fn method(&self) -> PyResult<String> {
-        decomposition_method_label(self.inner.method)
+        finstack_quant_core::wire::serde_label(&self.inner.method).map_err(core_to_py)
     }
 
     /// Whether leave-one-out incremental VaR is computed.

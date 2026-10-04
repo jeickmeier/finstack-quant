@@ -15,7 +15,6 @@ use crate::bindings::pandas_utils::{
 };
 use crate::bindings::repr_support::repr_from_serde;
 
-use super::config::decomposition_method_label;
 use crate::bindings::json_bridge::{deserialize_json, serialize_json};
 
 /// Python-style rendering of an optional float (`None` or the number).
@@ -801,7 +800,8 @@ impl PyPositionRiskDecomposition {
     /// Decomposition method: ``"parametric"`` or ``"historical"``.
     #[getter]
     fn method(&self) -> PyResult<String> {
-        decomposition_method_label(self.inner.method)
+        finstack_quant_core::wire::serde_label(&self.inner.method)
+            .map_err(crate::errors::core_to_py)
     }
 
     /// Parametric-mode numerical residual; ``None`` in historical mode.
@@ -892,7 +892,7 @@ impl PyPositionRiskDecomposition {
             self.inner.portfolio_es,
             self.inner.confidence,
             self.inner.n_positions,
-            decomposition_method_label(self.inner.method).unwrap_or_else(|_| "?".to_string()),
+            finstack_quant_core::wire::serde_label(&self.inner.method).unwrap_or_else(|_| "?".to_string()),
             py_opt(self.inner.euler_residual),
         )
     }

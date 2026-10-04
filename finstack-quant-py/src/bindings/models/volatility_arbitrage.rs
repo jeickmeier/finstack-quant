@@ -8,6 +8,7 @@
 //! returns a typed `ArbitrageReport`.
 
 use crate::bindings::macros::wire_methods;
+use finstack_quant_core::wire::serde_label;
 use finstack_quant_models::volatility::arbitrage::{
     self as model_arbitrage, ArbitrageReport, ArbitrageSeverity, ArbitrageType, ArbitrageViolation,
 };
@@ -16,11 +17,6 @@ use pyo3::types::{PyDict, PyModule};
 
 use crate::bindings::pandas_utils::{serde_rows_to_dataframe, serde_to_py};
 use crate::errors::core_to_py;
-
-/// Serde name of an arbitrage enum variant (the `snake_case` wire form).
-fn label<T: serde::Serialize>(value: &T) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(value).map_err(core_to_py)
-}
 
 /// Convert a slice of violations into a Python list of serde dicts.
 ///
@@ -112,7 +108,7 @@ impl PyArbitrageReport {
             ArbitrageSeverity::Critical,
         ] {
             by_sev.set_item(
-                label(&sev)?,
+                serde_label(&sev).map_err(core_to_py)?,
                 self.inner
                     .counts_by_severity
                     .get(&sev)
@@ -136,7 +132,7 @@ impl PyArbitrageReport {
             ArbitrageType::SviCalendarSpread,
         ] {
             by_type.set_item(
-                label(&t)?,
+                serde_label(&t).map_err(core_to_py)?,
                 self.inner.counts_by_type.get(&t).copied().unwrap_or(0),
             )?;
         }
@@ -155,8 +151,8 @@ impl PyArbitrageReport {
             .iter()
             .map(|v| {
                 Ok(ViolationRow {
-                    violation_type: label(&v.violation_type)?,
-                    severity: label(&v.severity)?,
+                    violation_type: serde_label(&v.violation_type).map_err(core_to_py)?,
+                    severity: serde_label(&v.severity).map_err(core_to_py)?,
                     strike: v.location.strike,
                     expiry: v.location.expiry,
                     adjacent_expiry: v.location.adjacent_expiry,

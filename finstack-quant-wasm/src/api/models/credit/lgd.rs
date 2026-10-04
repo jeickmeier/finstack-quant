@@ -534,7 +534,7 @@ impl JsDownturnLgd {
     /// Canonical name of the adjustment method: `"stressed_approximation"` or `"regulatory_floor"`.
     #[wasm_bindgen(getter)]
     pub fn method(&self) -> Result<String, JsValue> {
-        super::super::serde_tag(self.inner.method())
+        finstack_quant_core::wire::serde_tag(self.inner.method()).map_err(to_js_err)
     }
 
     /// Method parameters as a plain object in canonical JSON form.

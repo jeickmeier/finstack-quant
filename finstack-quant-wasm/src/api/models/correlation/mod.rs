@@ -450,6 +450,8 @@ pub struct JsPortfolioLossResult {
     pub(crate) inner: corr::PortfolioLossResult,
 }
 
+json_round_trip!(JsPortfolioLossResult, PortfolioLossResult);
+
 #[wasm_bindgen(js_class = PortfolioLossResult)]
 impl JsPortfolioLossResult {
     /// Aggregate a finite loss distribution under loss-positive conventions.
@@ -476,32 +478,6 @@ impl JsPortfolioLossResult {
         corr::PortfolioLossResult::from_losses(losses, confidence)
             .map(|inner| Self { inner })
             .map_err(to_js_err)
-    }
-
-    /// Load a result from its canonical JSON form.
-    ///
-    /// The losses and confidence are validated and the aggregates recomputed;
-    /// a payload whose aggregates disagree with its losses is rejected.
-    /// @param json - `PortfolioLossResult` JSON (`losses`, `expected_loss`, `var`, `expected_shortfall`, `confidence`), as a string or plain object.
-    /// @returns A `PortfolioLossResult` handle.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `TypeError` if `json` is neither a string nor a plain object,
-    /// and a `validation` error if it is malformed or fails the checks above.
-    #[wasm_bindgen(js_name = fromJson)]
-    pub fn from_json(json: JsValue) -> Result<JsPortfolioLossResult, JsValue> {
-        crate::utils::input::from_js_json(&json, "json").map(|inner| Self { inner })
-    }
-
-    /// Serialize to the canonical JSON wire format.
-    ///
-    /// # Errors
-    ///
-    /// Throws a `validation` error if serialization fails.
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner).map_err(to_js_err)
     }
 
     /// Loss per simulated path, in path order.

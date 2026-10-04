@@ -17,7 +17,7 @@ use crate::bindings::extract::extract_credit_rating;
 use crate::bindings::pandas_utils::{
     dict_to_dataframe, serde_object_to_single_row_dataframe, serde_to_py, values_to_series,
 };
-use crate::errors::{core_to_py, serde_json_to_py, value_error};
+use crate::errors::{core_to_py, value_error};
 use finstack_quant_models::credit::{
     moodys_warf_factor as rust_moodys_warf_factor, AssetDynamics, CreditState, CreditStateVariable,
     DynamicRecoverySpec, EndogenousHazardSpec, MertonBarrierType, MertonModel, RatingFactorTable,
@@ -1013,7 +1013,7 @@ impl PyDynamicRecoverySpec {
     /// ``"floored_inverse"``, ``"linear_decline"``.
     #[getter]
     fn kind(&self) -> PyResult<String> {
-        model_tag(self.inner.model())
+        finstack_quant_core::wire::serde_tag(self.inner.model()).map_err(core_to_py)
     }
 
     /// Recovery rate (decimal) at the given current notional.
@@ -1159,7 +1159,7 @@ impl PyEndogenousHazardSpec {
     /// One of ``"power_law"``, ``"exponential"``, ``"tabular"``.
     #[getter]
     fn kind(&self) -> PyResult<String> {
-        model_tag(self.inner.leverage_hazard_map())
+        finstack_quant_core::wire::serde_tag(self.inner.leverage_hazard_map()).map_err(core_to_py)
     }
 
     /// Annualized hazard rate (decimal) at the given leverage ratio.
@@ -1520,24 +1520,6 @@ wire_methods!(
     ToggleExerciseModel,
     "ToggleExerciseModel"
 );
-
-/// Canonical serde tag of an externally-tagged enum value (`"constant"`,
-/// `{"inverse_power": {...}}` -> `"inverse_power"`).
-fn model_tag<T: serde::Serialize>(value: &T) -> PyResult<String> {
-    match serde_json::to_value(value)
-        .map_err(|err| serde_json_to_py(err, "model tag serialization failed"))?
-    {
-        serde_json::Value::String(tag) => Ok(tag),
-        serde_json::Value::Object(map) if map.len() == 1 => map
-            .keys()
-            .next()
-            .cloned()
-            .ok_or_else(|| value_error("model tag object is empty")),
-        other => Err(value_error(format!(
-            "expected an externally tagged enum value, got {other}"
-        ))),
-    }
-}
 
 /// Render an externally-tagged enum as its Python constructor call:
 /// `"terminal"` -> `Name.terminal()`, `{"first_passage": {"k": v}}` ->

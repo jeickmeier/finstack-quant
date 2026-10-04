@@ -11259,8 +11259,8 @@ export interface PortfolioLossResult extends WasmOwned {
   ): TrancheLossStatistics;
   /**
    * Serialize to the canonical JSON wire format.
-   * @returns Canonical `PortfolioLossResult` JSON.
-   * @throws Error - Throws a `validation` error if serialization fails.
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
    */
   toJson(): string;
 }
@@ -11297,9 +11297,9 @@ export interface PortfolioLossResultConstructor {
    * Load a result from its canonical JSON form; the losses and confidence are
    * validated and the aggregates recomputed, so a payload whose aggregates
    * disagree with its losses is rejected.
-   * @param json - `PortfolioLossResult` JSON (`losses`, `expected_loss`, `var`, `expected_shortfall`, `confidence`), as a string or plain object.
-   * @returns A `PortfolioLossResult` handle.
-   * @throws Error - Throws a `TypeError` if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the checks above.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
   fromJson(json: JsonInput): PortfolioLossResult;
 }
@@ -25736,8 +25736,8 @@ export interface SabrParameters extends WasmOwned {
   isShifted(): boolean;
   /**
    * Serialize to the Rust `SabrParameters` JSON wire form.
-   * @returns JSON text with `alpha`, `beta`, `nu`, `rho` and, when set, `shift`.
-   * @throws If serialization fails (not expected).
+   * @returns Compact canonical JSON text.
+   * @throws Error - Throws a `validation` error if serialization fails (not expected for a valid handle).
    */
   toJson(): string;
 }
@@ -25826,11 +25826,11 @@ export interface SabrParametersConstructor {
   shiftedLognormal(alpha: number, nu: number, rho: number, shift: number): SabrParameters;
   /**
    * Deserialize from the Rust `SabrParameters` JSON wire form produced by `toJson`.
-   * @param json - JSON text with `alpha`, `beta`, `nu`, `rho` and an optional `shift`; unknown fields are rejected and every field is range-checked.
-   * @returns The parsed `SabrParameters` handle.
-   * @throws `TypeError` if `json` is not a string; `FinstackError` (kind `validation`) on malformed JSON, an unknown field, or a parameter outside its domain.
+   * @param json - Canonical JSON for this type, as JSON text or a plain object.
+   * @returns The validated handle.
+   * @throws Error - Throws a `TypeError` (`kind: "invalid_type"`) if `json` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the type's validation.
    */
-  fromJson(json: string): SabrParameters;
+  fromJson(json: JsonInput): SabrParameters;
 }
 
 /**

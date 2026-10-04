@@ -27,18 +27,6 @@ use finstack_quant_models::factor::risk::{DecompositionConfig, PositionRiskDecom
 use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorId, FactorModelConfig};
 use wasm_bindgen::prelude::*;
 
-// Horizon helper (shared by CreditCalibrator and FactorCovarianceForecast)
-
-/// Parse a horizon descriptor string into a [`VolHorizon`].
-///
-/// Delegates to the canonical [`VolHorizon::parse`] implementation in
-/// `finstack-quant-models`; this wrapper only maps the error to a `JsValue`.
-fn parse_vol_horizon(
-    s: &str,
-) -> Result<finstack_quant_models::factor::credit::VolHorizon, JsValue> {
-    finstack_quant_models::factor::credit::VolHorizon::parse(s).map_err(to_js_err)
-}
-
 /// Calibrated credit factor hierarchy artifact.
 ///
 /// Produced by `CreditCalibrator` or loaded from JSON via
@@ -451,7 +439,8 @@ impl JsFactorCovarianceForecast {
     #[wasm_bindgen(js_name = covarianceAt)]
     pub fn covariance_at(&self, horizon_json: JsValue) -> Result<JsValue, JsValue> {
         let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
-        let h = parse_vol_horizon(horizon_json)?;
+        let h = finstack_quant_models::factor::credit::VolHorizon::parse(horizon_json)
+            .map_err(to_js_err)?;
         let forecast =
             finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
         let cov = forecast.covariance_at(h).map_err(to_js_err)?;
@@ -475,7 +464,8 @@ impl JsFactorCovarianceForecast {
     ) -> Result<f64, JsValue> {
         let issuer_id: &str = &js_string(&issuer_id, "issuerId")?;
         let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
-        let h = parse_vol_horizon(horizon_json)?;
+        let h = finstack_quant_models::factor::credit::VolHorizon::parse(horizon_json)
+            .map_err(to_js_err)?;
         let id = finstack_quant_core::types::IssuerId::new(issuer_id);
         let forecast =
             finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
@@ -498,7 +488,8 @@ impl JsFactorCovarianceForecast {
         risk_measure_json: Option<JsValue>,
     ) -> Result<JsValue, JsValue> {
         let horizon_json: &str = &json_text(&horizon_json, "horizonJson")?;
-        let h = parse_vol_horizon(horizon_json)?;
+        let h = finstack_quant_models::factor::credit::VolHorizon::parse(horizon_json)
+            .map_err(to_js_err)?;
         // `js_opt_wire`: the unit variants are bare wire strings (`"variance"`),
         // which are not JSON text.
         let measure: finstack_quant_models::factor::RiskMeasure =
@@ -1445,24 +1436,5 @@ mod tests {
                 other => panic!("unexpected dimension JSON: {other:?}"),
             }
         }
-    }
-
-    /// Verify parse_vol_horizon recognizes valid forms without triggering
-    /// `js_sys` (which only works on wasm32 targets).
-    #[test]
-    fn parse_vol_horizon_valid_forms() {
-        use finstack_quant_models::factor::credit::VolHorizon;
-        // OneStep and Unconditional match early without calling to_js_err.
-        assert!(matches!(
-            super::parse_vol_horizon("one_step").unwrap(),
-            VolHorizon::OneStep
-        ));
-        assert!(matches!(
-            super::parse_vol_horizon("unconditional").unwrap(),
-            VolHorizon::Unconditional
-        ));
-        // NSteps parses a valid JSON object — also no to_js_err call on this path.
-        let h = super::parse_vol_horizon(r#"{"n_steps": 5}"#).unwrap();
-        assert!(matches!(h, VolHorizon::NSteps(5)));
     }
 }

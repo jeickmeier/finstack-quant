@@ -6,6 +6,7 @@
 //! `finstack-quant-models`.
 
 use crate::bindings::macros::wire_methods;
+use finstack_quant_core::wire::serde_label;
 use std::collections::BTreeMap;
 
 use numpy::{PyArray2, PyArrayMethods};
@@ -77,11 +78,6 @@ const ISSUER_ROW_COLUMNS: &[ColumnSchema<'static>] = &[
     ("n_obs", "float64"),
     ("spread_duration", "float64"),
 ];
-
-/// Serde label (snake_case string) of a unit-variant enum.
-fn label<T: serde::Serialize>(value: &T) -> PyResult<String> {
-    finstack_quant_core::wire::serde_label(value).map_err(core_to_py)
-}
 
 /// Deserialize `obj` into `T`, accepting a JSON string, a mapping / list, or
 /// any object exposing ``to_dict()`` (``pandas.Series`` / ``DataFrame``).
@@ -199,13 +195,13 @@ impl PyCreditFactorModel {
     /// ``"quarterly"``) that fixed the annualization factor.
     #[getter]
     fn panel_frequency(&self) -> PyResult<String> {
-        label(&self.inner.panel_frequency)
+        serde_label(&self.inner.panel_frequency).map_err(core_to_py)
     }
 
     /// Bucket-mean weighting used at calibration (``"equal"`` or ``"dts"``).
     #[getter]
     fn bucket_weighting(&self) -> PyResult<String> {
-        label(&self.inner.bucket_weighting)
+        serde_label(&self.inner.bucket_weighting).map_err(core_to_py)
     }
 
     /// Point-in-time factor-model configuration (factors, covariance,
@@ -290,12 +286,12 @@ impl PyCreditFactorModel {
             rows.push(serde_json::json!({
                 "issuer_id": row.issuer_id.as_str(),
                 "tags": row.tags,
-                "mode": label(&row.mode)?,
+                "mode": serde_label(&row.mode).map_err(core_to_py)?,
                 "beta_pc": row.betas.pc,
                 "beta_levels": row.betas.levels,
                 "adder_at_anchor": row.adder_at_anchor,
                 "adder_vol_annualized": row.adder_vol_annualized,
-                "adder_vol_source": label(&row.adder_vol_source)?,
+                "adder_vol_source": serde_label(&row.adder_vol_source).map_err(core_to_py)?,
                 "r_squared": fit.map(|f| f.r_squared),
                 "n_obs": fit.map(|f| f.n_obs),
                 "spread_duration": row.spread_duration,
@@ -548,11 +544,11 @@ impl PyCreditCalibrator {
         let config = self.inner.config();
         format!(
             "CreditCalibrator(policy={:?}, n_levels={}, vol_model={:?}, covariance_strategy={:?}, bucket_weighting={:?})",
-            label(&config.policy).unwrap_or_default(),
+            serde_label(&config.policy).unwrap_or_default(),
             config.hierarchy.levels.len(),
-            label(&config.vol_model).unwrap_or_default(),
-            label(&config.covariance_strategy).unwrap_or_default(),
-            label(&config.bucket_weighting).unwrap_or_default(),
+            serde_label(&config.vol_model).unwrap_or_default(),
+            serde_label(&config.covariance_strategy).unwrap_or_default(),
+            serde_label(&config.bucket_weighting).unwrap_or_default(),
         )
     }
 }

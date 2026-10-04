@@ -947,6 +947,31 @@ mod tests {
         assert_eq!(percentage["minimum"], -100.0);
         assert_eq!(percentage["maximum"], 100.0);
     }
+
+    #[test]
+    fn serde_tag_reads_unit_and_data_variants() {
+        #[derive(Serialize)]
+        #[serde(rename_all = "snake_case")]
+        enum Shape {
+            Constant,
+            InversePower { exponent: f64 },
+        }
+
+        assert_eq!(serde_tag(&Shape::Constant).expect("unit tag"), "constant");
+        assert_eq!(
+            serde_tag(&Shape::InversePower { exponent: 2.0 }).expect("data tag"),
+            "inverse_power"
+        );
+        assert_eq!(serde_label(&Shape::Constant).expect("label"), "constant");
+        assert!(serde_label(&Shape::InversePower { exponent: 2.0 }).is_err());
+    }
+
+    #[test]
+    fn serde_tag_rejects_untagged_forms() {
+        assert!(serde_tag(&1.5_f64).is_err());
+        assert!(serde_tag(&json!({})).is_err());
+        assert!(serde_tag(&json!({"a": 1, "b": 2})).is_err());
+    }
 }
 
 /// Serde field adapter for an `f64` that may legitimately be non-finite.
@@ -1369,6 +1394,37 @@ pub fn serde_label<T: Serialize>(value: &T) -> crate::Result<String> {
         Ok(serde_json::Value::String(label)) => Ok(label),
         Ok(other) => Err(crate::Error::Internal(format!(
             "expected a string serde form, got {other}"
+        ))),
+        Err(e) => Err(crate::Error::Internal(e.to_string())),
+    }
+}
+
+/// Serde tag of an externally tagged enum value.
+///
+/// A unit variant serializes to a bare string (`"constant"`) and a data
+/// variant to a single-key object (`{"inverse_power": {...}}`); the tag is that
+/// string or that key. Lets hosts report which variant a value carries with
+/// the exact name serde owns.
+///
+/// # Arguments
+///
+/// * `value` - Externally tagged enum (or any type) whose serde form is a JSON
+///   string or a JSON object with exactly one key.
+///
+/// # Errors
+///
+/// Returns [`crate::Error::Internal`] when `value` does not serialize to a
+/// JSON string or a single-key JSON object.
+pub fn serde_tag<T: Serialize>(value: &T) -> crate::Result<String> {
+    match serde_json::to_value(value) {
+        Ok(serde_json::Value::String(tag)) => Ok(tag),
+        Ok(serde_json::Value::Object(map)) if map.len() == 1 => map
+            .into_iter()
+            .next()
+            .map(|(tag, _)| tag)
+            .ok_or_else(|| crate::Error::Internal("empty serde tag object".to_string())),
+        Ok(other) => Err(crate::Error::Internal(format!(
+            "expected an externally tagged enum value, got {other}"
         ))),
         Err(e) => Err(crate::Error::Internal(e.to_string())),
     }

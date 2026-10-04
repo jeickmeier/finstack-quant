@@ -18,7 +18,7 @@ use pyo3::types::{PyList, PyModule};
 use crate::bindings::pandas_utils::{
     serde_object_to_single_row_dataframe_with_schema, serde_rows_to_dataframe_with_schema,
 };
-use crate::errors::{core_to_py, serde_json_to_py, value_error};
+use crate::errors::{core_to_py, value_error};
 
 /// Accepted `WorkoutCollateralType` strings, in canonical order.
 const COLLATERAL_TYPES: &str =
@@ -753,19 +753,7 @@ impl PyDownturnLgd {
     /// Canonical method name: ``"stressed_approximation"`` or ``"regulatory_floor"``.
     #[getter]
     fn method(&self) -> PyResult<String> {
-        match serde_json::to_value(self.inner.method())
-            .map_err(|err| serde_json_to_py(err, "DownturnMethod serialization failed"))?
-        {
-            serde_json::Value::Object(map) => map
-                .keys()
-                .next()
-                .cloned()
-                .ok_or_else(|| value_error("DownturnMethod has no tag")),
-            serde_json::Value::String(tag) => Ok(tag),
-            other => Err(value_error(format!(
-                "unexpected DownturnMethod form {other}"
-            ))),
-        }
+        finstack_quant_core::wire::serde_tag(self.inner.method()).map_err(core_to_py)
     }
 
     /// Method parameters as a mapping in canonical JSON form.
