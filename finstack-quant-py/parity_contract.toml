@@ -2262,8 +2262,6 @@ prepaymentModelSpecValidate = "twin of Python PrepaymentModelSpec.validate (Rust
 prepaymentModelSpecVector = "twin of Python PrepaymentModelSpec.vector (Rust PrepaymentModelSpec::vector); recorded as a member rename of finstack_quant.cashflows.builder.PrepaymentModelSpec"
 recoveryModelSpecRecoveryRate = "twin of Python RecoveryModelSpec.recovery_rate (Rust RecoveryModelSpec::recovery_rate); recorded as a member rename of finstack_quant.cashflows.builder.RecoveryModelSpec"
 recoveryModelSpecValidate = "twin of Python RecoveryModelSpec.validate (Rust RecoveryModelSpec::validate); recorded as a member rename of finstack_quant.cashflows.builder.RecoveryModelSpec"
-scheduleCalendarYearLadder = "JSON-first twin of CashFlowSchedule.calendarYearLadder (Rust schedule_calendar_year_ladder): takes schedule JSON instead of a handle"
-scheduleOutstandingByDate = "JSON-first twin of CashFlowSchedule.outstandingByDate (Rust schedule_outstanding_by_date): takes schedule JSON instead of a handle"
 scheduleParamsAnnualActact = "twin of Python ScheduleParams.annual_actact (Rust ScheduleParams::annual_actact); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
 scheduleParamsEurEstrSwap = "twin of Python ScheduleParams.eur_estr_swap (Rust ScheduleParams::eur_estr_swap); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
 scheduleParamsEurGovBond = "twin of Python ScheduleParams.eur_gov_bond (Rust ScheduleParams::eur_gov_bond); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
@@ -2275,7 +2273,6 @@ scheduleParamsUsdCorporateBond = "twin of Python ScheduleParams.usd_corporate_bo
 scheduleParamsUsdSofrSwap = "twin of Python ScheduleParams.usd_sofr_swap (Rust ScheduleParams::usd_sofr_swap); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
 scheduleParamsUsdTreasury = "twin of Python ScheduleParams.usd_treasury (Rust ScheduleParams::usd_treasury); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
 scheduleParamsValidate = "twin of Python ScheduleParams.validate (Rust ScheduleParams::validate); recorded as a member rename of finstack_quant.cashflows.builder.ScheduleParams"
-scheduleWal = "JSON-first twin of CashFlowSchedule.wal (Rust schedule_wal): takes schedule JSON instead of a handle"
 
 [parity.js."covenants".wasm_only]
 covenantConsequenceAccelerateMaturity = "twin of Python CovenantConsequence.accelerate_maturity (Rust CovenantConsequence::AccelerateMaturity); recorded as a member rename of finstack_quant.covenants.CovenantConsequence"

@@ -660,7 +660,7 @@ export type ReplayResult = WithFields<generated.portfolio.ReplayResult, { steps:
 export type PortfolioOptimizationResult = generated.portfolio.PortfolioOptimizationResultWire;
 
 /**
- * A dated amount (Rust `DatedFlowJson`); in `cashflows.scheduleOutstandingByDate`
+ * A dated amount (Rust `DatedFlowJson`); in `CashFlowSchedule.outstandingByDate`
  * the amount is the outstanding balance after that date's flows.
  */
 export interface DatedFlowJson {
@@ -14843,38 +14843,6 @@ export interface CashflowsNamespace {
    * @throws If `speed` is non-finite or outside `[0, 1]` (kind `validation`), or `month` is not a non-negative integer (kind `invalid_type`).
    */
   absToSmm(speed: number, month: number): number;
-
-  /**
-   * Weighted average life of a schedule, in years from `asOf`.
-   *
-   * @param scheduleJson - `CashFlowSchedule` (object or JSON).
-   * @param asOf - ISO-8601 measurement date; only principal flows strictly after it count.
-   * @returns WAL in years; `0` when no principal flow falls after `asOf`.
-   * @throws If the schedule or date is malformed or the schedule fails validation (kind `validation`).
-   */
-  scheduleWal(scheduleJson: JsonInput, asOf: string): number;
-
-  /**
-   * Outstanding principal balance after each unique date of a schedule.
-   *
-   * @param scheduleJson - `CashFlowSchedule` (object or JSON) with `meta.issue_date` set.
-   * @returns `{ date, amount }` entries in date order; `amount` is the outstanding balance after that date's flows.
-   * @throws If the schedule is malformed or fails validation, `meta.issue_date` is unset, or principal flows mix currencies (kind `validation`).
-   */
-  scheduleOutstandingByDate(scheduleJson: JsonInput): DatedFlowJson[];
-
-  /**
-   * Calendar-year non-principal / principal / PV ladder of a schedule.
-   *
-   * @param scheduleJson - `CashFlowSchedule` (object or JSON).
-   * @param pvs - Present value of each schedule flow, one per flow in schedule order, in flow-amount units.
-   * @returns `{ year, non_principal, principal, pv }` rows in ascending year order.
-   * @throws If the schedule is malformed or fails validation, `pvs` does not have one entry per flow, or a value is non-finite (kind `validation`).
-   */
-  scheduleCalendarYearLadder(
-    scheduleJson: JsonInput,
-    pvs: number[] | Float64Array
-  ): CalendarYearLadderRow[];
 
   /**
    * `CashFlowSchedule` handle: canonical cashflow schedule: classified dated flows with their notional,

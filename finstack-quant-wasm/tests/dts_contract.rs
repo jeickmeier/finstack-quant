@@ -1824,9 +1824,6 @@ fn rust_computation_twins_are_declared() {
     let dts = index_dts();
     for sig in [
         "absToSmm(speed: number, month: number): number;",
-        "scheduleWal(scheduleJson: JsonInput, asOf: string): number;",
-        "scheduleOutstandingByDate(scheduleJson: JsonInput): DatedFlowJson[];",
-        "scheduleCalendarYearLadder(scheduleJson: JsonInput, pvs: number[] | Float64Array): CalendarYearLadderRow[];",
         "instrumentCashflows(instrumentJson: JsonInput, marketJson: JsonInput, asOf: string, model: string): generated.valuations.InstrumentCashflowEnvelope;",
         "valuationResultMetricSeries(result: ValuationResult | string, base: string): [string[], number][];",
         "calibrationEnvelopeContentHash(envelopeJson: CalibrationEnvelope | string): string;",

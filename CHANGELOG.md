@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Cashflows API simplification
+
+#### Changed (breaking)
+
+- Removed the JSON-string schedule analytics `schedule_wal`, `schedule_outstanding_by_date` and `schedule_calendar_year_ladder` (WASM `scheduleWal`, `scheduleOutstandingByDate`, `scheduleCalendarYearLadder`). Parse once with `CashFlowSchedule.fromJson` and call `wal`, `outstandingByDate` or `calendarYearLadder` on the handle.
+
 ### Margin API simplification
 
 #### Changed (breaking)

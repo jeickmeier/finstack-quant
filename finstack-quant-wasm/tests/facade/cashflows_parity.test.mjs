@@ -527,11 +527,6 @@ test('typed and JSON schedule builders agree', () => {
   withBond((schedule) => {
     assert.deepEqual(json(cashflows.CashFlowSchedule.fromJson(schedule.toJson())), fromJson);
     assert.deepEqual(json(cashflows.CashFlowSchedule.fromJson(fromJson)), fromJson);
-    assert.equal(cashflows.scheduleWal(schedule.toJson(), ISSUE), schedule.wal(ISSUE));
-    assert.deepEqual(
-      cashflows.scheduleOutstandingByDate(schedule.toJson()),
-      schedule.outstandingByDate()
-    );
     assert.deepEqual(
       cashflows.datedFlows(schedule),
       JSON.parse(cashflows.datedFlowsJson(schedule.toJson()))
