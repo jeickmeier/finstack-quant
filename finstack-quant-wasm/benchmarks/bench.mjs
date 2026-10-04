@@ -909,17 +909,28 @@ async function main() {
     w.explainFormula(FINANCIAL_MODEL_JSON, STATEMENT_RESULT_BASE_JSON, 'revenue', '2025Q1');
   });
 
-  benchTry('portfolio', 'buildPortfolioFromSpecJson', 3000, () => {
-    w.buildPortfolioFromSpecJson(PORTFOLIO_SPEC_JSON);
+  benchTry('portfolio', 'Portfolio.fromSpec', 3000, () => {
+    const book = w.Portfolio.fromSpec(PORTFOLIO_SPEC_JSON);
+    try {
+      book.toJson();
+    } finally {
+      book.free();
+    }
   });
 
-  benchTry('portfolio', 'valuePortfolio', 200, () => {
-    w.valuePortfolio(PORTFOLIO_SPEC_JSON, MARKET_CONTEXT_JSON, false);
-  });
-
-  benchTry('portfolio', 'aggregateFullCashflows', 200, () => {
-    w.aggregateFullCashflows(PORTFOLIO_SPEC_JSON, MARKET_CONTEXT_JSON);
-  });
+  const portfolioBook = w.Portfolio.fromSpec(PORTFOLIO_SPEC_JSON);
+  const portfolioMarket = w.MarketContext.fromJson(MARKET_CONTEXT_JSON);
+  try {
+    benchTry('portfolio', 'valuePortfolio', 200, () => {
+      w.valuePortfolio(portfolioBook, portfolioMarket, false);
+    });
+    benchTry('portfolio', 'aggregateFullCashflows', 200, () => {
+      w.aggregateFullCashflows(portfolioBook, portfolioMarket);
+    });
+  } finally {
+    portfolioBook.free();
+    portfolioMarket.free();
+  }
 
   let sampleValuationJson = '';
   let firstStandardMetric = 'accrued';

@@ -3651,16 +3651,13 @@
       "Portfolio",
       "PortfolioBuilder",
       "aggregateFullCashflows",
-      "aggregateFullCashflowsBuilt",
       "aggregateMetrics",
       "allocateWeights",
       "allocateWeightsJson",
       "applyScenarioAndRevalue",
-      "applyScenarioAndRevalueBuilt",
       "attributePortfolioPnl",
       "brinsonFachler",
       "buildCreditVolReport",
-      "buildPortfolioFromSpecJson",
       "campisiAttribution",
       "campisiCarinoLink",
       "campisiCarinoLinkFromSnapshots",
@@ -3671,9 +3668,7 @@
       "cellReturnsFromReference",
       "collapseToBaseByDateKind",
       "computeFactorSensitivities",
-      "computeFactorSensitivitiesWithMarket",
       "computePnlProfiles",
-      "computePnlProfilesWithMarket",
       "constraintBudget",
       "constraintExposureLimit",
       "constraintExposureMinimum",
@@ -3705,7 +3700,6 @@
       "replayPortfolio",
       "scenarioPnl",
       "scenarioPnlBatch",
-      "scenarioPnlBuilt",
       "schema",
       "sensitivityMatrixDelta",
       "sensitivityMatrixFactorDeltas",
@@ -3713,8 +3707,7 @@
       "twrrLinked",
       "twrrModifiedDietz",
       "validateAllocationJson",
-      "valuePortfolio",
-      "valuePortfolioBuilt"
+      "valuePortfolio"
     ]
   },
   "portfolio.InstrumentArtifactCache": {
@@ -3794,9 +3787,6 @@
   "portfolio.mwrXirr": {
     "kind": "function"
   },
-  "portfolio.buildPortfolioFromSpecJson": {
-    "kind": "function"
-  },
   "portfolio.aggregateMetrics": {
     "kind": "function"
   },
@@ -3806,13 +3796,7 @@
   "portfolio.valuePortfolio": {
     "kind": "function"
   },
-  "portfolio.valuePortfolioBuilt": {
-    "kind": "function"
-  },
   "portfolio.aggregateFullCashflows": {
-    "kind": "function"
-  },
-  "portfolio.aggregateFullCashflowsBuilt": {
     "kind": "function"
   },
   "portfolio.netInCurrencyByDate": {
@@ -3824,13 +3808,7 @@
   "portfolio.applyScenarioAndRevalue": {
     "kind": "function"
   },
-  "portfolio.applyScenarioAndRevalueBuilt": {
-    "kind": "function"
-  },
   "portfolio.scenarioPnl": {
-    "kind": "function"
-  },
-  "portfolio.scenarioPnlBuilt": {
     "kind": "function"
   },
   "portfolio.optimizePortfolio": {
@@ -3845,13 +3823,7 @@
   "portfolio.computeFactorSensitivities": {
     "kind": "function"
   },
-  "portfolio.computeFactorSensitivitiesWithMarket": {
-    "kind": "function"
-  },
   "portfolio.computePnlProfiles": {
-    "kind": "function"
-  },
-  "portfolio.computePnlProfilesWithMarket": {
     "kind": "function"
   },
   "portfolio.decomposeFactorRisk": {

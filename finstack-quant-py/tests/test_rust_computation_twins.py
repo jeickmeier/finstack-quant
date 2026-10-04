@@ -192,13 +192,11 @@ def test_infeasible_rebalance_raises_portfolio_error() -> None:
     result = optimize_portfolio(spec, market)
     assert result.status.kind == "infeasible"
     with pytest.raises(PortfolioError, match="infeasible"):
-        result.to_rebalanced_portfolio()
-    with pytest.raises(PortfolioError, match="infeasible"):
         rebalance_from_spec(spec, result)
 
 
-def test_rebalanced_portfolio_needs_the_live_result() -> None:
-    """A result rebuilt from JSON has no live problem; the method says so."""
+def test_rebalanced_portfolio_is_identical_after_result_reconstruction() -> None:
+    """Rebalancing uses the matching spec for both live and reconstructed results."""
     market = MarketContext().insert(DiscountCurve.flat("USD-OIS", datetime.date(2024, 1, 15), 0.04))
     spec = (
         PortfolioOptimizationSpec
@@ -210,7 +208,9 @@ def test_rebalanced_portfolio_needs_the_live_result() -> None:
         .with_constraint(Constraint.budget(1.0))
     )
     result = optimize_portfolio(spec, market)
-    quantities = [p["quantity"] for p in json.loads(result.to_rebalanced_portfolio().to_json())["positions"]]
+    quantities = [p["quantity"] for p in json.loads(rebalance_from_spec(spec, result).to_json())["positions"]]
     assert quantities == [0.0, 3.0]
-    with pytest.raises(RuntimeError, match="rebuilt from JSON"):
-        PortfolioOptimizationResult.from_json(result.to_json()).to_rebalanced_portfolio()
+    assert (
+        rebalance_from_spec(spec, PortfolioOptimizationResult.from_json(result.to_json())).to_json()
+        == rebalance_from_spec(spec, result).to_json()
+    )

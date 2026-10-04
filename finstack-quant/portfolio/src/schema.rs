@@ -156,6 +156,7 @@ fn optimization_result_examples() -> Result<Vec<Value>> {
     slacks.insert("max_weight".to_string(), 0.40);
 
     let result = crate::optimization::PortfolioOptimizationResultWire {
+        meta: finstack_quant_core::config::ResultsMeta::default(),
         schema_version: finstack_quant_core::wire::SchemaVersion::CURRENT,
         status: crate::optimization::OptimizationStatus::Optimal,
         status_label: "optimal".to_string(),
@@ -507,7 +508,7 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Scenario-P&L view returned by binding surfaces."
     )
     .with_packager(package_materialization_schema)
-    .with_examples(examples::scenario_pnl_view),
+    .with_examples(examples::scenario_pnl_view_example),
     finstack_quant_core::schema_artifact!(
         ScenarioRevalueView,
         "portfolio",

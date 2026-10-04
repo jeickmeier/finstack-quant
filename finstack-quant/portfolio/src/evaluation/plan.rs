@@ -195,8 +195,7 @@ pub(crate) struct PortfolioEvaluationPlan<'a> {
 }
 
 pub(crate) struct PortfolioEvaluationOutcome {
-    results: IndexMap<EvaluationId, Arc<PortfolioValuation>>,
-    failures: IndexMap<EvaluationId, Error>,
+    results: IndexMap<EvaluationId, Result<Arc<PortfolioValuation>>>,
 }
 
 impl<'a> PortfolioEvaluationPlan<'a> {
@@ -362,20 +361,13 @@ impl<'a> PortfolioEvaluationPlan<'a> {
             .map(|job| self.execute_job(job, job.execution))
             .collect();
 
-        let mut results = IndexMap::with_capacity(self.jobs.len());
-        let mut failures = IndexMap::new();
-        for (job, result) in self.jobs.iter().zip(ordered_results) {
-            match result {
-                Ok(valuation) => {
-                    results.insert(job.id, Arc::new(valuation));
-                }
-                Err(error) => {
-                    failures.insert(job.id, error);
-                }
-            }
-        }
-
-        PortfolioEvaluationOutcome { results, failures }
+        let results = self
+            .jobs
+            .iter()
+            .zip(ordered_results)
+            .map(|(job, result)| (job.id, result.map(Arc::new)))
+            .collect();
+        PortfolioEvaluationOutcome { results }
     }
 
     fn execute_job(
@@ -424,26 +416,18 @@ impl<'a> PortfolioEvaluationPlan<'a> {
 
 impl PortfolioEvaluationOutcome {
     pub(crate) fn get(&self, id: EvaluationId) -> Result<&Arc<PortfolioValuation>> {
-        if let Some(result) = self.results.get(&id) {
-            return Ok(result);
-        }
-        if let Some(error) = self.failures.get(&id) {
-            return Err(error.clone());
-        }
-        Err(Error::invalid_input(format!(
-            "unknown evaluation result {}",
-            id.0
-        )))
+        self.results
+            .get(&id)
+            .ok_or_else(|| Error::invalid_input(format!("unknown evaluation result {}", id.0)))?
+            .as_ref()
+            .map_err(Clone::clone)
     }
 
     pub(crate) fn take_valuation(&mut self, id: EvaluationId) -> Result<PortfolioValuation> {
-        if let Some(error) = self.failures.shift_remove(&id) {
-            return Err(error);
-        }
         let result = self
             .results
             .shift_remove(&id)
-            .ok_or_else(|| Error::invalid_input(format!("unknown evaluation result {}", id.0)))?;
+            .ok_or_else(|| Error::invalid_input(format!("unknown evaluation result {}", id.0)))??;
         Ok(Arc::try_unwrap(result).unwrap_or_else(|shared| shared.as_ref().clone()))
     }
 }
@@ -999,7 +983,11 @@ mod tests {
         }
 
         let outcome = plan.execute();
-        let failure_ids = outcome.failures.keys().copied().collect::<Vec<_>>();
+        let failure_ids = outcome
+            .results
+            .iter()
+            .filter_map(|(id, result)| result.is_err().then_some(*id))
+            .collect::<Vec<_>>();
         assert_eq!(failure_ids[0], first);
         assert_eq!(failure_ids[1], second);
         assert!(outcome

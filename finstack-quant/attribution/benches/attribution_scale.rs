@@ -36,9 +36,7 @@ use finstack_quant_models::factor::credit::hierarchy::{
     DateRange, FactorCorrelationMatrix, GenericFactorSpec, HierarchyDimension, IssuerBetaMode,
     IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelsAtAnchor, VolState,
 };
-use finstack_quant_models::factor::{
-    FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
-};
+use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
 use finstack_quant_valuations::instruments::fixed_income::bond::Bond;
 use finstack_quant_valuations::instruments::PricingOptions;
 use finstack_quant_valuations::instruments::{Attributes, Instrument};
@@ -337,7 +335,7 @@ fn build_credit_model_for_n(n: usize) -> CreditFactorModel {
         factors: vec![],
         covariance: FactorCovarianceMatrix::new(vec![], vec![]).unwrap(),
         matching: MatchingConfig::MappingTable(vec![]),
-        pricing_mode: PricingMode::DeltaBased,
+
         risk_measure: Default::default(),
         bump_config: None,
         unmatched_policy: None,

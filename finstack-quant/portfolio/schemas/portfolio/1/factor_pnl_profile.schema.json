@@ -807,6 +807,7 @@
   },
   "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_pnl_profile.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "P&L profile for one factor across a scenario grid.",
   "examples": [
     {
@@ -819,12 +820,14 @@
       "position_pnls": [
         [
           4612.0,
-          0.0,
-          -4588.0
+          7431.0
         ],
         [
-          7431.0,
           0.0,
+          0.0
+        ],
+        [
+          -4588.0,
           -7369.0
         ]
       ],

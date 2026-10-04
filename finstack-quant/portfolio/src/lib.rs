@@ -243,8 +243,7 @@ pub use grid_attribution::{
 };
 pub use margin::{NettingSetMargin, PortfolioMarginAggregator, PortfolioMarginResult};
 pub use performance::{
-    mwr_xirr, mwr_xirr_from_cashflows, twrr_linked, twrr_modified_dietz, DatedCashflow,
-    LinkedReturn, TwrrPeriod,
+    mwr_xirr, twrr_linked, twrr_modified_dietz, DatedCashflow, LinkedReturn, TwrrPeriod,
 };
 pub use portfolio::PortfolioSpec;
 pub use position::{Position, PositionUnit};

@@ -84,6 +84,22 @@ test('scenarioPnlBatch matches Python and keeps input order', () => {
   );
 });
 
+test('scenarioPnlBatch preserves Rust base-valuation error precedence', () => {
+  const emptyMarket = new core.MarketContext();
+  try {
+    assert.throws(
+      () => portfolio.scenarioPnlBatch(book, [{ id: '', operations: [] }], emptyMarket),
+      (error) => {
+        assert.doesNotMatch(error.message, /Scenario ID cannot be empty/);
+        assert.match(error.message, /curve|market|missing|not found/i);
+        return true;
+      }
+    );
+  } finally {
+    emptyMarket.free();
+  }
+});
+
 test('attributePortfolioPnl and its result methods match Python', () => {
   const attribution = portfolio.attributePortfolioPnl(
     book,
@@ -212,7 +228,12 @@ test('buildCreditVolReport matches Python', () => {
 });
 
 test('valuation and metrics lookups match Python', () => {
-  const valuation = portfolio.valuePortfolioBuilt(book, inputs.market_t0, undefined, ['dv01']);
+  const valuation = portfolio.valuePortfolio(
+    book,
+    core.MarketContext.fromJson(inputs.market_t0),
+    undefined,
+    ['dv01']
+  );
   const position = portfolio.portfolioValuationGetPositionValue(valuation, 'POS-1');
   assertClose(Number(position.value_base.amount), expected.valuation_position_value_base);
   assert.equal(portfolio.portfolioValuationGetPositionValue(valuation, 'NOPE'), undefined);

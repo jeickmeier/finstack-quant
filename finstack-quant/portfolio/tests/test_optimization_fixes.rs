@@ -649,71 +649,6 @@ fn test_missing_metric_exclude_freezes_position_at_current_weight() {
     assert_eq!(result.optimal_weights.get("POS_MISSING"), Some(&0.5));
     assert_eq!(result.optimal_weights.get("POS_RICH"), Some(&0.5));
 }
-
-#[test]
-fn test_pv_native_objective_rejected_in_aggregated_expression() {
-    let as_of = create_date(2024, Month::January, 1).unwrap();
-
-    let usd_position = Position::new(
-        "POS_USD",
-        "ENT_A",
-        "USD_INST",
-        Arc::new(MetricInstrument::new(
-            "USD_INST",
-            Money::new(100.0, Currency::USD).expect("valid money fixture"),
-            IndexMap::new(),
-        )),
-        1.0,
-        PositionUnit::Units,
-    )
-    .unwrap();
-    let eur_position = Position::new(
-        "POS_EUR",
-        "ENT_A",
-        "EUR_INST",
-        Arc::new(MetricInstrument::new(
-            "EUR_INST",
-            Money::new(100.0, Currency::EUR).expect("valid money fixture"),
-            IndexMap::new(),
-        )),
-        1.0,
-        PositionUnit::Units,
-    )
-    .unwrap();
-
-    let portfolio = PortfolioBuilder::new("MULTI_CCY_PORTFOLIO")
-        .base_currency(Currency::USD)
-        .as_of(as_of)
-        .entity(Entity::new("ENT_A"))
-        .position(usd_position)
-        .position(eur_position)
-        .build()
-        .unwrap();
-
-    // PvNative is no longer silently substituted for PvBase: aggregated
-    // objectives over multi-currency portfolios must be explicit about which
-    // numeraire they sum in.
-    let problem = PortfolioOptimizationProblem::new(
-        portfolio,
-        Objective::Maximize(MetricExpr::WeightedSum {
-            metric: PerPositionMetric::PvNative,
-            filter: None,
-        }),
-    );
-
-    let market = build_multi_currency_market();
-    let config = FinstackConfig::default();
-    let optimizer = DefaultLpOptimizer;
-    let err = optimizer
-        .optimize(&problem, &market, &config)
-        .expect_err("PvNative in WeightedSum must error");
-    let msg = err.to_string();
-    assert!(
-        msg.contains("PvNative") && msg.contains("PvBase"),
-        "error should mention PvNative and PvBase: {msg}"
-    );
-}
-
 #[test]
 fn test_short_candidates_can_take_negative_weights() {
     let portfolio = PortfolioBuilder::new("EMPTY_PORTFOLIO")
@@ -1173,6 +1108,14 @@ fn mo6_filtered_value_weighted_average_metric_bound_uses_filtered_denominator(
             .abs()
             < 1e-8,
         "MO-6: filtered average cap should force the high-metric bucket out"
+    );
+    let json = serde_json::to_string(&result)?;
+    let restored: finstack_quant_portfolio::optimization::PortfolioOptimizationResultWire =
+        serde_json::from_str(&json)?;
+    assert_eq!(restored.optimal_weights, result.optimal_weights);
+    assert_eq!(
+        serde_json::to_value(restored.meta)?,
+        serde_json::to_value(result.meta)?
     );
     Ok(())
 }
@@ -2246,4 +2189,9 @@ fn rebalance_from_spec_matches_the_live_result_and_rejects_foreign_results() {
         conflicting_constraints: Vec::new(),
     };
     assert!(rebalance_from_spec(&spec, &infeasible).is_err());
+}
+
+#[test]
+fn obsolete_native_pv_metric_is_rejected_at_the_wire_boundary() {
+    assert!(serde_json::from_str::<PerPositionMetric>("\"pv_native\"").is_err());
 }

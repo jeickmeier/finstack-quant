@@ -43,6 +43,19 @@ pub struct NettingSetMargin {
 impl NettingSetMargin {
     /// Create a new netting set margin result.
     ///
+    /// # Arguments
+    ///
+    /// * `netting_set_id` - Contractual bilateral or cleared netting-set identifier.
+    /// * `as_of` - Margin calculation date.
+    /// * `initial_margin` - Gross model initial margin in the netting-set currency.
+    /// * `variation_margin` - Signed VM outflow in the same currency; positive posts, negative collections.
+    /// * `position_count` - Number of successfully aggregated positions.
+    /// * `im_methodology` - Model used to calculate gross initial margin.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error for different currencies or an unrepresentable total.
+    ///
     /// # Returns
     ///
     /// Netting-set margin result with total margin computed as
@@ -56,10 +69,13 @@ impl NettingSetMargin {
         im_methodology: ImMethodology,
     ) -> finstack_quant_core::Result<Self> {
         let currency = initial_margin.currency();
-        let total = Money::new(
-            initial_margin.amount() + variation_margin.amount().max(0.0),
-            currency,
-        )?;
+        if variation_margin.currency() != currency {
+            return Err(finstack_quant_core::Error::Validation(
+                "initial and variation margin currencies must match".to_string(),
+            ));
+        }
+        let total = initial_margin
+            .checked_add(Money::new(variation_margin.amount().max(0.0), currency)?)?;
         Ok(Self {
             netting_set_id,
             csa_id: None,

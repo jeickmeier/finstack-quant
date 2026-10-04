@@ -107,14 +107,14 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1245567
+            "bytes": 1244582
           },
           {
             "path": "schemas/attribution/1/attribution_inputs.schema.json",
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 234594
+            "bytes": 233609
           },
           {
             "path": "schemas/attribution/1/attribution_result.schema.json",
@@ -527,7 +527,6 @@
           "PrepaymentModelSpec",
           "PrepaymentPenalty",
           "PriceTrigger",
-          "PricingMode",
           "PrivateMarketsFund",
           "ProjectedFixing",
           "ProtectionLegSpec",
@@ -774,7 +773,6 @@
           "PrepaymentCurve",
           "PrepaymentModelSpec",
           "PriceTrigger",
-          "PricingMode",
           "RateCalibrationCurveRole",
           "RateCalibrationFutureContractId",
           "RateCalibrationMethod",
@@ -1528,14 +1526,14 @@
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
             "type_name": "CreditFactorModel",
             "kind": "input",
-            "bytes": 90957
+            "bytes": 89933
           },
           {
             "path": "schemas/factor_model/1/factor_model_config.schema.json",
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/factor_model_config.schema.json",
             "type_name": "FactorModelConfigEnvelope",
             "kind": "input",
-            "bytes": 60274
+            "bytes": 59250
           }
         ]
       },
@@ -1583,7 +1581,6 @@
           "MappingRule",
           "MarketMapping",
           "MatchingConfig",
-          "PricingMode",
           "RiskMeasure",
           "UnmatchedPolicy"
         ]
@@ -1632,7 +1629,6 @@
           "MappingRule",
           "MarketMapping",
           "MatchingConfig",
-          "PricingMode",
           "RiskMeasure",
           "UnmatchedPolicy"
         ]
@@ -1739,7 +1735,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_pnl_profile.schema.json",
             "type_name": "FactorPnlProfile",
             "kind": "output",
-            "bytes": 21156
+            "bytes": 21209
           },
           {
             "path": "schemas/portfolio/1/fi_attribution_config.schema.json",
@@ -1774,7 +1770,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_carino_linked_result.schema.json",
             "type_name": "GridCarinoLinkedResult",
             "kind": "output",
-            "bytes": 10397
+            "bytes": 8971
           },
           {
             "path": "schemas/portfolio/1/grid_position.schema.json",
@@ -1816,7 +1812,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
             "type_name": "PortfolioMarginResult",
             "kind": "output",
-            "bytes": 44232
+            "bytes": 44297
           },
           {
             "path": "schemas/portfolio/1/portfolio_materialization.schema.json",
@@ -1830,14 +1826,14 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
             "type_name": "PortfolioOptimizationResultWire",
             "kind": "output",
-            "bytes": 10752
+            "bytes": 17598
           },
           {
             "path": "schemas/portfolio/1/portfolio_optimization_spec.schema.json",
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
             "type_name": "PortfolioOptimizationSpec",
             "kind": "input",
-            "bytes": 57461
+            "bytes": 56904
           },
           {
             "path": "schemas/portfolio/1/portfolio_primitive_exposure_report.schema.json",
@@ -1886,7 +1882,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_result.schema.json",
             "type_name": "ReplayResult",
             "kind": "output",
-            "bytes": 89550
+            "bytes": 87601
           },
           {
             "path": "schemas/portfolio/1/scenario_pnl_batch_item.schema.json",
@@ -3597,7 +3593,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution.schema.json",
             "type_name": "AttributionEnvelope",
             "kind": "input",
-            "bytes": 1245567
+            "bytes": 1244582
           },
           {
             "domain": "attribution",
@@ -3605,7 +3601,7 @@
             "$id": "https://finstack_quant.dev/schemas/attribution/1/attribution_inputs.schema.json",
             "type_name": "AttributionInputs",
             "kind": "input",
-            "bytes": 234594
+            "bytes": 233609
           },
           {
             "domain": "attribution",
@@ -3925,7 +3921,7 @@
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/credit_factor_model.schema.json",
             "type_name": "CreditFactorModel",
             "kind": "input",
-            "bytes": 90957
+            "bytes": 89933
           },
           {
             "domain": "factor_model",
@@ -3933,7 +3929,7 @@
             "$id": "https://finstack_quant.dev/schemas/factor_model/1/factor_model_config.schema.json",
             "type_name": "FactorModelConfigEnvelope",
             "kind": "input",
-            "bytes": 60274
+            "bytes": 59250
           },
           {
             "domain": "margin",
@@ -4245,7 +4241,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_pnl_profile.schema.json",
             "type_name": "FactorPnlProfile",
             "kind": "output",
-            "bytes": 21156
+            "bytes": 21209
           },
           {
             "domain": "portfolio",
@@ -4285,7 +4281,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_carino_linked_result.schema.json",
             "type_name": "GridCarinoLinkedResult",
             "kind": "output",
-            "bytes": 10397
+            "bytes": 8971
           },
           {
             "domain": "portfolio",
@@ -4333,7 +4329,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
             "type_name": "PortfolioMarginResult",
             "kind": "output",
-            "bytes": 44232
+            "bytes": 44297
           },
           {
             "domain": "portfolio",
@@ -4349,7 +4345,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
             "type_name": "PortfolioOptimizationResultWire",
             "kind": "output",
-            "bytes": 10752
+            "bytes": 17598
           },
           {
             "domain": "portfolio",
@@ -4357,7 +4353,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
             "type_name": "PortfolioOptimizationSpec",
             "kind": "input",
-            "bytes": 57461
+            "bytes": 56904
           },
           {
             "domain": "portfolio",
@@ -4413,7 +4409,7 @@
             "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_result.schema.json",
             "type_name": "ReplayResult",
             "kind": "output",
-            "bytes": 89550
+            "bytes": 87601
           },
           {
             "domain": "portfolio",
@@ -5846,7 +5842,6 @@
           "MatchingConfig",
           "PanelFrequency",
           "PanelSpace",
-          "PricingMode",
           "RiskMeasure",
           "UnmatchedPolicy",
           "VolState"
@@ -5896,7 +5891,6 @@
           "MappingRule",
           "MarketMapping",
           "MatchingConfig",
-          "PricingMode",
           "RiskMeasure",
           "UnmatchedPolicy"
         ]

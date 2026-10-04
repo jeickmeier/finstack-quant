@@ -325,6 +325,8 @@ impl PortfolioOptimizationResult {
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
 #[serde(deny_unknown_fields)]
 pub struct PortfolioOptimizationResultWire {
+    /// Configuration and numerical provenance from the solve.
+    pub meta: ResultsMeta,
     /// Required numeric v1 marker.
     pub schema_version: SchemaVersion,
     /// Solver outcome.
@@ -364,7 +366,12 @@ pub struct PortfolioOptimizationResultWire {
     pub metric_values: IndexMap<String, f64>,
     /// Executable trade list.
     pub trades: Vec<TradeSpec>,
-    /// Constraint slack values.
+    /// Constraint slack values; undefined averages use the `"nan"` sentinel.
+    #[serde(with = "slack_values")]
+    #[cfg_attr(
+        feature = "json-schema",
+        schemars(with = "IndexMap<String, finstack_quant_core::wire::NonFiniteF64Wire>")
+    )]
     pub constraint_slacks: IndexMap<String, f64>,
     /// Approximately binding constraint names.
     pub binding_constraints: Vec<String>,
@@ -487,6 +494,7 @@ impl From<&PortfolioOptimizationResult> for PortfolioOptimizationResultWire {
             OptimizationStatus::Error { .. } => "error",
         };
         Self {
+            meta: result.meta.clone(),
             schema_version: SchemaVersion::CURRENT,
             status: result.status.clone(),
             status_label: status_label.to_string(),
@@ -539,6 +547,7 @@ mod tests {
         constraint_slacks.insert("budget".to_string(), 0.0);
         constraint_slacks.insert("max_weight".to_string(), 0.25);
         PortfolioOptimizationResultWire {
+            meta: ResultsMeta::default(),
             schema_version: SchemaVersion::CURRENT,
             status: OptimizationStatus::Optimal,
             status_label: "optimal".to_string(),
@@ -587,6 +596,10 @@ mod tests {
         infeasible.objective_value = f64::NAN;
         infeasible.turnover = f64::NAN;
 
+        infeasible
+            .constraint_slacks
+            .insert("undefined_average".to_string(), f64::NAN);
+
         let json = serde_json::to_string(&infeasible).expect("serialize");
         assert!(json.contains(r#""objective_value":"nan""#), "{json}");
         assert!(json.contains(r#""turnover":"nan""#), "{json}");
@@ -594,10 +607,51 @@ mod tests {
             serde_json::from_str(&json).expect("deserialize");
         assert!(decoded.objective_value.is_nan());
         assert!(decoded.turnover.is_nan());
+        assert!(decoded.constraint_slacks["undefined_average"].is_nan());
+        assert_eq!(
+            serde_json::to_value(&decoded.meta).expect("metadata"),
+            serde_json::to_value(&infeasible.meta).expect("metadata")
+        );
 
         // Finite values keep the plain JSON number form.
         let feasible = serde_json::to_value(wire()).expect("serialize");
         assert_eq!(feasible["objective_value"], serde_json::json!(1.0));
         assert_eq!(feasible["turnover"], serde_json::json!(0.0));
+    }
+}
+
+// Each map value uses the core non-finite scalar contract.
+mod slack_values {
+    use indexmap::IndexMap;
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Serialize, Deserialize)]
+    struct Value(#[serde(with = "finstack_quant_core::wire::non_finite_f64")] f64);
+
+    /// Serialize ordered slack values with the core non-finite encoding.
+    ///
+    /// # Arguments
+    ///
+    /// * `values` - Ordered constraint names and slack values; NaN denotes an undefined average.
+    /// * `serializer` - Serde output receiving finite numbers or core sentinel strings.
+    pub fn serialize<S: serde::Serializer>(
+        values: &IndexMap<String, f64>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        serializer.collect_map(values.iter().map(|(key, value)| (key, Value(*value))))
+    }
+
+    /// Decode finite or sentinel-encoded constraint slacks.
+    ///
+    /// # Arguments
+    ///
+    /// * `deserializer` - Serde input containing an ordered constraint-to-slack map.
+    pub fn deserialize<'de, D: serde::Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<IndexMap<String, f64>, D::Error> {
+        Ok(IndexMap::<String, Value>::deserialize(deserializer)?
+            .into_iter()
+            .map(|(key, value)| (key, value.0))
+            .collect())
     }
 }

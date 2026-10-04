@@ -28,6 +28,24 @@
 - Pandas feature helpers require `op`, `groups`, `exposures`, and `volatility` as keyword arguments where those inputs follow optional key selectors. Operation annotations accept strings or the matching operation enum only; WASM declarations use the corresponding generated selector union.
 - Feature parameters are resolved once per call, rolling statistics share one window driver, and OLS filters complete observations once while preserving numerical results and missing-data behavior.
 
+### Portfolio simplicity and binding contracts
+
+#### Changed (breaking)
+
+- Factor-model configuration no longer has `PricingMode` / `pricing_mode`. First-order sensitivities use `DeltaBasedEngine`; nonlinear scenario grids use `FullRepricingEngine::compute_pnl_profiles`.
+- Rust `apply_and_revalue` and `scenario_pnl` return `ScenarioRevalueView` and `ScenarioPnlView`, respectively. The separate `_view` calculation functions are removed. `mwr_xirr` takes `DatedCashflow` values; `mwr_xirr_from_cashflows` is removed.
+- Grid attribution stores allocation and selection together in `GridSectorEffect`. `GridSelectionEffect`, `selection_effects`, and Python's separate selection dataframe are removed; the sector dataframe contains both effects.
+- `PortfolioAttribution` retains aggregate factor totals and per-position detail; its seven unused optional aggregate detail fields are removed.
+- Python's redundant portfolio calculation `_json` functions are removed. Use the typed calculation and its result's `to_json()` method. Construct portfolios with `Portfolio.from_spec`; `build_portfolio_from_spec_json` is removed.
+- WASM `valuePortfolio`, `aggregateFullCashflows`, `applyScenarioAndRevalue`, `scenarioPnl`, `computeFactorSensitivities`, and `computePnlProfiles` accept reusable portfolio and/or `MarketContext` handles. Their duplicate `Built` / `WithMarket` variants and `buildPortfolioFromSpecJson` are removed; construct with `Portfolio.fromSpec` and `core.MarketContext.fromJson`.
+- Optimization expressions no longer expose the unusable `PvNative` metric. Python optimization results contain the canonical wire value; use `rebalance_from_spec(spec, result)` to reconstruct a portfolio, including after JSON or pickle reconstruction.
+
+#### Fixed
+
+- Optimization result JSON preserves `ResultsMeta` and roundtrips non-finite constraint slacks using Rust's string sentinels.
+- Margin construction rejects mismatched currencies, and portfolio margin deserialization rejects duplicate netting-set identifiers while applying the same nested validation as standalone netting sets.
+- Factor P&L profiles reject duplicate position identifiers, invalid axes, and non-finite coordinates or amounts; Brinson linking validates supplied effect reconciliations. WASM scenario batches preserve Rust's base-valuation and ordered scenario error precedence.
+
 ### Instrument envelope is a value (Python-binding audit FUP-003)
 
 #### Changed (breaking)

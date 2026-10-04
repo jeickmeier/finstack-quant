@@ -52,7 +52,7 @@ Every class is marked `perf`. Selection within the suite is by class or by the
 | `TestMarginBenchmarks` | `CsaSpec.usd_regulatory`, `VmCalculator.calculate`, `NettingSetId`, `XvaConfig`, `FundingConfig`, `MarginUtilization` |
 | `TestStatementsBenchmarks` | `FinancialModelSpec.from_json`, `ModelBuilder`, `Evaluator.evaluate`, `parse_formula`, `parse_and_compile`, `normalize` |
 | `TestStatementsAnalyticsBenchmarks` | Sensitivity, variance, scenario sets, goal seek, dependency tracing, `explain_formula` — each benched **twice**, once on the JSON path and once on the typed path, so the serialization overhead of the wire surface is directly visible. `backtest_forecast` is the one unpaired case |
-| `TestPortfolioBenchmarks` | `Portfolio.from_materialization` (cold-unique, cold-dedup, warm-dedup) and `parse_portfolio_spec_json` / `build_portfolio_from_spec_json` |
+| `TestPortfolioBenchmarks` | `Portfolio.from_materialization` (cold-unique, cold-dedup, warm-dedup) and `parse_portfolio_spec_json` / `Portfolio.from_spec` |
 | `TestPortfolioCompoundWorkflow` | The realistic calling pattern (value + metrics + cashflows) over 500 positions, JSON path vs. typed `Portfolio`/`MarketContext` path |
 | `TestPortfolioReleaseControls` | Release-scale controls: metrics attribution (40/120 positions), `scenario_pnl_batch` vs. repeated `scenario_pnl` (10/100 scenarios), 20-snapshot `replay_portfolio`, standard-risk valuation at 3,000 positions, PV-only valuation at 3,000 and 25,000 positions |
 | `TestPortfolioRiskInputBenchmarks` | `parametric_var_decomposition` (256×256), `historical_var_decomposition` and `build_stress_attribution` (200×1,000), each with `list` and contiguous NumPy inputs — this pair exists to measure the zero-copy path, so keep both |

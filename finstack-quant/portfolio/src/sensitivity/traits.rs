@@ -123,14 +123,7 @@ fn dependencies_intersect_factor(
         return true;
     }
 
-    factor_keys.iter().any(|key| {
-        dependencies.contains(key)
-            || matches!(
-                key,
-                MarketFactorKey::Fx { base, quote }
-                    if dependencies.contains(&MarketFactorKey::fx(*quote, *base))
-            )
-    })
+    factor_keys.iter().any(|key| dependencies.contains(key))
 }
 
 /// Precomputed position routing for an ordered set of factors.

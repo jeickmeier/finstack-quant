@@ -17,9 +17,7 @@ use finstack_quant_models::factor::credit::hierarchy::{
     IssuerBetaPolicy, IssuerBetaRow, IssuerBetas, IssuerTags, LevelAnchor, LevelsAtAnchor,
     VolState,
 };
-use finstack_quant_models::factor::{
-    FactorCovarianceMatrix, FactorModelConfig, MatchingConfig, PricingMode,
-};
+use finstack_quant_models::factor::{FactorCovarianceMatrix, FactorModelConfig, MatchingConfig};
 use finstack_quant_valuations::instruments::json_loader::InstrumentJson;
 use finstack_quant_valuations::instruments::{Attributes, Bond};
 use finstack_quant_valuations::market::conventions::ids::{CdsConventionKey, CdsDocClause};
@@ -42,7 +40,7 @@ fn empty_factor_config() -> FactorModelConfig {
         factors: vec![],
         covariance: FactorCovarianceMatrix::new(vec![], vec![]).unwrap(),
         matching: MatchingConfig::MappingTable(vec![]),
-        pricing_mode: PricingMode::DeltaBased,
+
         risk_measure: Default::default(),
         bump_config: None,
         unmatched_policy: None,

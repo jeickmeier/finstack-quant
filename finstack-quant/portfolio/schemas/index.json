@@ -101,7 +101,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/factor_pnl_profile.schema.json",
-      "bytes": 21156,
+      "bytes": 21209,
       "kind": "output",
       "path": "schemas/portfolio/1/factor_pnl_profile.schema.json",
       "summary": "P&L profile for one factor across a scenario grid.",
@@ -146,7 +146,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/grid_carino_linked_result.schema.json",
-      "bytes": 10397,
+      "bytes": 8971,
       "kind": "output",
       "path": "schemas/portfolio/1/grid_carino_linked_result.schema.json",
       "summary": "Multi-period Carino-linked hierarchical grid attribution.",
@@ -200,7 +200,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_margin_result.schema.json",
-      "bytes": 44232,
+      "bytes": 44297,
       "kind": "output",
       "path": "schemas/portfolio/1/portfolio_margin_result.schema.json",
       "summary": "Portfolio-wide margin calculation results.",
@@ -218,7 +218,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_result.schema.json",
-      "bytes": 10752,
+      "bytes": 17598,
       "kind": "output",
       "path": "schemas/portfolio/1/portfolio_optimization_result.schema.json",
       "summary": "Optimizer weights and diagnostics.",
@@ -227,7 +227,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/portfolio_optimization_spec.schema.json",
-      "bytes": 57461,
+      "bytes": 56904,
       "kind": "input",
       "path": "schemas/portfolio/1/portfolio_optimization_spec.schema.json",
       "summary": "JSON-serializable specification for a portfolio optimization problem.",
@@ -290,7 +290,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/portfolio/1/replay_result.schema.json",
-      "bytes": 89550,
+      "bytes": 87601,
       "kind": "output",
       "path": "schemas/portfolio/1/replay_result.schema.json",
       "summary": "Full output of a replay run.",

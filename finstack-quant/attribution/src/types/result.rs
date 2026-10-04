@@ -661,7 +661,7 @@ impl PnlAttribution {
     /// # Errors
     ///
     /// Propagates the first error returned by `f`.
-    pub(crate) fn for_each_money_mut(
+    pub fn for_each_money_mut(
         &mut self,
         mut f: impl FnMut(&mut Money) -> Result<()>,
     ) -> Result<()> {

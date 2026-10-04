@@ -192,7 +192,6 @@
           }
         ]
       },
-      "pricing_mode": "full_repricing",
       "risk_measure": "variance"
     },
     "stresses": [
@@ -292,8 +291,7 @@
         },
         "matching": {
           "mapping_table": []
-        },
-        "pricing_mode": "delta_based"
+        }
       },
       "issuer_betas": [],
       "anchor_state": {
@@ -791,16 +789,9 @@
           "result_invalid": false
         }
       },
-      "rates_detail": null,
-      "credit_detail": null,
-      "inflation_detail": null,
-      "correlations_detail": null,
-      "fx_detail": null,
-      "vol_detail": null,
-      "scalars_detail": null,
       "result_invalid": false
     },
-    "attribution_explain": "Portfolio P&L: USD -1150.55\n  \u251c\u2500 Carry: USD 328.81 (-28.6%)\n  \u251c\u2500 Rates Curves: USD -1479.36 (128.6%)\n  \u251c\u2500 Credit Curves: USD 0.00 (-0.0%)\n  \u251c\u2500 Inflation: USD 0.00 (-0.0%)\n  \u251c\u2500 Correlations: USD 0.00 (-0.0%)\n  \u251c\u2500 FX: USD 0.00 (-0.0%)\n  \u251c\u2500 FX Translation: USD 0.00 (-0.0%)\n  \u251c\u2500 Cross Factor: USD 0.00 (-0.0%)\n  \u251c\u2500 Vol: USD 0.00 (-0.0%)\n  \u251c\u2500 Model Params: USD 0.00 (-0.0%)\n  \u251c\u2500 Market Scalars: USD 0.00 (-0.0%)\n  \u2514\u2500 Residual: USD 0.00 (-0.0%)",
+    "attribution_explain": "Portfolio P&L: USD -1150.55\n  ├─ Carry: USD 328.81 (-28.6%)\n  ├─ Rates Curves: USD -1479.36 (128.6%)\n  ├─ Credit Curves: USD 0.00 (-0.0%)\n  ├─ Inflation: USD 0.00 (-0.0%)\n  ├─ Correlations: USD 0.00 (-0.0%)\n  ├─ FX: USD 0.00 (-0.0%)\n  ├─ FX Translation: USD 0.00 (-0.0%)\n  ├─ Cross Factor: USD 0.00 (-0.0%)\n  ├─ Vol: USD 0.00 (-0.0%)\n  ├─ Model Params: USD 0.00 (-0.0%)\n  ├─ Market Scalars: USD 0.00 (-0.0%)\n  └─ Residual: USD 0.00 (-0.0%)",
     "attribution_reconciliation_check": {
       "total_residual": 6.821210263296962e-13,
       "is_reconciled": true,

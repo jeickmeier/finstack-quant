@@ -22,26 +22,7 @@ pub fn parse_portfolio_spec_json(py: Python<'_>, json_str: &str) -> PyResult<Str
     })
     .map_err(display_to_py)
 }
-
-/// Build a runtime portfolio from a JSON spec and round-trip the spec.
-///
-/// Returns the JSON form after `Portfolio::from_spec` → `Portfolio::to_spec`.
-/// Prefer :meth:`Portfolio.from_spec` for real work — it returns the typed
-/// object that pipeline functions reuse without rebuilding.
-#[pyfunction]
-pub fn build_portfolio_from_spec_json(py: Python<'_>, spec_json: &str) -> PyResult<String> {
-    let spec_json = spec_json.to_owned();
-    let spec: finstack_quant_portfolio::portfolio::PortfolioSpec = py
-        .detach(move || serde_json::from_str(&spec_json))
-        .map_err(display_to_py)?;
-    let portfolio = py
-        .detach(move || finstack_quant_portfolio::Portfolio::from_spec(spec))
-        .map_err(portfolio_to_py)?;
-    py.detach(move || serde_json::to_string(&portfolio.to_spec()))
-        .map_err(display_to_py)
-}
-
-/// Run the canonical Rust metric aggregation for both entry points.
+/// Run canonical Rust metric aggregation after extracting host inputs.
 fn run_aggregate_metrics(
     py: Python<'_>,
     valuation: &Bound<'_, PyAny>,
@@ -79,7 +60,7 @@ fn run_aggregate_metrics(
 /// Returns
 /// -------
 /// PortfolioMetrics
-///     Typed aggregate-metrics wrapper. Use :func:`aggregate_metrics_json`
+///     Typed aggregate-metrics wrapper. Use :meth:`to_json`
 ///     for the raw wire string.
 #[pyfunction]
 #[pyo3(text_signature = "(valuation, base_currency, market, as_of)")]
@@ -93,34 +74,9 @@ pub fn aggregate_metrics(
     let metrics = run_aggregate_metrics(py, valuation, base_currency, market, as_of)?;
     Ok(crate::bindings::portfolio::types::PyPortfolioMetrics::from_inner(metrics))
 }
-
-/// Aggregate portfolio metrics from a valuation and return wire JSON.
-///
-/// Wire twin of :func:`aggregate_metrics`; same inputs, JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``PortfolioMetrics``.
-#[pyfunction]
-#[pyo3(text_signature = "(valuation, base_currency, market, as_of)")]
-pub fn aggregate_metrics_json(
-    py: Python<'_>,
-    valuation: &Bound<'_, PyAny>,
-    base_currency: &Bound<'_, PyAny>,
-    market: &Bound<'_, PyAny>,
-    as_of: &Bound<'_, PyAny>,
-) -> PyResult<String> {
-    let metrics = run_aggregate_metrics(py, valuation, base_currency, market, as_of)?;
-    py.detach(move || serde_json::to_string(&metrics))
-        .map_err(display_to_py)
-}
-
 /// Register spec functions on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(pyo3::wrap_pyfunction!(parse_portfolio_spec_json, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(build_portfolio_from_spec_json, m)?)?;
     m.add_function(pyo3::wrap_pyfunction!(aggregate_metrics, m)?)?;
-    m.add_function(pyo3::wrap_pyfunction!(aggregate_metrics_json, m)?)?;
     Ok(())
 }

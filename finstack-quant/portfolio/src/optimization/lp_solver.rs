@@ -109,12 +109,27 @@ impl DefaultLpOptimizer {
     /// Returns `None` when the metric/attribute is missing for the position;
     /// callers apply the [`MissingMetricPolicy`] on top of this.
     fn per_position_metric_raw(ppm: &PerPositionMetric, feat: &DecisionFeatures) -> Option<f64> {
-        ppm.resolve(
-            &feat.measures,
-            &feat.attributes,
-            feat.pv_base,
-            feat.pv_native,
-        )
+        ppm.resolve(&feat.measures, &feat.attributes, feat.pv_base)
+    }
+
+    fn expression_value(
+        metric: &PerPositionMetric,
+        filter: Option<&super::universe::PositionFilter>,
+        item: &super::decision::DecisionItem,
+        feat: &DecisionFeatures,
+        missing_policy: MissingMetricPolicy,
+    ) -> Result<Option<f64>> {
+        if filter.is_some_and(|filter| {
+            !filter.matches(&item.entity_id, &item.position_id, &feat.attributes)
+        }) || (matches!(missing_policy, MissingMetricPolicy::Exclude)
+            && Self::per_position_metric_raw(metric, feat).is_none())
+        {
+            return Ok(None);
+        }
+        if matches!(metric, PerPositionMetric::PvBase) && !item.is_existing {
+            return Err(Error::invalid_input(format!("PvBase is not valid in aggregated expressions when candidate positions are in scope: candidate '{}' has no held base value (pv_base = 0). Filter candidates out or use a per-position metric/attribute.", item.position_id)));
+        }
+        Self::per_position_metric_value(metric, feat, missing_policy).map(Some)
     }
 
     /// Lower a `PerPositionMetric` to a per‑decision value `m_i`.
@@ -153,51 +168,16 @@ impl DefaultLpOptimizer {
             MetricExpr::WeightedSum { metric, filter }
             | MetricExpr::ValueWeightedAverage { metric, filter } => {
                 for (item, feat) in items.iter().zip(feats) {
-                    if let Some(f) = filter {
-                        if !f.matches(&item.entity_id, &item.position_id, &feat.attributes) {
-                            coeffs.push(0.0);
-                            continue;
-                        }
-                    }
-                    // Under `MissingMetricPolicy::Exclude` a position with a
-                    // missing metric keeps its current weight and is dropped
-                    // from constraint / objective evaluation. `WeightedSum`
-                    // and unfiltered `ValueWeightedAverage` share this
-                    // coefficient builder; skip here the same way VWA bounds
-                    // drop the name from both numerator and denominator.
-                    if matches!(missing_policy, MissingMetricPolicy::Exclude)
-                        && Self::per_position_metric_raw(metric, feat).is_none()
-                    {
-                        coeffs.push(0.0);
-                        continue;
-                    }
-                    // Aggregated objectives sum across positions, so the per-
-                    // position metric must be expressed in a common numeraire.
-                    // `PvNative` is per-position native currency and is not
-                    // commensurable across multi-currency portfolios, so reject
-                    // it explicitly instead of silently substituting `PvBase`.
-                    if matches!(metric, PerPositionMetric::PvNative) {
-                        return Err(Error::invalid_input(
-                            "PvNative is not valid in aggregated objectives \
-                             (WeightedSum / ValueWeightedAverage); values in \
-                             different native currencies are not commensurable. \
-                             Use PerPositionMetric::PvBase instead.",
-                        ));
-                    }
-                    // Candidates carry `pv_base = 0` (no held value), so a
-                    // PvBase coefficient would silently ignore their actual
-                    // value in the objective/constraint — fail closed instead.
-                    if matches!(metric, PerPositionMetric::PvBase) && !item.is_existing {
-                        return Err(Error::invalid_input(format!(
-                            "PvBase is not valid in aggregated expressions when candidate \
-                             positions are in scope: candidate '{}' has no held base value \
-                             (pv_base = 0) and would be silently ignored. Filter candidates \
-                             out of the expression or use a per-position metric/attribute.",
-                            item.position_id
-                        )));
-                    }
-                    let m_i = Self::per_position_metric_value(metric, feat, missing_policy)?;
-                    coeffs.push(m_i);
+                    coeffs.push(
+                        Self::expression_value(
+                            metric,
+                            filter.as_ref(),
+                            item,
+                            feat,
+                            missing_policy,
+                        )?
+                        .unwrap_or(0.0),
+                    );
                 }
             }
         }
@@ -221,45 +201,9 @@ impl DefaultLpOptimizer {
         let mut coeffs = Vec::with_capacity(feats.len());
         let mut mask = Vec::with_capacity(feats.len());
         for (item, feat) in items.iter().zip(feats) {
-            if let Some(f) = filter {
-                if !f.matches(&item.entity_id, &item.position_id, &feat.attributes) {
-                    coeffs.push(0.0);
-                    mask.push(false);
-                    continue;
-                }
-            }
-            // Under `MissingMetricPolicy::Exclude` a position with a missing
-            // metric keeps its current weight and is excluded from constraint
-            // evaluation. Leaving it in the average with `m_i = 0` would
-            // contribute `−wᵢ·rhs` to the lowered row and distort the bound,
-            // so drop it from both numerator and denominator.
-            if matches!(missing_policy, MissingMetricPolicy::Exclude)
-                && Self::per_position_metric_raw(metric, feat).is_none()
-            {
-                coeffs.push(0.0);
-                mask.push(false);
-                continue;
-            }
-            mask.push(true);
-            if matches!(metric, PerPositionMetric::PvNative) {
-                return Err(Error::invalid_input(
-                    "PvNative is not valid in ValueWeightedAverage constraints; \
-                     use PerPositionMetric::PvBase instead.",
-                ));
-            }
-            // Candidates carry `pv_base = 0`; see the identical guard in
-            // `build_metric_coefficients`.
-            if matches!(metric, PerPositionMetric::PvBase) && !item.is_existing {
-                return Err(Error::invalid_input(format!(
-                    "PvBase is not valid in aggregated expressions when candidate \
-                     positions are in scope: candidate '{}' has no held base value \
-                     (pv_base = 0) and would be silently ignored. Filter candidates \
-                     out of the expression or use a per-position metric/attribute.",
-                    item.position_id
-                )));
-            }
-            let m_i = Self::per_position_metric_value(metric, feat, missing_policy)?;
-            coeffs.push(m_i - rhs);
+            let value = Self::expression_value(metric, filter, item, feat, missing_policy)?;
+            mask.push(value.is_some());
+            coeffs.push(value.map_or(0.0, |value| value - rhs));
         }
         Ok((coeffs, mask))
     }
@@ -838,32 +782,8 @@ impl DefaultLpOptimizer {
             } = constraint
             {
                 for (item, feat) in decision_items.iter().zip(decision_features.iter_mut()) {
-                    let is_match = if item.is_existing {
-                        if let Some(position) =
-                            problem.portfolio.get_position(item.position_id.as_str())
-                        {
-                            filter.matches(
-                                &position.entity_id,
-                                &position.position_id,
-                                &position.attributes,
-                            )
-                        } else {
-                            false
-                        }
-                    } else {
-                        problem
-                            .trade_universe
-                            .candidates
-                            .iter()
-                            .find(|candidate| candidate.id == item.position_id)
-                            .is_some_and(|candidate| {
-                                filter.matches(
-                                    &candidate.entity_id,
-                                    &candidate.id,
-                                    &candidate.attributes,
-                                )
-                            })
-                    };
+                    let is_match =
+                        filter.matches(&item.entity_id, &item.position_id, &feat.attributes);
 
                     if is_match {
                         feat.min_weight = feat.min_weight.max(*min);
@@ -956,30 +876,6 @@ impl DefaultLpOptimizer {
 mod tests {
     use super::*;
     use crate::types::AttributeValue;
-
-    #[test]
-    fn pv_native_metric_uses_native_value_not_base_value() {
-        let feat = DecisionFeatures {
-            pv_base: 125.0,
-            pv_native: 100.0,
-            pv_per_unit: 125.0,
-            deal_notional_abs: 0.0,
-            measures: IndexMap::new(),
-            attributes: IndexMap::new(),
-            min_weight: 0.0,
-            max_weight: 1.0,
-        };
-
-        let value = DefaultLpOptimizer::per_position_metric_value(
-            &PerPositionMetric::PvNative,
-            &feat,
-            MissingMetricPolicy::Strict,
-        )
-        .expect("native PV should be available");
-
-        assert_eq!(value, 100.0);
-    }
-
     #[test]
     fn attribute_indicator_metric_evaluates_correctly() {
         let mut attributes = IndexMap::new();
@@ -989,7 +885,6 @@ mod tests {
         );
         let feat = DecisionFeatures {
             pv_base: 100.0,
-            pv_native: 100.0,
             pv_per_unit: 100.0,
             deal_notional_abs: 0.0,
             measures: IndexMap::new(),
@@ -1025,7 +920,6 @@ mod tests {
         attributes.insert("score".to_string(), AttributeValue::Number(650.0));
         let feat = DecisionFeatures {
             pv_base: 100.0,
-            pv_native: 100.0,
             pv_per_unit: 100.0,
             deal_notional_abs: 0.0,
             measures: IndexMap::new(),
@@ -1050,7 +944,6 @@ mod tests {
 
         let scored = DecisionFeatures {
             pv_base: 50.0,
-            pv_native: 50.0,
             pv_per_unit: 50.0,
             deal_notional_abs: 0.0,
             measures: IndexMap::from([("ytm".to_string(), 10.0)]),
@@ -1060,7 +953,6 @@ mod tests {
         };
         let missing = DecisionFeatures {
             pv_base: 50.0,
-            pv_native: 50.0,
             pv_per_unit: 50.0,
             deal_notional_abs: 0.0,
             measures: IndexMap::new(),

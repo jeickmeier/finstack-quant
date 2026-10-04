@@ -734,7 +734,7 @@ pub(super) struct PyPositionRiskDecomposition {
 }
 
 impl PyPositionRiskDecomposition {
-    pub(super) fn from_inner(inner: PositionRiskDecomposition) -> Self {
+    pub(crate) fn from_inner(inner: PositionRiskDecomposition) -> Self {
         Self { inner }
     }
 }

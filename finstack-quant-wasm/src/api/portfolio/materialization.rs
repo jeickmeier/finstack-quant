@@ -1,7 +1,6 @@
 //! Browser-safe WASM wrappers for strict portfolio materialization.
 
 use crate::utils::input::js_opt_uint;
-use std::sync::Arc;
 
 use finstack_quant_core::contract::LoadLimits;
 use finstack_quant_portfolio::{InstrumentArtifactCache, Portfolio as RustPortfolio};
@@ -22,7 +21,7 @@ use crate::utils::{materialization_to_js_error, to_js_value};
 /// ```
 #[wasm_bindgen(js_name = InstrumentArtifactCache)]
 pub struct JsInstrumentArtifactCache {
-    inner: Arc<InstrumentArtifactCache>,
+    inner: InstrumentArtifactCache,
 }
 
 #[wasm_bindgen(js_class = InstrumentArtifactCache)]
@@ -36,11 +35,9 @@ impl JsInstrumentArtifactCache {
     pub fn new(capacity: Option<JsValue>) -> Result<JsInstrumentArtifactCache, JsValue> {
         let capacity: Option<usize> = js_opt_uint(capacity.as_ref(), "capacity")?;
         Ok(Self {
-            inner: Arc::new(
-                capacity
-                    .map(InstrumentArtifactCache::with_capacity)
-                    .unwrap_or_default(),
-            ),
+            inner: capacity
+                .map(InstrumentArtifactCache::with_capacity)
+                .unwrap_or_default(),
         })
     }
 
@@ -90,9 +87,7 @@ impl JsPortfolio {
                 .map_err(materialization_to_js_error)?;
 
         let result = js_sys::Object::new();
-        let portfolio = JsPortfolio {
-            inner: Arc::new(portfolio),
-        };
+        let portfolio = JsPortfolio { inner: portfolio };
         js_sys::Reflect::set(
             &result,
             &JsValue::from("portfolio"),

@@ -22,7 +22,7 @@ use finstack_quant_core::Result;
 use finstack_quant_models::factor::risk::ParametricDecomposer;
 use finstack_quant_models::factor::{
     BumpSizeConfig, FactorCovarianceMatrix, FactorDefinition, FactorId, FactorType, MarketMapping,
-    PricingMode, RiskMeasure, SensitivityMatrix, UnmatchedPolicy,
+    RiskMeasure, SensitivityMatrix, UnmatchedPolicy,
 };
 use finstack_quant_portfolio::factor_model::FactorModel;
 use finstack_quant_portfolio::position::{Position, PositionUnit};
@@ -343,7 +343,7 @@ fn factor_stress_model() -> finstack_quant_portfolio::factor_model::FactorModel 
             attribute_filter: finstack_quant_models::factor::AttributeFilter::default(),
             factor_id,
         }]),
-        pricing_mode: PricingMode::DeltaBased,
+
         risk_measure: RiskMeasure::Variance,
         bump_config: Some(BumpSizeConfig::default()),
         unmatched_policy: Some(UnmatchedPolicy::Warn),

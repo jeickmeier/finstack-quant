@@ -493,23 +493,24 @@ const TRADE_COLUMNS: [ColumnSchema<'static>; 9] = [
 )]
 pub(super) struct PyPortfolioOptimizationResult {
     pub(crate) inner: PortfolioOptimizationResultWire,
-    /// The live result (with the original problem, which does not survive the
-    /// wire round-trip), kept so the rebalanced portfolio is built on demand.
-    /// `None` for a result rebuilt from JSON or unpickled.
-    live: Option<std::sync::Arc<PortfolioOptimizationResult>>,
 }
 
 impl PyPortfolioOptimizationResult {
     pub(crate) fn from_inner(inner: PortfolioOptimizationResult) -> Self {
         Self {
             inner: PortfolioOptimizationResultWire::from(&inner),
-            live: Some(std::sync::Arc::new(inner)),
         }
     }
 }
 
 #[pymethods]
 impl PyPortfolioOptimizationResult {
+    /// Configuration and numerical provenance stamped by the Rust solver.
+    #[getter]
+    fn meta<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        crate::bindings::pandas_utils::serde_to_py(py, &self.inner.meta)
+    }
+
     /// Serialize to the canonical JSON wire format.
     #[pyo3(text_signature = "(self)")]
     fn to_json(&self) -> PyResult<String> {
@@ -532,41 +533,8 @@ impl PyPortfolioOptimizationResult {
     fn from_json(json_str: &str) -> PyResult<Self> {
         let inner = serde_json::from_str(json_str)
             .map_err(|e| crate::errors::serde_json_to_py(e, "invalid optimization result JSON"))?;
-        Ok(Self { inner, live: None })
+        Ok(Self { inner })
     }
-
-    /// Rebuild the portfolio with the implied post-trade quantities.
-    ///
-    /// Existing positions take their ``implied_quantities`` entry (positions
-    /// outside the trade universe keep their quantity) and traded candidates
-    /// become new positions.
-    ///
-    /// Raises
-    /// ------
-    /// PortfolioError
-    ///     If the solution is infeasible.
-    /// RuntimeError
-    ///     If this result was rebuilt from JSON / unpickled (the live problem
-    ///     is not part of the wire form).
-    #[pyo3(text_signature = "(self)")]
-    fn to_rebalanced_portfolio(
-        &self,
-        py: Python<'_>,
-    ) -> PyResult<crate::bindings::portfolio::types::PyPortfolio> {
-        let live = self.live.as_ref().ok_or_else(|| {
-            pyo3::exceptions::PyRuntimeError::new_err(
-                "rebalanced portfolio is only available on a result returned by \
-                 optimize_portfolio, not on one rebuilt from JSON",
-            )
-        })?;
-        let portfolio = py
-            .detach(|| live.to_rebalanced_portfolio())
-            .map_err(crate::errors::portfolio_to_py)?;
-        Ok(crate::bindings::portfolio::types::PyPortfolio {
-            inner: std::sync::Arc::new(portfolio),
-        })
-    }
-
     /// Support `pickle` (and therefore `multiprocessing`, `joblib`, `dask`).
     ///
     /// Reconstruction goes through the same strict serde round-trip as

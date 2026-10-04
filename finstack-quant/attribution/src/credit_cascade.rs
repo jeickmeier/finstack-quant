@@ -655,7 +655,7 @@ mod tests {
     };
     use finstack_quant_models::factor::{
         FactorCovarianceMatrix, FactorDefinition, FactorId, FactorModelConfig, FactorType,
-        MarketMapping, MatchingConfig, PricingMode,
+        MarketMapping, MatchingConfig,
     };
     use finstack_quant_valuations::instruments::Instrument;
     use finstack_quant_valuations::instruments::{Attributes, Bond};
@@ -666,7 +666,7 @@ mod tests {
             factors: vec![],
             covariance: FactorCovarianceMatrix::new(vec![], vec![]).unwrap(),
             matching: MatchingConfig::MappingTable(vec![]),
-            pricing_mode: PricingMode::DeltaBased,
+
             risk_measure: Default::default(),
             bump_config: None,
             unmatched_policy: None,

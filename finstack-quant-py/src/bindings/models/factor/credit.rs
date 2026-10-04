@@ -1197,7 +1197,7 @@ impl PyFactorCovarianceMatrix {
 ///
 /// Example:
 ///     >>> from finstack_quant.models.factor.credit import FactorModelConfig
-///     >>> config = FactorModelConfig.from_json('{"factors":[],"covariance":{"factor_ids":[],"n":0,"data":[]},"matching":{"mapping_table":[]},"pricing_mode":"delta_based","risk_measure":"variance"}')
+///     >>> config = FactorModelConfig.from_json('{"factors":[],"covariance":{"factor_ids":[],"n":0,"data":[]},"matching":{"mapping_table":[]},"risk_measure":"variance"}')
 ///     >>> config.n_factors
 ///     0
 #[pyclass(
@@ -1271,13 +1271,6 @@ impl PyFactorModelConfig {
     fn matching<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         serde_to_py(py, &self.inner.matching)
     }
-
-    /// Sensitivity extraction strategy (``delta_based`` or ``full_repricing``).
-    #[getter]
-    fn pricing_mode(&self) -> String {
-        self.inner.pricing_mode.to_string()
-    }
-
     /// Risk measure as its canonical Python value: ``"variance"``,
     /// ``"volatility"``, ``{"var": {"confidence": c}}`` or
     /// ``{"expected_shortfall": {"confidence": c}}``.
@@ -1318,11 +1311,7 @@ impl PyFactorModelConfig {
     }
 
     fn __repr__(&self) -> String {
-        format!(
-            "FactorModelConfig(n_factors={}, pricing_mode={:?})",
-            self.inner.factors.len(),
-            self.inner.pricing_mode.to_string(),
-        )
+        format!("FactorModelConfig(n_factors={})", self.inner.factors.len(),)
     }
 }
 

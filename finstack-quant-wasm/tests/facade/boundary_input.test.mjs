@@ -225,10 +225,24 @@ test('string arrays must be arrays of strings (portfolio metrics)', () => {
     entities: {},
     positions: [],
   };
-  assert.equal(typeof portfolio.valuePortfolio(spec, golden.market.data, false, []), 'object');
+  assert.equal(
+    typeof portfolio.valuePortfolio(
+      portfolio.Portfolio.fromSpec(spec),
+      core.MarketContext.fromJson(golden.market.data),
+      false,
+      []
+    ),
+    'object'
+  );
   for (const bad of ['dv01', 5, {}, new Set(['theta'])]) {
     assert.throws(
-      () => portfolio.valuePortfolio(spec, golden.market.data, false, bad),
+      () =>
+        portfolio.valuePortfolio(
+          portfolio.Portfolio.fromSpec(spec),
+          core.MarketContext.fromJson(golden.market.data),
+          false,
+          bad
+        ),
       invalidType('metrics')
     );
   }

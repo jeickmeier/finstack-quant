@@ -471,7 +471,7 @@ fn run_campisi_reconciliation_check(
 /// -------
 /// FiAttributionResult
 ///     Typed result with per-sector effects and the five effect totals. Use
-///     :func:`campisi_attribution_json` for the raw wire string.
+///     :meth:`to_json` for the raw wire string.
 ///
 /// Raises
 /// ------
@@ -502,35 +502,6 @@ fn campisi_attribution(
         inner: run_campisi_attribution(py, portfolio_json, benchmark_json, config_json)?,
     })
 }
-
-/// Compute a single-period Campisi attribution and return wire JSON.
-///
-/// Wire twin of :func:`campisi_attribution`; same inputs, JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``FiAttributionResult``.
-#[pyfunction]
-#[pyo3(text_signature = "(portfolio_json, benchmark_json, config_json)")]
-fn campisi_attribution_json(
-    py: Python<'_>,
-    portfolio_json: &Bound<'_, PyAny>,
-    benchmark_json: &Bound<'_, PyAny>,
-    config_json: &Bound<'_, PyAny>,
-) -> PyResult<String> {
-    let portfolio_json =
-        crate::bindings::extract::extract_records_json(py, portfolio_json, "portfolio")?;
-    let portfolio_json: &str = &portfolio_json;
-    let benchmark_json =
-        crate::bindings::extract::extract_records_json(py, benchmark_json, "benchmark")?;
-    let benchmark_json: &str = &benchmark_json;
-    let config_json = crate::bindings::extract::extract_records_json(py, config_json, "config")?;
-    let config_json: &str = &config_json;
-    let result = run_campisi_attribution(py, portfolio_json, benchmark_json, config_json)?;
-    serde_json::to_string(&result).map_err(|err| serde_json_to_py(err, "serialize Campisi result"))
-}
-
 /// Carino-link already-computed single-period Campisi attribution results.
 ///
 /// Binds Rust `finstack_quant_portfolio::campisi_carino_link`. Because each
@@ -542,14 +513,14 @@ fn campisi_attribution_json(
 /// ----------
 /// periods_json : str | dict | list | pandas.DataFrame
 ///     JSON array of ``FiAttributionResult`` objects, in chronological order,
-///     as returned by :func:`campisi_attribution_json` (or
+///     as returned by :meth:`to_json` (or
 ///     ``FiAttributionResult.to_json()``).
 ///
 /// Returns
 /// -------
 /// FiCarinoLinkedResult
 ///     Typed result with linked per-sector effects and compounded returns.
-///     Use :func:`campisi_carino_link_json` for the raw wire string.
+///     Use :meth:`to_json` for the raw wire string.
 ///
 /// Raises
 /// ------
@@ -578,25 +549,6 @@ fn campisi_carino_link(
         inner: run_campisi_carino_link(py, periods_json)?,
     })
 }
-
-/// Carino-link single-period Campisi results and return wire JSON.
-///
-/// Wire twin of :func:`campisi_carino_link`; same inputs, JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``FiCarinoLinkedResult``.
-#[pyfunction]
-#[pyo3(text_signature = "(periods_json)")]
-fn campisi_carino_link_json(py: Python<'_>, periods_json: &Bound<'_, PyAny>) -> PyResult<String> {
-    let periods_json = crate::bindings::extract::extract_records_json(py, periods_json, "periods")?;
-    let periods_json: &str = &periods_json;
-    let result = run_campisi_carino_link(py, periods_json)?;
-    serde_json::to_string(&result)
-        .map_err(|err| serde_json_to_py(err, "serialize Campisi linked result"))
-}
-
 /// Compute Carino-linked multi-period Campisi attribution from period JSON.
 ///
 /// Binds Rust `finstack_quant_portfolio::campisi_carino_link_from_snapshots`.
@@ -615,7 +567,7 @@ fn campisi_carino_link_json(py: Python<'_>, periods_json: &Bound<'_, PyAny>) -> 
 /// -------
 /// FiCarinoLinkedResult
 ///     Typed result with linked per-sector effects and compounded returns.
-///     Use :func:`campisi_carino_link_from_snapshots_json` for the raw wire
+///     Use :meth:`to_json` for the raw wire
 ///     string.
 #[pyfunction]
 #[pyo3(text_signature = "(periods_json, config_json)")]
@@ -632,32 +584,6 @@ fn campisi_carino_link_from_snapshots(
         inner: run_campisi_carino_link_from_snapshots(py, periods_json, config_json)?,
     })
 }
-
-/// Compute snapshot-level Carino-linked Campisi attribution and return wire JSON.
-///
-/// Wire twin of :func:`campisi_carino_link_from_snapshots`; same inputs,
-/// JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``FiCarinoLinkedResult``.
-#[pyfunction]
-#[pyo3(text_signature = "(periods_json, config_json)")]
-fn campisi_carino_link_from_snapshots_json(
-    py: Python<'_>,
-    periods_json: &Bound<'_, PyAny>,
-    config_json: &Bound<'_, PyAny>,
-) -> PyResult<String> {
-    let periods_json = crate::bindings::extract::extract_records_json(py, periods_json, "periods")?;
-    let periods_json: &str = &periods_json;
-    let config_json = crate::bindings::extract::extract_records_json(py, config_json, "config")?;
-    let config_json: &str = &config_json;
-    let result = run_campisi_carino_link_from_snapshots(py, periods_json, config_json)?;
-    serde_json::to_string(&result)
-        .map_err(|err| serde_json_to_py(err, "serialize Campisi linked result"))
-}
-
 /// Reconcile the five Campisi effect totals against the active return.
 ///
 /// Binds the Rust method
@@ -671,7 +597,7 @@ fn campisi_carino_link_from_snapshots_json(
 /// result_json : FiAttributionResult | str | dict | list | pandas.DataFrame
 ///     Typed ``FiAttributionResult`` (as returned by
 ///     :func:`campisi_attribution`) or its JSON form, as returned by
-///     :func:`campisi_attribution_json` (or ``FiAttributionResult.to_json()``).
+///     :meth:`to_json` (or ``FiAttributionResult.to_json()``).
 ///     ``FiAttributionResult.reconciliation_check`` is the method form.
 /// tolerance : float
 ///     Absolute tolerance in return units (``1e-10`` is appropriate for
@@ -681,7 +607,7 @@ fn campisi_carino_link_from_snapshots_json(
 /// -------
 /// FiReconciliationReport
 ///     Typed report with ``total_residual``, ``is_reconciled`` and
-///     ``tolerance``. Use :func:`campisi_reconciliation_check_json` for the
+///     ``tolerance``. Use :meth:`to_json` for the
 ///     raw wire string.
 #[pyfunction]
 #[pyo3(text_signature = "(result_json, tolerance)")]
@@ -696,45 +622,14 @@ fn campisi_reconciliation_check(
         inner: run_campisi_reconciliation_check(py, result_json, tolerance)?,
     })
 }
-
-/// Reconcile the five Campisi effect totals and return wire JSON.
-///
-/// Wire twin of :func:`campisi_reconciliation_check`; same inputs,
-/// JSON-string output.
-///
-/// Returns
-/// -------
-/// str
-///     JSON-serialized ``FiReconciliationReport``.
-#[pyfunction]
-#[pyo3(text_signature = "(result_json, tolerance)")]
-fn campisi_reconciliation_check_json(
-    py: Python<'_>,
-    result_json: &Bound<'_, PyAny>,
-    tolerance: f64,
-) -> PyResult<String> {
-    let result_json = crate::bindings::extract::extract_records_json(py, result_json, "result")?;
-    let result_json: &str = &result_json;
-    let report = run_campisi_reconciliation_check(py, result_json, tolerance)?;
-    serde_json::to_string(&report)
-        .map_err(|err| serde_json_to_py(err, "serialize Campisi reconciliation report"))
-}
-
 /// Register Campisi attribution functions on the portfolio submodule.
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyFiAttributionResult>()?;
     m.add_class::<PyFiCarinoLinkedResult>()?;
     m.add_class::<PyFiReconciliationReport>()?;
     m.add_function(wrap_pyfunction!(campisi_attribution, m)?)?;
-    m.add_function(wrap_pyfunction!(campisi_attribution_json, m)?)?;
     m.add_function(wrap_pyfunction!(campisi_carino_link, m)?)?;
-    m.add_function(wrap_pyfunction!(campisi_carino_link_json, m)?)?;
     m.add_function(wrap_pyfunction!(campisi_carino_link_from_snapshots, m)?)?;
-    m.add_function(wrap_pyfunction!(
-        campisi_carino_link_from_snapshots_json,
-        m
-    )?)?;
     m.add_function(wrap_pyfunction!(campisi_reconciliation_check, m)?)?;
-    m.add_function(wrap_pyfunction!(campisi_reconciliation_check_json, m)?)?;
     Ok(())
 }

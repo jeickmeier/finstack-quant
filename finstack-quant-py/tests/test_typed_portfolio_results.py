@@ -1,8 +1,7 @@
 """Typed result-return contract for the portfolio attribution/performance surface.
 
 Every computation entry point returns a typed ``Py*`` wrapper; the exact JSON
-string the old API returned is still available from the paired ``<name>_json``
-wire surface. Each wrapper carries typed getters, ``to_json``, a static
+wire string is available from ``result.to_json()``. Each wrapper carries typed getters, ``to_json``, a static
 ``from_json``, and ``to_dataframe``.
 """
 
@@ -69,7 +68,7 @@ def _reference_table_json() -> str:
         {"duration": 1.5, "total_return": 0.02},
         {"duration": 2.5, "total_return": 0.03},
     ]
-    return pf.cell_returns_from_reference_json(json.dumps(reference), "UST", json.dumps({"width": 1.0}))
+    return pf.cell_returns_from_reference(json.dumps(reference), "UST", json.dumps({"width": 1.0})).to_json()
 
 
 _GRID_PORTFOLIO = json.dumps([
@@ -202,25 +201,23 @@ def _frame_columns(wrapper: Any) -> list[str]:
 
 def test_brinson_fachler_returns_typed_result() -> None:
     result = pf.brinson_fachler(_brinson_sectors())
-    expected = json.loads(pf.brinson_fachler_json(_brinson_sectors()))
+    expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.BrinsonPeriodResult)
     assert result.total_allocation == pytest.approx(expected["total_allocation"])
     assert result.total_excess_return == pytest.approx(expected["total_excess_return"])
     assert [s["sector"] for s in result.sectors] == ["TECH", "ENERGY"]
     assert _frame_columns(result) == ["sector", "allocation", "selection", "interaction", "total"]
-    assert json.loads(result.to_json()) == expected
 
 
 def test_carino_link_returns_typed_result() -> None:
     periods = json.dumps([json.loads(_brinson_sectors()), json.loads(_brinson_sectors())])
     result = pf.carino_link_from_sector_periods(periods)
-    expected = json.loads(pf.carino_link_from_sector_periods_json(periods))
+    expected = json.loads(result.to_json())
     # `carino_link` binds Rust `carino_link`: it links the precomputed
     # per-period results and reaches the same answer.
-    period_result = json.loads(pf.brinson_fachler_json(_brinson_sectors()))
+    period_result = json.loads(pf.brinson_fachler(_brinson_sectors()).to_json())
     precomputed = json.dumps([period_result, period_result])
-    assert json.loads(pf.carino_link_json(precomputed)) == expected
     assert json.loads(pf.carino_link(precomputed).to_json()) == expected
 
     _assert_contract(result, pf.CarinoLinkedAttribution)
@@ -237,7 +234,7 @@ def test_carino_link_returns_typed_result() -> None:
 
 def test_campisi_attribution_returns_typed_result() -> None:
     result = pf.campisi_attribution(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG)
-    expected = json.loads(pf.campisi_attribution_json(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG))
+    expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.FiAttributionResult)
     assert result.active_return == pytest.approx(expected["active_return"])
@@ -259,10 +256,10 @@ def test_campisi_attribution_returns_typed_result() -> None:
 
 
 def test_campisi_carino_link_returns_typed_result() -> None:
-    period = pf.campisi_attribution_json(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG)
+    period = pf.campisi_attribution(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG).to_json()
     periods = json.dumps([json.loads(period), json.loads(period)])
     result = pf.campisi_carino_link(periods)
-    expected = json.loads(pf.campisi_carino_link_json(periods))
+    expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.FiCarinoLinkedResult)
     assert result.linked_allocation == pytest.approx(expected["linked_allocation"])
@@ -284,16 +281,16 @@ def test_campisi_carino_link_from_snapshots_returns_typed_result() -> None:
         {"portfolio": json.loads(_CAMPISI_PORTFOLIO), "benchmark": json.loads(_CAMPISI_BENCHMARK)},
     ])
     result = pf.campisi_carino_link_from_snapshots(periods, _CAMPISI_CONFIG)
-    expected = json.loads(pf.campisi_carino_link_from_snapshots_json(periods, _CAMPISI_CONFIG))
+    expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.FiCarinoLinkedResult)
     assert result.linked_selection == pytest.approx(expected["linked_selection"])
 
 
 def test_campisi_reconciliation_check_returns_typed_report() -> None:
-    period = pf.campisi_attribution_json(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG)
+    period = pf.campisi_attribution(_CAMPISI_PORTFOLIO, _CAMPISI_BENCHMARK, _CAMPISI_CONFIG).to_json()
     report = pf.campisi_reconciliation_check(period, 1e-10)
-    expected = json.loads(pf.campisi_reconciliation_check_json(period, 1e-10))
+    expected = json.loads(report.to_json())
 
     _assert_contract(report, pf.FiReconciliationReport)
     assert report.is_reconciled is expected["is_reconciled"]
@@ -310,7 +307,7 @@ def test_campisi_reconciliation_check_returns_typed_report() -> None:
 def test_cell_returns_from_reference_returns_typed_table() -> None:
     reference = json.dumps([{"duration": 1.0, "total_return": 0.02}])
     table = pf.cell_returns_from_reference(reference, "UST", json.dumps({"width": 2.0}))
-    expected = json.loads(pf.cell_returns_from_reference_json(reference, "UST", json.dumps({"width": 2.0})))
+    expected = json.loads(table.to_json())
 
     _assert_contract(table, pf.DurationCellTable)
     assert table.base_label == "UST"
@@ -324,7 +321,7 @@ def test_cell_returns_from_curves_returns_typed_table() -> None:
     config = json.dumps({"width": 1.0})
 
     table = pf.cell_returns_from_curves(start, end, 0.25, 2.0, "UST", config)
-    expected = json.loads(pf.cell_returns_from_curves_json(start, end, 0.25, 2.0, "UST", config))
+    expected = json.loads(table.to_json())
 
     _assert_contract(table, pf.DurationCellTable)
     assert len(table.cells) == len(expected["cells"]) == 2
@@ -338,7 +335,7 @@ def test_excess_returns_returns_typed_result() -> None:
     ])
 
     result = pf.excess_returns(positions, table_json)
-    expected = json.loads(pf.excess_returns_json(positions, table_json))
+    expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.ExcessReturnResult)
     assert result.portfolio_excess_return == pytest.approx(expected["portfolio_excess_return"])
@@ -353,7 +350,7 @@ def test_excess_returns_returns_typed_result() -> None:
 
 def test_grid_attribution_returns_typed_result() -> None:
     result = pf.grid_attribution(_GRID_PORTFOLIO, _GRID_BENCHMARK)
-    expected = json.loads(pf.grid_attribution_json(_GRID_PORTFOLIO, _GRID_BENCHMARK))
+    expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.GridAttributionResult)
     assert result.active_return == pytest.approx(expected["active_return"])
@@ -365,16 +362,20 @@ def test_grid_attribution_returns_typed_result() -> None:
         "benchmark_cell_return",
         "curve_effect",
     ]
-    assert list(result.to_sector_effects_dataframe().columns) == ["cell", "sector", "allocation_effect"]
-    assert list(result.to_selection_effects_dataframe().columns) == ["cell", "sector", "selection_effect"]
+    assert list(result.to_sector_effects_dataframe().columns) == [
+        "cell",
+        "sector",
+        "allocation_effect",
+        "selection_effect",
+    ]
 
 
 def test_grid_carino_link_returns_typed_result() -> None:
-    period = pf.grid_attribution_json(_GRID_PORTFOLIO, _GRID_BENCHMARK)
+    period = pf.grid_attribution(_GRID_PORTFOLIO, _GRID_BENCHMARK).to_json()
     periods = json.dumps([json.loads(period), json.loads(period)])
 
     result = pf.grid_carino_link(periods)
-    expected = json.loads(pf.grid_carino_link_json(periods))
+    expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.GridCarinoLinkedResult)
     assert result.linked_selection == pytest.approx(expected["linked_selection"])
@@ -395,7 +396,7 @@ def test_grid_carino_link_returns_typed_result() -> None:
 
 def test_factor_brinson_attribution_returns_typed_result() -> None:
     result = pf.factor_brinson_attribution(_FACTOR_BRINSON_INPUT, [0.02])
-    expected = json.loads(pf.factor_brinson_attribution_json(_FACTOR_BRINSON_INPUT, [0.02]))
+    expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.FactorBrinsonResult)
     assert result.active_return == pytest.approx(expected["active_return"])
@@ -417,7 +418,7 @@ def test_factor_brinson_attribution_returns_typed_result() -> None:
 def test_twrr_linked_returns_typed_result() -> None:
     returns = json.dumps([0.05, 0.03])
     result = pf.twrr_linked(returns, 1.0)
-    expected = json.loads(pf.twrr_linked_json(returns, 1.0))
+    expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.LinkedReturn)
     assert result.cumulative == pytest.approx(expected["cumulative"])
@@ -437,7 +438,7 @@ def test_aggregate_metrics_returns_typed_portfolio_metrics() -> None:
     valuation = pf.value_portfolio(portfolio, market)
 
     metrics = pf.aggregate_metrics(valuation, "USD", market, AS_OF)
-    expected = json.loads(pf.aggregate_metrics_json(valuation, "USD", market, AS_OF))
+    expected = json.loads(metrics.to_json())
 
     assert isinstance(metrics, pf.PortfolioMetrics)
     assert json.loads(metrics.to_json()) == expected
@@ -460,7 +461,7 @@ def test_replay_portfolio_returns_typed_result() -> None:
     config = json.dumps({"mode": "pv_only"})
 
     result = pf.replay_portfolio(portfolio, snapshots, config)
-    expected = json.loads(pf.replay_portfolio_json(portfolio, snapshots, config))
+    expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.ReplayResult)
     assert result.summary["num_steps"] == expected["summary"]["num_steps"] == 2
@@ -475,10 +476,9 @@ def test_replay_portfolio_returns_typed_result() -> None:
 
 def test_allocate_weights_returns_typed_result() -> None:
     result = pf.allocate_weights(_ALLOCATION_SPEC)
-    expected = json.loads(pf.allocate_weights_json(_ALLOCATION_SPEC))
+    expected = json.loads(result.to_json())
 
     _assert_contract(result, pf.WeightAllocationResult)
-    assert json.loads(result.to_json()) == expected
     assert result.scheme == expected["scheme"]
     assert [row["id"] for row in result.allocations] == ["S1", "S2"]
     assert result.diagnostics["weights_sum"] == pytest.approx(expected["diagnostics"]["weights_sum"])
@@ -518,6 +518,6 @@ def test_scenario_pnl_batch_returns_typed_items() -> None:
 
 def test_json_twins_return_wire_strings() -> None:
     """Every ``_json`` twin returns a parseable JSON string."""
-    assert isinstance(json.loads(pf.brinson_fachler_json(_brinson_sectors())), dict)
-    assert isinstance(json.loads(pf.twrr_linked_json(json.dumps([0.01]), 0.0)), dict)
+    assert isinstance(json.loads(pf.brinson_fachler(_brinson_sectors()).to_json()), dict)
+    assert isinstance(json.loads(pf.twrr_linked(json.dumps([0.01]), 0.0).to_json()), dict)
     assert isinstance(json.loads(pf.allocate_weights_json(_ALLOCATION_SPEC)), dict)
