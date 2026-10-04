@@ -541,9 +541,7 @@ test('cashflows preserves principal deltas and accrual calendars through JSON', 
     built.flows.find((flow) => flow.kind === 'fixed').accrual.calendar_id,
     'weekends_only'
   );
-  assert.ok(
-    Math.abs(accruedInterest(raw, '2025-02-01', null) - (100000 * 23) / 252) < 1e-8
-  );
+  assert.ok(Math.abs(accruedInterest(raw, '2025-02-01', null) - (100000 * 23) / 252) < 1e-8);
 });
 
 test('cashflows retains earned accrual until the delayed payment', () => {
@@ -558,9 +556,7 @@ test('cashflows retains earned accrual until the delayed payment', () => {
     payment_lag_days: 2,
   });
   const raw = cashflows.buildCashflowScheduleJson(JSON.stringify(spec), null);
-  assert.ok(
-    Math.abs(accruedInterest(raw, '2025-07-02', null) - (100000 * 181) / 360) < 1e-8
-  );
+  assert.ok(Math.abs(accruedInterest(raw, '2025-07-02', null) - (100000 * 181) / 360) < 1e-8);
   assert.equal(accruedInterest(raw, '2025-07-03', null), 0);
 });
 
