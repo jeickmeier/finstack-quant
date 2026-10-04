@@ -22,8 +22,7 @@ pub use short_rate_tree::{
     DEFAULT_NORMAL_VOL,
 };
 pub use tree_framework::{
-    single_factor_equity_state, state_keys, EvolutionParams, NodeState, TreeGreeks, TreeModel,
-    TreeValuator,
+    single_factor_equity_state, state_keys, EvolutionParams, NodeState, TreeGreeks, TreeValuator,
 };
 pub use two_factor_rates_credit::{
     RatesCreditCalibrationTargets, RatesCreditConfig, RatesCreditPathState, RatesCreditTransition,

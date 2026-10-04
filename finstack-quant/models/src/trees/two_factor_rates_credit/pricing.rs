@@ -1,4 +1,4 @@
-//! Backward induction with node coupons and the `TreeModel` implementation.
+//! Backward induction with node coupons.
 
 use super::*;
 
@@ -26,18 +26,17 @@ impl RatesCreditTree {
     pub(super) fn folded_increment_values(
         &self,
         coupon: &NodeCoupon,
-        time_to_maturity: f64,
         oas_decimal: f64,
     ) -> Result<Vec<f64>> {
         let steps = self.config.steps;
-        let dt = self.validate_pricing_horizon(time_to_maturity)?;
+        let dt = self.calibrated_dt()?;
         let max_nodes = steps + 1;
         let n = coupon.reset_step;
         let m = coupon.payment_step;
 
         // Node-dependent increment amounts from the forward-derivation
         // operator (raw rates, no OAS, no survival).
-        let p_rf = self.conditional_discount_factors(n, m, time_to_maturity)?;
+        let p_rf = self.conditional_discount_factors(n, m)?;
         let base_composed = calculate_floating_rate(coupon.base_index_rate, &coupon.params);
         let mut delta_amounts = vec![0.0; n + 1];
         for (i, slot) in delta_amounts.iter_mut().enumerate() {
@@ -130,7 +129,7 @@ impl RatesCreditTree {
     /// Price with node-dependent floating-coupon increments folded into
     /// continuation at their reset slices.
     ///
-    /// This is the full backward induction of [`TreeModel::price`] plus, at
+    /// This is the full backward induction over the joint lattice plus, at
     /// each [`NodeCoupon::reset_step`], the coupon's node-dependent
     /// increment added to the continuation value **before** the valuator's
     /// exercise decision and survival weighting. Adding it to continuation
@@ -154,14 +153,13 @@ impl RatesCreditTree {
     ///    correlated joint transitions); moves that amount from payment to
     ///    reset.
     ///
-    /// With an empty `node_coupons` slice this is exactly
-    /// [`TreeModel::price`], which delegates here.
+    /// With an empty `node_coupons` slice this is the plain backward
+    /// induction of the valuator over the calibrated horizon.
     ///
     /// # Arguments
     ///
     /// * `initial_vars` - initial state variables; `"oas"` (basis points)
     ///   is applied as a parallel shift to the calibrated short rates
-    /// * `time_to_maturity` - total lattice horizon in years
     /// * `market_context` - market data passed through to the valuator
     /// * `valuator` - instrument value function driven by the induction
     /// * `node_coupons` - future floating-coupon increments to fold at
@@ -169,19 +167,19 @@ impl RatesCreditTree {
     ///
     /// # Errors
     ///
-    /// Returns an error when the tree is uncalibrated, the supplied horizon
-    /// differs from calibration, a descriptor violates its invariants (see
+    /// Returns an error when the tree is uncalibrated, a descriptor violates
+    /// its invariants (see
     /// [`NodeCoupon`]), or the valuator fails.
     pub fn price_with_node_coupons<V: TreeValuator>(
         &self,
         initial_vars: HashMap<&'static str, f64>,
-        time_to_maturity: f64,
         market_context: &MarketContext,
         valuator: &V,
         node_coupons: &[NodeCoupon],
     ) -> Result<f64> {
         let steps = self.config.steps;
-        let dt = self.validate_pricing_horizon(time_to_maturity)?;
+        let dt = self.calibrated_dt()?;
+        let time_to_maturity = self.time_grid()?[steps];
 
         // OAS from initial variables (bp units, same convention as ShortRateTree)
         let oas_decimal = initial_vars
@@ -197,7 +195,7 @@ impl RatesCreditTree {
         let mut folded_by_step: Vec<Option<Vec<f64>>> = vec![None; steps];
         for coupon in node_coupons {
             coupon.validate(steps)?;
-            let folded = self.folded_increment_values(coupon, time_to_maturity, oas_decimal)?;
+            let folded = self.folded_increment_values(coupon, oas_decimal)?;
             match &mut folded_by_step[coupon.reset_step] {
                 Some(existing) => {
                     for (slot, add) in existing.iter_mut().zip(folded.iter()) {
@@ -320,23 +318,5 @@ impl RatesCreditTree {
         }
 
         Ok(curr_values[0])
-    }
-}
-
-impl TreeModel for RatesCreditTree {
-    fn price<V: TreeValuator>(
-        &self,
-        initial_vars: HashMap<&'static str, f64>,
-        time_to_maturity: f64,
-        market_context: &MarketContext,
-        valuator: &V,
-    ) -> Result<f64> {
-        self.price_with_node_coupons(
-            initial_vars,
-            time_to_maturity,
-            market_context,
-            valuator,
-            &[],
-        )
     }
 }

@@ -1,7 +1,7 @@
 //! Generic tree-based pricing framework for financial instruments.
 //!
 //! This module provides a lattice pricing engine that separates instrument
-//! payoff logic (`TreeValuator`) from lattice evolution (`TreeModel`), so the
+//! payoff logic (`TreeValuator`) from lattice evolution (the tree types), so the
 //! same backward induction serves equity and short-rate trees.
 //!
 //! ## Serialization Policy
@@ -43,4 +43,4 @@ pub use evolution::EvolutionParams;
 pub(crate) use node_state::CachedValues;
 pub use node_state::NodeState;
 pub use recombining::{price_recombining_tree, single_factor_equity_state, RecombiningInputs};
-pub use traits::{TreeGreeks, TreeModel, TreeValuator};
+pub use traits::{TreeGreeks, TreeValuator};

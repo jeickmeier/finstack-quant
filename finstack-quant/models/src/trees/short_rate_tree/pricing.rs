@@ -2,8 +2,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::{Error, HashMap, Result};
 
 use crate::trees::tree_framework::{
-    price_recombining_tree, state_keys, CachedValues, NodeState, RecombiningInputs, TreeModel,
-    TreeValuator,
+    price_recombining_tree, state_keys, CachedValues, NodeState, RecombiningInputs, TreeValuator,
 };
 
 use super::black_karasinski::{transition_index, transition_offsets, BkTrinomialLattice};
@@ -103,11 +102,30 @@ impl ShortRateTree {
     }
 }
 
-impl TreeModel for ShortRateTree {
-    fn price<V: TreeValuator>(
+impl ShortRateTree {
+    /// Price an instrument by backward induction over the calibrated lattice.
+    ///
+    /// Works for every [`ShortRateModel`]: Ho-Lee and Black-Derman-Toy roll
+    /// back on the binomial lattice, Black-Karasinski on its trinomial one.
+    /// The horizon is the one the tree was calibrated to.
+    ///
+    /// # Arguments
+    ///
+    /// * `initial_vars` - State variables at the root. `"oas"` (basis points,
+    ///   continuously compounded) is added to every node short rate; the
+    ///   root short rate is supplied under `"interest_rate"` when absent.
+    /// * `market_context` - Market data passed through to the valuator.
+    /// * `valuator` - Instrument payoff and exercise logic applied at each
+    ///   node.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the tree has not been calibrated, its stored
+    /// lattice is inconsistent with its configuration, or the valuator fails.
+    #[must_use = "pricing result should not be discarded"]
+    pub fn price<V: TreeValuator>(
         &self,
         mut initial_vars: HashMap<&'static str, f64>,
-        time_to_maturity: f64,
         market_context: &MarketContext,
         valuator: &V,
     ) -> Result<f64> {
@@ -118,7 +136,10 @@ impl TreeModel for ShortRateTree {
             ));
         }
         self.validate_lattice_geometry()?;
-        let time_to_maturity = self.validate_pricing_horizon(time_to_maturity)?;
+        let time_to_maturity =
+            self.time_steps.last().copied().ok_or_else(|| {
+                Error::internal("short-rate tree must be calibrated before pricing")
+            })?;
 
         if !initial_vars.contains_key(state_keys::INTEREST_RATE) {
             if let Some(&r0) = self.rates.first().and_then(|row| row.first()) {

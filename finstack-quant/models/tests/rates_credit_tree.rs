@@ -18,7 +18,7 @@ use finstack_quant_core::market_data::term_structures::{DiscountCurve, HazardCur
 use finstack_quant_core::market_data::traits::Discounting;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::HashMap;
-use finstack_quant_models::trees::tree_framework::{NodeState, TreeModel, TreeValuator};
+use finstack_quant_models::trees::tree_framework::{NodeState, TreeValuator};
 use finstack_quant_models::trees::two_factor_rates_credit::{
     RatesCreditCalibrationTargets, RatesCreditConfig, RatesCreditTree,
 };
@@ -129,7 +129,9 @@ fn rates_credit_tree_reproduces_disc_curve_when_hazard_is_silent() {
     let ctx = MarketContext::new();
     let vars = HashMap::<&'static str, f64>::default();
     let val = DefaultableZcbValuator;
-    let price = tree.price(vars, ttm, &ctx, &val).expect("price");
+    let price = tree
+        .price_with_node_coupons(vars, &ctx, &val, &[])
+        .expect("price");
 
     let market_df = 0.78; // disc curve knot at t=5
     let err_bp = (price - market_df).abs() * 10_000.0;
@@ -159,7 +161,8 @@ fn rates_credit_tree_correlation_extremes_are_well_defined() {
         });
         calibrate_tree(&mut tree, &disc, &haz, ttm);
         let vars = HashMap::<&'static str, f64>::default();
-        tree.price(vars, ttm, &ctx, &val).expect("price")
+        tree.price_with_node_coupons(vars, &ctx, &val, &[])
+            .expect("price")
     };
 
     let p_neg = price_at(-0.99);
@@ -189,7 +192,7 @@ fn rates_credit_tree_uncalibrated_returns_error() {
     let ctx = MarketContext::new();
     let vars = HashMap::<&'static str, f64>::default();
     let val = DefaultableZcbValuator;
-    let result = tree.price(vars, 1.0, &ctx, &val);
+    let result = tree.price_with_node_coupons(vars, &ctx, &val, &[]);
     assert!(
         result.is_err(),
         "price() without calibrate() must fail loudly",

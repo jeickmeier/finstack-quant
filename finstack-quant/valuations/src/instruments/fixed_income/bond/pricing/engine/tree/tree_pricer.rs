@@ -14,7 +14,7 @@ use finstack_quant_core::{Error, Result};
 use finstack_quant_models::trees::hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
 use finstack_quant_models::trees::short_rate_tree::TreeCalibrationResult;
 use finstack_quant_models::trees::two_factor_rates_credit::RatesCreditTree;
-use finstack_quant_models::{short_rate_keys, ShortRateTree, ShortRateTreeConfig, TreeModel};
+use finstack_quant_models::{short_rate_keys, ShortRateTree, ShortRateTreeConfig};
 use std::borrow::Cow;
 
 /// Tree-based pricer for bonds with embedded options and OAS calculations.
@@ -563,11 +563,7 @@ impl TreePricer {
                     time_to_maturity,
                     tree_steps,
                 )?;
-                PreparedTree::ShortRate {
-                    tree,
-                    valuator,
-                    time_to_maturity,
-                }
+                PreparedTree::ShortRate { tree, valuator }
             }
             model @ TreeModelChoice::BlackKarasinski { sigma, kappa } => {
                 // Same uniform grid and exercise-date step alignment as BDT;
@@ -590,11 +586,7 @@ impl TreePricer {
                     time_to_maturity,
                     tree_steps,
                 )?;
-                PreparedTree::ShortRate {
-                    tree,
-                    valuator,
-                    time_to_maturity,
-                }
+                PreparedTree::ShortRate { tree, valuator }
             }
             TreeModelChoice::HoLee { sigma } => {
                 let tree_config = ShortRateTreeConfig {
@@ -613,11 +605,7 @@ impl TreePricer {
                     time_to_maturity,
                     self.config.tree_steps,
                 )?;
-                PreparedTree::ShortRate {
-                    tree,
-                    valuator,
-                    time_to_maturity,
-                }
+                PreparedTree::ShortRate { tree, valuator }
             }
         };
         Ok(pricer(prepared))
@@ -640,7 +628,6 @@ enum PreparedTree {
     ShortRate {
         tree: ShortRateTree,
         valuator: BondValuator,
-        time_to_maturity: f64,
     },
 }
 
@@ -685,15 +672,11 @@ impl OasPricer<'_> {
                 valuator.price_deterministic_rates_credit(tree, oas)?
             }
             PreparedTree::HullWhite(tree, valuator) => valuator.price_with_hw_tree(tree, oas)?,
-            PreparedTree::ShortRate {
-                tree,
-                valuator,
-                time_to_maturity,
-            } => {
+            PreparedTree::ShortRate { tree, valuator } => {
                 let mut vars = HashMap::<&'static str, f64>::default();
                 vars.insert(short_rate_keys::SHORT_RATE, tree.rate_at_node(0, 0)?);
                 vars.insert(short_rate_keys::OAS, oas);
-                tree.price(vars, *time_to_maturity, self.market, valuator)?
+                tree.price(vars, self.market, valuator)?
             }
         };
         Ok(TreePriceOutcome::deterministic(amount))

@@ -342,7 +342,6 @@ impl RatesCreditTree {
     ///
     /// * `reset_step` - slice at which the forward is observed
     /// * `payment_step` - slice at which the notional would be repaid
-    /// * `time_to_maturity` - total lattice horizon in years (defines `Δt`)
     ///
     /// # Returns
     ///
@@ -351,17 +350,15 @@ impl RatesCreditTree {
     ///
     /// # Errors
     ///
-    /// Returns an error when the tree is uncalibrated, the steps are not
-    /// strictly ordered within the lattice, or `time_to_maturity` differs
-    /// from the calibrated horizon.
+    /// Returns an error when the tree is uncalibrated or the steps are not
+    /// strictly ordered within the lattice.
     pub fn conditional_discount_factors(
         &self,
         reset_step: usize,
         payment_step: usize,
-        time_to_maturity: f64,
     ) -> Result<Vec<f64>> {
         let steps = self.config.steps;
-        let dt = self.validate_pricing_horizon(time_to_maturity)?;
+        let dt = self.calibrated_dt()?;
         if reset_step >= payment_step || payment_step > steps {
             return Err(Error::Validation(format!(
                 "conditional discounting requires reset_step < payment_step <= steps, \

@@ -1,7 +1,5 @@
 //! Shared node, evolution, and backward-induction components for pricing trees.
 //!
-use finstack_quant_core::market_data::context::MarketContext;
-use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
 
 use super::node_state::NodeState;
@@ -20,25 +18,6 @@ pub trait TreeValuator: Send + Sync {
     /// * `continuation_value` - Discounted expected value from child nodes
     /// * `dt` - Time step size (passed explicitly to avoid hash lookup)
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64>;
-}
-
-/// Trait for generic tree models (binomial, short-rate, two-factor)
-pub trait TreeModel: Send + Sync {
-    /// Price an instrument using this tree model
-    ///
-    /// # Arguments
-    /// * `initial_vars` - Initial state variables at t=0
-    /// * `time_to_maturity` - Total time to maturity in years
-    /// * `market_context` - Market data context
-    /// * `valuator` - Instrument-specific valuation logic
-    #[must_use = "pricing result should not be discarded"]
-    fn price<V: TreeValuator>(
-        &self,
-        initial_vars: HashMap<&'static str, f64>,
-        time_to_maturity: f64,
-        market_context: &MarketContext,
-        valuator: &V,
-    ) -> Result<f64>;
 }
 
 /// Greeks calculated from tree models.

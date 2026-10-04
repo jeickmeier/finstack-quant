@@ -204,24 +204,6 @@ impl ShortRateTree {
         Ok(self.time_steps[step])
     }
 
-    /// Validate a pricing request against the grid whose rates were calibrated.
-    pub(super) fn validate_pricing_horizon(&self, time_to_maturity: f64) -> Result<f64> {
-        let calibrated_horizon =
-            self.time_steps.last().copied().ok_or_else(|| {
-                Error::internal("short-rate tree must be calibrated before pricing")
-            })?;
-        let tolerance = 1e-12_f64.max(calibrated_horizon.abs() * 1e-10);
-        if !time_to_maturity.is_finite()
-            || time_to_maturity <= 0.0
-            || (time_to_maturity - calibrated_horizon).abs() > tolerance
-        {
-            return Err(Error::Validation(format!(
-                "short-rate pricing horizon {time_to_maturity} does not match the calibrated horizon {calibrated_horizon}"
-            )));
-        }
-        Ok(calibrated_horizon)
-    }
-
     pub(super) fn validate_lattice_geometry(&self) -> Result<()> {
         if self.rates.len() != self.config.steps + 1 {
             return Err(Error::internal(format!(

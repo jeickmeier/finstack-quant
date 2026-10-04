@@ -389,7 +389,6 @@ fn test_rates_credit_default_lowers_price() {
     let valuator_high =
         BondValuator::new(bond, &ctx_high, as_of, time_to_maturity, steps).expect("valuator");
 
-    use finstack_quant_models::TreeModel;
     let disc_low = ctx_low
         .get_discount("USD-OIS")
         .expect("Discount curve should exist");
@@ -439,11 +438,11 @@ fn test_rates_credit_default_lowers_price() {
     let vars = HashMap::<&'static str, f64>::default();
 
     let pv_low = tree_low
-        .price(vars.clone(), time_to_maturity, &ctx_low, &valuator_low)
+        .price_with_node_coupons(vars.clone(), &ctx_low, &valuator_low, &[])
         .expect("price low");
 
     let pv_high = tree_high
-        .price(vars, time_to_maturity, &ctx_high, &valuator_high)
+        .price_with_node_coupons(vars, &ctx_high, &valuator_high, &[])
         .expect("price high");
 
     assert!(pv_high < pv_low, "pv_high={} pv_low={}", pv_high, pv_low);

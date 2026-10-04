@@ -55,7 +55,7 @@ use finstack_quant_core::HashMap;
 use finstack_quant_core::Result;
 use finstack_quant_models::trees::two_factor_rates_credit::{NodeCoupon, RatesCreditTree};
 use finstack_quant_models::{
-    short_rate_keys, NodeState, ShortRateTree, ShortRateTreeConfig, TreeModel, TreeValuator,
+    short_rate_keys, NodeState, ShortRateTree, ShortRateTreeConfig, TreeValuator,
 };
 
 /// Reject hazard-model inputs on a loan that never reaches the rates-credit
@@ -202,14 +202,12 @@ enum PreparedTree {
         tree: RatesCreditTree,
         valuator: TermLoanValuator,
         node_coupons: Vec<NodeCoupon>,
-        time_to_maturity: f64,
     },
     /// Risk-free short-rate tree.
     ShortRate {
         tree: ShortRateTree,
         initial_rate: f64,
         valuator: TermLoanValuator,
-        time_to_maturity: f64,
     },
 }
 
@@ -862,7 +860,6 @@ impl TermLoanTreePricer {
                 tree,
                 valuator,
                 node_coupons,
-                time_to_maturity,
             }));
         }
 
@@ -877,7 +874,6 @@ impl TermLoanTreePricer {
             tree,
             initial_rate,
             valuator,
-            time_to_maturity,
         }))
     }
 
@@ -887,28 +883,20 @@ impl TermLoanTreePricer {
                 tree,
                 valuator,
                 node_coupons,
-                time_to_maturity,
             } => {
                 let mut vars = HashMap::<&'static str, f64>::default();
                 vars.insert(short_rate_keys::OAS, oas_bp);
-                tree.price_with_node_coupons(
-                    vars,
-                    *time_to_maturity,
-                    market,
-                    valuator,
-                    node_coupons,
-                )
+                tree.price_with_node_coupons(vars, market, valuator, node_coupons)
             }
             PreparedTree::ShortRate {
                 tree,
                 initial_rate,
                 valuator,
-                time_to_maturity,
             } => {
                 let mut vars = HashMap::<&'static str, f64>::default();
                 vars.insert(short_rate_keys::SHORT_RATE, *initial_rate);
                 vars.insert(short_rate_keys::OAS, oas_bp);
-                tree.price(vars, *time_to_maturity, market, valuator)
+                tree.price(vars, market, valuator)
             }
         }
     }

@@ -155,7 +155,7 @@ use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::RandomStream;
 
 use super::short_rate_keys;
-use super::tree_framework::{CachedValues, NodeState, TreeModel, TreeValuator};
+use super::tree_framework::{CachedValues, NodeState, TreeValuator};
 
 mod calibration;
 mod pricing;
@@ -789,23 +789,6 @@ impl RatesCreditTree {
     fn calibrated_dt(&self) -> Result<f64> {
         let times = self.time_grid()?;
         Ok(times[1] - times[0])
-    }
-
-    /// Validate that a legacy tree-pricing horizon matches calibration.
-    fn validate_pricing_horizon(&self, time_to_maturity: f64) -> Result<f64> {
-        let times = self.time_grid()?;
-        let calibrated_horizon = times[self.config.steps];
-        let tolerance = 1e-12_f64.max(calibrated_horizon.abs() * 1e-10);
-        if !time_to_maturity.is_finite()
-            || time_to_maturity <= 0.0
-            || (time_to_maturity - calibrated_horizon).abs() > tolerance
-        {
-            return Err(Error::Validation(format!(
-                "rates-credit pricing horizon {time_to_maturity} does not match the \
-                 calibrated horizon {calibrated_horizon}"
-            )));
-        }
-        self.calibrated_dt()
     }
 
     /// Largest `|ρ|` this calibrated lattice can express.

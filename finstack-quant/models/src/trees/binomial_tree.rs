@@ -1,7 +1,7 @@
 //! Binomial tree models for option pricing.
 //!
 //! Implements Cox-Ross-Rubinstein (CRR) and Leisen-Reimer binomial trees
-//! for American and Bermudan options via the generic [`TreeModel`] engine.
+//! for American and Bermudan options on the shared recombining-lattice engine.
 
 use crate::trees::NodeState;
 use crate::types::{OptionMarketParams, OptionType};
@@ -13,8 +13,8 @@ use finstack_quant_core::HashSet;
 use finstack_quant_core::{Error, Result};
 
 use super::tree_framework::{
-    map_exercise_dates_to_steps, price_recombining_tree, single_factor_equity_state, state_keys,
-    EvolutionParams, RecombiningInputs, TreeModel, TreeValuator,
+    map_exercise_dates_to_steps, price_recombining_tree, single_factor_equity_state,
+    EvolutionParams, RecombiningInputs, TreeValuator,
 };
 
 /// Binomial tree types
@@ -452,53 +452,6 @@ impl BinomialTree {
         steps.dedup();
         self.price_with_exercise(market_params, Some(&steps))
     }
-
-    /// Generic [`TreeModel`] pricing for an arbitrary [`TreeValuator`].
-    ///
-    /// This entry point has no contractual strike, so it requires CRR.
-    /// Leisen-Reimer requires a strike and must use the dedicated option methods.
-    #[inline(never)] // Prevent inlining to reduce coverage metadata conflicts
-    pub fn price_generic<V: TreeValuator>(
-        &self,
-        initial_vars: HashMap<&'static str, f64>,
-        time_to_maturity: f64,
-        market_context: &MarketContext,
-        valuator: &V,
-    ) -> Result<f64> {
-        let r = *initial_vars
-            .get(state_keys::INTEREST_RATE)
-            .ok_or_else(|| Error::internal("binomial tree requires initial interest rate"))?;
-        let q = initial_vars
-            .get(state_keys::DIVIDEND_YIELD)
-            .copied()
-            .unwrap_or(0.0);
-        let sigma = *initial_vars
-            .get(state_keys::VOLATILITY)
-            .ok_or_else(|| Error::internal("binomial tree requires initial volatility"))?;
-
-        let factors = self.calculate_parameters(0.0, 0.0, r, sigma, time_to_maturity, q)?;
-        self.induct(
-            factors,
-            initial_vars,
-            time_to_maturity,
-            r,
-            market_context,
-            valuator,
-        )
-    }
-}
-
-/// Implementation of TreeModel trait for BinomialTree
-impl TreeModel for BinomialTree {
-    fn price<V: TreeValuator>(
-        &self,
-        initial_vars: HashMap<&'static str, f64>,
-        time_to_maturity: f64,
-        market_context: &MarketContext,
-        valuator: &V,
-    ) -> Result<f64> {
-        self.price_generic(initial_vars, time_to_maturity, market_context, valuator)
-    }
 }
 
 #[cfg(test)]
@@ -523,28 +476,6 @@ mod tests {
                 }
             }
         }
-    }
-
-    #[test]
-    fn generic_crr_valuator_still_requires_no_option_strike() {
-        struct UnitPayoff;
-        impl TreeValuator for UnitPayoff {
-            fn value_at_maturity(&self, _state: &NodeState) -> Result<f64> {
-                Ok(1.0)
-            }
-            fn value_at_node(&self, _state: &NodeState, value: f64, _dt: f64) -> Result<f64> {
-                Ok(value)
-            }
-        }
-        let actual = BinomialTree::crr(20)
-            .price_generic(
-                single_factor_equity_state(0.0, 0.05, 0.02, 0.2),
-                1.0,
-                &MarketContext::new(),
-                &UnitPayoff,
-            )
-            .expect("generic payoff without a strike");
-        assert!((actual - (-0.05_f64).exp()).abs() < 1e-12);
     }
 
     #[test]

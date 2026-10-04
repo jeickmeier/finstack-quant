@@ -7,7 +7,7 @@ lattice for credit-risky callables.
 
 A shared backward-induction engine drives every recombining model, and
 instrument payoff logic is decoupled from lattice evolution through the
-`TreeValuator` / `TreeModel` trait pair.
+`TreeValuator` trait.
 
 ## Position in the stack
 
@@ -36,28 +36,33 @@ The shared `price_recombining_tree` engine is binomial. Trinomial lattices
 convertible-bond Tsiveriotis-Zhang engine over `EvolutionParams::equity_trinomial`)
 carry their own backward induction.
 
-## Traits
+## The valuator trait
 
 ```text
-TreeValuator                       TreeModel
-  ├─ value_at_maturity(&NodeState)   └─ price(initial_vars, ttm, &MarketContext, &valuator)
-  └─ value_at_node(&NodeState,
-       continuation_value, dt)
+TreeValuator
+  ├─ value_at_maturity(&NodeState)
+  └─ value_at_node(&NodeState, continuation_value, dt)
 ```
 
 `TreeValuator` owns the instrument: terminal payoff, and the per-node decision
-(hold vs. exercise, cap/floor, coupon accrual). `TreeModel` owns the lattice:
-state evolution and backward-induction orchestration. Both require
-`Send + Sync`.
+(hold vs. exercise, cap/floor, coupon accrual); it requires `Send + Sync`.
+Each tree owns its lattice — state evolution and backward-induction
+orchestration — and exposes its own inherent pricing methods; there is no
+trait over the trees.
 
+| Tree | Valuator-driven entry point |
+|------|-----------------------------|
+| `ShortRateTree` | `price(initial_vars, &MarketContext, &valuator)` |
+| `RatesCreditTree` | `price_with_node_coupons(initial_vars, &MarketContext, &valuator, &node_coupons)` |
+| `BinomialTree` | `price_european` / `price_american` / `price_bermudan` (option payoffs built in) |
+
+Calibrated trees price over the horizon they were calibrated to.
 `initial_vars` is a plain `HashMap<&'static str, f64>` keyed by `state_keys`
 constants.
 
-Implementors: `BinomialTree`, `ShortRateTree`, `RatesCreditTree`.
-`HullWhiteTree` is not a `TreeModel` — it exposes its own
-`backward_induction`, `bond_price`, `forward_swap_rate`, and `annuity`
-accessors instead, because swaption pricing needs the calibrated tree's
-internals directly.
+`HullWhiteTree` exposes `backward_induction`, `bond_price`,
+`forward_swap_rate`, and `annuity` accessors instead, because swaption pricing
+needs the calibrated tree's internals directly.
 
 ## Model comparison
 
@@ -106,13 +111,12 @@ assert!(american >= european - 1e-9); // early exercise never destroys value
 
 `BinomialTree::leisen_reimer(steps)` rounds positive even requests up to the next odd step count. Additional entry points:
 `price_bermudan(&params, &exercise_times)`,
-`price_american_with_discrete_dividends`, `price_bermudan_with_discrete_dividends`,
-and `price_generic::<V: TreeValuator>`. Greeks are finite differences owned by
+`price_american_with_discrete_dividends` and `price_bermudan_with_discrete_dividends`.
+Greeks are finite differences owned by
 the instrument pricers, not the lattice.
 
-Vanilla option entry points require positive finite spot and strike. The
-generic CRR entry point has no option strike and retains its arbitrary-payoff
-contract. Cash-dividend pricing keeps `dividend_yield` active: the escrowed
+Vanilla option entry points require positive finite spot and strike.
+Cash-dividend pricing keeps `dividend_yield` active: the escrowed
 dividend reserve uses `exp(-(r-q)(t_div-t))`, and the stock component evolves
 with carry `r-q`. Continuous yield must exclude the separately scheduled cash
 payments. This matches the reserve convention in
@@ -157,7 +161,7 @@ set consistent defaults; `Default` is Ho-Lee with `DEFAULT_NORMAL_VOL = 0.01`.
 `calibrate` takes `(&dyn Discounting, time_to_maturity)` and rejects
 `steps == 0`, a non-finite/non-positive horizon, or any non-finite/non-positive
 curve discount target. All three models enforce `curve_fit_tolerance_bp`.
-Pricing must use the calibrated horizon; changing it requires recalibration.
+`price` rolls back over the calibrated horizon; a different horizon requires recalibration.
 Ho-Lee and binomial BDT use equal up/down probabilities; the drift lives in
 the calibrated node rates.
 
@@ -358,7 +362,7 @@ mise run rust-bench
 
 1. Add the file (or directory) and declare it in [`mod.rs`](mod.rs) with the
    public re-exports.
-2. Implement `TreeModel`. The shortest path is to build a `RecombiningInputs`
+2. Give the tree an inherent pricing method. The shortest path is to build a `RecombiningInputs`
    and call `price_recombining_tree(inputs)` — note it takes the struct **by
    value**. Fields: `steps`, `initial_vars`, `time_to_maturity`,
    `market_context`, `valuator`, `up_factor`, `down_factor`, `prob_up`,

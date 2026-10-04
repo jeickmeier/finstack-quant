@@ -119,11 +119,6 @@ fn explicit_conditional_targets_define_levels_and_horizon() {
     assert!((tree.rate_at_node(0, 0).expect("rate") - 0.03).abs() < 1e-12);
     assert!((tree.hazard_at_node(0, 0).expect("hazard") - 0.02).abs() < 1e-12);
     assert_eq!(tree.recovery_rate(), 0.35);
-
-    let err = tree
-        .conditional_discount_factors(0, 1, horizon + 0.25)
-        .expect_err("pricing with a different horizon must fail");
-    assert!(err.to_string().contains("does not match"));
 }
 
 #[test]
@@ -449,11 +444,11 @@ fn infeasible_correlation_fails_at_calibration_with_bound() {
     calibrate_for_test(&mut feasible, &disc, &haz, ttm)
         .expect("a correlation inside the reported bound must calibrate");
     feasible
-        .price(
+        .price_with_node_coupons(
             HashMap::<&'static str, f64>::default(),
-            ttm,
             &MarketContext::new(),
             &DummyValuator,
+            &[],
         )
         .expect("and must price");
 }
@@ -661,11 +656,11 @@ fn zero_volatility_factors_are_deterministic_limits() {
             ..RatesCreditConfig::default()
         });
         calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibrate");
-        tree.price(
+        tree.price_with_node_coupons(
             HashMap::<&'static str, f64>::default(),
-            ttm,
             &ctx,
             &DummyValuator,
+            &[],
         )
         .expect("price")
     };
@@ -855,7 +850,7 @@ fn conditional_discount_factors_match_curve_at_zero_rate_vol() {
     let (n, m) = (16usize, 20usize);
     let market_fwd_df = disc.df(m as f64 * dt) / disc.df(n as f64 * dt);
     let conditional = tree
-        .conditional_discount_factors(n, m, ttm)
+        .conditional_discount_factors(n, m)
         .expect("conditional discounting");
     assert_eq!(conditional.len(), n + 1);
     for (i, p) in conditional.iter().enumerate() {
@@ -885,7 +880,7 @@ fn conditional_discount_factors_decrease_in_rate_node() {
     calibrate_for_test(&mut tree, &disc, &haz, ttm).expect("calibration");
 
     let conditional = tree
-        .conditional_discount_factors(16, 24, ttm)
+        .conditional_discount_factors(16, 24)
         .expect("conditional discounting");
     for pair in conditional.windows(2) {
         assert!(
@@ -944,7 +939,6 @@ fn pure_forward_increment_folds_to_zero_without_correlation() {
         vars.insert(short_rate_keys::OAS, 175.0);
         tree.price_with_node_coupons(
             vars,
-            ttm,
             &MarketContext::new(),
             &valuator,
             std::slice::from_ref(&coupon),
@@ -998,7 +992,7 @@ fn interior_node_coupon_payment_matches_cashflow_under_positive_hazard() {
     assert!(tree.hazard_at_node(m, 0).expect("hazard") > 0.0);
 
     let reset_df = tree
-        .conditional_discount_factors(n, m, ttm)
+        .conditional_discount_factors(n, m)
         .expect("conditional discount")[0];
     let node_forward = (1.0 / reset_df - 1.0) / tau;
     let increment = notional * tau * node_forward;
@@ -1018,7 +1012,6 @@ fn interior_node_coupon_payment_matches_cashflow_under_positive_hazard() {
     let folded = tree
         .price_with_node_coupons(
             vars.clone(),
-            ttm,
             &MarketContext::new(),
             &SurvivalCashflowValuator {
                 cashflows: vec![0.0; steps + 1],
@@ -1030,11 +1023,11 @@ fn interior_node_coupon_payment_matches_cashflow_under_positive_hazard() {
     let mut cashflows = vec![0.0; steps + 1];
     cashflows[m] = increment;
     let direct = tree
-        .price(
+        .price_with_node_coupons(
             vars,
-            ttm,
             &MarketContext::new(),
             &SurvivalCashflowValuator { cashflows },
+            &[],
         )
         .expect("direct cashflow price");
 
@@ -1065,17 +1058,16 @@ fn empty_node_coupons_match_plain_price() {
     let valuator = SurvivalCashflowValuator { cashflows };
 
     let plain = tree
-        .price(
+        .price_with_node_coupons(
             HashMap::<&'static str, f64>::default(),
-            ttm,
             &MarketContext::new(),
             &valuator,
+            &[],
         )
         .expect("plain price");
     let with_empty = tree
         .price_with_node_coupons(
             HashMap::<&'static str, f64>::default(),
-            ttm,
             &MarketContext::new(),
             &valuator,
             &[],
@@ -1120,7 +1112,6 @@ fn node_coupon_descriptor_validation_rejects_bad_geometry() {
     let err = tree
         .price_with_node_coupons(
             HashMap::default(),
-            ttm,
             &MarketContext::new(),
             &valuator,
             std::slice::from_ref(&collapsed),
@@ -1138,10 +1129,9 @@ fn node_coupon_descriptor_validation_rejects_bad_geometry() {
     assert!(tree
         .price_with_node_coupons(
             HashMap::default(),
-            ttm,
             &MarketContext::new(),
             &valuator,
-            std::slice::from_ref(&beyond),
+            std::slice::from_ref(&beyond)
         )
         .is_err());
 
@@ -1152,10 +1142,9 @@ fn node_coupon_descriptor_validation_rejects_bad_geometry() {
     assert!(tree
         .price_with_node_coupons(
             HashMap::default(),
-            ttm,
             &MarketContext::new(),
             &valuator,
-            std::slice::from_ref(&bad_accrual),
+            std::slice::from_ref(&bad_accrual)
         )
         .is_err());
 }
@@ -1177,7 +1166,9 @@ fn rates_credit_calibrated_prices_positive() {
     let ctx = MarketContext::new();
     let vars = HashMap::<&'static str, f64>::default();
     let val = DummyValuator;
-    let price = tree.price(vars, 5.0, &ctx, &val).expect("should succeed");
+    let price = tree
+        .price_with_node_coupons(vars, &ctx, &val, &[])
+        .expect("should succeed");
     assert!(price.is_finite() && price > 0.0);
 }
 
@@ -1187,7 +1178,7 @@ fn uncalibrated_tree_returns_error() {
     let ctx = MarketContext::new();
     let vars = HashMap::<&'static str, f64>::default();
     let val = DummyValuator;
-    let result = tree.price(vars, 1.0, &ctx, &val);
+    let result = tree.price_with_node_coupons(vars, &ctx, &val, &[]);
     assert!(result.is_err(), "price() without calibrate() must fail");
 }
 
@@ -1213,7 +1204,9 @@ fn calibration_quality_zcb_repricing() {
     let ctx = MarketContext::new();
     let vars = HashMap::<&'static str, f64>::default();
     let val = DummyValuator;
-    let tree_price = tree.price(vars, ttm, &ctx, &val).expect("price");
+    let tree_price = tree
+        .price_with_node_coupons(vars, &ctx, &val, &[])
+        .expect("price");
     let market_df = disc.df(ttm);
 
     let error_bp = (tree_price - market_df).abs() * 10_000.0;
@@ -1302,11 +1295,11 @@ fn near_zero_rates_with_mean_reversion_price_finitely() {
     calibrate_for_test(&mut tree, &disc, &haz, 2.0).expect("calibration");
 
     let price = tree
-        .price(
+        .price_with_node_coupons(
             HashMap::<&'static str, f64>::default(),
-            2.0,
             &MarketContext::new(),
             &DummyValuator,
+            &[],
         )
         .expect("pricing should succeed");
 
@@ -1344,11 +1337,11 @@ fn calibration_reprices_disc_curve_with_rate_mean_reversion() {
 
         let ctx = MarketContext::new();
         let price = tree
-            .price(
+            .price_with_node_coupons(
                 HashMap::<&'static str, f64>::default(),
-                ttm,
                 &ctx,
                 &DummyValuator,
+                &[],
             )
             .expect("price");
         let market_df = disc.df(ttm);

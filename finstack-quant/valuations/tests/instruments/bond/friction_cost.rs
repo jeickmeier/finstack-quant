@@ -7,7 +7,7 @@ use finstack_quant_core::market_data::term_structures::DiscountCurve;
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::HashMap;
-use finstack_quant_models::{short_rate_keys, ShortRateTree, ShortRateTreeConfig, TreeModel};
+use finstack_quant_models::{short_rate_keys, ShortRateTree, ShortRateTreeConfig};
 use finstack_quant_valuations::instruments::fixed_income::bond::pricing::engine::tree::BondValuator;
 use finstack_quant_valuations::instruments::fixed_income::bond::{Bond, CallPut, CallPutSchedule};
 use finstack_quant_valuations::instruments::pricing_overrides::InstrumentPricingOverrides;
@@ -80,7 +80,7 @@ fn call_friction_raises_callable_price_toward_straight() {
     let valuator_straight =
         BondValuator::new(straight, &market, as_of, time_to_maturity, steps).unwrap();
     let price_straight = tree
-        .price(vars.clone(), time_to_maturity, &market, &valuator_straight)
+        .price(vars.clone(), &market, &valuator_straight)
         .unwrap();
 
     // Callable with friction = 0
@@ -88,9 +88,7 @@ fn call_friction_raises_callable_price_toward_straight() {
     callable0.instrument_pricing_overrides =
         InstrumentPricingOverrides::default().with_call_friction_cents(0.0);
     let valuator0 = BondValuator::new(callable0, &market, as_of, time_to_maturity, steps).unwrap();
-    let price0 = tree
-        .price(vars.clone(), time_to_maturity, &market, &valuator0)
-        .unwrap();
+    let price0 = tree.price(vars.clone(), &market, &valuator0).unwrap();
 
     // Callable with friction = 200 cents (= 2.00 points)
     let mut callable200 = callable_bond(as_of);
@@ -98,9 +96,7 @@ fn call_friction_raises_callable_price_toward_straight() {
         InstrumentPricingOverrides::default().with_call_friction_cents(200.0);
     let valuator200 =
         BondValuator::new(callable200, &market, as_of, time_to_maturity, steps).unwrap();
-    let price200 = tree
-        .price(vars, time_to_maturity, &market, &valuator200)
-        .unwrap();
+    let price200 = tree.price(vars, &market, &valuator200).unwrap();
 
     assert!(
         price200 >= price0,
