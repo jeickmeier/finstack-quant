@@ -379,9 +379,11 @@ impl PyDieboldLi {
     #[pyo3(signature = (lambda_ = None))]
     #[pyo3(text_signature = "(lambda_=None)")]
     fn new(lambda_: Option<f64>) -> PyResult<Self> {
-        dtsm::diebold_li_model(lambda_)
-            .map(Self::from_inner)
-            .map_err(core_to_py)
+        match lambda_ {
+            Some(lambda) => DieboldLi::new(lambda).map_err(core_to_py),
+            None => Ok(DieboldLi::with_default_lambda()),
+        }
+        .map(Self::from_inner)
     }
 
     /// Decay parameter in the years convention.
@@ -873,87 +875,6 @@ impl PyYieldPcaView {
 
 wire_methods!(PyYieldPcaView, YieldPcaView, "YieldPcaView");
 
-/// Extract time-varying Nelson-Siegel factors (level, slope, curvature) from a
-/// yield panel using the Diebold-Li (2006) parameterization.
-///
-/// Thin twin of ``DieboldLi(lambda_).extract_factors(YieldPanel(tenors, yields_matrix)).factors``.
-///
-/// Parameters
-/// ----------
-/// tenors : list[float]
-///     Tenor grid in years, strictly ascending and positive (length ``N``).
-/// yields_matrix : list[list[float]]
-///     ``yields_matrix[date_idx][tenor_idx]`` decimal zero rates.
-/// lambda_ : float | None, default ``None``
-///     Decay parameter for tenors in years; ``None`` uses the Rust default
-///     ``0.7308``.
-///
-/// Returns
-/// -------
-/// FactorTimeSeries
-///     Extracted factors with ``to_dataframe()``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the panel is malformed, has fewer than three tenors, or
-///     ``lambda_`` is invalid.
-#[pyfunction]
-#[pyo3(signature = (tenors, yields_matrix, lambda_ = None))]
-#[pyo3(text_signature = "(tenors, yields_matrix, lambda_=None)")]
-fn diebold_li_fit_factors(
-    py: Python<'_>,
-    tenors: Vec<f64>,
-    yields_matrix: Vec<Vec<f64>>,
-    lambda_: Option<f64>,
-) -> PyResult<PyFactorTimeSeries> {
-    py.detach(|| dtsm::diebold_li_fit_factors(tenors, yields_matrix, lambda_))
-        .map(PyFactorTimeSeries::from_inner)
-        .map_err(core_to_py)
-}
-
-/// Extract Diebold-Li factors, fit VAR(1) dynamics, and forecast the yield
-/// curve ``horizon`` steps ahead.
-///
-/// Thin twin of ``DieboldLi(lambda_).fit(panel).forecast(horizon)``.
-///
-/// Parameters
-/// ----------
-/// tenors : list[float]
-///     Tenor grid in years, length ``N``.
-/// yields_matrix : list[list[float]]
-///     ``yields_matrix[date_idx][tenor_idx]`` decimal zero rates (at least
-///     five rows for the VAR fit).
-/// horizon : int
-///     Forecast horizon in observation periods (``>= 1``).
-/// lambda_ : float | None, default ``None``
-///     Decay parameter for tenors in years; ``None`` uses the Rust default.
-///
-/// Returns
-/// -------
-/// YieldForecast
-///     Point forecast, factor triple and 95% bands with ``to_dataframe()``.
-///
-/// Raises
-/// ------
-/// ValueError
-///     If the panel is malformed, too short for the VAR fit, ``horizon`` is
-///     zero or ``lambda_`` is invalid.
-#[pyfunction]
-#[pyo3(signature = (tenors, yields_matrix, horizon, lambda_ = None))]
-#[pyo3(text_signature = "(tenors, yields_matrix, horizon, lambda_=None)")]
-fn diebold_li_forecast(
-    py: Python<'_>,
-    tenors: Vec<f64>,
-    yields_matrix: Vec<Vec<f64>>,
-    horizon: usize,
-    lambda_: Option<f64>,
-) -> PyResult<PyYieldForecast> {
-    py.detach(|| dtsm::diebold_li_forecast(tenors, yields_matrix, horizon, lambda_))
-        .map(PyYieldForecast::from_inner)
-        .map_err(core_to_py)
-}
-
 /// Evaluate the static Nelson-Siegel (1987) yield curve for a given decay
 /// parameter, factor triple, and tenor grid.
 ///
@@ -961,7 +882,7 @@ fn diebold_li_forecast(
 /// ``y(tau) = beta1 + beta2 * slope(tau) + beta3 * (slope(tau) - exp(-lambda*tau))``
 /// where ``slope(tau) = (1 - exp(-lambda*tau)) / (lambda*tau)``. Use it to
 /// reconstruct a fitted or forecast curve from factors returned by
-/// ``DieboldLi`` / ``diebold_li_forecast``.
+/// ``DieboldLi``.
 ///
 /// Parameters
 /// ----------
@@ -1007,8 +928,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyYieldPanel>()?;
     m.add_class::<PyYieldPca>()?;
     m.add_class::<PyYieldPcaView>()?;
-    m.add_function(wrap_pyfunction!(diebold_li_fit_factors, &m)?)?;
-    m.add_function(wrap_pyfunction!(diebold_li_forecast, &m)?)?;
     m.add_function(wrap_pyfunction!(nelson_siegel_yields, &m)?)?;
 
     let all = PyList::new(
@@ -1020,8 +939,6 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "YieldPanel",
             "YieldPca",
             "YieldPcaView",
-            "diebold_li_fit_factors",
-            "diebold_li_forecast",
             "nelson_siegel_yields",
         ],
     )?;

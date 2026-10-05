@@ -71,7 +71,6 @@ class TestCoreNamespace:
         assert market_data.__all__ == expected
         for name in expected:
             assert hasattr(market_data, name)
-        assert not hasattr(market_data, "diebold_li_fit_factors")
         assert not hasattr(market_data, "check_butterfly")
 
     def test_models_credit_exports_do_not_leak_binding_suffixes(self) -> None:

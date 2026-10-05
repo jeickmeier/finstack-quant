@@ -5,6 +5,4 @@ export const dtsm = {
   DieboldLi: wasm.DieboldLi,
   YieldPca: wasm.YieldPca,
   nelsonSiegelYields: wasm.nelsonSiegelYields,
-  dieboldLiFitFactors: wasm.dieboldLiFitFactors,
-  dieboldLiForecast: wasm.dieboldLiForecast,
 };

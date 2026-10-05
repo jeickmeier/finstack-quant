@@ -29166,34 +29166,6 @@ export interface DtsmNamespace {
    * Principal-component analysis of yield-curve changes.
    */
   YieldPca: YieldPcaConstructor;
-  /**
-   * Extract Diebold-Li level, slope and curvature factors from a yield matrix.
-   * @param tenors - Maturities in years, one per column of `yieldsMatrix`.
-   * @param yieldsMatrix - Yields as nested rows: one `number[]` per date, one decimal yield per tenor.
-   * @param lambda - Optional decay parameter; omitted uses the Rust default (0.7308).
-   * @returns The `FactorTimeSeries` object (`factors`, `residuals`, `r_squared`, `r_squared_avg`, `dates`).
-   * @throws Error - Throws a `validation` error if the inputs are ragged, too small or non-finite.
-   */
-  dieboldLiFitFactors(
-    tenors: NumericArray,
-    yieldsMatrix: NumericArray[],
-    lambda?: number
-  ): generated.models.FactorTimeSeries;
-  /**
-   * Fit Diebold-Li to a yield matrix and forecast the curve.
-   * @param tenors - Maturities in years, one per column of `yieldsMatrix`.
-   * @param yieldsMatrix - Yields as nested rows: one `number[]` per date, one decimal yield per tenor.
-   * @param horizon - Forecast horizon in observation periods; a positive safe integer.
-   * @param lambda - Optional decay parameter; omitted uses the Rust default (0.7308).
-   * @returns The `YieldForecast` object (`horizon`, `yields`, `tenors`, `factors`, `lower_95`, `upper_95`).
-   * @throws Error - Throws a `validation` error if the inputs are ragged, too small or non-finite, and a `computation` error if the VAR regression is singular.
-   */
-  dieboldLiForecast(
-    tenors: NumericArray,
-    yieldsMatrix: NumericArray[],
-    horizon: number,
-    lambda?: number
-  ): generated.models.YieldForecast;
 }
 
 /**

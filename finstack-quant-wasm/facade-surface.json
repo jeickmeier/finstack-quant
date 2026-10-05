@@ -3273,14 +3273,7 @@
   },
   "models.rates.dtsm": {
     "kind": "namespace",
-    "keys": [
-      "DieboldLi",
-      "YieldPanel",
-      "YieldPca",
-      "dieboldLiFitFactors",
-      "dieboldLiForecast",
-      "nelsonSiegelYields"
-    ]
+    "keys": ["DieboldLi", "YieldPanel", "YieldPca", "nelsonSiegelYields"]
   },
   "models.rates.dtsm.YieldPanel": {
     "kind": "class",
@@ -3319,12 +3312,6 @@
     ]
   },
   "models.rates.dtsm.nelsonSiegelYields": {
-    "kind": "function"
-  },
-  "models.rates.dtsm.dieboldLiFitFactors": {
-    "kind": "function"
-  },
-  "models.rates.dtsm.dieboldLiForecast": {
     "kind": "function"
   },
   "models.rates.hullWhite": {

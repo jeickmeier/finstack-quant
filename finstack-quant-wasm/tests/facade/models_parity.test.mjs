@@ -690,8 +690,8 @@ const CASES = {
       model.phi,
       list(model.mu),
       model.factors.r_squared_avg,
-      dtsm.dieboldLiFitFactors(TENORS, YIELDS).r_squared_avg,
-      dtsm.dieboldLiForecast(TENORS, YIELDS, 2).yields,
+      new dtsm.DieboldLi().extractFactors(panel()).factors.r_squared_avg,
+      model.forecast(2).yields,
     ];
   },
   'dtsm.yield_pca': () => {

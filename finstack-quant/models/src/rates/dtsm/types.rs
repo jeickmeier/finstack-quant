@@ -32,7 +32,10 @@ pub(super) fn validate_tenors(tenors: &[f64]) -> finstack_quant_core::Result<()>
     Ok(())
 }
 
-fn rows_to_dmatrix(rows: &[Vec<f64>], label: &str) -> finstack_quant_core::Result<DMatrix<f64>> {
+pub(super) fn rows_to_dmatrix(
+    rows: &[Vec<f64>],
+    label: &str,
+) -> finstack_quant_core::Result<DMatrix<f64>> {
     if rows.is_empty() {
         return Err(finstack_quant_core::Error::Validation(format!(
             "{label} must not be empty"
@@ -114,36 +117,6 @@ impl YieldPanel {
     ) -> finstack_quant_core::Result<Self> {
         let yields = rows_to_dmatrix(&yield_rows, "yield_rows")?;
         Self::new(yields, tenors, dates)
-    }
-
-    /// Reconstruct a pseudo-panel from row-major yield changes.
-    ///
-    /// PCA depends only on first differences, so this helper integrates the
-    /// supplied changes from an arbitrary zero base and assigns a synthetic
-    /// strictly ascending tenor grid. It is intended for callers that already
-    /// have differenced yield data.
-    ///
-    /// # Errors
-    /// - Yield-change rows are empty or ragged
-    /// - The reconstructed panel violates [`Self::new`] invariants
-    ///
-    /// # Arguments
-    ///
-    /// * `yield_changes` - Yield changes used by the algorithm, subject to the enclosing type invariants and documented units.
-    pub fn from_yield_changes(yield_changes: Vec<Vec<f64>>) -> finstack_quant_core::Result<Self> {
-        let changes = rows_to_dmatrix(&yield_changes, "yield_changes")?;
-        let n = changes.ncols();
-        let m = changes.nrows();
-
-        let mut levels = DMatrix::zeros(m + 1, n);
-        for i in 0..m {
-            for j in 0..n {
-                levels[(i + 1, j)] = levels[(i, j)] + changes[(i, j)];
-            }
-        }
-
-        let tenors: Vec<f64> = (1..=n).map(|i| i as f64).collect();
-        Self::new(levels, tenors, None)
     }
 
     /// Construct and validate a yield panel.
@@ -472,20 +445,5 @@ mod tests {
             .expect_err("ragged rows should be rejected");
 
         assert!(err.to_string().contains("row 1"), "unexpected error: {err}");
-    }
-
-    #[test]
-    fn yield_panel_from_yield_changes_reconstructs_synthetic_grid() {
-        let panel = YieldPanel::from_yield_changes(vec![
-            vec![0.001, 0.002, 0.003],
-            vec![0.004, 0.005, 0.006],
-        ])
-        .expect("valid yield changes should build");
-
-        assert_eq!(panel.tenors, vec![1.0, 2.0, 3.0]);
-        assert_eq!(panel.num_dates(), 3);
-        assert_eq!(panel.yields[(0, 0)], 0.0);
-        assert!((panel.yields[(2, 2)] - 0.009).abs() < 1e-12);
-        assert_eq!(panel.yield_changes().nrows(), 2);
     }
 }

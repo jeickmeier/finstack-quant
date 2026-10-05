@@ -709,15 +709,15 @@ public = [
     "surface_to_dataframe",
 ]
 
-# `diebold_li_fit_factors` / `diebold_li_forecast` / `nelson_siegel_yields` are
-# thin twins over the Rust free functions of the same name; the first two return
-# the typed `FactorTimeSeries` / `YieldForecast` wrappers. Yield-curve PCA has no
-# free functions: it is reached through the bound `YieldPca` methods
+# Diebold-Li is one typed pipeline in Rust and both hosts:
+# `DieboldLi(lambda_=None)` (Rust `DieboldLi::new` / `with_default_lambda`)
+# `.extract_factors(panel)` / `.fit(panel)` / `.forecast(horizon)`, returning the
+# typed `FactorTimeSeries` / `YieldForecast`. `nelson_siegel_yields` is the one
+# free function. Yield-curve PCA is reached through the bound `YieldPca` methods
 # (`fit_yield_changes(...).truncated(n_components)` returns a `YieldPcaView`,
-# `scenario(shocks)` shocks components). Rust-only: `diebold_li_model` (folded
-# into `DieboldLi(lambda_=None)`) and `DieboldLi::to_parametric_curve`. WASM
-# exposes the same three free functions (`dieboldLiFitFactors`,
-# `dieboldLiForecast`, `nelsonSiegelYields`) and classes.
+# `scenario(shocks)` shocks components); a fit from changes reports the column
+# positions `1..N` as placeholder tenors. WASM exposes the same classes and
+# `nelsonSiegelYields`.
 [crates.models.rates.dtsm]
 python_package = "finstack_quant.models.rates.dtsm"
 public = [
@@ -727,8 +727,6 @@ public = [
     "YieldPanel",
     "YieldPca",
     "YieldPcaView",
-    "diebold_li_fit_factors",
-    "diebold_li_forecast",
     "nelson_siegel_yields",
 ]
 

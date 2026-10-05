@@ -682,8 +682,8 @@ def _rates_cases() -> dict[str, Callable[[], Any]]:
             model().phi,
             list(model().mu),
             model().factors.r_squared_avg,
-            dtsm.diebold_li_fit_factors(TENORS, YIELDS).r_squared_avg,
-            list(dtsm.diebold_li_forecast(TENORS, YIELDS, 2).yields),
+            dtsm.DieboldLi().extract_factors(_panel()).factors.r_squared_avg,
+            list(model().forecast(2).yields),
         ],
         "dtsm.yield_pca": lambda: [
             list(pca().variance_explained),

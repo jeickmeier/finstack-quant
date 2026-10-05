@@ -10,7 +10,7 @@ use crate::utils::input::{
 };
 use crate::utils::{parse_iso_date, to_js_err, to_js_value};
 use finstack_quant_core::Error;
-use finstack_quant_models::rates::dtsm::{self, DieboldLi, YieldPanel, YieldPca};
+use finstack_quant_models::rates::dtsm::{DieboldLi, YieldPanel, YieldPca};
 use wasm_bindgen::prelude::*;
 
 /// Evaluate the static Nelson-Siegel (1987) yield curve for one factor triple.
@@ -166,9 +166,11 @@ impl JsDieboldLi {
     /// Throws a `validation` error if `lambda` is not positive and finite.
     #[wasm_bindgen(constructor)]
     pub fn new(lambda: Option<JsValue>) -> Result<JsDieboldLi, JsValue> {
-        dtsm::diebold_li_model(js_opt_f64(lambda.as_ref(), "lambda")?)
-            .map(|inner| Self { inner })
-            .map_err(to_js_err)
+        match js_opt_f64(lambda.as_ref(), "lambda")? {
+            Some(lambda) => DieboldLi::new(lambda).map_err(to_js_err),
+            None => Ok(DieboldLi::with_default_lambda()),
+        }
+        .map(|inner| Self { inner })
     }
 
     /// Exponential decay parameter (Python `lambda_`).
@@ -480,56 +482,4 @@ impl JsYieldPca {
             .map_err(to_js_err)?;
         to_js_value(&view)
     }
-}
-
-/// Extract Diebold-Li level, slope and curvature factors from a yield matrix.
-/// @param tenors - Maturities in years, one per column of `yieldsMatrix`.
-/// @param yields_matrix - Yields as nested rows: one `number[]` per date, one decimal yield per tenor.
-/// @param lambda - Optional decay parameter; omitted uses the Rust default (0.7308).
-/// @returns The `FactorTimeSeries` object (`factors`, `residuals`, `r_squared`, `r_squared_avg`, `dates`).
-///
-/// # Errors
-///
-/// Throws a `validation` error if the inputs are ragged, too small or non-finite.
-#[wasm_bindgen(js_name = dieboldLiFitFactors)]
-pub fn diebold_li_fit_factors(
-    tenors: JsValue,
-    yields_matrix: JsValue,
-    lambda: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let factors = dtsm::diebold_li_fit_factors(
-        js_f64_seq(&tenors, "tenors")?,
-        js_f64_matrix(&yields_matrix, "yieldsMatrix")?,
-        js_opt_f64(lambda.as_ref(), "lambda")?,
-    )
-    .map_err(to_js_err)?;
-    to_js_value(&factors)
-}
-
-/// Fit Diebold-Li to a yield matrix and forecast the curve.
-/// @param tenors - Maturities in years, one per column of `yieldsMatrix`.
-/// @param yields_matrix - Yields as nested rows: one `number[]` per date, one decimal yield per tenor.
-/// @param horizon - Forecast horizon in observation periods; a positive safe integer.
-/// @param lambda - Optional decay parameter; omitted uses the Rust default (0.7308).
-/// @returns The `YieldForecast` object (`horizon`, `yields`, `tenors`, `factors`, `lower_95`, `upper_95`).
-///
-/// # Errors
-///
-/// Throws a `validation` error if the inputs are ragged, too small or
-/// non-finite, and a `computation` error if the VAR regression is singular.
-#[wasm_bindgen(js_name = dieboldLiForecast)]
-pub fn diebold_li_forecast(
-    tenors: JsValue,
-    yields_matrix: JsValue,
-    horizon: JsValue,
-    lambda: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let forecast = dtsm::diebold_li_forecast(
-        js_f64_seq(&tenors, "tenors")?,
-        js_f64_matrix(&yields_matrix, "yieldsMatrix")?,
-        js_uint(&horizon, "horizon")?,
-        js_opt_f64(lambda.as_ref(), "lambda")?,
-    )
-    .map_err(to_js_err)?;
-    to_js_value(&forecast)
 }

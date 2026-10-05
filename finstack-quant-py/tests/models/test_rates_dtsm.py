@@ -13,8 +13,6 @@ from finstack_quant.models.rates.dtsm import (
     YieldPanel,
     YieldPca,
     YieldPcaView,
-    diebold_li_fit_factors,
-    diebold_li_forecast,
 )
 
 TENORS = [1.0, 2.0, 5.0, 10.0]
@@ -68,11 +66,8 @@ def test_diebold_li_typed_pipeline() -> None:
         DieboldLi(-1.0)
 
 
-def test_thin_twins_match_typed_api() -> None:
+def test_yield_pca_view_from_yield_changes() -> None:
     panel = YieldPanel(TENORS, YIELDS)
-    typed = DieboldLi().fit(panel)
-    assert diebold_li_fit_factors(TENORS, YIELDS).level == typed.factors.level
-    assert diebold_li_forecast(TENORS, YIELDS, 3).yields == typed.forecast(3).yields
     view = YieldPca.fit_yield_changes(panel.yield_changes()).truncated(2)
     assert isinstance(view, YieldPcaView)
     assert view.tenors == [1.0, 2.0, 3.0, 4.0]
