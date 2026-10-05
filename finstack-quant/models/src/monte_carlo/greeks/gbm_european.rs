@@ -21,7 +21,6 @@ use crate::types::OptionType;
 use finstack_quant_core::cashflow::flat_discount_factor;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;
-use std::str::FromStr;
 
 /// Two-sided 95% normal quantile used to turn `(value, stderr)` into a CI.
 const CI_95_Z: f64 = 1.96;
@@ -146,26 +145,13 @@ pub fn finite_diff_gamma_crn_gbm(spec: GbmEuropeanFdSpec) -> Result<Estimate> {
     run_gbm_fd(spec, FdKind::GammaCrn)
 }
 
-fn parse_registry_currency(code: &str) -> Result<Currency> {
-    Currency::from_str(code).map_err(|err| {
-        finstack_quant_core::Error::Validation(format!(
-            "invalid registry default currency '{code}': {err}"
-        ))
-    })
-}
-
 fn run_gbm_fd(spec: GbmEuropeanFdSpec, kind: FdKind) -> Result<Estimate> {
     let defaults = &registry::embedded_defaults()?.convenience.greeks;
     let num_paths = spec.num_paths.unwrap_or(defaults.num_paths);
     let seed = spec.seed.unwrap_or(defaults.seed);
     let num_steps = spec.num_steps.unwrap_or(defaults.num_steps);
     let bump_size = spec.bump_size.unwrap_or(defaults.bump_size);
-    let currency = match spec.currency {
-        Some(currency) => currency,
-        None => {
-            parse_registry_currency(&registry::embedded_defaults()?.convenience.default_currency)?
-        }
-    };
+    let currency = crate::monte_carlo::convenience::resolve_currency(spec.currency)?;
 
     #[cfg(target_arch = "wasm32")]
     let use_parallel = false;

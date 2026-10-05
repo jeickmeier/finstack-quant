@@ -168,6 +168,29 @@ impl PathDependentPricerConfig {
         )
     }
 
+    /// Translate this configuration into the engine configuration for one run.
+    ///
+    /// Path count, parallelism, chunk size, path capture and antithetic
+    /// pairing are copied as configured; no confidence-interval stopping
+    /// target is set. Seed, step density and the Sobol flags are not engine
+    /// settings: the caller builds `time_grid` and the random stream from them.
+    ///
+    /// # Arguments
+    ///
+    /// * `time_grid` - Simulation times in years, starting at zero, typically
+    ///   from [`Self::build_time_grid`]; moved into the returned configuration.
+    pub fn engine_config(&self, time_grid: TimeGrid) -> McEngineConfig {
+        McEngineConfig {
+            num_paths: self.num_paths,
+            time_grid,
+            target_ci_half_width: None,
+            use_parallel: self.use_parallel,
+            chunk_size: Some(self.chunk_size),
+            path_capture: self.path_capture.clone(),
+            antithetic: self.antithetic,
+        }
+    }
+
     /// Validate the configuration eagerly, before any path is simulated.
     ///
     /// Surface configuration mistakes at builder time rather than at
@@ -353,15 +376,11 @@ impl PathDependentPricer {
         // RNG adapter per path, but the per-step simulate/capture logic lives
         // on the engine so there is a single code path for path construction
         // and path bookkeeping.
-        let engine_config = McEngineConfig {
-            num_paths: self.config.num_paths,
-            time_grid: time_grid.clone(),
-            target_ci_half_width: None,
-            use_parallel: false,
-            chunk_size: Some(self.config.chunk_size),
-            path_capture: self.config.path_capture.clone(),
-            antithetic: false,
-        };
+        // The Sobol loop below is serial and unpaired whatever the
+        // configuration says (validation rejects both combinations).
+        let mut engine_config = self.config.engine_config(time_grid.clone());
+        engine_config.use_parallel = false;
+        engine_config.antithetic = false;
         let engine = McEngine::new(engine_config);
         engine.validate_runtime(
             process,
@@ -807,16 +826,7 @@ impl PathDependentPricer {
             );
         }
 
-        let engine_config = McEngineConfig {
-            num_paths: self.config.num_paths,
-            time_grid,
-            target_ci_half_width: None,
-            use_parallel: self.config.use_parallel,
-            chunk_size: Some(self.config.chunk_size),
-            path_capture: self.config.path_capture.clone(),
-            antithetic: self.config.antithetic,
-        };
-        let engine = McEngine::new(engine_config);
+        let engine = McEngine::new(self.config.engine_config(time_grid));
 
         let disc = ExactGbm::new();
         let initial_state = vec![initial_spot];
@@ -941,15 +951,9 @@ impl PathDependentPricer {
         }
         // Force path capture to get terminal spots and final discounted payoff values
         let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
-        let engine_config = McEngineConfig {
-            num_paths: self.config.num_paths,
-            time_grid,
-            target_ci_half_width: None,
-            use_parallel: self.config.use_parallel,
-            chunk_size: Some(self.config.chunk_size),
-            path_capture: PathCaptureConfig::all().with_payoffs(),
-            antithetic: false,
-        };
+        let mut engine_config = self.config.engine_config(time_grid);
+        engine_config.path_capture = PathCaptureConfig::all().with_payoffs();
+        engine_config.antithetic = false;
         let engine = McEngine::new(engine_config);
 
         let rng = crate::monte_carlo::rng::philox::PhiloxRng::new(self.config.seed);
