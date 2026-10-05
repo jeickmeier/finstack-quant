@@ -279,7 +279,8 @@ def test_lrm_greeks_round_trip_and_tabulate() -> None:
     )
 
     assert set(json.loads(greeks.to_json())) == {"price", "delta", "vega"}
-    for restored in (LrmGreeks.from_json(greeks.to_json()), pickle.loads(pickle.dumps(greeks))):
+    pickled = pickle.loads(pickle.dumps(greeks))  # noqa: S301 - trusted in-process round trip
+    for restored in (LrmGreeks.from_json(greeks.to_json()), pickled):
         assert restored.to_json() == greeks.to_json()
     with pytest.raises(ValueError, match="invalid LrmGreeks JSON"):
         LrmGreeks.from_json('{"price": 1.0}')
@@ -339,8 +340,8 @@ def test_heston_feller_uses_inclusive_predicate_without_validation() -> None:
     "greek",
     [
         finite_diff_delta,
-            finite_diff_gamma,
-        ],
+        finite_diff_gamma,
+    ],
 )
 @pytest.mark.parametrize(
     ("spot", "bump_size", "message"),

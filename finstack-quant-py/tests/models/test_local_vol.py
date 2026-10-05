@@ -59,7 +59,8 @@ def test_explicit_grid_round_trips_and_tabulates() -> None:
         "strikes": [100.0, 200.0],
         "local_vols": [0.1, 0.2, 0.3, 0.4],
     }
-    for restored in (LocalVolSurface.from_json(local.to_json()), pickle.loads(pickle.dumps(local))):
+    pickled = pickle.loads(pickle.dumps(local))  # noqa: S301 - trusted in-process round trip
+    for restored in (LocalVolSurface.from_json(local.to_json()), pickled):
         assert restored.to_json() == local.to_json()
     assert repr(local) == "LocalVolSurface(expiries=2, strikes=2)"
 
@@ -115,7 +116,7 @@ def test_extraction_errors_are_value_errors() -> None:
     with pytest.raises(ValueError, match="butterfly arbitrage"):
         LocalVolSurface.from_implied_vol(butterfly, [100.0] * 3)
     normal = VolSurface("N", EXPIRIES, STRIKES, [SMILE] * 4, quote_type="normal")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="stores 'normal' quotes"):
         LocalVolSurface.from_implied_vol(normal, FORWARDS)
 
 
