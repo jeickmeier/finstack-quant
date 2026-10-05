@@ -3186,9 +3186,7 @@
       "LsmcPricer",
       "PathDependentPricer",
       "finiteDiffDelta",
-      "finiteDiffDeltaCrn",
       "finiteDiffGamma",
-      "finiteDiffGammaCrn",
       "hestonSatisfiesFeller",
       "priceHestonCall",
       "priceHestonPut",
@@ -3235,13 +3233,7 @@
   "models.monteCarlo.finiteDiffDelta": {
     "kind": "function"
   },
-  "models.monteCarlo.finiteDiffDeltaCrn": {
-    "kind": "function"
-  },
   "models.monteCarlo.finiteDiffGamma": {
-    "kind": "function"
-  },
-  "models.monteCarlo.finiteDiffGammaCrn": {
     "kind": "function"
   },
   "models.monteCarlo.relativeStderr": {

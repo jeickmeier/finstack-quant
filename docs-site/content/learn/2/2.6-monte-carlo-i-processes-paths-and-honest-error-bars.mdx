@@ -271,16 +271,11 @@ Record both `num_paths` and `num_simulated_paths`: in this antithetic LSMC case,
 
 ### 4. Measure a Greek variance reduction, then change the model
 
-The delta and gamma experiment uses the same bump and sample budget for plain and CRN estimates. It reports the observed SE reduction for this fixture and checks CRN delta against analytical delta within four SE plus a small finite-difference allowance. The gain is measured here; it is not guaranteed for every payoff.
+The delta and gamma experiment prices every stencil point on common random numbers and reports the paired SE of the per-path differences next to the bound obtained by combining separately priced stencil points as if they were independent. It reports the observed SE reduction for this fixture and checks the delta against analytical delta within four SE plus a small finite-difference allowance. The gain is measured here; it is not guaranteed for every payoff.
 
 {/* notebook-block notebook="07_advanced_quant/monte_carlo/black_scholes_benchmarks.ipynb" cell="mc-crn-greeks" role="build" */}
 ```python exec id=mc-crn-greeks role=build
-from finstack_quant.models.monte_carlo import (
-    finite_diff_delta,
-    finite_diff_delta_crn,
-    finite_diff_gamma,
-    finite_diff_gamma_crn,
-)
+from finstack_quant.models.monte_carlo import EuropeanPricer, finite_diff_delta, finite_diff_gamma
 
 kw = dict(
     spot=100.0,
@@ -294,16 +289,20 @@ kw = dict(
     is_call=True,
 )
 d_est = finite_diff_delta(**kw); d, d_se = d_est.mean, d_est.stderr
-dc_est = finite_diff_delta_crn(**kw); dc, dc_se = dc_est.mean, dc_est.stderr
 g_est = finite_diff_gamma(**kw); g, g_se = g_est.mean, g_est.stderr
-gc_est = finite_diff_gamma_crn(**kw); gc, gc_se = gc_est.mean, gc_est.stderr
-print(f"delta      = {d:.5f}  (stderr={d_se:.5f})")
-print(f"delta_crn  = {dc:.5f}  (stderr={dc_se:.5f})  <- CRN cuts the stderr sharply")
-print(f"gamma      = {g:.5f}  (stderr={g_se:.5f})")
-print(f"gamma_crn  = {gc:.5f}  (stderr={gc_se:.5f})")
+# Independence bound: combine the stderrs of separately priced stencil points.
+h = 0.01 * kw["spot"]
+pricer = EuropeanPricer(num_paths=kw["num_paths"], seed=kw["seed"])
+se_up, se_mid, se_dn = (
+    pricer.price_call(s, 100.0, 0.05, 0.0, 0.20, 1.0).stderr for s in (100.0 + h, 100.0, 100.0 - h)
+)
+d_bound = (se_up**2 + se_dn**2) ** 0.5 / (2 * h)
+g_bound = (se_up**2 + 4 * se_mid**2 + se_dn**2) ** 0.5 / h**2
+print(f"delta = {d:.5f}  (paired stderr={d_se:.5f}; independence bound={d_bound:.5f})")
+print(f"gamma = {g:.5f}  (paired stderr={g_se:.5f}; independence bound={g_bound:.5f})")
 from finstack_quant.models import bs_greeks
 exact_delta = bs_greeks(100, 100, 0.05, 0, 0.2, 1, True).delta
-print(f"CRN delta SE ratio: {dc_se / d_se:.6f}; analytic delta: {exact_delta:.8f}")
+print(f"Paired/independent delta SE ratio: {d_se / d_bound:.6f}; analytic delta: {exact_delta:.8f}")
 ```
 {/* /notebook-block */}
 

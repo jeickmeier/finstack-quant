@@ -1,16 +1,15 @@
 //! Canonical GBM European finite-difference Greek entry points for host bindings.
 //!
 //! These free functions own the `TimeGrid` + engine + GBM process + vanilla
-//! payoff composition that Python exposes as `finite_diff_delta` /
-//! `finite_diff_gamma` (and the CRN variants), so the pipeline — including
-//! registry-backed defaults — is defined once in Rust.
+//! payoff composition that Python and WASM expose as `finite_diff_delta` /
+//! `finite_diff_gamma`, so the pipeline — including registry-backed defaults —
+//! is defined once in Rust.
 
 use crate::monte_carlo::discretization::exact::ExactGbm;
 use crate::monte_carlo::engine::{McEngine, McEngineConfig};
 use crate::monte_carlo::estimate::Estimate;
 use crate::monte_carlo::greeks::finite_diff::{
-    finite_diff_delta, finite_diff_delta_crn, finite_diff_gamma, finite_diff_gamma_crn,
-    FiniteDiffInputs,
+    finite_diff_delta, finite_diff_gamma, FiniteDiffInputs,
 };
 use crate::monte_carlo::payoff::vanilla::{EuropeanCall, EuropeanPut};
 use crate::monte_carlo::process::gbm::GbmProcess;
@@ -59,17 +58,15 @@ pub struct GbmEuropeanFdSpec {
 
 enum FdKind {
     Delta,
-    DeltaCrn,
     Gamma,
-    GammaCrn,
 }
 
 /// Finite-difference delta for a vanilla European option under GBM.
 ///
-/// Both this function and [`finite_diff_delta_crn_gbm`] reuse common random
-/// numbers via a splittable RNG. This function reports a **conservative
-/// independence-bound** stderr; [`finite_diff_delta_crn_gbm`] reports the
-/// tighter paired CRN stderr.
+/// Central difference in spot with common random numbers: the up and down
+/// valuations share each path's random draws, the estimate is the mean of
+/// the per-path differences, and the reported standard error is the paired
+/// (common-random-number) standard error of those differences.
 ///
 /// # Arguments
 ///
@@ -79,70 +76,41 @@ enum FdKind {
 ///
 /// # Returns
 ///
-/// An [`Estimate`] whose `mean` is the delta, `stderr` the estimator's
-/// standard error, `ci_95` the symmetric normal 95% band, and `num_paths` the
-/// independent estimator count used per bumped valuation. `num_simulated_paths`
-/// records the physical path count, including antithetic partners.
+/// An [`Estimate`] whose `mean` is the delta, `stderr` the paired standard
+/// error, `ci_95` the symmetric normal 95% band, and `num_paths` the
+/// independent estimator count. `num_simulated_paths` records the physical
+/// path count per stencil point, including antithetic partners.
 ///
 /// # Errors
 ///
 /// Returns an error if registry defaults cannot be loaded, `vol` is not
-/// strictly positive, GBM or bump inputs fail validation, or either pricing
-/// run fails.
+/// strictly positive, GBM or bump inputs fail validation, or a path
+/// simulation fails.
 pub fn finite_diff_delta_gbm(spec: GbmEuropeanFdSpec) -> Result<Estimate> {
     run_gbm_fd(spec, FdKind::Delta)
 }
 
-/// Finite-difference delta with paired common-random-number stderr.
-///
-/// Same CRN-priced central difference as [`finite_diff_delta_gbm`]; only the
-/// reported stderr estimator differs (paired pathwise differences instead of
-/// the independence bound).
-///
-/// # Arguments
-///
-/// * `spec` - Spot, strike, GBM parameters, required `option_type`, and
-///   optional registry overrides.
-///
-/// # Errors
-///
-/// Same failure modes as [`finite_diff_delta_gbm`].
-pub fn finite_diff_delta_crn_gbm(spec: GbmEuropeanFdSpec) -> Result<Estimate> {
-    run_gbm_fd(spec, FdKind::DeltaCrn)
-}
-
 /// Finite-difference gamma for a vanilla European option under GBM.
 ///
-/// Both this function and [`finite_diff_gamma_crn_gbm`] reuse common random
-/// numbers. This function reports a conservative independence-bound stderr.
+/// Second central difference in spot with common random numbers; the
+/// estimate is the mean of the per-path second differences and the reported
+/// standard error is their paired (common-random-number) standard error.
 ///
 /// # Arguments
 ///
 /// * `spec` - Spot, strike, GBM parameters, required `option_type`, and
 ///   optional registry overrides.
+///
+/// # Returns
+///
+/// An [`Estimate`] shaped as for [`finite_diff_delta_gbm`], with `mean` the
+/// gamma per squared unit of spot.
 ///
 /// # Errors
 ///
 /// Same failure modes as [`finite_diff_delta_gbm`].
 pub fn finite_diff_gamma_gbm(spec: GbmEuropeanFdSpec) -> Result<Estimate> {
     run_gbm_fd(spec, FdKind::Gamma)
-}
-
-/// Finite-difference gamma with paired common-random-number stderr.
-///
-/// Same CRN-priced second difference as [`finite_diff_gamma_gbm`]; only the
-/// reported stderr estimator differs.
-///
-/// # Arguments
-///
-/// * `spec` - Spot, strike, GBM parameters, required `option_type`, and
-///   optional registry overrides.
-///
-/// # Errors
-///
-/// Same failure modes as [`finite_diff_delta_gbm`].
-pub fn finite_diff_gamma_crn_gbm(spec: GbmEuropeanFdSpec) -> Result<Estimate> {
-    run_gbm_fd(spec, FdKind::GammaCrn)
 }
 
 fn run_gbm_fd(spec: GbmEuropeanFdSpec, kind: FdKind) -> Result<Estimate> {
@@ -185,9 +153,7 @@ fn run_gbm_fd(spec: GbmEuropeanFdSpec, kind: FdKind) -> Result<Estimate> {
             };
             match kind {
                 FdKind::Delta => finite_diff_delta(&inputs, spec.spot, bump_size)?,
-                FdKind::DeltaCrn => finite_diff_delta_crn(&inputs, spec.spot, bump_size)?,
                 FdKind::Gamma => finite_diff_gamma(&inputs, spec.spot, bump_size)?,
-                FdKind::GammaCrn => finite_diff_gamma_crn(&inputs, spec.spot, bump_size)?,
             }
         }
         OptionType::Put => {
@@ -203,9 +169,7 @@ fn run_gbm_fd(spec: GbmEuropeanFdSpec, kind: FdKind) -> Result<Estimate> {
             };
             match kind {
                 FdKind::Delta => finite_diff_delta(&inputs, spec.spot, bump_size)?,
-                FdKind::DeltaCrn => finite_diff_delta_crn(&inputs, spec.spot, bump_size)?,
                 FdKind::Gamma => finite_diff_gamma(&inputs, spec.spot, bump_size)?,
-                FdKind::GammaCrn => finite_diff_gamma_crn(&inputs, spec.spot, bump_size)?,
             }
         }
     };
@@ -295,9 +259,9 @@ mod tests {
     }
 
     #[test]
-    fn finite_diff_delta_crn_gbm_matches_black_scholes_atm_and_25d() {
+    fn finite_diff_delta_gbm_matches_black_scholes_atm_and_25d() {
         let (atm_spot, atm_strike) = (100.0, 100.0);
-        let est = finite_diff_delta_crn_gbm(crn_spec(atm_spot, atm_strike, OptionType::Call))
+        let est = finite_diff_delta_gbm(crn_spec(atm_spot, atm_strike, OptionType::Call))
             .expect("atm delta");
         let (bs_delta, _) = bs_spot_delta_gamma(atm_spot, atm_strike, 0.05, 0.0, 0.2, 1.0, true);
         let tol = (4.0 * est.stderr).max(0.03);
@@ -309,7 +273,7 @@ mod tests {
         );
 
         let otm_strike = 120.0;
-        let est_25 = finite_diff_delta_crn_gbm(crn_spec(atm_spot, otm_strike, OptionType::Call))
+        let est_25 = finite_diff_delta_gbm(crn_spec(atm_spot, otm_strike, OptionType::Call))
             .expect("otm delta");
         let (bs_delta_25, _) = bs_spot_delta_gamma(atm_spot, otm_strike, 0.05, 0.0, 0.2, 1.0, true);
         let tol_25 = (4.0 * est_25.stderr).max(0.03);
@@ -322,9 +286,9 @@ mod tests {
     }
 
     #[test]
-    fn finite_diff_gamma_crn_gbm_matches_black_scholes_atm() {
+    fn finite_diff_gamma_gbm_matches_black_scholes_atm() {
         let spec = crn_spec(100.0, 100.0, OptionType::Call);
-        let est = finite_diff_gamma_crn_gbm(spec).expect("atm gamma");
+        let est = finite_diff_gamma_gbm(spec).expect("atm gamma");
         let (_, bs_gamma) = bs_spot_delta_gamma(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, true);
         let tol = (4.0 * est.stderr).max(0.01);
         assert!(
@@ -335,10 +299,33 @@ mod tests {
         );
     }
 
+    /// Pins the per-path-paired estimates and standard errors bit-for-bit
+    /// (captured from the paired implementation before it took the short
+    /// names). A change here changes the Greeks every host reports for a seed.
+    #[test]
+    fn f4_pin_paired_finite_diff_greeks() {
+        let bits = |estimate: Estimate| [estimate.mean.to_bits(), estimate.stderr.to_bits()];
+        let put = || crn_spec(100.0, 110.0, OptionType::Put);
+        assert_eq!(
+            [
+                bits(finite_diff_delta_gbm(atm_spec()).expect("call delta")),
+                bits(finite_diff_gamma_gbm(atm_spec()).expect("call gamma")),
+                bits(finite_diff_delta_gbm(put()).expect("put delta")),
+                bits(finite_diff_gamma_gbm(put()).expect("put gamma")),
+            ],
+            [
+                [0x3fe4_435d_3a2c_3104, 0x3f68_16b5_9602_d2df],
+                [0x3f92_6177_6054_67aa, 0x3f5a_48d2_3f3d_5550],
+                [0xbfe1_70bb_1a96_6f20, 0x3f66_7b61_b338_9e43],
+                [0x3f94_ef48_0153_4edb, 0x3f4d_ed31_31d4_5fe1],
+            ]
+        );
+    }
+
     #[test]
     fn finite_diff_put_delta_is_negative() {
         let est =
-            finite_diff_delta_crn_gbm(crn_spec(100.0, 100.0, OptionType::Put)).expect("put delta");
+            finite_diff_delta_gbm(crn_spec(100.0, 100.0, OptionType::Put)).expect("put delta");
         assert!(est.mean < 0.0 && est.mean > -1.0, "put delta={}", est.mean);
     }
 

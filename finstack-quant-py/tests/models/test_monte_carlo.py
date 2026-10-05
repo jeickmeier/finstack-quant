@@ -14,9 +14,7 @@ from finstack_quant.models.monte_carlo import (
     PathDependentPricer,
     PathSummary,
     finite_diff_delta,
-    finite_diff_delta_crn,
     finite_diff_gamma,
-    finite_diff_gamma_crn,
     heston_satisfies_feller,
     simulate_paths,
 )
@@ -341,10 +339,8 @@ def test_heston_feller_uses_inclusive_predicate_without_validation() -> None:
     "greek",
     [
         finite_diff_delta,
-        finite_diff_delta_crn,
-        finite_diff_gamma,
-        finite_diff_gamma_crn,
-    ],
+            finite_diff_gamma,
+        ],
 )
 @pytest.mark.parametrize(
     ("spot", "bump_size", "message"),

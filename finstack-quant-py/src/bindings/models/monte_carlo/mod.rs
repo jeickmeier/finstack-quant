@@ -47,9 +47,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "price_heston_call",
             "price_heston_put",
             "finite_diff_delta",
-            "finite_diff_delta_crn",
             "finite_diff_gamma",
-            "finite_diff_gamma_crn",
         ],
     )?;
     m.setattr("__all__", all)?;

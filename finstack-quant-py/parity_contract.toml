@@ -566,7 +566,8 @@ public = [
 
 [crates.models.monte_carlo]
 python_package = "finstack_quant.models.monte_carlo"
-# `finite_diff_*` take `is_call: bool` and return a typed `Estimate`. The
+# `finite_diff_*` take `is_call: bool` and return a typed `Estimate` whose
+# `stderr` is the paired (common-random-number) standard error. The
 # closed-form Black-Scholes reference is `models.bs_price`. Rust-only:
 # engine/process/discretization/RNG/payoff
 # graph, `GbmEuropeanFdSpec` (flattened into kwargs), `PathDependentPricerConfig`
@@ -586,9 +587,7 @@ public = [
     "PathDependentPricer",
     "PathSummary",
     "finite_diff_delta",
-    "finite_diff_delta_crn",
     "finite_diff_gamma",
-    "finite_diff_gamma_crn",
     "heston_satisfies_feller",
     "price_heston_call",
     "price_heston_put",

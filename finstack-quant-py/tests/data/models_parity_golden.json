@@ -755,9 +755,7 @@
     ]
   ],
   "monte_carlo.finite_diff": [
-    0.6275942920970046,
     0.6275942920969967,
-    0.018671999522810623,
     0.01867199952282888
   ],
   "monte_carlo.heston_satisfies_feller": [

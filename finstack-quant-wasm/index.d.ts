@@ -12334,7 +12334,11 @@ export interface MonteCarloNamespace {
    */
   PathDependentPricer: PathDependentPricerConstructor;
   /**
-   * Monte Carlo finite-difference delta of a GBM European option, with independent draws per bump.
+   * Monte Carlo finite-difference delta of a GBM European option under common random numbers.
+   *
+   * The up and down valuations share each path's random draws; the estimate
+   * is the mean of the per-path central differences and `stderr` is their
+   * paired (common-random-number) standard error.
    * @param spot - Spot level at time 0.
    * @param strike - Exercise price in the same units as `spot`.
    * @param rate - Continuously compounded risk-free rate (decimal, annualized).
@@ -12347,7 +12351,7 @@ export interface MonteCarloNamespace {
    * @param numSteps - Optional time-grid steps; omitted uses the registry default.
    * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
    * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-   * @returns The `Estimate` object for delta (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @returns The `Estimate` object for delta (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
    * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
    */
   finiteDiffDelta(
@@ -12365,7 +12369,11 @@ export interface MonteCarloNamespace {
     currency?: string
   ): generated.models.Estimate;
   /**
-   * Monte Carlo finite-difference delta of a GBM European option under common random numbers.
+   * Monte Carlo finite-difference gamma of a GBM European option under common random numbers.
+   *
+   * The three stencil valuations share each path's random draws; the estimate
+   * is the mean of the per-path second differences and `stderr` is their
+   * paired (common-random-number) standard error.
    * @param spot - Spot level at time 0.
    * @param strike - Exercise price in the same units as `spot`.
    * @param rate - Continuously compounded risk-free rate (decimal, annualized).
@@ -12378,72 +12386,10 @@ export interface MonteCarloNamespace {
    * @param numSteps - Optional time-grid steps; omitted uses the registry default.
    * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
    * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-   * @returns The `Estimate` object for delta (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
-   */
-  finiteDiffDeltaCrn(
-    spot: number,
-    strike: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
-    isCall: boolean,
-    numPaths?: number,
-    seed?: number | bigint,
-    numSteps?: number,
-    bumpSize?: number,
-    currency?: string
-  ): generated.models.Estimate;
-  /**
-   * Monte Carlo finite-difference gamma of a GBM European option, with independent draws per bump.
-   * @param spot - Spot level at time 0.
-   * @param strike - Exercise price in the same units as `spot`.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal); positive.
-   * @param expiry - Time to expiry in years.
-   * @param isCall - `true` for a call payoff, `false` for a put.
-   * @param numPaths - Optional paths per evaluation; omitted uses the registry default.
-   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
-   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
-   * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
-   * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-   * @returns The `Estimate` object for gamma (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+   * @returns The `Estimate` object for gamma (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
    * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
    */
   finiteDiffGamma(
-    spot: number,
-    strike: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
-    isCall: boolean,
-    numPaths?: number,
-    seed?: number | bigint,
-    numSteps?: number,
-    bumpSize?: number,
-    currency?: string
-  ): generated.models.Estimate;
-  /**
-   * Monte Carlo finite-difference gamma of a GBM European option under common random numbers.
-   * @param spot - Spot level at time 0.
-   * @param strike - Exercise price in the same units as `spot`.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal); positive.
-   * @param expiry - Time to expiry in years.
-   * @param isCall - `true` for a call payoff, `false` for a put.
-   * @param numPaths - Optional paths per evaluation; omitted uses the registry default.
-   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
-   * @param numSteps - Optional time-grid steps; omitted uses the registry default.
-   * @param bumpSize - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
-   * @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-   * @returns The `Estimate` object for gamma (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-   * @throws Error - Throws a `validation` error if an input is non-finite or out of range or the currency code is unknown.
-   */
-  finiteDiffGammaCrn(
     spot: number,
     strike: number,
     rate: number,

@@ -635,9 +635,7 @@ const CASES = {
   },
   'monte_carlo.finite_diff': () => [
     monteCarlo.finiteDiffDelta(...GBM, true, 2000, 42).mean,
-    monteCarlo.finiteDiffDeltaCrn(...GBM, true, 2000, 42).mean,
     monteCarlo.finiteDiffGamma(...GBM, false, 2000, 42).mean,
-    monteCarlo.finiteDiffGammaCrn(...GBM, false, 2000, 42).mean,
   ],
   ...Object.fromEntries(
     Object.entries(PATH_SPECS).map(([name, spec]) => [

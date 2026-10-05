@@ -18,8 +18,7 @@ use crate::utils::{to_js_err, to_js_value};
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::convenience::{self, LsmcConvenience};
 use finstack_quant_models::monte_carlo::greeks::gbm_european::{
-    finite_diff_delta_crn_gbm, finite_diff_delta_gbm, finite_diff_gamma_crn_gbm,
-    finite_diff_gamma_gbm, GbmEuropeanFdSpec,
+    finite_diff_delta_gbm, finite_diff_gamma_gbm, GbmEuropeanFdSpec,
 };
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
@@ -356,7 +355,11 @@ fn fd_spec(
     })
 }
 
-/// Monte Carlo finite-difference delta of a GBM European option, with independent draws per bump.
+/// Monte Carlo finite-difference delta of a GBM European option under common random numbers.
+///
+/// The up and down valuations share each path's random draws; the estimate
+/// is the mean of the per-path central differences and `stderr` is their
+/// paired (common-random-number) standard error.
 /// @param spot - Spot level at time 0.
 /// @param strike - Exercise price in the same units as `spot`.
 /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
@@ -369,7 +372,7 @@ fn fd_spec(
 /// @param num_steps - Optional time-grid steps; omitted uses the registry default.
 /// @param bump_size - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
 /// @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-/// @returns The `Estimate` object for delta (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+/// @returns The `Estimate` object for delta (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
 ///
 /// # Errors
 ///
@@ -408,7 +411,11 @@ pub fn finite_diff_delta(
     to_js_value(&finite_diff_delta_gbm(spec).map_err(to_js_err)?)
 }
 
-/// Monte Carlo finite-difference delta of a GBM European option under common random numbers.
+/// Monte Carlo finite-difference gamma of a GBM European option under common random numbers.
+///
+/// The three stencil valuations share each path's random draws; the estimate
+/// is the mean of the per-path second differences and `stderr` is their
+/// paired (common-random-number) standard error.
 /// @param spot - Spot level at time 0.
 /// @param strike - Exercise price in the same units as `spot`.
 /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
@@ -421,59 +428,7 @@ pub fn finite_diff_delta(
 /// @param num_steps - Optional time-grid steps; omitted uses the registry default.
 /// @param bump_size - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
 /// @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-/// @returns The `Estimate` object for delta (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-///
-/// # Errors
-///
-/// Throws a `validation` error if an input is non-finite or out of range or
-/// the currency code is unknown.
-#[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = finiteDiffDeltaCrn)]
-pub fn finite_diff_delta_crn(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
-    num_paths: Option<JsValue>,
-    seed: Option<JsValue>,
-    num_steps: Option<JsValue>,
-    bump_size: Option<JsValue>,
-    currency: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let spec = fd_spec(
-        &spot,
-        &strike,
-        &rate,
-        &div_yield,
-        &vol,
-        &expiry,
-        &is_call,
-        num_paths.as_ref(),
-        seed.as_ref(),
-        num_steps.as_ref(),
-        bump_size.as_ref(),
-        currency.as_ref(),
-    )?;
-    to_js_value(&finite_diff_delta_crn_gbm(spec).map_err(to_js_err)?)
-}
-
-/// Monte Carlo finite-difference gamma of a GBM European option, with independent draws per bump.
-/// @param spot - Spot level at time 0.
-/// @param strike - Exercise price in the same units as `spot`.
-/// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-/// @param div_yield - Continuous dividend yield (decimal, annualized).
-/// @param vol - Annualized GBM volatility (decimal); positive.
-/// @param expiry - Time to expiry in years.
-/// @param is_call - `true` for a call payoff, `false` for a put.
-/// @param num_paths - Optional paths per evaluation; omitted uses the registry default.
-/// @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
-/// @param num_steps - Optional time-grid steps; omitted uses the registry default.
-/// @param bump_size - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
-/// @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-/// @returns The `Estimate` object for gamma (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
+/// @returns The `Estimate` object for gamma (`mean`, paired `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
 ///
 /// # Errors
 ///
@@ -510,58 +465,6 @@ pub fn finite_diff_gamma(
         currency.as_ref(),
     )?;
     to_js_value(&finite_diff_gamma_gbm(spec).map_err(to_js_err)?)
-}
-
-/// Monte Carlo finite-difference gamma of a GBM European option under common random numbers.
-/// @param spot - Spot level at time 0.
-/// @param strike - Exercise price in the same units as `spot`.
-/// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-/// @param div_yield - Continuous dividend yield (decimal, annualized).
-/// @param vol - Annualized GBM volatility (decimal); positive.
-/// @param expiry - Time to expiry in years.
-/// @param is_call - `true` for a call payoff, `false` for a put.
-/// @param num_paths - Optional paths per evaluation; omitted uses the registry default.
-/// @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the registry default.
-/// @param num_steps - Optional time-grid steps; omitted uses the registry default.
-/// @param bump_size - Optional relative spot shock (0.01 is 1% of spot); omitted uses the registry default.
-/// @param currency - Optional ISO-4217 code of the simulated payoffs; omitted uses the registry default.
-/// @returns The `Estimate` object for gamma (`mean`, `stderr`, `ci_lower`, `ci_upper`, `num_paths`).
-///
-/// # Errors
-///
-/// Throws a `validation` error if an input is non-finite or out of range or
-/// the currency code is unknown.
-#[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = finiteDiffGammaCrn)]
-pub fn finite_diff_gamma_crn(
-    spot: JsValue,
-    strike: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    is_call: JsValue,
-    num_paths: Option<JsValue>,
-    seed: Option<JsValue>,
-    num_steps: Option<JsValue>,
-    bump_size: Option<JsValue>,
-    currency: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let spec = fd_spec(
-        &spot,
-        &strike,
-        &rate,
-        &div_yield,
-        &vol,
-        &expiry,
-        &is_call,
-        num_paths.as_ref(),
-        seed.as_ref(),
-        num_steps.as_ref(),
-        bump_size.as_ref(),
-        currency.as_ref(),
-    )?;
-    to_js_value(&finite_diff_gamma_crn_gbm(spec).map_err(to_js_err)?)
 }
 
 /// Monte Carlo pricer for European options under geometric Brownian motion.

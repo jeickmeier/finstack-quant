@@ -626,9 +626,7 @@ def _monte_carlo_cases() -> dict[str, Callable[[], Any]]:
         ],
         "monte_carlo.finite_diff": lambda: [
             monte_carlo.finite_diff_delta(*GBM, True, **fd).mean,
-            monte_carlo.finite_diff_delta_crn(*GBM, True, **fd).mean,
             monte_carlo.finite_diff_gamma(*GBM, False, **fd).mean,
-            monte_carlo.finite_diff_gamma_crn(*GBM, False, **fd).mean,
         ],
         **{
             f"monte_carlo.simulate_paths.{name}": (

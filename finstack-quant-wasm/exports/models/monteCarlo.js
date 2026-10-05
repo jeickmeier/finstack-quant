@@ -9,8 +9,6 @@ export const monteCarlo = {
   hestonSatisfiesFeller: wasm.hestonSatisfiesFeller,
   simulatePaths: wasm.simulatePaths,
   finiteDiffDelta: wasm.finiteDiffDelta,
-  finiteDiffDeltaCrn: wasm.finiteDiffDeltaCrn,
   finiteDiffGamma: wasm.finiteDiffGamma,
-  finiteDiffGammaCrn: wasm.finiteDiffGammaCrn,
   relativeStderr: wasm.relativeStderr,
 };
