@@ -54,7 +54,8 @@ use crate::{
     rates::dtsm::YieldPca, rates::dtsm::YieldPcaView,
     rates::hull_white::HullWhiteCalibrationParams, rates::hull_white::HullWhiteParams,
     volatility::arbitrage::ArbitrageCheckConfig, volatility::arbitrage::ArbitrageReport,
-    volatility::heston::HestonParams, volatility::rough_heston::RoughHestonFourierParams,
+    volatility::heston::HestonParams, volatility::local_vol::LocalVolSurface,
+    volatility::rough_heston::RoughHestonFourierParams,
     volatility::sabr::ArbitrageValidationResult, volatility::svi::SviParams,
     volatility::VolatilityConvention, BsGreeks, ExerciseStyle, ForwardGreeks, HestonPricingParams,
     OptionType, SabrParameters,
@@ -369,6 +370,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "lmm_params",
         Input,
         "Parameters for the LMM/BGM model."
+    ),
+    finstack_quant_core::schema_artifact!(
+        LocalVolSurface,
+        "models",
+        "local_vol_surface",
+        Component,
+        "Dupire local volatility on an expiry-by-strike grid."
     ),
     finstack_quant_core::schema_artifact!(
         LrmGreeks,

@@ -69,6 +69,7 @@ pub mod arbitrage;
 pub mod black;
 mod conventions;
 mod convert;
+mod dupire;
 mod fx;
 pub mod heston;
 mod implied;

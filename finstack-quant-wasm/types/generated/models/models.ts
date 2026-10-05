@@ -4022,6 +4022,25 @@ export interface LmmParams {
   vol_values: [number, number, number][][];
 }
 /**
+ * Dupire local volatility on an expiry-by-strike grid.
+ */
+export interface LocalVolSurface {
+  /**
+   * Expiry axis in years, strictly increasing and non-negative.
+   */
+  expiries: number[];
+  /**
+   * Local volatilities as annualized decimals, finite and non-negative,
+   * row-major: `local_vols[expiry_index * strikes.len() + strike_index]`.
+   */
+  local_vols: number[];
+  /**
+   * Strike axis in price units of the underlying, strictly increasing and
+   * positive.
+   */
+  strikes: number[];
+}
+/**
  * Monte Carlo price with likelihood-ratio delta and vega from the same paths.
  */
 export interface LrmGreeks {

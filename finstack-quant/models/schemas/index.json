@@ -433,6 +433,15 @@
       "type_name": "LmmParams"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/local_vol_surface.schema.json",
+      "bytes": 1128,
+      "kind": "component",
+      "path": "schemas/models/1/local_vol_surface.schema.json",
+      "summary": "Dupire local volatility on an expiry-by-strike grid.",
+      "title": "LocalVolSurface",
+      "type_name": "LocalVolSurface"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/lrm_greeks.schema.json",
       "bytes": 28509,
       "kind": "output",

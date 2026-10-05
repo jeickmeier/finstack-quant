@@ -1,0 +1,39 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/local_vol_surface.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Dupire local volatility on an expiry-by-strike grid.",
+  "properties": {
+    "expiries": {
+      "description": "Expiry axis in years, strictly increasing and non-negative.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "local_vols": {
+      "description": "Local volatilities as annualized decimals, finite and non-negative,\nrow-major: `local_vols[expiry_index * strikes.len() + strike_index]`.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    },
+    "strikes": {
+      "description": "Strike axis in price units of the underlying, strictly increasing and\npositive.",
+      "items": {
+        "format": "double",
+        "type": "number"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "expiries",
+    "strikes",
+    "local_vols"
+  ],
+  "title": "LocalVolSurface",
+  "type": "object"
+}

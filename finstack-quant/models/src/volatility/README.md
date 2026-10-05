@@ -195,7 +195,7 @@ forward-based call prices; carry is already in the smile's forward.
 |-------|------|
 | Heston parameters, characteristic function, and calibration | `models::volatility::heston` |
 | Heston Fourier *pricing* | [`models::closed_form::heston`](../closed_form/heston/) |
-| Dupire local volatility (`LocalVolSurface`) | `models::volatility::local_vol` |
+| Dupire local volatility (`LocalVolSurface::from_implied_vol(surface, forwards)`, one forward per expiry) | `models::volatility::local_vol` |
 | SVI surface | `models::volatility::svi` |
 | Rough Heston | `models::volatility::rough_heston` |
 | SABR parameters, smile, and calibration | `models::volatility::sabr` |
