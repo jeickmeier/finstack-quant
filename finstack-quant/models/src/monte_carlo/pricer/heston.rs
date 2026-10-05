@@ -8,7 +8,7 @@
 //!
 //! Paths are generated with the Quadratic-Exponential (QE) discretization of
 //! Andersen (2008), which stays stable when the Feller condition
-//! (`2κθ ≥ σ_v²`, see [`crate::monte_carlo::process::heston::feller_condition`]) is
+//! (`2κθ ≥ σ_v²`, see [`crate::monte_carlo::process::heston::heston_satisfies_feller`]) is
 //! violated — the common case for equity calibrations.
 //!
 //! # Determinism

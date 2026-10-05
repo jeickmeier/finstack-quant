@@ -1422,7 +1422,7 @@ impl PyFactorCovarianceForecast {
                 let forecast = finstack_quant_models::factor::credit::FactorCovarianceForecast::new(
                     &self.model,
                 );
-                forecast.factor_model_config_at(h, measure)
+                forecast.factor_model_at(h, measure)
             })
             .map_err(core_to_py)?;
         Ok(PyFactorModelConfig::from_inner(config))

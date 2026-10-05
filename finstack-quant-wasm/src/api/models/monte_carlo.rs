@@ -260,7 +260,7 @@ pub fn heston_satisfies_feller(
     vol_of_vol: JsValue,
 ) -> Result<bool, JsValue> {
     Ok(
-        finstack_quant_models::monte_carlo::process::heston::feller_condition(
+        finstack_quant_models::monte_carlo::process::heston::heston_satisfies_feller(
             js_f64(&kappa, "kappa")?,
             js_f64(&theta, "theta")?,
             js_f64(&vol_of_vol, "volOfVol")?,

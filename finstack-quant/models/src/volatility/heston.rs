@@ -67,7 +67,7 @@ const HESTON_EXPONENT_REAL_LIMIT: f64 = 700.0;
 /// use finstack_quant_models::volatility::heston::HestonParams;
 ///
 /// let params = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).unwrap();
-/// assert!(params.satisfies_feller_condition());
+/// assert!(params.satisfies_feller());
 ///
 /// let call = finstack_quant_models::closed_form::heston::heston_call_price_fourier(100.0, 100.0, 1.0, &finstack_quant_models::closed_form::heston::HestonPricingParams { r: 0.05, q: 0.0, model: params }, None).expect("checked Heston price");
 /// assert!(call > 0.0 && call < 100.0);
@@ -193,7 +193,7 @@ impl HestonParams {
             rho,
         };
 
-        if !params.satisfies_feller_condition() {
+        if !params.satisfies_feller() {
             tracing::warn!(
                 v0 = v0,
                 kappa = kappa,
@@ -217,7 +217,7 @@ impl HestonParams {
     /// condition is violated, variance can reach zero, which causes numerical
     /// issues in Monte Carlo simulation (though Fourier pricing remains valid).
     #[must_use]
-    pub fn satisfies_feller_condition(&self) -> bool {
+    pub fn satisfies_feller(&self) -> bool {
         2.0 * self.kappa * self.theta >= self.sigma_v * self.sigma_v
     }
 
@@ -255,13 +255,13 @@ impl HestonParams {
     ///
     /// Returns an error if `2κθ ≤ σ²`.
     pub fn require_feller(self) -> finstack_quant_core::Result<Self> {
-        if self.satisfies_feller_condition() {
+        if self.satisfies_feller() {
             Ok(self)
         } else {
             Err(finstack_quant_core::Error::Validation(format!(
                 "Heston Feller condition violated: 2*kappa*theta ({:.6}) <= sigma_v^2 ({:.6}). \
                  Variance process can reach zero, causing numerical issues in Monte Carlo. \
-                 Use satisfies_feller_condition() to check, or omit require_feller() for \
+                 Use satisfies_feller() to check, or omit require_feller() for \
                  Fourier-only pricing.",
                 2.0 * self.kappa * self.theta,
                 self.sigma_v * self.sigma_v,
@@ -474,11 +474,11 @@ mod tests {
     fn feller_condition() {
         // Satisfies: 2*2*0.04 = 0.16 > 0.09 = 0.3²
         let p = HestonParams::new(0.04, 2.0, 0.04, 0.3, -0.5).expect("valid");
-        assert!(p.satisfies_feller_condition());
+        assert!(p.satisfies_feller());
 
         // Violates: 2*0.5*0.04 = 0.04 < 0.25 = 0.5²
         let p2 = HestonParams::new(0.04, 0.5, 0.04, 0.5, -0.5).expect("valid");
-        assert!(!p2.satisfies_feller_condition());
+        assert!(!p2.satisfies_feller());
     }
 
     #[test]

@@ -77,7 +77,7 @@ fn simulate_paths(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPathSum
 /// Test the inclusive Feller condition ``2 * kappa * theta >= vol_of_vol**2``.
 ///
 /// This is the Monte Carlo engine's own predicate
-/// (`finstack_quant_models::monte_carlo::process::heston::feller_condition`), so the
+/// (`finstack_quant_models::monte_carlo::process::heston::heston_satisfies_feller`), so the
 /// answer at the boundary matches :func:`price_heston_call` /
 /// :func:`price_heston_put`. Inputs are not validated: non-finite values
 /// typically yield ``False``.
@@ -101,7 +101,9 @@ fn simulate_paths(py: Python<'_>, spec: &Bound<'_, PyAny>) -> PyResult<PyPathSum
 /// - Heston (1993): see docs/REFERENCES.md#heston-1993
 #[pyfunction]
 fn heston_satisfies_feller(kappa: f64, theta: f64, vol_of_vol: f64) -> bool {
-    finstack_quant_models::monte_carlo::process::heston::feller_condition(kappa, theta, vol_of_vol)
+    finstack_quant_models::monte_carlo::process::heston::heston_satisfies_feller(
+        kappa, theta, vol_of_vol,
+    )
 }
 
 /// Resolve an optional currency argument, defaulting to the registry default.

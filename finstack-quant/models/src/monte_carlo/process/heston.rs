@@ -124,8 +124,9 @@ use crate::closed_form::heston::HestonPricingParams;
 
 /// Check the Feller condition `2κθ ≥ σ_v²` from raw variance-process parameters.
 ///
-/// This is the canonical predicate used by [`HestonPricingParams::satisfies_feller`]
-/// and by the host-language bindings, so all surfaces agree on the boundary
+/// This is the predicate behind
+/// [`HestonParams::satisfies_feller`](crate::volatility::heston::HestonParams::satisfies_feller)
+/// and the host-language bindings, so all surfaces agree on the boundary
 /// case: it is **inclusive** — non-attainment of zero holds iff `2κθ ≥ σ_v²`
 /// (Feller 1951), matching `CirParams::satisfies_feller`.
 ///
@@ -141,13 +142,13 @@ use crate::closed_form::heston::HestonPricingParams;
 /// # Examples
 ///
 /// ```
-/// use finstack_quant_models::monte_carlo::process::heston::feller_condition;
+/// use finstack_quant_models::monte_carlo::process::heston::heston_satisfies_feller;
 ///
-/// assert!(feller_condition(2.0, 0.04, 0.3)); // 0.16 >= 0.09
-/// assert!(!feller_condition(0.5, 0.04, 0.5)); // 0.04 < 0.25
+/// assert!(heston_satisfies_feller(2.0, 0.04, 0.3)); // 0.16 >= 0.09
+/// assert!(!heston_satisfies_feller(0.5, 0.04, 0.5)); // 0.04 < 0.25
 /// ```
 #[must_use]
-pub fn feller_condition(kappa: f64, theta: f64, sigma_v: f64) -> bool {
+pub fn heston_satisfies_feller(kappa: f64, theta: f64, sigma_v: f64) -> bool {
     2.0 * kappa * theta >= sigma_v * sigma_v
 }
 
@@ -337,9 +338,9 @@ mod tests {
     fn feller_condition_is_inclusive_at_the_boundary() {
         // 2κθ = 2 * 1.0 * 0.045 = 0.09 = σ_v² = 0.3² exactly: the boundary
         // case satisfies the condition (non-attainment holds iff 2κθ ≥ σ_v²).
-        assert!(feller_condition(1.0, 0.045, 0.3));
+        assert!(heston_satisfies_feller(1.0, 0.045, 0.3));
         // Just below the boundary it must fail.
-        assert!(!feller_condition(1.0, 0.045 - 1e-12, 0.3));
+        assert!(!heston_satisfies_feller(1.0, 0.045 - 1e-12, 0.3));
         // The params method delegates to the same predicate.
         let boundary =
             HestonPricingParams::new(0.05, 0.02, 1.0, 0.045, 0.3, -0.5, 0.04).expect("valid");

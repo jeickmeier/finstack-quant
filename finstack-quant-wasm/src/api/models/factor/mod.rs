@@ -497,9 +497,7 @@ impl JsFactorCovarianceForecast {
                 .unwrap_or_default();
         let forecast =
             finstack_quant_models::factor::credit::FactorCovarianceForecast::new(&self.model);
-        let config = forecast
-            .factor_model_config_at(h, measure)
-            .map_err(to_js_err)?;
+        let config = forecast.factor_model_at(h, measure).map_err(to_js_err)?;
         crate::utils::to_js_value(&config)
     }
 }

@@ -991,7 +991,7 @@ fn lvar_bangia(
     confidence: f64,
     position_value: f64,
 ) -> PyResult<PyLvarBangiaScalar> {
-    liquidity::lvar_bangia_scalar(var, spread_mean, spread_vol, confidence, position_value)
+    liquidity::lvar_bangia(var, spread_mean, spread_vol, confidence, position_value)
         .map(PyLvarBangiaScalar::from_inner)
         .map_err(core_to_py)
 }
@@ -1060,7 +1060,7 @@ fn almgren_chriss_impact(
     temporary_impact_coef: f64,
     reference_price: Option<f64>,
 ) -> PyResult<PyImpactEstimate> {
-    liquidity::almgren_chriss_uniform_impact(
+    liquidity::almgren_chriss_impact(
         position_size,
         avg_daily_volume,
         volatility,

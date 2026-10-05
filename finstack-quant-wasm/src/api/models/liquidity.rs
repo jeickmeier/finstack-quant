@@ -117,9 +117,8 @@ pub fn lvar_bangia(
     let spread_vol = js_f64(&spread_vol, "spreadVol")?;
     let confidence = js_f64(&confidence, "confidence")?;
     let position_value = js_f64(&position_value, "positionValue")?;
-    let result =
-        liquidity::lvar_bangia_scalar(var, spread_mean, spread_vol, confidence, position_value)
-            .map_err(to_js_err)?;
+    let result = liquidity::lvar_bangia(var, spread_mean, spread_vol, confidence, position_value)
+        .map_err(to_js_err)?;
     to_js_value(&result)
 }
 
@@ -155,7 +154,7 @@ pub fn almgren_chriss_impact(
     let permanent_impact_coef = js_f64(&permanent_impact_coef, "permanentImpactCoef")?;
     let temporary_impact_coef = js_f64(&temporary_impact_coef, "temporaryImpactCoef")?;
     let reference_price = js_opt_f64(reference_price.as_ref(), "referencePrice")?;
-    let estimate = liquidity::almgren_chriss_uniform_impact(
+    let estimate = liquidity::almgren_chriss_impact(
         position_size,
         avg_daily_volume,
         volatility,

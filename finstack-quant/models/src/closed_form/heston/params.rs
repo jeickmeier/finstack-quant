@@ -77,12 +77,6 @@ impl HestonPricingParams {
             model: HestonParams::new(v0, kappa, theta, sigma_v, rho)?,
         })
     }
-
-    /// Return whether the variance process satisfies the inclusive Feller condition.
-    #[must_use]
-    pub fn satisfies_feller(&self) -> bool {
-        self.model.satisfies_feller_condition()
-    }
 }
 
 /// Configuration for Heston Fourier integration.
