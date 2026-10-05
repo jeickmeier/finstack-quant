@@ -12136,6 +12136,16 @@ export interface PathDependentPricer extends WasmOwned {
    * Price an arithmetic-average Asian option under GBM with likelihood-ratio delta and vega estimated from the same paths.
    *
    * Every path is kept in memory, so `numPaths x (numSteps + 1)` may not exceed 4,000,000 and the default step count is 32, not the 252 steps of `priceAsianCall`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const pricer = new models.monteCarlo.PathDependentPricer(20000, 7);
+   * const greeks = pricer.priceWithLrmGreeks(100, 100, 0.04, 0.01, 0.25, 1.0, true, 12);
+   * console.log(greeks.price.mean.amount, greeks.price.mean.currency);
+   * console.log(greeks.delta.mean > 0 && greeks.delta.mean < 1); // true
+   * console.log(greeks.vega.stderr > 0); // true
+   * ```
    * @param spot - Finite, strictly positive spot level at time 0.
    * @param strike - Exercise price in the same units as `spot`.
    * @param rate - Continuously compounded risk-free rate (decimal, annualized).
@@ -12147,16 +12157,6 @@ export interface PathDependentPricer extends WasmOwned {
    * @param currency - Optional ISO-4217 code stamped on the price estimate; omitted uses the registry default.
    * @returns The `LrmGreeks` object: `price` (a `MoneyEstimate`), `delta` per unit of spot and `vega` per volatility point (`0.01`), each an `Estimate` with `mean`, `stderr` and `ci_95`.
    * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `spot`, `vol` or `expiry` is not finite and strictly positive, `numSteps` is zero, the currency code is unknown, the pricer uses Sobol or antithetic sampling, `numPaths` exceeds 100,000, or `numPaths x (numSteps + 1)` exceeds 4,000,000.
-   * @example
-   * ```typescript
-   * import init, { models } from "finstack-quant-wasm";
-   * await init();
-   * const pricer = new models.monteCarlo.PathDependentPricer(20000, 7);
-   * const greeks = pricer.priceWithLrmGreeks(100, 100, 0.04, 0.01, 0.25, 1.0, true, 12);
-   * console.log(greeks.price.mean.amount, greeks.price.mean.currency);
-   * console.log(greeks.delta.mean > 0 && greeks.delta.mean < 1); // true
-   * console.log(greeks.vega.stderr > 0); // true
-   * ```
    */
   priceWithLrmGreeks(
     spot: number,
@@ -27712,8 +27712,10 @@ export interface ToggleExerciseModel extends WasmOwned {
   /**
    * Whether the rule elects PIK for a credit state given one uniform draw.
    *
-   * Threshold rules ignore `u`; stochastic rules use it as the Bernoulli
-   * draw; optimal-exercise rules need nested simulation and return `false`.
+   * Threshold rules ignore `u`; stochastic rules elect PIK when `u` is
+   * below the logistic probability; optimal-exercise rules run their nested
+   * simulation with a seed derived from `u`, so equal draws give equal
+   * decisions.
    * @param state - `CreditState` JSON or plain object (`hazard_rate`, `distance_to_default`, `leverage`, `accreted_notional`, `coupon_due`, `asset_value`).
    * @param u - Uniform draw in `[0, 1)`.
    * @returns `true` when the rule elects to pay in kind.
@@ -28375,9 +28377,6 @@ export interface ModelCreditNamespace {
    *
    * Twin of the Rust `CollateralPiece::liquidation_value` and the Python
    * property `CollateralPiece.liquidation_value`.
-   * @param piece - `CollateralPiece` object or JSON (`collateral_type`, `book_value`, `haircut`), as held by `WorkoutLgd.collateral`.
-   * @returns `book_value * (1 - haircut)`, in the book value's monetary units.
-   * @throws Error - Throws a `TypeError` if `piece` is neither a string nor a plain object, and a `validation` error if it is malformed, the book value is negative or non-finite, or the haircut is outside `[0, 1]`.
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
@@ -28385,6 +28384,9 @@ export interface ModelCreditNamespace {
    * const piece = { collateral_type: "real_estate" as const, book_value: 800_000, haircut: 0.25 };
    * console.log(models.credit.collateralPieceLiquidationValue(piece)); // 600000
    * ```
+   * @param piece - `CollateralPiece` object or JSON (`collateral_type`, `book_value`, `haircut`), as held by `WorkoutLgd.collateral`.
+   * @returns `book_value * (1 - haircut)`, in the book value's monetary units.
+   * @throws Error - Throws a `TypeError` if `piece` is neither a string nor a plain object, and a `validation` error if it is malformed, the book value is negative or non-finite, or the haircut is outside `[0, 1]`.
    */
   collateralPieceLiquidationValue(piece: generated.models.CollateralPiece | string): number;
 
@@ -28443,9 +28445,6 @@ export interface ModelCreditNamespace {
    *
    * Twin of the Rust `RecoveryClaim::total_claim` and the Python property
    * `RecoveryClaim.total_claim`.
-   * @param claim - `RecoveryClaim` object or JSON, as passed to `allocateRecovery`.
-   * @returns `principal + accrued + penalties`, in the claim's monetary units.
-   * @throws Error - Throws a `TypeError` if `claim` is neither a string nor a plain object, and a `validation` error if it is malformed.
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
@@ -28462,6 +28461,9 @@ export interface ModelCreditNamespace {
    * };
    * console.log(models.credit.recoveryClaimTotalClaim(claim)); // 106
    * ```
+   * @param claim - `RecoveryClaim` object or JSON, as passed to `allocateRecovery`.
+   * @returns `principal + accrued + penalties`, in the claim's monetary units.
+   * @throws Error - Throws a `TypeError` if `claim` is neither a string nor a plain object, and a `validation` error if it is malformed.
    */
   recoveryClaimTotalClaim(claim: generated.models.RecoveryClaim | string): number;
   /**
@@ -29612,10 +29614,6 @@ export interface VolatilityNamespace {
    * Extract Dupire local volatility from an implied volatility surface.
    *
    * Twin of the Rust and Python `LocalVolSurface.from_implied_vol`. The local variance at each node of the implied grid is `(dw/dT) / g` in total variance `w = sigma^2 T` and log-moneyness `k = ln(K / F_T)` (Gatheral 2006, eq. 1.10), with the time derivative taken at fixed `k`.
-   * @param surface - `VolSurface` object or JSON in the canonical wire form: unshifted Black implied volatilities (decimals) on expiries in years and positive cash strikes, at least two expiries and three strikes.
-   * @param forwards - Forward price of the underlying for each surface expiry, in strike units and in the order of `surface.expiries`; finite and positive. For a flat carry, `F(T) = S * exp((r - q) * T)`.
-   * @returns The `LocalVolSurface` object: `expiries` in years, `strikes`, and `local_vols` as annualized decimals in row-major order (`local_vols[i * strikes.length + j]` for expiry `i`, strike `j`).
-   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `surface` is malformed, has fewer than two expiries or three strikes, is not an unshifted Black strike surface, `forwards` has the wrong length or a non-positive entry, or the surface has butterfly or calendar arbitrage at a node (the message names the node).
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
@@ -29633,6 +29631,10 @@ export interface VolatilityNamespace {
    * console.log(local.expiries, local.strikes); // [0.5, 1] [90, 100, 110]
    * console.log(local.local_vols.every((v) => Math.abs(v - 0.2) < 1e-12)); // true
    * ```
+   * @param surface - `VolSurface` object or JSON in the canonical wire form: unshifted Black implied volatilities (decimals) on expiries in years and positive cash strikes, at least two expiries and three strikes.
+   * @param forwards - Forward price of the underlying for each surface expiry, in strike units and in the order of `surface.expiries`; finite and positive. For a flat carry, `F(T) = S * exp((r - q) * T)`.
+   * @returns The `LocalVolSurface` object: `expiries` in years, `strikes`, and `local_vols` as annualized decimals in row-major order (`local_vols[i * strikes.length + j]` for expiry `i`, strike `j`).
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `surface` is malformed, has fewer than two expiries or three strikes, is not an unshifted Black strike surface, `forwards` has the wrong length or a non-positive entry, or the surface has butterfly or calendar arbitrage at a node (the message names the node).
    */
   localVolFromImpliedVol(
     surface: generated.core.VolSurface | string,
@@ -29642,11 +29644,6 @@ export interface VolatilityNamespace {
    * Extract Dupire local volatility after Gaussian smoothing of the implied volatilities along the strike axis.
    *
    * Twin of the Rust and Python `LocalVolSurface.from_implied_vol_smoothed`. Smoothing regularises the second strike derivative, the usual source of a non-positive Dupire density on market-calibrated grids.
-   * @param surface - `VolSurface` object or JSON, as for `localVolFromImpliedVol`.
-   * @param forwards - One forward per surface expiry, as for `localVolFromImpliedVol`.
-   * @param sigmaStrikes - Standard deviation of the Gaussian kernel in strike (price) units, non-negative; zero disables smoothing.
-   * @returns The `LocalVolSurface` object on the grid of `surface`.
-   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `sigmaStrikes` is negative or non-finite, or for any error of `localVolFromImpliedVol` on the smoothed surface.
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
@@ -29663,6 +29660,11 @@ export interface VolatilityNamespace {
    * const local = models.volatility.localVolFromImpliedVolSmoothed(implied, [100, 100], 5.0);
    * console.log(local.local_vols.length); // 6
    * ```
+   * @param surface - `VolSurface` object or JSON, as for `localVolFromImpliedVol`.
+   * @param forwards - One forward per surface expiry, as for `localVolFromImpliedVol`.
+   * @param sigmaStrikes - Standard deviation of the Gaussian kernel in strike (price) units, non-negative; zero disables smoothing.
+   * @returns The `LocalVolSurface` object on the grid of `surface`.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `sigmaStrikes` is negative or non-finite, or for any error of `localVolFromImpliedVol` on the smoothed surface.
    */
   localVolFromImpliedVolSmoothed(
     surface: generated.core.VolSurface | string,
@@ -29673,11 +29675,6 @@ export interface VolatilityNamespace {
    * Evaluate a local volatility surface: bilinear inside its grid, flat outside it.
    *
    * Twin of the Rust and Python `LocalVolSurface.value`.
-   * @param localVol - `LocalVolSurface` object or JSON (`expiries`, `strikes`, `local_vols`), validated on decode.
-   * @param expiry - Time in years from the valuation date.
-   * @param strike - Level of the underlying in price units.
-   * @returns The local volatility as an annualized decimal.
-   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `localVol` is malformed: an empty or unsorted axis, a non-positive strike, a negative volatility or a value count that does not match the grid.
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
@@ -29686,6 +29683,11 @@ export interface VolatilityNamespace {
    * console.log(models.volatility.localVolValue(local, 1.5, 150)); // 0.25
    * console.log(models.volatility.localVolValue(local, 9, 50)); // 0.3
    * ```
+   * @param localVol - `LocalVolSurface` object or JSON (`expiries`, `strikes`, `local_vols`), validated on decode.
+   * @param expiry - Time in years from the valuation date.
+   * @param strike - Level of the underlying in price units.
+   * @returns The local volatility as an annualized decimal.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `localVol` is malformed: an empty or unsorted axis, a non-positive strike, a negative volatility or a value count that does not match the grid.
    */
   localVolValue(
     localVol: generated.models.LocalVolSurface | string,
@@ -30160,9 +30162,6 @@ export interface LiquidityNamespace {
    *
    * Twin of the Rust `LiquidityProfile::spread` and the Python property
    * `LiquidityProfile.spread`.
-   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
-   * @returns `ask - bid`, in price units.
-   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
@@ -30180,6 +30179,9 @@ export interface LiquidityNamespace {
    * };
    * console.log(models.liquidity.liquidityProfileSpread(profile)); // 1
    * ```
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @returns `ask - bid`, in price units.
+   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
    */
   liquidityProfileSpread(profile: generated.models.LiquidityProfile | string): number;
   /**
@@ -30187,9 +30189,6 @@ export interface LiquidityNamespace {
    *
    * Twin of the Rust `LiquidityProfile::relative_spread` and the Python
    * property `LiquidityProfile.relative_spread`.
-   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
-   * @returns `(ask - bid) / mid`, as a decimal fraction of the mid price.
-   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
@@ -30207,6 +30206,9 @@ export interface LiquidityNamespace {
    * };
    * console.log(models.liquidity.liquidityProfileRelativeSpread(profile)); // 0.01
    * ```
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @returns `(ask - bid) / mid`, as a decimal fraction of the mid price.
+   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
    */
   liquidityProfileRelativeSpread(profile: generated.models.LiquidityProfile | string): number;
   /**
@@ -30215,9 +30217,6 @@ export interface LiquidityNamespace {
    *
    * Twin of the Rust `LiquidityProfile::half_spread` and the Python property
    * `LiquidityProfile.half_spread`.
-   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
-   * @returns `0.5 * (ask - bid)`, in price units.
-   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
@@ -30235,6 +30234,9 @@ export interface LiquidityNamespace {
    * };
    * console.log(models.liquidity.liquidityProfileHalfSpread(profile)); // 0.5
    * ```
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @returns `0.5 * (ask - bid)`, in price units.
+   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
    */
   liquidityProfileHalfSpread(profile: generated.models.LiquidityProfile | string): number;
   /**
@@ -30245,9 +30247,6 @@ export interface LiquidityNamespace {
    * `"absolute"` one divides it by `mid`. Twin of the Rust
    * `LiquidityProfile::relative_spread_volatility` and the Python property
    * `LiquidityProfile.relative_spread_volatility`.
-   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
-   * @returns The spread standard deviation as a decimal fraction of the mid price.
-   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
@@ -30265,6 +30264,9 @@ export interface LiquidityNamespace {
    * };
    * console.log(models.liquidity.liquidityProfileRelativeSpreadVolatility(profile)); // 0.0005
    * ```
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @returns The spread standard deviation as a decimal fraction of the mid price.
+   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
    */
   liquidityProfileRelativeSpreadVolatility(
     profile: generated.models.LiquidityProfile | string
@@ -30275,9 +30277,6 @@ export interface LiquidityNamespace {
    *
    * Twin of the Rust `TradeParams::effective_reference_price` and the Python
    * property `TradeParams.effective_reference_price`.
-   * @param params - `TradeParams` object or JSON (`quantity`, `horizon_days`, `daily_volatility`, `risk_aversion`, `reference_price`, `profile`).
-   * @returns The reference price in price units.
-   * @throws Error - Throws a `TypeError` if `params` is neither a string nor a plain object, and a `validation` error if it is malformed.
    * @example
    * ```typescript
    * import init, { models } from "finstack-quant-wasm";
@@ -30299,6 +30298,9 @@ export interface LiquidityNamespace {
    *   models.liquidity.tradeParamsEffectiveReferencePrice({ ...params, reference_price: 101 })
    * ); // 101
    * ```
+   * @param params - `TradeParams` object or JSON (`quantity`, `horizon_days`, `daily_volatility`, `risk_aversion`, `reference_price`, `profile`).
+   * @returns The reference price in price units.
+   * @throws Error - Throws a `TypeError` if `params` is neither a string nor a plain object, and a `validation` error if it is malformed.
    */
   tradeParamsEffectiveReferencePrice(params: generated.models.TradeParams | string): number;
   /**
