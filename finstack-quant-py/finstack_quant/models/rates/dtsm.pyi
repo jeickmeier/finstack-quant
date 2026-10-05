@@ -465,9 +465,7 @@ class FactorTimeSeries:
         Examples
         --------
         >>> from finstack_quant.models.rates.dtsm import DieboldLi, YieldPanel
-        >>> panel = YieldPanel(
-        ...     [1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]]
-        ... )
+        >>> panel = YieldPanel([1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]])
         >>> fts = DieboldLi().extract_factors(panel).factors
         >>> fts.to_dataframe().columns.tolist()
         ['level', 'slope', 'curvature']
@@ -490,9 +488,7 @@ class FactorTimeSeries:
         Examples
         --------
         >>> from finstack_quant.models.rates.dtsm import DieboldLi, FactorTimeSeries, YieldPanel
-        >>> panel = YieldPanel(
-        ...     [1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]]
-        ... )
+        >>> panel = YieldPanel([1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]])
         >>> fts = DieboldLi().extract_factors(panel).factors
         >>> FactorTimeSeries.from_json(fts.to_json()).num_dates
         2
@@ -522,9 +518,7 @@ class FactorTimeSeries:
         Examples
         --------
         >>> from finstack_quant.models.rates.dtsm import DieboldLi, FactorTimeSeries, YieldPanel
-        >>> panel = YieldPanel(
-        ...     [1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]]
-        ... )
+        >>> panel = YieldPanel([1.0, 2.0, 5.0, 10.0], [[0.02, 0.025, 0.03, 0.035], [0.021, 0.026, 0.031, 0.036]])
         >>> fts = DieboldLi().extract_factors(panel).factors
         >>> FactorTimeSeries.from_json(fts.to_json()).r_squared_avg == fts.r_squared_avg
         True

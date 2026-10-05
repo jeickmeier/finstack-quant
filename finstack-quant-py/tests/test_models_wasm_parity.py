@@ -715,9 +715,7 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
             json.loads(local_vol().to_json()),
             local_vol().value(0.75, 95.0),
             local_vol().value(5.0, 60.0),
-            json.loads(
-                volatility.LocalVolSurface.from_implied_vol_smoothed(implied(), LV_FORWARDS, 10.0).to_json()
-            ),
+            json.loads(volatility.LocalVolSurface.from_implied_vol_smoothed(implied(), LV_FORWARDS, 10.0).to_json()),
         ],
         "volatility.svi": lambda: [
             svi().total_variance(0.1),

@@ -228,10 +228,7 @@ test('toggle rules decide PIK from a credit state (F138: the state has a consume
   const optimal = credit.ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1);
   assert.equal(optimal.kind, 'optimal_exercise');
   // Optimal exercise runs a nested simulation seeded from `u`: deterministic per draw.
-  assert.equal(
-    optimal.shouldPik(state(0.8), 0.5),
-    optimal.shouldPik(state(0.8), 0.5)
-  );
+  assert.equal(optimal.shouldPik(state(0.8), 0.5), optimal.shouldPik(state(0.8), 0.5));
   assert.equal(typeof optimal.shouldPik(state(0.8), 0.5), 'boolean');
   assert.equal(
     credit.ToggleExerciseModel.fromJson(threshold.toJson()).toJson(),

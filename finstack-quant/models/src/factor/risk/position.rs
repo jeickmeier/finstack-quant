@@ -1484,7 +1484,10 @@ mod tests {
         let (ids, _, _, pnls, n_scenarios) = entry_point_inputs();
         let default = build_stress_attribution(&ids, &pnls, n_scenarios, None)?;
         let explicit = build_stress_attribution(&ids, &pnls, n_scenarios, Some(0.95))?;
-        assert_eq!(default.var_threshold.to_bits(), explicit.var_threshold.to_bits());
+        assert_eq!(
+            default.var_threshold.to_bits(),
+            explicit.var_threshold.to_bits()
+        );
         assert_eq!(default.n_tail_scenarios, explicit.n_tail_scenarios);
         assert_eq!(default.n_tail_scenarios, 10);
         Ok(())
