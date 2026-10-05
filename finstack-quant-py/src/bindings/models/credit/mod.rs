@@ -691,8 +691,8 @@ impl PyMertonModel {
     ///
     /// Raises ``ValueError`` when the firm is economically in default or the
     /// inversion is numerically ill-conditioned.
-    fn try_implied_equity(&self, horizon: f64) -> PyResult<(f64, f64)> {
-        self.inner.try_implied_equity(horizon).map_err(core_to_py)
+    fn implied_equity(&self, horizon: f64) -> PyResult<(f64, f64)> {
+        self.inner.implied_equity(horizon).map_err(core_to_py)
     }
 
     /// Bootstrap a piecewise-constant hazard curve from structural default probabilities.
@@ -733,7 +733,7 @@ impl PyMertonModel {
     /// * `num_steps` - Number of time steps per path (must be >= 1)
     /// * `horizon` - Simulation horizon in years (must be > 0)
     /// * `seed` - Seed for reproducible draws; the Rust
-    ///   ``MertonModel::simulate_paths_seeded`` owns the generator (PCG64), so
+    ///   ``MertonModel::simulate_paths`` owns the generator (PCG64), so
     ///   equal seeds give equal paths in every host
     /// * `antithetic` - When ``True``, use antithetic variates for variance
     ///   reduction (required, as in Rust and WASM)
@@ -748,7 +748,7 @@ impl PyMertonModel {
     ) -> PyResult<PySimulatedPaths> {
         let paths = self
             .inner
-            .simulate_paths_seeded(num_paths, num_steps, horizon, seed, antithetic)
+            .simulate_paths(num_paths, num_steps, horizon, seed, antithetic)
             .map_err(core_to_py)?;
         Ok(PySimulatedPaths::from_inner(paths))
     }
@@ -1232,7 +1232,7 @@ wire_methods!(
 
 /// Snapshot of an obligor's credit state at a PIK toggle decision date.
 ///
-/// Feeds ``ToggleExerciseModel.should_pik_with_uniform``. Hazard rates are
+/// Feeds ``ToggleExerciseModel.should_pik``. Hazard rates are
 /// annualized decimals, leverage is a ratio, and the monetary fields share
 /// the instrument's currency.
 #[pyclass(
@@ -1432,8 +1432,8 @@ impl PyToggleExerciseModel {
     ///     simulation with a seed derived from ``u``, so equal draws give equal
     ///     decisions.
     #[pyo3(text_signature = "($self, state, u)")]
-    fn should_pik_with_uniform(&self, state: &PyCreditState, u: f64) -> bool {
-        self.inner.should_pik_with_uniform(&state.inner, u)
+    fn should_pik(&self, state: &PyCreditState, u: f64) -> bool {
+        self.inner.should_pik(&state.inner, u)
     }
 
     /// Nested-Monte-Carlo optimal exercise rule.

@@ -298,7 +298,7 @@ impl PyTransitionMatrix {
     #[pyo3(text_signature = "($self, from_, to)")]
     fn probability_by_index(&self, from_: usize, to: usize) -> PyResult<f64> {
         self.inner
-            .try_probability_by_index(from_, to)
+            .probability_by_index(from_, to)
             .map_err(migration_to_py)
     }
 
@@ -762,7 +762,7 @@ impl PyMigrationSimulator {
         seed: u64,
     ) -> PyResult<PyRatingPaths> {
         let paths = py
-            .detach(|| self.inner.simulate_seeded(initial_state, n_paths, seed))
+            .detach(|| self.inner.simulate(initial_state, n_paths, seed))
             .map_err(migration_to_py)?;
         Ok(PyRatingPaths { inner: paths })
     }
@@ -787,7 +787,7 @@ impl PyMigrationSimulator {
         n_paths_per_state: usize,
         seed: u64,
     ) -> PyResult<PyTransitionMatrix> {
-        let matrix = py.detach(|| self.inner.empirical_matrix_seeded(n_paths_per_state, seed));
+        let matrix = py.detach(|| self.inner.empirical_matrix(n_paths_per_state, seed));
         matrix
             .map(PyTransitionMatrix::from_inner)
             .map_err(migration_to_py)

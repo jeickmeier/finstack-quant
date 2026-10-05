@@ -129,7 +129,7 @@ fn toggle_exercise_optimal_rejects_an_unsafe_path_count() {
 #[wasm_bindgen_test]
 fn merton_from_equity_roundtrips() {
     let known = native_merton();
-    let (equity, equity_vol) = known.try_implied_equity(1.0).expect("equity");
+    let (equity, equity_vol) = known.implied_equity(1.0).expect("equity");
     let calibrated = JsMertonModel::from_equity(
         JsValue::from(equity),
         JsValue::from(equity_vol),
@@ -150,11 +150,11 @@ fn merton_from_equity_roundtrips() {
 }
 
 #[wasm_bindgen_test]
-fn merton_try_implied_equity_matches_native() {
+fn merton_implied_equity_matches_native() {
     let pair = wasm_merton()
-        .try_implied_equity(JsValue::from(1.0))
+        .implied_equity(JsValue::from(1.0))
         .expect("equity");
-    let (equity_native, vol_native) = native_merton().try_implied_equity(1.0).expect("native");
+    let (equity_native, vol_native) = native_merton().implied_equity(1.0).expect("native");
     assert!((pair[0] - equity_native).abs() < 1e-12);
     assert!((pair[1] - vol_native).abs() < 1e-12);
 }

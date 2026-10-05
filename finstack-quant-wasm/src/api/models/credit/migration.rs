@@ -242,7 +242,7 @@ impl JsTransitionMatrix {
     #[wasm_bindgen(js_name = probabilityByIndex)]
     pub fn probability_by_index(&self, from: JsValue, to: JsValue) -> Result<f64, JsValue> {
         self.inner
-            .try_probability_by_index(js_uint(&from, "from")?, js_uint(&to, "to")?)
+            .probability_by_index(js_uint(&from, "from")?, js_uint(&to, "to")?)
             .map_err(to_js_err)
     }
 
@@ -601,7 +601,7 @@ impl JsMigrationSimulator {
         seed: JsValue,
     ) -> Result<JsRatingPaths, JsValue> {
         self.inner
-            .simulate_seeded(
+            .simulate(
                 js_uint(&initial_state, "initialState")?,
                 js_uint(&n_paths, "nPaths")?,
                 js_u64(&seed, "seed")?,
@@ -625,7 +625,7 @@ impl JsMigrationSimulator {
         seed: JsValue,
     ) -> Result<JsTransitionMatrix, JsValue> {
         self.inner
-            .empirical_matrix_seeded(
+            .empirical_matrix(
                 js_uint(&n_paths_per_state, "nPathsPerState")?,
                 js_u64(&seed, "seed")?,
             )

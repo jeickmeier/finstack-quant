@@ -301,7 +301,7 @@ def _merton_cases() -> dict[str, Callable[[], Any]]:
             model().debt_spread(5.0),
             model().cds_par_spread(5.0, 0.4),
         ],
-        "merton.implied_equity": lambda: list(model().try_implied_equity(1.0)),
+        "merton.implied_equity": lambda: list(model().implied_equity(1.0)),
         "merton.kmv_default_point": lambda: MertonModel.kmv_default_point(40.0, 60.0),
         "merton.hazard_curve_sp": lambda: (
             model().to_hazard_curve("ACME", date(2025, 1, 15), [1.0, 3.0, 5.0], 0.4, "act_365f").sp(5.0)
@@ -350,10 +350,10 @@ def _merton_cases() -> dict[str, Callable[[], Any]]:
             EndogenousHazardSpec.power_law(0.10, 1.5, 2.5).hazard_after_pik_accrual(120.0, 80.0),
         ],
         "toggle.should_pik": lambda: [
-            ToggleExerciseModel.threshold("leverage", 0.7, "above").should_pik_with_uniform(_state(), 0.5),
-            ToggleExerciseModel.stochastic("leverage", -2.0, 4.0).should_pik_with_uniform(_state(), 0.5),
-            ToggleExerciseModel.stochastic("leverage", -2.0, 4.0).should_pik_with_uniform(_state(), 0.9),
-            ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1.0).should_pik_with_uniform(_state(), 0.5),
+            ToggleExerciseModel.threshold("leverage", 0.7, "above").should_pik(_state(), 0.5),
+            ToggleExerciseModel.stochastic("leverage", -2.0, 4.0).should_pik(_state(), 0.5),
+            ToggleExerciseModel.stochastic("leverage", -2.0, 4.0).should_pik(_state(), 0.9),
+            ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1.0).should_pik(_state(), 0.5),
         ],
         "rating_factors": lambda: [
             moodys_warf_factor("B2"),

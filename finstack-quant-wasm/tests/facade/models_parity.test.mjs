@@ -287,7 +287,7 @@ const CASES = {
     merton().debtSpread(5.0),
     merton().cdsParSpread(5.0, 0.4),
   ],
-  'merton.implied_equity': () => list(merton().tryImpliedEquity(1.0)),
+  'merton.implied_equity': () => list(merton().impliedEquity(1.0)),
   'merton.kmv_default_point': () => credit.MertonModel.kmvDefaultPoint(40.0, 60.0),
   'merton.hazard_curve_sp': () =>
     merton().toHazardCurve('ACME', '2025-01-15', [1.0, 3.0, 5.0], 0.4, 'act_365f').sp(5.0),
@@ -336,10 +336,10 @@ const CASES = {
     credit.EndogenousHazardSpec.powerLaw(0.1, 1.5, 2.5).hazardAfterPikAccrual(120.0, 80.0),
   ],
   'toggle.should_pik': () => [
-    credit.ToggleExerciseModel.threshold('leverage', 0.7, 'above').shouldPikWithUniform(STATE, 0.5),
-    credit.ToggleExerciseModel.stochastic('leverage', -2.0, 4.0).shouldPikWithUniform(STATE, 0.5),
-    credit.ToggleExerciseModel.stochastic('leverage', -2.0, 4.0).shouldPikWithUniform(STATE, 0.9),
-    credit.ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1.0).shouldPikWithUniform(STATE, 0.5),
+    credit.ToggleExerciseModel.threshold('leverage', 0.7, 'above').shouldPik(STATE, 0.5),
+    credit.ToggleExerciseModel.stochastic('leverage', -2.0, 4.0).shouldPik(STATE, 0.5),
+    credit.ToggleExerciseModel.stochastic('leverage', -2.0, 4.0).shouldPik(STATE, 0.9),
+    credit.ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1.0).shouldPik(STATE, 0.5),
   ],
   rating_factors: () => [
     credit.moodysWarfFactor('B2'),

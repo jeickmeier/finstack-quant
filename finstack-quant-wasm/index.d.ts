@@ -27065,7 +27065,7 @@ export interface MertonModel extends WasmOwned {
    * @returns A `Float64Array` of length 2: `[equityValue, equityVolatility]`.
    * @throws Error - Throws a `validation` error if `horizon` is not positive and finite, the firm is economically in default, or the inversion is ill-conditioned.
    */
-  tryImpliedEquity(horizon: number): Float64Array;
+  impliedEquity(horizon: number): Float64Array;
   /**
    * Current fair value of the firm's assets, in monetary units.
    */
@@ -27773,7 +27773,7 @@ export interface ToggleExerciseModel extends WasmOwned {
    * @returns `true` when the rule elects to pay in kind.
    * @throws Error - Throws a `TypeError` if `state` is neither a string nor a plain object or `u` is not a number, and a `validation` error if `state` is malformed.
    */
-  shouldPikWithUniform(state: generated.models.CreditState | string, u: number): boolean;
+  shouldPik(state: generated.models.CreditState | string, u: number): boolean;
   /**
    * Serialize to the canonical JSON wire form accepted by `fromJson`
    * and by Python `from_json`.
@@ -27800,7 +27800,7 @@ export interface ToggleExerciseModel extends WasmOwned {
  * await init();
  * const rule = models.credit.ToggleExerciseModel.threshold("leverage", 0.7, "above");
  * const state = { hazard_rate: 0.05, distance_to_default: null, leverage: 0.8, accreted_notional: 100, coupon_due: 4, asset_value: null };
- * console.log(rule.kind, rule.shouldPikWithUniform(state, 0.5));
+ * console.log(rule.kind, rule.shouldPik(state, 0.5));
  * rule.free();
  * ```
  */

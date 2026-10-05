@@ -107,7 +107,7 @@ test('target-pd calibration honours the payout rate', () => {
 });
 
 test('equity calibration and the CreditGrades and explicit-dynamics factories build models', () => {
-  const [equity, equityVol] = model.tryImpliedEquity(1.0);
+  const [equity, equityVol] = model.impliedEquity(1.0);
   const calibrated = credit.MertonModel.fromEquity(equity, equityVol, 80.0, 0.05, 0.0, 1.0);
   assert.ok(Math.abs(calibrated.assetValue - 100.0) < 1e-6);
   const grades = credit.MertonModel.creditGrades(40.0, 0.4, 60.0, 0.03, 0.3, 0.5);
@@ -215,30 +215,30 @@ test('toggle rules decide PIK from a credit state (F138: the state has a consume
     threshold: 0.7,
     direction: 'above',
   });
-  assert.equal(threshold.shouldPikWithUniform(state(0.8), 0.5), true);
-  assert.equal(threshold.shouldPikWithUniform(state(0.6), 0.5), false);
-  assert.equal(threshold.shouldPikWithUniform(JSON.stringify(state(0.8)), 0.5), true);
+  assert.equal(threshold.shouldPik(state(0.8), 0.5), true);
+  assert.equal(threshold.shouldPik(state(0.6), 0.5), false);
+  assert.equal(threshold.shouldPik(JSON.stringify(state(0.8)), 0.5), true);
 
   const stochastic = credit.ToggleExerciseModel.stochastic('leverage', -2.0, 4.0);
   assert.equal(stochastic.kind, 'stochastic');
   // logistic(-2 + 4 * 0.8) = logistic(1.2) = 0.7685...
-  assert.equal(stochastic.shouldPikWithUniform(state(0.8), 0.5), true);
-  assert.equal(stochastic.shouldPikWithUniform(state(0.8), 0.9), false);
+  assert.equal(stochastic.shouldPik(state(0.8), 0.5), true);
+  assert.equal(stochastic.shouldPik(state(0.8), 0.9), false);
 
   const optimal = credit.ToggleExerciseModel.optimal(100, 0.1, 0.2, 0.03, 1);
   assert.equal(optimal.kind, 'optimal_exercise');
   // Optimal exercise runs a nested simulation seeded from `u`: deterministic per draw.
   assert.equal(
-    optimal.shouldPikWithUniform(state(0.8), 0.5),
-    optimal.shouldPikWithUniform(state(0.8), 0.5)
+    optimal.shouldPik(state(0.8), 0.5),
+    optimal.shouldPik(state(0.8), 0.5)
   );
-  assert.equal(typeof optimal.shouldPikWithUniform(state(0.8), 0.5), 'boolean');
+  assert.equal(typeof optimal.shouldPik(state(0.8), 0.5), 'boolean');
   assert.equal(
     credit.ToggleExerciseModel.fromJson(threshold.toJson()).toJson(),
     threshold.toJson()
   );
   assert.throws(
-    () => threshold.shouldPikWithUniform({ ...state(0.8), leverage: NaN }, 0.5),
+    () => threshold.shouldPik({ ...state(0.8), leverage: NaN }, 0.5),
     (e) => e instanceof TypeError
   );
 });

@@ -59,15 +59,15 @@ impl MertonModel {
     /// model uses `JumpDiffusion` dynamics, and [`InputError::Invalid`] if
     /// the implied equity value or `N(d1)` is below the well-posed floor (the
     /// firm is economically in default).
-    pub fn try_implied_equity(&self, horizon: f64) -> Result<(f64, f64)> {
+    pub fn implied_equity(&self, horizon: f64) -> Result<(f64, f64)> {
         if !(horizon.is_finite() && horizon > 0.0) {
             return Err(Error::Validation(format!(
-                "try_implied_equity: horizon must be > 0, got {horizon}"
+                "implied_equity: horizon must be > 0, got {horizon}"
             )));
         }
         if matches!(self.dynamics, AssetDynamics::JumpDiffusion { .. }) {
             return Err(Error::Validation(
-                "try_implied_equity: the Black-Scholes equity-vol inversion is \
+                "implied_equity: the Black-Scholes equity-vol inversion is \
                  diffusion-only; under JumpDiffusion the delta-scaled volatility is \
                  the diffusive component alone and would misstate observed equity \
                  volatility. Use GeometricBrownian dynamics for equity calibration."
@@ -619,7 +619,7 @@ mod tests {
     #[test]
     fn implied_equity_from_known_asset() {
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
-        let (equity, equity_vol) = m.try_implied_equity(1.0).expect("healthy firm");
+        let (equity, equity_vol) = m.implied_equity(1.0).expect("healthy firm");
         // E should be V*N(d1) - B*e^(-rT)*N(d2)
         assert!(equity > 0.0, "Equity should be positive, got {equity}");
         assert!(
@@ -636,7 +636,7 @@ mod tests {
     #[test]
     fn from_equity_recovers_known_values() {
         let m_known = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
-        let (equity, equity_vol) = m_known.try_implied_equity(1.0).expect("healthy firm");
+        let (equity, equity_vol) = m_known.implied_equity(1.0).expect("healthy firm");
         let m_calibrated = MertonModel::from_equity(equity, equity_vol, 80.0, 0.05, 0.0, 1.0)
             .expect("calibration");
         assert!(
@@ -760,8 +760,8 @@ mod tests {
         )
         .expect("valid");
 
-        let (eq_no_q, _) = m_no_q.try_implied_equity(1.0).expect("healthy firm");
-        let (eq_with_q, _) = m_with_q.try_implied_equity(1.0).expect("healthy firm");
+        let (eq_no_q, _) = m_no_q.implied_equity(1.0).expect("healthy firm");
+        let (eq_with_q, _) = m_with_q.implied_equity(1.0).expect("healthy firm");
 
         assert!(
             eq_with_q < eq_no_q,
@@ -781,7 +781,7 @@ mod tests {
             AssetDynamics::GeometricBrownian,
         )
         .expect("valid");
-        let (equity, equity_vol) = m_known.try_implied_equity(1.0).expect("healthy firm");
+        let (equity, equity_vol) = m_known.implied_equity(1.0).expect("healthy firm");
 
         let m_cal = MertonModel::from_equity(equity, equity_vol, 80.0, 0.05, 0.02, 1.0)
             .expect("calibration");
@@ -811,7 +811,7 @@ mod tests {
         // call-option equity value to ~0, so the equity-vol division would
         // otherwise blow up to inf/NaN.
         let m = MertonModel::new(1.0, 0.05, 1.0e9, 0.05).expect("valid");
-        let res = m.try_implied_equity(1.0);
+        let res = m.implied_equity(1.0);
         assert!(
             res.is_err(),
             "near-zero implied equity should be rejected, got {res:?}"
@@ -821,7 +821,7 @@ mod tests {
     #[test]
     fn implied_equity_ok_for_healthy_firm() {
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
-        let (equity, equity_vol) = m.try_implied_equity(1.0).expect("healthy firm");
+        let (equity, equity_vol) = m.implied_equity(1.0).expect("healthy firm");
         assert!(equity.is_finite() && equity > 0.0);
         assert!(equity_vol.is_finite() && equity_vol > 0.0);
     }
@@ -988,20 +988,20 @@ mod tests {
         );
     }
 
-    /// `try_implied_equity` must reject a non-positive horizon explicitly
+    /// `implied_equity` must reject a non-positive horizon explicitly
     /// (matching `implied_spread` and `simulate_paths`) rather than letting
     /// `horizon = 0` silently return intrinsic value with a meaningless
     /// "equity vol".
     #[test]
-    fn try_implied_equity_rejects_non_positive_horizon() {
+    fn implied_equity_rejects_non_positive_horizon() {
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
-        assert!(m.try_implied_equity(0.0).is_err(), "horizon=0 must error");
+        assert!(m.implied_equity(0.0).is_err(), "horizon=0 must error");
         assert!(
-            m.try_implied_equity(-1.0).is_err(),
+            m.implied_equity(-1.0).is_err(),
             "negative horizon must error"
         );
         assert!(
-            m.try_implied_equity(f64::NAN).is_err(),
+            m.implied_equity(f64::NAN).is_err(),
             "NaN horizon must error"
         );
     }
@@ -1040,7 +1040,7 @@ mod tests {
     }
 
     #[test]
-    fn try_implied_equity_rejects_jump_diffusion() {
+    fn implied_equity_rejects_jump_diffusion() {
         let model = MertonModel::new_with_dynamics(
             100.0,
             0.20,
@@ -1055,7 +1055,7 @@ mod tests {
             },
         )
         .expect("valid");
-        assert!(model.try_implied_equity(1.0).is_err());
+        assert!(model.implied_equity(1.0).is_err());
     }
 
     /// Golden pin for the CreditGrades survival formula (Finger et al. 2002).

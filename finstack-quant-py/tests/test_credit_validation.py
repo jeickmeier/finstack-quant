@@ -82,10 +82,10 @@ def test_structural_spec_constructors_and_equality() -> None:
 
     rule = credit.ToggleExerciseModel.stochastic("leverage", 100.0, 0.0)
     assert rule.kind == "stochastic"
-    assert rule.should_pik_with_uniform(credit.CreditState(leverage=5.0), 0.5)
+    assert rule.should_pik(credit.CreditState(leverage=5.0), 0.5)
     threshold = credit.ToggleExerciseModel.threshold("leverage", 5.0, "above")
-    assert threshold.should_pik_with_uniform(credit.CreditState(leverage=6.0), 0.0)
-    assert not threshold.should_pik_with_uniform(credit.CreditState(leverage=4.0), 0.0)
+    assert threshold.should_pik(credit.CreditState(leverage=6.0), 0.0)
+    assert not threshold.should_pik(credit.CreditState(leverage=4.0), 0.0)
     with pytest.raises(ValueError, match="hazard_rate, distance_to_default, leverage"):
         credit.ToggleExerciseModel.threshold("ebitda", 1.0, "above")
 

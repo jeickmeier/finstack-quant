@@ -65,10 +65,13 @@ struct StepJumpData {
 }
 
 impl MertonModel {
-    /// Simulate asset value paths using Monte Carlo.
+    /// Simulate asset value paths using Monte Carlo, reproducibly from a seed.
     ///
     /// Supports GBM and jump-diffusion dynamics. Optionally uses antithetic
-    /// variates to reduce variance.
+    /// variates to reduce variance. The draws come from a PCG64 generator
+    /// ([`Pcg64Rng`]) seeded by `seed`, so the same model, arguments and seed
+    /// return bit-identical paths on every platform and in both language
+    /// bindings.
     ///
     /// `CreditGrades` dynamics simulate the *asset value* as plain GBM: the
     /// CreditGrades stochastic barrier only enters the analytic
@@ -98,8 +101,8 @@ impl MertonModel {
     ///   at least 1, and each path stores `num_steps + 1` values
     /// * `horizon` - Time horizon T in years spanned by the grid; must be
     ///   finite and strictly positive
-    /// * `rng` - Random number generator supplying the standard normal (and,
-    ///   under `JumpDiffusion`, uniform) draws; determines reproducibility
+    /// * `seed` - PCG64 seed for the standard normal (and, under
+    ///   `JumpDiffusion`, uniform) draws; equal seeds reproduce equal paths
     /// * `antithetic` - When true, generate each odd-indexed path from the
     ///   negated normals of its predecessor for variance reduction
     ///
@@ -118,7 +121,7 @@ impl MertonModel {
         num_paths: usize,
         num_steps: usize,
         horizon: f64,
-        rng: &mut dyn RandomNumberGenerator,
+        seed: u64,
         antithetic: bool,
     ) -> Result<SimulatedPaths> {
         if num_steps == 0 {
@@ -145,6 +148,7 @@ impl MertonModel {
         let mut times: Vec<f64> = reserve_values(values_per_path)?;
         let mut normals: Vec<f64> = reserve_values(num_steps)?;
         normals.resize(num_steps, 0.0);
+        let mut rng = Pcg64Rng::new(seed);
 
         let dt = horizon / num_steps as f64;
         let sqrt_dt = dt.sqrt();
@@ -262,40 +266,6 @@ impl MertonModel {
             num_steps,
         })
     }
-
-    /// Simulate asset value paths from a seed, reproducibly.
-    ///
-    /// Runs [`Self::simulate_paths`] with a PCG64 generator
-    /// ([`Pcg64Rng`]) seeded by `seed`, so the same model, arguments and
-    /// seed return bit-identical paths on every platform. This is the entry
-    /// point both language bindings expose.
-    ///
-    /// # Arguments
-    ///
-    /// * `num_paths` - Number of independent paths to simulate; with
-    ///   `antithetic` set, each path is paired with its sign-flipped twin.
-    /// * `num_steps` - Number of equally spaced time steps per path; must be
-    ///   at least 1, and each path stores `num_steps + 1` values.
-    /// * `horizon` - Time horizon T in years spanned by the grid; must be
-    ///   finite and strictly positive.
-    /// * `seed` - PCG64 seed; equal seeds reproduce equal paths.
-    /// * `antithetic` - When true, generate each odd-indexed path from the
-    ///   negated normals of its predecessor for variance reduction.
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::simulate_paths`].
-    pub fn simulate_paths_seeded(
-        &self,
-        num_paths: usize,
-        num_steps: usize,
-        horizon: f64,
-        seed: u64,
-        antithetic: bool,
-    ) -> Result<SimulatedPaths> {
-        let mut rng = Pcg64Rng::new(seed);
-        self.simulate_paths(num_paths, num_steps, horizon, &mut rng, antithetic)
-    }
 }
 
 /// Empty buffer with room for exactly `len` values, or a validation error when
@@ -315,35 +285,59 @@ mod tests {
     use super::super::{AssetDynamics, MertonBarrierType, MertonModel};
 
     #[test]
-    fn simulate_paths_seeded_is_reproducible_pcg64() {
+    fn simulate_paths_is_reproducible_per_seed() {
         let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
-        let a = m.simulate_paths_seeded(8, 12, 1.0, 7, true).unwrap();
-        let b = m.simulate_paths_seeded(8, 12, 1.0, 7, true).unwrap();
+        let a = m.simulate_paths(8, 12, 1.0, 7, true).unwrap();
+        let b = m.simulate_paths(8, 12, 1.0, 7, true).unwrap();
         assert_eq!(a.asset_values, b.asset_values);
-        let mut rng = finstack_quant_core::math::random::Pcg64Rng::new(7);
-        let explicit = m.simulate_paths(8, 12, 1.0, &mut rng, true).unwrap();
-        assert_eq!(a.asset_values, explicit.asset_values);
-        let other = m.simulate_paths_seeded(8, 12, 1.0, 8, true).unwrap();
+        let other = m.simulate_paths(8, 12, 1.0, 8, true).unwrap();
         assert_ne!(a.asset_values, other.asset_values);
+    }
+
+    /// FNV-1a over 64-bit words: an exact fingerprint of a simulated stream.
+    fn fingerprint(values: &[f64]) -> u64 {
+        values.iter().fold(0xcbf2_9ce4_8422_2325, |hash, value| {
+            (hash ^ value.to_bits()).wrapping_mul(0x0000_0100_0000_01b3)
+        })
+    }
+
+    /// Pins the seed-to-path mapping of the seeded entry point (core PCG64,
+    /// normal draw order, antithetic pairing). A change here changes every
+    /// host's simulated asset paths for a given seed.
+    #[test]
+    fn f2_pin_merton_seed_to_stream_mapping() {
+        let gbm = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
+        let paths = gbm.simulate_paths(8, 12, 1.0, 7, true).unwrap();
+        let plain = gbm.simulate_paths(5, 6, 2.0, 11, false).unwrap();
+        assert_eq!(
+            (
+                fingerprint(&paths.times),
+                fingerprint(&paths.asset_values),
+                fingerprint(&plain.asset_values),
+            ),
+            (
+                5_718_244_427_887_314_902,
+                9_843_094_568_569_784_566,
+                9_861_744_696_887_898_460
+            )
+        );
     }
 
     #[test]
     fn simulate_paths_rejects_degenerate_grid() {
         let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
-        let mut rng = finstack_quant_core::math::random::Pcg64Rng::new(42);
-        assert!(m.simulate_paths(10, 0, 5.0, &mut rng, false).is_err());
-        assert!(m.simulate_paths(10, 60, 0.0, &mut rng, false).is_err());
+        assert!(m.simulate_paths(10, 0, 5.0, 42, false).is_err());
+        assert!(m.simulate_paths(10, 60, 0.0, 42, false).is_err());
     }
 
     #[test]
     fn simulate_paths_rejects_sizes_that_overflow_or_cannot_be_allocated() {
         use finstack_quant_core::error::ErrorKind;
         let m = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
-        let mut rng = finstack_quant_core::math::random::Pcg64Rng::new(42);
         // The last pair fits in usize but not in memory (more than isize::MAX bytes).
         for (paths, steps) in [(1, usize::MAX), (usize::MAX, 4), (usize::MAX / 16, 1)] {
             let error = m
-                .simulate_paths(paths, steps, 1.0, &mut rng, false)
+                .simulate_paths(paths, steps, 1.0, 42, false)
                 .expect_err("oversized request");
             assert_eq!(error.kind(), ErrorKind::Validation, "{error}");
         }
@@ -353,16 +347,9 @@ mod tests {
 
     #[test]
     fn simulate_paths_deterministic_with_seed() {
-        use finstack_quant_core::math::random::Pcg64Rng;
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
-        let mut rng1 = Pcg64Rng::new(42);
-        let mut rng2 = Pcg64Rng::new(42);
-        let paths1 = m
-            .simulate_paths(10, 60, 5.0, &mut rng1, false)
-            .expect("paths");
-        let paths2 = m
-            .simulate_paths(10, 60, 5.0, &mut rng2, false)
-            .expect("paths");
+        let paths1 = m.simulate_paths(10, 60, 5.0, 42, false).expect("paths");
+        let paths2 = m.simulate_paths(10, 60, 5.0, 42, false).expect("paths");
         assert_eq!(
             paths1.path(0),
             paths2.path(0),
@@ -372,12 +359,8 @@ mod tests {
 
     #[test]
     fn simulate_paths_gbm_mean_converges() {
-        use finstack_quant_core::math::random::Pcg64Rng;
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
-        let mut rng = Pcg64Rng::new(42);
-        let paths = m
-            .simulate_paths(50_000, 60, 5.0, &mut rng, true)
-            .expect("paths");
+        let paths = m.simulate_paths(50_000, 60, 5.0, 42, true).expect("paths");
         let mean_terminal: f64 = paths
             .iter_paths()
             .map(|p| *p.last().expect("non-empty"))
@@ -393,12 +376,8 @@ mod tests {
 
     #[test]
     fn simulate_paths_correct_dimensions() {
-        use finstack_quant_core::math::random::Pcg64Rng;
         let m = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
-        let mut rng = Pcg64Rng::new(42);
-        let paths = m
-            .simulate_paths(100, 60, 5.0, &mut rng, false)
-            .expect("paths");
+        let paths = m.simulate_paths(100, 60, 5.0, 42, false).expect("paths");
         assert_eq!(paths.num_paths, 100);
         assert_eq!(paths.num_steps, 60);
         assert_eq!(paths.times.len(), 61); // includes t=0
@@ -420,7 +399,6 @@ mod tests {
 
     #[test]
     fn jump_diffusion_produces_different_paths() {
-        use finstack_quant_core::math::random::Pcg64Rng;
         let m_gbm = MertonModel::new(100.0, 0.20, 80.0, 0.05).expect("valid");
         let m_jd = MertonModel::new_with_dynamics(
             100.0,
@@ -436,14 +414,10 @@ mod tests {
             },
         )
         .expect("valid");
-        let mut rng1 = Pcg64Rng::new(42);
-        let mut rng2 = Pcg64Rng::new(42);
         let paths_gbm = m_gbm
-            .simulate_paths(100, 60, 5.0, &mut rng1, false)
+            .simulate_paths(100, 60, 5.0, 42, false)
             .expect("paths");
-        let paths_jd = m_jd
-            .simulate_paths(100, 60, 5.0, &mut rng2, false)
-            .expect("paths");
+        let paths_jd = m_jd.simulate_paths(100, 60, 5.0, 42, false).expect("paths");
         // JD paths should differ from GBM (different drift compensation + jumps)
         let gbm_terminal: f64 = paths_gbm
             .iter_paths()
@@ -466,7 +440,6 @@ mod tests {
     /// E[V(T)] = V0 * e^{(r-q)T} holds exactly.
     #[test]
     fn simulate_paths_jump_diffusion_mean_converges() {
-        use finstack_quant_core::math::random::Pcg64Rng;
         let m = MertonModel::new_with_dynamics(
             100.0,
             0.20,
@@ -481,10 +454,7 @@ mod tests {
             },
         )
         .expect("valid");
-        let mut rng = Pcg64Rng::new(42);
-        let paths = m
-            .simulate_paths(50_000, 60, 5.0, &mut rng, true)
-            .expect("paths");
+        let paths = m.simulate_paths(50_000, 60, 5.0, 42, true).expect("paths");
         let mean_terminal: f64 = paths
             .iter_paths()
             .map(|p| *p.last().expect("non-empty"))

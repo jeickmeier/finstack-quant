@@ -15,16 +15,16 @@ from finstack_quant.models.credit import (
 
 def test_from_equity_recovers_known_values() -> None:
     known = MertonModel(100.0, 0.20, 80.0, 0.05)
-    equity, equity_vol = known.try_implied_equity(1.0)
+    equity, equity_vol = known.implied_equity(1.0)
     calibrated = MertonModel.from_equity(equity, equity_vol, 80.0, 0.05, 0.0, 1.0)
     assert abs(calibrated.asset_value - 100.0) < 0.5
     assert abs(calibrated.asset_vol - 0.20) < 0.05
 
 
-def test_try_implied_equity_rejects_non_positive_horizon() -> None:
+def test_implied_equity_rejects_non_positive_horizon() -> None:
     model = MertonModel(100.0, 0.20, 80.0, 0.05)
     with pytest.raises(ValueError, match="horizon must be > 0"):
-        model.try_implied_equity(0.0)
+        model.implied_equity(0.0)
 
 
 def test_from_equity_rejects_invalid_inputs() -> None:

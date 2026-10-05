@@ -416,7 +416,7 @@ impl MertonMcEngine {
 
                                         let tu =
                                             toggle_uniforms.get(coupon_idx).copied().unwrap_or(0.5);
-                                        if toggle.should_pik_with_uniform(&state, tu) {
+                                        if toggle.should_pik(&state, tu) {
                                             n_current += coupon_amount;
                                             path_pik_elections += 1;
                                         } else {

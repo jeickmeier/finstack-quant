@@ -2716,11 +2716,11 @@
       "distanceToDefault",
       "distanceToDefaultWithDrift",
       "free",
+      "impliedEquity",
       "impliedSpread",
       "simulatePaths",
       "toHazardCurve",
-      "toJson",
-      "tryImpliedEquity"
+      "toJson"
     ],
     "getters": [
       "assetValue",
@@ -2772,7 +2772,7 @@
   "models.credit.ToggleExerciseModel": {
     "kind": "class",
     "statics": ["fromJson", "optimal", "stochastic", "threshold"],
-    "methods": ["free", "shouldPikWithUniform", "toJson"],
+    "methods": ["free", "shouldPik", "toJson"],
     "getters": ["kind", "params"]
   },
   "models.credit.RatingFactorTable": {

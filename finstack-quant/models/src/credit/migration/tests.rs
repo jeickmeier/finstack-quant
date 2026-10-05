@@ -568,8 +568,8 @@ mod projection_tests {
         // Use a very small t instead of 0 (which is invalid).
         let (_, gen) = two_state_gen();
         let p = projection::project(&gen, 1e-10).unwrap();
-        assert!((p.probability_by_index(0, 0) - 1.0).abs() < 1e-6);
-        assert!(p.probability_by_index(0, 1) < 1e-6);
+        assert!((p.probability_by_index(0, 0).unwrap() - 1.0).abs() < 1e-6);
+        assert!(p.probability_by_index(0, 1).unwrap() < 1e-6);
     }
 
     #[test]
@@ -582,8 +582,9 @@ mod projection_tests {
         let composed = ps.compose(&pt).unwrap();
         for i in 0..2 {
             for j in 0..2 {
-                let diff =
-                    (composed.probability_by_index(i, j) - p3.probability_by_index(i, j)).abs();
+                let diff = (composed.probability_by_index(i, j).unwrap()
+                    - p3.probability_by_index(i, j).unwrap())
+                .abs();
                 assert!(
                     diff < 1e-8,
                     "semi-group property failed at ({i},{j}): diff={diff}"
@@ -597,7 +598,7 @@ mod projection_tests {
         let (_, gen) = two_state_gen();
         let p = projection::project(&gen, 5.0).unwrap();
         for i in 0..2 {
-            let sum: f64 = (0..2).map(|j| p.probability_by_index(i, j)).sum();
+            let sum: f64 = (0..2).map(|j| p.probability_by_index(i, j).unwrap()).sum();
             assert!((sum - 1.0).abs() < 1e-10);
         }
     }
@@ -608,7 +609,7 @@ mod projection_tests {
         let p = projection::project(&gen, 10.0).unwrap();
         for i in 0..2 {
             for j in 0..2 {
-                assert!(p.probability_by_index(i, j) >= 0.0);
+                assert!(p.probability_by_index(i, j).unwrap() >= 0.0);
             }
         }
     }
@@ -616,9 +617,6 @@ mod projection_tests {
 
 #[cfg(test)]
 mod simulation_tests {
-    use rand::SeedableRng;
-    use rand_pcg::Pcg64;
-
     use crate::credit::migration::{simulation::MigrationSimulator, GeneratorMatrix, RatingScale};
 
     fn two_state_gen() -> GeneratorMatrix {
@@ -637,9 +635,8 @@ mod simulation_tests {
     fn absorbing_state_stays_put() {
         let gen = two_state_gen();
         let sim = MigrationSimulator::new(gen, 10.0).unwrap();
-        let mut rng = Pcg64::seed_from_u64(42);
         // Start from D (index 1), which is absorbing.
-        let paths = sim.simulate(1, 100, &mut rng).unwrap();
+        let paths = sim.simulate(1, 100, 42).unwrap();
         for path in &paths {
             assert_eq!(path.n_transitions(), 0);
             assert_eq!(path.state_at(10.0), 1);
@@ -650,21 +647,45 @@ mod simulation_tests {
     fn deterministic_seed_reproducible() {
         let gen = two_state_gen();
         let sim = MigrationSimulator::new(gen, 5.0).unwrap();
-        let mut rng1 = Pcg64::seed_from_u64(99);
-        let mut rng2 = Pcg64::seed_from_u64(99);
-        let paths1 = sim.simulate(0, 10, &mut rng1).unwrap();
-        let paths2 = sim.simulate(0, 10, &mut rng2).unwrap();
+        let paths1 = sim.simulate(0, 10, 99).unwrap();
+        let paths2 = sim.simulate(0, 10, 99).unwrap();
         for (p1, p2) in paths1.iter().zip(paths2.iter()) {
             assert_eq!(p1.transitions(), p2.transitions());
         }
     }
 
+    /// FNV-1a over 64-bit words: an exact fingerprint of a simulated stream.
+    fn fingerprint(words: impl IntoIterator<Item = u64>) -> u64 {
+        words.into_iter().fold(0xcbf2_9ce4_8422_2325, |hash, word| {
+            (hash ^ word).wrapping_mul(0x0000_0100_0000_01b3)
+        })
+    }
+
+    /// Pins the seed-to-path mapping of the seeded entry points (PCG64 via
+    /// `seed_from_u64`, Gillespie draw order). A change here changes every
+    /// host's simulated ratings for a given seed.
+    #[test]
+    fn f2_pin_migration_seed_to_stream_mapping() {
+        let sim = MigrationSimulator::new(two_state_gen(), 20.0).unwrap();
+        let paths = sim.simulate(0, 64, 7).unwrap();
+        let events = fingerprint(paths.iter().flat_map(|path| {
+            path.transitions()
+                .iter()
+                .flat_map(|&(time, state)| [time.to_bits(), state as u64])
+        }));
+        let empirical = sim.empirical_matrix(200, 7).unwrap();
+        let rows = fingerprint(empirical.to_rows().into_iter().flatten().map(f64::to_bits));
+        assert_eq!(
+            (events, rows),
+            (9_101_374_654_972_199_437, 13_862_920_643_627_307_770)
+        );
+    }
+
     #[test]
     fn simulator_rejects_invalid_state_and_zero_empirical_paths() {
         let sim = MigrationSimulator::new(two_state_gen(), 1.0).unwrap();
-        let mut rng = Pcg64::seed_from_u64(7);
-        assert!(sim.simulate(2, 1, &mut rng).is_err());
-        assert!(sim.empirical_matrix(0, &mut rng).is_err());
+        assert!(sim.simulate(2, 1, 7).is_err());
+        assert!(sim.empirical_matrix(0, 7).is_err());
     }
 
     #[test]
@@ -672,9 +693,8 @@ mod simulation_tests {
         // P(1) for lambda=0.1: P(IG→D) = 1 - exp(-0.1) ≈ 0.09516
         let gen = two_state_gen();
         let sim = MigrationSimulator::new(gen, 1.0).unwrap();
-        let mut rng = Pcg64::seed_from_u64(12345);
-        let emp = sim.empirical_matrix(100_000, &mut rng).unwrap();
-        let empirical_pd = emp.probability_by_index(0, 1);
+        let emp = sim.empirical_matrix(100_000, 12345).unwrap();
+        let empirical_pd = emp.probability_by_index(0, 1).unwrap();
         let analytical_pd = 1.0 - (-0.1_f64).exp();
         assert!(
             (empirical_pd - analytical_pd).abs() < 0.005,
@@ -686,8 +706,7 @@ mod simulation_tests {
     fn default_time_recorded() {
         let gen = two_state_gen();
         let sim = MigrationSimulator::new(gen, 20.0).unwrap();
-        let mut rng = Pcg64::seed_from_u64(7);
-        let paths = sim.simulate(0, 1000, &mut rng).unwrap();
+        let paths = sim.simulate(0, 1000, 7).unwrap();
         let defaults: usize = paths.iter().filter(|p| p.defaulted()).count();
         // With lambda=0.1, P(default within 20y) = 1 - exp(-2) ≈ 0.865
         assert!(
@@ -759,14 +778,16 @@ mod reference_matrix_tests {
         let p_half = projection::project(&gen, 0.5).unwrap();
         // Row sums = 1, all entries ≥ 0.
         for i in 0..7 {
-            let sum: f64 = (0..7).map(|j| p_half.probability_by_index(i, j)).sum();
+            let sum: f64 = (0..7)
+                .map(|j| p_half.probability_by_index(i, j).unwrap())
+                .sum();
             assert!((sum - 1.0).abs() < 1e-8, "row {i} sum = {sum}");
             for j in 0..7 {
-                assert!(p_half.probability_by_index(i, j) >= 0.0);
+                assert!(p_half.probability_by_index(i, j).unwrap() >= 0.0);
             }
         }
         // Default state is still absorbing.
-        assert!((p_half.probability_by_index(6, 6) - 1.0).abs() < 1e-10);
+        assert!((p_half.probability_by_index(6, 6).unwrap() - 1.0).abs() < 1e-10);
     }
 
     #[test]
@@ -775,7 +796,7 @@ mod reference_matrix_tests {
         let gen = GeneratorMatrix::from_transition_matrix(&p).unwrap();
         let p5 = projection::project(&gen, 5.0).unwrap();
         // Cumulative default PD for BBB (index 3) over 5y should be material.
-        let pd_bbb = p5.probability_by_index(3, 6);
+        let pd_bbb = p5.probability_by_index(3, 6).unwrap();
         assert!(pd_bbb > 0.01, "5y BBB PD = {pd_bbb:.4} is too low");
         assert!(
             pd_bbb < 0.20,
@@ -793,8 +814,9 @@ mod reference_matrix_tests {
         let composed = p1.compose(&p2).unwrap();
         for i in 0..7 {
             for j in 0..7 {
-                let diff =
-                    (composed.probability_by_index(i, j) - p3.probability_by_index(i, j)).abs();
+                let diff = (composed.probability_by_index(i, j).unwrap()
+                    - p3.probability_by_index(i, j).unwrap())
+                .abs();
                 assert!(diff < 1e-6, "semi-group ({i},{j}): diff={diff}");
             }
         }

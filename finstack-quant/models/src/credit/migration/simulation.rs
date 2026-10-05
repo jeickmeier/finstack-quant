@@ -189,8 +189,6 @@ impl RatingPath {
 ///
 /// ```
 /// use finstack_quant_models::credit::migration::{RatingScale, GeneratorMatrix, simulation::MigrationSimulator};
-/// use rand::SeedableRng;
-/// use rand_pcg::Pcg64;
 ///
 /// let scale = RatingScale::custom(vec!["AAA".to_string(), "D".to_string()])
 ///     .expect("valid scale");
@@ -198,8 +196,7 @@ impl RatingPath {
 ///     .expect("valid generator");
 /// let sim = MigrationSimulator::new(gen, 5.0).expect("valid simulator");
 ///
-/// let mut rng = Pcg64::seed_from_u64(42);
-/// let paths = sim.simulate(0, 1000, &mut rng).expect("valid simulation inputs");
+/// let paths = sim.simulate(0, 1000, 42).expect("valid simulation inputs");
 /// assert_eq!(paths.len(), 1000);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -256,33 +253,8 @@ impl MigrationSimulator {
         Ok(Self { generator, horizon })
     }
 
-    /// Simulate `n_paths` independent rating paths from `initial_state`.
-    ///
-    /// # Arguments
-    ///
-    /// * `initial_state` — Starting state index.
-    /// * `n_paths` — Number of paths to generate.
-    /// * `rng` — Any `rand::Rng` source.
-    pub fn simulate<R: Rng>(
-        &self,
-        initial_state: usize,
-        n_paths: usize,
-        rng: &mut R,
-    ) -> Result<Vec<RatingPath>, MigrationError> {
-        let n_states = self.generator.n_states();
-        if initial_state >= n_states {
-            return Err(MigrationError::InvalidState {
-                state: initial_state,
-                n_states,
-            });
-        }
-        let scale = Arc::new(self.generator.scale.clone());
-        Ok((0..n_paths)
-            .map(|_| simulate_path(&self.generator, &scale, initial_state, self.horizon, rng))
-            .collect())
-    }
-
-    /// Simulate rating paths with a seeded PCG64 generator.
+    /// Simulate `n_paths` independent rating paths from `initial_state` with
+    /// a seeded PCG64 generator.
     ///
     /// The generator is owned here, so equal seeds give equal paths in every
     /// host language.
@@ -297,18 +269,39 @@ impl MigrationSimulator {
     ///
     /// Returns [`MigrationError::InvalidState`] if `initial_state` is outside
     /// the scale.
-    pub fn simulate_seeded(
+    pub fn simulate(
         &self,
         initial_state: usize,
         n_paths: usize,
         seed: u64,
     ) -> Result<Vec<RatingPath>, MigrationError> {
+        let n_states = self.generator.n_states();
+        if initial_state >= n_states {
+            return Err(MigrationError::InvalidState {
+                state: initial_state,
+                n_states,
+            });
+        }
         let mut rng = Pcg64::seed_from_u64(seed);
-        self.simulate(initial_state, n_paths, &mut rng)
+        let scale = Arc::new(self.generator.scale.clone());
+        Ok((0..n_paths)
+            .map(|_| {
+                simulate_path(
+                    &self.generator,
+                    &scale,
+                    initial_state,
+                    self.horizon,
+                    &mut rng,
+                )
+            })
+            .collect())
     }
 
     /// Estimate the transition matrix by simulation with a seeded PCG64
     /// generator.
+    ///
+    /// Runs `n_paths_per_state` paths from every state and records the terminal
+    /// state at `self.horizon` to build the empirical transition matrix.
     ///
     /// # Arguments
     ///
@@ -320,32 +313,15 @@ impl MigrationSimulator {
     ///
     /// Returns [`MigrationError::InvalidPathCount`] if `n_paths_per_state` is
     /// zero.
-    pub fn empirical_matrix_seeded(
+    pub fn empirical_matrix(
         &self,
         n_paths_per_state: usize,
         seed: u64,
     ) -> Result<TransitionMatrix, MigrationError> {
-        let mut rng = Pcg64::seed_from_u64(seed);
-        self.empirical_matrix(n_paths_per_state, &mut rng)
-    }
-
-    /// Estimate the transition matrix from batch simulation.
-    ///
-    /// Runs `n_paths_per_state` paths from every state and records the terminal
-    /// state at `self.horizon` to build the empirical transition matrix.
-    ///
-    /// # Arguments
-    ///
-    /// * `n_paths_per_state` — Paths per starting state.
-    /// * `rng` — Any `rand::Rng` source.
-    pub fn empirical_matrix<R: Rng>(
-        &self,
-        n_paths_per_state: usize,
-        rng: &mut R,
-    ) -> Result<TransitionMatrix, MigrationError> {
         if n_paths_per_state == 0 {
             return Err(MigrationError::InvalidPathCount);
         }
+        let mut rng = Pcg64::seed_from_u64(seed);
         let n = self.generator.n_states();
         // Flat row-major counts (index `from * n + to`) for cache-friendly
         // accumulation and a single allocation.
@@ -353,7 +329,7 @@ impl MigrationSimulator {
 
         for from in 0..n {
             for _ in 0..n_paths_per_state {
-                let to = simulate_terminal_state(&self.generator, from, self.horizon, rng);
+                let to = simulate_terminal_state(&self.generator, from, self.horizon, &mut rng);
                 counts[from * n + to] += 1;
             }
         }

@@ -1586,7 +1586,7 @@ class MertonModel:
         """
         ...
 
-    def try_implied_equity(self, horizon: float) -> tuple[float, float]:
+    def implied_equity(self, horizon: float) -> tuple[float, float]:
         """
         Return implied equity value and equity volatility at ``horizon`` years.
 
@@ -1682,7 +1682,7 @@ class MertonModel:
             Simulation horizon in years (must be > 0).
         seed : int
             Seed for reproducible draws. The Rust
-            ``MertonModel::simulate_paths_seeded`` owns the generator (PCG64),
+            ``MertonModel::simulate_paths`` owns the generator (PCG64),
             so equal seeds give equal paths in Python and WASM.
         antithetic : bool
             When ``True``, use antithetic variates for variance reduction.
@@ -2650,7 +2650,7 @@ class ToggleExerciseModel:
         """
         ...
 
-    def should_pik_with_uniform(self, state: CreditState, u: float) -> bool:
+    def should_pik(self, state: CreditState, u: float) -> bool:
         """
         Whether the rule elects PIK for ``state`` given one uniform draw.
 

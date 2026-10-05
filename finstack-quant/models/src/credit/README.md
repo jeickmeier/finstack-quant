@@ -62,10 +62,9 @@ value crosses the debt barrier.
 | `implied_spread(horizon, recovery)` | `s = −ln(1 − PD·(1−R)) / T`, a zero-coupon bond spread with exogenous recovery paid at maturity |
 | `debt_spread(horizon)` | Merton (1974) endogenous spread `−ln(D / B·e^{−rT}) / T` with `D = V·e^{−qT} − E`; `Terminal` only |
 | `cds_par_spread(maturity, recovery)` | ISDA-style par spread from the model's survival curve, with premium leg, accrual on default, and discounting |
-| `try_implied_equity(horizon)` | `-> Result<(equity_value, equity_vol)>` via Black-Scholes with a continuous payout rate; diffusion-only |
+| `implied_equity(horizon)` | `-> Result<(equity_value, equity_vol)>` via Black-Scholes with a continuous payout rate; diffusion-only |
 | `to_hazard_curve(id, base_date, &tenors, recovery, day_count)` | Piecewise-constant `HazardCurve` from the structural survival curve; tenors need not be sorted |
-| `simulate_paths(num_paths, num_steps, horizon, &mut rng, antithetic)` | `-> Result<SimulatedPaths>` |
-| `simulate_paths_seeded(num_paths, num_steps, horizon, seed, antithetic)` | `simulate_paths` with a PCG64 generator seeded by `seed`; the entry point both bindings expose |
+| `simulate_paths(num_paths, num_steps, horizon, seed, antithetic)` | `-> Result<SimulatedPaths>` from a PCG64 generator seeded by `seed`; the entry point both bindings expose |
 
 Read-only accessors: `asset_value()`, `asset_vol()`, `debt_barrier()`,
 `risk_free_rate()`, `payout_rate()`, `barrier_type()`, `dynamics()`.
@@ -160,10 +159,8 @@ attainable spread range or the competing brackets.
 ### `SimulatedPaths`
 
 Flat path storage with `values_per_path()`, `get(path_idx, time_idx)`,
-`path(path_idx)`, and `to_nested()`. Seeded via the
-`RandomNumberGenerator` the caller passes to `simulate_paths`, or via the PCG64
-seed given to `simulate_paths_seeded`, so the same seed reproduces the same
-paths. `num_steps == 0` or `horizon <= 0` is a validation
+`path(path_idx)`, and `to_nested()`. Seeded via the PCG64 seed given to
+`simulate_paths`, so the same seed reproduces the same paths. `num_steps == 0` or `horizon <= 0` is a validation
 error, not a degenerate grid.
 
 `simulate_paths` returns the raw asset grid with no barrier applied. Inferring
@@ -234,9 +231,8 @@ horizon)` return `Result` and reject non-finite parameters (and, for
 `optimal`, zero paths, a negative volatility or a non-positive horizon).
 `CreditState::new(...)` likewise rejects non-finite values.
 
-Decision entry points: `should_pik(&CreditState, &mut dyn
-RandomNumberGenerator) -> bool`, the deterministic
-`should_pik_with_uniform(&CreditState, u)`, and `pik_fraction(...)`.
+Decision entry point: `should_pik(&CreditState, u) -> bool`, a pure function
+of the state and one uniform draw `u` in `[0, 1)`.
 
 `CreditStateVariable` is `HazardRate`, `DistanceToDefault`, or `Leverage`;
 `ThresholdDirection` is `Above` or `Below`. Both implement `FromStr` over the
@@ -474,7 +470,7 @@ with the same typed handles as Python: `MertonModel`, `MertonBarrierType`,
 with the camelCase twin of every Python member and `toJson` / `fromJson`.
 `MertonModel.toHazardCurve` returns a `core.HazardCurve`. `CreditState` is a
 plain object (the generated `CreditState` type) passed to
-`ToggleExerciseModel.shouldPikWithUniform`.
+`ToggleExerciseModel.shouldPik`.
 
 `market_anchored` is Rust-only in both hosts.
 
@@ -519,9 +515,8 @@ clamp.
 monotonic where it should be, and that the `NaN`/`inf` guards hold.
 
 **New toggle model.** Add a `ToggleExerciseModel` variant and its config
-struct, implement the branch in `should_pik` (and
-`should_pik_with_uniform` / `pik_fraction`), and test determinism under a fixed
-seed, boundary behaviour, and the economic intuition that stressed firms prefer
+struct, implement the branch in `should_pik`, and test determinism under a
+fixed uniform draw, boundary behaviour, and the economic intuition that stressed firms prefer
 PIK.
 
 **New asset dynamics.** Add an `AssetDynamics` variant, handle it in

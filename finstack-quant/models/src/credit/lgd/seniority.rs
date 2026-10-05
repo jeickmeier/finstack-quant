@@ -12,7 +12,6 @@
 use finstack_quant_core::error::InputError;
 use finstack_quant_core::math::random::Pcg64Rng;
 use finstack_quant_core::math::special_functions::norm_cdf;
-use finstack_quant_core::math::RandomNumberGenerator;
 use finstack_quant_core::Result;
 
 /// Debt seniority classification for recovery rate modeling.
@@ -204,22 +203,6 @@ impl BetaRecovery {
         finstack_quant_core::math::distributions::sample_beta(rng, self.alpha, self.beta_param)
     }
 
-    /// Sample N recovery rate draws into the provided buffer.
-    ///
-    /// # Errors
-    ///
-    /// Propagates the first sampling error (see [`BetaRecovery::sample`]).
-    pub fn sample_n(
-        &self,
-        rng: &mut dyn finstack_quant_core::math::RandomNumberGenerator,
-        out: &mut [f64],
-    ) -> Result<()> {
-        for v in out.iter_mut() {
-            *v = self.sample(rng)?;
-        }
-        Ok(())
-    }
-
     /// Sample N recovery rates with a deterministic PCG64 seed.
     ///
     /// # Errors
@@ -228,7 +211,9 @@ impl BetaRecovery {
     pub fn sample_seeded(&self, n_samples: usize, seed: u64) -> Result<Vec<f64>> {
         let mut rng = Pcg64Rng::new(seed);
         let mut out = vec![0.0_f64; n_samples];
-        self.sample_n(&mut rng as &mut dyn RandomNumberGenerator, &mut out)?;
+        for value in &mut out {
+            *value = self.sample(&mut rng)?;
+        }
         Ok(out)
     }
 
@@ -524,11 +509,8 @@ mod tests {
     fn beta_recovery_sampling_converges_to_mean() {
         let mean = 0.40;
         let br = BetaRecovery::new(mean, 0.20).expect("valid params");
-        let mut rng = Pcg64Rng::new(12345);
         let n = 50_000;
-        let mut buf = vec![0.0; n];
-        br.sample_n(&mut rng as &mut dyn RandomNumberGenerator, &mut buf)
-            .expect("sampling should succeed");
+        let buf = br.sample_seeded(n, 12345).expect("sampling should succeed");
 
         let sample_mean = buf.iter().sum::<f64>() / n as f64;
         assert!(
