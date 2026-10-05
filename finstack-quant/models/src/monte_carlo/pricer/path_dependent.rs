@@ -280,13 +280,16 @@ impl PathDependentPricerConfig {
 ///     PathDependentPricer, PathDependentPricerConfig,
 /// };
 /// use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
+/// use finstack_quant_models::types::OptionType;
 ///
 /// let config = PathDependentPricerConfig::new(10_000)
 ///     .with_seed(42)
 ///     .with_parallel(false);
 /// let pricer = PathDependentPricer::new(config);
 /// let process = GbmProcess::with_params(0.05, 0.02, 0.20).unwrap();
-/// let payoff = Asian::new(crate::OptionType::Call, ///     100.0,
+/// let payoff = Asian::new(
+///     OptionType::Call,
+///     100.0,
 ///     1.0,
 ///     AveragingMethod::Arithmetic,
 ///     (1..=252).collect(),
