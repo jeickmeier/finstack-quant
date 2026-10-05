@@ -28,7 +28,7 @@
 //! | Strike (K) | Same units as forward | Decimal for rates, price units for equity |
 //! | Alpha (α) | Initial stochastic vol | Same scale as F^β |
 //! | Time (T) | Time to expiry | Years |
-//! | Output | Implied volatility — lognormal (Black) for β>0, **normal (Bachelier)** for β≈0; see `SabrVolType` | Decimal (0.20 = 20%) / absolute rate units |
+//! | Output | Implied volatility — lognormal (Black) for β>0, **normal (Bachelier)** for β≈0; see `SabrParameters::quote_convention` | Decimal (0.20 = 20%) / absolute rate units |
 
 mod calibration;
 mod expansion;
@@ -39,6 +39,6 @@ mod smile;
 mod tests;
 
 pub use calibration::{vega_weight, SabrCalibrationOutcome, SabrCalibrator, SabrShift};
-pub use model::{SabrModel, SabrVolType};
+pub use model::SabrModel;
 pub use parameters::SabrParameters;
 pub use smile::{ArbitrageValidationResult, ButterflyViolation, MonotonicityViolation, SabrSmile};

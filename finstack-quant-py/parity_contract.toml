@@ -661,10 +661,10 @@ python_package = "finstack_quant.models.volatility"
 # `local_vol` (Dupire surface construction), `heston` / `rough_heston` model
 # helpers (Heston pricing is `models.heston_price` / `models.monte_carlo`),
 # `source` (`VolSource`, `measure_vol_surface_shift`), the `black` helpers
-# (`d1` / `d1_d2` / `*_black76`), `vega_weight`, `SabrVolType` (and so
-# `SabrModel::vol_type` / `SabrSmile::vol_type` / `implied_volatility_with_type`:
-# the hosts' `implied_vol` returns the beta-dependent vol, documented on each
-# method), `SabrModel::effective_rates` (the shift is on `SabrParameters.shift`),
+# (`d1` / `d1_d2` / `*_black76`), `vega_weight`,
+# `SabrParameters::quote_convention` (the hosts' `implied_vol` returns the
+# beta-dependent vol, documented on each method),
+# `SabrModel::effective_rates` (the shift is on `SabrParameters.shift`),
 # `SabrParameters::{implied_vol_normal, implied_vol_lognormal}` (raw Hagan
 # expansions; hosts use `SabrModel.implied_vol`, which selects the branch),
 # `SabrCalibrationOutcome` and the `*_with_diagnostics` / `*_with_derivatives`

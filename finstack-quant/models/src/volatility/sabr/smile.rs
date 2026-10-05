@@ -146,13 +146,6 @@ impl SabrSmile {
             .implied_volatility(self.forward, self.forward, self.time_to_expiry)
     }
 
-    /// Quoting convention of the vols this smile produces (normal for β≈0,
-    /// Black otherwise) — see [`crate::volatility::sabr::SabrVolType`].
-    /// Check this before inserting generated vols into a vol surface.
-    pub fn vol_type(&self) -> crate::volatility::sabr::SabrVolType {
-        self.model.vol_type()
-    }
-
     /// Implied volatility at one strike on this smile.
     ///
     /// The quoting convention is β-dependent (normal vol in absolute rate

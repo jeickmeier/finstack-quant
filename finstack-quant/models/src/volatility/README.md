@@ -21,7 +21,7 @@ instrument pricers — `rates/{swaption, cap_floor, cms_option, cms_swap}`,
 the asset-owned futures-option instruments, `fx/fx_digital_option`,
 `exotics/range_accrual` — which reach for `normal::bachelier_price_with_annuity`,
 `black::{d1_d2, d1_black76, d1_d2_black76}`, and
-`SABRParameters` / `sabr::SabrVolType`.
+`SABRParameters` / `VolatilityConvention`.
 
 ## Layout
 
@@ -30,7 +30,7 @@ the asset-owned futures-option instruments, `fx/fx_digital_option`,
 | [`mod.rs`](mod.rs) | Re-exports |
 | [`black.rs`](black.rs) | `d1`, `d1_d2`, `d1_black76`, `d1_d2_black76` |
 | [`normal.rs`](normal.rs) | `bachelier_price_with_annuity` |
-| [`sabr/`](sabr/) | `SabrParameters`, `SabrModel`, `SabrVolType`, `SabrCalibrator`, `SabrSmile` |
+| [`sabr/`](sabr/) | `SabrParameters`, `SabrModel`, `SabrCalibrator`, `SabrSmile` |
 | [`source.rs`](source.rs) | `VolSource` plus surface, cube, and FX delta-volatility evaluation/materialization |
 | [`arbitrage/`](arbitrage/) | Model-dependent volatility arbitrage checks |
 | [`heston.rs`](heston.rs), [`rough_heston.rs`](rough_heston.rs), [`local_vol.rs`](local_vol.rs), [`svi.rs`](svi.rs) | Stochastic/local volatility engines and fitting |
@@ -106,11 +106,11 @@ dσ = ν σ dW₂
 `SABRModel::implied_volatility` returns a **normal (Bachelier)** volatility in
 absolute rate units when β is within `BETA_SNAP_TOL = 1e-4` of 0, and a
 **lognormal (Black)** volatility otherwise. Storing one in a surface that
-expects the other is a silent unit error. `SABRModel::vol_type()` returns the
-`SabrVolType::{Normal, Black}` tag, and
-`implied_volatility_with_type(forward, strike, t)` returns the pair so callers
-cannot drop the tag. The same rule binds calibration: pass normal quotes when
-calibrating with β ≈ 0 and lognormal quotes otherwise.
+expects the other is a silent unit error. `SABRParameters::quote_convention()`
+returns the `VolatilityConvention::{Normal, Lognormal, ShiftedLognormal}` tag
+of the vols `implied_volatility(forward, strike, t)` produces. The same rule
+binds calibration: pass normal quotes when calibrating with β ≈ 0 and
+lognormal quotes otherwise.
 
 ### `SABRParameters`
 
@@ -173,7 +173,6 @@ outside this budget fails, including stalled and iteration-limited solves.
 | Method | Notes |
 |--------|-------|
 | `atm_vol()` | `-> Result<f64>` |
-| `vol_type()` | Delegates to the model's `SabrVolType` |
 | `implied_vol(strike)` | `-> Result<f64>`; one strike |
 | `generate_smile(&strikes)` | `-> Result<Vec<f64>>` |
 | `strike_from_delta(delta, is_call)` | Delta-to-strike inversion |
@@ -218,8 +217,7 @@ forward-based call prices; carry is already in the smile's forward.
 use finstack_quant_models::OptionType;
 use finstack_quant_models::volatility::{
     bachelier_price_with_annuity, d1_d2, d1_d2_black76, norm_cdf,
-    sabr::SabrVolType,
-    SABRCalibrator, SABRModel, SABRParameters, SABRSmile,
+    SABRCalibrator, SABRModel, SABRParameters, SABRSmile, VolatilityConvention,
 };
 
 // Black-Scholes delta: note the (spot, strike, r, sigma, t, q) order.
@@ -235,8 +233,8 @@ assert!(receiver >= 0.0);
 
 // SABR: build a rates smile at beta = 0.5 and read one vol off it.
 let params = SABRParameters::rates_standard(0.02, 0.30, -0.10)?;
+assert_eq!(params.quote_convention(), VolatilityConvention::Lognormal); // beta = 0.5
 let model = SABRModel::new(params);
-assert_eq!(model.vol_type(), SabrVolType::Black); // beta = 0.5 -> lognormal quotes
 let vol = model.implied_volatility(0.03, 0.035, 1.0)?;
 
 // Calibrate to a market smile, then check the fit for butterfly arbitrage.
@@ -331,7 +329,7 @@ touching either file.
 3. Model struct exposing `implied_volatility()` and/or `price_*()`. Mark hot
    entry points `#[inline]` and `#[must_use]`.
 4. If the model's vol output convention is β- or regime-dependent, expose a tag
-   type the way `SabrVolType` does — an untagged vol is a unit bug waiting to
+   type the way `SabrParameters::quote_convention` does — an untagged vol is a unit bug waiting to
    happen.
 5. Keep observed surface/cube data and structural validation in core; keep all
    evaluation, fitting, extrapolation, and pricing behavior in models.

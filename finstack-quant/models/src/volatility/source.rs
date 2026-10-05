@@ -15,7 +15,7 @@ use finstack_quant_core::{
 
 use super::conventions::VolatilityConvention;
 use super::fx::get_fx_delta_vol;
-use super::sabr::{SabrModel, SabrParameters, SabrVolType};
+use super::sabr::SabrParameters;
 
 /// Concrete computational view over the core volatility artifacts.
 #[derive(Clone, Debug)]
@@ -67,13 +67,7 @@ impl VolSource {
             )?,
             Self::Cube(cube) => {
                 let (params, _, _) = cube_params(cube, expiry, tenor);
-                if SabrModel::new(params.clone()).vol_type() == SabrVolType::Normal {
-                    VolatilityConvention::Normal
-                } else if let Some(shift) = params.shift {
-                    VolatilityConvention::ShiftedLognormal { shift }
-                } else {
-                    VolatilityConvention::Lognormal
-                }
+                params.quote_convention()
             }
             Self::FxDelta(_) => VolatilityConvention::Lognormal,
         })
@@ -590,7 +584,7 @@ pub fn get_cube_normal_vol_clamped(cube: &VolCube, expiry: f64, tenor: f64, stri
     let tenor = tenor.clamp(cube.tenors()[0], cube.tenors()[cube.tenors().len() - 1]);
     let (params, forward, _) = cube_params(cube, expiry, tenor);
     let shift = params.shift.unwrap_or(0.0);
-    if SabrModel::new(params.clone()).vol_type() != SabrVolType::Normal
+    if params.quote_convention() != VolatilityConvention::Normal
         && (forward + shift <= 0.0 || strike + shift <= 0.0)
     {
         return f64::NAN;
