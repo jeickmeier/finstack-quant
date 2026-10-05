@@ -45,7 +45,7 @@ The module doc comment in [`mod.rs`](mod.rs) says the module "lives under
 | [`grid2d.rs`](grid2d.rs) | `Grid2D` tensor product, row-major indexing, bilinear interpolation |
 | [`operator.rs`](operator.rs) | `TridiagOperator` assembly, boundary elimination, Thomas solve, `ThomasError` |
 | [`operator2d.rs`](operator2d.rs) | `Operators2D` (per-line directional tridiagonals + cross-derivative coefficients), the monotone upwind switch, `apply_cross_derivative` |
-| [`stepper.rs`](stepper.rs) | `TimeStepper` trait, `ThetaStepper`, `RannacherStepper`, the CFL bound, `StepperError` |
+| [`stepper.rs`](stepper.rs) | `ThetaStepper` (theta scheme with optional Rannacher start-up), the CFL bound, `StepperError` |
 | [`adi.rs`](adi.rs) | `CraigSneydStepper` (Modified Craig-Sneyd), `AdiWorkBuffers`, `fill_boundaries` |
 | [`exercise.rs`](exercise.rs) | `PenaltyExercise`, `ExerciseType::{American, Bermudan}` |
 | [`solver.rs`](solver.rs) | `Solver1D`, `Solver1DBuilder`, `PdeSolution`, `PdeSolverError` |
@@ -56,7 +56,7 @@ The module doc comment in [`mod.rs`](mod.rs) says the module "lives under
 Pipelines, as in the module doc:
 
 ```text
-PdeProblem1D → TridiagOperator → TimeStepper → PenaltyExercise → PdeSolution
+PdeProblem1D → TridiagOperator → ThetaStepper → PenaltyExercise → PdeSolution
 PdeProblem2D → Operators2D     → CraigSneydStepper             → PdeSolution2D
 ```
 
@@ -68,8 +68,8 @@ re-exported at the `pde` root:
 `CraigSneydStepper`, `BoundaryCondition`, `BlackScholesPde`, `HestonPde`,
 `ExerciseError`, `Grid1D`, `PdeGridError`, `Grid2D`, `PdeProblem1D`,
 `PdeProblem2D`, `PdeSolution`, `PdeSolverError`, `Solver1D`, `Solver1DBuilder`,
-`PdeSolution2D`, `PdeSolver2DError`, `Solver2D`, `RannacherStepper`,
-`StepperError`, `ThetaStepper`, and `TimeStepper`.
+`PdeSolution2D`, `PdeSolver2DError`, `Solver2D`, `StepperError`, and
+`ThetaStepper`.
 
 The operators (`TridiagOperator`, `Operators2D`, `apply_cross_derivative`), the
 exercise constraint (`PenaltyExercise`, `ExerciseType`), work buffers, interval
@@ -169,7 +169,7 @@ the default mesh carries no uniform accuracy guarantee in this regime.
 with `dt = t_from − t_to > 0`. `is_time_homogeneous() == true` collapses the two
 assemblies into one. Constructors: `crank_nicolson(n)` (θ = 0.5),
 `implicit(n)` (θ = 1.0), `explicit(n)` (θ = 0, debugging only), `custom(θ, n)`.
-`RannacherStepper::new(implicit_steps, n_steps)` runs `implicit_steps` fully
+`ThetaStepper::rannacher(implicit_steps, n_steps)` runs `implicit_steps` fully
 implicit steps at the terminal condition and Crank-Nicolson thereafter, which
 damps the high-frequency modes a payoff kink injects and which plain CN
 propagates undamped.
@@ -247,7 +247,7 @@ as "optionally doing 2–3" overstates what `Solver1D` actually does — it call
 
 Bermudan exercise times are matched against the step's `t_to` with a `1e-10`
 absolute tolerance, so they must land on the time grid. `Solver1D` generates a
-uniform grid (`TimeStepper::time_levels`), so schedule them accordingly.
+uniform grid (`ThetaStepper::time_levels`), so schedule them accordingly.
 
 ### Solution and Greeks
 
@@ -329,10 +329,9 @@ ordering because spatial and time errors can cancel.
 Each halfstep solves the x and y directional operators implicitly and keeps
 the mixed derivative explicit. This first-order directional split damps stiff
 payoff modes; it is not a fully coupled backward-Euler solve, nor MCS with θ=1.
-Note the stepper does **not** implement `TimeStepper`
-(that trait is 1D-only); it carries its own inherent `step`, `n_steps`, and
-`time_levels`. `Solver2D` holds it
-concretely, so there is no 2D stepper polymorphism.
+Like the 1D `ThetaStepper`, it carries inherent `step`, `n_steps`, and
+`time_levels`, and `Solver2D` holds it concretely: there is no stepper
+polymorphism in either dimension.
 
 `AdiWorkBuffers` holds the fourteen scratch vectors one step needs.
 `Solver2D::solve` allocates them once per solve and reuses them across the whole
@@ -452,7 +451,9 @@ unmeasured. See [`../../../benches/README.md`](../../../benches/README.md).
    vanishes, `Linear` for zero curvature in the grid coordinate, `LinearInExp`
    for zero spot gamma on log-spot grids, and `Neumann` only if you
    know the derivative — and remember the one-sided discretization above.
-3. **A new 1D time scheme**: implement `TimeStepper`. Return
+3. **A new 1D time scheme**: add a constructor to `ThetaStepper` if it is a
+   theta schedule; anything else needs its own stepper type and a `Solver1D`
+   change, since the solver holds `ThetaStepper` concretely. Return
    `StepperError::NonPositiveStep` on a non-positive or non-finite `dt`, and gate
    any conditionally stable scheme on `cfl_max_dt` rather than letting it produce
    `NaN`. Propagate `ThomasError` with `?` — `StepperError` has the `#[from]`.

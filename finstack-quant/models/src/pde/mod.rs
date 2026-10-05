@@ -4,7 +4,7 @@
 //! ```text
 //! PdeProblem1D (coefficients + boundary conditions + domain)
 //!   → TridiagOperator (discretizes PDE on a Grid1D)
-//!     → TimeStepper (theta scheme: explicit/implicit/CN/Rannacher)
+//!     → ThetaStepper (theta scheme: explicit/implicit/CN/Rannacher)
 //!       → PenaltyExercise (American/Bermudan constraint)
 //!         → PdeSolution (values + interpolation + Greeks)
 //! ```
@@ -79,4 +79,4 @@ pub use problem::PdeProblem1D;
 pub use problem2d::PdeProblem2D;
 pub use solver::{PdeSolution, PdeSolverError, Solver1D, Solver1DBuilder};
 pub use solver2d::{PdeSolution2D, PdeSolver2DError, Solver2D};
-pub use stepper::{RannacherStepper, StepperError, ThetaStepper, TimeStepper};
+pub use stepper::{StepperError, ThetaStepper};

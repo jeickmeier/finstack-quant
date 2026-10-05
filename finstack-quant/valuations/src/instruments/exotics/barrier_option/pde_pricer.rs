@@ -32,9 +32,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 
 use finstack_quant_core::types::PayoutTiming;
-use finstack_quant_models::pde::{
-    BoundaryCondition, Grid1D, PdeProblem1D, RannacherStepper, Solver1D, TimeStepper,
-};
+use finstack_quant_models::pde::{BoundaryCondition, Grid1D, PdeProblem1D, Solver1D, ThetaStepper};
 
 /// Black-Scholes PDE with barrier enforcement via boundary conditions.
 ///
@@ -561,7 +559,7 @@ impl BarrierOptionPdePricer {
             true
         };
         apply_observation(inputs.maturity, &mut values);
-        let stepper = RannacherStepper::new(RANNACHER_IMPLICIT_STEPS, levels.len() - 1);
+        let stepper = ThetaStepper::rannacher(RANNACHER_IMPLICIT_STEPS, levels.len() - 1);
         let mut since_observation = 0;
         for times in levels.windows(2) {
             stepper
@@ -730,6 +728,63 @@ mod tests {
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         }
+    }
+
+    /// Exact bit patterns of the barrier PDE pricer (continuous and discrete
+    /// monitoring), captured before the `TimeStepper` trait was replaced by
+    /// the concrete `ThetaStepper`.
+    #[rustfmt::skip]
+    const BARRIER_PDE_PIN: &[u64] = &[
+        0x40223cefad505edf, 0x4026ccb20dcfa67a, 0x3fb5b3baf9065e23, 0x3fd7c45b213973e4,
+        0x4009e4687b5f3ea3, 0x3feea3021fe081d0, 0x401d85c591709605, 0x401c610bed6e6292,
+        0x3fe60bef814818eb, 0x3ffa7352f64660c7, 0x401b391122781543, 0x401d2bd07148443b,
+        0x40275548b49fed21, 0x4025674b21ed1b05, 0x3fe51c02da16ced0, 0x3fc5fabdb96b3ba1,
+    ];
+
+    fn barrier_pde_pin_values() -> Vec<u64> {
+        let as_of = date(2024, 1, 1);
+        let expiry = date(2025, 1, 1);
+        let mkt = market(as_of, 100.0, 0.25, 0.05);
+        let pricer = BarrierOptionPdePricer {
+            space_points: 200,
+            time_steps: 100,
+        };
+        let mut out = Vec::new();
+        for (barrier_type, level) in [
+            (BarrierType::DownAndOut, 90.0),
+            (BarrierType::DownAndIn, 90.0),
+            (BarrierType::UpAndOut, 120.0),
+            (BarrierType::UpAndIn, 120.0),
+        ] {
+            for option_type in [OptionType::Call, OptionType::Put] {
+                for discrete in [false, true] {
+                    let mut option =
+                        barrier_option(barrier_type, option_type, expiry, 100.0, level);
+                    if discrete {
+                        option.monitoring = crate::instruments::Monitoring::Discrete {
+                            observation_dates: vec![
+                                date(2024, 4, 1),
+                                date(2024, 7, 1),
+                                date(2024, 10, 1),
+                                expiry,
+                            ],
+                        };
+                    }
+                    let pv = pricer
+                        .price_internal(&option, &mkt, as_of)
+                        .expect("PDE price")
+                        .amount();
+                    out.push(pv.to_bits());
+                }
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn barrier_pde_stepper_bit_pin() {
+        let values = barrier_pde_pin_values();
+        assert_eq!(values.as_slice(), BARRIER_PDE_PIN);
     }
 
     /// W-01: Rannacher startup must remove the Crank-Nicolson oscillation near
