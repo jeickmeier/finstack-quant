@@ -1287,6 +1287,24 @@ export type ProcessSpec =
     }
   | {
       /**
+       * Dividend yield or foreign rate, continuously compounded (annualized
+       * decimal).
+       */
+      q: number;
+      /**
+       * Risk-free rate, continuously compounded (annualized decimal).
+       */
+      r: number;
+      /**
+       * Local volatility `σ_loc(t, S)`: expiry axis in years from the
+       * simulation start, strike axis in spot price units. Flat outside its
+       * grid.
+       */
+      surface: LocalVolSurface;
+      type: "local_vol";
+    }
+  | {
+      /**
        * Accrual factors τ_i = T_{i+1} − T_i (length N).
        */
       accrual_factors: number[];
@@ -4022,7 +4040,40 @@ export interface LmmParams {
   vol_values: [number, number, number][][];
 }
 /**
- * Dupire local volatility on an expiry-by-strike grid.
+ * Rates and local volatility surface of the Dupire local-volatility process.
+ */
+export interface LocalVolParams {
+  /**
+   * Dividend yield or foreign rate, continuously compounded (annualized
+   * decimal).
+   */
+  q: number;
+  /**
+   * Risk-free rate, continuously compounded (annualized decimal).
+   */
+  r: number;
+  /**
+   * Local volatility `σ_loc(t, S)`: expiry axis in years from the
+   * simulation start, strike axis in spot price units. Flat outside its
+   * grid.
+   */
+  surface: LocalVolSurface;
+}
+/**
+ * Local volatility surface `σ_loc(T, K)` on a rectangular expiry-by-strike
+ * grid, extracted from an implied volatility surface via the Dupire formula.
+ *
+ * Off-grid queries are interpolated bilinearly; outside the grid the nearest
+ * boundary value applies (flat extrapolation).
+ *
+ * # Invariants
+ *
+ * - Expiries and strikes are finite and strictly increasing; expiries are
+ *   non-negative and strikes positive.
+ * - There is one finite, non-negative local volatility per grid node, stored
+ *   row-major with the expiry as the slow axis.
+ *
+ * Deserialization enforces the same invariants.
  */
 export interface LocalVolSurface {
   /**

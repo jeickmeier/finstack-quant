@@ -17,7 +17,7 @@ Per-item detail is in the rustdoc (`cargo doc -p finstack-quant-models --open`).
 | `greeks/` | Sensitivity estimators | `pathwise`, `lrm`, `finite_diff`, `gbm_european` |
 | `payoff/` | Contract definitions evaluated on `PathState` | `vanilla`, `asian`, `barrier`, `lookback` |
 | `pricer/` | Higher-level workflows over `McEngine` | `european`, `path_dependent`, `lsmc`, `heston`, `basis`, `lsq` |
-| `process/` | SDE definitions and process metadata | all 12 model modules plus `metadata` |
+| `process/` | SDE definitions and process metadata | all 13 model modules (including Dupire `local_vol`) plus `metadata` |
 | `rng/` | Random and quasi-random generation | `philox`, `sobol`, `fbm`, `volterra`; `brownian_bridge`, `poisson`, and `BrownianBridge` live in `finstack_quant_core::math::random` |
 | `variance_reduction/` | `control_variate` only — antithetic pairing lives in the engine loop, not here | `control_variate` |
 

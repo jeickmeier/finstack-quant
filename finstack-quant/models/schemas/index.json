@@ -433,6 +433,15 @@
       "type_name": "LmmParams"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/local_vol_params.schema.json",
+      "bytes": 3610,
+      "kind": "input",
+      "path": "schemas/models/1/local_vol_params.schema.json",
+      "summary": "Rates and local volatility surface of the Dupire local-volatility process.",
+      "title": "LocalVolParams",
+      "type_name": "LocalVolParams"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/local_vol_surface.schema.json",
       "bytes": 1128,
       "kind": "component",
@@ -569,7 +578,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/path_simulation_spec.schema.json",
-      "bytes": 38027,
+      "bytes": 42038,
       "kind": "input",
       "path": "schemas/models/1/path_simulation_spec.schema.json",
       "summary": "Complete, serializable description of one path simulation.",
@@ -641,7 +650,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
-      "bytes": 27598,
+      "bytes": 31509,
       "kind": "input",
       "path": "schemas/models/1/process_spec.schema.json",
       "summary": "Stochastic process to simulate, with its parameters.",
@@ -749,7 +758,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/scheme_spec.schema.json",
-      "bytes": 1224,
+      "bytes": 1200,
       "kind": "component",
       "path": "schemas/models/1/scheme_spec.schema.json",
       "summary": "Time-discretization scheme used to advance the process.",

@@ -44,7 +44,7 @@ use crate::{
     monte_carlo::payoff::barrier::OptionKind, monte_carlo::pricer::basis::BasisKind,
     monte_carlo::process::cheyette_rough::CheyetteRoughVolParams,
     monte_carlo::process::cir::CirParams, monte_carlo::process::lmm::LmmParams,
-    monte_carlo::process::ou::HullWhite1FParams,
+    monte_carlo::process::local_vol::LocalVolParams, monte_carlo::process::ou::HullWhite1FParams,
     monte_carlo::process::rough_bergomi::RoughBergomiParams,
     monte_carlo::process::rough_heston::RoughHestonParams,
     monte_carlo::process::schwartz_smith::SchwartzSmithParams,
@@ -370,6 +370,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "lmm_params",
         Input,
         "Parameters for the LMM/BGM model."
+    ),
+    finstack_quant_core::schema_artifact!(
+        LocalVolParams,
+        "models",
+        "local_vol_params",
+        Input,
+        "Rates and local volatility surface of the Dupire local-volatility process."
     ),
     finstack_quant_core::schema_artifact!(
         LocalVolSurface,

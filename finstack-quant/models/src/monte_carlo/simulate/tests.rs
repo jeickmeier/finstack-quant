@@ -4,6 +4,7 @@
 use super::*;
 use crate::monte_carlo::engine::{McEngineConfig, PathCaptureConfig};
 use crate::monte_carlo::payoff::vanilla::EuropeanCall;
+use crate::volatility::local_vol::LocalVolSurface;
 use finstack_quant_core::currency::Currency;
 
 const SCHEMES: [SchemeSpec; 4] = [
@@ -115,6 +116,16 @@ fn schwartz_smith() -> ProcessSpec {
 }
 
 /// Every process with a valid initial state, in `ProcessSpec` order.
+fn local_vol() -> ProcessSpec {
+    let surface = LocalVolSurface::new(
+        vec![0.25, 1.0],
+        vec![80.0, 100.0, 120.0],
+        vec![0.30, 0.22, 0.18, 0.26, 0.20, 0.17],
+    )
+    .unwrap();
+    ProcessSpec::LocalVol(LocalVolParams::new(0.04, 0.01, surface).unwrap())
+}
+
 fn processes() -> Vec<(ProcessSpec, Vec<f64>)> {
     vec![
         (gbm(), vec![100.0]),
@@ -128,6 +139,7 @@ fn processes() -> Vec<(ProcessSpec, Vec<f64>)> {
         (cir_plus_plus(), vec![0.04]),
         (heston(), vec![100.0, 0.03]),
         (schwartz_smith(), vec![0.2, 4.0]),
+        (local_vol(), vec![100.0]),
     ]
 }
 
@@ -136,7 +148,11 @@ fn supported(process: &ProcessSpec, scheme: SchemeSpec) -> bool {
     match scheme {
         SchemeSpec::Default => true,
         SchemeSpec::Euler => !matches!(process, ProcessSpec::GbmWithDividends { .. }),
-        SchemeSpec::LogEuler | SchemeSpec::Milstein => {
+        SchemeSpec::LogEuler => matches!(
+            process,
+            ProcessSpec::Gbm(_) | ProcessSpec::MultiGbm { .. } | ProcessSpec::LocalVol(_)
+        ),
+        SchemeSpec::Milstein => {
             matches!(process, ProcessSpec::Gbm(_) | ProcessSpec::MultiGbm { .. })
         }
     }
@@ -1008,6 +1024,7 @@ fn process_and_scheme_tags_are_stable() {
             "cir_plus_plus",
             "heston",
             "schwartz_smith",
+            "local_vol",
         ]
     );
     for scheme in SCHEMES {

@@ -28,6 +28,7 @@
 //! | `cir`, `cir_plus_plus` | quadratic-exponential | `euler` (full truncation) |
 //! | `heston` | quadratic-exponential | `euler` (biased; research use) |
 //! | `schwartz_smith` | exact Gaussian transition | `euler` |
+//! | `local_vol` | log-Euler, volatility frozen at the step start | `log_euler`, `euler` |
 //! | `lmm` | predictor-corrector under the terminal measure | none |
 //! | `rough_bergomi` | left-point log-Euler on injected fractional noise | none |
 //! | `rough_heston` | hybrid Volterra kernel scheme | none |
@@ -77,6 +78,7 @@ use crate::monte_carlo::process::gbm::MultiGbmProcess;
 use crate::monte_carlo::process::gbm_dividends::{Dividend, GbmWithDividends};
 use crate::monte_carlo::process::heston::HestonProcess;
 use crate::monte_carlo::process::lmm::{LmmParams, LmmProcess};
+use crate::monte_carlo::process::local_vol::{LocalVolParams, LocalVolProcess};
 use crate::monte_carlo::process::multi_ou::MultiOuProcess;
 use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
 use crate::monte_carlo::process::rough_bergomi::{RoughBergomiParams, RoughBergomiProcess};
@@ -199,6 +201,14 @@ pub enum ProcessSpec {
     /// State: `[x, y]`, the short-term deviation and the long-term level of
     /// the log price; the spot is `exp(x + y)`.
     SchwartzSmith(SchwartzSmithParams),
+    /// Dupire local volatility `dS = (r - q) S dt + σ_loc(t, S) S dW`, with
+    /// `σ_loc` read from a local volatility surface at the simulation time
+    /// and the current spot.
+    ///
+    /// State: `[spot]`, which must start strictly positive. The default
+    /// scheme is `log_euler`; its discretization error falls with the step
+    /// size, so use a fine time grid (about 100 steps per year).
+    LocalVol(LocalVolParams),
     /// LIBOR market model: displaced-lognormal forward rates under the
     /// terminal measure, with piecewise-constant factor loadings.
     ///
@@ -248,6 +258,7 @@ impl ProcessSpec {
             Self::CirPlusPlus { .. } => "cir_plus_plus",
             Self::Heston(_) => "heston",
             Self::SchwartzSmith(_) => "schwartz_smith",
+            Self::LocalVol(_) => "local_vol",
             Self::Lmm(_) => "lmm",
             Self::RoughBergomi(_) => "rough_bergomi",
             Self::RoughHeston(_) => "rough_heston",
@@ -270,8 +281,8 @@ pub enum SchemeSpec {
     /// available for every process except `gbm_with_dividends`, `lmm`,
     /// `rough_bergomi`, `rough_heston` and `cheyette_rough`.
     Euler,
-    /// Euler on the log state, which keeps the state positive. Only for the
-    /// proportional-diffusion processes `gbm` and `multi_gbm`.
+    /// Euler on the log state, which keeps the state positive. Only for
+    /// `gbm`, `multi_gbm` and `local_vol`.
     LogEuler,
     /// Milstein with the proportional-diffusion correction
     /// `½ σ² X (Z² - 1) Δt`. Only for `gbm` and `multi_gbm`.
@@ -635,6 +646,17 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                 }
                 SchemeSpec::Euler => simulate(&process, &EulerMaruyama, spec, x0, parallel),
                 _ => unsupported(),
+            }
+        }
+        ProcessSpec::LocalVol(p) => {
+            let process = LocalVolProcess::new(LocalVolParams::new(p.r, p.q, p.surface.clone())?);
+            require_domain(spec, &process, f64::MIN_POSITIVE)?;
+            match spec.scheme {
+                SchemeSpec::Default | SchemeSpec::LogEuler => {
+                    simulate(&process, &LogEuler, spec, x0, parallel)
+                }
+                SchemeSpec::Euler => simulate(&process, &EulerMaruyama, spec, x0, parallel),
+                SchemeSpec::Milstein => unsupported(),
             }
         }
         ProcessSpec::Lmm(p) => {
