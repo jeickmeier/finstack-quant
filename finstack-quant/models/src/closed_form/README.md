@@ -228,11 +228,8 @@ P_j = 0.5 + (1/π) ∫₀^∞ Re[e^(-iφ·ln K) · ψ_j(φ) / (iφ)] dφ
 |------|-------|
 | `heston_call_price_fourier` | `(spot, strike, time, &HestonPricingParams, Option<&HestonFourierSettings>) -> f64` |
 | `heston_put_price_fourier` | same, via put-call parity |
-| `heston_call_prices_fourier` / `heston_put_prices_fourier` | strike-strip variants |
-| `HestonStripPricer` | caches the strike-independent characteristic function on the quadrature grid |
 | `HestonPricingParams` | `r` and `q` plus canonical `volatility::heston::HestonParams` — `new()` validates and returns `Result` |
 | `HestonFourierSettings` | `u_max`, `panels`, `gl_order`, `phi_eps`; `new()` / `validate()` |
-| `heston_defaults` | module of `KAPPA`/`THETA`/`SIGMA_V`/`RHO`/`V0` constants — the single source of truth for Heston defaults across the Fourier, PDE, and Monte Carlo equity pricers |
 
 The "Little Heston Trap" algebra (Albrecher et al. 2007) lives once in
 `models::volatility::heston`;
@@ -241,7 +238,7 @@ maps this module's market-aware parameter grouping onto the volatility engine's
 five stochastic parameters.
 
 Passing `settings: None` selects
-`HestonFourierSettings::for_maturity_with_variance(time, v0)`, which widens the
+`HestonFourierSettings::for_maturity(time, v0)`, which widens the
 grid for short maturities and for small `v0` — the integrand tail decays on a
 `u`-scale proportional to `1/√(v0·T)`. Buckets: `u_max = 200/panels = 200`
 under 0.05y, `150/150` under 0.25y, the default `100/100` under 1y, `80/80`

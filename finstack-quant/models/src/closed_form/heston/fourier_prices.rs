@@ -13,8 +13,7 @@ fn resolve_heston_settings(
     if let Some(settings) = settings {
         return *settings;
     }
-    let mut settings =
-        HestonFourierSettings::for_maturity_with_variance(time, params.v0.min(params.theta));
+    let mut settings = HestonFourierSettings::for_maturity(time, params.v0.min(params.theta));
     // Include the large-frequency Heston exponential tail alongside the
     // Gaussian short-time bound. Neither bound alone covers both regimes.
     let c_inf = (1.0 - params.rho * params.rho).sqrt()
@@ -35,7 +34,7 @@ fn resolve_heston_settings(
 /// * `params` - Validated Heston rate, carry, variance, mean-reversion,
 ///   volatility-of-variance, and correlation parameters.
 /// * `settings` - Optional Fourier integration grid, truncation, and damping
-///   settings. `None` uses [`HestonFourierSettings::for_maturity_with_variance`]
+///   settings. `None` uses [`HestonFourierSettings::for_maturity`]
 ///   so short-dated and low-variance options get a wider/finer grid.
 ///
 /// # Returns
@@ -141,8 +140,8 @@ pub(super) fn validate_heston_inputs(
 ///   volatility-of-variance, and correlation parameters.
 /// * `settings` - Optional Fourier integration settings applied consistently
 ///   to the whole strike strip. `None` uses
-///   [`HestonFourierSettings::for_maturity_with_variance`].
-pub fn heston_call_prices_fourier(
+///   [`HestonFourierSettings::for_maturity`].
+pub(crate) fn heston_call_prices_fourier(
     spot: f64,
     strikes: &[f64],
     time: f64,
@@ -208,39 +207,6 @@ pub fn heston_call_prices_fourier(
     })
 }
 
-/// Price a strip of European put options under the Heston model using shared
-/// characteristic-function precomputation.
-///
-/// # Arguments
-///
-/// * `spot` - Current underlying spot price in the option quote currency.
-/// * `strikes` - Exercise prices in result order, each in the same units as
-///   `spot`; the returned vector has the same length and order.
-/// * `time` - Common remaining time to expiry in years.
-/// * `params` - Validated Heston rate, carry, variance, mean-reversion,
-///   volatility-of-variance, and correlation parameters.
-/// * `settings` - Optional Fourier integration settings applied consistently
-///   to the whole strike strip. `None` uses
-///   [`HestonFourierSettings::for_maturity_with_variance`].
-pub fn heston_put_prices_fourier(
-    spot: f64,
-    strikes: &[f64],
-    time: f64,
-    params: &HestonPricingParams,
-    settings: Option<&HestonFourierSettings>,
-) -> Result<Vec<f64>> {
-    let call_prices = heston_call_prices_fourier(spot, strikes, time, params, settings)?;
-    Ok(call_prices
-        .into_iter()
-        .zip(strikes.iter())
-        .map(|(call_price, strike)| {
-            let forward = spot * (-params.q * time.max(0.0)).exp();
-            let discount_k = *strike * (-params.r * time.max(0.0)).exp();
-            (call_price - forward + discount_k).max(0.0)
-        })
-        .collect())
-}
-
 /// Price a European put option under the Heston model using Fourier inversion.
 ///
 /// # Arguments
@@ -251,7 +217,7 @@ pub fn heston_put_prices_fourier(
 /// * `params` - Validated Heston rate, carry, variance, mean-reversion,
 ///   volatility-of-variance, and correlation parameters.
 /// * `settings` - Optional Fourier integration settings. `None` uses
-///   [`HestonFourierSettings::for_maturity_with_variance`].
+///   [`HestonFourierSettings::for_maturity`].
 ///
 /// # Returns
 ///
@@ -298,7 +264,7 @@ pub fn heston_put_price_fourier(
 ///   volatility-of-variance, and correlation parameters.
 /// * `option_type` - Call or put payoff.
 /// * `settings` - Optional Fourier integration settings. `None` uses
-///   [`HestonFourierSettings::for_maturity_with_variance`].
+///   [`HestonFourierSettings::for_maturity`].
 ///
 /// # Returns
 ///

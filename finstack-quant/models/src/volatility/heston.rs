@@ -900,33 +900,22 @@ mod tests {
         let q: f64 = 0.02;
         let t: f64 = 1.0;
         let strikes = [85.0, 95.0, 100.0, 105.0, 115.0];
+        let pricing = crate::closed_form::heston::HestonPricingParams {
+            r,
+            q,
+            model: params,
+        };
 
         let calls = crate::closed_form::heston::heston_call_prices_fourier(
-            spot,
-            &strikes,
-            t,
-            &crate::closed_form::heston::HestonPricingParams {
-                r,
-                q,
-                model: params,
-            },
-            None,
-        )
-        .expect("checked Heston price");
-        let puts = crate::closed_form::heston::heston_put_prices_fourier(
-            spot,
-            &strikes,
-            t,
-            &crate::closed_form::heston::HestonPricingParams {
-                r,
-                q,
-                model: params,
-            },
-            None,
+            spot, &strikes, t, &pricing, None,
         )
         .expect("checked Heston price");
 
-        for ((&strike, &call), &put) in strikes.iter().zip(calls.iter()).zip(puts.iter()) {
+        for (&strike, &call) in strikes.iter().zip(calls.iter()) {
+            let put = crate::closed_form::heston::heston_put_price_fourier(
+                spot, strike, t, &pricing, None,
+            )
+            .expect("checked Heston price");
             let parity = call - put - (spot * (-q * t).exp() - strike * (-r * t).exp());
             assert!(
                 parity.abs() < 1e-12,
