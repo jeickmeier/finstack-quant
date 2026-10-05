@@ -249,6 +249,7 @@ class RecoveryClaim:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import recovery_waterfall
         >>> value = recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)
         >>> recovery_waterfall.RecoveryClaim.from_json(value.to_json()) == value
         True
@@ -467,6 +468,7 @@ class RecoveryAllocation:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import recovery_waterfall
         >>> value = recovery_waterfall.allocate_recovery(
         ...     40.0, [recovery_waterfall.RecoveryClaim("SEN", "secured", 1, 100.0, 0.0, 0.0, 0.0)]
         ... ).allocations[0]

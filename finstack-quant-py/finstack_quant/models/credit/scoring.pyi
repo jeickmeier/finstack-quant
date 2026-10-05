@@ -123,6 +123,7 @@ class ScoringResult:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import scoring
         >>> value = scoring.zmijewski_score(0.05, 0.5, 1.5)
         >>> scoring.ScoringResult.from_json(value.to_json()) == value
         True

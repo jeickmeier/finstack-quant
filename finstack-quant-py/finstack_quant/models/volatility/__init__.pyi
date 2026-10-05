@@ -2273,9 +2273,7 @@ class LocalVolSurface:
     --------
     >>> from finstack_quant.core.market_data import VolSurface
     >>> from finstack_quant.models.volatility import LocalVolSurface
-    >>> implied = VolSurface(">>> from finstack_quant.core.market_data import VolSurface
-        >>> from finstack_quant.models.volatility import LocalVolSurface
-        >>> implied = VolSurface("FLAT", [0.5, 1.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2)", [0.5, 1.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2)
+    >>> implied = VolSurface("FLAT", [0.5, 1.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2)
     >>> local = LocalVolSurface.from_implied_vol(implied, [100.0, 100.0])
     >>> local.grid_shape
     (2, 3)
@@ -2549,7 +2547,7 @@ class LocalVolSurface:
     @property
     def grid_shape(self) -> tuple[int, int]:
         """
-        Grid shape.
+        Number of expiry rows and strike columns on the local volatility grid.
 
         Returns
         -------

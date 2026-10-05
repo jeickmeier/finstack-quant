@@ -233,6 +233,7 @@ class ExchangeOfferAnalysis:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import liability_management
         >>> value = liability_management.analyze_exchange_offer(60.0, 75.0, 2.0, 0.0, "par_for_par")
         >>> liability_management.ExchangeOfferAnalysis.from_json(value.to_json()) == value
         True
@@ -387,6 +388,7 @@ class LeverageImpact:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import liability_management
         >>> value = liability_management.analyze_lme("tender_offer", 100.0, 0.8, 1.0, ebitda=20.0).leverage_impact
         >>> liability_management.LeverageImpact.from_json(value.to_json()) == value
         True
@@ -621,6 +623,7 @@ class LmeAnalysis:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import liability_management
         >>> value = liability_management.analyze_lme("tender_offer", 100.0, 0.8, 1.0)
         >>> liability_management.LmeAnalysis.from_json(value.to_json()) == value
         True

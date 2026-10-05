@@ -234,7 +234,7 @@ def test_simulate_paths_scheme_changes_the_paths_but_not_the_seeded_draws() -> N
     ("spec", "message"),
     [
         ({**_GBM_SPEC, "paths": 3}, "unknown field"),
-        ({**_GBM_SPEC, "process": {"type": "local_vol"}}, "unknown variant"),
+        ({**_GBM_SPEC, "process": {"type": "variance_gamma"}}, "unknown variant"),
         ({**_GBM_SPEC, "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": -0.2}}, "sigma"),
         ({**_GBM_SPEC, "initial_state": [-100.0]}, "initial"),
         ({**_GBM_SPEC, "initial_state": [100.0, 1.0]}, "initial_state"),

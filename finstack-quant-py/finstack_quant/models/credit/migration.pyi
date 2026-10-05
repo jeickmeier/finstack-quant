@@ -339,6 +339,7 @@ class RatingScale:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import migration
         >>> value = migration.RatingScale.standard()
         >>> migration.RatingScale.from_json(value.to_json()) == value
         True
@@ -688,6 +689,7 @@ class TransitionMatrix:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import migration
         >>> value = migration.TransitionMatrix(migration.RatingScale.custom(["A", "D"]), [0.9, 0.1, 0.0, 1.0], 1.0)
         >>> migration.TransitionMatrix.from_json(value.to_json()).to_json() == value.to_json()
         True
@@ -1002,6 +1004,7 @@ class GeneratorMatrix:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import migration
         >>> value = migration.GeneratorMatrix(migration.RatingScale.custom(["A", "D"]), [-0.1, 0.1, 0.0, 0.0])
         >>> migration.GeneratorMatrix.from_json(value.to_json()).to_json() == value.to_json()
         True
@@ -1222,6 +1225,7 @@ class RatingPath:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import migration
         >>> value = migration.MigrationSimulator(
         ...     migration.GeneratorMatrix(migration.RatingScale.custom(["A", "D"]), [-0.25, 0.25, 0.0, 0.0]), 3.0
         ... ).simulate(0, 1, 42)[0]
@@ -1362,6 +1366,7 @@ class RatingPaths:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import migration
         >>> value = migration.MigrationSimulator(
         ...     migration.GeneratorMatrix(migration.RatingScale.custom(["A", "D"]), [-0.25, 0.25, 0.0, 0.0]), 3.0
         ... ).simulate(0, 2, 42)
@@ -1590,6 +1595,7 @@ class MigrationSimulator:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import migration
         >>> value = migration.MigrationSimulator(
         ...     migration.GeneratorMatrix(migration.RatingScale.custom(["A", "D"]), [-0.25, 0.25, 0.0, 0.0]), 3.0
         ... )

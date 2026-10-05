@@ -233,6 +233,7 @@ class BetaRecovery:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import lgd
         >>> value = lgd.BetaRecovery(0.4, 0.2)
         >>> lgd.BetaRecovery.from_json(value.to_json()).to_json() == value.to_json()
         True
@@ -416,6 +417,7 @@ class CollateralPiece:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import lgd
         >>> value = lgd.CollateralPiece("cash", 10.0, 0.0)
         >>> lgd.CollateralPiece.from_json(value.to_json()).to_json() == value.to_json()
         True
@@ -612,6 +614,7 @@ class WorkoutCosts:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import lgd
         >>> value = lgd.WorkoutCosts(0.05, 0.03)
         >>> lgd.WorkoutCosts.from_json(value.to_json()).to_json() == value.to_json()
         True
@@ -745,6 +748,7 @@ class WorkoutLgdResult:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import lgd
         >>> value = lgd.workout_lgd(100.0, [("cash", 50.0, 0.0)], 0.0, 0.0, 1.0, 0.0)
         >>> lgd.WorkoutLgdResult.from_json(value.to_json()) == value
         True
@@ -1041,6 +1045,7 @@ class WorkoutLgd:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import lgd
         >>> value = lgd.WorkoutLgd.builder().build()
         >>> lgd.WorkoutLgd.from_json(value.to_json()).to_json() == value.to_json()
         True
@@ -1457,6 +1462,7 @@ class DownturnLgd:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import lgd
         >>> value = lgd.DownturnLgd.regulatory_floor(0.05, 0.25)
         >>> lgd.DownturnLgd.from_json(value.to_json()).to_json() == value.to_json()
         True
@@ -1689,6 +1695,7 @@ class EadCalculator:
 
         Examples
         --------
+        >>> from finstack_quant.models.credit import lgd
         >>> value = lgd.EadCalculator.revolver(60.0, 40.0)
         >>> lgd.EadCalculator.from_json(value.to_json()).to_json() == value.to_json()
         True
