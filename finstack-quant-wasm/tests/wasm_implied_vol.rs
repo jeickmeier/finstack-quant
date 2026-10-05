@@ -1,7 +1,9 @@
 //! wasm-bindgen-test suite for `api::models` implied-volatility adapters.
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_wasm::api::models::analytic::{black76_implied_vol, bs_implied_vol, bs_price};
+use finstack_quant_wasm::api::models::closed_form::{
+    black76_implied_vol, bs_implied_vol, bs_price,
+};
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 

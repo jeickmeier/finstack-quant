@@ -1058,46 +1058,6 @@ pub fn strike_to_delta(
     Ok(vol::strike_to_delta(strike, forward, vol, expiry))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn sabr_params_equity_default_roundtrip() {
-        let p = JsSabrParameters::equity_default();
-        assert!((p.alpha() - 0.20).abs() < 1e-12);
-        assert!((p.beta() - 1.0).abs() < 1e-12);
-    }
-
-    #[test]
-    fn sabr_auto_shift_fits_negative_rate_smile() {
-        // Native tests cannot construct `JsValue` strings or Debug a `JsValue`
-        // error: both abort off wasm32. Drive the same `"auto"` policy through
-        // the Rust keyword parser the binding calls and the domain calibrator.
-        // Synthetic quotes use the documented 2% ladder rung
-        // (`-min(strike)+10bp = 1.6%` rounds up to 2%), matching the JS facade
-        // and Python bindings.
-        let policy = "auto".parse::<SabrShift>().expect("auto shift policy");
-        let p = SabrParameters::new_with_shift(0.05, 0.5, 0.4, -0.1, 0.02).expect("params");
-        let forward = -0.005;
-        let strikes = vec![-0.015, -0.01, -0.005, 0.0, 0.005];
-        let vols = SabrSmile::new(SabrModel::new(p), forward, 1.0)
-            .generate_smile(&strikes)
-            .expect("smile");
-
-        let fitted = SabrCalibrator::new()
-            .with_shift(policy)
-            .calibrate(forward, &strikes, &vols, 1.0, 0.5)
-            .expect("auto-shift calibrate");
-        let shift = fitted
-            .shift()
-            .expect("negative-rate fit must carry a shift");
-        assert!(shift > 0.0);
-        assert!(fitted.is_shifted());
-        assert!((shift - 0.02).abs() < 1e-12);
-    }
-}
-
 #[wasm_bindgen(js_class = SabrSmile)]
 impl JsSabrSmile {
     /// Forward price or rate the smile is built around.
@@ -1608,4 +1568,44 @@ pub fn materialize_fx_delta_surface(
     )
     .map_err(to_js_err)?;
     to_js_value(&surface)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn sabr_params_equity_default_roundtrip() {
+        let p = JsSabrParameters::equity_default();
+        assert!((p.alpha() - 0.20).abs() < 1e-12);
+        assert!((p.beta() - 1.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn sabr_auto_shift_fits_negative_rate_smile() {
+        // Native tests cannot construct `JsValue` strings or Debug a `JsValue`
+        // error: both abort off wasm32. Drive the same `"auto"` policy through
+        // the Rust keyword parser the binding calls and the domain calibrator.
+        // Synthetic quotes use the documented 2% ladder rung
+        // (`-min(strike)+10bp = 1.6%` rounds up to 2%), matching the JS facade
+        // and Python bindings.
+        let policy = "auto".parse::<SabrShift>().expect("auto shift policy");
+        let p = SabrParameters::new_with_shift(0.05, 0.5, 0.4, -0.1, 0.02).expect("params");
+        let forward = -0.005;
+        let strikes = vec![-0.015, -0.01, -0.005, 0.0, 0.005];
+        let vols = SabrSmile::new(SabrModel::new(p), forward, 1.0)
+            .generate_smile(&strikes)
+            .expect("smile");
+
+        let fitted = SabrCalibrator::new()
+            .with_shift(policy)
+            .calibrate(forward, &strikes, &vols, 1.0, 0.5)
+            .expect("auto-shift calibrate");
+        let shift = fitted
+            .shift()
+            .expect("negative-rate fit must carry a shift");
+        assert!(shift > 0.0);
+        assert!(fitted.is_shifted());
+        assert!((shift - 0.02).abs() < 1e-12);
+    }
 }

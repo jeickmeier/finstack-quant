@@ -1,10 +1,12 @@
 //! WASM bindings for the `finstack-quant-models` crate.
 //!
 //! Split by model family:
-//! - [`analytic`] — closed-form option primitives.
+//! - [`closed_form`] — closed-form option primitives.
 //! - [`fourier`] — COS-method Fourier pricers.
 //! - [`volatility`] — volatility models, evaluators, and convention conversion.
-//! - [`credit`] — structural-credit model factories.
+//! - [`credit`] — structural-credit, LGD, PD, migration, scoring, recovery-waterfall
+//!   and liability-management models.
+//! - [`factor`] — credit factor hierarchy and factor-risk decomposition.
 //! - [`correlation`] — copula, recovery, and joint-probability utilities.
 //! - [`monte_carlo`] — stochastic option-pricing convenience functions.
 //! - [`liquidity`] — liquidity estimation, risk, and market-impact models.
@@ -53,12 +55,11 @@ macro_rules! json_round_trip {
     };
 }
 
-pub mod analytic;
+pub mod closed_form;
 pub mod correlation;
 pub mod credit;
 pub mod factor;
 pub mod fourier;
-pub mod liability_management;
 pub mod liquidity;
 pub mod monte_carlo;
 pub mod rates;

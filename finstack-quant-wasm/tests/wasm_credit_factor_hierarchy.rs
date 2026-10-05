@@ -5,7 +5,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_wasm::api::models::factor::{
+use finstack_quant_wasm::api::models::factor::credit::{
     JsCreditCalibrator, JsCreditFactorModel, JsFactorCovarianceForecast,
 };
 use wasm_bindgen::JsValue;
@@ -146,7 +146,7 @@ fn level_values_reject_non_integer_indices() {
         .calibrate(JsValue::from(&minimal_inputs_json()))
         .expect("calibrate must succeed on minimal inputs");
     let spreads = r#"{"ISSUER-A": 0.0150, "ISSUER-B": 0.0175, "ISSUER-C": 0.0200}"#;
-    let levels = finstack_quant_wasm::api::models::factor::decompose_levels(
+    let levels = finstack_quant_wasm::api::models::factor::credit::decompose_levels(
         &model,
         JsValue::from(spreads),
         JsValue::from(0.0100),

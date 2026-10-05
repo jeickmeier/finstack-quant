@@ -5,7 +5,7 @@ pub(crate) mod contributions;
 mod functions;
 mod stress;
 use budget::{evaluate_risk_budget, PyPositionBudgetEntry, PyRiskBudgetResult};
-use config::{PyDecompositionConfig, PyVolHorizon};
+use config::PyDecompositionConfig;
 pub(crate) use contributions::PyRiskDecomposition;
 use contributions::{
     PyFactorContribution, PyPositionEsContribution, PyPositionFactorContribution,
@@ -47,11 +47,5 @@ pub(crate) fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(evaluate_risk_budget, m)?)?;
     m.add_function(wrap_pyfunction!(build_stress_attribution, m)?)?;
     m.add_function(wrap_pyfunction!(position_component_var, m)?)?;
-    Ok(())
-}
-
-/// Register the models-owned credit forecast horizon wrapper.
-pub(crate) fn register_credit_forecast(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyVolHorizon>()?;
     Ok(())
 }

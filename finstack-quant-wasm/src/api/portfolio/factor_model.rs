@@ -4,7 +4,7 @@
 
 use super::JsPortfolio;
 use crate::api::core::market_context::JsMarketContext;
-use crate::api::models::factor::JsCreditFactorModel;
+use crate::api::models::factor::credit::JsCreditFactorModel;
 use crate::utils::date::parse_iso_date;
 use crate::utils::input::{from_js_json, js_bool, js_string, json_text};
 use crate::utils::{to_js_err, to_js_value};

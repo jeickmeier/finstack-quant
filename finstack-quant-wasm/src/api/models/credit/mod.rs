@@ -6,6 +6,7 @@
 //! `models.credit`.
 
 pub mod lgd;
+pub mod liability_management;
 pub mod migration;
 pub mod pd;
 pub mod recovery_waterfall;

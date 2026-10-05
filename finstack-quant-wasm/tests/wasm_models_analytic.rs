@@ -2,7 +2,7 @@
 
 #![cfg(target_arch = "wasm32")]
 
-use finstack_quant_wasm::api::models::analytic::*;
+use finstack_quant_wasm::api::models::closed_form::*;
 use finstack_quant_wasm::api::models::fourier::*;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
