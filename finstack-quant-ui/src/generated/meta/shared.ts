@@ -28725,7 +28725,7 @@ export default [
   {
     "path": "#/$defs/StochasticPrepaySpec/oneOf/2",
     "source": "https://finstack_quant.dev/schemas/ui/1/shared-defs.schema.json#/$defs/StochasticPrepaySpec/oneOf/2",
-    "description": "Richard-Roll prepayment model for RMBS.\n\nFull stochastic model with refinancing incentive, seasoning,\nburnout, and optional seasonality."
+    "description": "Richard-Roll prepayment model for RMBS.\n\nFull stochastic model with refinancing incentive, seasoning and\nburnout."
   },
   {
     "path": "#/$defs/StochasticPrepaySpec/oneOf/2/properties/base_cpr",
