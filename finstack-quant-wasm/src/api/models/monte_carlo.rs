@@ -1,8 +1,8 @@
 //! WASM bindings for the Monte Carlo engine in `finstack-quant-models`.
 //!
 //! Mirrors `finstack-quant-py/src/bindings/models/monte_carlo/`: Heston and
-//! GBM convenience pricers, path simulation for the built-in Markov processes
-//! and finite-difference Greeks. Estimates cross the boundary as the canonical
+//! GBM convenience pricers, path simulation for the built-in processes (Markov
+//! and path-dependent) and finite-difference Greeks. Estimates cross the boundary as the canonical
 //! Rust `MoneyEstimate` / `Estimate` serde objects, and simulated paths as the
 //! `PathSummary` object. Closed-form Black-Scholes references live in
 //! `models.bsPrice`; `simulatePaths` selects a process and discretization by

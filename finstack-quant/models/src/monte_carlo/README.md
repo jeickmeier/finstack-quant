@@ -33,7 +33,7 @@ Per-item detail is in the rustdoc (`cargo doc -p finstack-quant-models --open`).
 | `paths.rs` | `PathDataset`, `SimulatedPath`, `PathPoint`, `PathSamplingMethod`, `ProcessParams`, `CashflowType` |
 | `registry.rs` | Embedded runtime defaults from `../data/defaults/pricer_defaults.v1.json`; `MONTE_CARLO_DEFAULTS_EXTENSION_KEY` |
 | `seed.rs` | `derive_seed` — FNV-1a seed derivation from instrument id + scenario name |
-| `simulate.rs` | `simulate_paths`: one entry point returning a compact `PathSummary` for any Markov process and scheme named by a serializable `PathSimulationSpec` (`ProcessSpec`, `SchemeSpec`, `TimeGridSpec`) |
+| `simulate.rs` | `simulate_paths`: one entry point returning a compact `PathSummary` for any built-in process (Markov, LMM or rough-volatility) and scheme named by a serializable `PathSimulationSpec` (`ProcessSpec`, `SchemeSpec`, `TimeGridSpec`) |
 | `captured_path_stats.rs` | Private: folds captured-path distribution statistics into an `Estimate` |
 | `indexed_spot_table.rs` | Private: static `spot_0` … `spot_127` key table backing `traits::state_keys::indexed_spot` (higher indices fall through to a cached overflow path) |
 | `mc_process_params_serialization.rs` | `#[cfg(test)]` only |

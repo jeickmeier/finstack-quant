@@ -10,7 +10,7 @@ use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Simulated paths of a Markov process on a shared time grid.
+/// Simulated paths of one built-in process on a shared time grid.
 #[pyclass(
     name = "PathSummary",
     module = "finstack_quant.models.monte_carlo",

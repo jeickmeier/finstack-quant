@@ -1,6 +1,7 @@
 //! Python bindings for the `finstack-quant-models` crate.
 //!
-//! Exposes path simulation for the built-in Markov processes and canonical
+//! Exposes path simulation for the built-in processes (Markov diffusions, the
+//! LIBOR market model and the rough-volatility models) and canonical
 //! European, Asian, LSMC, Heston, and Greek workflows; closed-form
 //! Black-Scholes references live at `finstack_quant.models`. `simulate_paths`
 //! selects a process and discretization scheme by spec; the process,

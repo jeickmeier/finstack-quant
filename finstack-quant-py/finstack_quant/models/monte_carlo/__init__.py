@@ -1,9 +1,9 @@
 """Monte Carlo convenience bindings: engine, pricers, Greek estimators.
 
 Bindings for the core convenience subset of the ``finstack-quant-models`` Rust
-crate. ``simulate_paths`` simulates any built-in Markov process (GBM, Heston,
-Hull-White, CIR, ...) under a chosen discretization scheme from a plain-data
-spec. The Rust process, discretization, RNG, and payoff types are not surfaced
+crate. ``simulate_paths`` simulates any built-in process (GBM, Heston,
+Hull-White, CIR, local volatility, the LIBOR market model, rough Bergomi, ...)
+under a chosen discretization scheme from a plain-data spec. The Rust process, discretization, RNG, and payoff types are not surfaced
 as standalone Python types; the pricers take their parameters directly as
 numeric arguments.
 

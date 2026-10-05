@@ -1,8 +1,8 @@
 """
 Monte Carlo convenience bindings (``finstack-quant-models``).
 
-Exposes path simulation for the built-in Markov processes
-(:func:`simulate_paths`), GBM and Heston pricers, and finite-difference Greek
+Exposes path simulation for the built-in processes, Markov and
+path-dependent (:func:`simulate_paths`), GBM and Heston pricers, and finite-difference Greek
 estimators. Processes and discretization schemes are selected by the plain-data
 spec passed to :func:`simulate_paths`; the Rust process, discretization, RNG
 and payoff types are not surfaced as standalone Python types, and the pricers
@@ -759,7 +759,7 @@ class LrmGreeks:
 
 class PathSummary:
     """
-    Simulated paths of a Markov process on a shared time grid.
+    Simulated paths of one built-in process on a shared time grid.
 
     Returned by :func:`simulate_paths`. ``values`` holds every state in
     row-major ``[path][time][factor]`` order; :meth:`to_dataframe` reshapes it
