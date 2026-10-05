@@ -36,7 +36,7 @@ use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::term_structures::HazardCurve;
 use finstack_quant_models::factor::matching::ISSUER_ID_META_KEY;
 use finstack_quant_models::factor::risk::{
-    apply_residual_contributions, ParametricDecomposer, PositionResidualContribution,
+    apply_residual_contributions, decompose_factors, PositionResidualContribution,
     ResidualContributionSource, RiskDecomposition,
 };
 use finstack_quant_models::factor::{
@@ -57,7 +57,6 @@ pub struct FactorModel {
     covariance: FactorCovarianceMatrix,
     matcher: Box<dyn finstack_quant_models::factor::FactorMatcher>,
     sensitivity_engine: Box<dyn FactorSensitivityEngine>,
-    decomposer: ParametricDecomposer,
     risk_measure: RiskMeasure,
     unmatched_policy: UnmatchedPolicy,
     bump_config: BumpSizeConfig,
@@ -98,7 +97,6 @@ impl FactorModel {
             covariance: config.covariance,
             matcher,
             sensitivity_engine,
-            decomposer: ParametricDecomposer,
             risk_measure: config.risk_measure,
             unmatched_policy: config.unmatched_policy.unwrap_or_default(),
             bump_config,
@@ -427,8 +425,7 @@ impl FactorModel {
             &mut credit_exposures,
         )?;
         let mut decomposition =
-            self.decomposer
-                .decompose(&sensitivities, &self.covariance, &self.risk_measure)?;
+            decompose_factors(&sensitivities, &self.covariance, &self.risk_measure)?;
         self.add_credit_residual_risk_with_credit_exposures(
             &mut decomposition,
             portfolio,
@@ -689,10 +686,6 @@ impl FactorModel {
 
     pub(crate) fn covariance(&self) -> &FactorCovarianceMatrix {
         &self.covariance
-    }
-
-    pub(crate) fn decomposer(&self) -> &ParametricDecomposer {
-        &self.decomposer
     }
 
     pub(crate) fn risk_measure(&self) -> &RiskMeasure {
@@ -1495,7 +1488,7 @@ pub(super) mod tests {
     }
 
     /// Returns a sensitivity engine that places known deltas for a single
-    /// position so the downstream `ParametricDecomposer` can be verified.
+    /// position so the downstream `decompose_factors` can be verified.
     struct KnownDeltaEngine {
         deltas: Vec<f64>,
     }

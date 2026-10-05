@@ -12,7 +12,7 @@
 //! 4. Use [`crate::factor_model::FactorModel::analyze`] to decompose portfolio risk.
 //!
 //! Risk is decomposed with the closed-form covariance-based
-//! [`finstack_quant_models::factor::risk::ParametricDecomposer`], which assumes
+//! [`finstack_quant_models::factor::risk::decompose_factors`], which assumes
 //! the upstream sensitivity engine has already scaled rows by position
 //! quantity, so decomposition works on portfolio exposures directly.
 //!

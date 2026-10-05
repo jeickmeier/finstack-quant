@@ -1,7 +1,7 @@
 //! Residual-risk overlays for additive factor decompositions.
 
 use super::math::{normal_pdf, normal_quantile};
-use super::parametric::ParametricDecomposer;
+use super::parametric::scale_for_measure;
 use super::types::{PositionResidualContribution, RiskDecomposition};
 use crate::factor::RiskMeasure;
 
@@ -71,9 +71,9 @@ pub fn apply_residual_contributions(
         variance_from_measure(decomposition.measure, decomposition.total_risk)?;
     let combined_variance = systematic_variance + residual_variance;
     let (combined_total, combined_component_scale) =
-        ParametricDecomposer::scale_for_measure(&decomposition.measure, combined_variance)?;
+        scale_for_measure(&decomposition.measure, combined_variance)?;
     let (_, systematic_component_scale) =
-        ParametricDecomposer::scale_for_measure(&decomposition.measure, systematic_variance)?;
+        scale_for_measure(&decomposition.measure, systematic_variance)?;
     let factor_rescale = if systematic_component_scale.abs() > 0.0 {
         combined_component_scale / systematic_component_scale
     } else {
@@ -141,7 +141,7 @@ fn variance_from_measure(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::factor::risk::ResidualContributionSource;
+    use crate::factor::risk::{decompose_factors, ResidualContributionSource};
     use crate::factor::{FactorCovarianceMatrix, FactorId, SensitivityMatrix};
 
     fn base(measure: RiskMeasure) -> finstack_quant_core::Result<RiskDecomposition> {
@@ -149,7 +149,7 @@ mod tests {
         let covariance = FactorCovarianceMatrix::new(factors.clone(), vec![1.0])?;
         let mut sensitivities = SensitivityMatrix::zeros(vec!["P".into()], factors);
         sensitivities.set_delta(0, 0, 10.0);
-        ParametricDecomposer.decompose(&sensitivities, &covariance, &measure)
+        decompose_factors(&sensitivities, &covariance, &measure)
     }
 
     fn residual(variance: f64) -> PositionResidualContribution {

@@ -474,10 +474,9 @@ fn decompose_factor_risk(
     py.detach(move || {
         let covariance: finstack_quant_models::factor::FactorCovarianceMatrix =
             serde_json::from_str(&covariance_json).map_err(display_to_py)?;
-        let decomposer = finstack_quant_models::factor::risk::ParametricDecomposer;
-        let result = decomposer
-            .decompose(&matrix, &covariance, &measure)
-            .map_err(core_to_py)?;
+        let result =
+            finstack_quant_models::factor::risk::decompose_factors(&matrix, &covariance, &measure)
+                .map_err(core_to_py)?;
         Ok(PyRiskDecomposition::from_inner(result))
     })
 }

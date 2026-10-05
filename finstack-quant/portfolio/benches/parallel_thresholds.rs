@@ -19,7 +19,7 @@
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use finstack_quant_models::factor::risk::{
-    DecompositionConfig, HistoricalPositionDecomposer, PositionRiskDecomposition,
+    decompose_from_pnls, DecompositionConfig, PositionRiskDecomposition,
 };
 
 fn bench_historical_tail_threshold(c: &mut Criterion) {
@@ -49,16 +49,15 @@ fn bench_historical_tail_threshold(c: &mut Criterion) {
         let ids: Vec<String> = (0..n).map(|i| format!("P{i}")).collect();
         let mut config = DecompositionConfig::historical(confidence);
         config.confidence = confidence;
-        let decomposer = HistoricalPositionDecomposer;
 
         group.bench_with_input(
             BenchmarkId::new("decompose_from_pnls", format!("{}p_x_{}sc", n, n_scenarios)),
             &n,
             |b, _| {
                 b.iter(|| {
-                    let _: PositionRiskDecomposition = decomposer
-                        .decompose_from_pnls(&pnls, &ids, n_scenarios, &config)
-                        .expect("bench: decomposition should succeed");
+                    let _: PositionRiskDecomposition =
+                        decompose_from_pnls(&pnls, &ids, n_scenarios, &config)
+                            .expect("bench: decomposition should succeed");
                 });
             },
         );

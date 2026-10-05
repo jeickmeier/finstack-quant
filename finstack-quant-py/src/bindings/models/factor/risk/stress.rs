@@ -448,9 +448,6 @@ pub(super) fn build_stress_attribution(
     position_pnls: &Bound<'_, PyAny>,
     confidence: Option<f64>,
 ) -> PyResult<PyStressAttribution> {
-    let confidence = confidence.unwrap_or_else(|| {
-        finstack_quant_models::factor::risk::DecompositionConfig::historical_95().confidence
-    });
     let (position_ids, position_pnls) = extract_pnl_input(py, position_ids, position_pnls)?;
     let n_positions = position_ids.len();
     let n_scenarios = position_pnls.n_scenarios();

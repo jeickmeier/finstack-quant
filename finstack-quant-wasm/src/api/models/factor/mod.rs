@@ -539,7 +539,7 @@ pub fn parametric_var_decomposition(
 ) -> Result<JsValue, JsValue> {
     let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
     use finstack_quant_models::factor::risk::{
-        flatten_square_matrix, DecompositionConfig, ParametricPositionDecomposer,
+        flatten_square_matrix, parametric_var_decomposition,
     };
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let weights = js_f64_seq(&weights, "weights")?;
@@ -548,16 +548,14 @@ pub fn parametric_var_decomposition(
 
     let cov_flat =
         flatten_square_matrix(covariance, weights.len(), "covariance").map_err(to_js_err)?;
-    let mut config = confidence.map_or_else(
-        DecompositionConfig::parametric_95,
-        DecompositionConfig::parametric,
-    );
-    if compute_incremental == Some(true) {
-        config = config.with_incremental();
-    }
-    let result = ParametricPositionDecomposer
-        .decompose_positions(&weights, &cov_flat, &ids, &config)
-        .map_err(to_js_err)?;
+    let result = parametric_var_decomposition(
+        &ids,
+        &weights,
+        &cov_flat,
+        confidence,
+        compute_incremental == Some(true),
+    )
+    .map_err(to_js_err)?;
     crate::utils::to_js_value(&result)
 }
 
@@ -588,24 +586,16 @@ pub fn parametric_es_decomposition(
     confidence: Option<JsValue>,
 ) -> Result<JsValue, JsValue> {
     let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
-    use finstack_quant_models::factor::risk::{
-        flatten_square_matrix, parametric_es_decomposition_view, DecompositionConfig,
-        ParametricPositionDecomposer,
-    };
+    use finstack_quant_models::factor::risk::{flatten_square_matrix, parametric_es_decomposition};
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let weights = js_f64_seq(&weights, "weights")?;
     let covariance = js_f64_matrix(&covariance, "covariance")?;
 
     let cov_flat =
         flatten_square_matrix(covariance, weights.len(), "covariance").map_err(to_js_err)?;
-    let config = confidence.map_or_else(
-        DecompositionConfig::parametric_95,
-        DecompositionConfig::parametric,
-    );
-    let decomposition = ParametricPositionDecomposer
-        .decompose_positions(&weights, &cov_flat, &ids, &config)
-        .map_err(to_js_err)?;
-    crate::utils::to_js_value(&parametric_es_decomposition_view(&decomposition))
+    let view =
+        parametric_es_decomposition(&ids, &weights, &cov_flat, confidence).map_err(to_js_err)?;
+    crate::utils::to_js_value(&view)
 }
 
 /// Decompose portfolio VaR and ES from per-position scenario P&Ls via
@@ -633,19 +623,14 @@ pub fn historical_var_decomposition(
 ) -> Result<JsValue, JsValue> {
     let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
     use finstack_quant_models::factor::risk::{
-        flatten_position_pnls, DecompositionConfig, HistoricalPositionDecomposer,
+        flatten_position_pnls, historical_var_decomposition,
     };
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let position_pnls = js_f64_matrix(&position_pnls, "positionPnls")?;
 
     let (flat, n_scenarios) = flatten_position_pnls(position_pnls, ids.len()).map_err(to_js_err)?;
-    let config = confidence.map_or_else(
-        DecompositionConfig::historical_95,
-        DecompositionConfig::historical,
-    );
-    let result = HistoricalPositionDecomposer
-        .decompose_from_pnls(&flat, &ids, n_scenarios, &config)
-        .map_err(to_js_err)?;
+    let result =
+        historical_var_decomposition(&ids, &flat, n_scenarios, confidence).map_err(to_js_err)?;
     crate::utils::to_js_value(&result)
 }
 
@@ -1120,8 +1105,7 @@ pub fn build_stress_attribution(
     use finstack_quant_models::factor::risk::{build_stress_attribution, flatten_position_pnls};
     let ids = js_string_seq(&position_ids, "positionIds")?;
     let position_pnls = js_f64_matrix(&position_pnls, "positionPnls")?;
-    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?
-        .unwrap_or_else(|| DecompositionConfig::historical_95().confidence);
+    let confidence = js_opt_f64(confidence.as_ref(), "confidence")?;
     let (flat, n_scenarios) = flatten_position_pnls(position_pnls, ids.len()).map_err(to_js_err)?;
     let result =
         build_stress_attribution(&ids, &flat, n_scenarios, confidence).map_err(to_js_err)?;

@@ -37,12 +37,125 @@ pub(crate) fn validate_finite_sensitivities(
     Ok(())
 }
 
-/// Covariance-based decomposer for linear factor risk measures.
+const VARIANCE_TOLERANCE: f64 = 1e-12;
+
+fn validate_factor_axes(
+    sensitivities: &SensitivityMatrix,
+    covariance: &FactorCovarianceMatrix,
+) -> finstack_quant_core::Result<()> {
+    if sensitivities.n_factors() != covariance.n_factors() {
+        return Err(finstack_quant_core::Error::Validation(
+            "SensitivityMatrix and FactorCovarianceMatrix factor dimensions do not match"
+                .to_string(),
+        ));
+    }
+
+    if sensitivities.factor_ids() != covariance.factor_ids() {
+        return Err(finstack_quant_core::Error::Validation(
+            "SensitivityMatrix and FactorCovarianceMatrix factor order does not match".to_string(),
+        ));
+    }
+
+    // Covariance is immutable and validates finiteness, symmetry and PSD
+    // on construction and deserialization. Re-factorizing it here adds a
+    // cubic pass and risks a different acceptance rule from its constructor.
+    validate_finite_sensitivities(sensitivities)
+}
+
+fn portfolio_exposures(sensitivities: &SensitivityMatrix) -> Vec<f64> {
+    let mut exposures = vec![0.0; sensitivities.n_factors()];
+
+    for row in sensitivities
+        .as_slice()
+        .chunks_exact(sensitivities.n_factors())
+    {
+        for (exposure, delta) in exposures.iter_mut().zip(row.iter()) {
+            *exposure += *delta;
+        }
+    }
+
+    exposures
+}
+
+fn covariance_times_exposures(covariance: &FactorCovarianceMatrix, exposures: &[f64]) -> Vec<f64> {
+    let mut cov_times_exposure = vec![0.0; covariance.n_factors()];
+
+    for (result, row) in cov_times_exposure
+        .iter_mut()
+        .zip(covariance.as_slice().chunks_exact(covariance.n_factors()))
+    {
+        *result = row
+            .iter()
+            .zip(exposures.iter())
+            .map(|(entry, exposure)| entry * exposure)
+            .sum();
+    }
+
+    cov_times_exposure
+}
+
+pub(super) fn scale_for_measure(
+    measure: &RiskMeasure,
+    variance: f64,
+) -> finstack_quant_core::Result<(f64, f64)> {
+    measure.validate()?;
+    let variance = validated_variance(variance)?;
+    let sigma = variance.sqrt();
+
+    let scaled = match measure {
+        RiskMeasure::Variance => (variance, 1.0),
+        RiskMeasure::Volatility => {
+            if sigma > 0.0 {
+                (sigma, sigma.recip())
+            } else {
+                (0.0, 0.0)
+            }
+        }
+        RiskMeasure::VaR { confidence } => {
+            // Loss convention: VaR is reported as a negative number.
+            let z_score = super::math::normal_quantile(*confidence);
+            if sigma > 0.0 {
+                (-sigma * z_score, -z_score * sigma.recip())
+            } else {
+                (0.0, 0.0)
+            }
+        }
+        RiskMeasure::ExpectedShortfall { confidence } => {
+            // Loss convention: ES is reported as a negative number.
+            let z_score = super::math::normal_quantile(*confidence);
+            let es_multiplier = super::math::normal_pdf(z_score) / (1.0 - confidence);
+            if sigma > 0.0 {
+                (-sigma * es_multiplier, -es_multiplier * sigma.recip())
+            } else {
+                (0.0, 0.0)
+            }
+        }
+    };
+
+    Ok(scaled)
+}
+
+fn validated_variance(variance: f64) -> finstack_quant_core::Result<f64> {
+    if !variance.is_finite() {
+        Err(finstack_quant_core::Error::Validation(format!(
+            "Portfolio variance is not finite ({variance}); check sensitivities and covariance inputs"
+        )))
+    } else if variance < -VARIANCE_TOLERANCE {
+        Err(finstack_quant_core::Error::Validation(format!(
+            "Portfolio variance must be non-negative, got {variance}"
+        )))
+    } else {
+        Ok(variance.max(0.0))
+    }
+}
+
+/// Decompose the requested portfolio risk measure into factor and residual components.
 ///
-/// `ParametricDecomposer` assumes the incoming [`SensitivityMatrix`] rows are already
-/// position-weighted by the upstream sensitivity engine. Portfolio exposures are therefore
-/// just the column sums of the matrix, and Euler allocations are computed directly from those
-/// weighted exposures.
+/// `sensitivities` must already reflect any position sizing or weighting applied by the
+/// upstream sensitivity engine: each row is aligned with
+/// `sensitivities.position_ids()` and portfolio weights are not re-applied.
+/// Portfolio exposures are therefore just the column sums of the matrix, and
+/// Euler allocations are computed directly from those weighted exposures.
 ///
 /// # Sign convention
 ///
@@ -56,245 +169,116 @@ pub(crate) fn validate_finite_sensitivities(
 ///
 /// - `docs/REFERENCES.md#meucci-risk-and-asset-allocation`
 /// - `docs/REFERENCES.md#tasche-2008-capital-allocation`
-#[derive(Debug, Clone, Copy, Default)]
-pub struct ParametricDecomposer;
+///
+/// # Arguments
+///
+/// * `sensitivities` - Weighted position-factor sensitivity matrix.
+/// * `covariance` - Factor covariance matrix aligned to the same factor order.
+/// * `measure` - Risk measure to decompose.
+///
+/// # Returns
+///
+/// Factor and residual risk decomposition in the units implied by `measure`.
+///
+/// # Errors
+///
+/// Returns a validation error when factor axes are inconsistent, the
+/// covariance matrix is not finite, symmetric and positive semi-definite,
+/// or the requested measure cannot be evaluated.
+pub fn decompose_factors(
+    sensitivities: &SensitivityMatrix,
+    covariance: &FactorCovarianceMatrix,
+    measure: &RiskMeasure,
+) -> finstack_quant_core::Result<RiskDecomposition> {
+    validate_factor_axes(sensitivities, covariance)?;
+    measure.validate()?;
 
-impl ParametricDecomposer {
-    const VARIANCE_TOLERANCE: f64 = 1e-12;
-
-    fn validate_factor_axes(
-        sensitivities: &SensitivityMatrix,
-        covariance: &FactorCovarianceMatrix,
-    ) -> finstack_quant_core::Result<()> {
-        if sensitivities.n_factors() != covariance.n_factors() {
-            return Err(finstack_quant_core::Error::Validation(
-                "SensitivityMatrix and FactorCovarianceMatrix factor dimensions do not match"
-                    .to_string(),
-            ));
-        }
-
-        if sensitivities.factor_ids() != covariance.factor_ids() {
-            return Err(finstack_quant_core::Error::Validation(
-                "SensitivityMatrix and FactorCovarianceMatrix factor order does not match"
-                    .to_string(),
-            ));
-        }
-
-        // Covariance is immutable and validates finiteness, symmetry and PSD
-        // on construction and deserialization. Re-factorizing it here adds a
-        // cubic pass and risks a different acceptance rule from its constructor.
-        validate_finite_sensitivities(sensitivities)
-    }
-
-    fn portfolio_exposures(sensitivities: &SensitivityMatrix) -> Vec<f64> {
-        let mut exposures = vec![0.0; sensitivities.n_factors()];
-
-        for row in sensitivities
-            .as_slice()
-            .chunks_exact(sensitivities.n_factors())
-        {
-            for (exposure, delta) in exposures.iter_mut().zip(row.iter()) {
-                *exposure += *delta;
-            }
-        }
-
-        exposures
-    }
-
-    fn covariance_times_exposures(
-        covariance: &FactorCovarianceMatrix,
-        exposures: &[f64],
-    ) -> Vec<f64> {
-        let mut cov_times_exposure = vec![0.0; covariance.n_factors()];
-
-        for (result, row) in cov_times_exposure
-            .iter_mut()
-            .zip(covariance.as_slice().chunks_exact(covariance.n_factors()))
-        {
-            *result = row
-                .iter()
-                .zip(exposures.iter())
-                .map(|(entry, exposure)| entry * exposure)
-                .sum();
-        }
-
-        cov_times_exposure
-    }
-
-    pub(super) fn scale_for_measure(
-        measure: &RiskMeasure,
-        variance: f64,
-    ) -> finstack_quant_core::Result<(f64, f64)> {
-        measure.validate()?;
-        let variance = Self::validated_variance(variance)?;
-        let sigma = variance.sqrt();
-
-        let scaled = match measure {
-            RiskMeasure::Variance => (variance, 1.0),
-            RiskMeasure::Volatility => {
-                if sigma > 0.0 {
-                    (sigma, sigma.recip())
-                } else {
-                    (0.0, 0.0)
-                }
-            }
-            RiskMeasure::VaR { confidence } => {
-                // Loss convention: VaR is reported as a negative number.
-                let z_score = super::math::normal_quantile(*confidence);
-                if sigma > 0.0 {
-                    (-sigma * z_score, -z_score * sigma.recip())
-                } else {
-                    (0.0, 0.0)
-                }
-            }
-            RiskMeasure::ExpectedShortfall { confidence } => {
-                // Loss convention: ES is reported as a negative number.
-                let z_score = super::math::normal_quantile(*confidence);
-                let es_multiplier = super::math::normal_pdf(z_score) / (1.0 - confidence);
-                if sigma > 0.0 {
-                    (-sigma * es_multiplier, -es_multiplier * sigma.recip())
-                } else {
-                    (0.0, 0.0)
-                }
-            }
-        };
-
-        Ok(scaled)
-    }
-
-    fn validated_variance(variance: f64) -> finstack_quant_core::Result<f64> {
-        if !variance.is_finite() {
-            Err(finstack_quant_core::Error::Validation(format!(
-                "Portfolio variance is not finite ({variance}); check sensitivities and covariance inputs"
-            )))
-        } else if variance < -Self::VARIANCE_TOLERANCE {
-            Err(finstack_quant_core::Error::Validation(format!(
-                "Portfolio variance must be non-negative, got {variance}"
-            )))
-        } else {
-            Ok(variance.max(0.0))
-        }
-    }
-}
-
-impl ParametricDecomposer {
-    /// Decompose the requested portfolio risk measure into factor and residual components.
-    ///
-    /// `sensitivities` must already reflect any position sizing or weighting applied by the
-    /// upstream sensitivity engine: each row is aligned with
-    /// `sensitivities.position_ids()` and portfolio weights are not re-applied.
-    ///
-    /// # Arguments
-    ///
-    /// * `sensitivities` - Weighted position-factor sensitivity matrix.
-    /// * `covariance` - Factor covariance matrix aligned to the same factor order.
-    /// * `measure` - Risk measure to decompose.
-    ///
-    /// # Returns
-    ///
-    /// Factor and residual risk decomposition in the units implied by `measure`.
-    ///
-    /// # Errors
-    ///
-    /// Returns a validation error when factor axes are inconsistent, the
-    /// covariance matrix is not finite, symmetric and positive semi-definite,
-    /// or the requested measure cannot be evaluated.
-    pub fn decompose(
-        &self,
-        sensitivities: &SensitivityMatrix,
-        covariance: &FactorCovarianceMatrix,
-        measure: &RiskMeasure,
-    ) -> finstack_quant_core::Result<RiskDecomposition> {
-        Self::validate_factor_axes(sensitivities, covariance)?;
-        measure.validate()?;
-
-        if sensitivities.n_factors() == 0 {
-            return Ok(RiskDecomposition {
-                total_risk: 0.0,
-                measure: *measure,
-                factor_contributions: Vec::new(),
-                residual_risk: 0.0,
-                position_factor_contributions: Vec::new(),
-                position_residual_contributions: Vec::new(),
-            });
-        }
-
-        let exposures = Self::portfolio_exposures(sensitivities);
-        let cov_times_exposure = Self::covariance_times_exposures(covariance, &exposures);
-        let component_variance: Vec<f64> = exposures
-            .iter()
-            .zip(cov_times_exposure.iter())
-            .map(|(exposure, covariance_exposure)| exposure * covariance_exposure)
-            .collect();
-        let variance: f64 = component_variance.iter().sum();
-
-        let (total_risk, scale) = Self::scale_for_measure(measure, variance)?;
-        let factor_ids = covariance.factor_ids();
-
-        let factor_contributions = factor_ids
-            .iter()
-            .zip(component_variance.iter().zip(cov_times_exposure.iter()))
-            .map(
-                |(factor_id, (factor_component_variance, marginal_component_variance))| {
-                    let absolute_risk = factor_component_variance * scale;
-                    let relative_risk = if total_risk.abs() > 0.0 {
-                        absolute_risk / total_risk
-                    } else {
-                        0.0
-                    };
-                    let marginal_multiplier = if matches!(measure, RiskMeasure::Variance) {
-                        2.0
-                    } else {
-                        1.0
-                    };
-                    let marginal_risk = marginal_component_variance * scale * marginal_multiplier;
-
-                    FactorContribution {
-                        factor_id: factor_id.clone(),
-                        absolute_risk,
-                        relative_risk,
-                        marginal_risk,
-                    }
-                },
-            )
-            .collect();
-
-        let position_factor_contributions = sensitivities
-            .position_ids()
-            .iter()
-            .zip(
-                sensitivities
-                    .as_slice()
-                    .chunks_exact(sensitivities.n_factors()),
-            )
-            .flat_map(|(position_id, row)| {
-                factor_ids
-                    .iter()
-                    .zip(row.iter().zip(cov_times_exposure.iter()))
-                    .map(move |(factor_id, (delta, covariance_exposure))| {
-                        PositionFactorContribution {
-                            position_id: position_id.clone(),
-                            factor_id: factor_id.clone(),
-                            risk_contribution: delta * covariance_exposure * scale,
-                        }
-                    })
-            })
-            .collect();
-
-        Ok(RiskDecomposition {
-            total_risk,
+    if sensitivities.n_factors() == 0 {
+        return Ok(RiskDecomposition {
+            total_risk: 0.0,
             measure: *measure,
-            factor_contributions,
+            factor_contributions: Vec::new(),
             residual_risk: 0.0,
-            position_factor_contributions,
+            position_factor_contributions: Vec::new(),
             position_residual_contributions: Vec::new(),
-        })
+        });
     }
+
+    let exposures = portfolio_exposures(sensitivities);
+    let cov_times_exposure = covariance_times_exposures(covariance, &exposures);
+    let component_variance: Vec<f64> = exposures
+        .iter()
+        .zip(cov_times_exposure.iter())
+        .map(|(exposure, covariance_exposure)| exposure * covariance_exposure)
+        .collect();
+    let variance: f64 = component_variance.iter().sum();
+
+    let (total_risk, scale) = scale_for_measure(measure, variance)?;
+    let factor_ids = covariance.factor_ids();
+
+    let factor_contributions = factor_ids
+        .iter()
+        .zip(component_variance.iter().zip(cov_times_exposure.iter()))
+        .map(
+            |(factor_id, (factor_component_variance, marginal_component_variance))| {
+                let absolute_risk = factor_component_variance * scale;
+                let relative_risk = if total_risk.abs() > 0.0 {
+                    absolute_risk / total_risk
+                } else {
+                    0.0
+                };
+                let marginal_multiplier = if matches!(measure, RiskMeasure::Variance) {
+                    2.0
+                } else {
+                    1.0
+                };
+                let marginal_risk = marginal_component_variance * scale * marginal_multiplier;
+
+                FactorContribution {
+                    factor_id: factor_id.clone(),
+                    absolute_risk,
+                    relative_risk,
+                    marginal_risk,
+                }
+            },
+        )
+        .collect();
+
+    let position_factor_contributions = sensitivities
+        .position_ids()
+        .iter()
+        .zip(
+            sensitivities
+                .as_slice()
+                .chunks_exact(sensitivities.n_factors()),
+        )
+        .flat_map(|(position_id, row)| {
+            factor_ids
+                .iter()
+                .zip(row.iter().zip(cov_times_exposure.iter()))
+                .map(
+                    move |(factor_id, (delta, covariance_exposure))| PositionFactorContribution {
+                        position_id: position_id.clone(),
+                        factor_id: factor_id.clone(),
+                        risk_contribution: delta * covariance_exposure * scale,
+                    },
+                )
+        })
+        .collect();
+
+    Ok(RiskDecomposition {
+        total_risk,
+        measure: *measure,
+        factor_contributions,
+        residual_risk: 0.0,
+        position_factor_contributions,
+        position_residual_contributions: Vec::new(),
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::ParametricDecomposer;
+    use super::{decompose_factors, scale_for_measure};
     use crate::factor::SensitivityMatrix;
     use crate::factor::{FactorCovarianceMatrix, FactorId, RiskMeasure};
 
@@ -316,11 +300,7 @@ mod tests {
             let mut sensitivities = SensitivityMatrix::zeros(vec!["position".into()], ids);
             sensitivities.set_delta(0, 0, 1.0);
             sensitivities.set_delta(0, 1, 1.0);
-            let result = ParametricDecomposer.decompose(
-                &sensitivities,
-                &covariance,
-                &RiskMeasure::Variance,
-            )?;
+            let result = decompose_factors(&sensitivities, &covariance, &RiskMeasure::Variance)?;
             assert!((result.total_risk - 10000.200001).abs() < 1e-9);
         }
         Ok(())
@@ -353,7 +333,7 @@ mod tests {
             RiskMeasure::VaR { confidence: 0.99 },
             RiskMeasure::ExpectedShortfall { confidence: 0.975 },
         ] {
-            let scaled = ParametricDecomposer::scale_for_measure(&measure, 4.0);
+            let scaled = scale_for_measure(&measure, 4.0);
             assert!(
                 scaled.is_ok(),
                 "supported measure {measure:?} must not error"
@@ -368,7 +348,7 @@ mod tests {
     #[test]
     fn scale_for_measure_rejects_invalid_confidence_without_panicking() {
         let measure = RiskMeasure::VaR { confidence: 1.5 };
-        let result = ParametricDecomposer::scale_for_measure(&measure, 4.0);
+        let result = scale_for_measure(&measure, 4.0);
         assert!(result.is_err(), "confidence outside (0.5, 1) must error");
     }
 
@@ -377,8 +357,7 @@ mod tests {
         let (mut sensitivities, covariance) = test_setup()?;
         sensitivities.set_delta(0, 1, f64::NAN);
 
-        let result =
-            ParametricDecomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Volatility);
+        let result = decompose_factors(&sensitivities, &covariance, &RiskMeasure::Volatility);
 
         let Err(error) = result else {
             return Err(finstack_quant_core::Error::Validation(
@@ -394,8 +373,7 @@ mod tests {
     #[test]
     fn test_parametric_variance_decomposition_uses_weighted_sensitivities_directly() -> TestResult {
         let (sensitivities, covariance) = test_setup()?;
-        let decomposer = ParametricDecomposer;
-        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Variance)?;
+        let result = decompose_factors(&sensitivities, &covariance, &RiskMeasure::Variance)?;
 
         assert!((result.total_risk - 925.0).abs() < 1e-10);
 
@@ -466,8 +444,7 @@ mod tests {
     #[test]
     fn test_parametric_volatility_decomposition_scales_component_variance() -> TestResult {
         let (sensitivities, covariance) = test_setup()?;
-        let decomposer = ParametricDecomposer;
-        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Volatility)?;
+        let result = decompose_factors(&sensitivities, &covariance, &RiskMeasure::Volatility)?;
 
         let sigma = 925.0_f64.sqrt();
         assert!((result.total_risk - sigma).abs() < 1e-10);
@@ -502,8 +479,7 @@ mod tests {
     #[test]
     fn test_parametric_var_decomposition_uses_validated_confidence_scaling() -> TestResult {
         let (sensitivities, covariance) = test_setup()?;
-        let decomposer = ParametricDecomposer;
-        let result = decomposer.decompose(
+        let result = decompose_factors(
             &sensitivities,
             &covariance,
             &RiskMeasure::VaR { confidence: 0.99 },
@@ -537,8 +513,7 @@ mod tests {
     #[test]
     fn test_parametric_expected_shortfall_scales_component_variance() -> TestResult {
         let (sensitivities, covariance) = test_setup()?;
-        let decomposer = ParametricDecomposer;
-        let result = decomposer.decompose(
+        let result = decompose_factors(
             &sensitivities,
             &covariance,
             &RiskMeasure::ExpectedShortfall { confidence: 0.99 },
@@ -578,8 +553,7 @@ mod tests {
             vec![FactorId::new("Rates"), FactorId::new("Credit")],
             vec![0.04, 0.0, 0.0, 0.09],
         )?;
-        let decomposer = ParametricDecomposer;
-        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Variance)?;
+        let result = decompose_factors(&sensitivities, &covariance, &RiskMeasure::Variance)?;
 
         assert!((result.total_risk).abs() < 1e-12);
         for contribution in &result.factor_contributions {
@@ -598,8 +572,7 @@ mod tests {
             vec![FactorId::new("Credit"), FactorId::new("Rates")],
             vec![0.09, 0.03, 0.03, 0.04],
         )?;
-        let decomposer = ParametricDecomposer;
-        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Variance);
+        let result = decompose_factors(&sensitivities, &covariance, &RiskMeasure::Variance);
 
         assert!(result.is_err());
         let Err(error) = result else {
@@ -616,8 +589,7 @@ mod tests {
     fn test_parametric_zero_factor_axes_return_empty_zero_risk_decomposition() -> TestResult {
         let sensitivities = SensitivityMatrix::zeros(vec!["cash".into()], vec![]);
         let covariance = FactorCovarianceMatrix::new(vec![], vec![])?;
-        let decomposer = ParametricDecomposer;
-        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Variance)?;
+        let result = decompose_factors(&sensitivities, &covariance, &RiskMeasure::Variance)?;
 
         assert!((result.total_risk).abs() < 1e-12);
         assert!(result.factor_contributions.is_empty());
@@ -645,8 +617,7 @@ mod tests {
             vec![FactorId::new("Rates"), FactorId::new("Duplicate")],
             vec![0.04, 0.04, 0.04, 0.04],
         )?;
-        let decomposer = ParametricDecomposer;
-        let result = decomposer.decompose(&sensitivities, &covariance, &RiskMeasure::Variance)?;
+        let result = decompose_factors(&sensitivities, &covariance, &RiskMeasure::Variance)?;
 
         // Portfolio variance = (10+10)^2 * 0.04 = 16.0.
         assert!((result.total_risk - 16.0).abs() < 1e-10);

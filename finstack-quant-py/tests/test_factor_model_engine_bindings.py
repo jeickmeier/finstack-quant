@@ -30,7 +30,7 @@ def test_build_stress_attribution_from_position_pnls() -> None:
     assert isinstance(attr, StressAttribution)
     assert attr.n_tail_scenarios == 2
     # Losses-negative convention: threshold is the signed P&L of the
-    # least-bad tail scenario (matches Rust HistoricalPositionDecomposer).
+    # least-bad tail scenario (matches Rust decompose_from_pnls).
     assert attr.var_threshold == pytest.approx(-6.0)
     assert [scenario.scenario_index for scenario in attr.tail_scenarios] == [0, 1]
 

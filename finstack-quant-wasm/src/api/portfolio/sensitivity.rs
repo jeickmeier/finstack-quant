@@ -151,8 +151,8 @@ pub fn decompose_factor_risk(
     let measure: finstack_quant_models::factor::RiskMeasure =
         crate::utils::wire::js_opt_wire(risk_measure_json.as_ref(), "riskMeasureJson")?
             .unwrap_or_default();
-    let result = finstack_quant_models::factor::risk::ParametricDecomposer
-        .decompose(&matrix, &covariance, &measure)
-        .map_err(to_js_err)?;
+    let result =
+        finstack_quant_models::factor::risk::decompose_factors(&matrix, &covariance, &measure)
+            .map_err(to_js_err)?;
     to_js_value(&result)
 }

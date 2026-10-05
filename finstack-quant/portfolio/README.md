@@ -62,7 +62,7 @@ through its module path. See the rustdoc for detail
 | `factor_brinson` | `factor_brinson_attribution` |
 | `excess_return` | `excess_returns`, `cell_returns_from_curves`, `cell_returns_from_reference` |
 | `performance` | `twrr_modified_dietz`, `twrr_linked`, `mwr_xirr` |
-| `factor_model` | `FactorModel` (`assign_factors` / `compute_sensitivities` / `analyze`), `ParametricDecomposer`, `allocate_weights` |
+| `factor_model` | `FactorModel` (`assign_factors` / `compute_sensitivities` / `analyze`), `decompose_factors`, `allocate_weights` |
 | `sensitivity` | `DeltaBasedEngine`, `FullRepricingEngine` + `ScenarioGrid`, `FactorSensitivityEngine` |
 | `optimization` | `PortfolioOptimizationProblem`, `DefaultLpOptimizer`, `optimize_from_spec`, `PortfolioOptimizationResult` |
 | `margin` (re-exported at root) | `PortfolioMarginAggregator`, `PortfolioMarginResult` — see [`src/margin/README.md`](src/margin/README.md) |

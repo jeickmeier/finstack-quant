@@ -234,8 +234,8 @@ pub fn evaluate_risk_budget_arrays(
 #[cfg(test)]
 mod tests {
     use super::super::position::{
-        DecompositionConfig, DecompositionMethod, ParametricPositionDecomposer,
-        PositionRiskDecomposition, PositionVarContribution,
+        decompose_positions, DecompositionConfig, DecompositionMethod, PositionRiskDecomposition,
+        PositionVarContribution,
     };
     use super::*;
 
@@ -460,12 +460,7 @@ mod tests {
         let covariance = [0.04, -0.03, -0.03, 0.09];
         let ids = [String::from("A"), String::from("B")];
         let config = DecompositionConfig::parametric_95();
-        let decomp = ParametricPositionDecomposer.decompose_positions(
-            &weights,
-            &covariance,
-            &ids,
-            &config,
-        )?;
+        let decomp = decompose_positions(&weights, &covariance, &ids, &config)?;
 
         // B is a hedge: its component VaR carries the opposite sign of the
         // portfolio VaR.
@@ -627,8 +622,7 @@ mod tests {
         let ids = [String::from("A"), String::from("B"), String::from("C")];
         let config = DecompositionConfig::parametric_95();
 
-        let decomposer = ParametricPositionDecomposer;
-        let decomp = decomposer.decompose_positions(&weights, &covariance, &ids, &config)?;
+        let decomp = decompose_positions(&weights, &covariance, &ids, &config)?;
 
         let targets = [("A", 0.33), ("B", 0.34), ("C", 0.33)];
 

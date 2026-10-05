@@ -209,7 +209,7 @@ impl<'a> WhatIfEngine<'a> {
             }
         }
 
-        let mut after = self.model.decomposer().decompose(
+        let mut after = finstack_quant_models::factor::risk::decompose_factors(
             &sensitivities,
             self.model.covariance(),
             self.model.risk_measure(),

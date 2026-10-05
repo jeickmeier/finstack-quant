@@ -16,12 +16,12 @@ pub use budget::{
     evaluate_risk_budget_arrays, PositionBudgetEntry, RiskBudgetResult,
     DEFAULT_UTILIZATION_THRESHOLD,
 };
-pub use parametric::ParametricDecomposer;
+pub use parametric::decompose_factors;
 pub use position::{
-    build_stress_attribution, DecompositionConfig, DecompositionMethod,
-    HistoricalPositionDecomposer, ParametricPositionDecomposer, PositionEsContribution,
-    PositionRiskDecomposition, PositionVarContribution, StressAttribution, StressPositionEntry,
-    TailScenarioBreakdown,
+    build_stress_attribution, decompose_from_pnls, decompose_positions,
+    historical_var_decomposition, parametric_es_decomposition, parametric_var_decomposition,
+    DecompositionConfig, DecompositionMethod, PositionEsContribution, PositionRiskDecomposition,
+    PositionVarContribution, StressAttribution, StressPositionEntry, TailScenarioBreakdown,
 };
 pub use residual::apply_residual_contributions;
 pub use types::{
