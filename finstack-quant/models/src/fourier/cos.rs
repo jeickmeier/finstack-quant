@@ -12,11 +12,12 @@
 //!   *SIAM J. Sci. Comput.*, 31(2), 826-848. `docs/REFERENCES.md#fang-oosterlee-2008`
 //!
 
-use super::FourierError;
+use super::{invalid_input, numerical};
 use crate::fourier::characteristic_function::{
     BlackScholesCf, CharacteristicFunction, MertonJumpCf, VarianceGammaCf,
 };
 use finstack_quant_core::math::NeumaierAccumulator;
+use finstack_quant_core::Result;
 use num_complex::Complex64;
 use std::f64::consts::PI;
 
@@ -48,9 +49,9 @@ impl Default for CosConfig {
     }
 }
 
-/// Inputs for Black-Scholes pricing via the COS method.
+/// Option and market inputs shared by the COS entry points.
 #[derive(Debug, Clone, Copy)]
-pub struct BlackScholesCosParams {
+pub struct CosMarketParams {
     /// Current spot price of the underlying.
     pub spot: f64,
     /// Option strike.
@@ -59,62 +60,6 @@ pub struct BlackScholesCosParams {
     pub rate: f64,
     /// Continuous dividend yield (decimal, annualized).
     pub div_yield: f64,
-    /// Annualized volatility.
-    pub vol: f64,
-    /// Time to expiry in years.
-    pub expiry: f64,
-    /// `true` for call, `false` for put.
-    pub is_call: bool,
-    /// Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
-    /// [`CosConfig::default`].
-    pub n_terms: Option<usize>,
-}
-
-/// Inputs for Variance Gamma pricing via the COS method.
-#[derive(Debug, Clone, Copy)]
-pub struct VarianceGammaCosParams {
-    /// Current spot price of the underlying.
-    pub spot: f64,
-    /// Option strike.
-    pub strike: f64,
-    /// Continuously-compounded risk-free rate.
-    pub rate: f64,
-    /// Continuous dividend yield (decimal, annualized).
-    pub div_yield: f64,
-    /// Volatility of the subordinated Brownian motion.
-    pub sigma: f64,
-    /// Drift of the subordinated Brownian motion.
-    pub theta: f64,
-    /// Variance rate of the Gamma subordinator.
-    pub nu: f64,
-    /// Time to expiry in years.
-    pub expiry: f64,
-    /// `true` for call, `false` for put.
-    pub is_call: bool,
-    /// Optional COS term count in `1..=`[`CosConfig::MAX_TERMS`]; defaults to
-    /// [`CosConfig::default`].
-    pub n_terms: Option<usize>,
-}
-
-/// Inputs for Merton jump-diffusion pricing via the COS method.
-#[derive(Debug, Clone, Copy)]
-pub struct MertonJumpCosParams {
-    /// Current spot price of the underlying.
-    pub spot: f64,
-    /// Option strike.
-    pub strike: f64,
-    /// Continuously-compounded risk-free rate.
-    pub rate: f64,
-    /// Continuous dividend yield (decimal, annualized).
-    pub div_yield: f64,
-    /// Diffusion volatility.
-    pub sigma: f64,
-    /// Mean of log-jump size.
-    pub mu_jump: f64,
-    /// Standard deviation of log-jump size.
-    pub sigma_jump: f64,
-    /// Jump intensity, in expected jumps per year.
-    pub lambda: f64,
     /// Time to expiry in years.
     pub expiry: f64,
     /// `true` for call, `false` for put.
@@ -128,113 +73,96 @@ pub struct MertonJumpCosParams {
 ///
 /// # Arguments
 ///
-/// * `params` - Black-Scholes COS input bag containing spot, strike, expiry,
-///   continuous rates/carry, volatility, payoff direction, and optional term
-///   count; `None` uses [`CosConfig::default`]. Spot, strike, expiry, and
-///   volatility must be finite and positive; rates/carry must be finite.
+/// * `market` - Spot, strike, expiry, continuous rate and dividend yield,
+///   payoff direction, and optional term count; `None` uses
+///   [`CosConfig::default`]. Spot, strike, and expiry must be finite and
+///   positive; rate and dividend yield must be finite.
+/// * `vol` - Annualized lognormal volatility as a decimal; finite and
+///   strictly positive.
 ///
 /// # Errors
 ///
 /// Returns an error for invalid market inputs, a zero term count, a degenerate
 /// truncation range, or non-finite model evaluations or prices.
-pub fn bs_cos_price(params: BlackScholesCosParams) -> std::result::Result<f64, FourierError> {
-    if !params.div_yield.is_finite() {
-        return Err(FourierError::invalid_input(
-            "Black-Scholes COS div_yield must be finite",
-        ));
+pub fn bs_cos_price(market: CosMarketParams, vol: f64) -> Result<f64> {
+    if !market.div_yield.is_finite() {
+        return Err(invalid_input("Black-Scholes COS div_yield must be finite"));
     }
-    if !params.vol.is_finite() || params.vol <= 0.0 {
-        return Err(FourierError::invalid_input(format!(
-            "Black-Scholes COS volatility must be finite and strictly positive, got {}",
-            params.vol
+    if !vol.is_finite() || vol <= 0.0 {
+        return Err(invalid_input(format!(
+            "Black-Scholes COS volatility must be finite and strictly positive, got {vol}"
         )));
     }
     let cf = BlackScholesCf {
-        r: params.rate,
-        q: params.div_yield,
-        sigma: params.vol,
+        r: market.rate,
+        q: market.div_yield,
+        sigma: vol,
     };
-    price_from_cf(
-        &cf,
-        params.spot,
-        params.strike,
-        params.rate,
-        params.expiry,
-        params.is_call,
-        params.n_terms,
-    )
+    price_from_cf(&cf, market)
 }
 
 /// Price a European option under Variance Gamma using the COS method.
 ///
 /// # Arguments
 ///
-/// * `params` - Variance-Gamma COS input bag containing option data, continuous
-///   rates/carry, process parameters, payoff direction, and optional term
-///   count; `None` uses [`CosConfig::default`]. Spot, strike, expiry, sigma,
-///   and nu must be finite and positive. Rates, carry, and theta must be finite;
-///   `1 - theta*nu - sigma*sigma*nu/2` must be finite and positive.
+/// * `market` - Spot, strike, expiry, continuous rate and dividend yield,
+///   payoff direction, and optional term count; `None` uses
+///   [`CosConfig::default`]. Spot, strike, and expiry must be finite and
+///   positive; rate and dividend yield must be finite.
+/// * `sigma` - Volatility of the subordinated Brownian motion (annualized
+///   decimal); finite and positive.
+/// * `theta` - Drift of the subordinated Brownian motion; finite, with
+///   `1 - theta*nu - sigma*sigma*nu/2` finite and positive.
+/// * `nu` - Variance rate of the Gamma subordinator; finite and positive.
 ///
 /// # Errors
 ///
 /// Returns an error for invalid market/process inputs, a zero term count, a
 /// degenerate truncation range, or non-finite model evaluations or prices.
-pub fn vg_cos_price(params: VarianceGammaCosParams) -> std::result::Result<f64, FourierError> {
-    let cf = VarianceGammaCf::new(
-        params.rate,
-        params.div_yield,
-        params.sigma,
-        params.nu,
-        params.theta,
-    )
-    .map_err(FourierError::invalid_input)?;
-    price_from_cf(
-        &cf,
-        params.spot,
-        params.strike,
-        params.rate,
-        params.expiry,
-        params.is_call,
-        params.n_terms,
-    )
+pub fn vg_cos_price(market: CosMarketParams, sigma: f64, theta: f64, nu: f64) -> Result<f64> {
+    let cf = VarianceGammaCf::new(market.rate, market.div_yield, sigma, nu, theta)
+        .map_err(invalid_input)?;
+    price_from_cf(&cf, market)
 }
 
 /// Price a European option under Merton jump-diffusion using the COS method.
 ///
 /// # Arguments
 ///
-/// * `params` - Merton jump-diffusion COS input bag containing option data,
-///   continuous rates/carry, diffusion and jump parameters, payoff direction,
-///   and optional term count; `None` uses [`CosConfig::default`]. Spot, strike,
-///   and expiry must be finite and positive. Rates, carry, and mean log jump
-///   must be finite; diffusion/jump volatility and annual intensity must be
-///   finite and non-negative, with a finite risk-neutral jump compensator.
+/// * `market` - Spot, strike, expiry, continuous rate and dividend yield,
+///   payoff direction, and optional term count; `None` uses
+///   [`CosConfig::default`]. Spot, strike, and expiry must be finite and
+///   positive; rate and dividend yield must be finite.
+/// * `sigma` - Diffusion volatility (annualized decimal); finite and
+///   non-negative.
+/// * `mu_jump` - Mean of the log-jump size; finite, with a finite
+///   risk-neutral jump compensator.
+/// * `sigma_jump` - Standard deviation of the log-jump size; finite and
+///   non-negative.
+/// * `lambda` - Jump intensity in expected jumps per year; finite and
+///   non-negative.
 ///
 /// # Errors
 ///
 /// Returns an error for invalid market/process inputs, a zero term count, a
 /// degenerate truncation range, or non-finite model evaluations or prices.
 pub fn merton_jump_cos_price(
-    params: MertonJumpCosParams,
-) -> std::result::Result<f64, FourierError> {
+    market: CosMarketParams,
+    sigma: f64,
+    mu_jump: f64,
+    sigma_jump: f64,
+    lambda: f64,
+) -> Result<f64> {
     let cf = MertonJumpCf {
-        r: params.rate,
-        q: params.div_yield,
-        sigma: params.sigma,
-        lambda: params.lambda,
-        mu_j: params.mu_jump,
-        sigma_j: params.sigma_jump,
+        r: market.rate,
+        q: market.div_yield,
+        sigma,
+        lambda,
+        mu_j: mu_jump,
+        sigma_j: sigma_jump,
     };
-    cf.validate().map_err(FourierError::invalid_input)?;
-    price_from_cf(
-        &cf,
-        params.spot,
-        params.strike,
-        params.rate,
-        params.expiry,
-        params.is_call,
-        params.n_terms,
-    )
+    cf.validate().map_err(invalid_input)?;
+    price_from_cf(&cf, market)
 }
 
 fn cos_config(n_terms: Option<usize>) -> CosConfig {
@@ -245,20 +173,12 @@ fn cos_config(n_terms: Option<usize>) -> CosConfig {
     }
 }
 
-fn price_from_cf(
-    cf: &dyn CharacteristicFunction,
-    spot: f64,
-    strike: f64,
-    rate: f64,
-    expiry: f64,
-    is_call: bool,
-    n_terms: Option<usize>,
-) -> std::result::Result<f64, FourierError> {
-    let pricer = CosPricer::new(cf, cos_config(n_terms));
-    if is_call {
-        pricer.price_call(spot, strike, rate, expiry)
+fn price_from_cf(cf: &dyn CharacteristicFunction, market: CosMarketParams) -> Result<f64> {
+    let pricer = CosPricer::new(cf, cos_config(market.n_terms));
+    if market.is_call {
+        pricer.price_call(market.spot, market.strike, market.rate, market.expiry)
     } else {
-        pricer.price_put(spot, strike, rate, expiry)
+        pricer.price_put(market.spot, market.strike, market.rate, market.expiry)
     }
 }
 
@@ -307,58 +227,27 @@ impl<'a> CosPricer<'a> {
     /// * `strike` - Option strike in the surface's quote units (absolute or relative)
     /// * `r` - Continuously compounded risk-free rate in decimal annual units
     /// * `t` - Year-fraction time from the curve or surface base date to the query point
-    pub fn price_call(
-        &self,
-        spot: f64,
-        strike: f64,
-        r: f64,
-        t: f64,
-    ) -> std::result::Result<f64, FourierError> {
+    pub fn price_call(&self, spot: f64, strike: f64, r: f64, t: f64) -> Result<f64> {
         self.price(spot, strike, r, t, true)
     }
 
     /// Price a European put option. See [`price_call`](Self::price_call) for the
     /// role of `r`.
-    pub fn price_put(
-        &self,
-        spot: f64,
-        strike: f64,
-        r: f64,
-        t: f64,
-    ) -> std::result::Result<f64, FourierError> {
+    pub fn price_put(&self, spot: f64, strike: f64, r: f64, t: f64) -> Result<f64> {
         self.price(spot, strike, r, t, false)
     }
 
     /// Price a strip of European calls across strikes.
-    pub fn price_calls(
-        &self,
-        spot: f64,
-        strikes: &[f64],
-        r: f64,
-        t: f64,
-    ) -> Result<Vec<f64>, FourierError> {
+    pub fn price_calls(&self, spot: f64, strikes: &[f64], r: f64, t: f64) -> Result<Vec<f64>> {
         self.price_strip(spot, strikes, r, t, true)
     }
 
     /// Price a strip of European puts across strikes.
-    pub fn price_puts(
-        &self,
-        spot: f64,
-        strikes: &[f64],
-        r: f64,
-        t: f64,
-    ) -> Result<Vec<f64>, FourierError> {
+    pub fn price_puts(&self, spot: f64, strikes: &[f64], r: f64, t: f64) -> Result<Vec<f64>> {
         self.price_strip(spot, strikes, r, t, false)
     }
 
-    fn price(
-        &self,
-        spot: f64,
-        strike: f64,
-        r: f64,
-        t: f64,
-        is_call: bool,
-    ) -> std::result::Result<f64, FourierError> {
+    fn price(&self, spot: f64, strike: f64, r: f64, t: f64, is_call: bool) -> Result<f64> {
         // `price_strip` returns one price per input strike; with a single
         // strike the result is a one-element vector. Use a non-panicking
         // accessor — a panicking index has no place in library code.
@@ -366,9 +255,7 @@ impl<'a> CosPricer<'a> {
             .into_iter()
             .next()
             .ok_or_else(|| {
-                FourierError::numerical(
-                    "COS method: price_strip returned no price for a single strike",
-                )
+                numerical("COS method: price_strip returned no price for a single strike")
             })
     }
 
@@ -379,35 +266,33 @@ impl<'a> CosPricer<'a> {
         r: f64,
         t: f64,
         is_call: bool,
-    ) -> Result<Vec<f64>, FourierError> {
+    ) -> Result<Vec<f64>> {
         for (name, value) in [("spot", spot), ("expiry", t)] {
             if !value.is_finite() || value <= 0.0 {
-                return Err(FourierError::invalid_input(format!(
+                return Err(invalid_input(format!(
                     "COS method: {name} must be finite and positive, got {value}"
                 )));
             }
         }
         if !r.is_finite() {
-            return Err(FourierError::invalid_input(
-                "COS method: rate must be finite",
-            ));
+            return Err(invalid_input("COS method: rate must be finite"));
         }
         for &strike in strikes {
             if !strike.is_finite() || strike <= 0.0 {
-                return Err(FourierError::invalid_input(format!(
+                return Err(invalid_input(format!(
                     "COS method: strike must be finite and positive, got {strike}"
                 )));
             }
         }
         if self.config.num_terms == 0 || self.config.num_terms > CosConfig::MAX_TERMS {
-            return Err(FourierError::invalid_input(format!(
+            return Err(invalid_input(format!(
                 "COS method: num_terms must be in 1..={}, got {}",
                 CosConfig::MAX_TERMS,
                 self.config.num_terms
             )));
         }
         if !self.config.truncation_l.is_finite() || self.config.truncation_l <= 0.0 {
-            return Err(FourierError::invalid_input(
+            return Err(invalid_input(
                 "COS method: truncation_l must be finite and positive",
             ));
         }
@@ -433,7 +318,7 @@ impl<'a> CosPricer<'a> {
         let (a, b) = truncation_range(&cumulants, self.config.truncation_l)?;
 
         if !(a.is_finite() && b.is_finite()) || b <= a {
-            return Err(FourierError::numerical(
+            return Err(numerical(
                 "COS method: invalid truncation range from cumulants",
             ));
         }
@@ -442,7 +327,7 @@ impl<'a> CosPricer<'a> {
         let bma = b - a;
         let df = (-r * t).exp();
         if !df.is_finite() || df <= 0.0 {
-            return Err(FourierError::invalid_input(
+            return Err(invalid_input(
                 "COS method: discount factor must be finite and positive",
             ));
         }
@@ -463,7 +348,7 @@ impl<'a> CosPricer<'a> {
             let u_k = k as f64 * PI / bma;
             let cf_val = self.cf.cf(Complex64::new(u_k, 0.0), t);
             if !(cf_val.re.is_finite() && cf_val.im.is_finite()) {
-                return Err(FourierError::numerical(format!(
+                return Err(numerical(format!(
                     "COS method: characteristic function returned a non-finite \
                          value ({cf_val}) at frequency u_{k}={u_k}; the model is \
                          likely parameterised outside its domain of validity"
@@ -493,7 +378,7 @@ impl<'a> CosPricer<'a> {
         let fwd_moment_re = if is_call {
             let fwd_moment = self.cf.cf(Complex64::new(0.0, -1.0), t);
             if !(fwd_moment.re.is_finite() && fwd_moment.im.is_finite()) {
-                return Err(FourierError::numerical(format!(
+                return Err(numerical(format!(
                     "COS method: characteristic function returned a non-finite \
                          forward moment phi(-i) ({fwd_moment}); cannot apply \
                          put-call parity"
@@ -536,7 +421,7 @@ impl<'a> CosPricer<'a> {
         bma: f64,
         df: f64,
         aks: &[f64],
-    ) -> std::result::Result<f64, FourierError> {
+    ) -> Result<f64> {
         // x0 = ln(S/K): shift from Y to X = Y + x0.
         // Integration window in X-space, following the moneyness shift.
         let x0 = spot.ln() - strike.ln();
@@ -594,9 +479,9 @@ impl<'a> CosPricer<'a> {
 /// function diverged; returning `raw.max(0.0)` would turn that into a silent
 /// `$0`, since `f64::max(NaN, 0.0) == 0.0` and the negativity check
 /// `raw < -tol` is `false` for `NaN`. Surface it as an explicit error instead.
-fn cos_finite_price(raw: f64, side: &str) -> std::result::Result<f64, FourierError> {
+fn cos_finite_price(raw: f64, side: &str) -> Result<f64> {
     if !raw.is_finite() {
-        return Err(FourierError::numerical(format!(
+        return Err(numerical(format!(
             "COS method: {side} price is non-finite ({raw}); the cosine \
                  series or characteristic function diverged — increase \
                  num_terms / truncation_l or check the model parameters"
@@ -639,10 +524,10 @@ const DEGENERATE_CUMULANT_RADICAND: f64 = 1e-12;
 fn truncation_range(
     c: &crate::fourier::characteristic_function::Cumulants,
     l: f64,
-) -> std::result::Result<(f64, f64), FourierError> {
+) -> Result<(f64, f64)> {
     let radicand = c.c2 + c.c4.abs().sqrt();
     if !radicand.is_finite() || radicand <= DEGENERATE_CUMULANT_RADICAND {
-        return Err(FourierError::numerical(format!(
+        return Err(numerical(format!(
             "COS method: degenerate cumulant set (c2={}, c4={}); the \
                  log-price distribution has effectively zero spread, so no \
                  meaningful truncation window exists — the COS method is not \
@@ -714,69 +599,33 @@ mod tests {
 
     #[test]
     fn cos_entry_points_validate_process_domains() {
-        let vg = VarianceGammaCosParams {
+        let market = CosMarketParams {
             spot: 100.0,
             strike: 100.0,
             rate: 0.05,
             div_yield: 0.0,
-            sigma: 0.2,
-            theta: -0.1,
-            nu: 0.2,
             expiry: 1.0,
             is_call: true,
             n_terms: None,
         };
-        assert!(vg_cos_price(vg).is_ok());
-        for invalid in [f64::NAN, f64::INFINITY, -0.2, 0.0] {
-            assert!(vg_cos_price(VarianceGammaCosParams {
-                sigma: invalid,
-                ..vg
-            })
-            .is_err());
-            assert!(vg_cos_price(VarianceGammaCosParams { nu: invalid, ..vg }).is_err());
-        }
-        assert!(vg_cos_price(VarianceGammaCosParams { theta: 10.0, ..vg }).is_err());
-        assert!(vg_cos_price(VarianceGammaCosParams {
+        let bad_carry = CosMarketParams {
             div_yield: f64::NAN,
-            ..vg
-        })
-        .is_err());
-        let merton = MertonJumpCosParams {
-            spot: 100.0,
-            strike: 100.0,
-            rate: 0.05,
-            div_yield: 0.0,
-            sigma: 0.2,
-            mu_jump: -0.05,
-            sigma_jump: 0.1,
-            lambda: 1.0,
-            expiry: 1.0,
-            is_call: true,
-            n_terms: None,
+            ..market
         };
-        assert!(merton_jump_cos_price(merton).is_ok());
-        for invalid in [f64::NAN, f64::INFINITY, -0.1] {
-            assert!(merton_jump_cos_price(MertonJumpCosParams {
-                sigma: invalid,
-                ..merton
-            })
-            .is_err());
-            assert!(merton_jump_cos_price(MertonJumpCosParams {
-                sigma_jump: invalid,
-                ..merton
-            })
-            .is_err());
-            assert!(merton_jump_cos_price(MertonJumpCosParams {
-                lambda: invalid,
-                ..merton
-            })
-            .is_err());
+        assert!(vg_cos_price(market, 0.2, -0.1, 0.2).is_ok());
+        for invalid in [f64::NAN, f64::INFINITY, -0.2, 0.0] {
+            assert!(vg_cos_price(market, invalid, -0.1, 0.2).is_err());
+            assert!(vg_cos_price(market, 0.2, -0.1, invalid).is_err());
         }
-        assert!(merton_jump_cos_price(MertonJumpCosParams {
-            mu_jump: 1000.0,
-            ..merton
-        })
-        .is_err());
+        assert!(vg_cos_price(market, 0.2, 10.0, 0.2).is_err());
+        assert!(vg_cos_price(bad_carry, 0.2, -0.1, 0.2).is_err());
+        assert!(merton_jump_cos_price(market, 0.2, -0.05, 0.1, 1.0).is_ok());
+        for invalid in [f64::NAN, f64::INFINITY, -0.1] {
+            assert!(merton_jump_cos_price(market, invalid, -0.05, 0.1, 1.0).is_err());
+            assert!(merton_jump_cos_price(market, 0.2, -0.05, invalid, 1.0).is_err());
+            assert!(merton_jump_cos_price(market, 0.2, -0.05, 0.1, invalid).is_err());
+        }
+        assert!(merton_jump_cos_price(market, 0.2, 1000.0, 0.1, 1.0).is_err());
     }
 
     /// Test CF whose `cf` evaluation returns a non-finite value.
@@ -1046,37 +895,29 @@ mod tests {
 
     #[test]
     fn cos_term_count_must_be_in_range() {
-        let params = |n_terms| BlackScholesCosParams {
+        let market = |n_terms| CosMarketParams {
             spot: 100.0,
             strike: 100.0,
             rate: 0.03,
             div_yield: 0.0,
-            vol: 0.2,
             expiry: 1.0,
             is_call: true,
             n_terms: Some(n_terms),
         };
-        assert!(bs_cos_price(params(CosConfig::MAX_TERMS)).is_ok());
+        assert!(bs_cos_price(market(CosConfig::MAX_TERMS), 0.2).is_ok());
         for n_terms in [0, CosConfig::MAX_TERMS + 1] {
-            let err = bs_cos_price(params(n_terms)).expect_err("out-of-range term count");
+            let err = bs_cos_price(market(n_terms), 0.2).expect_err("out-of-range term count");
             assert!(
-                err.message.contains("num_terms must be in 1..=65536"),
+                err.to_string().contains("num_terms must be in 1..=65536"),
                 "{err}"
             );
             assert_eq!(
                 err.kind(),
                 finstack_quant_core::error::ErrorKind::Validation
             );
-            assert_eq!(
-                finstack_quant_core::Error::from(err).kind(),
-                finstack_quant_core::error::ErrorKind::Validation
-            );
         }
-        let degenerate = bs_cos_price(BlackScholesCosParams {
-            vol: -0.2,
-            ..params(128)
-        })
-        .expect_err("negative volatility is rejected");
+        let degenerate =
+            bs_cos_price(market(128), -0.2).expect_err("negative volatility is rejected");
         assert_eq!(
             degenerate.kind(),
             finstack_quant_core::error::ErrorKind::Validation
@@ -1199,5 +1040,153 @@ mod tests {
             }
         }
         Ok(())
+    }
+
+    /// Bit-level pin of the three COS entry points (call and put, default and
+    /// explicit term counts), and of the error kind and message the host
+    /// bindings report for rejected inputs and numerical failures.
+    #[test]
+    fn h7_pin_cos_entry_points_are_bit_stable() {
+        const EXPECTED: &[u64] = &[
+            0x402667d6de59772a,
+            0x40253784f95ea333,
+            0x402752c709a9d508,
+            0x402667d6de59772a,
+            0x40253785dbdd3452,
+            0x402752c709a9cada,
+            0x402667d6de59772a,
+            0x40253784f9293621,
+            0x402752c709a9d508,
+            0x40194d925cdc5161,
+            0x4016ecee92e6a973,
+            0x401b2372b37d0d1c,
+            0x40194d925cdc5161,
+            0x4016ecf057e3cbb1,
+            0x401b2372b37cf8c0,
+            0x40194d925cdc5161,
+            0x4016ecee927bcf4f,
+            0x401b2372b37d0d1c,
+            0x40342bd353add40f,
+            0x40344e24c14b082a,
+            0x40345c6dc30fd427,
+            0x40342bd353add40f,
+            0x40344de94c1ac1ff,
+            0x40345c6dc31f2f6e,
+            0x40342bd353add40f,
+            0x40344e2223eaa30e,
+            0x40345c6dc30fd427,
+            0x3fb27b08023d20ab,
+            0x3fca663acfb89df5,
+            0x3fd0c55dd90f4e43,
+            0x3fb27b08023d20ab,
+            0x3fca48803795887a,
+            0x3fd0c55ddce61fee,
+            0x3fb27b08023d20ab,
+            0x3fca64ec1f860fc1,
+            0x3fd0c55dd90f4e43,
+            0x40102e73cf60ae60,
+            0x40082fb3da41bca0,
+            0x4011e176f987e998,
+            0x40102e73cf60ae60,
+            0x40082fb3d9a7a2b0,
+            0x4011e176f987ea18,
+            0x40102e73cf60ae60,
+            0x40082fb3da41bca0,
+            0x4011e176f987e998,
+            0x40470e5baa28e2ba,
+            0x40468b886de0e8b8,
+            0x404744bc0f6dca21,
+            0x40470e5baa28e2ba,
+            0x40468b886dd74719,
+            0x404744bc0f6dca31,
+            0x40470e5baa28e2ba,
+            0x40468b886de0e8b8,
+            0x404744bc0f6dca21,
+        ];
+        let mut actual = Vec::new();
+        for (spot, strike, rate, div_yield, expiry) in [
+            (100.0, 100.0, 0.05, 0.0, 1.0),
+            (100.0, 80.0, 0.03, 0.02, 0.25),
+            (100.0, 135.0, -0.01, 0.01, 3.0),
+        ] {
+            for is_call in [true, false] {
+                for n_terms in [None, Some(64), Some(512)] {
+                    let market = CosMarketParams {
+                        spot,
+                        strike,
+                        rate,
+                        div_yield,
+                        expiry,
+                        is_call,
+                        n_terms,
+                    };
+                    let bs = bs_cos_price(market, 0.22);
+                    let vg = vg_cos_price(market, 0.2, -0.14, 0.2);
+                    let merton = merton_jump_cos_price(market, 0.2, -0.1, 0.15, 0.5);
+                    for price in [bs, vg, merton] {
+                        actual.push(price.expect("price").to_bits());
+                    }
+                }
+            }
+        }
+        assert_eq!(actual, EXPECTED, "{actual:#x?}");
+
+        // What `core_to_py` and the WASM `to_js_err` report.
+        let host_view = |vol: f64, expiry: f64, n_terms: Option<usize>| {
+            let error = bs_cos_price(
+                CosMarketParams {
+                    spot: 100.0,
+                    strike: 100.0,
+                    rate: 0.05,
+                    div_yield: 0.0,
+                    expiry,
+                    is_call: true,
+                    n_terms,
+                },
+                vol,
+            )
+            .expect_err("rejected");
+            (
+                error.kind().as_str(),
+                finstack_quant_core::error::format_chain(&error),
+            )
+        };
+        for ((vol, expiry, n_terms), (kind, message)) in [
+            (
+                (0.2, 1.0, Some(0)),
+                (
+                    "validation",
+                    "Validation error: Fourier model failure: COS method: num_terms must be in \
+                     1..=65536, got 0",
+                ),
+            ),
+            (
+                (-0.2, 1.0, None),
+                (
+                    "validation",
+                    "Validation error: Fourier model failure: Black-Scholes COS volatility must \
+                     be finite and strictly positive, got -0.2",
+                ),
+            ),
+            (
+                (0.2, 0.0, None),
+                (
+                    "validation",
+                    "Validation error: Fourier model failure: COS method: expiry must be finite \
+                     and positive, got 0",
+                ),
+            ),
+            (
+                (0.2, 1e-320, None),
+                (
+                    "computation",
+                    "Calibration error: COS method: degenerate cumulant set (c2=0.0",
+                ),
+            ),
+        ] {
+            let (actual_kind, actual_message) = host_view(vol, expiry, n_terms);
+            assert_eq!(actual_kind, kind);
+            assert!(actual_message.starts_with(message), "{actual_message}");
+        }
     }
 }

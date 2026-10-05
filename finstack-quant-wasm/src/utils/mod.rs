@@ -76,7 +76,6 @@ core_folded_js_error!(
     finstack_quant_valuations::Error,
     finstack_quant_models::correlation::Error,
     finstack_quant_core::math::linalg::CorrelationError,
-    finstack_quant_models::fourier::FourierError,
 );
 
 impl IntoJsError for finstack_quant_portfolio::Error {
