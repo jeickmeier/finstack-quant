@@ -21,9 +21,14 @@ const expected = [
   'amihudIlliquidity',
   'daysToLiquidate',
   'kyleLambda',
+  'liquidityProfileHalfSpread',
+  'liquidityProfileRelativeSpread',
+  'liquidityProfileRelativeSpreadVolatility',
+  'liquidityProfileSpread',
   'liquidityTier',
   'lvarBangia',
   'rollEffectiveSpread',
+  'tradeParamsEffectiveReferencePrice',
 ];
 
 function structured(value, label) {
@@ -102,6 +107,53 @@ test('liquidityTier takes custom thresholds validated in Rust', () => {
   }
   assert.throws(
     () => liquidity.liquidityTier(3, [1, 2, 3]),
+    (e) => e instanceof TypeError && e.kind === 'invalid_type'
+  );
+});
+
+// Twins of the Python properties computed by the Rust `LiquidityProfile` and
+// `TradeParams` methods; the types are plain objects in WASM.
+test('liquidity profile and trade-params derived values are computed in Rust', () => {
+  const profile = {
+    instrument_id: 'XYZ',
+    mid: 100,
+    bid: 99.5,
+    ask: 100.5,
+    avg_daily_volume: 1_000_000,
+    avg_trade_size: 200,
+    spread_volatility: 0.05,
+    spread_volatility_kind: 'absolute',
+    observation_days: 20,
+  };
+  assert.equal(liquidity.liquidityProfileSpread(profile), 1);
+  assert.equal(liquidity.liquidityProfileRelativeSpread(profile), 0.01);
+  assert.equal(liquidity.liquidityProfileHalfSpread(profile), 0.5);
+  assert.equal(liquidity.liquidityProfileRelativeSpreadVolatility(profile), 0.05 / 100);
+  assert.equal(
+    liquidity.liquidityProfileRelativeSpreadVolatility({
+      ...profile,
+      spread_volatility_kind: 'relative',
+    }),
+    0.05
+  );
+  assert.equal(liquidity.liquidityProfileSpread(JSON.stringify(profile)), 1);
+
+  const params = { quantity: 10_000, horizon_days: 2, daily_volatility: 0.02, profile };
+  assert.equal(liquidity.tradeParamsEffectiveReferencePrice(params), 100);
+  assert.equal(
+    liquidity.tradeParamsEffectiveReferencePrice({ ...params, reference_price: 101 }),
+    101
+  );
+
+  const validation = (e) => e instanceof Error && e.kind === 'validation';
+  assert.throws(() => liquidity.liquidityProfileSpread({ ...profile, bid: 101 }), validation);
+  assert.throws(() => liquidity.liquidityProfileHalfSpread({ ...profile, extra: 1 }), validation);
+  assert.throws(
+    () => liquidity.tradeParamsEffectiveReferencePrice({ ...params, unknown: 1 }),
+    validation
+  );
+  assert.throws(
+    () => liquidity.liquidityProfileRelativeSpread(42),
     (e) => e instanceof TypeError && e.kind === 'invalid_type'
   );
 });

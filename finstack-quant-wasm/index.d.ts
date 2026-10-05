@@ -28370,6 +28370,23 @@ export interface ModelCreditNamespace {
    * @throws Error - Throws a `validation` error if the series is empty or a rate is non-finite or outside `[0, 1]`.
    */
   centralTendency(annualDefaultRates: NumericArray): number;
+  /**
+   * Net liquidation value of a collateral piece after its haircut.
+   *
+   * Twin of the Rust `CollateralPiece::liquidation_value` and the Python
+   * property `CollateralPiece.liquidation_value`.
+   * @param piece - `CollateralPiece` object or JSON (`collateral_type`, `book_value`, `haircut`), as held by `WorkoutLgd.collateral`.
+   * @returns `book_value * (1 - haircut)`, in the book value's monetary units.
+   * @throws Error - Throws a `TypeError` if `piece` is neither a string nor a plain object, and a `validation` error if it is malformed, the book value is negative or non-finite, or the haircut is outside `[0, 1]`.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const piece = { collateral_type: "real_estate" as const, book_value: 800_000, haircut: 0.25 };
+   * console.log(models.credit.collateralPieceLiquidationValue(piece)); // 600000
+   * ```
+   */
+  collateralPieceLiquidationValue(piece: generated.models.CollateralPiece | string): number;
 
   /**
    * Moody's WARF rating factor for one credit rating.
@@ -28420,6 +28437,33 @@ export interface ModelCreditNamespace {
    * @throws Error - Throws a `validation` error if `t` is not positive and finite, and a `computation` error if the matrix exponential fails.
    */
   project(generator: GeneratorMatrix, t: number): TransitionMatrix;
+  /**
+   * Total allowed amount of a recovery claim: principal plus accrued amounts
+   * and penalties.
+   *
+   * Twin of the Rust `RecoveryClaim::total_claim` and the Python property
+   * `RecoveryClaim.total_claim`.
+   * @param claim - `RecoveryClaim` object or JSON, as passed to `allocateRecovery`.
+   * @returns `principal + accrued + penalties`, in the claim's monetary units.
+   * @throws Error - Throws a `TypeError` if `claim` is neither a string nor a plain object, and a `validation` error if it is malformed.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const claim = {
+   *   id: "TL-B",
+   *   seniority: "senior_secured",
+   *   priority: 1,
+   *   principal: 100,
+   *   accrued: 5,
+   *   penalties: 1,
+   *   collateral_value: null,
+   *   collateral_haircut: 0,
+   * };
+   * console.log(models.credit.recoveryClaimTotalClaim(claim)); // 106
+   * ```
+   */
+  recoveryClaimTotalClaim(claim: generated.models.RecoveryClaim | string): number;
   /**
    * Historical Beta recovery distribution for a debt seniority class.
    * @param seniority - Seniority class label such as `"senior_secured"`, `"senior_unsecured"` or `"subordinated"`.
@@ -30139,6 +30183,152 @@ export interface LiquidityNamespace {
     volumes: NumericArray,
     referencePrice: number
   ): number | undefined;
+  /**
+   * Absolute bid-ask spread of a liquidity profile.
+   *
+   * Twin of the Rust `LiquidityProfile::spread` and the Python property
+   * `LiquidityProfile.spread`.
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @returns `ask - bid`, in price units.
+   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const profile = {
+   *   instrument_id: "XYZ",
+   *   mid: 100,
+   *   bid: 99.5,
+   *   ask: 100.5,
+   *   avg_daily_volume: 1_000_000,
+   *   avg_trade_size: 200,
+   *   spread_volatility: 0.05,
+   *   spread_volatility_kind: "absolute" as const,
+   *   observation_days: 20,
+   * };
+   * console.log(models.liquidity.liquidityProfileSpread(profile)); // 1
+   * ```
+   */
+  liquidityProfileSpread(profile: generated.models.LiquidityProfile | string): number;
+  /**
+   * Relative bid-ask spread of a liquidity profile, as a fraction of mid.
+   *
+   * Twin of the Rust `LiquidityProfile::relative_spread` and the Python
+   * property `LiquidityProfile.relative_spread`.
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @returns `(ask - bid) / mid`, as a decimal fraction of the mid price.
+   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const profile = {
+   *   instrument_id: "XYZ",
+   *   mid: 100,
+   *   bid: 99.5,
+   *   ask: 100.5,
+   *   avg_daily_volume: 1_000_000,
+   *   avg_trade_size: 200,
+   *   spread_volatility: 0.05,
+   *   spread_volatility_kind: "absolute" as const,
+   *   observation_days: 20,
+   * };
+   * console.log(models.liquidity.liquidityProfileRelativeSpread(profile)); // 0.01
+   * ```
+   */
+  liquidityProfileRelativeSpread(profile: generated.models.LiquidityProfile | string): number;
+  /**
+   * Half the absolute bid-ask spread of a liquidity profile: the one-way
+   * transaction cost at mid.
+   *
+   * Twin of the Rust `LiquidityProfile::half_spread` and the Python property
+   * `LiquidityProfile.half_spread`.
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @returns `0.5 * (ask - bid)`, in price units.
+   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const profile = {
+   *   instrument_id: "XYZ",
+   *   mid: 100,
+   *   bid: 99.5,
+   *   ask: 100.5,
+   *   avg_daily_volume: 1_000_000,
+   *   avg_trade_size: 200,
+   *   spread_volatility: 0.05,
+   *   spread_volatility_kind: "absolute" as const,
+   *   observation_days: 20,
+   * };
+   * console.log(models.liquidity.liquidityProfileHalfSpread(profile)); // 0.5
+   * ```
+   */
+  liquidityProfileHalfSpread(profile: generated.models.LiquidityProfile | string): number;
+  /**
+   * Spread volatility of a liquidity profile normalised to relative
+   * (fraction-of-mid) units.
+   *
+   * A `"relative"` `spread_volatility_kind` returns the stored value; an
+   * `"absolute"` one divides it by `mid`. Twin of the Rust
+   * `LiquidityProfile::relative_spread_volatility` and the Python property
+   * `LiquidityProfile.relative_spread_volatility`.
+   * @param profile - `LiquidityProfile` object or JSON (`instrument_id`, `mid`, `bid`, `ask`, `avg_daily_volume`, `avg_trade_size`, `spread_volatility`, `spread_volatility_kind`, `observation_days`).
+   * @returns The spread standard deviation as a decimal fraction of the mid price.
+   * @throws Error - Throws a `TypeError` if `profile` is neither a string nor a plain object, and a `validation` error if it is malformed or fails the profile's quote and volume checks.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const profile = {
+   *   instrument_id: "XYZ",
+   *   mid: 100,
+   *   bid: 99.5,
+   *   ask: 100.5,
+   *   avg_daily_volume: 1_000_000,
+   *   avg_trade_size: 200,
+   *   spread_volatility: 0.05,
+   *   spread_volatility_kind: "absolute" as const,
+   *   observation_days: 20,
+   * };
+   * console.log(models.liquidity.liquidityProfileRelativeSpreadVolatility(profile)); // 0.0005
+   * ```
+   */
+  liquidityProfileRelativeSpreadVolatility(
+    profile: generated.models.LiquidityProfile | string
+  ): number;
+  /**
+   * Reference price a trade actually uses: its explicit `reference_price`, or
+   * the profile's `mid` when that is `null`.
+   *
+   * Twin of the Rust `TradeParams::effective_reference_price` and the Python
+   * property `TradeParams.effective_reference_price`.
+   * @param params - `TradeParams` object or JSON (`quantity`, `horizon_days`, `daily_volatility`, `risk_aversion`, `reference_price`, `profile`).
+   * @returns The reference price in price units.
+   * @throws Error - Throws a `TypeError` if `params` is neither a string nor a plain object, and a `validation` error if it is malformed.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const profile = {
+   *   instrument_id: "XYZ",
+   *   mid: 100,
+   *   bid: 99.5,
+   *   ask: 100.5,
+   *   avg_daily_volume: 1_000_000,
+   *   avg_trade_size: 200,
+   *   spread_volatility: 0.05,
+   *   spread_volatility_kind: "absolute" as const,
+   *   observation_days: 20,
+   * };
+   * const params = { quantity: 10_000, horizon_days: 2, daily_volatility: 0.02, profile };
+   * console.log(models.liquidity.tradeParamsEffectiveReferencePrice(params)); // 100
+   * console.log(
+   *   models.liquidity.tradeParamsEffectiveReferencePrice({ ...params, reference_price: 101 })
+   * ); // 101
+   * ```
+   */
+  tradeParamsEffectiveReferencePrice(params: generated.models.TradeParams | string): number;
   /**
    * Almgren-Chriss market-impact model.
    */

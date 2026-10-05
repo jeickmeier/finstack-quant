@@ -395,6 +395,32 @@ impl JsWorkoutLgdBuilder {
     }
 }
 
+/// Net liquidation value of a collateral piece after its haircut.
+///
+/// Twin of the Rust `CollateralPiece::liquidation_value` and the Python
+/// property `CollateralPiece.liquidation_value`.
+/// @param piece - `CollateralPiece` object or JSON (`collateral_type`, `book_value`, `haircut`), as held by `WorkoutLgd.collateral`.
+/// @returns `book_value * (1 - haircut)`, in the book value's monetary units.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const piece = { collateral_type: "real_estate" as const, book_value: 800_000, haircut: 0.25 };
+/// console.log(models.credit.collateralPieceLiquidationValue(piece)); // 600000
+/// ```
+///
+/// # Errors
+///
+/// Throws a `TypeError` if `piece` is neither a string nor a plain object,
+/// and a `validation` error if it is malformed, the book value is negative or
+/// non-finite, or the haircut is outside `[0, 1]`.
+#[wasm_bindgen(js_name = collateralPieceLiquidationValue)]
+pub fn collateral_piece_liquidation_value(piece: JsValue) -> Result<f64, JsValue> {
+    let piece: CollateralPiece = from_js_json(&piece, "piece")?;
+    Ok(piece.liquidation_value())
+}
+
 /// One-call workout LGD from collateral tuples and cost assumptions.
 /// @param ead - Exposure at default in monetary units; positive.
 /// @param collateral - Array of `[collateralType, bookValue, haircut]` tuples, such as `[["real_estate", 800000, 0.3]]`.

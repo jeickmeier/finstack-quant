@@ -2685,10 +2685,12 @@
       "applyBaselIrbPdFloor",
       "baselIrbPdFloor",
       "centralTendency",
+      "collateralPieceLiquidationValue",
       "moodysWarfFactor",
       "ohlsonOScore",
       "pitToTtc",
       "project",
+      "recoveryClaimTotalClaim",
       "seniorityRecoveryStats",
       "tenderRecommendationHurdle",
       "ttcToPit",
@@ -2850,6 +2852,9 @@
   "models.credit.workoutLgd": {
     "kind": "function"
   },
+  "models.credit.collateralPieceLiquidationValue": {
+    "kind": "function"
+  },
   "models.credit.MasterScale": {
     "kind": "class",
     "statics": ["fromJson", "fromRegistryId", "moodysAssumptions", "spAssumptions"],
@@ -2957,6 +2962,9 @@
     "kind": "function"
   },
   "models.credit.allocateRecovery": {
+    "kind": "function"
+  },
+  "models.credit.recoveryClaimTotalClaim": {
     "kind": "function"
   },
   "models.factor": {
@@ -3141,9 +3149,14 @@
       "amihudIlliquidity",
       "daysToLiquidate",
       "kyleLambda",
+      "liquidityProfileHalfSpread",
+      "liquidityProfileRelativeSpread",
+      "liquidityProfileRelativeSpreadVolatility",
+      "liquidityProfileSpread",
       "liquidityTier",
       "lvarBangia",
-      "rollEffectiveSpread"
+      "rollEffectiveSpread",
+      "tradeParamsEffectiveReferencePrice"
     ]
   },
   "models.liquidity.AlmgrenChrissModel": {
@@ -3177,6 +3190,21 @@
     "kind": "function"
   },
   "models.liquidity.kyleLambda": {
+    "kind": "function"
+  },
+  "models.liquidity.liquidityProfileSpread": {
+    "kind": "function"
+  },
+  "models.liquidity.liquidityProfileRelativeSpread": {
+    "kind": "function"
+  },
+  "models.liquidity.liquidityProfileHalfSpread": {
+    "kind": "function"
+  },
+  "models.liquidity.liquidityProfileRelativeSpreadVolatility": {
+    "kind": "function"
+  },
+  "models.liquidity.tradeParamsEffectiveReferencePrice": {
     "kind": "function"
   },
   "models.monteCarlo": {

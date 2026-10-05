@@ -2376,12 +2376,23 @@ vmResultRequiresCall = "twin of the Python property VmResult.requires_call (Rust
 [parity.js."models".wasm_only]
 bsGreeksIsValid = "free-function twin of Python BsGreeks.is_valid: the type is a plain object in WASM"
 
+[parity.js."models.credit".wasm_only]
+collateralPieceLiquidationValue = "free-function twin of the Python property CollateralPiece.liquidation_value (Rust CollateralPiece::liquidation_value), which is not serialized: the type is a plain object in WASM"
+recoveryClaimTotalClaim = "free-function twin of the Python property RecoveryClaim.total_claim (Rust RecoveryClaim::total_claim), which is not serialized: the type is a plain object in WASM"
+
 [parity.js."models.factor.credit".wasm_only]
 factorCorrelation = "free-function twin of Python FactorCovarianceMatrix.correlation: the type is a plain object in WASM"
 factorCovariance = "free-function twin of Python FactorCovarianceMatrix.covariance: the type is a plain object in WASM"
 factorCovarianceRows = "nested-row twin of Python FactorCovarianceMatrix.to_numpy"
 factorVariance = "free-function twin of Python FactorCovarianceMatrix.variance: the type is a plain object in WASM"
 validateFactorModelConfig = "free-function twin of Python FactorModelConfig.validate: the type is a plain object in WASM"
+
+[parity.js."models.liquidity".wasm_only]
+liquidityProfileHalfSpread = "free-function twin of the Python property LiquidityProfile.half_spread (Rust LiquidityProfile::half_spread), which is not serialized: the type is a plain object in WASM"
+liquidityProfileRelativeSpread = "free-function twin of the Python property LiquidityProfile.relative_spread (Rust LiquidityProfile::relative_spread), which is not serialized: the type is a plain object in WASM"
+liquidityProfileRelativeSpreadVolatility = "free-function twin of the Python property LiquidityProfile.relative_spread_volatility (Rust LiquidityProfile::relative_spread_volatility), which is not serialized: the type is a plain object in WASM"
+liquidityProfileSpread = "free-function twin of the Python property LiquidityProfile.spread (Rust LiquidityProfile::spread), which is not serialized: the type is a plain object in WASM"
+tradeParamsEffectiveReferencePrice = "free-function twin of the Python property TradeParams.effective_reference_price (Rust TradeParams::effective_reference_price), which is not serialized: the type is a plain object in WASM"
 
 [parity.js."models.monteCarlo".wasm_only]
 relativeStderr = "free-function twin of Python MoneyEstimate.relative_stderr: the type is a plain object in WASM"
@@ -2828,6 +2839,68 @@ variance = { js = "models.factor.credit.factorVariance", reason = "free-function
 
 [parity.members."finstack_quant.models.factor.credit.FactorModelConfig".renames]
 validate = { js = "models.factor.credit.validateFactorModelConfig", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+
+# Properties of `models` data classes that the TypeScript type has no field
+# for. Each one below is a plain view of wire fields (a count, an element of a
+# tuple, a column of a matrix, an enum tag, a host-attached label list), so the
+# TypeScript object is its twin (`literal`). Properties computed by a Rust
+# method are recorded as renames to their WASM free-function twins instead.
+[parity.members."finstack_quant.models.factor.credit.FactorCovarianceMatrix".excluded]
+n_factors = "literal"
+
+[parity.members."finstack_quant.models.factor.credit.FactorModelConfig".excluded]
+factor_ids = "literal"
+n_factors = "literal"
+
+[parity.members."finstack_quant.models.factor.risk.PositionResidualContribution".excluded]
+source_issuer_id = "literal"
+source_kind = "literal"
+
+[parity.members."finstack_quant.models.factor.risk.RiskDecomposition".excluded]
+measure_json = "literal"
+
+[parity.members."finstack_quant.models.factor.risk.TailScenarioBreakdown".excluded]
+position_ids = "literal"
+
+[parity.members."finstack_quant.models.monte_carlo.Estimate".excluded]
+ci_lower = "literal"
+ci_upper = "literal"
+
+[parity.members."finstack_quant.models.monte_carlo.MoneyEstimate".excluded]
+ci_lower = "literal"
+ci_upper = "literal"
+
+[parity.members."finstack_quant.models.rates.dtsm.FactorTimeSeries".excluded]
+curvature = "literal"
+level = "literal"
+num_dates = "literal"
+slope = "literal"
+
+[parity.members."finstack_quant.models.rates.dtsm.YieldPcaView".excluded]
+num_components = "literal"
+
+[parity.members."finstack_quant.models.volatility.ArbitrageReport".excluded]
+by_severity = "literal"
+by_type = "literal"
+total_violations = "literal"
+
+[parity.members."finstack_quant.models.volatility.LocalVolSurface".excluded]
+grid_shape = "literal"
+
+[parity.members."finstack_quant.models.credit.lgd.CollateralPiece".renames]
+liquidation_value = { js = "models.credit.collateralPieceLiquidationValue", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+
+[parity.members."finstack_quant.models.credit.recovery_waterfall.RecoveryClaim".renames]
+total_claim = { js = "models.credit.recoveryClaimTotalClaim", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+
+[parity.members."finstack_quant.models.liquidity.LiquidityProfile".renames]
+half_spread = { js = "models.liquidity.liquidityProfileHalfSpread", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+relative_spread = { js = "models.liquidity.liquidityProfileRelativeSpread", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+relative_spread_volatility = { js = "models.liquidity.liquidityProfileRelativeSpreadVolatility", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+spread = { js = "models.liquidity.liquidityProfileSpread", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
+
+[parity.members."finstack_quant.models.liquidity.TradeParams".renames]
+effective_reference_price = { js = "models.liquidity.tradeParamsEffectiveReferencePrice", reason = "free-function twin of the Rust method behind the Python property: the type crosses the boundary as a plain object" }
 
 [parity.members."finstack_quant.models.volatility.LocalVolSurface".renames]
 from_implied_vol = { js = "models.volatility.localVolFromImpliedVol", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }

@@ -226,6 +226,33 @@ test('LGD, EAD and PD handles expose their accessors and reject bad input', () =
   assert.throws(() => credit.allocateRecovery(100, [{ id: 'x' }]), kind('validation'));
 });
 
+// Twins of the Python properties `RecoveryClaim.total_claim` and
+// `CollateralPiece.liquidation_value`, computed by the same Rust methods.
+test('recovery-claim and collateral-piece derived values are computed in Rust', () => {
+  const claim = {
+    id: 'TL-B',
+    seniority: 'senior_secured',
+    priority: 1,
+    principal: 100,
+    accrued: 5,
+    penalties: 1,
+    collateral_value: null,
+    collateral_haircut: 0,
+  };
+  assert.equal(credit.recoveryClaimTotalClaim(claim), 106);
+  assert.equal(credit.recoveryClaimTotalClaim(JSON.stringify(claim)), 106);
+  assert.throws(() => credit.recoveryClaimTotalClaim({ id: 'x' }), kind('validation'));
+  assert.throws(() => credit.recoveryClaimTotalClaim(1), invalidType);
+
+  const piece = { collateral_type: 'real_estate', book_value: 800_000, haircut: 0.25 };
+  assert.equal(credit.collateralPieceLiquidationValue(piece), 600_000);
+  assert.throws(
+    () => credit.collateralPieceLiquidationValue({ ...piece, haircut: 1.5 }),
+    kind('validation')
+  );
+  assert.throws(() => credit.collateralPieceLiquidationValue(null), invalidType);
+});
+
 test('correlation handles expose their accessors and reject bad input', () => {
   const pair = new correlation.CorrelatedBernoulli(0.1, 0.2, 0.3);
   assert.equal(pair.p1, 0.1);
@@ -410,7 +437,10 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
   );
   assert.throws(() => lrmPricer.priceWithLrmGreeks(...gbm, 'call', 12), invalidType);
   assert.throws(() => lrmPricer.priceWithLrmGreeks(...gbm, true, 1.5), invalidType);
-  assert.throws(() => lrmPricer.priceWithLrmGreeks(0, ...gbm.slice(1), true, 12), kind('validation'));
+  assert.throws(
+    () => lrmPricer.priceWithLrmGreeks(0, ...gbm.slice(1), true, 12),
+    kind('validation')
+  );
   assert.throws(() => asian.priceWithLrmGreeks(...gbm, true, 12), kind('validation'));
 
   const lsmc = new monteCarlo.LsmcPricer(500, 7, false, 10, 'polynomial', 3, false);
@@ -604,7 +634,10 @@ test('local volatility is a plain object with free-function twins', () => {
   const forwards = [100.5, 101.0, 102.0, 104.0];
 
   // A flat implied volatility is its own local volatility, under any forwards.
-  const flat = volatility.localVolFromImpliedVol(implied(Array(4).fill(Array(5).fill(0.2))), forwards);
+  const flat = volatility.localVolFromImpliedVol(
+    implied(Array(4).fill(Array(5).fill(0.2))),
+    forwards
+  );
   assert.deepEqual(Object.keys(flat).sort(), ['expiries', 'local_vols', 'strikes']);
   assert.deepEqual(flat.expiries, [0.25, 0.5, 1.0, 2.0]);
   assert.equal(flat.local_vols.length, 20);
@@ -628,7 +661,10 @@ test('local volatility is a plain object with free-function twins', () => {
   assert.equal(volatility.localVolValue(grid, 9, 50), 0.3);
 
   const message = (pattern) => (e) => kind('validation')(e) && pattern.test(e.message);
-  assert.throws(() => volatility.localVolFromImpliedVol(skew, [100]), message(/one forward per expiry/));
+  assert.throws(
+    () => volatility.localVolFromImpliedVol(skew, [100]),
+    message(/one forward per expiry/)
+  );
   assert.throws(
     () => volatility.localVolFromImpliedVol(skew, [100, 100, -1, 100]),
     message(/finite and positive/)
@@ -649,12 +685,18 @@ test('local volatility is a plain object with free-function twins', () => {
     () => volatility.localVolFromImpliedVol({ ...skew, quote_type: 'normal' }, forwards),
     kind('validation')
   );
-  assert.throws(() => volatility.localVolFromImpliedVol({ ...skew, extra: 1 }, forwards), kind('validation'));
+  assert.throws(
+    () => volatility.localVolFromImpliedVol({ ...skew, extra: 1 }, forwards),
+    kind('validation')
+  );
   assert.throws(() => volatility.localVolFromImpliedVol(42, forwards), invalidType);
   assert.throws(() => volatility.localVolFromImpliedVol(skew, 'forwards'), invalidType);
   assert.throws(() => volatility.localVolFromImpliedVolSmoothed(skew, forwards, '5'), invalidType);
   assert.throws(() => volatility.localVolValue(grid, '1', 100), invalidType);
-  assert.throws(() => volatility.localVolValue({ ...grid, local_vols: [0.1] }, 1, 100), kind('validation'));
+  assert.throws(
+    () => volatility.localVolValue({ ...grid, local_vols: [0.1] }, 1, 100),
+    kind('validation')
+  );
   assert.throws(() => volatility.localVolValue({ ...grid, extra: 1 }, 1, 100), kind('validation'));
 
   // The same object drives the `local_vol` path process.
