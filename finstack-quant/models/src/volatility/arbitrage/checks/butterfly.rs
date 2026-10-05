@@ -23,7 +23,7 @@
 //! - Durrleman, V. (2003). *From Implied to Spot Volatilities*. PhD thesis.
 //! - Gatheral, J. (2006). *The Volatility Surface*. Wiley. `docs/REFERENCES.md#gatheral-volatility-surface`
 
-use super::{classify_severity, ArbitrageCheck};
+use super::classify_severity;
 use crate::volatility::arbitrage::types::{ArbitrageType, ArbitrageViolation, ViolationLocation};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 
@@ -52,12 +52,16 @@ impl Default for ButterflyCheck {
     }
 }
 
-impl ArbitrageCheck for ButterflyCheck {
-    fn name(&self) -> &str {
-        "Butterfly"
-    }
-
-    fn check(&self, surface: &VolSurface) -> Vec<ArbitrageViolation> {
+impl ButterflyCheck {
+    /// Run the butterfly (Durrleman density) check and return every violation found.
+    ///
+    /// An empty `Vec` means the check passes. The surface is not mutated.
+    ///
+    /// # Arguments
+    ///
+    /// * `surface` - Implied-volatility surface on an expiry (years) by cash
+    ///   strike grid; expiries pair positionally with `self.forwards`.
+    pub fn check(&self, surface: &VolSurface) -> Vec<ArbitrageViolation> {
         let expiries = surface.expiries();
         let strikes = surface.strikes();
         let mut violations = Vec::new();
