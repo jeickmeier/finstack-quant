@@ -6,9 +6,9 @@ theta / Rannacher time stepping and a penalty method for early exercise, and a
 explicit cross-derivative term.
 
 The module is problem-agnostic — `PdeProblem1D` and `PdeProblem2D` supply raw
-coefficients, boundary conditions, and a terminal payoff — with two ready-made
-Feynman-Kac bridges (`BlackScholesPde`, `HestonPde`) so pricers do not implement
-the traits from scratch.
+coefficients, boundary conditions, and a terminal payoff — with three ready-made
+Feynman-Kac bridges (`BlackScholesPde`, `LocalVolPde`, `HestonPde`) so pricers do
+not implement the traits from scratch.
 
 ## Position in the stack
 
@@ -50,7 +50,7 @@ The module doc comment in [`mod.rs`](mod.rs) says the module "lives under
 | [`exercise.rs`](exercise.rs) | `PenaltyExercise`, `ExerciseType::{American, Bermudan}` |
 | [`solver.rs`](solver.rs) | `Solver1D`, `Solver1DBuilder`, `PdeSolution`, `PdeSolverError` |
 | [`solver2d.rs`](solver2d.rs) | `Solver2D`, `PdeSolution2D`, `PdeSolver2DError` |
-| [`bridge.rs`](bridge.rs) | `BlackScholesPde` in log-spot coordinates |
+| [`bridge.rs`](bridge.rs) | `BlackScholesPde` and the Dupire `LocalVolPde` in log-spot coordinates |
 | [`bridge2d.rs`](bridge2d.rs) | `HestonPde` in (log-spot, variance) coordinates; the Fourier convergence anchors |
 
 Pipelines, as in the module doc:
@@ -65,7 +65,7 @@ PdeProblem2D → Operators2D     → CraigSneydStepper             → PdeSoluti
 Implementation submodules are private. The supported surface is explicitly
 re-exported at the `pde` root:
 
-`CraigSneydStepper`, `BoundaryCondition`, `BlackScholesPde`, `HestonPde`,
+`CraigSneydStepper`, `BoundaryCondition`, `BlackScholesPde`, `LocalVolPde`, `HestonPde`,
 `ExerciseError`, `Grid1D`, `PdeGridError`, `Grid2D`, `PdeProblem1D`,
 `PdeProblem2D`, `PdeSolution`, `PdeSolverError`, `Solver1D`, `Solver1DBuilder`,
 `PdeSolution2D`, `PdeSolver2DError`, `Solver2D`, `StepperError`, and
@@ -363,6 +363,16 @@ with `Dirichlet(0)` on the deep-OTM edge and `LinearInExp` on the deep-ITM edge,
 reports `is_time_homogeneous() == true`. `bridge::tests` grades it against
 `finstack_quant_core::math::norm_cdf`-based Black-Scholes at 301 sinh points and
 300 CN steps: relative error below 1e-3 for both a call and a put.
+
+`LocalVolPde` solves the same equation with `σ` replaced by the Dupire local
+volatility `σ_loc(t, eˣ)` of a `volatility::local_vol::LocalVolSurface`, read at
+the calendar time of each time level, and reports `is_time_homogeneous() == false`.
+`bridge::tests` checks that a flat surface reproduces `BlackScholesPde` (relative
+difference below 1e-10) and that the local volatility extracted from an
+arbitrage-free SSVI surface reprices that surface: 801 sinh points, 400 Rannacher
+steps per year, implied-volatility error below 5 basis points at fifteen
+strike/expiry points (measured worst 4.2), within 2 basis points of the Monte
+Carlo `LocalVolProcess`.
 
 `HestonPde` solves, in `x = ln S` and `y = v`,
 
