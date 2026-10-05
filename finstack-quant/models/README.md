@@ -48,9 +48,11 @@ unconditional dependency. A few convenience entry points (`EuropeanPricer`,
 | `correlation` | Copulas, recovery models, latent-factor models, and portfolio-loss simulation |
 | `monte_carlo` | Random streams, stochastic processes, discretizations, payoffs, execution engines, pricers, Greeks, results, and embedded defaults |
 
-The Monte Carlo module also re-exports `simulate_gbm_paths`, `GbmPathConfig`,
-and `GbmPathSummary`: a compact captured-GBM-paths helper for plotting and
-diagnostics that bypasses the payoff machinery.
+`monte_carlo::simulate::simulate_paths` returns compact simulated paths for any
+Markov process and discretization scheme selected by a serializable
+`PathSimulationSpec`, bypassing the payoff machinery. The Monte Carlo module
+also re-exports `simulate_gbm_paths`, `GbmPathConfig`, and `GbmPathSummary`, a
+GBM-only view of the same simulation used by the bindings.
 
 Antithetic pairing is **not** in `variance_reduction` — it is implemented inline
 in the engine loop and configured with `McEngineConfig::antithetic`.

@@ -17,11 +17,15 @@
 //!
 //! Between dividends, evolution follows standard GBM.
 
+use super::super::paths::ProcessParams;
 use super::super::traits::StochasticProcess;
 use super::gbm::GbmParams;
+use super::metadata::ProcessMetadata;
 
 /// Dividend payment specification.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(rename_all = "snake_case")]
 pub enum Dividend {
     /// Cash dividend: fixed dollar amount
     Cash(f64),
@@ -191,6 +195,16 @@ impl StochasticProcess for GbmWithDividends {
     /// `ProportionalDiffusion`: Milstein-family schemes must not accept it.)
     fn dedicated_scheme(&self) -> Option<&'static str> {
         Some("exact_gbm_with_dividends")
+    }
+}
+
+impl ProcessMetadata for GbmWithDividends {
+    fn metadata(&self) -> ProcessParams {
+        let mut params = ProcessParams::new("GBMWithDividends");
+        params.add_param("r", self.params.r);
+        params.add_param("q", self.params.q);
+        params.add_param("sigma", self.params.sigma);
+        params.with_factors(vec!["spot".to_string()])
     }
 }
 

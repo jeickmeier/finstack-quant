@@ -1,0 +1,28 @@
+{
+  "$id": "https://finstack_quant.dev/schemas/models/1/scheme_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Time-discretization scheme used to advance the process.",
+  "oneOf": [
+    {
+      "const": "default",
+      "description": "The process's canonical scheme: its exact transition where one exists,\nquadratic-exponential for square-root variance, Euler otherwise. See\nthe [module table](self#supported-pairs).",
+      "type": "string"
+    },
+    {
+      "const": "euler",
+      "description": "Euler-Maruyama: `X += μ Δt + σ √Δt Z`. First-order weak convergence;\navailable for every process except `gbm_with_dividends`.",
+      "type": "string"
+    },
+    {
+      "const": "log_euler",
+      "description": "Euler on the log state, which keeps the state positive. Only for the\nproportional-diffusion processes `gbm` and `multi_gbm`.",
+      "type": "string"
+    },
+    {
+      "const": "milstein",
+      "description": "Milstein with the proportional-diffusion correction\n`½ σ² X (Z² - 1) Δt`. Only for `gbm` and `multi_gbm`.",
+      "type": "string"
+    }
+  ],
+  "title": "SchemeSpec"
+}

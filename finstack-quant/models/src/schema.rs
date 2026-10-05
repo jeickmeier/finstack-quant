@@ -9,6 +9,7 @@
 
 use finstack_quant_core::schema::SchemaArtifact;
 
+use crate::monte_carlo::simulate::{PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec};
 use crate::{
     correlation::CreditExposure, correlation::LatentFactorSpec, correlation::PortfolioLossConfig,
     correlation::PortfolioLossResult, correlation::RecoverySpec,
@@ -459,6 +460,20 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "Serializable Expected Shortfall decomposition view."
     ),
     finstack_quant_core::schema_artifact!(
+        PathSimulationSpec,
+        "models",
+        "path_simulation_spec",
+        Input,
+        "Complete, serializable description of one path simulation."
+    ),
+    finstack_quant_core::schema_artifact!(
+        PathSummary,
+        "models",
+        "path_summary",
+        Output,
+        "Simulated paths on a shared time grid."
+    ),
+    finstack_quant_core::schema_artifact!(
         PdCycleParams,
         "models",
         "pd_cycle_params",
@@ -499,6 +514,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "position_risk_decomposition",
         Output,
         "Complete position-level risk decomposition of a portfolio."
+    ),
+    finstack_quant_core::schema_artifact!(
+        ProcessSpec,
+        "models",
+        "process_spec",
+        Input,
+        "Stochastic process to simulate, with its parameters."
     ),
     finstack_quant_core::schema_artifact!(
         RatingFactorTable,
@@ -576,6 +598,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "sabr_parameters",
         Input,
         "SABR model parameters"
+    ),
+    finstack_quant_core::schema_artifact!(
+        SchemeSpec,
+        "models",
+        "scheme_spec",
+        Component,
+        "Time-discretization scheme used to advance the process."
     ),
     finstack_quant_core::schema_artifact!(
         SchwartzSmithParams,

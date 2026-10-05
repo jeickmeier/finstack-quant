@@ -154,7 +154,8 @@ fn test_multi_ou_params_serialization() {
         vec![1.0, -1.0], // thetas
         vec![0.3, 0.4],  // sigmas
         None,            // no correlation
-    );
+    )
+    .expect("valid params");
 
     let restored = roundtrip_json(&params);
 
@@ -173,7 +174,8 @@ fn test_multi_ou_params_with_correlation_serialization() {
         vec![1.0, -1.0], // thetas
         vec![0.3, 0.4],  // sigmas
         Some(corr),
-    );
+    )
+    .expect("valid params");
 
     let restored = roundtrip_json(&params);
 
@@ -190,7 +192,8 @@ fn test_brownian_params_serialization() {
     let params = BrownianParams::new(
         0.1, // μ = drift
         0.3, // σ = diffusion
-    );
+    )
+    .expect("valid params");
 
     let restored = roundtrip_json(&params);
 
@@ -223,7 +226,7 @@ fn test_schwartz_smith_params_serialization() {
 #[test]
 fn test_edge_case_zero_volatilities() {
     // Test that zero volatilities serialize correctly (though may not be practical)
-    let params = BrownianParams::new(0.0, 0.0);
+    let params = BrownianParams::new(0.0, 0.0).expect("valid params");
     let restored = roundtrip_json(&params);
     assert_eq!(params.mu, restored.mu);
     assert_eq!(params.sigma, restored.sigma);

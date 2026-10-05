@@ -1,0 +1,577 @@
+{
+  "$defs": {
+    "CirParams": {
+      "additionalProperties": false,
+      "description": "CIR process parameters.",
+      "properties": {
+        "kappa": {
+          "description": "Mean reversion speed (κ)",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma": {
+          "description": "Volatility of volatility (σ)",
+          "format": "double",
+          "type": "number"
+        },
+        "theta": {
+          "description": "Long-term mean (θ)",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "kappa",
+        "theta",
+        "sigma"
+      ],
+      "type": "object"
+    },
+    "Dividend": {
+      "description": "Dividend payment specification.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Cash dividend: fixed dollar amount",
+          "properties": {
+            "cash": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "cash"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Proportional dividend: percentage of spot (e.g., 0.02 for 2%)",
+          "properties": {
+            "proportional": {
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "proportional"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "GbmParams": {
+      "additionalProperties": false,
+      "description": "Geometric Brownian Motion parameters.",
+      "properties": {
+        "q": {
+          "description": "Dividend/foreign rate (annual)",
+          "format": "double",
+          "type": "number"
+        },
+        "r": {
+          "description": "Risk-free rate (annual)",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma": {
+          "description": "Volatility (annual)",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "r",
+        "q",
+        "sigma"
+      ],
+      "type": "object"
+    },
+    "HestonPricingParams": {
+      "description": "Market inputs for closed-form Heston pricing.\n\nThe stochastic parameters are stored once in the canonical models-layer\n[`HestonParams`]; this wrapper adds only the continuous carry rates required\nby risk-neutral pricing.\n\n# References\n\n- Heston, S. L. (1993). \"A Closed-Form Solution for Options with Stochastic Volatility\n  with Applications to Bond and Currency Options.\" *Review of Financial Studies*, 6(2), 327-343. `docs/REFERENCES.md#heston-1993`",
+      "properties": {
+        "kappa": {
+          "description": "Mean reversion speed.",
+          "format": "double",
+          "type": "number"
+        },
+        "q": {
+          "description": "Continuously compounded dividend or foreign yield as an annual decimal.",
+          "format": "double",
+          "type": "number"
+        },
+        "r": {
+          "description": "Continuously compounded risk-free rate as an annual decimal.",
+          "format": "double",
+          "type": "number"
+        },
+        "rho": {
+          "description": "Spot-variance correlation.",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma_v": {
+          "description": "Vol-of-vol.",
+          "format": "double",
+          "type": "number"
+        },
+        "theta": {
+          "description": "Long-run variance.",
+          "format": "double",
+          "type": "number"
+        },
+        "v0": {
+          "description": "Initial variance.",
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "r",
+        "q",
+        "v0",
+        "kappa",
+        "theta",
+        "sigma_v",
+        "rho"
+      ],
+      "type": "object"
+    },
+    "HullWhite1FParams": {
+      "description": "Validated Hull-White one-factor process parameters.",
+      "properties": {
+        "kappa": {
+          "format": "double",
+          "type": "number"
+        },
+        "theta_curve": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "theta_times": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "volatility": {
+          "$ref": "#/$defs/PiecewiseConstantCurve"
+        }
+      },
+      "required": [
+        "kappa",
+        "volatility",
+        "theta_curve",
+        "theta_times"
+      ],
+      "type": "object"
+    },
+    "PiecewiseConstantCurve": {
+      "description": "A finite, left-continuous piecewise-constant curve.",
+      "properties": {
+        "times": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "values": {
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "times",
+        "values"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Stochastic process to simulate, with its parameters.",
+  "oneOf": [
+    {
+      "additionalProperties": false,
+      "description": "Geometric Brownian motion `dS = (r - q) S dt + σ S dW`.\n\nState: `[spot]`, which must start strictly positive.",
+      "properties": {
+        "q": {
+          "description": "Dividend/foreign rate (annual)",
+          "format": "double",
+          "type": "number"
+        },
+        "r": {
+          "description": "Risk-free rate (annual)",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma": {
+          "description": "Volatility (annual)",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "gbm",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "r",
+        "q",
+        "sigma"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Geometric Brownian motion with discrete dividends paid at fixed times.\n\nState: `[spot]`, which must start strictly positive.",
+      "properties": {
+        "dividends": {
+          "description": "Dividend schedule as `[time, dividend]` pairs. `time` is the\nex-dividend time in years: strictly positive and distinct, in any\norder. A cash dividend is a non-negative amount in spot units and\na proportional dividend a non-negative decimal fraction of spot.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "double",
+                "type": "number"
+              },
+              {
+                "$ref": "#/$defs/Dividend"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "params": {
+          "$ref": "#/$defs/GbmParams",
+          "description": "Diffusion parameters between dividend dates. Set `q` to zero when\nevery dividend is listed explicitly."
+        },
+        "type": {
+          "const": "gbm_with_dividends",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "params",
+        "dividends"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Correlated geometric Brownian motions, one per asset.\n\nState: `[spot_0, spot_1, ...]`, each starting strictly positive.",
+      "properties": {
+        "assets": {
+          "description": "Per-asset parameters; the vector length is the state dimension.",
+          "items": {
+            "$ref": "#/$defs/GbmParams"
+          },
+          "type": "array"
+        },
+        "correlation": {
+          "default": null,
+          "description": "Row-major `n x n` correlation matrix of the driving Brownian\nmotions; omitted means independent assets.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "type": {
+          "const": "multi_gbm",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "assets"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Arithmetic Brownian motion with drift `dX = μ dt + σ dW`.\n\nState: `[x]`.",
+      "properties": {
+        "mu": {
+          "description": "Constant drift per year.",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma": {
+          "description": "Constant diffusion scale per square root year.",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "brownian",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "mu",
+        "sigma"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Correlated arithmetic Brownian motions.\n\nState: `[x_0, x_1, ...]`.",
+      "properties": {
+        "correlation": {
+          "default": null,
+          "description": "Row-major `n x n` correlation matrix of the driving Brownian\nmotions; omitted means independent components.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "mus": {
+          "description": "Per-component drifts per year; the vector length is the state\ndimension.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "sigmas": {
+          "description": "Per-component diffusion scales per square-root year, non-negative.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "type": {
+          "const": "multi_brownian",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "mus",
+        "sigmas"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Correlated Ornstein-Uhlenbeck processes `dX_i = κ_i (θ_i - X_i) dt + σ_i dW_i`.\n\nState: `[x_0, x_1, ...]`.",
+      "properties": {
+        "correlation": {
+          "description": "Optional row-major `n x n` correlation matrix.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "kappas": {
+          "description": "Mean-reversion speeds `κ_i` per year.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "sigmas": {
+          "description": "Diffusion scales `σ_i` per square root year.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "thetas": {
+          "description": "Long-run means `θ_i` in state units.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "type": {
+          "const": "multi_ou",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "kappas",
+        "thetas",
+        "sigmas"
+      ],
+      "type": "object"
+    },
+    {
+      "$ref": "#/$defs/HullWhite1FParams",
+      "description": "Hull-White one-factor short rate `dr = κ (θ(t) - r) dt + σ(t) dW`.\n\nState: `[short_rate]` as a decimal.",
+      "properties": {
+        "type": {
+          "const": "hull_white_1f",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Cox-Ingersoll-Ross square-root process `dv = κ (θ - v) dt + σ √v dW`.\n\nState: `[short_rate]` (or an intensity or variance), starting\nnon-negative.",
+      "properties": {
+        "kappa": {
+          "description": "Mean reversion speed (κ)",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma": {
+          "description": "Volatility of volatility (σ)",
+          "format": "double",
+          "type": "number"
+        },
+        "theta": {
+          "description": "Long-term mean (θ)",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "cir",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "kappa",
+        "theta",
+        "sigma"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "CIR++ short rate `r_t = x_t + φ(t)` with `x` a CIR factor and `φ` a\npiecewise-constant deterministic shift.\n\nState: `[short_rate]`. The initial state is the short rate `r_0`, not\nthe factor: the factor starts at `r_0 - φ(0)`, which must be\nnon-negative, and every reported value is the shifted rate.",
+      "properties": {
+        "params": {
+          "$ref": "#/$defs/CirParams",
+          "description": "Parameters of the unshifted CIR factor."
+        },
+        "shift_curve": {
+          "description": "Shift values `φ` as decimal rates, one per entry of `shift_times`;\neach applies from its time until the next.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "shift_times": {
+          "description": "Strictly increasing shift start times in years. Times before the\nfirst entry use the first shift value.",
+          "items": {
+            "format": "double",
+            "type": "number"
+          },
+          "type": "array"
+        },
+        "type": {
+          "const": "cir_plus_plus",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "params",
+        "shift_curve",
+        "shift_times"
+      ],
+      "type": "object"
+    },
+    {
+      "$ref": "#/$defs/HestonPricingParams",
+      "description": "Heston stochastic volatility.\n\nState: `[spot, variance]`; spot starts strictly positive, and the\nstarting variance `initial_state[1]` must equal the `v0` parameter.",
+      "properties": {
+        "type": {
+          "const": "heston",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "description": "Schwartz-Smith two-factor commodity model.\n\nState: `[x, y]`, the short-term deviation and the long-term level of\nthe log price; the spot is `exp(x + y)`.",
+      "properties": {
+        "kappa": {
+          "description": "Mean reversion speed for short-term deviation (κ_X)",
+          "format": "double",
+          "type": "number"
+        },
+        "lambda_x": {
+          "default": 0.0,
+          "description": "Constant risk-premium drift shift for the short-term factor (λ_X).\n\nUnder the risk-neutral measure the short-term factor follows\n`dX = (−κ_X X − λ_X) dt + σ_X dW*` (Schwartz & Smith 2000): a constant\ndrift shift at unchanged κ_X. Defaults to 0 (physical measure).",
+          "format": "double",
+          "type": "number"
+        },
+        "mu_y": {
+          "description": "Drift of long-term trend (μ_Y)",
+          "format": "double",
+          "type": "number"
+        },
+        "rho_xy": {
+          "description": "Correlation between X and Y (ρ)",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma_x": {
+          "description": "Volatility of short-term component (σ_X)",
+          "format": "double",
+          "type": "number"
+        },
+        "sigma_y": {
+          "description": "Volatility of long-term component (σ_Y)",
+          "format": "double",
+          "type": "number"
+        },
+        "type": {
+          "const": "schwartz_smith",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "kappa",
+        "sigma_x",
+        "mu_y",
+        "sigma_y",
+        "rho_xy"
+      ],
+      "type": "object"
+    }
+  ],
+  "title": "ProcessSpec"
+}

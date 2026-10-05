@@ -22,13 +22,16 @@
 //! For positivity: 2κθ ≥ σ²
 //! If violated, zero is attainable (but QE handles gracefully).
 
+use super::super::paths::ProcessParams;
 #[cfg(test)]
 use super::super::traits::state_keys;
 use super::super::traits::{PathState, StateKey, StochasticProcess};
+use super::metadata::ProcessMetadata;
 
 /// CIR process parameters.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct CirParams {
     /// Mean reversion speed (κ)
     pub kappa: f64,
@@ -178,6 +181,16 @@ impl StochasticProcess for CirProcess {
     }
 }
 
+impl ProcessMetadata for CirProcess {
+    fn metadata(&self) -> ProcessParams {
+        let mut params = ProcessParams::new("CIR");
+        params.add_param("kappa", self.params.kappa);
+        params.add_param("theta", self.params.theta);
+        params.add_param("sigma", self.params.sigma);
+        params.with_factors(vec!["short_rate".to_string()])
+    }
+}
+
 /// CIR++ process (shifted CIR for yield curve fitting).
 ///
 /// The CIR++ model adds a deterministic shift φ(t) to CIR:
@@ -206,28 +219,60 @@ impl CirPlusPlusProcess {
     /// # Arguments
     ///
     /// * `cir` - Base CIR process
-    /// * `shift_curve` - Deterministic shift values
-    /// * `shift_times` - Time breakpoints (must be sorted)
-    pub fn new(cir: CirProcess, shift_curve: Vec<f64>, shift_times: Vec<f64>) -> Self {
-        assert_eq!(
-            shift_curve.len(),
-            shift_times.len(),
-            "Shift curve and times must have same length"
-        );
-        assert!(
-            !shift_times.is_empty(),
-            "Must have at least one shift value"
-        );
+    /// * `shift_curve` - Deterministic shift values φ as decimal rates, one
+    ///   per breakpoint; each applies from its breakpoint until the next
+    /// * `shift_times` - Strictly increasing finite time breakpoints in years
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the two vectors are empty or differ in
+    /// length, any value is non-finite, or the times are not strictly
+    /// increasing.
+    pub fn new(
+        cir: CirProcess,
+        shift_curve: Vec<f64>,
+        shift_times: Vec<f64>,
+    ) -> finstack_quant_core::Result<Self> {
+        if shift_times.is_empty() || shift_curve.len() != shift_times.len() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "CIR++ shift curve and times must be non-empty and equally sized, got {} and {}",
+                shift_curve.len(),
+                shift_times.len()
+            )));
+        }
+        if shift_curve
+            .iter()
+            .chain(&shift_times)
+            .any(|value| !value.is_finite())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "CIR++ shift values and times must be finite".to_string(),
+            ));
+        }
+        if shift_times.windows(2).any(|pair| pair[1] <= pair[0]) {
+            return Err(finstack_quant_core::Error::Validation(
+                "CIR++ shift times must increase strictly".to_string(),
+            ));
+        }
 
-        Self {
+        Ok(Self {
             cir,
             shift_curve,
             shift_times,
-        }
+        })
     }
 
     /// Create with constant shift.
-    pub fn with_constant_shift(cir: CirProcess, shift: f64) -> Self {
+    ///
+    /// # Arguments
+    ///
+    /// * `cir` - Base CIR process
+    /// * `shift` - Finite constant shift φ as a decimal rate
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `shift` is non-finite.
+    pub fn with_constant_shift(cir: CirProcess, shift: f64) -> finstack_quant_core::Result<Self> {
         Self::new(cir, vec![shift], vec![0.0])
     }
 
@@ -279,6 +324,19 @@ impl StochasticProcess for CirPlusPlusProcess {
             state.set_key(StateKey::ShortRate, rate);
             state.set_key(StateKey::Spot, rate);
         }
+    }
+}
+
+// The state vector holds the unshifted CIR factor `x_t`; the short rate is
+// `x_t + φ(t)` (see `actual_rate`).
+impl ProcessMetadata for CirPlusPlusProcess {
+    fn metadata(&self) -> ProcessParams {
+        let cir = self.cir.params();
+        let mut params = ProcessParams::new("CIR++");
+        params.add_param("kappa", cir.kappa);
+        params.add_param("theta", cir.theta);
+        params.add_param("sigma", cir.sigma);
+        params.with_factors(vec!["x".to_string()])
     }
 }
 
@@ -337,7 +395,7 @@ mod tests {
         let shift_curve = vec![0.01, 0.02];
         let shift_times = vec![0.0, 1.0];
 
-        let cir_pp = CirPlusPlusProcess::new(cir, shift_curve, shift_times);
+        let cir_pp = CirPlusPlusProcess::new(cir, shift_curve, shift_times).unwrap();
 
         assert_eq!(cir_pp.shift_at_time(0.0), 0.01);
         assert_eq!(cir_pp.shift_at_time(0.5), 0.01);
@@ -352,7 +410,7 @@ mod tests {
     #[test]
     fn test_cir_plus_plus_populates_shifted_short_rate() {
         let cir = CirProcess::with_params(0.1, 0.03, 0.05).unwrap();
-        let cir_pp = CirPlusPlusProcess::new(cir, vec![0.01, 0.02], vec![0.0, 1.0]);
+        let cir_pp = CirPlusPlusProcess::new(cir, vec![0.01, 0.02], vec![0.0, 1.0]).unwrap();
         let mut state = PathState::new(1, 1.5);
 
         cir_pp.populate_path_state(&[0.03], &mut state);
@@ -364,7 +422,7 @@ mod tests {
     #[test]
     fn test_cir_plus_plus_dynamics() {
         let cir = CirProcess::with_params(0.1, 0.03, 0.05).unwrap();
-        let cir_pp = CirPlusPlusProcess::with_constant_shift(cir, 0.02);
+        let cir_pp = CirPlusPlusProcess::with_constant_shift(cir, 0.02).unwrap();
 
         // The state x follows base CIR dynamics
         let x = vec![0.04];
@@ -373,5 +431,14 @@ mod tests {
 
         // Drift should be same as base CIR
         assert_eq!(drift[0], 0.1 * (0.03 - 0.04));
+    }
+
+    #[test]
+    fn invalid_cir_plus_plus_shift_schedules_are_errors() {
+        let cir = || CirProcess::with_params(0.1, 0.03, 0.05).unwrap();
+        assert!(CirPlusPlusProcess::new(cir(), vec![], vec![]).is_err());
+        assert!(CirPlusPlusProcess::new(cir(), vec![0.01], vec![0.0, 1.0]).is_err());
+        assert!(CirPlusPlusProcess::new(cir(), vec![0.01, 0.02], vec![1.0, 1.0]).is_err());
+        assert!(CirPlusPlusProcess::with_constant_shift(cir(), f64::NAN).is_err());
     }
 }

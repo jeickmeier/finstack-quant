@@ -10,10 +10,12 @@
 use super::super::paths::ProcessParams;
 use super::super::traits::StochasticProcess;
 use super::metadata::ProcessMetadata;
+use finstack_quant_core::math::linalg::check_correlation_matrix;
 
 /// Parameters for a multi-dimensional Ornstein-Uhlenbeck process.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct MultiOuParams {
     /// Mean-reversion speeds `κ_i` per year.
     pub kappas: Vec<f64>,
@@ -34,24 +36,70 @@ impl MultiOuParams {
     /// * `thetas` - Long-run levels in state units.
     /// * `sigmas` - Diffusion scales per square root year.
     /// * `correlation` - Optional row-major `n x n` correlation matrix.
+    ///
+    /// # Errors
+    ///
+    /// Returns the validation errors of [`Self::validate`].
     pub fn new(
         kappas: Vec<f64>,
         thetas: Vec<f64>,
         sigmas: Vec<f64>,
         correlation: Option<Vec<f64>>,
-    ) -> Self {
-        let n = kappas.len();
-        assert_eq!(thetas.len(), n, "thetas length must match kappas");
-        assert_eq!(sigmas.len(), n, "sigmas length must match kappas");
-        if let Some(ref corr) = correlation {
-            assert_eq!(corr.len(), n * n, "correlation must be n x n");
-        }
-        Self {
+    ) -> finstack_quant_core::Result<Self> {
+        let params = Self {
             kappas,
             thetas,
             sigmas,
             correlation,
+        };
+        params.validate()?;
+        Ok(params)
+    }
+
+    /// Check the shape and range of every parameter.
+    ///
+    /// Deserialization does not validate, so parameters read from JSON must
+    /// pass through this check before they drive a simulation.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `kappas` is empty, `thetas` or
+    /// `sigmas` has a different length, any value is non-finite, any diffusion
+    /// scale is negative, or `correlation` is not a valid `n x n` correlation
+    /// matrix.
+    pub fn validate(&self) -> finstack_quant_core::Result<()> {
+        let n = self.kappas.len();
+        if n == 0 || self.thetas.len() != n || self.sigmas.len() != n {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "MultiOU kappas, thetas and sigmas must be non-empty and equally sized, \
+                 got {n}, {} and {}",
+                self.thetas.len(),
+                self.sigmas.len()
+            )));
         }
+        if self
+            .kappas
+            .iter()
+            .chain(&self.thetas)
+            .any(|value| !value.is_finite())
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "MultiOU kappas and thetas must be finite".to_string(),
+            ));
+        }
+        if self
+            .sigmas
+            .iter()
+            .any(|sigma| !sigma.is_finite() || *sigma < 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "MultiOU sigmas (diffusion scales) must be finite and non-negative".to_string(),
+            ));
+        }
+        if let Some(ref corr) = self.correlation {
+            check_correlation_matrix(corr, n)?;
+        }
+        Ok(())
     }
 }
 
@@ -126,7 +174,8 @@ mod tests {
 
     #[test]
     fn test_multi_ou_drift_diffusion() {
-        let params = MultiOuParams::new(vec![2.0, 1.0], vec![1.0, -1.0], vec![0.3, 0.4], None);
+        let params =
+            MultiOuParams::new(vec![2.0, 1.0], vec![1.0, -1.0], vec![0.3, 0.4], None).unwrap();
         let proc = MultiOuProcess::new(params);
         let x = [0.0, 0.0];
         let mut mu = [0.0, 0.0];
@@ -137,5 +186,20 @@ mod tests {
         assert!((mu[1] - 1.0 * (-1.0 - 0.0)).abs() < 1e-12);
         assert!((sig[0] - 0.3).abs() < 1e-12);
         assert!((sig[1] - 0.4).abs() < 1e-12);
+    }
+
+    #[test]
+    fn invalid_multi_ou_params_are_errors() {
+        assert!(MultiOuParams::new(vec![], vec![], vec![], None).is_err());
+        assert!(MultiOuParams::new(vec![1.0, 1.0], vec![0.0], vec![0.1, 0.1], None).is_err());
+        assert!(MultiOuParams::new(vec![1.0], vec![0.0], vec![-0.1], None).is_err());
+        assert!(MultiOuParams::new(vec![f64::NAN], vec![0.0], vec![0.1], None).is_err());
+        assert!(MultiOuParams::new(
+            vec![1.0, 1.0],
+            vec![0.0, 0.0],
+            vec![0.1, 0.1],
+            Some(vec![1.0])
+        )
+        .is_err());
     }
 }

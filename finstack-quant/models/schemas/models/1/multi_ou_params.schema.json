@@ -1,6 +1,7 @@
 {
   "$id": "https://finstack_quant.dev/schemas/models/1/multi_ou_params.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Parameters for a multi-dimensional Ornstein-Uhlenbeck process.",
   "properties": {
     "correlation": {

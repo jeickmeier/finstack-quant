@@ -19,10 +19,12 @@
 use super::super::paths::ProcessParams;
 use super::super::traits::StochasticProcess;
 use super::metadata::ProcessMetadata;
+use finstack_quant_core::math::linalg::check_correlation_matrix;
 
 /// Parameters for one-dimensional Brownian motion with drift.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(feature = "json-schema", derive(schemars::JsonSchema))]
+#[serde(deny_unknown_fields)]
 pub struct BrownianParams {
     /// Constant drift per year.
     pub mu: f64,
@@ -37,8 +39,23 @@ impl BrownianParams {
     ///
     /// * `mu` - Constant drift per year.
     /// * `sigma` - Constant diffusion scale per square root year.
-    pub fn new(mu: f64, sigma: f64) -> Self {
-        Self { mu, sigma }
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `mu` is non-finite or `sigma` is
+    /// non-finite or negative.
+    pub fn new(mu: f64, sigma: f64) -> finstack_quant_core::Result<Self> {
+        if !mu.is_finite() {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Brownian mu (drift) must be finite, got {mu}"
+            )));
+        }
+        if !sigma.is_finite() || sigma < 0.0 {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "Brownian sigma (diffusion scale) must be finite and non-negative, got {sigma}"
+            )));
+        }
+        Ok(Self { mu, sigma })
     }
 }
 
@@ -55,8 +72,17 @@ impl BrownianProcess {
     }
 
     /// Create a Brownian process from `mu` and `sigma`.
-    pub fn with_params(mu: f64, sigma: f64) -> Self {
-        Self::new(BrownianParams::new(mu, sigma))
+    ///
+    /// # Arguments
+    ///
+    /// * `mu` - Constant drift per year.
+    /// * `sigma` - Constant diffusion scale per square root year.
+    ///
+    /// # Errors
+    ///
+    /// Returns the validation errors of [`BrownianParams::new`].
+    pub fn with_params(mu: f64, sigma: f64) -> finstack_quant_core::Result<Self> {
+        Ok(Self::new(BrownianParams::new(mu, sigma)?))
     }
 
     /// Drift parameter μ.
@@ -119,21 +145,47 @@ impl MultiBrownianProcess {
     /// * `mus` - Per-component drifts per year.
     /// * `sigmas` - Per-component diffusion scales per square root year.
     /// * `correlation` - Optional row-major `n x n` correlation matrix.
-    pub fn new(mus: Vec<f64>, sigmas: Vec<f64>, correlation: Option<Vec<f64>>) -> Self {
-        assert_eq!(
-            mus.len(),
-            sigmas.len(),
-            "mus and sigmas must have same length"
-        );
-        if let Some(ref corr) = correlation {
-            let n = mus.len();
-            assert_eq!(corr.len(), n * n, "Correlation matrix must be n x n");
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when `mus` is empty, `sigmas` has a
+    /// different length, any drift is non-finite, any diffusion scale is
+    /// non-finite or negative, or `correlation` is not a valid `n x n`
+    /// correlation matrix.
+    pub fn new(
+        mus: Vec<f64>,
+        sigmas: Vec<f64>,
+        correlation: Option<Vec<f64>>,
+    ) -> finstack_quant_core::Result<Self> {
+        let n = mus.len();
+        if n == 0 || sigmas.len() != n {
+            return Err(finstack_quant_core::Error::Validation(format!(
+                "MultiBrownian mus and sigmas must be non-empty and equally sized, got {n} and {}",
+                sigmas.len()
+            )));
         }
-        Self {
+        if mus.iter().any(|mu| !mu.is_finite()) {
+            return Err(finstack_quant_core::Error::Validation(
+                "MultiBrownian mus (drifts) must be finite".to_string(),
+            ));
+        }
+        if sigmas
+            .iter()
+            .any(|sigma| !sigma.is_finite() || *sigma < 0.0)
+        {
+            return Err(finstack_quant_core::Error::Validation(
+                "MultiBrownian sigmas (diffusion scales) must be finite and non-negative"
+                    .to_string(),
+            ));
+        }
+        if let Some(ref corr) = correlation {
+            check_correlation_matrix(corr, n)?;
+        }
+        Ok(Self {
             mus,
             sigmas,
             correlation,
-        }
+        })
     }
 
     /// Dimension.
@@ -192,7 +244,7 @@ mod tests {
 
     #[test]
     fn test_brownian_drift_diffusion() {
-        let proc = BrownianProcess::with_params(0.1, 0.3);
+        let proc = BrownianProcess::with_params(0.1, 0.3).unwrap();
         let mut mu = [0.0];
         let mut sig = [0.0];
         proc.drift(0.0, &[0.0], &mut mu);
@@ -207,7 +259,7 @@ mod tests {
         let mu = vec![0.1, -0.2];
         let sig = vec![0.3, 0.5];
         let corr = vec![1.0, 0.2, 0.2, 1.0];
-        let proc = MultiBrownianProcess::new(mu, sig, Some(corr));
+        let proc = MultiBrownianProcess::new(mu, sig, Some(corr)).unwrap();
         assert_eq!(proc.dim(), 2);
         let md = proc.metadata();
         assert_eq!(md.process_type, "MultiBrownian");
@@ -215,5 +267,17 @@ mod tests {
         assert_eq!(md.parameters.get("sigma_1"), Some(&0.5));
         assert!(md.correlation.is_some());
         assert_eq!(md.factor_names, vec!["x_0".to_string(), "x_1".to_string()]);
+    }
+
+    #[test]
+    fn invalid_brownian_inputs_are_errors() {
+        assert!(BrownianParams::new(f64::NAN, 0.1).is_err());
+        assert!(BrownianParams::new(0.0, -0.1).is_err());
+        assert!(MultiBrownianProcess::new(vec![], vec![], None).is_err());
+        assert!(MultiBrownianProcess::new(vec![0.0, 0.0], vec![0.1], None).is_err());
+        assert!(MultiBrownianProcess::new(vec![0.0, 0.0], vec![0.1, -0.1], None).is_err());
+        assert!(
+            MultiBrownianProcess::new(vec![0.0, 0.0], vec![0.1, 0.1], Some(vec![1.0])).is_err()
+        );
     }
 }

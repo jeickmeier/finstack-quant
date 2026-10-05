@@ -1,20 +1,16 @@
-//! Productized geometric-Brownian-motion path simulation.
+//! Geometric-Brownian-motion path simulation for the host bindings.
 //!
-//! This module intentionally returns a compact spot-path summary rather than
-//! exposing the generic process/discretization/path graph used by the engine.
+//! A GBM-only view of [`simulate_paths`]; the bindings move to
+//! [`simulate_paths`] next and this module is then removed.
 
-use crate::monte_carlo::discretization::ExactGbm;
 use crate::monte_carlo::engine::MAX_CAPTURED_PATHS;
-use crate::monte_carlo::process::GbmProcess;
-use crate::monte_carlo::rng::philox::PhiloxRng;
-use crate::monte_carlo::traits::{Discretization, RandomStream};
-use crate::monte_carlo::TimeGrid;
+use crate::monte_carlo::process::GbmParams;
+use crate::monte_carlo::simulate::{
+    simulate_paths, PathSimulationSpec, ProcessSpec, SchemeSpec, TimeGridSpec,
+    MAX_STORED_VALUES as MAX_GBM_STORED_VALUES,
+};
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
-
-// Includes compact paths and the shared time-grid/copy storage. Bound the
-// product before constructing even the time grid, which itself allocates.
-const MAX_GBM_STORED_VALUES: usize = 64_000_000;
 
 /// Inputs for a compact GBM path simulation.
 #[derive(Debug, Clone, PartialEq)]
@@ -100,8 +96,9 @@ pub struct GbmPathSummary {
 
 /// Simulate compact GBM spot paths with canonical exact GBM transitions.
 ///
-/// Uses the same Philox path-ID streams and [`ExactGbm`] discretization as the
-/// generic engine, retaining only the requested spots and shared times.
+/// Uses the same Philox path-ID streams and
+/// [`ExactGbm`](crate::monte_carlo::discretization::ExactGbm) discretization as
+/// the generic engine, retaining only the requested spots and shared times.
 ///
 /// # Arguments
 ///
@@ -141,76 +138,39 @@ pub fn simulate_gbm_paths(config: &GbmPathConfig) -> Result<GbmPathSummary> {
                 "GBM captured paths and shared time grids exceed {MAX_GBM_STORED_VALUES} values"
             ))
         })?;
-    let time_grid = TimeGrid::uniform(config.expiry, config.num_steps)?;
-    let rng = PhiloxRng::new(config.seed);
-    let process = GbmProcess::with_params(config.rate, config.div_yield, config.vol)?;
-    let discretization = ExactGbm::new();
-    let capture_path = |path_id: usize| -> Result<Vec<f64>> {
-        let mut path_rng = rng.substream(path_id as u64);
-        let mut state = [config.spot];
-        let mut z = [0.0];
-        let mut path = Vec::with_capacity(stride);
-        path.push(config.spot);
-        for step in 0..config.num_steps {
-            path_rng.fill_std_normals(&mut z);
-            discretization.step(
-                &process,
-                time_grid.time(step),
-                time_grid.dt(step),
-                &mut state,
-                &z,
-                &mut [],
-            );
-            if !state[0].is_finite() {
-                return Err(Error::Validation(format!(
-                    "non-finite GBM spot on path {path_id} at step {}",
-                    step + 1
-                )));
-            }
-            path.push(state[0]);
-        }
-        Ok(path)
-    };
-    #[cfg(not(target_arch = "wasm32"))]
-    let paths = {
-        use rayon::prelude::*;
-        if crate::monte_carlo::registry::embedded_defaults()?
-            .rust
-            .engine
-            .use_parallel
-        {
-            (0..config.num_paths)
-                .into_par_iter()
-                .map(capture_path)
-                .collect::<Result<Vec<_>>>()?
-        } else {
-            (0..config.num_paths)
-                .map(capture_path)
-                .collect::<Result<Vec<_>>>()?
-        }
-    };
-    #[cfg(target_arch = "wasm32")]
-    let paths = (0..config.num_paths)
-        .map(capture_path)
-        .collect::<Result<Vec<_>>>()?;
-    let times = std::iter::once(0.0)
-        .chain((0..config.num_steps).map(|step| time_grid.time(step) + time_grid.dt(step)))
-        .collect();
+    let summary = simulate_paths(&PathSimulationSpec {
+        process: ProcessSpec::Gbm(GbmParams {
+            r: config.rate,
+            q: config.div_yield,
+            sigma: config.vol,
+        }),
+        scheme: SchemeSpec::Default,
+        initial_state: vec![config.spot],
+        time_grid: TimeGridSpec::Uniform {
+            expiry: config.expiry,
+            num_steps: config.num_steps,
+        },
+        num_paths: config.num_paths,
+        seed: config.seed,
+        antithetic: false,
+    })?;
 
     Ok(GbmPathSummary {
-        num_paths: config.num_paths,
-        num_simulated_paths: config.num_paths,
-        times,
-        paths,
+        num_paths: summary.num_paths,
+        num_simulated_paths: summary.num_simulated_paths,
+        paths: summary.values.chunks(stride).map(<[f64]>::to_vec).collect(),
+        times: summary.times,
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::monte_carlo::discretization::ExactGbm;
     use crate::monte_carlo::engine::{McEngine, McEngineConfig, PathCaptureConfig};
     use crate::monte_carlo::payoff::vanilla::EuropeanCall;
-    use crate::monte_carlo::process::ProcessMetadata;
+    use crate::monte_carlo::process::{GbmProcess, ProcessMetadata};
+    use crate::monte_carlo::rng::philox::PhiloxRng;
     use finstack_quant_core::currency::Currency;
 
     #[test]
@@ -255,6 +215,40 @@ mod tests {
         assert_eq!(compact.times, times);
         assert_eq!(compact.num_simulated_paths, 32);
     }
+
+    /// FNV-1a over the IEEE-754 bit patterns of every time and every spot, in
+    /// `times` then row-major path order.
+    fn bit_hash(summary: &GbmPathSummary) -> u64 {
+        let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+        for value in summary.times.iter().chain(summary.paths.iter().flatten()) {
+            for byte in value.to_bits().to_le_bytes() {
+                hash ^= u64::from(byte);
+                hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+        }
+        hash
+    }
+
+    #[test]
+    fn gbm_paths_are_pinned_bit_for_bit() {
+        let a = simulate_gbm_paths(
+            &GbmPathConfig::new(100.0, 0.04, 0.01, 0.25, 1.3, 17, 32).with_seed(19),
+        )
+        .expect("paths");
+        let b = simulate_gbm_paths(
+            &GbmPathConfig::new(42.5, -0.01, 0.03, 0.6, 0.37, 1, 5).with_seed(7_919),
+        )
+        .expect("paths");
+        assert_eq!(bit_hash(&a), PIN_A_HASH);
+        assert_eq!(a.paths[31][17].to_bits(), PIN_A_LAST);
+        assert_eq!(bit_hash(&b), PIN_B_HASH);
+        assert_eq!(b.paths[4][1].to_bits(), PIN_B_LAST);
+    }
+
+    const PIN_A_HASH: u64 = 0x7e9a_6884_54fb_d37c;
+    const PIN_A_LAST: u64 = 0x4060_5556_4027_5291;
+    const PIN_B_HASH: u64 = 0x2b4a_52ec_fdb1_426b;
+    const PIN_B_LAST: u64 = 0x4040_f04d_39a6_c0fb;
 
     #[test]
     fn compact_capture_rejects_workload_before_allocation() {

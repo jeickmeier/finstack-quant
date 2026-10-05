@@ -248,7 +248,7 @@ impl Discretization<MultiGbmProcess> for ExactMultiGbmCorrelated {
         work: &mut [f64],
     ) {
         let dim = process.dim();
-        assert_eq!(dim, self.dim, "Process dimension must match discretization");
+        debug_assert_eq!(dim, self.dim, "Process dimension must match discretization");
 
         let (correlated_shocks, exact_work) = work.split_at_mut(dim);
         // The adapter owns shock correlation; the exact transition remains shared.

@@ -775,6 +775,16 @@ export type DefaultModelSpec =
       curve: "timing";
     };
 /**
+ * Dividend payment specification.
+ */
+export type Dividend =
+  | {
+      cash: number;
+    }
+  | {
+      proportional: number;
+    };
+/**
  * Method for computing downturn LGD from base (through-the-cycle) LGD.
  */
 export type DownturnMethod =
@@ -1089,6 +1099,201 @@ export type OptionKind = "call" | "put";
  * Option payoff direction used by analytical and numerical model engines.
  */
 export type OptionType = "call" | "put";
+/**
+ * Stochastic process to simulate, with its parameters.
+ *
+ * Serialized as an internally tagged object: `{"type": "gbm", "r": 0.03, ...}`.
+ * Parameters are re-validated when [`simulate_paths`] runs, so a spec read
+ * from JSON cannot bypass the range checks of the Rust constructors.
+ */
+export type ProcessSpec =
+  | {
+      /**
+       * Dividend/foreign rate (annual)
+       */
+      q: number;
+      /**
+       * Risk-free rate (annual)
+       */
+      r: number;
+      /**
+       * Volatility (annual)
+       */
+      sigma: number;
+      type: "gbm";
+    }
+  | {
+      /**
+       * Dividend schedule as `[time, dividend]` pairs. `time` is the
+       * ex-dividend time in years: strictly positive and distinct, in any
+       * order. A cash dividend is a non-negative amount in spot units and
+       * a proportional dividend a non-negative decimal fraction of spot.
+       */
+      dividends: [unknown, unknown][];
+      /**
+       * Diffusion parameters between dividend dates. Set `q` to zero when
+       * every dividend is listed explicitly.
+       */
+      params: GbmParams;
+      type: "gbm_with_dividends";
+    }
+  | {
+      /**
+       * Per-asset parameters; the vector length is the state dimension.
+       */
+      assets: GbmParams[];
+      /**
+       * Row-major `n x n` correlation matrix of the driving Brownian
+       * motions; omitted means independent assets.
+       */
+      correlation?: number[] | null;
+      type: "multi_gbm";
+    }
+  | {
+      /**
+       * Constant drift per year.
+       */
+      mu: number;
+      /**
+       * Constant diffusion scale per square root year.
+       */
+      sigma: number;
+      type: "brownian";
+    }
+  | {
+      /**
+       * Row-major `n x n` correlation matrix of the driving Brownian
+       * motions; omitted means independent components.
+       */
+      correlation?: number[] | null;
+      /**
+       * Per-component drifts per year; the vector length is the state
+       * dimension.
+       */
+      mus: number[];
+      /**
+       * Per-component diffusion scales per square-root year, non-negative.
+       */
+      sigmas: number[];
+      type: "multi_brownian";
+    }
+  | {
+      /**
+       * Optional row-major `n x n` correlation matrix.
+       */
+      correlation?: number[] | null;
+      /**
+       * Mean-reversion speeds `κ_i` per year.
+       */
+      kappas: number[];
+      /**
+       * Diffusion scales `σ_i` per square root year.
+       */
+      sigmas: number[];
+      /**
+       * Long-run means `θ_i` in state units.
+       */
+      thetas: number[];
+      type: "multi_ou";
+    }
+  | (HullWhite1FParams & {
+      type: "hull_white_1f";
+      [k: string]: unknown;
+    })
+  | {
+      /**
+       * Mean reversion speed (κ)
+       */
+      kappa: number;
+      /**
+       * Volatility of volatility (σ)
+       */
+      sigma: number;
+      /**
+       * Long-term mean (θ)
+       */
+      theta: number;
+      type: "cir";
+    }
+  | {
+      /**
+       * Parameters of the unshifted CIR factor.
+       */
+      params: CirParams;
+      /**
+       * Shift values `φ` as decimal rates, one per entry of `shift_times`;
+       * each applies from its time until the next.
+       */
+      shift_curve: number[];
+      /**
+       * Strictly increasing shift start times in years. Times before the
+       * first entry use the first shift value.
+       */
+      shift_times: number[];
+      type: "cir_plus_plus";
+    }
+  | (HestonPricingParams & {
+      type: "heston";
+      [k: string]: unknown;
+    })
+  | {
+      /**
+       * Mean reversion speed for short-term deviation (κ_X)
+       */
+      kappa: number;
+      /**
+       * Constant risk-premium drift shift for the short-term factor (λ_X).
+       *
+       * Under the risk-neutral measure the short-term factor follows
+       * `dX = (−κ_X X − λ_X) dt + σ_X dW*` (Schwartz & Smith 2000): a constant
+       * drift shift at unchanged κ_X. Defaults to 0 (physical measure).
+       */
+      lambda_x?: number;
+      /**
+       * Drift of long-term trend (μ_Y)
+       */
+      mu_y: number;
+      /**
+       * Correlation between X and Y (ρ)
+       */
+      rho_xy: number;
+      /**
+       * Volatility of short-term component (σ_X)
+       */
+      sigma_x: number;
+      /**
+       * Volatility of long-term component (σ_Y)
+       */
+      sigma_y: number;
+      type: "schwartz_smith";
+    };
+/**
+ * Time-discretization scheme used to advance the process.
+ */
+export type SchemeSpec = "default" | "euler" | "log_euler" | "milstein";
+/**
+ * Simulation dates, as year fractions from the simulation start.
+ */
+export type TimeGridSpec =
+  | {
+      /**
+       * Finite positive horizon in years.
+       */
+      expiry: number;
+      /**
+       * Positive number of steps.
+       */
+      num_steps: number;
+      type: "uniform";
+    }
+  | {
+      /**
+       * Strictly increasing finite times in years, starting at exactly
+       * `0.0`, with at least two entries.
+       */
+      times: number[];
+      type: "times";
+    };
 /**
  * AssetPool-granularity policy for the structured-credit default engine.
  */
@@ -1825,7 +2030,6 @@ export interface BrownianParams {
    * Constant diffusion scale per square root year.
    */
   sigma: number;
-  [k: string]: unknown;
 }
 /**
  * Black–Scholes/Garman–Kohlhagen Greeks (per unit, not scaled by contract size).
@@ -1992,7 +2196,6 @@ export interface CirParams {
    * Long-term mean (θ)
    */
   theta: number;
-  [k: string]: unknown;
 }
 /**
  * A single piece of collateral in the recovery waterfall.
@@ -3260,7 +3463,6 @@ export interface GbmParams {
    * Volatility (annual)
    */
   sigma: number;
-  [k: string]: unknown;
 }
 /**
  * Compact captured GBM paths for plotting and diagnostics.
@@ -4157,7 +4359,6 @@ export interface MultiOuParams {
    * Long-run means `θ_i` in state units.
    */
   thetas: number[];
-  [k: string]: unknown;
 }
 /**
  * Input for the Ohlson O-Score logistic model (1980).
@@ -4321,6 +4522,77 @@ export interface PositionEsContributionView {
    * Position identifier.
    */
   position_id: string;
+  [k: string]: unknown;
+}
+/**
+ * Complete, serializable description of one path simulation.
+ */
+export interface PathSimulationSpec {
+  /**
+   * Emit an antithetic partner after each path, driven by the negated
+   * normal draws of the same stream.
+   */
+  antithetic?: boolean;
+  /**
+   * State at time zero, in the layout documented on the [`ProcessSpec`]
+   * variant. Its length must equal the process dimension.
+   */
+  initial_state: number[];
+  /**
+   * Number of independent random streams, in `1..=100_000`. Each stream
+   * yields one path, or two when `antithetic` is set.
+   */
+  num_paths: number;
+  /**
+   * Process and parameters.
+   */
+  process: ProcessSpec;
+  /**
+   * Discretization scheme; defaults to the process's canonical scheme.
+   */
+  scheme?: SchemeSpec;
+  /**
+   * Root seed of the Philox generator. The same spec always reproduces the
+   * same paths bit for bit.
+   */
+  seed: number;
+  /**
+   * Simulation dates.
+   */
+  time_grid: TimeGridSpec;
+}
+/**
+ * Simulated paths on a shared time grid.
+ */
+export interface PathSummary {
+  /**
+   * State dimension; equals `factor_names.len()`.
+   */
+  dim: number;
+  /**
+   * Name of each state component, in state-vector order.
+   */
+  factor_names: string[];
+  /**
+   * Number of independent random streams requested.
+   */
+  num_paths: number;
+  /**
+   * Number of stored paths: `num_paths`, or `2 * num_paths` with
+   * antithetic sampling, where stored paths `2k` and `2k + 1` are stream
+   * `k` and its antithetic partner.
+   */
+  num_simulated_paths: number;
+  /**
+   * Simulation times in years, starting at zero; length `num_steps + 1`.
+   */
+  times: number[];
+  /**
+   * States in row-major `[path][time][factor]` order: the value of factor
+   * `f` on stored path `p` at `times[s]` is
+   * `values[(p * times.len() + s) * dim + f]`.
+   */
+  values: number[];
   [k: string]: unknown;
 }
 /**

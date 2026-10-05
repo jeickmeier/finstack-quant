@@ -25,8 +25,9 @@
 //!   [`traits::StochasticProcess`], [`traits::Discretization`], and
 //!   [`traits::Payoff`] into a generic simulation.
 //! - [`pricer`] provides higher-level European, path-dependent, and LSMC workflows.
-//! - [`simulate_gbm_paths`] returns compact captured GBM paths for plotting and
-//!   diagnostics.
+//! - [`simulate::simulate_paths`] returns compact simulated paths for any
+//!   Markov process and scheme selected by a serializable
+//!   [`simulate::PathSimulationSpec`].
 //!
 //! # Module map
 //!
@@ -99,6 +100,7 @@ pub mod pricer;
 pub mod registry;
 pub mod results;
 pub mod seed;
+pub mod simulate;
 pub mod variance_reduction;
 
 #[cfg(test)]

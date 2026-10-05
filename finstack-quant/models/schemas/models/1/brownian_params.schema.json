@@ -1,6 +1,7 @@
 {
   "$id": "https://finstack_quant.dev/schemas/models/1/brownian_params.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
   "description": "Parameters for one-dimensional Brownian motion with drift.",
   "properties": {
     "mu": {

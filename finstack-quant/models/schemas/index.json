@@ -128,7 +128,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/brownian_params.schema.json",
-      "bytes": 600,
+      "bytes": 633,
       "kind": "input",
       "path": "schemas/models/1/brownian_params.schema.json",
       "summary": "Parameters for one-dimensional Brownian motion with drift.",
@@ -155,7 +155,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/cir_params.schema.json",
-      "bytes": 673,
+      "bytes": 706,
       "kind": "input",
       "path": "schemas/models/1/cir_params.schema.json",
       "summary": "CIR process parameters.",
@@ -299,7 +299,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/gbm_params.schema.json",
-      "bytes": 670,
+      "bytes": 703,
       "kind": "input",
       "path": "schemas/models/1/gbm_params.schema.json",
       "summary": "Geometric Brownian Motion parameters.",
@@ -506,7 +506,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/multi_ou_params.schema.json",
-      "bytes": 1164,
+      "bytes": 1197,
       "kind": "input",
       "path": "schemas/models/1/multi_ou_params.schema.json",
       "summary": "Parameters for a multi-dimensional Ornstein-Uhlenbeck process.",
@@ -548,6 +548,24 @@
       "summary": "Serializable Expected Shortfall decomposition view.",
       "title": "ParametricEsDecompositionView",
       "type_name": "ParametricEsDecompositionView"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/path_simulation_spec.schema.json",
+      "bytes": 22656,
+      "kind": "input",
+      "path": "schemas/models/1/path_simulation_spec.schema.json",
+      "summary": "Complete, serializable description of one path simulation.",
+      "title": "PathSimulationSpec",
+      "type_name": "PathSimulationSpec"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/path_summary.schema.json",
+      "bytes": 1708,
+      "kind": "output",
+      "path": "schemas/models/1/path_summary.schema.json",
+      "summary": "Simulated paths on a shared time grid.",
+      "title": "PathSummary",
+      "type_name": "PathSummary"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/pd_cycle_params.schema.json",
@@ -602,6 +620,15 @@
       "summary": "Complete position-level risk decomposition of a portfolio.",
       "title": "PositionRiskDecomposition",
       "type_name": "PositionRiskDecomposition"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
+      "bytes": 16630,
+      "kind": "input",
+      "path": "schemas/models/1/process_spec.schema.json",
+      "summary": "Stochastic process to simulate, with its parameters.",
+      "title": "ProcessSpec",
+      "type_name": "ProcessSpec"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rating_factor_table.schema.json",
@@ -701,6 +728,15 @@
       "summary": "SABR model parameters",
       "title": "SabrParameters",
       "type_name": "SabrParameters"
+    },
+    {
+      "$id": "https://finstack_quant.dev/schemas/models/1/scheme_spec.schema.json",
+      "bytes": 1162,
+      "kind": "component",
+      "path": "schemas/models/1/scheme_spec.schema.json",
+      "summary": "Time-discretization scheme used to advance the process.",
+      "title": "SchemeSpec",
+      "type_name": "SchemeSpec"
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/schwartz_smith_params.schema.json",
