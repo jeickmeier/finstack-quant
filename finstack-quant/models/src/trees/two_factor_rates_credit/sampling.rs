@@ -15,7 +15,7 @@ impl RatesCreditTree {
     ///
     /// Returns an error when the tree is uncalibrated or any index is outside
     /// the calibrated lattice.
-    pub fn transition_probabilities(
+    pub(crate) fn transition_probabilities(
         &self,
         step: usize,
         rate_node: usize,
@@ -54,31 +54,8 @@ impl RatesCreditTree {
         })
     }
 
-    /// Sample one deterministic joint factor path with a dedicated Philox
-    /// substream.
-    ///
-    /// # Arguments
-    ///
-    /// * `seed` - root Philox seed shared by a reproducible simulation run
-    /// * `path_index` - unique Philox substream identifier for this logical path
-    /// * `antithetic` - when true, use `1 - u` for every uniform from the same
-    ///   `(seed, path_index)` stream
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the tree is uncalibrated.
-    pub fn sample_path(
-        &self,
-        seed: u64,
-        path_index: u64,
-        antithetic: bool,
-    ) -> Result<Vec<RatesCreditPathState>> {
-        let mut path = Vec::with_capacity(self.config.steps + 1);
-        self.sample_path_into(seed, path_index, antithetic, &mut path)?;
-        Ok(path)
-    }
-
-    /// Sample one deterministic joint factor path into caller-owned storage.
+    /// Sample one deterministic joint factor path into caller-owned storage,
+    /// drawing from a dedicated Philox substream.
     ///
     /// Reusing `output` avoids one allocation per path in streamed or blocked
     /// simulations. Existing contents are cleared before the new path is
@@ -155,8 +132,9 @@ impl RatesCreditTree {
 
     /// Resume a deterministic sampled factor path over one inclusive step range.
     ///
-    /// The returned states are bit-for-bit identical to
-    /// `sample_path(seed, path_index, antithetic)?[checkpoint.step..=end_step]`.
+    /// The returned states are bit-for-bit identical to elements
+    /// `checkpoint.step..=end_step` of the path written by
+    /// [`Self::sample_path_into`] for the same `(seed, path_index, antithetic)`.
     /// This supports bounded-memory consumers that checkpoint product state at
     /// time-block boundaries and must not replay the full factor-path prefix.
     ///

@@ -13,8 +13,6 @@
 //! configuration structs (e.g. `EvolutionParams`) and keep runtime engine types
 //! (`BinomialTree`, etc.) non-serializable.
 
-pub use finstack_quant_core::math::time_grid::{map_date_to_step, map_exercise_dates_to_steps};
-
 mod evolution;
 mod node_state;
 mod recombining;
@@ -26,4 +24,4 @@ mod tests;
 pub use evolution::EvolutionParams;
 pub use node_state::NodeState;
 pub use recombining::{price_recombining_tree, RecombiningInputs, RecombiningLattice};
-pub use traits::{TreeGreeks, TreeValuator};
+pub use traits::TreeValuator;

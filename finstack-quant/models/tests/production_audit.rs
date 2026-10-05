@@ -19,7 +19,7 @@ fn m1_hull_white_node_bond_uses_centered_state() {
     let kappa: f64 = 0.07;
     let sigma: f64 = 0.025;
     for steps in [20, 80] {
-        let tree = HullWhiteTree::calibrate_with_times(
+        let tree = HullWhiteTree::calibrate(
             HullWhiteTreeConfig::new(kappa, sigma, steps),
             &curve,
             5.0,
@@ -58,12 +58,11 @@ fn m1_scheduled_hw_bond_matches_integrated_ou_moments() {
     for kappa in [1e-12_f64, 0.07] {
         let schedule =
             PiecewiseConstantCurve::new(vec![0.0, 1.0], vec![0.01, 0.025]).expect("schedule");
-        let tree = HullWhiteTree::calibrate_with_times_and_volatility(
-            HullWhiteTreeConfig::new(kappa, 0.01, 40),
+        let tree = HullWhiteTree::calibrate(
+            HullWhiteTreeConfig::new(kappa, 0.01, 40).with_volatility(schedule),
             &curve,
             5.0,
             &[t],
-            Some(schedule),
         )
         .expect("tree");
         let step = tree.step_at_time(t).expect("step");
@@ -260,7 +259,7 @@ fn m1_hw_bond_option_converges_to_independent_affine_price() {
     let expected = p_maturity * norm_cdf(d1) - strike * p_expiry * norm_cdf(d1 - bond_vol);
     let mut errors = Vec::new();
     for steps in [25, 100, 400] {
-        let tree = HullWhiteTree::calibrate_with_times(
+        let tree = HullWhiteTree::calibrate(
             HullWhiteTreeConfig::new(kappa, sigma, steps),
             &curve,
             expiry,

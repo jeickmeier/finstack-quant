@@ -20,8 +20,8 @@ pub use hull_white_tree::{HullWhiteTree, HullWhiteTreeConfig};
 pub use short_rate_tree::{
     ShortRateModel, ShortRateTree, ShortRateTreeConfig, TreeDiscounting, DEFAULT_NORMAL_VOL,
 };
-pub use tree_framework::{EvolutionParams, NodeState, TreeGreeks, TreeValuator};
+pub use tree_framework::{EvolutionParams, NodeState, TreeValuator};
 pub use two_factor_rates_credit::{
-    RatesCreditCalibrationTargets, RatesCreditConfig, RatesCreditPathState, RatesCreditTransition,
-    RatesCreditTree, KAPPA_MAX,
+    RatesCreditCalibrationTargets, RatesCreditConfig, RatesCreditPathState, RatesCreditTree,
+    KAPPA_MAX,
 };

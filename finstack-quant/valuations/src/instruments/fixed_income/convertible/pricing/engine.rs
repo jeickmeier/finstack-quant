@@ -13,9 +13,9 @@ use crate::cashflow::builder::CashFlowSchedule;
 use crate::instruments::common_impl::traits::{GreekBumps, Instrument};
 use crate::instruments::fixed_income::convertible::{
     market_inputs::resolve_dividend_yield, ConversionEvent, ConversionPolicy, ConvertibleBond,
+    ConvertibleGreeks,
 };
 use crate::metrics::bump_discount_curve_parallel;
-use finstack_quant_models::TreeGreeks;
 
 use super::tsiveriotis_zhang::{terminal_payoff, TsiveriotisZhangEngine, TzMarketInputs};
 use super::valuator::ConvertibleBondValuator;
@@ -490,7 +490,7 @@ pub fn calculate_convertible_greeks(
     tree_type: ConvertibleTreeType,
     bumps: GreekBumps,
     as_of: Date,
-) -> Result<TreeGreeks> {
+) -> Result<ConvertibleGreeks> {
     bond.validate_for_pricing()?;
     tree_steps(bond)?;
     for (name, value) in [
@@ -512,14 +512,13 @@ pub fn calculate_convertible_greeks(
     let inputs = prepare_for_pricing(bond, market, as_of)?;
     let base_price = price_convertible_bond_with_inputs(bond, market, &inputs, tree_type, as_of)?;
 
-    let mut greeks = TreeGreeks {
+    let mut greeks = ConvertibleGreeks {
         price: base_price.amount(),
         delta: 0.0,
         gamma: 0.0,
         vega: 0.0,
         theta: 0.0,
         rho: 0.0,
-        oas01: 0.0,
     };
 
     // ---- Delta & Gamma: bump equity spot (central differences) ----

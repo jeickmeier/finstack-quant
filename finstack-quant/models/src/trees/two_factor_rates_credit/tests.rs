@@ -216,9 +216,15 @@ fn sampled_paths_are_seeded_weighted_and_antithetic() {
     });
     tree.calibrate(&targets).expect("calibrate");
 
-    let path = tree.sample_path(42, 7, false).expect("path");
-    let replay = tree.sample_path(42, 7, false).expect("replay");
-    let antithetic = tree.sample_path(42, 7, true).expect("antithetic");
+    let sample = |antithetic: bool| {
+        let mut path = Vec::new();
+        tree.sample_path_into(42, 7, antithetic, &mut path)
+            .expect("path");
+        path
+    };
+    let path = sample(false);
+    let replay = sample(false);
+    let antithetic = sample(true);
     assert_eq!(path, replay);
     assert_eq!(path.len(), steps + 1);
     assert_eq!(antithetic.len(), steps + 1);

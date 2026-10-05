@@ -334,7 +334,7 @@ fn test_mean_reversion_reduces_rate_dispersion() {
             steps,
             ..Default::default()
         };
-        let tree = HullWhiteTree::calibrate(config, &curve, ttm).unwrap();
+        let tree = HullWhiteTree::calibrate(config, &curve, ttm, &[]).unwrap();
         let last_step = tree.num_steps();
         let mut q_sum = 0.0;
         let mut mean = 0.0;

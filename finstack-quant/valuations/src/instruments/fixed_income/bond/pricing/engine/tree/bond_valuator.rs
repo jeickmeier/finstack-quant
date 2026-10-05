@@ -1174,8 +1174,8 @@ mod tests {
     use finstack_quant_core::dates::{DayCount, DayCountContext, Tenor};
     use finstack_quant_core::market_data::context::MarketContext;
     use finstack_quant_core::market_data::term_structures::DiscountCurve;
+    use finstack_quant_core::math::map_date_to_step;
     use finstack_quant_core::money::Money;
-    use finstack_quant_models::trees::tree_framework::map_date_to_step;
     use finstack_quant_models::trees::two_factor_rates_credit::{
         RatesCreditCalibrationTargets, RatesCreditConfig,
     };

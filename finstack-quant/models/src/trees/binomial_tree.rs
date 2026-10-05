@@ -6,13 +6,13 @@
 use crate::trees::NodeState;
 use crate::types::{OptionMarketParams, OptionType};
 use crate::volatility::black::d1_d2;
+use finstack_quant_core::math::map_exercise_dates_to_steps;
 use finstack_quant_core::validation::validate_f64_positive;
 use finstack_quant_core::HashSet;
 use finstack_quant_core::{Error, Result};
 
 use super::tree_framework::{
-    map_exercise_dates_to_steps, price_recombining_tree, EvolutionParams, RecombiningInputs,
-    RecombiningLattice, TreeValuator,
+    price_recombining_tree, EvolutionParams, RecombiningInputs, RecombiningLattice, TreeValuator,
 };
 
 /// Binomial tree types
@@ -699,12 +699,12 @@ mod tests {
     fn test_exercise_schedule_mapping() {
         // Map quarterly exercise dates over 1Y with 4 steps
         let dates = vec![0.0, 0.25, 0.5, 0.75, 1.0];
-        let steps = super::map_exercise_dates_to_steps(&dates, 1.0, 4);
+        let steps = map_exercise_dates_to_steps(&dates, 1.0, 4);
         assert_eq!(steps, vec![0, 1, 2, 3, 4]);
 
         // Irregular dates should round to nearest step
         let dates2 = vec![0.12, 0.37, 0.62, 0.88];
-        let steps2 = super::map_exercise_dates_to_steps(&dates2, 1.0, 4);
+        let steps2 = map_exercise_dates_to_steps(&dates2, 1.0, 4);
         assert_eq!(steps2, vec![0, 1, 2, 4]);
     }
 

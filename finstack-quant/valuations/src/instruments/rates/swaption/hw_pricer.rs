@@ -151,15 +151,13 @@ impl SwaptionHullWhitePricer {
                 .tree_steps
                 .unwrap_or(self.tree_steps),
         );
-        let tree = HullWhiteTree::calibrate_with_times(
-            config,
-            &discount,
-            swap_end_time,
-            &[time_to_expiry],
-        )
-        .map_err(|e| {
-            PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())
-        })?;
+        let tree = HullWhiteTree::calibrate(config, &discount, swap_end_time, &[time_to_expiry])
+            .map_err(|e| {
+                PricingError::model_failure_with_context(
+                    e.to_string(),
+                    PricingErrorContext::default(),
+                )
+            })?;
 
         let strike = swaption.strike_f64().map_err(|e| {
             PricingError::model_failure_with_context(e.to_string(), PricingErrorContext::default())

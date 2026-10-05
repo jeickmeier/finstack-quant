@@ -161,7 +161,7 @@ fn tree_floating_note_pv(
         .map(|&d| day_count.year_fraction(as_of, d, ctx).expect("fixing time"))
         .collect();
     let config = HullWhiteTreeConfig::new(hw.kappa, hw.sigma, tree_steps);
-    let tree = HullWhiteTree::calibrate_with_times(config, discount_curve, horizon, &fixing_times)
+    let tree = HullWhiteTree::calibrate(config, discount_curve, horizon, &fixing_times)
         .expect("tree calibrate");
 
     let mut pv = 0.0_f64;

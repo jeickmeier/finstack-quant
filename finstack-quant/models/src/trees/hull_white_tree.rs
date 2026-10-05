@@ -73,11 +73,12 @@ pub struct HullWhiteTreeConfig {
     /// Typical values: 50 (fast), 100 (standard), 200+ (high precision)
     pub steps: usize,
 
-    /// Maximum number of nodes per step (limits tree width).
+    /// Optional left-continuous piecewise-constant volatility schedule σ(t).
     ///
-    /// For mean-reverting processes, the tree doesn't grow indefinitely.
-    /// Default: 2 * steps + 1 (sufficient for most cases)
-    pub max_nodes: Option<usize>,
+    /// When set it replaces the scalar `sigma` for transition widths and
+    /// node bond prices, and its knots are merged into the time grid so no
+    /// transition straddles a sigma change. Default: `None` (scalar `sigma`).
+    pub volatility: Option<PiecewiseConstantCurve>,
 
     /// Per-node discount factor convention.
     ///
@@ -92,7 +93,7 @@ impl Default for HullWhiteTreeConfig {
             kappa: 0.03,
             sigma: 0.01,
             steps: 100,
-            max_nodes: None,
+            volatility: None,
             compounding: Compounding::default(),
         }
     }
@@ -105,14 +106,21 @@ impl HullWhiteTreeConfig {
             kappa,
             sigma,
             steps,
-            max_nodes: None,
+            volatility: None,
             compounding: Compounding::default(),
         }
     }
 
-    /// Set maximum nodes per step.
-    pub fn with_max_nodes(mut self, max_nodes: usize) -> Self {
-        self.max_nodes = Some(max_nodes);
+    /// Use a left-continuous piecewise-constant volatility schedule instead
+    /// of the scalar `sigma`.
+    ///
+    /// # Arguments
+    ///
+    /// * `volatility` - Normal short-rate volatility σ(t) in annualized rate
+    ///   units, keyed by time in years from the valuation date. Knots inside
+    ///   the tree horizon become grid points.
+    pub fn with_volatility(mut self, volatility: PiecewiseConstantCurve) -> Self {
+        self.volatility = Some(volatility);
         self
     }
 
@@ -131,11 +139,10 @@ impl HullWhiteTreeConfig {
 
 /// Calibrated Hull-White trinomial tree.
 ///
-/// The tree is built and calibrated via [`HullWhiteTree::calibrate`] (uniform
-/// grid) or [`HullWhiteTree::calibrate_with_times`] (grid refined to pass
-/// exactly through caller-supplied mandatory dates such as exercise or coupon
-/// times). After calibration, it can compute bond prices, forward swap rates,
-/// and annuities at any node.
+/// The tree is built and calibrated via [`HullWhiteTree::calibrate`], whose
+/// grid passes exactly through caller-supplied mandatory dates such as
+/// exercise or coupon times (uniform when none are given). After calibration,
+/// it can compute bond prices, forward swap rates, and annuities at any node.
 ///
 /// # Node Indexing
 ///
@@ -160,8 +167,6 @@ impl HullWhiteTreeConfig {
 pub struct HullWhiteTree {
     /// Configuration parameters
     config: HullWhiteTreeConfig,
-    /// Optional left-continuous volatility schedule used for transition widths.
-    volatility: Option<PiecewiseConstantCurve>,
     /// Time grid (year fractions from t=0), `n+1` entries
     time_grid: Vec<f64>,
     /// Per-step time sizes: `dts[i] = time_grid[i+1] - time_grid[i]`, `n` entries
@@ -188,34 +193,6 @@ const GRID_TIME_TOLERANCE: f64 = 1e-9;
 type NodeBranch = (usize, (f64, f64, f64));
 
 impl HullWhiteTree {
-    /// Build and calibrate a Hull-White tree to match the discount curve.
-    ///
-    /// # Arguments
-    ///
-    /// * `config` - Tree configuration (κ, σ, steps)
-    /// * `discount_curve` - Initial yield curve for calibration
-    /// * `time_to_maturity` - Total tree horizon in years (must be finite and
-    ///   strictly positive)
-    ///
-    /// # Returns
-    ///
-    /// Calibrated tree ready for pricing
-    ///
-    /// # Errors
-    ///
-    /// Returns [`finstack_quant_core::Error::Validation`] if the
-    /// configuration is invalid or `time_to_maturity` is not a finite,
-    /// strictly positive number of years, a discount target is non-finite or
-    /// non-positive, or the calibrated grid misses a target by more than
-    /// 0.1 basis point of relative discount-factor error.
-    pub fn calibrate(
-        config: HullWhiteTreeConfig,
-        discount_curve: &dyn Discounting,
-        time_to_maturity: f64,
-    ) -> Result<Self> {
-        Self::calibrate_with_times(config, discount_curve, time_to_maturity, &[])
-    }
-
     /// Build and calibrate a Hull-White tree whose time grid passes exactly
     /// through caller-supplied mandatory times.
     ///
@@ -224,53 +201,39 @@ impl HullWhiteTree {
     /// segment subdivided so the total step count stays close to
     /// `config.steps` while every mandatory time lands exactly on a grid
     /// point. Steps therefore have per-step sizes `dt_i`, and each level
-    /// uses spacing `dx_i = σ√(3·dt_{i-1})`.
+    /// uses spacing `dx_i = σ√(3·dt_{i-1})`. With an empty `mandatory_times`
+    /// the grid is uniform.
     ///
-    /// With an empty `mandatory_times`, this degenerates to the uniform grid
-    /// built by [`HullWhiteTree::calibrate`].
+    /// When `config.volatility` holds a schedule, its knots are merged into
+    /// the mandatory grid so no transition straddles a sigma change.
     ///
     /// # Arguments
     ///
-    /// * `config` - Tree configuration (κ, σ, target steps)
+    /// * `config` - Tree configuration (κ, σ or a σ(t) schedule, target steps)
     /// * `discount_curve` - Initial yield curve for calibration
-    /// * `time_to_maturity` - Total tree horizon in years
+    /// * `time_to_maturity` - Total tree horizon in years (must be finite and
+    ///   strictly positive)
     /// * `mandatory_times` - Times (year fractions) that must coincide with
-    ///   grid points; entries outside `(0, time_to_maturity)` are ignored
+    ///   grid points; entries outside `(0, time_to_maturity)` are ignored.
+    ///   Pass `&[]` for a uniform grid.
+    ///
+    /// # Returns
+    ///
+    /// Calibrated tree ready for pricing
     ///
     /// # Errors
     ///
     /// Returns [`finstack_quant_core::Error::Validation`] if the configuration is
-    /// invalid, `time_to_maturity` is not a finite positive number, a
-    /// mandatory time is not finite, or calibration produces invalid
-    /// transition probabilities, non-finite state prices, or relative
+    /// invalid, `time_to_maturity` is not a finite, strictly positive number
+    /// of years, a mandatory time is not finite, or calibration produces
+    /// invalid transition probabilities, non-finite state prices, or relative
     /// discount-factor errors above 0.1 bp. Discount targets must be finite
     /// and strictly positive on the entire grid.
-    pub fn calibrate_with_times(
+    pub fn calibrate(
         config: HullWhiteTreeConfig,
         discount_curve: &dyn Discounting,
         time_to_maturity: f64,
         mandatory_times: &[f64],
-    ) -> Result<Self> {
-        Self::calibrate_with_times_and_volatility(
-            config,
-            discount_curve,
-            time_to_maturity,
-            mandatory_times,
-            None,
-        )
-    }
-
-    /// Build a tree with a left-continuous piecewise volatility schedule.
-    ///
-    /// Volatility knots are merged into the mandatory grid so no transition
-    /// straddles a sigma change. Scalar callers continue through
-    /// [`Self::calibrate_with_times`] unchanged.
-    pub fn calibrate_with_times_and_volatility(
-        config: HullWhiteTreeConfig,
-        discount_curve: &dyn Discounting,
-        time_to_maturity: f64,
-        mandatory_times: &[f64],
-        volatility: Option<PiecewiseConstantCurve>,
     ) -> Result<Self> {
         config.validate()?;
 
@@ -289,7 +252,7 @@ impl HullWhiteTree {
         }
 
         let mut refined_times = mandatory_times.to_vec();
-        if let Some(schedule) = &volatility {
+        if let Some(schedule) = &config.volatility {
             refined_times.extend(
                 schedule
                     .times()
@@ -319,7 +282,8 @@ impl HullWhiteTree {
             .iter()
             .enumerate()
             .map(|(step, _)| {
-                volatility
+                config
+                    .volatility
                     .as_ref()
                     .map_or(config.sigma, |schedule| schedule.value_at(time_grid[step]))
             })
@@ -332,12 +296,6 @@ impl HullWhiteTree {
         for (&dt_i, &sigma_i) in dts.iter().zip(&step_sigmas) {
             dxs.push(sigma_i * (3.0 * dt_i).sqrt());
         }
-
-        // Optional hard cap on level width from `max_nodes`: signed index
-        // |j| ≤ j_cap. Central children are clamped to keep all three
-        // branches inside the cap; if the cap is too tight the resulting
-        // probabilities go negative and calibration fails loudly below.
-        let j_cap: Option<i32> = config.max_nodes.map(|m| ((m.max(3) - 1) / 2) as i32);
 
         let mut j_mins: Vec<i32> = vec![0];
         let mut widths: Vec<usize> = vec![1];
@@ -371,11 +329,7 @@ impl HullWhiteTree {
                 let j = j_min + idx as i32;
                 let x = j as f64 * dx_curr;
                 let m_target = x * (1.0 - config.kappa * dt_i);
-                let mut k = (m_target / dx_next).round() as i32;
-                if let Some(cap) = j_cap {
-                    k = k.clamp(-(cap - 1), cap - 1);
-                }
-                centers.push(k);
+                centers.push((m_target / dx_next).round() as i32);
             }
 
             let next_j_min = centers.iter().copied().min().unwrap_or(0) - 1;
@@ -442,7 +396,6 @@ impl HullWhiteTree {
 
         Ok(Self {
             config,
-            volatility,
             time_grid,
             dts,
             dxs,
@@ -771,7 +724,7 @@ impl HullWhiteTree {
         // Variance term. A scheduled tree uses the same exact integrated
         // state variance as its affine caplet formulas; the scalar branch
         // retains the established arithmetic bit-for-bit.
-        let state_variance = if let Some(schedule) = &self.volatility {
+        let state_variance = if let Some(schedule) = &self.config.volatility {
             match schedule.integrate_squared_exp_weight(kappa, t, 0.0, t) {
                 Ok(variance) => variance,
                 Err(_) => return f64::NAN,
@@ -790,7 +743,7 @@ impl HullWhiteTree {
         // formula requires the instantaneous shift f(0,t) + c(t) instead.
         // Its forward term cancels against A(t,T), leaving the centered OU
         // state and c(t)=Cov[x(t), integral_0^t x(s) ds].
-        let shift = if let Some(schedule) = &self.volatility {
+        let shift = if let Some(schedule) = &self.config.volatility {
             if kappa.abs() < 1e-10 {
                 schedule
                     .times()
@@ -979,7 +932,7 @@ impl HullWhiteTree {
 
     /// Map a time (year fraction) to the nearest tree step.
     ///
-    /// Mandatory times supplied to [`HullWhiteTree::calibrate_with_times`]
+    /// Mandatory times supplied to [`HullWhiteTree::calibrate`]
     /// land exactly on grid points, so for those the nearest step is exact.
     /// Use [`HullWhiteTree::step_at_time`] when an exact match is required.
     pub fn time_to_step(&self, time: f64) -> usize {
@@ -1021,7 +974,7 @@ impl HullWhiteTree {
         } else {
             Err(Error::Validation(format!(
                 "Hull-White tree has no grid point at t={time} (nearest is t={grid_time}); \
-                 pass it as a mandatory time to calibrate_with_times"
+                 pass it as a mandatory time to calibrate"
             )))
         }
     }
@@ -1060,7 +1013,7 @@ mod tests {
         let curve = test_discount_curve();
 
         let tree =
-            HullWhiteTree::calibrate(config, &curve, 5.0).expect("Calibration should succeed");
+            HullWhiteTree::calibrate(config, &curve, 5.0, &[]).expect("Calibration should succeed");
 
         assert_eq!(tree.num_steps(), 200);
 
@@ -1126,6 +1079,7 @@ mod tests {
                             target
                         },
                         1.0,
+                        &[],
                     )
                     .is_err(),
                     "compounding={compounding:?}, target={target}"
@@ -1139,12 +1093,11 @@ mod tests {
         let curve = test_discount_curve();
         let schedule =
             PiecewiseConstantCurve::new(vec![0.0, 1.0], vec![0.01, 0.02]).expect("schedule");
-        let tree = HullWhiteTree::calibrate_with_times_and_volatility(
-            HullWhiteTreeConfig::new(0.03, 0.01, 40),
+        let tree = HullWhiteTree::calibrate(
+            HullWhiteTreeConfig::new(0.03, 0.01, 40).with_volatility(schedule),
             &curve,
             2.0,
             &[],
-            Some(schedule),
         )
         .expect("scheduled tree");
 
@@ -1180,7 +1133,7 @@ mod tests {
             .expect("Valid curve");
 
         let config = HullWhiteTreeConfig::new(0.03, 0.01, 200);
-        let tree = HullWhiteTree::calibrate(config, &steep_curve, 10.0)
+        let tree = HullWhiteTree::calibrate(config, &steep_curve, 10.0, &[])
             .expect("Calibration should succeed");
 
         for step in [10, 20, 40, 100, 160, 200] {
@@ -1224,7 +1177,7 @@ mod tests {
         let curve = test_discount_curve();
 
         let tree =
-            HullWhiteTree::calibrate(config, &curve, 2.0).expect("Calibration should succeed");
+            HullWhiteTree::calibrate(config, &curve, 2.0, &[]).expect("Calibration should succeed");
         let final_step = tree.num_steps();
         let mid_node = tree.num_nodes(final_step) / 2;
 
@@ -1245,7 +1198,7 @@ mod tests {
         let curve = test_discount_curve();
 
         let tree =
-            HullWhiteTree::calibrate(config, &curve, 1.0).expect("Calibration should succeed");
+            HullWhiteTree::calibrate(config, &curve, 1.0, &[]).expect("Calibration should succeed");
 
         let terminal = vec![0.0; tree.num_nodes(10)];
         let value = tree
@@ -1262,7 +1215,7 @@ mod tests {
         let curve = test_discount_curve();
 
         let tree =
-            HullWhiteTree::calibrate(config, &curve, 1.0).expect("Calibration should succeed");
+            HullWhiteTree::calibrate(config, &curve, 1.0, &[]).expect("Calibration should succeed");
         let final_step = tree.num_steps();
 
         let terminal = vec![1.0; tree.num_nodes(final_step)];
@@ -1287,8 +1240,9 @@ mod tests {
     #[test]
     fn root_forward_swap_rate_matches_curve_par_rate_within_one_bp() {
         let curve = test_discount_curve();
-        let tree = HullWhiteTree::calibrate(HullWhiteTreeConfig::new(0.03, 0.01, 80), &curve, 5.0)
-            .expect("calibration should succeed");
+        let tree =
+            HullWhiteTree::calibrate(HullWhiteTreeConfig::new(0.03, 0.01, 80), &curve, 5.0, &[])
+                .expect("calibration should succeed");
         let payment_times: Vec<f64> = (1..=10).map(|period| period as f64 * 0.5).collect();
         let accrual_fractions = [0.5; 10];
 
@@ -1313,9 +1267,13 @@ mod tests {
     fn low_kappa_tree_calibrates_and_clamps_time_mapping() {
         let curve = test_discount_curve();
         let steps = 80;
-        let tree =
-            HullWhiteTree::calibrate(HullWhiteTreeConfig::new(0.01, 0.01, steps), &curve, 10.0)
-                .expect("low-kappa calibration should succeed");
+        let tree = HullWhiteTree::calibrate(
+            HullWhiteTreeConfig::new(0.01, 0.01, steps),
+            &curve,
+            10.0,
+            &[],
+        )
+        .expect("low-kappa calibration should succeed");
 
         assert_eq!(tree.time_to_step(-1.0), 0);
         assert_eq!(tree.time_to_step(0.0), 0);
@@ -1340,12 +1298,20 @@ mod tests {
     fn higher_volatility_increases_node_rate_dispersion() {
         let curve = test_discount_curve();
         let steps = 60;
-        let low_vol =
-            HullWhiteTree::calibrate(HullWhiteTreeConfig::new(0.03, 0.005, steps), &curve, 5.0)
-                .expect("low-volatility calibration should succeed");
-        let high_vol =
-            HullWhiteTree::calibrate(HullWhiteTreeConfig::new(0.03, 0.02, steps), &curve, 5.0)
-                .expect("high-volatility calibration should succeed");
+        let low_vol = HullWhiteTree::calibrate(
+            HullWhiteTreeConfig::new(0.03, 0.005, steps),
+            &curve,
+            5.0,
+            &[],
+        )
+        .expect("low-volatility calibration should succeed");
+        let high_vol = HullWhiteTree::calibrate(
+            HullWhiteTreeConfig::new(0.03, 0.02, steps),
+            &curve,
+            5.0,
+            &[],
+        )
+        .expect("high-volatility calibration should succeed");
         let midpoint = steps / 2;
 
         let low_spread = low_vol.rate_at_node(midpoint, low_vol.num_nodes(midpoint) - 1)
@@ -1366,7 +1332,7 @@ mod tests {
         let config = HullWhiteTreeConfig::new(0.03, 0.01, 50);
         let curve = test_discount_curve();
         let tree =
-            HullWhiteTree::calibrate(config, &curve, 1.0).expect("Calibration should succeed");
+            HullWhiteTree::calibrate(config, &curve, 1.0, &[]).expect("Calibration should succeed");
 
         let expected = tree.num_nodes(tree.num_steps());
         for bad_len in [0, expected - 1, expected + 1] {
@@ -1391,7 +1357,7 @@ mod tests {
         let curve = test_discount_curve();
         for &bad_t in &[0.0_f64, -1.0, -5.0] {
             let config = HullWhiteTreeConfig::new(0.03, 0.01, 100);
-            let err = HullWhiteTree::calibrate(config, &curve, bad_t)
+            let err = HullWhiteTree::calibrate(config, &curve, bad_t, &[])
                 .expect_err("non-positive time_to_maturity must be rejected");
             match err {
                 finstack_quant_core::Error::Validation(msg) => {
@@ -1416,7 +1382,7 @@ mod tests {
         // A genuinely small-but-positive horizon must still calibrate.
         let curve = test_discount_curve();
         let config = HullWhiteTreeConfig::new(0.03, 0.01, 10);
-        let tree = HullWhiteTree::calibrate(config, &curve, 0.25)
+        let tree = HullWhiteTree::calibrate(config, &curve, 0.25, &[])
             .expect("small positive maturity should calibrate");
         assert_eq!(tree.num_steps(), 10);
     }
@@ -1432,7 +1398,7 @@ mod tests {
         let curve = test_discount_curve();
 
         let tree =
-            HullWhiteTree::calibrate(config, &curve, 5.0).expect("Calibration should succeed");
+            HullWhiteTree::calibrate(config, &curve, 5.0, &[]).expect("Calibration should succeed");
 
         // Verify mean reversion actually limits the width well below the
         // uncontained 2·steps + 1 node count.
@@ -1480,13 +1446,13 @@ mod tests {
     }
 
     #[test]
-    fn calibrate_with_times_places_mandatory_dates_on_grid() {
+    fn calibrate_places_mandatory_dates_on_grid() {
         let curve = test_discount_curve();
         let config = HullWhiteTreeConfig::new(0.03, 0.01, 100);
         // Irregular exercise dates that a uniform 100-step grid over 5y
         // (dt = 0.05) cannot represent exactly.
         let mandatory = [0.7123, 1.234, 2.5, 3.99];
-        let tree = HullWhiteTree::calibrate_with_times(config, &curve, 5.0, &mandatory)
+        let tree = HullWhiteTree::calibrate(config, &curve, 5.0, &mandatory)
             .expect("Calibration should succeed");
 
         for &t in &mandatory {
@@ -1515,31 +1481,6 @@ mod tests {
     }
 
     #[test]
-    fn calibrate_with_times_empty_matches_uniform_calibrate() {
-        let curve = test_discount_curve();
-        let config = HullWhiteTreeConfig::new(0.03, 0.01, 100);
-        let uniform = HullWhiteTree::calibrate(config.clone(), &curve, 5.0).expect("uniform");
-        let with_empty =
-            HullWhiteTree::calibrate_with_times(config, &curve, 5.0, &[]).expect("empty mandatory");
-
-        assert_eq!(uniform.num_steps(), with_empty.num_steps());
-        for step in 0..=uniform.num_steps() {
-            assert_eq!(uniform.num_nodes(step), with_empty.num_nodes(step));
-            assert!((uniform.time_at_step(step) - with_empty.time_at_step(step)).abs() < 1e-15);
-        }
-
-        let final_step = uniform.num_steps();
-        let terminal = vec![1.0; uniform.num_nodes(final_step)];
-        let v_uniform = uniform
-            .backward_induction(&terminal, |_, _, cont| cont)
-            .expect("uniform induction");
-        let v_empty = with_empty
-            .backward_induction(&terminal, |_, _, cont| cont)
-            .expect("empty-mandatory induction");
-        assert!((v_uniform - v_empty).abs() < 1e-15);
-    }
-
-    #[test]
     fn steep_curve_recalibration_with_mandatory_pillars_stays_tight() {
         // Per-step dt regression: a non-uniform grid through every curve
         // pillar must still reprice the steep input curve to < 0.1 bp at
@@ -1563,7 +1504,7 @@ mod tests {
 
         let config = HullWhiteTreeConfig::new(0.03, 0.01, 200);
         let pillars = [0.5, 1.0, 2.0, 5.0];
-        let tree = HullWhiteTree::calibrate_with_times(config, &steep_curve, 10.0, &pillars)
+        let tree = HullWhiteTree::calibrate(config, &steep_curve, 10.0, &pillars)
             .expect("Calibration should succeed");
 
         for &t in &pillars {

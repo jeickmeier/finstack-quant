@@ -521,7 +521,7 @@ impl TreePricer {
                     kappa,
                     sigma,
                     steps: self.config.tree_steps,
-                    max_nodes: None,
+                    volatility: None,
                     compounding: self.config.tree_compounding,
                 };
                 // Thread coupon and call/put dates into the tree grid so
@@ -529,7 +529,7 @@ impl TreePricer {
                 // and build the valuator on the tree's (non-uniform) grid.
                 let mandatory =
                     BondValuator::mandatory_grid_times(&tree_bond, market_context, as_of)?;
-                let tree = HullWhiteTree::calibrate_with_times(
+                let tree = HullWhiteTree::calibrate(
                     hw_config,
                     discount_curve.as_ref(),
                     time_to_maturity,

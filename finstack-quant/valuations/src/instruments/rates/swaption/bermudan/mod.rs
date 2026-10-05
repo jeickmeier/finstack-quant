@@ -108,8 +108,8 @@ impl PreparedHullWhiteModel {
         let config = HullWhiteTreeConfig::new(params.kappa, params.sigma, steps);
         let discount = ModelDiscountCurve::new(disc, as_of)
             .map_err(|e| PricingError::from_core(e, PricingErrorContext::default()))?;
-        let tree = HullWhiteTree::calibrate_with_times(config, &discount, ttm, mandatory_times)
-            .map_err(|e| {
+        let tree =
+            HullWhiteTree::calibrate(config, &discount, ttm, mandatory_times).map_err(|e| {
                 PricingError::model_failure_with_context(
                     e.to_string(),
                     PricingErrorContext::default(),

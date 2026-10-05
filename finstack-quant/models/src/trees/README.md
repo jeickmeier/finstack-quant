@@ -190,10 +190,8 @@ dx(t) = −κx(t)dt + σdW(t)
 
 Level spacing is `dx_i = σ√(3·dt_{i-1})`, matching the variance of the step
 arriving at level `i`. Width is set by the natural branching geometry (each
-node's central child plus one node either side), optionally hard-capped by
-`config.max_nodes`; if that cap is too tight the transition probabilities go
-negative and calibration fails loudly. Boundary handling follows Hull & White
-(1994).
+node's central child plus one node either side): mean reversion pulls the
+central child inward, so the lattice limits its own width.
 
 ```rust
 use finstack_quant_models::trees::{HullWhiteTree, HullWhiteTreeConfig};
@@ -202,12 +200,11 @@ let config = HullWhiteTreeConfig {
     kappa: 0.03,
     sigma: 0.01,
     steps: 100,
-    max_nodes: None,
     ..Default::default()
 };
 
 // Exercise dates land exactly on grid points.
-let tree = HullWhiteTree::calibrate_with_times(
+let tree = HullWhiteTree::calibrate(
     config,
     discount_curve,
     time_to_maturity,
@@ -222,8 +219,8 @@ let price = tree.backward_induction(&terminal_values, |step, node, continuation|
 `backward_induction` takes terminal values indexed by node at the final step
 (`terminal_values.len()` must equal `tree.num_nodes(tree.num_steps())`) and a
 closure `(step, node_idx, continuation_value) -> f64`. `calibrate` is the
-uniform-grid shorthand for `calibrate_with_times(.., &[])`;
-`calibrate_with_times_and_volatility` additionally accepts a left-continuous
+single entry point: pass `&[]` as the mandatory times for a uniform grid.
+`HullWhiteTreeConfig::with_volatility` supplies a left-continuous
 piecewise-constant `σ` schedule whose knots are merged into the grid so no
 transition straddles a change.
 
@@ -317,7 +314,7 @@ model as `None`.
 | Commodity options | `BinomialTree::leisen_reimer` | `instruments/commodity/commodity_option/types.rs` |
 | Callable / putable bonds | `ShortRateTree`, `RatesCreditTree`, `HullWhiteTree` | `instruments/fixed_income/bond/pricing/engine/tree/` |
 | Term loans | `ShortRateTree`, `RatesCreditTree` | `instruments/fixed_income/term_loan/pricing/tree_engine.rs` |
-| Bermudan swaptions | `HullWhiteTree::calibrate_with_times` | `instruments/rates/swaption/` |
+| Bermudan swaptions | `HullWhiteTree::calibrate` | `instruments/rates/swaption/` |
 | Convertible bonds | Tsiveriotis-Zhang engine over `EvolutionParams` (binomial or trinomial) | `instruments/fixed_income/convertible/pricing/` |
 
 ## Serialization

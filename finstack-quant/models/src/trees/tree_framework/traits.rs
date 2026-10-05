@@ -20,31 +20,3 @@ pub trait TreeValuator: Send + Sync {
     /// * `dt` - Time step size in years
     fn value_at_node(&self, state: &NodeState, continuation_value: f64, dt: f64) -> Result<f64>;
 }
-
-/// Greeks calculated from tree models.
-///
-/// # Units and Conventions
-///
-/// - **Delta**: Per unit of spot (e.g., delta=0.5 means $0.50 per $1 spot move)
-/// - **Gamma**: Per unit of spot squared (second derivative)
-/// - **Vega**: Per 1% absolute volatility move (e.g., 20% → 21%)
-/// - **Theta**: Per day (negative for long positions typically)
-/// - **Rho**: Per 1 basis point (0.01%) interest rate move
-/// - **OAS01**: Per 1 basis point option-adjusted-spread move
-#[derive(Debug, Clone)]
-pub struct TreeGreeks {
-    /// Instrument price
-    pub price: f64,
-    /// Delta (spot sensitivity per unit spot move)
-    pub delta: f64,
-    /// Gamma (curvature, second derivative w.r.t. spot)
-    pub gamma: f64,
-    /// Vega (volatility sensitivity per 1% vol move)
-    pub vega: f64,
-    /// Theta (time decay per day)
-    pub theta: f64,
-    /// Rho (interest rate sensitivity per 1bp rate move)
-    pub rho: f64,
-    /// OAS01 (option-adjusted-spread sensitivity per 1bp spread move)
-    pub oas01: f64,
-}

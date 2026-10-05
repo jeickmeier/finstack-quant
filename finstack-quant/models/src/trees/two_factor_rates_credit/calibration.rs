@@ -251,22 +251,6 @@ impl RatesCreditTree {
         candidate.calibrated_hazards = calibrated_hazards;
         candidate.hazard_floor_saturation = saturation;
 
-        candidate.rate_variance_retention = Self::scan_variance_retention(
-            &candidate.calibrated_rates,
-            steps,
-            candidate.rate_ref,
-            rate_kappa,
-            rate_vol,
-            dt,
-        );
-        candidate.hazard_variance_retention = Self::scan_variance_retention(
-            &candidate.calibrated_hazards,
-            steps,
-            candidate.hazard_ref,
-            hazard_kappa,
-            hazard_vol,
-            dt,
-        );
         candidate.validate_correlation_feasibility(dt)?;
 
         *self = candidate;
