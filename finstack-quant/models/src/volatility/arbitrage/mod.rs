@@ -9,9 +9,8 @@
 //! - **Types** ([`types`]): Violation
 //!   taxonomy, severity model, and report
 //! - **Checks** ([`checks`]):
-//!   Composable [`ArbitrageCheck`]
-//!   trait with implementations for butterfly, calendar spread, and local vol
-//!   density
+//!   [`ButterflyCheck`], [`CalendarSpreadCheck`] and [`LocalVolDensityCheck`],
+//!   each with a `check(&self, surface)` method
 //! - **Orchestrator**
 //!   ([`check_surface`]): Runs all
 //!   enabled checks and aggregates results into an
@@ -50,7 +49,7 @@
 pub mod checks;
 pub mod types;
 
-pub use checks::{ArbitrageCheck, ButterflyCheck, CalendarSpreadCheck, LocalVolDensityCheck};
+pub use checks::{ButterflyCheck, CalendarSpreadCheck, LocalVolDensityCheck};
 pub use types::{
     ArbitrageReport, ArbitrageSeverity, ArbitrageType, ArbitrageViolation, ViolationLocation,
 };

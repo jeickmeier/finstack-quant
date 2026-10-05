@@ -1,6 +1,6 @@
 //! Top-level 1D PDE solver with builder pattern.
 //!
-//! Combines a [`Grid1D`], a [`TimeStepper`], and an optional [`PenaltyExercise`]
+//! Combines a [`Grid1D`], a [`ThetaStepper`], and an optional [`PenaltyExercise`]
 //! to solve a backward PDE from terminal condition to `t = 0`. Returns a
 //! [`PdeSolution`] with the solution values, interpolation, and finite-difference
 //! Greeks (delta, gamma) read directly from the grid.
@@ -9,7 +9,7 @@ use super::boundary::BoundaryCondition;
 use super::exercise::{ExerciseError, ExerciseType, PenaltyExercise};
 use super::grid::{find_nearest, Grid1D};
 use super::problem::PdeProblem1D;
-use super::stepper::{RannacherStepper, StepperError, ThetaStepper, TimeStepper};
+use super::stepper::{StepperError, ThetaStepper};
 
 /// Builder for constructing a [`Solver1D`] with a fluent API.
 ///
@@ -30,7 +30,7 @@ pub struct Solver1DBuilder {
     /// Spatial grid.
     grid: Option<Grid1D>,
     /// Time stepper.
-    stepper: Option<Box<dyn TimeStepper>>,
+    stepper: Option<ThetaStepper>,
     /// Optional early exercise constraint.
     exercise: Option<PenaltyExercise>,
 }
@@ -44,19 +44,19 @@ impl Solver1DBuilder {
 
     /// Use Crank-Nicolson time stepping with `n_steps` steps.
     pub fn crank_nicolson(mut self, n_steps: usize) -> Self {
-        self.stepper = Some(Box::new(ThetaStepper::crank_nicolson(n_steps)));
+        self.stepper = Some(ThetaStepper::crank_nicolson(n_steps));
         self
     }
 
     /// Use fully implicit time stepping with `n_steps` steps.
     pub fn implicit(mut self, n_steps: usize) -> Self {
-        self.stepper = Some(Box::new(ThetaStepper::implicit(n_steps)));
+        self.stepper = Some(ThetaStepper::implicit(n_steps));
         self
     }
 
     /// Use Rannacher smoothing: `implicit_steps` implicit steps at start, then CN.
     pub fn rannacher(mut self, implicit_steps: usize, n_steps: usize) -> Self {
-        self.stepper = Some(Box::new(RannacherStepper::new(implicit_steps, n_steps)));
+        self.stepper = Some(ThetaStepper::rannacher(implicit_steps, n_steps));
         self
     }
 
@@ -102,7 +102,7 @@ pub struct Solver1D {
     /// Spatial grid.
     grid: Grid1D,
     /// Time-stepping scheme.
-    stepper: Box<dyn TimeStepper>,
+    stepper: ThetaStepper,
     /// Optional American/Bermudan exercise.
     exercise: Option<PenaltyExercise>,
 }
@@ -421,6 +421,92 @@ mod tests {
     use super::super::problem::PdeProblem1D;
     use super::*;
 
+    /// Exact bit patterns of Black-Scholes solves, captured before the
+    /// `TimeStepper` trait was replaced by the concrete `ThetaStepper`.
+    #[rustfmt::skip]
+    const STEPPER_PIN: &[u64] = &[
+        0x3ff6366c68d18b32, 0x40214f8aac72c01d, 0x403b59e51713de88, 0x404c81aa0e56efa0,
+        0x3ff6366f1556e028, 0x40214fa8dbb0a15c, 0x403b5bf7d6418dd5, 0x404c823a31f89cb0,
+        0x3ff6366d12f7ffe7, 0x40214f9972ef007b, 0x403b5b603e8ff424, 0x404c81fa2b19c320,
+        0x3ff6368a75152363, 0x40214f6d22c78c23, 0x403b59e36da8294e, 0x404c81a4a17ba778,
+        0x3ff6368d22dba06c, 0x40214f8b55d0ae2c, 0x403b5bf63db00f76, 0x404c8234d0cb9e58,
+        0x3ff6368b1f42efad, 0x40214f7be9b9e6ed, 0x403b5b5e9bb86aa0, 0x404c81f4c07de2a0,
+        0x3ff6364e6aeb48be, 0x40214fa833a2fb3e, 0x403b59e6c14e546a, 0x404c81af7aea61f0,
+        0x3ff6365116c65734, 0x40214fc660174bbe, 0x403b5bf97076b039, 0x404c823f94de56b0,
+        0x3ff6364f150a6482, 0x40214fb6f9a90c28, 0x403b5b61e234bd5a, 0x404c81ff956d6490,
+        0x3ff63c7044a0ef64, 0x402149d7a22afdd8, 0x403b599778831b07, 0x404c809eec0d86f8,
+        0x3ff63c73f0094c87, 0x402149f948faa70b, 0x403b5bb742f18dc0, 0x404c8139f71860b0,
+        0x3ff63c715795d72e, 0x402149e8bb0a0c25, 0x403b5b1d28c32978, 0x404c80f748c58040,
+        0x4032dfb90db5bc62, 0x401aed9809ee3a5c, 0x3ff2a510a996730b, 0xc0442c8c73d28360,
+        0x40343105d7893098, 0x401be0a04bd2cb48, 0x3ff2ff4c007a405e, 0xc0453807dd345d94,
+        0x4033f41cd2146235, 0x401b9b46f3427601, 0x3ff2cdda3bb2d57e, 0xc04509bbd0756e78,
+        0x4032dfbc0823a8f8, 0x401aed60e80f2e7f, 0x3ff2a5038ed17b84, 0xc0442c922a2b58e0,
+        0x403430f88ae94d5a, 0x401bdfd6ac8ec238, 0x3ff2fe72a529521a, 0xc04537f36c1d9dd8,
+        0x4033f415a0742b14, 0x401b9af42ea3fc40, 0x3ff2cdbefd8c7062, 0xc04509aec57431e4,
+        0x4032dfb6142da772, 0x401aedcf26d76b42, 0x3ff2a51dd148423a, 0xc0442c86bdc1835c,
+        0x403431190b0fcdc3, 0x401be1ceee9ee55c, 0x3ff300f285c43873, 0xc0453818151fac34,
+        0x4033f424012d3a6b, 0x401b9b999dbd2ff2, 0x3ff2cdf576dd1ec8, 0xc04509c8d2c67d94,
+        0x4032e04f34f7e9a7, 0x401ae2f32d9ff928, 0x3ff2a2cb7e7d85fb, 0xc0442da5a7216e60,
+        0x40342ee4a22395ec, 0x401bd14bfc1c2b36, 0x3ff2facd60064bea, 0xc04535972bf2c624,
+        0x4033f35f86b6e3f4, 0x401b8e845050e90d, 0x3ff2cbefeac01da1, 0xc0450809593226e8,
+    ];
+
+    fn stepper_pin_values() -> Vec<u64> {
+        use super::super::bridge::BlackScholesPde;
+
+        let maturity = 1.0;
+        let n_time = 100;
+        let grid = Grid1D::sinh_concentrated(50.0_f64.ln(), 200.0_f64.ln(), 101, 0.0, 0.15)
+            .expect("valid grid");
+        let mut out = Vec::new();
+        for is_call in [true, false] {
+            let pde = BlackScholesPde {
+                sigma: 0.2,
+                rate: 0.05,
+                dividend: 0.03,
+                strike: 100.0,
+                maturity,
+                is_call,
+            };
+            let payoff: Vec<f64> = grid.points()[1..grid.n() - 1]
+                .iter()
+                .map(|&x| pde.terminal_condition(x))
+                .collect();
+            for scheme in 0..4 {
+                for exercise in 0..3 {
+                    let builder = Solver1D::builder().grid(grid.clone());
+                    let builder = match scheme {
+                        0 => builder.rannacher(2, n_time),
+                        1 => builder.rannacher(4, n_time),
+                        2 => builder.crank_nicolson(n_time),
+                        _ => builder.implicit(n_time),
+                    };
+                    let builder = match exercise {
+                        0 => builder,
+                        1 => builder.american(payoff.clone()),
+                        _ => builder.bermudan(payoff.clone(), vec![0.25, 0.5, 0.75]),
+                    };
+                    let solution = builder
+                        .build()
+                        .expect("solver")
+                        .solve(&pde, maturity)
+                        .expect("solve");
+                    for spot in [80.0_f64, 100.0, 125.0] {
+                        out.push(solution.interpolate(spot.ln()).to_bits());
+                    }
+                    out.push(solution.delta(100.0_f64.ln()).to_bits());
+                }
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn stepper_bit_pin() {
+        let values = stepper_pin_values();
+        assert_eq!(values.as_slice(), STEPPER_PIN);
+    }
+
     struct LinearBoundaryDiffusion;
 
     impl PdeProblem1D for LinearBoundaryDiffusion {
@@ -599,7 +685,7 @@ mod tests {
     /// with fully-implicit solver, confirming the heavy-penalty damping
     /// (`λ = 1e8/dt`) is the accepted mitigation for post-exercise kinks.
     ///
-    /// Background: `RannacherStepper` uses implicit steps at the start then
+    /// Background: `ThetaStepper::rannacher` uses implicit steps at the start then
     /// Crank-Nicolson.  After each step the penalty exercise constraint
     /// hard-clamps `u = payoff` at violated nodes (`λ·dt = 1e8`), so the
     /// kink re-introduced by the constraint is already frozen at the payoff

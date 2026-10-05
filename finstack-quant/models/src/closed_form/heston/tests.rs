@@ -462,29 +462,6 @@ fn test_heston_call_strip_matches_single_strike_prices() {
     }
 }
 
-/// Test multi-strike put pricing matches the existing single-strike API.
-#[test]
-fn test_heston_put_strip_matches_single_strike_prices() {
-    let params = HestonPricingParams::new(0.05, 0.02, 2.0, 0.04, 0.3, -0.7, 0.04).expect("valid");
-    let strikes = [80.0, 90.0, 100.0, 110.0, 120.0];
-
-    let strip_prices = heston_put_prices_fourier(100.0, &strikes, 0.5, &params, None)
-        .expect("Heston Fourier put strip");
-
-    assert_eq!(strip_prices.len(), strikes.len());
-    for (idx, &strike) in strikes.iter().enumerate() {
-        let single_price = heston_put_price_fourier(100.0, strike, 0.5, &params, None)
-            .expect("Heston Fourier put price");
-        assert!(
-            (strip_prices[idx] - single_price).abs() < 1e-12,
-            "strip put price {} should match single-strike put price {} for K={}",
-            strip_prices[idx],
-            single_price,
-            strike
-        );
-    }
-}
-
 /// Test multi-strike pricing preserves expected call ordering across a strip.
 #[test]
 fn test_heston_call_strip_monotonic_in_strike() {
@@ -631,7 +608,7 @@ fn long_dated_high_kappa_theta_does_not_fall_back_to_bs() {
     let spot = 100.0;
     let strike = 100.0;
     let time = 15.0;
-    let settings = HestonFourierSettings::for_maturity_with_variance(time, params.v0);
+    let settings = HestonFourierSettings::for_maturity(time, params.v0);
 
     // Neither Gil-Pelaez probability may be flagged corrupted.
     for j in [1u8, 2u8] {
@@ -804,7 +781,7 @@ fn gil_pelaez_exposes_truncation_tail_diagnostic() {
 
     // With a well-resolved grid the tail estimate must be small (the
     // integrand has genuinely decayed) — no false positive.
-    let fine = HestonFourierSettings::for_maturity(1.0);
+    let fine = HestonFourierSettings::for_maturity(1.0, 0.04);
     let diag_fine = heston_pj_with_diagnostics(1, 100.0, 100.0, 1.0, &params, &fine);
     assert!(
         diag_fine.tail_estimate < 1e-3,
@@ -826,9 +803,9 @@ fn low_variance_settings_match_high_umax_reference() {
     let params = HestonPricingParams::new(0.02, 0.0, 1.5, 0.0016, 0.2, -0.5, v0).expect("valid");
     let (spot, strike, time) = (100.0, 105.0, 2.0);
 
-    let settings = HestonFourierSettings::for_maturity_with_variance(time, v0);
+    let settings = HestonFourierSettings::for_maturity(time, v0);
     assert!(
-        settings.u_max > HestonFourierSettings::for_maturity(time).u_max,
+        settings.u_max > HestonFourierSettings::for_maturity(time, 0.04).u_max,
         "low v0 must widen u_max beyond the maturity-bucket default"
     );
 

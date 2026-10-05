@@ -115,7 +115,9 @@
 //! ## Barrier Option
 //!
 //! ```
-//! use finstack_quant_models::closed_form::barrier::down_out_call;
+//! use finstack_quant_core::types::BarrierType;
+//! use finstack_quant_models::closed_form::barrier::{barrier_price, BarrierParams};
+//! use finstack_quant_models::types::OptionType;
 //!
 //! let spot = 100.0;
 //! let strike = 100.0;
@@ -125,7 +127,8 @@
 //! let div_yield = 0.02;
 //! let vol = 0.20;
 //!
-//! let price = down_out_call(spot, strike, barrier, time, rate, div_yield, vol);
+//! let params = BarrierParams::new(spot, strike, barrier, time, rate, div_yield, vol);
+//! let price = barrier_price(&params, BarrierType::DownAndOut, OptionType::Call);
 //! assert!(price > 0.0);
 //! ```
 //!
@@ -154,10 +157,7 @@ pub mod volatility;
 pub use asian::{
     arithmetic_asian_call_tw, arithmetic_asian_put_tw, geometric_asian_call, geometric_asian_put,
 };
-pub use barrier::{
-    barrier_call_continuous, barrier_put_continuous, barrier_rebate, down_in_call, down_out_call,
-    up_in_call, up_out_call,
-};
+pub use barrier::{barrier_price, barrier_rebate};
 pub use dispatch::{
     asian_option_price, barrier_call, barrier_put, lookback_option_price, quanto_option_price,
     DEFAULT_ASIAN_AVERAGING, DEFAULT_LOOKBACK_STRIKE_TYPE,

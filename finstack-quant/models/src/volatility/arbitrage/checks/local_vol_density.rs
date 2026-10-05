@@ -19,7 +19,7 @@
 //! Both numerator (dw/dT >= 0) and denominator (density condition) must be
 //! non-negative.
 
-use super::{classify_severity, ArbitrageCheck};
+use super::classify_severity;
 use crate::volatility::arbitrage::types::{ArbitrageType, ArbitrageViolation, ViolationLocation};
 use finstack_quant_core::market_data::surfaces::VolSurface;
 
@@ -32,12 +32,16 @@ pub struct LocalVolDensityCheck {
     pub tolerance: f64,
 }
 
-impl ArbitrageCheck for LocalVolDensityCheck {
-    fn name(&self) -> &str {
-        "Local Vol Density"
-    }
-
-    fn check(&self, surface: &VolSurface) -> Vec<ArbitrageViolation> {
+impl LocalVolDensityCheck {
+    /// Run the Dupire local-variance positivity check and return every violation found.
+    ///
+    /// An empty `Vec` means the check passes. The surface is not mutated.
+    ///
+    /// # Arguments
+    ///
+    /// * `surface` - Implied-volatility surface on an expiry (years) by cash
+    ///   strike grid; expiries pair positionally with `self.forwards`.
+    pub fn check(&self, surface: &VolSurface) -> Vec<ArbitrageViolation> {
         let expiries = surface.expiries();
         let strikes = surface.strikes();
         let mut violations = Vec::new();

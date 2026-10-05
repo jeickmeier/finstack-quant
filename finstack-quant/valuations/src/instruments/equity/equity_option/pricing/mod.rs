@@ -24,9 +24,7 @@ use crate::pricer::PricingError;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
-use finstack_quant_models::closed_form::heston::{
-    heston_call_price_fourier, heston_put_price_fourier,
-};
+use finstack_quant_models::closed_form::heston::heston_price;
 
 /// Equity option Heston semi-analytical pricer (Fourier inversion).
 pub(crate) struct EquityOptionHestonFourierPricer;
@@ -133,14 +131,14 @@ impl crate::pricer::Pricer for EquityOptionHestonFourierPricer {
         let params = crate::instruments::equity::equity_option::heston_market::heston_params_from_market_strict(market, r, q)
             .map_err(|e| crate::pricer::PricingError::from_core(e, err_ctx.clone()))?;
 
-        let price = match equity_option.option_type {
-            OptionType::Call => {
-                heston_call_price_fourier(spot, equity_option.strike, t, &params, None)
-            }
-            OptionType::Put => {
-                heston_put_price_fourier(spot, equity_option.strike, t, &params, None)
-            }
-        }
+        let price = heston_price(
+            spot,
+            equity_option.strike,
+            t,
+            &params,
+            equity_option.option_type,
+            None,
+        )
         .map_err(|error| crate::pricer::PricingError::from_core(error, err_ctx))?;
 
         let pv = Money::new(price * equity_option.quantity, equity_option.currency).map_err(

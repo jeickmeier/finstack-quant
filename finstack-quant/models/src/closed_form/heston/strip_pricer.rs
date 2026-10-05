@@ -13,7 +13,7 @@ use std::f64::consts::PI;
 /// of strike, so it can be precomputed once on the composite Gauss-Legendre grid
 /// and reused across a strike strip.
 #[derive(Debug, Clone)]
-pub struct HestonStripPricer {
+pub(crate) struct HestonStripPricer {
     spot: f64,
     time: f64,
     params: HestonPricingParams,
@@ -51,7 +51,7 @@ impl HestonStripPricer {
     /// * `params` - Finite rates and valid canonical Heston variance parameters.
     /// * `settings` - Validated integration extent, quadrature order, and panel count.
     #[must_use]
-    pub fn new(
+    pub(crate) fn new(
         spot: f64,
         time: f64,
         params: &HestonPricingParams,
@@ -173,7 +173,7 @@ impl HestonStripPricer {
     /// # Arguments
     ///
     /// * `strike` - Positive finite exercise price in the same quote units as spot.
-    pub fn price_call(&self, strike: f64) -> Result<f64> {
+    pub(crate) fn price_call(&self, strike: f64) -> Result<f64> {
         if !strike.is_finite() || strike <= 0.0 {
             return Err(Error::Validation(
                 "Heston strike must be finite and positive".to_string(),
@@ -238,7 +238,7 @@ impl HestonStripPricer {
     /// # Arguments
     ///
     /// * `strikes` - Positive finite exercise prices in spot units and result order.
-    pub fn price_calls(&self, strikes: &[f64]) -> Result<Vec<f64>> {
+    pub(crate) fn price_calls(&self, strikes: &[f64]) -> Result<Vec<f64>> {
         strikes
             .iter()
             .map(|&strike| self.price_call(strike))

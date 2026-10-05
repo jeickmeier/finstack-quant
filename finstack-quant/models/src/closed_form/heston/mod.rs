@@ -40,12 +40,12 @@ mod params;
 mod quadrature;
 mod strip_pricer;
 
-pub use fourier_prices::{
-    heston_call_price_fourier, heston_call_prices_fourier, heston_price, heston_put_price_fourier,
-    heston_put_prices_fourier,
-};
-pub use params::{heston_defaults, HestonFourierSettings, HestonPricingParams};
-pub use strip_pricer::HestonStripPricer;
+pub use fourier_prices::{heston_call_price_fourier, heston_price, heston_put_price_fourier};
+pub use params::{HestonFourierSettings, HestonPricingParams};
+pub(crate) use strip_pricer::HestonStripPricer;
+
+#[cfg(test)]
+pub(crate) use fourier_prices::heston_call_prices_fourier;
 
 #[cfg(test)]
 use characteristic_fn::heston_pj_characteristic_function;

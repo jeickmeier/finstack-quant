@@ -1,8 +1,9 @@
-//! Arbitrage check trait and individual check implementations.
+//! Individual arbitrage checks.
 //!
-//! Each check is a stateless, composable unit that inspects a volatility
-//! surface for a specific class of arbitrage violation. Checks return
-//! `Vec<ArbitrageViolation>` (empty means pass) and never mutate input.
+//! Each check is a small config struct with a `check(&self, surface)` method
+//! that inspects a volatility surface for a specific class of arbitrage
+//! violation. Checks return `Vec<ArbitrageViolation>` (empty means pass) and
+//! never mutate input.
 
 pub mod butterfly;
 pub mod calendar_spread;
@@ -12,22 +13,7 @@ pub use butterfly::ButterflyCheck;
 pub use calendar_spread::CalendarSpreadCheck;
 pub use local_vol_density::LocalVolDensityCheck;
 
-use super::types::{ArbitrageSeverity, ArbitrageViolation};
-use finstack_quant_core::market_data::surfaces::VolSurface;
-
-/// A composable arbitrage check that can be run against a volatility surface.
-///
-/// Implementations are pure functions: they inspect the surface and return
-/// violations without mutating the input.
-pub trait ArbitrageCheck: Send + Sync {
-    /// Human-readable name of this check (e.g., "Butterfly", "Calendar Spread").
-    fn name(&self) -> &str;
-
-    /// Run this check against the given surface and return all violations found.
-    ///
-    /// An empty Vec means this check passes.
-    fn check(&self, surface: &VolSurface) -> Vec<ArbitrageViolation>;
-}
+use super::types::ArbitrageSeverity;
 
 /// Classify violation magnitude into a severity bucket.
 ///
