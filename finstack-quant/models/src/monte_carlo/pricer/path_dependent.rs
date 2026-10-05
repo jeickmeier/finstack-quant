@@ -8,6 +8,7 @@ use super::super::results::{MoneyEstimate, MonteCarloResult};
 use super::super::traits::Payoff;
 use crate::monte_carlo::discretization::exact::ExactGbm;
 use crate::monte_carlo::estimate::Estimate;
+use crate::monte_carlo::greeks::lrm::{lrm_delta, lrm_vega_from_scores, LrmGreeks};
 use crate::monte_carlo::payoff::asian::{
     default_fixing_steps, AsianCall, AsianPut, AveragingMethod,
 };
@@ -42,6 +43,11 @@ const SOBOL_SCRAMBLE_DOMAIN_SALT: u64 = 0x534F_424F_4C53_4352; // "SOBOLSCR"
 /// the run is split into R replicates, each with its own Owen-scrambling
 /// seed, and the standard error is computed across the R replicate means.
 const SOBOL_QMC_REPLICATES: usize = 16;
+
+/// Upper bound on captured path points (`num_paths x (num_steps + 1)`) in
+/// [`PathDependentPricer::price_with_lrm_greeks`], which keeps every path in
+/// memory to rebuild its shocks. Checked before any path is simulated.
+const MAX_LRM_CAPTURED_POINTS: usize = 4_000_000;
 
 /// Configuration for path-dependent option pricing.
 #[derive(Debug, Clone)]
@@ -719,6 +725,81 @@ impl PathDependentPricer {
         }
     }
 
+    /// Price an arithmetic Asian option under risk-neutral GBM together with
+    /// its likelihood-ratio delta and vega.
+    ///
+    /// Uses unit notional, arithmetic averaging over the default post-step
+    /// fixing schedule [`default_fixing_steps`], and the flat continuous
+    /// discount factor `exp(-rT)`: the contract of
+    /// [`Self::price_gbm_asian_call`] and [`Self::price_gbm_asian_put`], run
+    /// through [`Self::price_with_lrm_greeks`]. This is the canonical
+    /// composition behind the host-binding
+    /// `PathDependentPricer.price_with_lrm_greeks` methods.
+    ///
+    /// # Arguments
+    ///
+    /// * `option_type` - Call or put payoff on the arithmetic average.
+    /// * `spot` - Finite, strictly positive spot level at time `0`.
+    /// * `strike` - Exercise price in the same units as `spot`.
+    /// * `rate` - Continuously compounded risk-free rate (decimal, annualized).
+    /// * `div_yield` - Continuous dividend yield (decimal, annualized).
+    /// * `vol` - Annualized GBM volatility (decimal), strictly positive.
+    /// * `expiry` - Time to expiry in years; also the uniform-grid horizon.
+    /// * `num_steps` - Number of time-grid steps between `0` and `expiry`,
+    ///   each of which is an averaging date.
+    /// * `currency` - Currency stamped on the returned price estimate.
+    ///
+    /// # Errors
+    ///
+    /// Returns a validation error when the GBM parameters, discount factor or
+    /// grid are invalid, and in every case listed on
+    /// [`Self::price_with_lrm_greeks`]: Sobol or antithetic sampling, or more
+    /// than four million captured path points.
+    #[allow(clippy::too_many_arguments)]
+    pub fn price_gbm_asian_with_lrm_greeks(
+        &self,
+        option_type: crate::OptionType,
+        spot: f64,
+        strike: f64,
+        rate: f64,
+        div_yield: f64,
+        vol: f64,
+        expiry: f64,
+        num_steps: usize,
+        currency: Currency,
+    ) -> Result<LrmGreeks> {
+        crate::monte_carlo::require_positive_vol(vol)?;
+        let process = GbmProcess::with_params(rate, div_yield, vol)?;
+        let discount_factor = flat_discount_factor(rate, expiry)?;
+        let fixing_steps = default_fixing_steps(num_steps);
+        match option_type {
+            crate::OptionType::Call => self.price_with_lrm_greeks(
+                &process,
+                spot,
+                expiry,
+                num_steps,
+                &AsianCall::new(strike, 1.0, AveragingMethod::Arithmetic, fixing_steps)?,
+                currency,
+                discount_factor,
+                rate,
+                div_yield,
+                vol,
+            ),
+            crate::OptionType::Put => self.price_with_lrm_greeks(
+                &process,
+                spot,
+                expiry,
+                num_steps,
+                &AsianPut::new(strike, 1.0, AveragingMethod::Arithmetic, fixing_steps)?,
+                currency,
+                discount_factor,
+                rate,
+                div_yield,
+                vol,
+            ),
+        }
+    }
+
     /// Price a path-dependent option with a custom time grid.
     ///
     /// # Arguments
@@ -877,24 +958,44 @@ impl PathDependentPricer {
     /// dividend yield, and volatility must match the process; time-varying
     /// drift schedules are unsupported by this constant-parameter score.
     ///
+    /// # Memory
+    ///
+    /// Every path is captured in full to rebuild its shocks, so the run is
+    /// limited to four million path points, `num_paths x (num_steps + 1)`.
+    ///
+    /// # Returns
+    ///
+    /// The price estimate with delta (per unit of spot) and vega (per one
+    /// volatility point), each with its standard error and 95% confidence
+    /// interval over the same paths.
+    ///
     /// # Errors
     ///
     /// Returns a validation error for unsupported payoff sensitivity, Sobol
-    /// sampling, antithetic sampling, a drift schedule, or score parameters
-    /// that differ from the GBM process. Propagates simulation errors.
+    /// sampling, antithetic sampling, a drift schedule, score parameters
+    /// that differ from the GBM process, a non-positive or non-finite initial
+    /// spot, volatility or discount factor, more than four million captured
+    /// path points, or a captured path without one spot per grid time.
+    /// Propagates simulation errors.
     ///
     /// # Arguments
     ///
-    /// * `process` - Stochastic process driving the simulated state variables over the grid
-    /// * `initial_spot` - Positive initial underlying spot level in the payoff currency.
-    /// * `time_to_maturity` - Remaining maturity in years on an ACT/365-style model time axis.
-    /// * `num_steps` - Positive number of time steps used to discretize the simulation horizon.
-    /// * `payoff` - Pathwise payoff evaluator that returns the discounted path contribution
-    /// * `currency` - ISO-4217 currency that defines scale, rounding, and display units
-    /// * `discount_factor` - Callable mapping payment time to a discount factor for cashflows
-    /// * `rate` - Rate applied by the operation; representation and compounding follow the receiving type convention.
-    /// * `div_yield` - Continuously compounded annual dividend yield in decimal units.
-    /// * `vol` - Annualized volatility in decimal units.
+    /// * `process` - GBM dynamics with constant drift; `rate`, `div_yield` and
+    ///   `vol` must equal its parameters exactly.
+    /// * `initial_spot` - Finite, strictly positive initial spot in payoff price units.
+    /// * `time_to_maturity` - Finite positive simulation horizon in years.
+    /// * `num_steps` - Positive number of uniform time steps on the horizon.
+    /// * `payoff` - Path payoff that reports
+    ///   [`Payoff::supports_lrm_greeks`]; evaluated at the grid's step indices.
+    /// * `currency` - Currency of the returned price estimate.
+    /// * `discount_factor` - Finite, strictly positive present-value factor
+    ///   from payoff payment to valuation.
+    /// * `rate` - Continuously compounded risk-free rate (decimal, annualized)
+    ///   used in the score.
+    /// * `div_yield` - Continuous dividend yield (decimal, annualized) used in
+    ///   the score.
+    /// * `vol` - Annualized volatility (decimal), strictly positive, used in
+    ///   the score.
     #[allow(clippy::too_many_arguments)]
     pub fn price_with_lrm_greeks<P>(
         &self,
@@ -908,7 +1009,7 @@ impl PathDependentPricer {
         rate: f64,
         div_yield: f64,
         vol: f64,
-    ) -> Result<(MoneyEstimate, Option<(f64, f64)>)>
+    ) -> Result<LrmGreeks>
     where
         P: Payoff,
     {
@@ -949,7 +1050,31 @@ impl PathDependentPricer {
                     .to_string(),
             ));
         }
-        // Force path capture to get terminal spots and final discounted payoff values
+        // The scores divide by spot, volatility and the discount factor.
+        for (name, value) in [
+            ("initial_spot", initial_spot),
+            ("vol", vol),
+            ("discount_factor", discount_factor),
+        ] {
+            if !(value.is_finite() && value > 0.0) {
+                return Err(Error::Validation(format!(
+                    "price_with_lrm_greeks requires a finite, strictly positive {name}, \
+                     got {value}"
+                )));
+            }
+        }
+        if num_steps
+            .checked_add(1)
+            .and_then(|points| points.checked_mul(self.config.num_paths))
+            .is_none_or(|points| points > MAX_LRM_CAPTURED_POINTS)
+        {
+            return Err(Error::Validation(format!(
+                "price_with_lrm_greeks captures every path: num_paths x (num_steps + 1) must \
+                 not exceed {MAX_LRM_CAPTURED_POINTS}, got {} paths and {num_steps} steps",
+                self.config.num_paths
+            )));
+        }
+        // Force path capture to get every spot and the final discounted payoff value
         let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
         let mut engine_config = self.config.engine_config(time_grid);
         engine_config.path_capture = PathCaptureConfig::all().with_payoffs();
@@ -973,15 +1098,14 @@ impl PathDependentPricer {
             process_params,
         )?;
 
-        let estimate = full.estimate.clone();
         let paths = match &full.paths {
-            Some(ds) => &ds.paths,
-            None => return Ok((estimate, None)),
+            Some(dataset) if !dataset.paths.is_empty() => &dataset.paths,
+            _ => {
+                return Err(Error::Validation(
+                    "price_with_lrm_greeks: the simulation captured no paths".to_string(),
+                ));
+            }
         };
-
-        if paths.is_empty() || discount_factor <= 0.0 || time_to_maturity <= 0.0 || vol <= 0.0 {
-            return Ok((estimate, None));
-        }
 
         // Build undiscounted payoffs and per-path joint-density scores by
         // reconstructing each step's standardized shock from consecutive
@@ -999,10 +1123,15 @@ impl PathDependentPricer {
                 .iter()
                 .filter_map(super::super::paths::PathPoint::spot)
                 .collect();
-            // Grid points = steps + 1 (initial spot at step 0); skip a path
-            // whose capture is incomplete rather than misalign the scores.
+            // Grid points = steps + 1 (initial spot at step 0); an incomplete
+            // capture would misalign the scores.
             if spots.len() != num_steps + 1 {
-                continue;
+                return Err(Error::Validation(format!(
+                    "price_with_lrm_greeks: captured path {} holds {} spots, expected {}",
+                    p.path_id,
+                    spots.len(),
+                    num_steps + 1
+                )));
             }
 
             let mut first_shock = 0.0;
@@ -1021,14 +1150,9 @@ impl PathDependentPricer {
             vega_scores.push(score_sum);
         }
 
-        if payoffs.is_empty() {
-            return Ok((estimate, None));
-        }
-
-        use super::super::greeks::lrm::{lrm_delta, lrm_vega_from_scores};
         // Delta: only the first transition density depends on S₀, so the
         // terminal-score helper is reused with the FIRST step's shock and Δt.
-        let (delta, _) = lrm_delta(
+        let delta = lrm_delta(
             &payoffs,
             &first_shocks,
             initial_spot,
@@ -1036,8 +1160,12 @@ impl PathDependentPricer {
             dt,
             discount_factor,
         );
-        let (vega, _) = lrm_vega_from_scores(&payoffs, &vega_scores, discount_factor);
-        Ok((estimate, Some((delta, vega))))
+        let vega = lrm_vega_from_scores(&payoffs, &vega_scores, discount_factor);
+        Ok(LrmGreeks {
+            price: full.estimate,
+            delta,
+            vega,
+        })
     }
 
     /// Get configuration.
@@ -1470,7 +1598,7 @@ mod tests {
             .expect("nonempty fixing schedule");
 
         let df = (-r * t).exp();
-        let (_, greeks) = pricer
+        let greeks = pricer
             .price_with_lrm_greeks(
                 &gbm,
                 s0,
@@ -1484,7 +1612,10 @@ mod tests {
                 sigma,
             )
             .expect("LRM pricing should succeed");
-        let (delta, vega) = greeks.expect("greeks should be computed");
+        let (delta, vega) = (greeks.delta.mean, greeks.vega.mean);
+        assert_eq!(greeks.delta.num_paths, 100_000);
+        assert_eq!(greeks.price.num_paths, 100_000);
+        assert!(greeks.delta.stderr > 0.0 && greeks.vega.stderr > 0.0);
 
         let d1 = ((s0 / k).ln() + (r - q + 0.5 * sigma * sigma) * tau) / (sigma * tau.sqrt());
         let growth = ((r - q) * tau).exp();
