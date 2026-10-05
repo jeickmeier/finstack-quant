@@ -195,7 +195,7 @@ impl<'a> WhatIfEngine<'a> {
                         )));
                     }
                     let scale = *new_quantity / position.quantity;
-                    let row = sensitivities.position_deltas(position_idx).to_vec();
+                    let row = sensitivities.position_deltas(position_idx)?.to_vec();
                     for (factor_idx, delta) in row.into_iter().enumerate() {
                         sensitivities.set_delta(position_idx, factor_idx, delta * scale);
                     }

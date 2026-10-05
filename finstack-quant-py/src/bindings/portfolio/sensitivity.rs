@@ -133,7 +133,7 @@ impl PySensitivityMatrix {
     #[pyo3(text_signature = "(self, position_idx, factor_idx)")]
     fn delta(&self, position_idx: usize, factor_idx: usize) -> PyResult<f64> {
         self.inner
-            .try_delta(position_idx, factor_idx)
+            .delta(position_idx, factor_idx)
             .map_err(core_to_py)
     }
 
@@ -141,7 +141,7 @@ impl PySensitivityMatrix {
     #[pyo3(text_signature = "(self, position_idx)")]
     fn position_deltas(&self, position_idx: usize) -> PyResult<Vec<f64>> {
         self.inner
-            .try_position_deltas(position_idx)
+            .position_deltas(position_idx)
             .map(<[f64]>::to_vec)
             .map_err(core_to_py)
     }
@@ -149,7 +149,7 @@ impl PySensitivityMatrix {
     /// Sensitivity column for a single factor across all positions.
     #[pyo3(text_signature = "(self, factor_idx)")]
     fn factor_deltas(&self, factor_idx: usize) -> PyResult<Vec<f64>> {
-        self.inner.try_factor_deltas(factor_idx).map_err(core_to_py)
+        self.inner.factor_deltas(factor_idx).map_err(core_to_py)
     }
 
     /// Export as a pandas ``DataFrame`` with positions as rows and factors as columns.
@@ -157,7 +157,10 @@ impl PySensitivityMatrix {
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
         let data = PyDict::new(py);
         for (fi, factor_id) in self.inner.factor_ids().iter().enumerate() {
-            data.set_item(factor_id.to_string(), self.inner.factor_deltas(fi))?;
+            data.set_item(
+                factor_id.to_string(),
+                self.inner.factor_deltas(fi).map_err(core_to_py)?,
+            )?;
         }
         let index = PyList::new(py, self.inner.position_ids())?;
         dict_to_dataframe(py, &data, Some(index.into_any()))

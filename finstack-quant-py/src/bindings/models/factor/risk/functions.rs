@@ -296,10 +296,7 @@ pub(super) fn position_component_var(
     decomp: &PyPositionRiskDecomposition,
     position_id: &str,
 ) -> PyResult<f64> {
-    decomp
-        .inner
-        .try_component_var(position_id)
-        .map_err(core_to_py)
+    decomp.inner.component_var(position_id).map_err(core_to_py)
 }
 
 /// One position's row in a ``ParametricEsDecompositionView``.

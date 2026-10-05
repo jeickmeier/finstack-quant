@@ -208,7 +208,7 @@ fn prepare_issuer(spec: &CreditHierarchySpec, row: &IssuerBetaRow) -> PreparedIs
 }
 
 impl FactorMatcher for CreditHierarchicalMatcher {
-    fn match_factor_with_betas(
+    fn match_factor(
         &self,
         dependency: &MarketDependency,
         attributes: &Attributes,
@@ -516,7 +516,7 @@ mod tests {
             .with_meta("credit::region", "NA")
             .with_meta("credit::sector", "TECH");
         let entries = matcher
-            .match_factor_with_betas(&dep, &attrs)
+            .match_factor(&dep, &attrs)
             .expect("must succeed")
             .expect("must match");
         assert_eq!(entries.len(), 4, "PC + 3 levels from namespaced tags");
@@ -532,7 +532,7 @@ mod tests {
             .with_meta("region", "NA")
             .with_meta("sector", "TECH");
         let entries = matcher
-            .match_factor_with_betas(&dep, &bare)
+            .match_factor(&dep, &bare)
             .expect("must succeed")
             .expect("must match");
         assert_eq!(
@@ -558,7 +558,7 @@ mod tests {
             .with_meta("credit::region", "NA")
             .with_meta("credit::sector", "TECH");
         let err = matcher
-            .match_factor_with_betas(&dep, &attrs)
+            .match_factor(&dep, &attrs)
             .expect_err("dotted runtime tag value must be rejected");
         assert!(
             err.to_string().contains("A.BBB"),
@@ -588,7 +588,7 @@ mod tests {
         };
 
         let err = matcher
-            .match_factor_with_betas(&dep, &Attributes::default())
+            .match_factor(&dep, &Attributes::default())
             .expect_err("missing issuer id meta must be rejected when required");
         assert!(
             err.to_string().contains(ISSUER_ID_META_KEY),
@@ -597,7 +597,7 @@ mod tests {
 
         // With the issuer id present the matcher works normally.
         let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISSUER-A");
-        assert!(matcher.match_factor_with_betas(&dep, &attrs).is_ok());
+        assert!(matcher.match_factor(&dep, &attrs).is_ok());
     }
 
     #[test]
@@ -609,7 +609,7 @@ mod tests {
         let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISSUER-A");
 
         let entries = matcher
-            .match_factor_with_betas(&dep, &attrs)
+            .match_factor(&dep, &attrs)
             .expect("must succeed")
             .expect("must match");
 
@@ -658,7 +658,7 @@ mod tests {
         let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISSUER-MISSING");
 
         let err = matcher
-            .match_factor_with_betas(&dep, &attrs)
+            .match_factor(&dep, &attrs)
             .expect_err("missing region tag must be reported as error");
         match err {
             FactorMatchError::MissingRequiredTag { dimension } => {
@@ -687,7 +687,7 @@ mod tests {
         };
         let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISSUER-A");
         let entries = matcher
-            .match_factor_with_betas(&dep, &attrs)
+            .match_factor(&dep, &attrs)
             .expect("must succeed")
             .expect("must match");
         assert!(
@@ -714,7 +714,7 @@ mod tests {
         };
         let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISSUER-SHORT");
         let err = matcher
-            .match_factor_with_betas(&dep, &attrs)
+            .match_factor(&dep, &attrs)
             .expect_err("short beta vector must error");
         match err {
             FactorMatchError::BetaShapeMismatch {
@@ -749,7 +749,7 @@ mod tests {
             .with_meta(ISSUER_ID_META_KEY, "UNKNOWN")
             .with_meta("credit::rating", "IG");
         let err = matcher
-            .match_factor_with_betas(&dep, &attrs_partial)
+            .match_factor(&dep, &attrs_partial)
             .expect_err("partial tags must error, not silently truncate");
         match err {
             FactorMatchError::MissingRequiredTag { dimension } => {
@@ -761,7 +761,7 @@ mod tests {
         // No hierarchy tags at all → documented PC-only fallback.
         let attrs_none = Attributes::default().with_meta(ISSUER_ID_META_KEY, "UNKNOWN");
         let entries = matcher
-            .match_factor_with_betas(&dep, &attrs_none)
+            .match_factor(&dep, &attrs_none)
             .expect("must succeed")
             .expect("must match");
         assert_eq!(entries.len(), 1, "PC-only proxy");
@@ -797,7 +797,7 @@ mod tests {
         };
         let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISSUER-F");
         let entries = matcher
-            .match_factor_with_betas(&dep, &attrs)
+            .match_factor(&dep, &attrs)
             .expect("must succeed")
             .expect("must match");
         assert_eq!(entries.len(), 3, "PC + levels 0 and 2 only");
@@ -829,7 +829,7 @@ mod tests {
             .with_meta("credit::sector", "FIN");
 
         let entries = matcher
-            .match_factor_with_betas(&dep, &attrs)
+            .match_factor(&dep, &attrs)
             .expect("must succeed")
             .expect("must match (bucket-only)");
 
@@ -853,7 +853,7 @@ mod tests {
         let matcher = matcher_with_one_issuer();
         let dep = MarketDependency::Spot { id: "AAPL".into() };
         let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISSUER-A");
-        let result = matcher.match_factor_with_betas(&dep, &attrs).unwrap();
+        let result = matcher.match_factor(&dep, &attrs).unwrap();
         assert!(result.is_none());
     }
 
@@ -883,10 +883,7 @@ mod tests {
         };
         let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "ISS-X");
 
-        let entries = matcher
-            .match_factor_with_betas(&dep, &attrs)
-            .unwrap()
-            .unwrap();
+        let entries = matcher.match_factor(&dep, &attrs).unwrap().unwrap();
         assert_eq!(entries.len(), 3);
         assert_eq!(
             entries[2].factor_id,
@@ -929,10 +926,7 @@ mod tests {
             id: CurveId::new("X"),
         };
         let attrs = Attributes::default().with_meta(ISSUER_ID_META_KEY, "CCC");
-        let entries = matcher
-            .match_factor_with_betas(&dep, &attrs)
-            .unwrap()
-            .unwrap();
+        let entries = matcher.match_factor(&dep, &attrs).unwrap().unwrap();
         assert!((entries[0].beta - 1.5).abs() < 1e-12);
     }
 

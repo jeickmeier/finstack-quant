@@ -2414,9 +2414,9 @@ constraintMaxTurnover = "free-function twin of Python Constraint.max_turnover (R
 constraintWeightBounds = "free-function twin of Python Constraint.weight_bounds (Rust Constraint::weight_bounds; member rename)"
 portfolioMetricsRequireTotal = "free-function twin of Python PortfolioResult.require_metric (Rust PortfolioMetrics::require_total; member rename)"
 portfolioOptimizationResultToTradeList = "free-function twin of Python PortfolioOptimizationResult.to_trade_list (Rust PortfolioOptimizationResultWire::to_trade_list; member rename)"
-sensitivityMatrixDelta = "free-function twin of Python SensitivityMatrix.delta (Rust SensitivityMatrix::try_delta; member rename)"
-sensitivityMatrixFactorDeltas = "free-function twin of Python SensitivityMatrix.factor_deltas (Rust SensitivityMatrix::try_factor_deltas; member rename)"
-sensitivityMatrixPositionDeltas = "free-function twin of Python SensitivityMatrix.position_deltas (Rust SensitivityMatrix::try_position_deltas; member rename)"
+sensitivityMatrixDelta = "free-function twin of Python SensitivityMatrix.delta (Rust SensitivityMatrix::delta; member rename)"
+sensitivityMatrixFactorDeltas = "free-function twin of Python SensitivityMatrix.factor_deltas (Rust SensitivityMatrix::factor_deltas; member rename)"
+sensitivityMatrixPositionDeltas = "free-function twin of Python SensitivityMatrix.position_deltas (Rust SensitivityMatrix::position_deltas; member rename)"
 
 [parity.js."scenarios".wasm_only]
 parseScenarioSpec = "twin of Python ScenarioSpec.from_json (Rust ScenarioSpec::from_json)"
@@ -3029,7 +3029,7 @@ excluded = { mappings_json = "literal" }
 excluded = { all = "literal", and_ = "literal", by_attribute = "literal", by_entity_id = "literal", by_position_ids = "literal", not_ = "literal", or_ = "literal" }
 
 [parity.members."finstack_quant.portfolio.SensitivityMatrix"]
-renames = { delta = { js = "portfolio.sensitivityMatrixDelta", reason = "WASM results are plain objects; the Rust SensitivityMatrix::try_delta method is a free function taking the object" }, factor_deltas = { js = "portfolio.sensitivityMatrixFactorDeltas", reason = "WASM results are plain objects; the Rust SensitivityMatrix::try_factor_deltas method is a free function taking the object" }, position_deltas = { js = "portfolio.sensitivityMatrixPositionDeltas", reason = "WASM results are plain objects; the Rust SensitivityMatrix::try_position_deltas method is a free function taking the object" } }
+renames = { delta = { js = "portfolio.sensitivityMatrixDelta", reason = "WASM results are plain objects; the Rust SensitivityMatrix::delta method is a free function taking the object" }, factor_deltas = { js = "portfolio.sensitivityMatrixFactorDeltas", reason = "WASM results are plain objects; the Rust SensitivityMatrix::factor_deltas method is a free function taking the object" }, position_deltas = { js = "portfolio.sensitivityMatrixPositionDeltas", reason = "WASM results are plain objects; the Rust SensitivityMatrix::position_deltas method is a free function taking the object" } }
 
 [parity.members."finstack_quant.portfolio.TradeDirection"]
 excluded = { buy = "literal", hold = "literal", sell = "literal" }

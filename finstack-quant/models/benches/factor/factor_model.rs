@@ -126,7 +126,7 @@ fn bench_mapping_table_matcher(c: &mut Criterion) {
             curve_type: CurveType::Discount,
         };
         group.bench_with_input(BenchmarkId::new("hit_first", n), &n, |b, _| {
-            b.iter(|| black_box(matcher.match_factor_with_betas(black_box(&first_dep), &attrs)))
+            b.iter(|| black_box(matcher.match_factor(black_box(&first_dep), &attrs)))
         });
 
         let last_dep = MarketDependency::Curve {
@@ -134,7 +134,7 @@ fn bench_mapping_table_matcher(c: &mut Criterion) {
             curve_type: CurveType::Discount,
         };
         group.bench_with_input(BenchmarkId::new("hit_last", n), &n, |b, _| {
-            b.iter(|| black_box(matcher.match_factor_with_betas(black_box(&last_dep), &attrs)))
+            b.iter(|| black_box(matcher.match_factor(black_box(&last_dep), &attrs)))
         });
 
         let miss_dep = MarketDependency::Curve {
@@ -142,7 +142,7 @@ fn bench_mapping_table_matcher(c: &mut Criterion) {
             curve_type: CurveType::Discount,
         };
         group.bench_with_input(BenchmarkId::new("miss", n), &n, |b, _| {
-            b.iter(|| black_box(matcher.match_factor_with_betas(black_box(&miss_dep), &attrs)))
+            b.iter(|| black_box(matcher.match_factor(black_box(&miss_dep), &attrs)))
         });
     }
 
@@ -200,13 +200,13 @@ fn bench_hierarchical_matcher(c: &mut Criterion) {
         let attrs_hit = Attributes::default().with_tag("sector-0");
 
         bench_iter(&mut group, format!("{name}_hit"), || {
-            let _ = black_box(matcher.match_factor_with_betas(black_box(&dep), &attrs_hit));
+            let _ = black_box(matcher.match_factor(black_box(&dep), &attrs_hit));
         });
 
         let attrs_miss = Attributes::default().with_tag("nonexistent");
 
         bench_iter(&mut group, format!("{name}_fallback"), || {
-            let _ = black_box(matcher.match_factor_with_betas(black_box(&dep), &attrs_miss));
+            let _ = black_box(matcher.match_factor(black_box(&dep), &attrs_miss));
         });
     }
 
@@ -246,21 +246,21 @@ fn bench_cascade_matcher(c: &mut Criterion) {
         id: finstack_quant_core::types::CurveId::new("ACME-HAZARD"),
     };
     bench_iter(&mut group, "hit_first_stage", || {
-        let _ = black_box(cascade.match_factor_with_betas(black_box(&exact_dep), &attrs));
+        let _ = black_box(cascade.match_factor(black_box(&exact_dep), &attrs));
     });
 
     let fallback_dep = MarketDependency::CreditCurve {
         id: finstack_quant_core::types::CurveId::new("OTHER-HAZARD"),
     };
     bench_iter(&mut group, "hit_second_stage", || {
-        let _ = black_box(cascade.match_factor_with_betas(black_box(&fallback_dep), &attrs));
+        let _ = black_box(cascade.match_factor(black_box(&fallback_dep), &attrs));
     });
 
     let miss_dep = MarketDependency::Spot {
         id: "EQUITY".into(),
     };
     bench_iter(&mut group, "miss_all_stages", || {
-        let _ = black_box(cascade.match_factor_with_betas(black_box(&miss_dep), &attrs));
+        let _ = black_box(cascade.match_factor(black_box(&miss_dep), &attrs));
     });
 
     group.finish();
@@ -399,7 +399,7 @@ fn bench_credit_hierarchical_matcher(c: &mut Criterion) {
         b.iter(|| {
             black_box(
                 matcher
-                    .match_factor_with_betas(black_box(&known_dep), black_box(&known_attrs))
+                    .match_factor(black_box(&known_dep), black_box(&known_attrs))
                     .unwrap(),
             )
         })
@@ -411,7 +411,7 @@ fn bench_credit_hierarchical_matcher(c: &mut Criterion) {
         b.iter(|| {
             black_box(
                 matcher
-                    .match_factor_with_betas(black_box(&last_dep), black_box(&last_attrs))
+                    .match_factor(black_box(&last_dep), black_box(&last_attrs))
                     .unwrap(),
             )
         })
@@ -423,7 +423,7 @@ fn bench_credit_hierarchical_matcher(c: &mut Criterion) {
         b.iter(|| {
             black_box(
                 matcher
-                    .match_factor_with_betas(black_box(&unknown_dep), black_box(&unknown_attrs))
+                    .match_factor(black_box(&unknown_dep), black_box(&unknown_attrs))
                     .unwrap(),
             )
         })
@@ -436,7 +436,7 @@ fn bench_credit_hierarchical_matcher(c: &mut Criterion) {
         b.iter(|| {
             black_box(
                 matcher
-                    .match_factor_with_betas(black_box(&miss_dep), black_box(&known_attrs))
+                    .match_factor(black_box(&miss_dep), black_box(&known_attrs))
                     .unwrap(),
             )
         })
@@ -478,7 +478,9 @@ fn bench_sensitivity_matrix(c: &mut Criterion) {
         b.iter(|| {
             let mut acc = 0.0;
             for p in 0..n_pos {
-                acc += black_box(matrix.position_deltas(p)).iter().sum::<f64>();
+                acc += black_box(matrix.position_deltas(p).unwrap())
+                    .iter()
+                    .sum::<f64>();
             }
             black_box(acc);
         })
@@ -486,7 +488,9 @@ fn bench_sensitivity_matrix(c: &mut Criterion) {
 
     group.bench_function("all_factor_deltas/1000x50", |b| {
         b.iter(|| {
-            let cols: Vec<Vec<f64>> = (0..n_fac).map(|f| matrix.factor_deltas(f)).collect();
+            let cols: Vec<Vec<f64>> = (0..n_fac)
+                .map(|f| matrix.factor_deltas(f).unwrap())
+                .collect();
             black_box(cols);
         })
     });

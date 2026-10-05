@@ -36142,7 +36142,7 @@ export interface PortfolioNamespace {
   /**
    * Read one position-by-factor sensitivity.
    *
-   * Twin of Python `SensitivityMatrix.delta` (Rust `SensitivityMatrix::try_delta`).
+   * Twin of Python `SensitivityMatrix.delta` (Rust `SensitivityMatrix::delta`).
    * @param matrix - Sensitivity-matrix object or JSON `{ base_currency, position_ids, factor_ids, data }` from `computeFactorSensitivities`.
    * @param positionIdx - Zero-based row index into `position_ids`.
    * @param factorIdx - Zero-based column index into `factor_ids`.
@@ -36158,7 +36158,7 @@ export interface PortfolioNamespace {
    * Sensitivities of one position to every factor.
    *
    * Twin of Python `SensitivityMatrix.position_deltas` (Rust
-   * `SensitivityMatrix::try_position_deltas`).
+   * `SensitivityMatrix::position_deltas`).
    * @param matrix - Sensitivity-matrix object or JSON from `computeFactorSensitivities`.
    * @param positionIdx - Zero-based row index into `position_ids`.
    * @returns One value per factor, in `factor_ids` order.
@@ -36172,7 +36172,7 @@ export interface PortfolioNamespace {
    * Sensitivities of every position to one factor.
    *
    * Twin of Python `SensitivityMatrix.factor_deltas` (Rust
-   * `SensitivityMatrix::try_factor_deltas`).
+   * `SensitivityMatrix::factor_deltas`).
    * @param matrix - Sensitivity-matrix object or JSON from `computeFactorSensitivities`.
    * @param factorIdx - Zero-based column index into `factor_ids`.
    * @returns One value per position, in `position_ids` order.

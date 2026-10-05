@@ -121,7 +121,7 @@ mod tests {
         attributes: &Attributes,
     ) -> Option<FactorId> {
         matcher
-            .match_factor_with_betas(dependency, attributes)
+            .match_factor(dependency, attributes)
             .ok()
             .flatten()
             .and_then(|entries| entries.last().map(|entry| entry.factor_id.clone()))

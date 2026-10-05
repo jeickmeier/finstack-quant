@@ -338,7 +338,7 @@ impl FactorModel {
                 // (`attribution::credit_factor`). Dropping the beta here
                 // would overstate risk for defensive names (β < 1) and
                 // understate it for levered ones (β > 1).
-                let current = sensitivities.delta(position_idx, factor_idx);
+                let current = sensitivities.delta(position_idx, factor_idx)?;
                 let weighted_delta = current + *beta * delta;
                 if !weighted_delta.is_finite() {
                     return Err(Error::invalid_input(format!(
@@ -789,7 +789,7 @@ impl FactorModel {
                 };
                 let Some(entries) = self
                     .matcher
-                    .match_factor_with_betas(dependency, position.instrument.attributes())
+                    .match_factor(dependency, position.instrument.attributes())
                     .map_err(|e| Error::invalid_input(e.to_string()))?
                 else {
                     continue;
@@ -2038,8 +2038,8 @@ pub(super) mod tests {
             .compute_sensitivities(&portfolio, &market, as_of)
             .expect("sensitivities");
 
-        let generic = sensitivities.delta(0, 0);
-        let rating = sensitivities.delta(0, 1);
+        let generic = sensitivities.delta(0, 0).expect("in range");
+        let rating = sensitivities.delta(0, 1).expect("in range");
         assert!(
             generic.abs() > 1e-8,
             "canonical bond should have credit sensitivity"
@@ -2415,8 +2415,8 @@ pub(super) mod tests {
         let unit_matrix = model
             .compute_sensitivities(&unit_portfolio, &market, as_of)
             .expect("ordinary quote-space credit sensitivities remain finite");
-        assert!(unit_matrix.delta(0, 0).is_finite());
-        assert!(unit_matrix.delta(0, 0).abs() > 1.0);
+        assert!(unit_matrix.delta(0, 0).expect("in range").is_finite());
+        assert!(unit_matrix.delta(0, 0).expect("in range").abs() > 1.0);
 
         let huge_portfolio = credit_bond_portfolio(as_of, &curve_id, &[("credit", 1e308)]);
         let error = model
@@ -2636,8 +2636,8 @@ pub(super) mod tests {
                 - tranche.value_raw(&down, as_of).expect("down PV"))
                 / 2.0;
             assert!(manual.abs() > 1.0);
-            assert!((matrix.delta(0, factor_idx) - manual).abs() < 1e-8);
-            assert!((full_matrix.delta(0, factor_idx) - manual).abs() < 1e-8);
+            assert!((matrix.delta(0, factor_idx).expect("in range") - manual).abs() < 1e-8);
+            assert!((full_matrix.delta(0, factor_idx).expect("in range") - manual).abs() < 1e-8);
             let pnl = model
                 .factor_stress_pnl(
                     &portfolio,

@@ -36,7 +36,7 @@ pub const DEFAULT_PNL_SCENARIO_POINTS: usize = 5;
 ///     r#"{"base_currency":"USD","position_ids":["A"],"factor_ids":["F1","F2"],"data":[[1.0,2.0]]}"#,
 /// )?;
 /// let matrix = SensitivityMatrix::try_from(wire)?;
-/// assert_eq!(matrix.delta(0, 1), 2.0);
+/// assert_eq!(matrix.delta(0, 1)?, 2.0);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -183,12 +183,13 @@ impl SensitivityMatrixJson {
     /// * `matrix` - Position-by-factor monetary sensitivities to serialize.
     /// * `base_currency` - Currency in which all matrix entries were calculated.
     pub fn from_matrix(matrix: &SensitivityMatrix, base_currency: Currency) -> Self {
+        let n_factors = matrix.n_factors();
         Self {
             base_currency,
             position_ids: matrix.position_ids().to_vec(),
             factor_ids: matrix.factor_ids().to_vec(),
             data: (0..matrix.n_positions())
-                .map(|idx| matrix.position_deltas(idx).to_vec())
+                .map(|idx| matrix.as_slice()[idx * n_factors..(idx + 1) * n_factors].to_vec())
                 .collect(),
         }
     }
@@ -300,10 +301,16 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(first.delta(0, 0), 0.0);
-        assert!(first.delta(1, 0).abs() > 1.0);
-        assert_eq!(first.delta(1, 0), second.delta(0, 0));
-        assert_eq!(first.delta(0, 0), second.delta(1, 0));
+        assert_eq!(first.delta(0, 0).expect("in range"), 0.0);
+        assert!(first.delta(1, 0).expect("in range").abs() > 1.0);
+        assert_eq!(
+            first.delta(1, 0).expect("in range"),
+            second.delta(0, 0).expect("in range")
+        );
+        assert_eq!(
+            first.delta(0, 0).expect("in range"),
+            second.delta(1, 0).expect("in range")
+        );
         let wire = SensitivityMatrixJson::from_matrix(&first, Currency::USD);
         assert_eq!(wire.base_currency, Currency::USD);
         assert_eq!(SensitivityMatrix::try_from(wire).unwrap(), first);

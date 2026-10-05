@@ -1143,7 +1143,7 @@ pub fn build_stress_attribution(
 pub fn position_component_var(decomp: JsValue, position_id: JsValue) -> Result<f64, JsValue> {
     let decomp: PositionRiskDecomposition = from_js_json(&decomp, "decomp")?;
     let position_id = js_string(&position_id, "positionId")?;
-    decomp.try_component_var(&position_id).map_err(to_js_err)
+    decomp.component_var(&position_id).map_err(to_js_err)
 }
 
 #[cfg(test)]

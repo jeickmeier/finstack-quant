@@ -195,10 +195,11 @@ fn component_var_lookup_fails_with_not_found_for_an_unknown_position() {
         )
         .expect("valid inputs");
 
-    let known = decomposition.try_component_var("A").expect("known id");
-    assert_eq!(Some(known), decomposition.component_var("A"));
+    let known = decomposition.component_var("A").expect("known id");
+    assert_eq!(known, decomposition.var_contributions[0].component_var);
+    assert_eq!(decomposition.var_contributions[0].position_id, "A");
     let err = decomposition
-        .try_component_var("missing")
+        .component_var("missing")
         .expect_err("unknown id");
     assert_eq!(err.kind(), ErrorKind::NotFound);
 }

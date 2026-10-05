@@ -740,7 +740,7 @@ mod tests {
 
         assert_eq!(matrix.n_positions(), 1);
         assert_eq!(matrix.n_factors(), 1);
-        assert!((matrix.delta(0, 0) - 1.0).abs() < 1e-3);
+        assert!((matrix.delta(0, 0).expect("in range") - 1.0).abs() < 1e-3);
         Ok(())
     }
 
@@ -835,7 +835,7 @@ mod tests {
             Currency::USD,
         )?;
 
-        assert!((matrix.delta(0, 0) - 1.0).abs() < 1e-9);
+        assert!((matrix.delta(0, 0).expect("in range") - 1.0).abs() < 1e-9);
         Ok(())
     }
 
@@ -863,7 +863,7 @@ mod tests {
         )?;
 
         assert!(
-            matrix.delta(0, 0).abs() > 1e-12,
+            matrix.delta(0, 0).expect("in range").abs() > 1e-12,
             "a USD/EUR leg bump must move the triangulated EUR/JPY cross"
         );
         Ok(())
@@ -916,8 +916,13 @@ mod tests {
                 Currency::USD,
             )?;
 
-        assert!((matrix.delta(0, 0) - reference_matrix.delta(0, 0)).abs() < 1e-12);
-        assert_eq!(matrix.delta(1, 0), 0.0);
+        assert!(
+            (matrix.delta(0, 0).expect("in range")
+                - reference_matrix.delta(0, 0).expect("in range"))
+            .abs()
+                < 1e-12
+        );
+        assert_eq!(matrix.delta(1, 0).expect("in range"), 0.0);
         assert_eq!(affected_calls.load(Ordering::Relaxed), 2);
         assert_eq!(
             unaffected_calls.load(Ordering::Relaxed),
@@ -958,7 +963,7 @@ mod tests {
             Currency::USD,
         )?;
 
-        assert_eq!(matrix.delta(0, 0), 0.0);
+        assert_eq!(matrix.delta(0, 0).expect("in range"), 0.0);
         assert_eq!(
             calls.load(Ordering::Relaxed),
             2,

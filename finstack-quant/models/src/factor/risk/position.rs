@@ -280,33 +280,24 @@ impl PositionRiskDecomposition {
     /// # Returns
     ///
     /// The position's Euler-allocated component VaR (loss convention, same
-    /// units as [`Self::portfolio_var`]), or `None` when the id is absent.
-    #[must_use]
-    pub fn component_var(&self, position_id: &str) -> Option<f64> {
-        self.var_contributions
-            .iter()
-            .find(|c| c.position_id == position_id)
-            .map(|c| c.component_var)
-    }
-
-    /// Look up one position's component VaR, failing when the position is
-    /// absent.
-    ///
-    /// # Arguments
-    ///
-    /// * `position_id` - Position identifier exactly as it appears in
-    ///   [`PositionVarContribution::position_id`].
+    /// units as [`Self::portfolio_var`]).
     ///
     /// # Errors
     ///
     /// Returns [`finstack_quant_core::error::InputError::NotFound`] when the
     /// decomposition holds no contribution for `position_id`.
-    pub fn try_component_var(&self, position_id: &str) -> finstack_quant_core::Result<f64> {
-        self.component_var(position_id).ok_or_else(|| {
-            finstack_quant_core::Error::Input(finstack_quant_core::error::InputError::NotFound {
-                id: format!("position '{position_id}' in decomposition"),
+    pub fn component_var(&self, position_id: &str) -> finstack_quant_core::Result<f64> {
+        self.var_contributions
+            .iter()
+            .find(|c| c.position_id == position_id)
+            .map(|c| c.component_var)
+            .ok_or_else(|| {
+                finstack_quant_core::Error::Input(
+                    finstack_quant_core::error::InputError::NotFound {
+                        id: format!("position '{position_id}' in decomposition"),
+                    },
+                )
             })
-        })
     }
 }
 
