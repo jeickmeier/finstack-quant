@@ -25,7 +25,13 @@ from typing import Any
 import pytest
 
 from finstack_quant import models
-from finstack_quant.core.market_data import DiscountCurve, FxDeltaVolSurface, VolCube, VolCubeExpirySlice
+from finstack_quant.core.market_data import (
+    DiscountCurve,
+    FxDeltaVolSurface,
+    VolCube,
+    VolCubeExpirySlice,
+    VolSurface,
+)
 from finstack_quant.models import correlation, liquidity, monte_carlo, volatility
 from finstack_quant.models.credit import (
     AssetDynamics,
@@ -72,6 +78,20 @@ ROUGH_BERGOMI = {
 PATH_SPECS = {
     "gbm": {
         "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+        "initial_state": [100.0],
+        **PATH_GRID,
+    },
+    "local_vol": {
+        "process": {
+            "type": "local_vol",
+            "r": 0.04,
+            "q": 0.01,
+            "surface": {
+                "expiries": [0.25, 1.0],
+                "strikes": [80.0, 100.0, 120.0],
+                "local_vols": [0.30, 0.22, 0.18, 0.26, 0.20, 0.17],
+            },
+        },
         "initial_state": [100.0],
         **PATH_GRID,
     },
@@ -188,6 +208,10 @@ STRIKES = [80.0, 90.0, 100.0, 110.0, 120.0]
 EXPIRIES = [0.5, 1.0]
 VOLS = [[0.28, 0.24, 0.20, 0.21, 0.23], [0.27, 0.235, 0.21, 0.215, 0.23]]
 SVI = (0.04, 0.4, -0.4, 0.0, 0.2)
+# Implied skew, flat in expiry by cash strike, and one forward per expiry.
+LV_EXPIRIES = [0.25, 0.5, 1.0, 2.0]
+LV_SMILE = [0.24, 0.22, 0.20, 0.19, 0.185]
+LV_FORWARDS = [100.5, 101.0, 102.0, 104.0]
 CAP_PERIODS = [(0.25, 0.5, 0.25), (0.5, 0.75, 0.25), (0.75, 1.0, 0.25)]
 
 
@@ -686,7 +710,17 @@ def _volatility_cases() -> dict[str, Callable[[], Any]]:
     fx = lambda: FxDeltaVolSurface("EURUSD", [0.5, 1.0], [0.10, 0.11], [0.01, 0.012], [0.002, 0.003])  # noqa: E731
     greeks = lambda: models.bs_greeks(100.0, 100.0, 0.05, 0.0, 0.2, 1.0, True)  # noqa: E731
     smile = lambda: volatility.SabrSmile(volatility.SabrParameters(0.2, 1.0, 0.3, -0.2), 100.0, 1.5)  # noqa: E731
+    implied = lambda: VolSurface("SKEW", LV_EXPIRIES, STRIKES, [LV_SMILE] * 4)  # noqa: E731
+    local_vol = lambda: volatility.LocalVolSurface.from_implied_vol(implied(), LV_FORWARDS)  # noqa: E731
     return {
+        "volatility.local_vol": lambda: [
+            json.loads(local_vol().to_json()),
+            local_vol().value(0.75, 95.0),
+            local_vol().value(5.0, 60.0),
+            json.loads(
+                volatility.LocalVolSurface.from_implied_vol_smoothed(implied(), LV_FORWARDS, 10.0).to_json()
+            ),
+        ],
         "volatility.svi": lambda: [
             svi().total_variance(0.1),
             svi().durrleman_g(0.1),

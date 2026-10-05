@@ -671,9 +671,12 @@ python_package = "finstack_quant.models.volatility"
 # `SabrCalibrationOutcome` and the `*_with_diagnostics` / `*_with_derivatives`
 # / `*_with_atm_pinning` calibrator variants, `ArbitrageCheckConfig` /
 # `check_surface` on a `VolSurface`, and `SviParams::{validate, butterfly_violation}`
-# (validation runs in the constructor).
+# (validation runs in the constructor). `LocalVolSurface` is a class in Python
+# and a plain object with `localVol*` free functions in WASM; the Dupire
+# density check stays reachable through `check_local_vol_density_grid`.
 public = [
     "ArbitrageReport",
+    "LocalVolSurface",
     "SabrCalibrator",
     "SabrModel",
     "SabrParameters",
@@ -2117,7 +2120,7 @@ js = "models.rates.hullWhite"
 
 [parity.modules."finstack_quant.models.volatility"]
 js = "models.volatility"
-types = { ArbitrageReport = "ArbitrageReport", SviParams = "SviParams" }
+types = { ArbitrageReport = "ArbitrageReport", LocalVolSurface = "LocalVolSurface", SviParams = "SviParams" }
 excluded = { surface_to_dataframe = "pandas" }
 
 [parity.modules."finstack_quant.portfolio"]
@@ -2385,6 +2388,9 @@ validateFactorModelConfig = "free-function twin of Python FactorModelConfig.vali
 relativeStderr = "free-function twin of Python MoneyEstimate.relative_stderr: the type is a plain object in WASM"
 
 [parity.js."models.volatility".wasm_only]
+localVolFromImpliedVol = "free-function twin of Python LocalVolSurface.from_implied_vol: the type is a plain object in WASM"
+localVolFromImpliedVolSmoothed = "free-function twin of Python LocalVolSurface.from_implied_vol_smoothed: the type is a plain object in WASM"
+localVolValue = "free-function twin of Python LocalVolSurface.value: the type is a plain object in WASM"
 sviDurrlemanG = "free-function twin of Python SviParams.durrleman_g: the type is a plain object in WASM"
 sviImpliedVol = "free-function twin of Python SviParams.implied_vol: the type is a plain object in WASM"
 sviTotalVariance = "free-function twin of Python SviParams.total_variance: the type is a plain object in WASM"
@@ -2823,6 +2829,11 @@ variance = { js = "models.factor.credit.factorVariance", reason = "free-function
 
 [parity.members."finstack_quant.models.factor.credit.FactorModelConfig".renames]
 validate = { js = "models.factor.credit.validateFactorModelConfig", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+
+[parity.members."finstack_quant.models.volatility.LocalVolSurface".renames]
+from_implied_vol = { js = "models.volatility.localVolFromImpliedVol", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+from_implied_vol_smoothed = { js = "models.volatility.localVolFromImpliedVolSmoothed", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
+value = { js = "models.volatility.localVolValue", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }
 
 [parity.members."finstack_quant.models.volatility.SviParams".renames]
 durrleman_g = { js = "models.volatility.sviDurrlemanG", reason = "free-function twin of the Rust method: the type crosses the boundary as a plain object" }

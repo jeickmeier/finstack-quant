@@ -846,6 +846,18 @@ mod tests {
             .expect("extraction should succeed");
         assert_eq!(lv.grid_shape(), (4, 5));
         assert!(lv.value(1.0, 90.0) - lv.value(1.0, 110.0) > 0.22 - 0.19);
+
+        // The fixture of the Python and WASM tests and of their parity case.
+        let host_forwards = [100.5, 101.0, 102.0, 104.0];
+        let host = LocalVolSurface::from_implied_vol(&surface, &host_forwards)
+            .expect("host fixture extracts");
+        assert!(host.value(1.0, 90.0) - host.value(1.0, 110.0) > 0.22 - 0.19);
+        let smoothed = LocalVolSurface::from_implied_vol_smoothed(&surface, &host_forwards, 10.0)
+            .expect("smoothed host fixture extracts");
+        assert!(
+            smoothed.value(1.0, 80.0) - smoothed.value(1.0, 120.0)
+                < host.value(1.0, 80.0) - host.value(1.0, 120.0)
+        );
     }
 
     #[test]

@@ -29647,6 +29647,90 @@ export interface VolatilityNamespace {
    */
   sviImpliedVol(params: SviParams, k: number, t: number): number;
   /**
+   * Extract Dupire local volatility from an implied volatility surface.
+   *
+   * Twin of the Rust and Python `LocalVolSurface.from_implied_vol`. The local variance at each node of the implied grid is `(dw/dT) / g` in total variance `w = sigma^2 T` and log-moneyness `k = ln(K / F_T)` (Gatheral 2006, eq. 1.10), with the time derivative taken at fixed `k`.
+   * @param surface - `VolSurface` object or JSON in the canonical wire form: unshifted Black implied volatilities (decimals) on expiries in years and positive cash strikes, at least two expiries and three strikes.
+   * @param forwards - Forward price of the underlying for each surface expiry, in strike units and in the order of `surface.expiries`; finite and positive. For a flat carry, `F(T) = S * exp((r - q) * T)`.
+   * @returns The `LocalVolSurface` object: `expiries` in years, `strikes`, and `local_vols` as annualized decimals in row-major order (`local_vols[i * strikes.length + j]` for expiry `i`, strike `j`).
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `surface` is malformed, has fewer than two expiries or three strikes, is not an unshifted Black strike surface, `forwards` has the wrong length or a non-positive entry, or the surface has butterfly or calendar arbitrage at a node (the message names the node).
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const implied = {
+   *   id: "FLAT",
+   *   expiries: [0.5, 1.0],
+   *   strikes: [90, 100, 110],
+   *   vols_row_major: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+   *   secondary_axis: "strike" as const,
+   *   interpolation_mode: "vol" as const,
+   *   quote_type: "black_lognormal" as const,
+   * };
+   * const local = models.volatility.localVolFromImpliedVol(implied, [100, 100]);
+   * console.log(local.expiries, local.strikes); // [0.5, 1] [90, 100, 110]
+   * console.log(local.local_vols.every((v) => Math.abs(v - 0.2) < 1e-12)); // true
+   * ```
+   */
+  localVolFromImpliedVol(
+    surface: generated.core.VolSurface | string,
+    forwards: NumericArray
+  ): generated.models.LocalVolSurface;
+  /**
+   * Extract Dupire local volatility after Gaussian smoothing of the implied volatilities along the strike axis.
+   *
+   * Twin of the Rust and Python `LocalVolSurface.from_implied_vol_smoothed`. Smoothing regularises the second strike derivative, the usual source of a non-positive Dupire density on market-calibrated grids.
+   * @param surface - `VolSurface` object or JSON, as for `localVolFromImpliedVol`.
+   * @param forwards - One forward per surface expiry, as for `localVolFromImpliedVol`.
+   * @param sigmaStrikes - Standard deviation of the Gaussian kernel in strike (price) units, non-negative; zero disables smoothing.
+   * @returns The `LocalVolSurface` object on the grid of `surface`.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `sigmaStrikes` is negative or non-finite, or for any error of `localVolFromImpliedVol` on the smoothed surface.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const implied = {
+   *   id: "FLAT",
+   *   expiries: [0.5, 1.0],
+   *   strikes: [90, 100, 110],
+   *   vols_row_major: [0.2, 0.2, 0.2, 0.2, 0.2, 0.2],
+   *   secondary_axis: "strike" as const,
+   *   interpolation_mode: "vol" as const,
+   *   quote_type: "black_lognormal" as const,
+   * };
+   * const local = models.volatility.localVolFromImpliedVolSmoothed(implied, [100, 100], 5.0);
+   * console.log(local.local_vols.length); // 6
+   * ```
+   */
+  localVolFromImpliedVolSmoothed(
+    surface: generated.core.VolSurface | string,
+    forwards: NumericArray,
+    sigmaStrikes: number
+  ): generated.models.LocalVolSurface;
+  /**
+   * Evaluate a local volatility surface: bilinear inside its grid, flat outside it.
+   *
+   * Twin of the Rust and Python `LocalVolSurface.value`.
+   * @param localVol - `LocalVolSurface` object or JSON (`expiries`, `strikes`, `local_vols`), validated on decode.
+   * @param expiry - Time in years from the valuation date.
+   * @param strike - Level of the underlying in price units.
+   * @returns The local volatility as an annualized decimal.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `localVol` is malformed: an empty or unsorted axis, a non-positive strike, a negative volatility or a value count that does not match the grid.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const local = { expiries: [1, 2], strikes: [100, 200], local_vols: [0.1, 0.2, 0.3, 0.4] };
+   * console.log(models.volatility.localVolValue(local, 1.5, 150)); // 0.25
+   * console.log(models.volatility.localVolValue(local, 9, 50)); // 0.3
+   * ```
+   */
+  localVolValue(
+    localVol: generated.models.LocalVolSurface | string,
+    expiry: number,
+    strike: number
+  ): number;
+  /**
    * Butterfly-arbitrage check on a strike by expiry volatility grid.
    * @param strikes - Strictly increasing strike grid shared by every row.
    * @param expiries - Strictly increasing expiries in years, one per row of `vols`.

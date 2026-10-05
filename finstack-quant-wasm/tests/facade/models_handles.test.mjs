@@ -589,3 +589,94 @@ test('LGD replay and uncorrelated factors use checked Rust construction', () => 
     assert.throws(() => correlation.LatentMultiFactor.uncorrelated(2, vols));
   }
 });
+
+test('local volatility is a plain object with free-function twins', () => {
+  const smile = [0.24, 0.22, 0.2, 0.19, 0.185];
+  const implied = (rows) => ({
+    id: 'IMPLIED',
+    expiries: [0.25, 0.5, 1.0, 2.0],
+    strikes: [80, 90, 100, 110, 120],
+    vols_row_major: rows.flat(),
+    secondary_axis: 'strike',
+    interpolation_mode: 'vol',
+    quote_type: 'black_lognormal',
+  });
+  const forwards = [100.5, 101.0, 102.0, 104.0];
+
+  // A flat implied volatility is its own local volatility, under any forwards.
+  const flat = volatility.localVolFromImpliedVol(implied(Array(4).fill(Array(5).fill(0.2))), forwards);
+  assert.deepEqual(Object.keys(flat).sort(), ['expiries', 'local_vols', 'strikes']);
+  assert.deepEqual(flat.expiries, [0.25, 0.5, 1.0, 2.0]);
+  assert.equal(flat.local_vols.length, 20);
+  assert.ok(flat.local_vols.every((vol) => Math.abs(vol - 0.2) < 1e-12));
+  assert.ok(Math.abs(volatility.localVolValue(flat, 0.7, 93) - 0.2) < 1e-12);
+
+  const skew = implied(Array(4).fill(smile));
+  const local = volatility.localVolFromImpliedVol(skew, forwards);
+  const value = (surface, strike) => volatility.localVolValue(surface, 1.0, strike);
+  assert.ok(value(local, 90) - value(local, 110) > 0.22 - 0.19);
+  assert.equal(value(local, 100), local.local_vols[2 * 5 + 2]);
+  assert.deepEqual(volatility.localVolFromImpliedVol(JSON.stringify(skew), forwards), local);
+  assert.equal(volatility.localVolValue(JSON.stringify(local), 1.0, 100), value(local, 100));
+  const smoothed = volatility.localVolFromImpliedVolSmoothed(skew, forwards, 10.0);
+  assert.ok(value(smoothed, 80) - value(smoothed, 120) < value(local, 80) - value(local, 120));
+  assert.deepEqual(volatility.localVolFromImpliedVolSmoothed(skew, forwards, 0), local);
+
+  // Bilinear inside the grid, flat outside it.
+  const grid = { expiries: [1, 2], strikes: [100, 200], local_vols: [0.1, 0.2, 0.3, 0.4] };
+  assert.ok(Math.abs(volatility.localVolValue(grid, 1.5, 150) - 0.25) < 1e-15);
+  assert.equal(volatility.localVolValue(grid, 9, 50), 0.3);
+
+  const message = (pattern) => (e) => kind('validation')(e) && pattern.test(e.message);
+  assert.throws(() => volatility.localVolFromImpliedVol(skew, [100]), message(/one forward per expiry/));
+  assert.throws(
+    () => volatility.localVolFromImpliedVol(skew, [100, 100, -1, 100]),
+    message(/finite and positive/)
+  );
+  assert.throws(
+    () => volatility.localVolFromImpliedVolSmoothed(skew, forwards, -1),
+    message(/sigma_strikes/)
+  );
+  const calendar = {
+    ...implied([Array(5).fill(0.25), Array(5).fill(0.25), Array(5).fill(0.15)]),
+    expiries: [0.5, 1.0, 2.0],
+  };
+  assert.throws(
+    () => volatility.localVolFromImpliedVol(calendar, [100, 100, 100]),
+    message(/calendar arbitrage/)
+  );
+  assert.throws(
+    () => volatility.localVolFromImpliedVol({ ...skew, quote_type: 'normal' }, forwards),
+    kind('validation')
+  );
+  assert.throws(() => volatility.localVolFromImpliedVol({ ...skew, extra: 1 }, forwards), kind('validation'));
+  assert.throws(() => volatility.localVolFromImpliedVol(42, forwards), invalidType);
+  assert.throws(() => volatility.localVolFromImpliedVol(skew, 'forwards'), invalidType);
+  assert.throws(() => volatility.localVolFromImpliedVolSmoothed(skew, forwards, '5'), invalidType);
+  assert.throws(() => volatility.localVolValue(grid, '1', 100), invalidType);
+  assert.throws(() => volatility.localVolValue({ ...grid, local_vols: [0.1] }, 1, 100), kind('validation'));
+  assert.throws(() => volatility.localVolValue({ ...grid, extra: 1 }, 1, 100), kind('validation'));
+
+  // The same object drives the `local_vol` path process.
+  const paths = monteCarlo.simulatePaths({
+    process: { type: 'local_vol', r: 0.03, q: 0.01, surface: grid },
+    initial_state: [100],
+    time_grid: { type: 'uniform', expiry: 1.0, num_steps: 4 },
+    num_paths: 3,
+    seed: 5,
+  });
+  assert.deepEqual(paths.factor_names, ['spot']);
+  assert.ok(paths.values.every((spot) => spot > 0));
+  assert.throws(
+    () =>
+      monteCarlo.simulatePaths({
+        process: { type: 'local_vol', r: 0.03, q: 0.01, surface: grid },
+        scheme: 'milstein',
+        initial_state: [100],
+        time_grid: { type: 'uniform', expiry: 1.0, num_steps: 4 },
+        num_paths: 3,
+        seed: 5,
+      }),
+    message(/scheme 'milstein' is not available for process 'local_vol'/)
+  );
+});

@@ -23,8 +23,9 @@ use pyo3::prelude::*;
 ///     - ``process`` : dict tagged by ``"type"`` — ``"gbm"``,
 ///       ``"gbm_with_dividends"``, ``"multi_gbm"``, ``"brownian"``,
 ///       ``"multi_brownian"``, ``"multi_ou"``, ``"hull_white_1f"``, ``"cir"``,
-///       ``"cir_plus_plus"``, ``"heston"``, ``"schwartz_smith"``, ``"lmm"``,
-///       ``"rough_bergomi"``, ``"rough_heston"`` or ``"cheyette_rough"`` — plus
+///       ``"cir_plus_plus"``, ``"heston"``, ``"schwartz_smith"``,
+///       ``"local_vol"``, ``"lmm"``, ``"rough_bergomi"``, ``"rough_heston"`` or
+///       ``"cheyette_rough"`` — plus
 ///       that process's parameters. Rates, yields and volatilities are
 ///       annualized decimals.
 ///     - ``scheme`` : ``"default"`` (the process's canonical scheme; used when

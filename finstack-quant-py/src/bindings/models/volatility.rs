@@ -21,7 +21,7 @@
 //! Rust and Python use the canonical PascalCase forms (`SabrParameters`,
 //! `SabrModel`, `SabrSmile`, `SabrCalibrator`).
 
-use crate::bindings::macros::wire_methods;
+use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use std::sync::Arc;
 
 use crate::bindings::core::market_data::curves::{
@@ -33,6 +33,7 @@ use crate::bindings::pandas_utils::serde_to_py;
 use crate::bindings::repr_support::repr_from_serde;
 use crate::errors::core_to_py;
 use finstack_quant_models::volatility as vol;
+use finstack_quant_models::volatility::local_vol::LocalVolSurface;
 use finstack_quant_models::volatility::sabr::{
     SabrCalibrator, SabrModel, SabrParameters, SabrShift, SabrSmile,
 };
@@ -1200,6 +1201,198 @@ impl PySviParams {
 
 wire_methods!(PySviParams, SviParams, "SviParams");
 
+/// Dupire local volatility ``sigma_loc(T, K)`` on an expiry-by-strike grid.
+///
+/// Extracted from an implied volatility surface by ``from_implied_vol``. It
+/// is the volatility of the model ``dS = (r - q) S dt + sigma_loc(t, S) S dW``
+/// that reprices every European option of that surface. Off-grid queries are
+/// interpolated bilinearly and are flat outside the grid.
+///
+/// Examples
+/// --------
+/// >>> from finstack_quant.core.market_data import VolSurface
+/// >>> from finstack_quant.models.volatility import LocalVolSurface
+/// >>> implied = VolSurface("FLAT", [0.5, 1.0], [90.0, 100.0, 110.0], [[0.2] * 3] * 2)
+/// >>> local = LocalVolSurface.from_implied_vol(implied, [100.0, 100.0])
+/// >>> round(local.value(0.75, 95.0), 10)
+/// 0.2
+///
+/// Sources
+/// -------
+/// - Dupire (1994): see docs/REFERENCES.md#dupire-1994
+/// - Gatheral (2006): see docs/REFERENCES.md#gatheral-volatility-surface
+#[pyclass(
+    name = "LocalVolSurface",
+    module = "finstack_quant.models.volatility",
+    frozen,
+    from_py_object
+)]
+#[derive(Clone)]
+pub struct PyLocalVolSurface {
+    pub(crate) inner: LocalVolSurface,
+}
+
+#[pymethods]
+impl PyLocalVolSurface {
+    /// Build a local volatility surface from an explicit grid.
+    ///
+    /// Parameters
+    /// ----------
+    /// expiries : list[float]
+    ///     Expiry axis in years: finite, non-negative, strictly increasing.
+    /// strikes : list[float]
+    ///     Strike axis in price units of the underlying: finite, positive,
+    ///     strictly increasing.
+    /// local_vols : list[float]
+    ///     Local volatilities as annualized decimals, finite and
+    ///     non-negative, one per node in row-major order with the expiry as
+    ///     the slow axis (``len(expiries) * len(strikes)`` values).
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If an axis is empty, non-finite or not strictly increasing, an
+    ///     expiry is negative, a strike is not positive, the value count does
+    ///     not match the grid, or a volatility is negative or non-finite.
+    #[new]
+    #[pyo3(signature = (expiries, strikes, local_vols))]
+    fn new(expiries: Vec<f64>, strikes: Vec<f64>, local_vols: Vec<f64>) -> PyResult<Self> {
+        LocalVolSurface::new(expiries, strikes, local_vols)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    /// Extract local volatility from an implied volatility surface (Dupire).
+    ///
+    /// Parameters
+    /// ----------
+    /// surface : VolSurface
+    ///     Unshifted Black implied volatilities (decimals) on expiries in
+    ///     years and cash strikes; at least two expiries and three positive
+    ///     strikes.
+    /// forwards : list[float]
+    ///     Forward price of the underlying for each surface expiry, in strike
+    ///     units and in the order of ``surface.expiries``; finite and
+    ///     positive. For a flat carry, ``F(T) = S * exp((r - q) * T)``.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If the grid is too small, the surface is not an unshifted Black
+    ///     strike surface, ``forwards`` has the wrong length or a non-positive
+    ///     entry, or the surface has butterfly or calendar arbitrage at a
+    ///     node (the message names the node).
+    #[staticmethod]
+    #[pyo3(signature = (surface, forwards))]
+    fn from_implied_vol(surface: &PyVolSurface, forwards: Vec<f64>) -> PyResult<Self> {
+        LocalVolSurface::from_implied_vol(&surface.inner, &forwards)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    /// Extract local volatility after Gaussian smoothing of the implied
+    /// volatilities along the strike axis.
+    ///
+    /// Parameters
+    /// ----------
+    /// surface : VolSurface
+    ///     Implied surface, as for ``from_implied_vol``.
+    /// forwards : list[float]
+    ///     One forward per surface expiry, as for ``from_implied_vol``.
+    /// sigma_strikes : float
+    ///     Standard deviation of the Gaussian kernel in strike (price) units,
+    ///     non-negative; zero disables smoothing.
+    ///
+    /// Raises
+    /// ------
+    /// ValueError
+    ///     If ``sigma_strikes`` is negative or non-finite, or for any error
+    ///     of ``from_implied_vol`` on the smoothed surface.
+    #[staticmethod]
+    #[pyo3(signature = (surface, forwards, sigma_strikes))]
+    fn from_implied_vol_smoothed(
+        surface: &PyVolSurface,
+        forwards: Vec<f64>,
+        sigma_strikes: f64,
+    ) -> PyResult<Self> {
+        LocalVolSurface::from_implied_vol_smoothed(&surface.inner, &forwards, sigma_strikes)
+            .map(|inner| Self { inner })
+            .map_err(core_to_py)
+    }
+
+    /// Local volatility at ``(expiry, strike)``: bilinear inside the grid,
+    /// flat outside it.
+    ///
+    /// Parameters
+    /// ----------
+    /// expiry : float
+    ///     Time in years from the valuation date.
+    /// strike : float
+    ///     Level of the underlying in price units.
+    #[pyo3(signature = (expiry, strike))]
+    fn value(&self, expiry: f64, strike: f64) -> f64 {
+        self.inner.value(expiry, strike)
+    }
+
+    /// Expiry axis in years.
+    #[getter]
+    fn expiries(&self) -> Vec<f64> {
+        self.inner.expiries().to_vec()
+    }
+
+    /// Strike axis in price units of the underlying.
+    #[getter]
+    fn strikes(&self) -> Vec<f64> {
+        self.inner.strikes().to_vec()
+    }
+
+    /// Local volatilities (annualized decimals) in row-major order, expiry as
+    /// the slow axis.
+    #[getter]
+    fn local_vols(&self) -> Vec<f64> {
+        self.inner.local_vols().to_vec()
+    }
+
+    /// Grid shape as ``(n_expiries, n_strikes)``.
+    #[getter]
+    fn grid_shape(&self) -> (usize, usize) {
+        self.inner.grid_shape()
+    }
+
+    /// Tabulate the grid as a pandas ``DataFrame``.
+    ///
+    /// One row per expiry (index named ``"expiry"``, in years) and one
+    /// float64 column per strike, the layout of ``surface_to_dataframe`` for
+    /// an implied surface.
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let expiries = self.inner.expiries();
+        let strikes = self.inner.strikes();
+        let vols = self.inner.local_vols();
+        let data = PyDict::new(py);
+        for (j, strike) in strikes.iter().enumerate() {
+            let column: Vec<f64> = (0..expiries.len())
+                .map(|i| vols[i * strikes.len() + j])
+                .collect();
+            data.set_item(*strike, column)?;
+        }
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("name", "expiry")?;
+        let index = py
+            .import("pandas")?
+            .getattr("Index")?
+            .call((expiries.to_vec(),), Some(&kwargs))?;
+        dict_to_dataframe(py, &data, Some(index))
+    }
+
+    fn __repr__(&self) -> String {
+        let (expiries, strikes) = self.inner.grid_shape();
+        format!("LocalVolSurface(expiries={expiries}, strikes={strikes})")
+    }
+}
+
+wire_methods!(PyLocalVolSurface, LocalVolSurface, "LocalVolSurface");
+impl_repr_html_via_dataframe!(PyLocalVolSurface);
+
 /// Calibrate SVI parameters to a market smile (Gatheral 2004).
 ///
 /// Parameters
@@ -1265,6 +1458,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySabrSmile>()?;
     m.add_class::<PySabrCalibrator>()?;
     m.add_class::<PySviParams>()?;
+    m.add_class::<PyLocalVolSurface>()?;
     m.add_function(wrap_pyfunction!(calibrate_svi, &m)?)?;
     m.add_function(wrap_pyfunction!(convert_atm_volatility, &m)?)?;
     m.add_function(wrap_pyfunction!(surface_to_dataframe, &m)?)?;
@@ -1294,6 +1488,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             py,
             [
                 "ArbitrageReport",
+                "LocalVolSurface",
                 "SabrCalibrator",
                 "SabrModel",
                 "SabrParameters",

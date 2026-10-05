@@ -58,6 +58,20 @@ const PATH_SPECS = {
     initial_state: [100.0],
     ...PATH_GRID,
   },
+  local_vol: {
+    process: {
+      type: 'local_vol',
+      r: 0.04,
+      q: 0.01,
+      surface: {
+        expiries: [0.25, 1.0],
+        strikes: [80.0, 100.0, 120.0],
+        local_vols: [0.3, 0.22, 0.18, 0.26, 0.2, 0.17],
+      },
+    },
+    initial_state: [100.0],
+    ...PATH_GRID,
+  },
   heston: {
     process: {
       type: 'heston',
@@ -217,6 +231,18 @@ const VOLS = [
   [0.27, 0.235, 0.21, 0.215, 0.23],
 ];
 const SVI = { a: 0.04, b: 0.4, rho: -0.4, m: 0.0, sigma: 0.2 };
+// Implied skew, flat in expiry by cash strike, and one forward per expiry.
+const LV_SMILE = [0.24, 0.22, 0.2, 0.19, 0.185];
+const LV_IMPLIED = {
+  id: 'SKEW',
+  expiries: [0.25, 0.5, 1.0, 2.0],
+  strikes: STRIKES,
+  vols_row_major: [...LV_SMILE, ...LV_SMILE, ...LV_SMILE, ...LV_SMILE],
+  secondary_axis: 'strike',
+  interpolation_mode: 'vol',
+  quote_type: 'black_lognormal',
+};
+const LV_FORWARDS = [100.5, 101.0, 102.0, 104.0];
 const CAP_PERIODS = [
   [0.25, 0.5, 0.25],
   [0.5, 0.75, 0.25],
@@ -684,6 +710,15 @@ const CASES = {
     ];
   },
 
+  'volatility.local_vol': () => {
+    const localVol = volatility.localVolFromImpliedVol(LV_IMPLIED, LV_FORWARDS);
+    return [
+      localVol,
+      volatility.localVolValue(localVol, 0.75, 95.0),
+      volatility.localVolValue(localVol, 5.0, 60.0),
+      volatility.localVolFromImpliedVolSmoothed(LV_IMPLIED, LV_FORWARDS, 10.0),
+    ];
+  },
   'volatility.svi': () => [
     volatility.sviTotalVariance(SVI, 0.1),
     volatility.sviDurrlemanG(SVI, 0.1),

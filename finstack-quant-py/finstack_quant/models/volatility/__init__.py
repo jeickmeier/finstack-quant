@@ -12,6 +12,7 @@ from finstack_quant.finstack_quant import models as _models
 _volatility = _models.volatility
 
 ArbitrageReport = _volatility.ArbitrageReport
+LocalVolSurface = _volatility.LocalVolSurface
 SabrCalibrator = _volatility.SabrCalibrator
 SabrModel = _volatility.SabrModel
 SabrParameters = _volatility.SabrParameters
@@ -46,6 +47,7 @@ surface_to_dataframe = _volatility.surface_to_dataframe
 
 __all__ = [
     "ArbitrageReport",
+    "LocalVolSurface",
     "SabrCalibrator",
     "SabrModel",
     "SabrParameters",

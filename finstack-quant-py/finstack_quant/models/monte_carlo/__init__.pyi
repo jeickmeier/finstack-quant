@@ -1003,6 +1003,12 @@ def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
             must equal ``v0``.
           - ``"schwartz_smith"`` : ``kappa``, ``sigma_x``, ``mu_y``,
             ``sigma_y``, ``rho_xy``, optional ``lambda_x``. State ``[x, y]``.
+          - ``"local_vol"`` : ``r``, ``q`` and ``surface``, a Dupire local
+            volatility grid ``{"expiries": [...], "strikes": [...],
+            "local_vols": [...]}`` (row-major, expiry as the slow axis) such
+            as ``json.loads(LocalVolSurface.to_json())`` from
+            :mod:`finstack_quant.models.volatility`. State ``[spot]``. Use a
+            fine time grid: the scheme freezes the volatility over each step.
           - ``"lmm"`` : ``num_forwards``, ``num_factors`` (2 or 3),
             ``tenors`` (``num_forwards + 1`` year fractions),
             ``accrual_factors``, ``displacements``, ``vol_times``,
@@ -1031,7 +1037,8 @@ def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
           exact transition where one exists, quadratic-exponential for
           square-root variance, Euler otherwise; used when omitted),
           ``"euler"``, ``"log_euler"`` or ``"milstein"``. ``"log_euler"`` and
-          ``"milstein"`` apply to ``"gbm"`` and ``"multi_gbm"`` only;
+          ``"milstein"`` apply to ``"gbm"`` and ``"multi_gbm"`` only, except
+          that ``"local_vol"`` also accepts ``"log_euler"`` (its default);
           ``"lmm"``, ``"rough_bergomi"``, ``"rough_heston"`` and
           ``"cheyette_rough"`` accept ``"default"`` only.
         - ``initial_state`` : list of float, the state at time zero in the

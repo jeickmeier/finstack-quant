@@ -3365,6 +3365,9 @@
       "getSurfaceVolClamped",
       "impliedVolBachelier",
       "impliedVolBlack",
+      "localVolFromImpliedVol",
+      "localVolFromImpliedVolSmoothed",
+      "localVolValue",
       "materializeCubeExpirySlice",
       "materializeCubeExpirySliceNormal",
       "materializeCubeTenorSlice",
@@ -3462,6 +3465,15 @@
     "kind": "function"
   },
   "models.volatility.impliedVolBlack": {
+    "kind": "function"
+  },
+  "models.volatility.localVolFromImpliedVol": {
+    "kind": "function"
+  },
+  "models.volatility.localVolFromImpliedVolSmoothed": {
+    "kind": "function"
+  },
+  "models.volatility.localVolValue": {
     "kind": "function"
   },
   "models.volatility.strikeToDelta": {
