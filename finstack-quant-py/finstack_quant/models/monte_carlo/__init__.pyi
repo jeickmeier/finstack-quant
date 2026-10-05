@@ -820,7 +820,7 @@ class PathSummary:
 
 def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
     """
-    Simulate paths of any built-in Markov process on a shared time grid.
+    Simulate paths of any built-in process on a shared time grid.
 
     Binds Rust ``monte_carlo::simulate::simulate_paths``. The spec is plain
     data validated in Rust: it selects the process, the discretization scheme,
@@ -858,12 +858,37 @@ def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
             must equal ``v0``.
           - ``"schwartz_smith"`` : ``kappa``, ``sigma_x``, ``mu_y``,
             ``sigma_y``, ``rho_xy``, optional ``lambda_x``. State ``[x, y]``.
+          - ``"lmm"`` : ``num_forwards``, ``num_factors`` (2 or 3),
+            ``tenors`` (``num_forwards + 1`` year fractions),
+            ``accrual_factors``, ``displacements``, ``vol_times``,
+            ``vol_values`` (per volatility period, per forward, three factor
+            loadings) and ``initial_forwards``. State ``[forward_0, ...]``,
+            simple forward rates under the terminal measure;
+            ``initial_state`` must equal ``initial_forwards``, and the time
+            grid must contain every fixing date and volatility breakpoint
+            inside the horizon.
+          - ``"rough_bergomi"`` : ``r``, ``q``, ``hurst`` (``{"h": H}`` with
+            ``H`` in ``(0, 1)``), ``eta``, ``rho`` and ``xi``, the forward
+            variance curve ``{"interpolation": "linear" |
+            "constant_intervals", "times": [...], "values": [...]}``. State
+            ``[spot]``.
+          - ``"rough_heston"`` : ``r``, ``q``, ``hurst`` (``H`` in
+            ``(0, 0.5)``), ``kappa``, ``theta``, ``sigma_v``, ``rho``, ``v0``.
+            State ``[spot, variance]``; the starting variance must equal
+            ``v0``. At most 8,000 steps.
+          - ``"cheyette_rough"`` : ``kappa``, ``sigma_base`` (base volatility
+            curve, same shape as ``xi``), ``hurst``, ``eta``, ``rho``,
+            ``phi_times`` and ``phi_values`` (initial forward curve). State
+            ``[x, y]``, normally started at ``[0, 0]``; the short rate is
+            ``x`` plus the initial forward rate.
 
         - ``scheme`` : ``"default"`` (the process's canonical scheme — its
           exact transition where one exists, quadratic-exponential for
           square-root variance, Euler otherwise; used when omitted),
           ``"euler"``, ``"log_euler"`` or ``"milstein"``. ``"log_euler"`` and
-          ``"milstein"`` apply to ``"gbm"`` and ``"multi_gbm"`` only.
+          ``"milstein"`` apply to ``"gbm"`` and ``"multi_gbm"`` only;
+          ``"lmm"``, ``"rough_bergomi"``, ``"rough_heston"`` and
+          ``"cheyette_rough"`` accept ``"default"`` only.
         - ``initial_state`` : list of float, the state at time zero in the
           process's state layout.
         - ``time_grid`` : ``{"type": "uniform", "expiry": years, "num_steps": n}``
@@ -875,6 +900,15 @@ def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
         - ``antithetic`` : bool, default ``False``. When ``True`` each stream's
           path is followed by its antithetic partner, driven by the negated
           normal draws.
+        - ``fbm`` : dict, optional. Generator of the fractional noise that
+          ``"rough_bergomi"`` and ``"cheyette_rough"`` consume:
+          ``{"type": "volterra"}`` (used when omitted; the Riemann-Liouville
+          Volterra process of the published models, uniform grids only),
+          ``{"type": "cholesky"}`` (exact fractional Brownian motion, at most
+          8,000 steps) or ``{"type": "windowed_conditional",
+          "near_field_size": n}`` (approximate fractional Brownian motion
+          with an ``n``-step window; ``n`` optional). The last two give a
+          different model with the same forwards.
 
     Returns
     -------
@@ -888,6 +922,7 @@ def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
         If ``spec`` is not valid ``PathSimulationSpec`` data (unknown key or
         tag, missing field, wrong type); a process parameter or correlation
         matrix is out of range; the scheme is not available for the process;
+        ``fbm`` is set for a process that does not consume fractional noise;
         ``initial_state`` has the wrong length or lies outside the process's
         domain (for example a non-positive GBM spot); the time grid is
         invalid; ``num_paths`` is outside ``[1, 100_000]``; the output would

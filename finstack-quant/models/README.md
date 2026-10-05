@@ -49,8 +49,11 @@ unconditional dependency. A few convenience entry points (`EuropeanPricer`,
 | `monte_carlo` | Random streams, stochastic processes, discretizations, payoffs, execution engines, pricers, Greeks, results, and embedded defaults |
 
 `monte_carlo::simulate::simulate_paths` returns compact simulated paths for any
-Markov process and discretization scheme selected by a serializable
-`PathSimulationSpec`, bypassing the payoff machinery. It is the one
+built-in process and discretization scheme selected by a serializable
+`PathSimulationSpec`, bypassing the payoff machinery. That includes the
+path-dependent processes (`lmm`, `rough_bergomi`, `rough_heston`,
+`cheyette_rough`); `FbmSpec` selects the fractional-noise generator of the two
+that consume one. It is the one
 path-simulation entry point and is bound in Python and WASM.
 
 Antithetic pairing is **not** in `variance_reduction` — it is implemented inline

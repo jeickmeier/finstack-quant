@@ -289,6 +289,15 @@
       "type_name": "ExerciseStyle"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/fbm_spec.schema.json",
+      "bytes": 2004,
+      "kind": "component",
+      "path": "schemas/models/1/fbm_spec.schema.json",
+      "summary": "Generator of the fractional increments consumed by the rough-volatility processes.",
+      "title": "FbmSpec",
+      "type_name": "FbmSpec"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/forward_greeks.schema.json",
       "bytes": 886,
       "kind": "component",
@@ -416,7 +425,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/lmm_params.schema.json",
-      "bytes": 2268,
+      "bytes": 2301,
       "kind": "input",
       "path": "schemas/models/1/lmm_params.schema.json",
       "summary": "Parameters for the LMM/BGM model.",
@@ -542,7 +551,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/path_simulation_spec.schema.json",
-      "bytes": 22656,
+      "bytes": 38027,
       "kind": "input",
       "path": "schemas/models/1/path_simulation_spec.schema.json",
       "summary": "Complete, serializable description of one path simulation.",
@@ -614,7 +623,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/process_spec.schema.json",
-      "bytes": 16630,
+      "bytes": 27598,
       "kind": "input",
       "path": "schemas/models/1/process_spec.schema.json",
       "summary": "Stochastic process to simulate, with its parameters.",
@@ -686,7 +695,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_bergomi_params.schema.json",
-      "bytes": 1542,
+      "bytes": 3161,
       "kind": "input",
       "path": "schemas/models/1/rough_bergomi_params.schema.json",
       "summary": "rBergomi model parameters.",
@@ -704,7 +713,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/rough_heston_params.schema.json",
-      "bytes": 2000,
+      "bytes": 2033,
       "kind": "input",
       "path": "schemas/models/1/rough_heston_params.schema.json",
       "summary": "Rough Heston model parameters.",
@@ -722,7 +731,7 @@
     },
     {
       "$id": "https://finstack_quant.dev/schemas/models/1/scheme_spec.schema.json",
-      "bytes": 1162,
+      "bytes": 1224,
       "kind": "component",
       "path": "schemas/models/1/scheme_spec.schema.json",
       "summary": "Time-discretization scheme used to advance the process.",

@@ -9,7 +9,9 @@
 
 use finstack_quant_core::schema::SchemaArtifact;
 
-use crate::monte_carlo::simulate::{PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec};
+use crate::monte_carlo::simulate::{
+    FbmSpec, PathSimulationSpec, PathSummary, ProcessSpec, SchemeSpec,
+};
 use crate::{
     correlation::CreditExposure, correlation::LatentFactorSpec, correlation::PortfolioLossConfig,
     correlation::PortfolioLossResult, correlation::RecoverySpec,
@@ -255,6 +257,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "exercise_style",
         Component,
         "Exercise schedule convention for option models."
+    ),
+    finstack_quant_core::schema_artifact!(
+        FbmSpec,
+        "models",
+        "fbm_spec",
+        Component,
+        "Generator of the fractional increments consumed by the rough-volatility processes."
     ),
     finstack_quant_core::schema_artifact!(
         ForwardGreeks,

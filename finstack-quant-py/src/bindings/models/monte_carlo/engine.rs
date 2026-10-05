@@ -8,7 +8,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::simulate::PathSimulationSpec;
 use pyo3::prelude::*;
 
-/// Simulate paths of any built-in Markov process on a shared time grid.
+/// Simulate paths of any built-in process on a shared time grid.
 ///
 /// Binds Rust ``monte_carlo::simulate::simulate_paths``: ``spec`` selects the
 /// process, the discretization scheme, the time grid and the random streams,
@@ -23,9 +23,10 @@ use pyo3::prelude::*;
 ///     - ``process`` : dict tagged by ``"type"`` — ``"gbm"``,
 ///       ``"gbm_with_dividends"``, ``"multi_gbm"``, ``"brownian"``,
 ///       ``"multi_brownian"``, ``"multi_ou"``, ``"hull_white_1f"``, ``"cir"``,
-///       ``"cir_plus_plus"``, ``"heston"`` or ``"schwartz_smith"`` — plus that
-///       process's parameters. Rates, yields and volatilities are annualized
-///       decimals.
+///       ``"cir_plus_plus"``, ``"heston"``, ``"schwartz_smith"``, ``"lmm"``,
+///       ``"rough_bergomi"``, ``"rough_heston"`` or ``"cheyette_rough"`` — plus
+///       that process's parameters. Rates, yields and volatilities are
+///       annualized decimals.
 ///     - ``scheme`` : ``"default"`` (the process's canonical scheme; used when
 ///       omitted), ``"euler"``, ``"log_euler"`` or ``"milstein"``.
 ///     - ``initial_state`` : list of float, the state at time zero in the
@@ -39,6 +40,10 @@ use pyo3::prelude::*;
 ///       paths bit for bit.
 ///     - ``antithetic`` : bool, default ``False``; store an antithetic partner
 ///       after each stream's path.
+///     - ``fbm`` : dict, optional; fractional-noise generator for
+///       ``"rough_bergomi"`` and ``"cheyette_rough"``: ``{"type": "volterra"}``
+///       (used when omitted), ``{"type": "cholesky"}`` or
+///       ``{"type": "windowed_conditional", "near_field_size": n}``.
 ///
 /// Returns
 /// -------
@@ -51,6 +56,7 @@ use pyo3::prelude::*;
 ///     If ``spec`` is not valid ``PathSimulationSpec`` data (unknown key or
 ///     tag, missing field, wrong type); a process parameter or correlation
 ///     matrix is out of range; the scheme is not available for the process;
+///     ``fbm`` is set for a process that does not consume fractional noise;
 ///     ``initial_state`` has the wrong length or lies outside the process's
 ///     domain; the time grid is invalid; ``num_paths`` is outside
 ///     ``[1, 100_000]``; the output would exceed ``64_000_000`` stored values;

@@ -26,7 +26,7 @@
 //!   [`traits::Payoff`] into a generic simulation.
 //! - [`pricer`] provides higher-level European, path-dependent, and LSMC workflows.
 //! - [`simulate::simulate_paths`] returns compact simulated paths for any
-//!   Markov process and scheme selected by a serializable
+//!   built-in process and scheme selected by a serializable
 //!   [`simulate::PathSimulationSpec`].
 //!
 //! # Module map

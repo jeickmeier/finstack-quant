@@ -905,6 +905,24 @@ export type ExerciseStyle = "european" | "american" | "bermudan";
  */
 export type FactorModelConfigSchema = "finstack_quant.factor_model_config/1";
 /**
+ * Generator of the fractional increments consumed by the rough-volatility processes.
+ */
+export type FbmSpec =
+  | {
+      type: "volterra";
+    }
+  | {
+      type: "cholesky";
+    }
+  | {
+      /**
+       * Positive window length in steps, capped at the number of steps.
+       * Omitted selects `min(max(10, √n), 50)`.
+       */
+      near_field_size?: number | null;
+      type: "windowed_conditional";
+    };
+/**
  * Factor model specification for configuration and serialization.
  */
 export type LatentFactorSpec =
@@ -1266,7 +1284,111 @@ export type ProcessSpec =
        */
       sigma_y: number;
       type: "schwartz_smith";
-    };
+    }
+  | {
+      /**
+       * Accrual factors τ_i = T_{i+1} − T_i (length N).
+       */
+      accrual_factors: number[];
+      /**
+       * Displacement per forward for negative-rate support (length N).
+       */
+      displacements: number[];
+      /**
+       * Initial forward rates F_i(0) from the curve (length N).
+       */
+      initial_forwards: number[];
+      /**
+       * Number of Brownian factors (2 or 3).
+       */
+      num_factors: number;
+      /**
+       * Number of forward rates (N).
+       */
+      num_forwards: number;
+      /**
+       * Tenor dates T_0, T_1, ..., T_N (N+1 dates, year fractions).
+       */
+      tenors: number[];
+      type: "lmm";
+      /**
+       * Piecewise-constant vol breakpoints (ascending, length M).
+       */
+      vol_times: number[];
+      /**
+       * Factor loadings λ_{i,k}(t) per forward, per time period.
+       *
+       * Outer: M+1 time periods.
+       * Inner: N forwards, each with up to 3 factor loadings.
+       */
+      vol_values: [number, number, number][][];
+    }
+  | {
+      /**
+       * Vol-of-vol scaling (η > 0).
+       */
+      eta: number;
+      /**
+       * Hurst exponent H ∈ (0, 0.5), typically 0.07–0.12 for equity indices.
+       */
+      hurst: HurstExponent;
+      /**
+       * Dividend yield (annual, continuously compounded).
+       */
+      q: number;
+      /**
+       * Risk-free rate (annual, continuously compounded).
+       */
+      r: number;
+      /**
+       * Spot-vol correlation ρ ∈ [-1, 1].
+       */
+      rho: number;
+      type: "rough_bergomi";
+      /**
+       * Initial forward variance curve ξ₀(t).
+       */
+      xi: ForwardVarianceCurve;
+    }
+  | {
+      /**
+       * Hurst exponent H ∈ (0, 0.5) — controls the roughness of the variance.
+       */
+      hurst: HurstExponent;
+      /**
+       * Mean reversion speed (κ > 0).
+       */
+      kappa: number;
+      /**
+       * Dividend yield (annual, continuously compounded).
+       */
+      q: number;
+      /**
+       * Risk-free rate (annual, continuously compounded).
+       */
+      r: number;
+      /**
+       * Spot–variance correlation ρ ∈ \[−1, 1\].
+       */
+      rho: number;
+      /**
+       * Volatility of variance — vol-of-vol (σᵥ > 0).
+       */
+      sigma_v: number;
+      /**
+       * Long-run variance level (θ > 0).
+       */
+      theta: number;
+      type: "rough_heston";
+      /**
+       * Initial variance (v₀ > 0).
+       */
+      v0: number;
+    }
+  | (CheyetteRoughVolParams & {
+      type: "cheyette_rough";
+      [k: string]: unknown;
+    });
 /**
  * Time-discretization scheme used to advance the process.
  */
@@ -3898,7 +4020,6 @@ export interface LmmParams {
    * Inner: N forwards, each with up to 3 factor loadings.
    */
   vol_values: [number, number, number][][];
-  [k: string]: unknown;
 }
 /**
  * Scalar Bangia LVaR outputs for an isolated position where relative spread statistics are already known.
@@ -4512,6 +4633,12 @@ export interface PathSimulationSpec {
    */
   antithetic?: boolean;
   /**
+   * Fractional-noise generator for `rough_bergomi` and `cheyette_rough`;
+   * omitted selects `volterra`, the generator the pricers use. Setting it
+   * for any other process is a validation error.
+   */
+  fbm?: FbmSpec | null;
+  /**
    * State at time zero, in the layout documented on the [`ProcessSpec`]
    * variant. Its length must equal the process dimension.
    */
@@ -5113,7 +5240,10 @@ export interface RoughBergomiParams {
    * Spot-vol correlation ρ ∈ [-1, 1].
    */
   rho: number;
-  [k: string]: unknown;
+  /**
+   * Initial forward variance curve ξ₀(t).
+   */
+  xi: ForwardVarianceCurve;
 }
 /**
  * Rough Heston model parameters for Fourier-based European option pricing.
@@ -5180,7 +5310,6 @@ export interface RoughHestonParams {
    * Initial variance (v₀ > 0).
    */
   v0: number;
-  [k: string]: unknown;
 }
 /**
  * SABR model parameters

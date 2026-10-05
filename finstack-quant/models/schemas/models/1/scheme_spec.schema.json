@@ -10,7 +10,7 @@
     },
     {
       "const": "euler",
-      "description": "Euler-Maruyama: `X += μ Δt + σ √Δt Z`. First-order weak convergence;\navailable for every process except `gbm_with_dividends`.",
+      "description": "Euler-Maruyama: `X += μ Δt + σ √Δt Z`. First-order weak convergence;\navailable for every process except `gbm_with_dividends`, `lmm`,\n`rough_bergomi`, `rough_heston` and `cheyette_rough`.",
       "type": "string"
     },
     {

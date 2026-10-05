@@ -41,6 +41,15 @@ const PATH_GRID = {
   num_paths: 3,
   seed: 42,
 };
+const ROUGH_BERGOMI = {
+  type: 'rough_bergomi',
+  r: 0.03,
+  q: 0.01,
+  hurst: { h: 0.1 },
+  eta: 1.2,
+  rho: -0.7,
+  xi: { interpolation: 'linear', times: [0.0, 1.0], values: [0.04, 0.05] },
+};
 // One `PathSimulationSpec` per process family; the same objects are in
 // `test_models_wasm_parity.py`, and each case compares the whole `PathSummary`.
 const PATH_SPECS = {
@@ -99,6 +108,18 @@ const PATH_SPECS = {
     time_grid: { type: 'times', times: [0.0, 0.25, 0.5, 1.0] },
     num_paths: 3,
     seed: 42,
+  },
+  rough_bergomi: {
+    process: ROUGH_BERGOMI,
+    initial_state: [100.0],
+    antithetic: true,
+    ...PATH_GRID,
+  },
+  rough_bergomi_cholesky: {
+    process: ROUGH_BERGOMI,
+    initial_state: [100.0],
+    fbm: { type: 'cholesky' },
+    ...PATH_GRID,
   },
 };
 const GBM = [100.0, 100.0, 0.05, 0.0, 0.2, 1.0];

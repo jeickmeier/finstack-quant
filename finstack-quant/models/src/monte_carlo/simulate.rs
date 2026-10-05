@@ -1,4 +1,4 @@
-//! Path simulation for the Markov Monte Carlo processes behind one data-driven entry point.
+//! Path simulation for the Monte Carlo processes behind one data-driven entry point.
 //!
 //! [`McEngine`] is generic over the
 //! process and the discretization scheme, so a host language cannot name the
@@ -28,8 +28,22 @@
 //! | `cir`, `cir_plus_plus` | quadratic-exponential | `euler` (full truncation) |
 //! | `heston` | quadratic-exponential | `euler` (biased; research use) |
 //! | `schwartz_smith` | exact Gaussian transition | `euler` |
+//! | `lmm` | predictor-corrector under the terminal measure | none |
+//! | `rough_bergomi` | left-point log-Euler on injected fractional noise | none |
+//! | `rough_heston` | hybrid Volterra kernel scheme | none |
+//! | `cheyette_rough` | left-point Euler on injected fractional noise | none |
 //!
 //! Any other pairing is a validation error naming the process and the scheme.
+//!
+//! # Path-dependent processes
+//!
+//! The last four rows are not Markov in the reported state: `lmm` freezes
+//! each forward at its fixing date, and the rough models carry the history of
+//! their volatility driver. `rough_bergomi` and `cheyette_rough` consume
+//! fractional noise generated for the whole path before its first step;
+//! [`FbmSpec`] selects the generator, and
+//! [`PathSimulationSpec::fbm`] is rejected for every other process. Their
+//! cost per path grows with the square of the number of steps.
 //!
 //! # References
 //!
@@ -38,21 +52,35 @@
 //! - Quadratic-exponential scheme: `docs/REFERENCES.md#andersen-2008-heston-qe`
 //! - Full-truncation Euler: `docs/REFERENCES.md#lord-koekkoek-vandijk-2010`
 //! - Schwartz-Smith exact transition: `docs/REFERENCES.md#schwartz-smith-2000`
+//! - LIBOR market model: `docs/REFERENCES.md#andersen-piterbarg-interest-rate-modeling`
+//! - Rough Bergomi: `docs/REFERENCES.md#bayer-friz-gatheral-2016`
+//! - Hybrid scheme for the Volterra driver:
+//!   `docs/REFERENCES.md#bennedsen-lunde-pakkanen-2017`
 
 use crate::closed_form::heston::HestonPricingParams;
+use crate::monte_carlo::discretization::cheyette_rough::CheyetteRoughEuler;
 use crate::monte_carlo::discretization::euler::{EulerMaruyama, LogEuler};
 use crate::monte_carlo::discretization::exact::{ExactGbm, ExactMultiGbm};
 use crate::monte_carlo::discretization::exact_gbm_dividends::ExactGbmWithDividends;
+use crate::monte_carlo::discretization::lmm_predictor_corrector::LmmPredictorCorrector;
 use crate::monte_carlo::discretization::milstein::Milstein;
+use crate::monte_carlo::discretization::rough_bergomi::RoughBergomiEuler;
+use crate::monte_carlo::discretization::rough_heston::RoughHestonHybrid;
 use crate::monte_carlo::discretization::{ExactHullWhite1F, ExactSchwartzSmith, QeCir, QeHeston};
 use crate::monte_carlo::engine::{build_correlation_factor, McEngine, MAX_CAPTURED_PATHS};
 use crate::monte_carlo::process::brownian::{BrownianProcess, MultiBrownianProcess};
+use crate::monte_carlo::process::cheyette_rough::{
+    CheyetteRoughVolParams, CheyetteRoughVolProcess,
+};
 use crate::monte_carlo::process::cir::{CirParams, CirPlusPlusProcess, CirProcess};
 use crate::monte_carlo::process::gbm::MultiGbmProcess;
 use crate::monte_carlo::process::gbm_dividends::{Dividend, GbmWithDividends};
 use crate::monte_carlo::process::heston::HestonProcess;
+use crate::monte_carlo::process::lmm::{LmmParams, LmmProcess};
 use crate::monte_carlo::process::multi_ou::MultiOuProcess;
 use crate::monte_carlo::process::ou::{HullWhite1FParams, HullWhite1FProcess};
+use crate::monte_carlo::process::rough_bergomi::{RoughBergomiParams, RoughBergomiProcess};
+use crate::monte_carlo::process::rough_heston::{RoughHestonParams, RoughHestonProcess};
 use crate::monte_carlo::process::schwartz_smith::{SchwartzSmithParams, SchwartzSmithProcess};
 use crate::monte_carlo::process::{
     BrownianParams, GbmParams, GbmProcess, MultiOuParams, ProcessMetadata,
@@ -63,8 +91,14 @@ use crate::monte_carlo::TimeGrid;
 use finstack_quant_core::{Error, Result};
 use serde::{Deserialize, Serialize};
 
+mod fractional;
+#[cfg(test)]
+mod non_markov_tests;
 #[cfg(test)]
 mod tests;
+
+pub use fractional::FbmSpec;
+use fractional::FractionalNoise;
 
 /// Upper bound on stored scalars: every path's states plus the shared time
 /// grids. Checked before the time grid or any path buffer is allocated.
@@ -165,6 +199,38 @@ pub enum ProcessSpec {
     /// State: `[x, y]`, the short-term deviation and the long-term level of
     /// the log price; the spot is `exp(x + y)`.
     SchwartzSmith(SchwartzSmithParams),
+    /// LIBOR market model: displaced-lognormal forward rates under the
+    /// terminal measure, with piecewise-constant factor loadings.
+    ///
+    /// State: `[forward_0, forward_1, ...]`, simple forward rates as decimals,
+    /// one per accrual period. `initial_state` must equal the
+    /// `initial_forwards` parameter. A forward stops moving at its fixing
+    /// date, and the time grid must contain every fixing date and volatility
+    /// breakpoint inside the horizon.
+    Lmm(LmmParams),
+    /// Rough Bergomi stochastic volatility: lognormal variance driven by a
+    /// Riemann-Liouville Volterra process, around the forward variance curve
+    /// `xi`.
+    ///
+    /// State: `[spot]`, which must start strictly positive. The variance is a
+    /// functional of the driver's history and is not part of the state.
+    /// Consumes fractional noise; see [`FbmSpec`].
+    RoughBergomi(RoughBergomiParams),
+    /// Rough Heston stochastic volatility: a Volterra square-root variance
+    /// with a power-law kernel, `hurst` in `(0, 0.5)`.
+    ///
+    /// State: `[spot, variance]`; spot starts strictly positive, and the
+    /// starting variance `initial_state[1]` must equal the `v0` parameter.
+    /// At most 8,000 steps.
+    RoughHeston(RoughHestonParams),
+    /// Cheyette short-rate model with rough stochastic volatility.
+    ///
+    /// State: `[x, y]`, the deviation of the short rate from the initial
+    /// forward curve and the accumulated variance; both normally start at
+    /// zero. The short rate at time `t` is `x + φ(t)`, with `φ` the initial
+    /// forward curve in the parameters. Consumes fractional noise; see
+    /// [`FbmSpec`].
+    CheyetteRough(CheyetteRoughVolParams),
 }
 
 impl ProcessSpec {
@@ -182,6 +248,10 @@ impl ProcessSpec {
             Self::CirPlusPlus { .. } => "cir_plus_plus",
             Self::Heston(_) => "heston",
             Self::SchwartzSmith(_) => "schwartz_smith",
+            Self::Lmm(_) => "lmm",
+            Self::RoughBergomi(_) => "rough_bergomi",
+            Self::RoughHeston(_) => "rough_heston",
+            Self::CheyetteRough(_) => "cheyette_rough",
         }
     }
 }
@@ -197,7 +267,8 @@ pub enum SchemeSpec {
     #[default]
     Default,
     /// Euler-Maruyama: `X += μ Δt + σ √Δt Z`. First-order weak convergence;
-    /// available for every process except `gbm_with_dividends`.
+    /// available for every process except `gbm_with_dividends`, `lmm`,
+    /// `rough_bergomi`, `rough_heston` and `cheyette_rough`.
     Euler,
     /// Euler on the log state, which keeps the state positive. Only for the
     /// proportional-diffusion processes `gbm` and `multi_gbm`.
@@ -268,6 +339,11 @@ pub struct PathSimulationSpec {
     /// normal draws of the same stream.
     #[serde(default)]
     pub antithetic: bool,
+    /// Fractional-noise generator for `rough_bergomi` and `cheyette_rough`;
+    /// omitted selects `volterra`, the generator the pricers use. Setting it
+    /// for any other process is a validation error.
+    #[serde(default)]
+    pub fbm: Option<FbmSpec>,
 }
 
 /// Simulated paths on a shared time grid.
@@ -309,7 +385,8 @@ pub struct PathSummary {
 ///
 /// * a process parameter is out of range, or a correlation matrix is not a
 ///   valid correlation matrix of the process dimension;
-/// * the scheme is not available for the process;
+/// * the scheme is not available for the process, or `fbm` is set for a
+///   process that does not consume fractional noise;
 /// * `initial_state` has the wrong length, is non-finite, or lies outside the
 ///   process's state domain (for example a non-positive GBM spot);
 /// * the time grid is invalid or crosses an event the scheme cannot integrate;
@@ -338,6 +415,7 @@ pub struct PathSummary {
 ///     num_paths: 100,
 ///     seed: 7,
 ///     antithetic: false,
+///     fbm: None,
 /// };
 /// let paths = simulate_paths(&spec)?;
 ///
@@ -365,6 +443,17 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
             spec.process.tag()
         )))
     };
+    if spec.fbm.is_some()
+        && !matches!(
+            spec.process,
+            ProcessSpec::RoughBergomi(_) | ProcessSpec::CheyetteRough(_)
+        )
+    {
+        return Err(Error::Validation(format!(
+            "fbm applies only to processes 'rough_bergomi' and 'cheyette_rough', which consume              fractional noise; process '{}' does not",
+            spec.process.tag()
+        )));
+    }
     match &spec.process {
         ProcessSpec::Gbm(p) => {
             let process = GbmProcess::new(GbmParams::new(p.r, p.q, p.sigma)?);
@@ -548,6 +637,99 @@ fn dispatch(spec: &PathSimulationSpec, parallel: bool) -> Result<PathSummary> {
                 _ => unsupported(),
             }
         }
+        ProcessSpec::Lmm(p) => {
+            let process = LmmProcess::new(p.clone().validate()?);
+            if x0.len() == p.initial_forwards.len()
+                && x0
+                    .iter()
+                    .zip(&p.initial_forwards)
+                    .any(|(x, forward)| x.to_bits() != forward.to_bits())
+            {
+                return Err(Error::Validation(format!(
+                    "process 'lmm' needs initial_state to equal the initial_forwards parameter                      {:?}, got {x0:?}",
+                    p.initial_forwards
+                )));
+            }
+            match spec.scheme {
+                SchemeSpec::Default => {
+                    simulate(&process, &LmmPredictorCorrector::new(), spec, x0, parallel)
+                }
+                _ => unsupported(),
+            }
+        }
+        ProcessSpec::RoughBergomi(p) => {
+            let params = RoughBergomiParams::new(p.r, p.q, p.hurst, p.eta, p.rho, p.xi.clone())?;
+            let process = RoughBergomiProcess::new(params);
+            require_domain(spec, &process, f64::MIN_POSITIVE)?;
+            match spec.scheme {
+                SchemeSpec::Default => simulate_with_noise(
+                    &process,
+                    &RoughBergomiEuler::new(p.hurst),
+                    spec,
+                    x0,
+                    parallel,
+                    Some((spec.fbm.unwrap_or_default(), p.hurst.value())),
+                ),
+                _ => unsupported(),
+            }
+        }
+        ProcessSpec::RoughHeston(p) => {
+            let process = RoughHestonProcess::new(p.clone().validate()?);
+            if let [spot, variance] = *x0 {
+                if spot.is_nan() || spot <= 0.0 {
+                    return Err(Error::Validation(format!(
+                        "process 'rough_heston' needs a strictly positive initial spot, got {spot}"
+                    )));
+                }
+                if variance.to_bits() != p.v0.to_bits() {
+                    return Err(Error::Validation(format!(
+                        "process 'rough_heston' needs initial_state[1] to equal the v0                          parameter {}, got {variance}",
+                        p.v0
+                    )));
+                }
+            }
+            if spec.scheme != SchemeSpec::Default {
+                return unsupported();
+            }
+            // The scheme stores one kernel weight per pair of steps.
+            let num_steps = spec.time_grid.num_steps();
+            if num_steps
+                .checked_mul(num_steps)
+                .is_none_or(|weights| weights > MAX_STORED_VALUES)
+            {
+                return Err(Error::Validation(format!(
+                    "process 'rough_heston' supports at most 8000 steps, got {num_steps}"
+                )));
+            }
+            // Kernel times as the pricer builds them: `expiry · i / n` on a
+            // uniform grid.
+            let times: Vec<f64> = match &spec.time_grid {
+                TimeGridSpec::Uniform { expiry, num_steps } => (0..=*num_steps)
+                    .map(|i| expiry * i as f64 / *num_steps as f64)
+                    .collect(),
+                TimeGridSpec::Times { times } => times.clone(),
+            };
+            let scheme = RoughHestonHybrid::new(&times, p.hurst.value())?;
+            simulate(&process, &scheme, spec, x0, parallel)
+        }
+        ProcessSpec::CheyetteRough(p) => {
+            let process = CheyetteRoughVolProcess::new(p.revalidated()?);
+            let mut summary = match spec.scheme {
+                SchemeSpec::Default => simulate_with_noise(
+                    &process,
+                    &CheyetteRoughEuler::new(p.hurst),
+                    spec,
+                    x0,
+                    parallel,
+                    Some((spec.fbm.unwrap_or_default(), p.hurst.value())),
+                ),
+                _ => unsupported(),
+            }?;
+            // The raw state, not the short rate `x + φ(t)` the process
+            // metadata describes.
+            summary.factor_names = vec!["x".to_string(), "y".to_string()];
+            Ok(summary)
+        }
     }
 }
 
@@ -594,6 +776,31 @@ struct Scratch {
     work_anti: Vec<f64>,
     z: Vec<f64>,
     z_raw: Vec<f64>,
+    /// Standard normals behind one path's fractional noise; empty without it.
+    fbm_normals: Vec<f64>,
+    /// One path's fractional increments, one per step; empty without them.
+    fbm_increments: Vec<f64>,
+}
+
+/// Factor slot receiving the fractional increment of the step.
+const FBM_Z_INDEX: usize = 1;
+/// Factor slot receiving the unit-variance normal that drives that increment.
+const DRIVE_Z_INDEX: usize = 2;
+
+/// Simulate `spec.num_paths` streams of one concrete process and scheme that
+/// need no injected noise.
+fn simulate<P, D>(
+    process: &P,
+    scheme: &D,
+    spec: &PathSimulationSpec,
+    initial_state: &[f64],
+    parallel: bool,
+) -> Result<PathSummary>
+where
+    P: StochasticProcess + ProcessMetadata,
+    D: Discretization<P> + Clone,
+{
+    simulate_with_noise(process, scheme, spec, initial_state, parallel, None)
 }
 
 /// Simulate `spec.num_paths` streams of one concrete process and scheme.
@@ -602,12 +809,22 @@ struct Scratch {
 /// substream `p`, each step draws one vector of standard normals, the
 /// engine-side Cholesky factor is applied unless the scheme correlates
 /// internally, and an antithetic partner reuses the negated correlated draws.
-fn simulate<P, D>(
+///
+/// `fractional` is the generator and Hurst exponent for a process that needs
+/// injected noise. Such a stream follows
+/// [`simulate_path_fractional`](crate::monte_carlo::engine_fractional::simulate_path_fractional)
+/// as the pricers drive it: the generator's normals are drawn first, then each
+/// step draws its vector of normals and has the fractional increment and its
+/// driving normal written over factor slots 1 and 2. No engine-side
+/// correlation is applied. The generators are linear in their normals, so the
+/// antithetic partner still sees every Gaussian input negated.
+fn simulate_with_noise<P, D>(
     process: &P,
     scheme: &D,
     spec: &PathSimulationSpec,
     initial_state: &[f64],
     parallel: bool,
+    fractional: Option<(FbmSpec, f64)>,
 ) -> Result<PathSummary>
 where
     P: StochasticProcess + ProcessMetadata,
@@ -622,10 +839,11 @@ where
             factor_names.len()
         )));
     }
-    if process.requires_injected_noise() {
+    if process.requires_injected_noise() != fractional.is_some()
+        || (fractional.is_some() && process.num_factors() <= DRIVE_Z_INDEX)
+    {
         return Err(Error::Validation(format!(
-            "process '{}' needs externally injected noise and cannot be driven by \
-             independent normal draws",
+            "process '{}' and its noise source disagree on externally injected noise",
             spec.process.tag()
         )));
     }
@@ -672,7 +890,14 @@ where
     let mut scheme = scheme.clone();
     scheme.prepare(process, &time_grid);
     let scheme = &scheme;
-    let correlation = build_correlation_factor(process, scheme)?;
+    let noise = fractional
+        .map(|(fbm, hurst)| FractionalNoise::new(fbm, hurst, &spec.time_grid, &time_grid))
+        .transpose()?;
+    let noise = noise.as_ref();
+    let correlation = match noise {
+        Some(_) => None,
+        None => build_correlation_factor(process, scheme)?,
+    };
     let rng = PhiloxRng::new(spec.seed);
 
     let path_len = stride * dim;
@@ -692,6 +917,8 @@ where
                 0
             }
         ],
+        fbm_normals: vec![0.0; noise.map_or(0, FractionalNoise::normals_len)],
+        fbm_increments: vec![0.0; noise.map_or(0, |_| num_steps)],
     };
     let record = |path: &mut [f64], step: usize, state: &[f64], stream: usize| -> Result<()> {
         if let Some(factor) = state.iter().position(|x| !x.is_finite()) {
@@ -715,6 +942,10 @@ where
             s.work_anti.fill(0.0);
             mirrored[..dim].copy_from_slice(initial_state);
         }
+        if let Some(noise) = noise {
+            path_rng.fill_std_normals(&mut s.fbm_normals);
+            noise.generate(&s.fbm_normals, &mut s.fbm_increments);
+        }
         for step in 0..num_steps {
             let (t, dt) = (time_grid.time(step), time_grid.dt(step));
             match &correlation {
@@ -725,6 +956,10 @@ where
                     })?;
                 }
                 None => path_rng.fill_std_normals(&mut s.z),
+            }
+            if let Some(noise) = noise {
+                s.z[FBM_Z_INDEX] = s.fbm_increments[step];
+                s.z[DRIVE_Z_INDEX] = noise.driving_normal(&s.fbm_normals, step);
             }
             scheme.step(process, t, dt, &mut s.state, &s.z, &mut s.work);
             record(primary, step + 1, &s.state, stream)?;

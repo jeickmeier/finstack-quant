@@ -268,12 +268,12 @@ pub fn heston_satisfies_feller(
     )
 }
 
-/// Simulate paths of any built-in Markov process on a shared time grid.
+/// Simulate paths of any built-in process on a shared time grid.
 ///
 /// Twin of the Rust and Python `simulate_paths`: the spec selects the process,
 /// the discretization scheme, the time grid and the random streams, and Rust
 /// validates every field.
-/// @param spec - `PathSimulationSpec` object or JSON: `process` (tagged by `type`, with annualized decimal rates and volatilities), optional `scheme` (`"default"` uses the process's canonical scheme), `initial_state` in the process's state layout, `time_grid` in years, `num_paths` in [1, 100000], `seed`, and optional `antithetic` (default `false`).
+/// @param spec - `PathSimulationSpec` object or JSON: `process` (tagged by `type`, with annualized decimal rates and volatilities), optional `scheme` (`"default"` uses the process's canonical scheme), `initial_state` in the process's state layout, `time_grid` in years, `num_paths` in [1, 100000], `seed`, optional `antithetic` (default `false`), and optional `fbm`, the fractional-noise generator of the `rough_bergomi` and `cheyette_rough` processes (`{ type: "volterra" }` when omitted).
 /// @returns The `PathSummary` object: `num_paths`, `num_simulated_paths`, `dim`, `times`, `factor_names`, and `values` in row-major `[path][time][factor]` order, so factor `f` on path `p` at `times[s]` is `values[(p * times.length + s) * dim + f]`.
 ///
 /// @example
@@ -297,6 +297,7 @@ pub fn heston_satisfies_feller(
 /// Throws a `TypeError` if `spec` is neither an object nor JSON text, and a
 /// `validation` error if it does not match `PathSimulationSpec`, a process
 /// parameter is out of range, the scheme is not available for the process,
+/// `fbm` is set for a process that does not consume fractional noise,
 /// `initial_state` has the wrong length or lies outside the process's domain,
 /// the time grid is invalid, `num_paths` is outside [1, 100000], the output
 /// would exceed 64 million stored values, or a simulated state is non-finite.

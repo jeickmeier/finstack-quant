@@ -241,6 +241,25 @@ impl CheyetteRoughVolParams {
         })
     }
 
+    /// Re-run the constructor's validation on a parameter set whose public
+    /// fields may have been edited after construction.
+    pub(crate) fn revalidated(&self) -> finstack_quant_core::Result<Self> {
+        let phi_points: Vec<_> = self
+            .phi_times
+            .iter()
+            .copied()
+            .zip(self.phi_values.iter().copied())
+            .collect();
+        Self::new(
+            self.kappa,
+            self.sigma_base.clone(),
+            self.hurst,
+            self.eta,
+            self.rho,
+            &phi_points,
+        )
+    }
+
     /// Interpolate the initial forward rate φ(t) = f(0, t) at time `t`.
     ///
     /// Uses linear interpolation between knots and flat extrapolation at the

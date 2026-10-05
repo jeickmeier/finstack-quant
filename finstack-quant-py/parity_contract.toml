@@ -571,7 +571,7 @@ python_package = "finstack_quant.models.monte_carlo"
 # engine/process/discretization/RNG/payoff
 # graph, `GbmEuropeanFdSpec` (flattened into kwargs), `PathDependentPricerConfig`
 # / `LsmcConfig` (flattened into constructor kwargs), captured-path datasets,
-# `PathSimulationSpec` / `ProcessSpec` / `SchemeSpec` / `TimeGridSpec` (plain
+# `PathSimulationSpec` / `ProcessSpec` / `SchemeSpec` / `TimeGridSpec` / `FbmSpec` (plain
 # data: `simulate_paths` takes the spec as a dict or JSON text in Python and
 # as the schema-typed object in WASM, validated by the Rust deserializer),
 # the registry defaults module, and `monte_carlo::convenience` (the one place

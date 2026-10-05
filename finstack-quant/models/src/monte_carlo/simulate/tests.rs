@@ -17,7 +17,11 @@ const SCHEMES: [SchemeSpec; 4] = [
 /// sample mean at this size.
 const N: usize = 20_000;
 
-fn spec(process: ProcessSpec, initial_state: &[f64], num_steps: usize) -> PathSimulationSpec {
+pub(super) fn spec(
+    process: ProcessSpec,
+    initial_state: &[f64],
+    num_steps: usize,
+) -> PathSimulationSpec {
     PathSimulationSpec {
         process,
         scheme: SchemeSpec::Default,
@@ -29,6 +33,7 @@ fn spec(process: ProcessSpec, initial_state: &[f64], num_steps: usize) -> PathSi
         num_paths: N,
         seed: 20_261_004,
         antithetic: false,
+        fbm: None,
     }
 }
 
@@ -154,7 +159,7 @@ fn supported_specs() -> Vec<PathSimulationSpec> {
 }
 
 /// Values of `factor` at the last time on every stored path.
-fn terminal(summary: &PathSummary, factor: usize) -> Vec<f64> {
+pub(super) fn terminal(summary: &PathSummary, factor: usize) -> Vec<f64> {
     let path_len = summary.times.len() * summary.dim;
     summary
         .values
@@ -163,7 +168,7 @@ fn terminal(summary: &PathSummary, factor: usize) -> Vec<f64> {
         .collect()
 }
 
-fn mean_var(xs: &[f64]) -> (f64, f64) {
+pub(super) fn mean_var(xs: &[f64]) -> (f64, f64) {
     let n = xs.len() as f64;
     let mean = xs.iter().sum::<f64>() / n;
     let var = xs.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / (n - 1.0);
@@ -182,7 +187,7 @@ fn correlation(xs: &[f64], ys: &[f64]) -> f64 {
 }
 
 /// Assert the sample mean is within four standard errors of `expected`.
-fn assert_mean(xs: &[f64], expected: f64, what: &str) {
+pub(super) fn assert_mean(xs: &[f64], expected: f64, what: &str) {
     let (mean, var) = mean_var(xs);
     let stderr = (var / xs.len() as f64).sqrt();
     assert!(
@@ -213,7 +218,7 @@ fn assert_correlation(xs: &[f64], ys: &[f64], expected: f64, what: &str) {
     );
 }
 
-fn error_message(spec: &PathSimulationSpec) -> String {
+pub(super) fn error_message(spec: &PathSimulationSpec) -> String {
     simulate_paths(spec)
         .expect_err("spec should be rejected")
         .to_string()
@@ -248,6 +253,7 @@ fn gbm_default_scheme_is_pinned_bit_for_bit() {
             num_paths,
             seed,
             antithetic: false,
+            fbm: None,
         })
         .unwrap()
     };
@@ -388,7 +394,7 @@ fn explicit_times_grid_is_honoured() {
 // ---------------------------------------------------------------------------
 
 /// States captured by `McEngine` for the same process, scheme, seed and grid.
-fn engine_states<P, D>(process: &P, scheme: &D, x0: &[f64], num_paths: usize) -> Vec<f64>
+pub(super) fn engine_states<P, D>(process: &P, scheme: &D, x0: &[f64], num_paths: usize) -> Vec<f64>
 where
     P: StochasticProcess + ProcessMetadata,
     D: Discretization<P> + Clone,
