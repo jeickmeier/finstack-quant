@@ -28,6 +28,7 @@ _mc = _models.monte_carlo
 MoneyEstimate = _mc.MoneyEstimate
 Estimate = _mc.Estimate
 PathSummary = _mc.PathSummary
+LrmGreeks = _mc.LrmGreeks
 
 
 simulate_paths = _mc.simulate_paths
@@ -53,6 +54,7 @@ finite_diff_gamma_crn = _mc.finite_diff_gamma_crn
 __all__: list[str] = [
     "Estimate",
     "EuropeanPricer",
+    "LrmGreeks",
     "LsmcPricer",
     "MoneyEstimate",
     "PathDependentPricer",

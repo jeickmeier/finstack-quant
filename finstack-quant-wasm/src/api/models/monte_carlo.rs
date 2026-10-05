@@ -886,6 +886,77 @@ impl JsPathDependentPricer {
             .map_err(to_js_err)?;
         to_js_value(&estimate)
     }
+
+    /// Price an arithmetic-average Asian option under GBM with
+    /// likelihood-ratio delta and vega estimated from the same paths.
+    ///
+    /// Every path is kept in memory, so `numPaths x (numSteps + 1)` may not
+    /// exceed 4,000,000 and the default step count is 32, not the 252 steps
+    /// of `priceAsianCall`.
+    /// @param spot - Finite, strictly positive spot level at time 0.
+    /// @param strike - Exercise price in the same units as `spot`.
+    /// @param rate - Continuously compounded risk-free rate (decimal, annualized).
+    /// @param div_yield - Continuous dividend yield (decimal, annualized).
+    /// @param vol - Annualized GBM volatility (decimal), strictly positive.
+    /// @param expiry - Time to expiry in years.
+    /// @param is_call - `true` for a call on the arithmetic average, `false` for a put.
+    /// @param num_steps - Optional number of time-grid steps, each an averaging date; omitted uses the registry default `convenience.greeks.lrm_num_steps` (32).
+    /// @param currency - Optional ISO-4217 code stamped on the price estimate; omitted uses the registry default.
+    /// @returns The `LrmGreeks` object: `price` (a `MoneyEstimate`), `delta` per unit of spot and `vega` per volatility point (`0.01`), each an `Estimate` with `mean`, `stderr` and `ci_95`.
+    ///
+    /// @example
+    /// ```typescript
+    /// import init, { models } from "finstack-quant-wasm";
+    /// await init();
+    /// const pricer = new models.monteCarlo.PathDependentPricer(20000, 7);
+    /// const greeks = pricer.priceWithLrmGreeks(100, 100, 0.04, 0.01, 0.25, 1.0, true, 12);
+    /// console.log(greeks.price.mean.amount, greeks.price.mean.currency);
+    /// console.log(greeks.delta.mean > 0 && greeks.delta.mean < 1); // true
+    /// console.log(greeks.vega.stderr > 0); // true
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Throws a `TypeError` if an argument has the wrong JavaScript type, and
+    /// a `validation` error if `spot`, `vol` or `expiry` is not finite and
+    /// strictly positive, `numSteps` is zero, the currency code is unknown,
+    /// the pricer uses Sobol or antithetic sampling, `numPaths` exceeds
+    /// 100,000, or `numPaths x (numSteps + 1)` exceeds 4,000,000.
+    #[allow(clippy::too_many_arguments)]
+    #[wasm_bindgen(js_name = priceWithLrmGreeks)]
+    pub fn price_with_lrm_greeks(
+        &self,
+        spot: JsValue,
+        strike: JsValue,
+        rate: JsValue,
+        div_yield: JsValue,
+        vol: JsValue,
+        expiry: JsValue,
+        is_call: JsValue,
+        num_steps: Option<JsValue>,
+        currency: Option<JsValue>,
+    ) -> Result<JsValue, JsValue> {
+        let gbm = gbm_inputs(&spot, &strike, &rate, &div_yield, &vol, &expiry)?;
+        let option_type = OptionType::from(js_bool(&is_call, "isCall")?);
+        let num_steps = convenience::lrm_num_steps(js_opt_uint(num_steps.as_ref(), "numSteps")?)
+            .map_err(to_js_err)?;
+        let currency = js_currency(currency.as_ref())?;
+        let greeks = self
+            .inner
+            .price_gbm_asian_with_lrm_greeks(
+                option_type,
+                gbm.spot,
+                gbm.strike,
+                gbm.rate,
+                gbm.div_yield,
+                gbm.vol,
+                gbm.expiry,
+                num_steps,
+                currency,
+            )
+            .map_err(to_js_err)?;
+        to_js_value(&greeks)
+    }
 }
 
 /// Longstaff-Schwartz Monte Carlo pricer for American options under GBM.

@@ -10,6 +10,8 @@ import pytest
 from finstack_quant.models.monte_carlo import (
     Estimate,
     EuropeanPricer,
+    LrmGreeks,
+    PathDependentPricer,
     PathSummary,
     finite_diff_delta,
     finite_diff_delta_crn,
@@ -250,6 +252,82 @@ def test_simulate_paths_scheme_changes_the_paths_but_not_the_seeded_draws() -> N
 def test_simulate_paths_maps_invalid_specs_to_value_error(spec: object, message: str) -> None:
     with pytest.raises(ValueError, match=message):
         simulate_paths(spec)  # type: ignore[arg-type]
+
+
+def test_lrm_greeks_share_the_plain_asian_price_and_bracket_the_bump_delta() -> None:
+    pricer = PathDependentPricer(20_000, 7, use_parallel=False)
+    args = (100.0, 100.0, 0.04, 0.01, 0.25, 1.0)
+    greeks = pricer.price_with_lrm_greeks(*args, True, num_steps=12)
+
+    assert isinstance(greeks, LrmGreeks)
+    assert greeks.price.mean.amount == pricer.price_asian_call(*args, num_steps=12).mean.amount
+    assert greeks.price.mean.currency.code == "USD"
+    assert greeks.delta.num_paths == greeks.vega.num_paths == 20_000
+
+    bump = 0.5
+    up = pricer.price_asian_call(100.0 + bump, *args[1:], num_steps=12).mean.amount
+    down = pricer.price_asian_call(100.0 - bump, *args[1:], num_steps=12).mean.amount
+    assert abs(greeks.delta.mean - (up - down) / (2 * bump)) < 5 * greeks.delta.stderr
+    assert greeks.vega.stderr > 0.0
+
+    put = pricer.price_with_lrm_greeks(*args, False, num_steps=12, currency="EUR")
+    assert put.delta.mean < 0.0
+    assert put.price.mean.currency.code == "EUR"
+
+
+def test_lrm_greeks_round_trip_and_tabulate() -> None:
+    greeks = PathDependentPricer(2_000, 7, use_parallel=False).price_with_lrm_greeks(
+        100.0, 100.0, 0.04, 0.01, 0.25, 1.0, True, num_steps=12
+    )
+
+    assert set(json.loads(greeks.to_json())) == {"price", "delta", "vega"}
+    for restored in (LrmGreeks.from_json(greeks.to_json()), pickle.loads(pickle.dumps(greeks))):
+        assert restored.to_json() == greeks.to_json()
+    with pytest.raises(ValueError, match="invalid LrmGreeks JSON"):
+        LrmGreeks.from_json('{"price": 1.0}')
+
+    frame = greeks.to_dataframe()
+    assert list(frame.index) == ["price", "delta", "vega"]
+    assert list(frame.columns) == ["mean", "stderr", "ci_lower", "ci_upper"]
+    assert frame.loc["delta", "mean"] == greeks.delta.mean
+    assert frame.loc["price", "ci_upper"] == greeks.price.ci_upper.amount
+    assert "<table" in greeks._repr_html_()
+    assert repr(greeks).startswith("LrmGreeks(price=")
+
+
+def test_lrm_greeks_default_arguments_fit_the_capture_cap() -> None:
+    # 100,000 default paths x (32 default steps + 1) stays under 4,000,000 points.
+    greeks = PathDependentPricer().price_with_lrm_greeks(100.0, 100.0, 0.04, 0.01, 0.25, 1.0, True)
+    assert greeks.price.num_paths == 100_000
+    assert 0.0 < greeks.delta.mean < 1.0
+
+
+@pytest.mark.parametrize(
+    ("pricer_kwargs", "overrides", "message"),
+    [
+        ({}, {"num_steps": 252}, "must not exceed 4000000"),
+        ({"num_paths": 500}, {"spot": 0.0}, "initial_spot|spot"),
+        ({"num_paths": 500}, {"vol": 0.0}, "vol"),
+        ({"num_paths": 500}, {"expiry": 0.0}, "."),
+        ({"num_paths": 500, "antithetic": True}, {}, "antithetic"),
+        ({"num_paths": 512, "use_sobol": True, "use_parallel": False}, {}, "Sobol"),
+    ],
+)
+def test_lrm_greeks_map_unsupported_runs_to_value_error(
+    pricer_kwargs: dict[str, object], overrides: dict[str, float], message: str
+) -> None:
+    inputs = {
+        "spot": 100.0,
+        "strike": 100.0,
+        "rate": 0.04,
+        "div_yield": 0.01,
+        "vol": 0.25,
+        "expiry": 1.0,
+        "is_call": True,
+        "num_steps": 12,
+    } | overrides
+    with pytest.raises(ValueError, match=message):
+        PathDependentPricer(**pricer_kwargs).price_with_lrm_greeks(**inputs)
 
 
 def test_heston_feller_uses_inclusive_predicate_without_validation() -> None:

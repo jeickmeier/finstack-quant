@@ -589,6 +589,13 @@ const CASES = {
     const asian = new monteCarlo.PathDependentPricer(2000, 42, false);
     return [money(asian.priceAsianCall(...GBM, 12)), money(asian.priceAsianPut(...GBM, 12))];
   },
+  'monte_carlo.lrm_greeks': () => {
+    const asian = new monteCarlo.PathDependentPricer(2000, 42, false);
+    return [
+      asian.priceWithLrmGreeks(...GBM, true, 12),
+      asian.priceWithLrmGreeks(...GBM, false, 12, 'EUR'),
+    ];
+  },
   'monte_carlo.lsmc': () => {
     const lsmc = new monteCarlo.LsmcPricer(2000, 42, false, 20);
     return [

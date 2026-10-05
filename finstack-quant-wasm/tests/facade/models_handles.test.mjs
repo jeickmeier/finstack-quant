@@ -385,6 +385,34 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
   assert.equal(typeof asian.useBrownianBridge, 'boolean');
   assert.equal(asian.useParallel, false);
 
+  const lrmPricer = new monteCarlo.PathDependentPricer(20000, 7, false);
+  const gbm = [100, 100, 0.04, 0.01, 0.25, 1];
+  const greeks = lrmPricer.priceWithLrmGreeks(...gbm, true, 12);
+  assert.deepEqual(Object.keys(greeks).sort(), ['delta', 'price', 'vega']);
+  assert.equal(greeks.price.mean.amount, lrmPricer.priceAsianCall(...gbm, 12).mean.amount);
+  assert.equal(greeks.delta.num_paths, 20000);
+  const bumpDelta =
+    (lrmPricer.priceAsianCall(100.5, ...gbm.slice(1), 12).mean.amount -
+      lrmPricer.priceAsianCall(99.5, ...gbm.slice(1), 12).mean.amount) /
+    1.0;
+  assert.ok(Math.abs(greeks.delta.mean - bumpDelta) < 5 * greeks.delta.stderr);
+  assert.ok(greeks.vega.stderr > 0);
+  assert.deepEqual(JSON.parse(JSON.stringify(greeks)), greeks);
+  assert.equal(lrmPricer.priceWithLrmGreeks(...gbm, false, 12, 'EUR').price.mean.currency, 'EUR');
+  // The default step count keeps a default pricer under the path-capture cap.
+  assert.equal(
+    new monteCarlo.PathDependentPricer().priceWithLrmGreeks(...gbm, true).price.num_paths,
+    100000
+  );
+  assert.throws(
+    () => new monteCarlo.PathDependentPricer().priceWithLrmGreeks(...gbm, true, 252),
+    (e) => kind('validation')(e) && /must not exceed 4000000/.test(e.message)
+  );
+  assert.throws(() => lrmPricer.priceWithLrmGreeks(...gbm, 'call', 12), invalidType);
+  assert.throws(() => lrmPricer.priceWithLrmGreeks(...gbm, true, 1.5), invalidType);
+  assert.throws(() => lrmPricer.priceWithLrmGreeks(0, ...gbm.slice(1), true, 12), kind('validation'));
+  assert.throws(() => asian.priceWithLrmGreeks(...gbm, true, 12), kind('validation'));
+
   const lsmc = new monteCarlo.LsmcPricer(500, 7, false, 10, 'polynomial', 3, false);
   assert.equal(lsmc.basis, 'polynomial');
   assert.equal(lsmc.basisDegree, 3);

@@ -580,6 +580,7 @@ python_package = "finstack_quant.models.monte_carlo"
 public = [
     "Estimate",
     "EuropeanPricer",
+    "LrmGreeks",
     "LsmcPricer",
     "MoneyEstimate",
     "PathDependentPricer",
@@ -2100,12 +2101,12 @@ js = "models.factor.schema"
 js = "models.liquidity"
 types = { ExecutionTrajectory = "ExecutionTrajectory", ImpactEstimate = "ImpactEstimate", LiquidityProfile = "LiquidityProfile", LvarBangiaScalar = "LvarBangiaScalar", TradeParams = "TradeParams" }
 
-# The Monte Carlo pricers return the canonical `MoneyEstimate` / `Estimate`
-# serde objects (the same wire form as Python `to_json()`);
+# The Monte Carlo pricers return the canonical `MoneyEstimate` / `Estimate` /
+# `LrmGreeks` serde objects (the same wire form as Python `to_json()`);
 # `MoneyEstimate.relative_stderr` is the free function `relativeStderr`.
 [parity.modules."finstack_quant.models.monte_carlo"]
 js = "models.monteCarlo"
-types = { Estimate = "Estimate", MoneyEstimate = "MoneyEstimate", PathSummary = "PathSummary" }
+types = { Estimate = "Estimate", LrmGreeks = "LrmGreeks", MoneyEstimate = "MoneyEstimate", PathSummary = "PathSummary" }
 
 [parity.modules."finstack_quant.models.rates.dtsm"]
 js = "models.rates.dtsm"

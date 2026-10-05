@@ -3205,7 +3205,7 @@
   "models.monteCarlo.PathDependentPricer": {
     "kind": "class",
     "statics": [],
-    "methods": ["free", "priceAsianCall", "priceAsianPut"],
+    "methods": ["free", "priceAsianCall", "priceAsianPut", "priceWithLrmGreeks"],
     "getters": ["antithetic", "numPaths", "seed", "useBrownianBridge", "useParallel", "useSobol"]
   },
   "models.monteCarlo.LsmcPricer": {

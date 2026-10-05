@@ -55,6 +55,7 @@
       "num_paths": 10000,
       "seed": 42,
       "num_steps": 50,
+      "lrm_num_steps": 32,
       "bump_size": 0.01,
       "use_parallel": false,
       "chunk_size": 1000,

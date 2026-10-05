@@ -4022,6 +4022,111 @@ export interface LmmParams {
   vol_values: [number, number, number][][];
 }
 /**
+ * Monte Carlo price with likelihood-ratio delta and vega from the same paths.
+ */
+export interface LrmGreeks {
+  /**
+   * Delta: change in price per unit change in the initial spot.
+   */
+  delta: Estimate;
+  /**
+   * Discounted price estimate in the payoff currency.
+   */
+  price: MoneyEstimate;
+  /**
+   * Vega: change in price per one volatility point (`0.01` of annualized
+   * volatility).
+   */
+  vega: Estimate;
+}
+/**
+ * Discounted Monte Carlo estimate tagged with a currency.
+ *
+ * The engine computes these values from discounted path outcomes. `mean` and
+ * `ci_95` are stored as [`Money`], while the auxiliary statistics remain raw
+ * `f64` values in the same currency unit as `mean.amount()`.
+ */
+export interface MoneyEstimate {
+  /**
+   * 95% confidence interval for the discounted mean present value.
+   *
+   * @minItems 2
+   * @maxItems 2
+   */
+  ci_95: [unknown, unknown];
+  /**
+   * Optional maximum of captured discounted path values.
+   */
+  max?: number | null;
+  /**
+   * Discounted mean present value.
+   */
+  mean: Money;
+  /**
+   * Optional median of captured discounted path values.
+   *
+   * This is populated only when captured-path diagnostics are available.
+   */
+  median?: number | null;
+  /**
+   * Optional minimum of captured discounted path values.
+   */
+  min?: number | null;
+  /**
+   * Number of independent path estimators contributing to the estimate.
+   *
+   * See [`crate::monte_carlo::estimate::Estimate::num_paths`] for the full semantics,
+   * including how antithetic variates split simulated work across
+   * estimators.
+   */
+  num_paths: number;
+  /**
+   * Total number of simulated sample paths driving the estimator.
+   *
+   * See [`crate::monte_carlo::estimate::Estimate::num_simulated_paths`]. Equal to
+   * `num_paths` without variance reduction, or `2 * num_paths` with
+   * antithetic variates.
+   */
+  num_simulated_paths: number;
+  /**
+   * Optional 25th percentile of captured discounted path values.
+   */
+  percentile_25?: number | null;
+  /**
+   * Optional 75th percentile of captured discounted path values.
+   */
+  percentile_75?: number | null;
+  /**
+   * Optional sample standard deviation of discounted path values.
+   */
+  std_dev?: number | null;
+  /**
+   * Standard error of the discounted mean, in `mean.amount()` units.
+   */
+  stderr: number;
+}
+/**
+ * Currency-tagged monetary amount with safe arithmetic.
+ *
+ * Values retain decimal precision independently of ISO 4217 display precision.
+ *
+ * When you need configurable rounding during ingestion, use
+ * [`Money::new_with_config`].
+ */
+export interface Money {
+  /**
+   * Monetary amount, carried on the wire as an exact decimal string rather
+   * than a JSON number so no precision is lost in transit. Construction with
+   * configuration applies the selected ingest scale; raw construction does not.
+   */
+  amount: DecimalWire;
+  /**
+   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
+   * requires this to match; there is no implicit conversion.
+   */
+  currency: Currency;
+}
+/**
  * Scalar Bangia LVaR outputs for an isolated position where relative spread statistics are already known.
  */
 export interface LvarBangiaScalar {
@@ -4169,93 +4274,6 @@ export interface MertonModel {
 export interface MigrationSimulator {
   generator: GeneratorMatrix;
   horizon: number;
-}
-/**
- * Currency-tagged monetary amount with safe arithmetic.
- *
- * Values retain decimal precision independently of ISO 4217 display precision.
- *
- * When you need configurable rounding during ingestion, use
- * [`Money::new_with_config`].
- */
-export interface Money {
-  /**
-   * Monetary amount, carried on the wire as an exact decimal string rather
-   * than a JSON number so no precision is lost in transit. Construction with
-   * configuration applies the selected ingest scale; raw construction does not.
-   */
-  amount: DecimalWire;
-  /**
-   * ISO 4217 currency of `amount`. Arithmetic between two `Money` values
-   * requires this to match; there is no implicit conversion.
-   */
-  currency: Currency;
-}
-/**
- * Discounted Monte Carlo estimate tagged with a currency.
- *
- * The engine computes these values from discounted path outcomes. `mean` and
- * `ci_95` are stored as [`Money`], while the auxiliary statistics remain raw
- * `f64` values in the same currency unit as `mean.amount()`.
- */
-export interface MoneyEstimate {
-  /**
-   * 95% confidence interval for the discounted mean present value.
-   *
-   * @minItems 2
-   * @maxItems 2
-   */
-  ci_95: [unknown, unknown];
-  /**
-   * Optional maximum of captured discounted path values.
-   */
-  max?: number | null;
-  /**
-   * Discounted mean present value.
-   */
-  mean: Money;
-  /**
-   * Optional median of captured discounted path values.
-   *
-   * This is populated only when captured-path diagnostics are available.
-   */
-  median?: number | null;
-  /**
-   * Optional minimum of captured discounted path values.
-   */
-  min?: number | null;
-  /**
-   * Number of independent path estimators contributing to the estimate.
-   *
-   * See [`crate::monte_carlo::estimate::Estimate::num_paths`] for the full semantics,
-   * including how antithetic variates split simulated work across
-   * estimators.
-   */
-  num_paths: number;
-  /**
-   * Total number of simulated sample paths driving the estimator.
-   *
-   * See [`crate::monte_carlo::estimate::Estimate::num_simulated_paths`]. Equal to
-   * `num_paths` without variance reduction, or `2 * num_paths` with
-   * antithetic variates.
-   */
-  num_simulated_paths: number;
-  /**
-   * Optional 25th percentile of captured discounted path values.
-   */
-  percentile_25?: number | null;
-  /**
-   * Optional 75th percentile of captured discounted path values.
-   */
-  percentile_75?: number | null;
-  /**
-   * Optional sample standard deviation of discounted path values.
-   */
-  std_dev?: number | null;
-  /**
-   * Standard error of the discounted mean, in `mean.amount()` units.
-   */
-  stderr: number;
 }
 /**
  * Monte Carlo pricing result with optional captured paths.

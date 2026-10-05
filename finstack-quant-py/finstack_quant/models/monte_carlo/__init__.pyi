@@ -27,6 +27,7 @@ from finstack_quant.core.money import Money
 __all__ = [
     "Estimate",
     "EuropeanPricer",
+    "LrmGreeks",
     "LsmcPricer",
     "MoneyEstimate",
     "PathDependentPricer",
@@ -611,6 +612,150 @@ class Estimate:
         Notes
         -----
         This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+class LrmGreeks:
+    """
+    Monte Carlo price with likelihood-ratio delta and vega from the same paths.
+
+    Returned by :meth:`PathDependentPricer.price_with_lrm_greeks`. Each Greek
+    is a sample mean of ``discounted payoff x score``, so it carries its own
+    standard error and 95% confidence interval. The three estimates share one
+    set of paths and are correlated.
+
+    Examples
+    --------
+    >>> from finstack_quant.models.monte_carlo import PathDependentPricer
+    >>> pricer = PathDependentPricer(2000, 7, use_parallel=False)
+    >>> greeks = pricer.price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, True, num_steps=12)
+    >>> (greeks.price.num_paths, greeks.delta.num_paths, greeks.vega.num_paths)
+    (2000, 2000, 2000)
+    >>> list(greeks.to_dataframe().index)
+    ['price', 'delta', 'vega']
+    """
+
+    @staticmethod
+    def from_json(json: str) -> LrmGreeks:
+        """
+        Deserialize an ``LrmGreeks`` from JSON.
+
+        Parameters
+        ----------
+        json : str
+            JSON string produced by :meth:`to_json`.
+
+        Returns
+        -------
+        LrmGreeks
+            Parsed ``LrmGreeks`` instance.
+
+        Raises
+        ------
+        ValueError
+            If ``json`` is malformed or does not satisfy the serialized schema.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.monte_carlo import LrmGreeks, PathDependentPricer
+        >>> pricer = PathDependentPricer(2000, 7, use_parallel=False)
+        >>> greeks = pricer.price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, False, num_steps=12)
+        >>> LrmGreeks.from_json(greeks.to_json()).delta.mean == greeks.delta.mean
+        True
+        """
+        ...
+
+    def to_json(self) -> str:
+        """
+        Serialize to compact JSON.
+
+        Returns
+        -------
+        str
+            Compact JSON string with the ``price``, ``delta`` and ``vega``
+            estimates.
+
+        Raises
+        ------
+        ValueError
+            If the value cannot be serialized to JSON.
+        """
+        ...
+
+    @property
+    def price(self) -> MoneyEstimate:
+        """
+        Discounted price estimate in the payoff currency.
+
+        Returns
+        -------
+        MoneyEstimate
+            Mean, standard error and 95% confidence interval of the price.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def delta(self) -> Estimate:
+        """
+        Likelihood-ratio delta.
+
+        Returns
+        -------
+        Estimate
+            Change in price per unit change in the initial spot, with its
+            standard error and 95% confidence interval.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def vega(self) -> Estimate:
+        """
+        Likelihood-ratio vega.
+
+        Returns
+        -------
+        Estimate
+            Change in price per one volatility point (``0.01`` of annualized
+            volatility), with its standard error and 95% confidence interval.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    def to_dataframe(self) -> pd.DataFrame:
+        """
+        Tabulate the three estimates as a pandas DataFrame.
+
+        Returns
+        -------
+        pd.DataFrame
+            Three rows indexed ``["price", "delta", "vega"]`` with float64
+            columns ``mean``, ``stderr``, ``ci_lower`` and ``ci_upper`` (the
+            95% confidence interval). The price row is in units of the price
+            currency.
+
+        Raises
+        ------
+        ImportError
+            If pandas is not installed.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.monte_carlo import PathDependentPricer
+        >>> pricer = PathDependentPricer(2000, 7, use_parallel=False)
+        >>> frame = pricer.price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, True, num_steps=12).to_dataframe()
+        >>> list(frame.columns)
+        ['mean', 'stderr', 'ci_lower', 'ci_upper']
         """
         ...
 
@@ -1403,6 +1548,81 @@ class PathDependentPricer:
         TypeError
             If a non-``None`` ``currency`` is neither a string nor a ``Currency`` instance.
 
+        """
+        ...
+
+    def price_with_lrm_greeks(
+        self,
+        spot: float,
+        strike: float,
+        rate: float,
+        div_yield: float,
+        vol: float,
+        expiry: float,
+        is_call: bool,
+        num_steps: int | None = None,
+        currency: str | None = None,
+    ) -> LrmGreeks:
+        """
+        Price an arithmetic Asian option with likelihood-ratio delta and vega.
+
+        The price, delta and vega come from one set of GBM paths: the Greeks
+        weight each discounted payoff by the score of the path density
+        (Glasserman 2003, section 7.3), so no bumped re-simulation is needed.
+        The payoff is the one :meth:`price_asian_call` / :meth:`price_asian_put`
+        price: unit notional, fixings at steps ``1..=num_steps``.
+
+        Parameters
+        ----------
+        spot : float
+            Finite, strictly positive spot price at time zero.
+        strike : float
+            Strike price in the same units as ``spot``.
+        rate : float
+            Risk-free rate (continuously compounded decimal).
+        div_yield : float
+            Dividend yield (continuously compounded decimal).
+        vol : float
+            Annualized volatility (decimal), strictly positive.
+        expiry : float
+            Maturity in years.
+        is_call : bool
+            ``True`` for a call on the arithmetic average, ``False`` for a put.
+        num_steps : int, optional
+            Time-grid steps, each an averaging date. Defaults to the registry
+            value ``convenience.greeks.lrm_num_steps`` (32), not the 252 steps
+            of :meth:`price_asian_call`: every path is kept in memory, so
+            ``num_paths * (num_steps + 1)`` may not exceed ``4_000_000``. A
+            default pricer (100,000 paths) therefore accepts at most 39 steps.
+        currency : str, optional
+            ISO currency code. Defaults to USD.
+
+        Returns
+        -------
+        LrmGreeks
+            Price in ``currency``, delta per unit of spot and vega per
+            volatility point (``0.01``), each with its standard error and 95%
+            confidence interval.
+
+        Raises
+        ------
+        ValueError
+            If ``spot``, ``vol`` or ``expiry`` is not finite and strictly
+            positive, ``rate`` or ``div_yield`` is non-finite, ``num_steps``
+            is zero, the pricer uses Sobol or antithetic sampling,
+            ``num_paths`` exceeds ``100_000``, ``num_paths * (num_steps + 1)``
+            exceeds ``4_000_000``, or ``currency`` is unknown.
+        TypeError
+            If a non-``None`` ``currency`` is neither a string nor a ``Currency`` instance.
+
+        Examples
+        --------
+        >>> from finstack_quant.models.monte_carlo import PathDependentPricer
+        >>> greeks = PathDependentPricer().price_with_lrm_greeks(100, 100, 0.04, 0.01, 0.25, 1.0, True)
+        >>> 0.0 < greeks.delta.mean < 1.0
+        True
+        >>> greeks.vega.stderr > 0.0
+        True
         """
         ...
 

@@ -433,6 +433,15 @@
       "type_name": "LmmParams"
     },
     {
+      "$id": "https://finstack_quant.dev/schemas/models/1/lrm_greeks.schema.json",
+      "bytes": 28509,
+      "kind": "output",
+      "path": "schemas/models/1/lrm_greeks.schema.json",
+      "summary": "Monte Carlo price with likelihood-ratio delta and vega from the same paths.",
+      "title": "LrmGreeks",
+      "type_name": "LrmGreeks"
+    },
+    {
       "$id": "https://finstack_quant.dev/schemas/models/1/lvar_bangia_scalar.schema.json",
       "bytes": 1052,
       "kind": "component",

@@ -156,6 +156,11 @@ pub struct ConvenienceGreekDefaults {
     pub seed: u64,
     /// Default number of time steps.
     pub num_steps: usize,
+    /// Default number of time steps (and averaging dates) of the
+    /// likelihood-ratio Greeks convenience. That estimator keeps every path
+    /// in memory, so the default must satisfy
+    /// `path_dependent_pricer.num_paths x (lrm_num_steps + 1) <= 4_000_000`.
+    pub lrm_num_steps: usize,
     /// Relative spot bump used as an MC finite-difference shock (e.g. `0.01`
     /// for a 1% of spot bump). This is a Monte Carlo differentiation step, not
     /// a closed-form local Greek step and not a desk reporting shock.
@@ -290,6 +295,7 @@ fn validate_python_lsmc(label: &str, defaults: &ConvenienceLsmcDefaults) -> Resu
 fn validate_python_greeks(label: &str, defaults: &ConvenienceGreekDefaults) -> Result<()> {
     validate_positive_usize(&format!("{label}.num_paths"), defaults.num_paths)?;
     validate_positive_usize(&format!("{label}.num_steps"), defaults.num_steps)?;
+    validate_positive_usize(&format!("{label}.lrm_num_steps"), defaults.lrm_num_steps)?;
     validate_positive_f64(&format!("{label}.bump_size"), defaults.bump_size)?;
     validate_positive_usize(&format!("{label}.chunk_size"), defaults.chunk_size)?;
     let _seed = defaults.seed;

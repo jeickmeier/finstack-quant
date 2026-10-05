@@ -588,6 +588,10 @@ def _monte_carlo_cases() -> dict[str, Callable[[], Any]]:
             _money(asian().price_asian_call(*GBM, 12)),
             _money(asian().price_asian_put(*GBM, 12)),
         ],
+        "monte_carlo.lrm_greeks": lambda: [
+            json.loads(asian().price_with_lrm_greeks(*GBM, True, 12).to_json()),
+            json.loads(asian().price_with_lrm_greeks(*GBM, False, 12, "EUR").to_json()),
+        ],
         "monte_carlo.lsmc": lambda: [
             _money(lsmc().price_american_put(*GBM)),
             _money(lsmc().price_american_call(*GBM, num_steps=10, basis="polynomial", basis_degree=2)),

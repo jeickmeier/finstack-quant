@@ -40,8 +40,8 @@ use crate::{
     liquidity::AlmgrenChrissModel, liquidity::ExecutionTrajectory, liquidity::ImpactEstimate,
     liquidity::KyleLambdaModel, liquidity::LiquidityConfig, liquidity::LiquidityTier,
     liquidity::LvarBangiaScalar, liquidity::TradeParams, monte_carlo::estimate::Estimate,
-    monte_carlo::payoff::asian::AveragingMethod, monte_carlo::payoff::barrier::OptionKind,
-    monte_carlo::pricer::basis::BasisKind,
+    monte_carlo::greeks::lrm::LrmGreeks, monte_carlo::payoff::asian::AveragingMethod,
+    monte_carlo::payoff::barrier::OptionKind, monte_carlo::pricer::basis::BasisKind,
     monte_carlo::process::cheyette_rough::CheyetteRoughVolParams,
     monte_carlo::process::cir::CirParams, monte_carlo::process::lmm::LmmParams,
     monte_carlo::process::ou::HullWhite1FParams,
@@ -369,6 +369,13 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "lmm_params",
         Input,
         "Parameters for the LMM/BGM model."
+    ),
+    finstack_quant_core::schema_artifact!(
+        LrmGreeks,
+        "models",
+        "lrm_greeks",
+        Output,
+        "Monte Carlo price with likelihood-ratio delta and vega from the same paths."
     ),
     finstack_quant_core::schema_artifact!(
         LvarBangiaScalar,

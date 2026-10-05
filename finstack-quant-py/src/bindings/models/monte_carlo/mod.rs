@@ -38,6 +38,7 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
             "MoneyEstimate",
             "Estimate",
             "PathSummary",
+            "LrmGreeks",
             "simulate_paths",
             "heston_satisfies_feller",
             "EuropeanPricer",

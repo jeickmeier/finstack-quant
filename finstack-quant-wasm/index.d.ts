@@ -12133,6 +12133,43 @@ export interface PathDependentPricer extends WasmOwned {
     currency?: string
   ): MoneyEstimate;
   /**
+   * Price an arithmetic-average Asian option under GBM with likelihood-ratio delta and vega estimated from the same paths.
+   *
+   * Every path is kept in memory, so `numPaths x (numSteps + 1)` may not exceed 4,000,000 and the default step count is 32, not the 252 steps of `priceAsianCall`.
+   * @param spot - Finite, strictly positive spot level at time 0.
+   * @param strike - Exercise price in the same units as `spot`.
+   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
+   * @param divYield - Continuous dividend yield (decimal, annualized).
+   * @param vol - Annualized GBM volatility (decimal), strictly positive.
+   * @param expiry - Time to expiry in years.
+   * @param isCall - `true` for a call on the arithmetic average, `false` for a put.
+   * @param numSteps - Optional number of time-grid steps, each an averaging date; omitted uses the registry default `convenience.greeks.lrm_num_steps` (32).
+   * @param currency - Optional ISO-4217 code stamped on the price estimate; omitted uses the registry default.
+   * @returns The `LrmGreeks` object: `price` (a `MoneyEstimate`), `delta` per unit of spot and `vega` per volatility point (`0.01`), each an `Estimate` with `mean`, `stderr` and `ci_95`.
+   * @throws Error - Throws a `TypeError` if an argument has the wrong JavaScript type, and a `validation` error if `spot`, `vol` or `expiry` is not finite and strictly positive, `numSteps` is zero, the currency code is unknown, the pricer uses Sobol or antithetic sampling, `numPaths` exceeds 100,000, or `numPaths x (numSteps + 1)` exceeds 4,000,000.
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const pricer = new models.monteCarlo.PathDependentPricer(20000, 7);
+   * const greeks = pricer.priceWithLrmGreeks(100, 100, 0.04, 0.01, 0.25, 1.0, true, 12);
+   * console.log(greeks.price.mean.amount, greeks.price.mean.currency);
+   * console.log(greeks.delta.mean > 0 && greeks.delta.mean < 1); // true
+   * console.log(greeks.vega.stderr > 0); // true
+   * ```
+   */
+  priceWithLrmGreeks(
+    spot: number,
+    strike: number,
+    rate: number,
+    divYield: number,
+    vol: number,
+    expiry: number,
+    isCall: boolean,
+    numSteps?: number,
+    currency?: string
+  ): generated.models.LrmGreeks;
+  /**
    * Whether antithetic variates are used.
    */
   readonly antithetic: boolean;

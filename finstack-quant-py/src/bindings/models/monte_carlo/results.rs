@@ -3,6 +3,7 @@
 use crate::bindings::core::money::PyMoney;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::dict_to_dataframe;
+use finstack_quant_models::monte_carlo::greeks::lrm::LrmGreeks;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
 use finstack_quant_models::monte_carlo::simulate::PathSummary;
 use numpy::PyArray1;
@@ -352,8 +353,103 @@ wire_methods!(
     "Estimate"
 );
 
+/// Monte Carlo price with likelihood-ratio delta and vega from the same paths.
+///
+/// Returned by ``PathDependentPricer.price_with_lrm_greeks``. Each Greek is a
+/// sample mean of ``discounted payoff x score`` and carries its own standard
+/// error and 95% confidence interval; the three estimates share one set of
+/// paths and are correlated.
+#[pyclass(
+    name = "LrmGreeks",
+    module = "finstack_quant.models.monte_carlo",
+    frozen
+)]
+pub struct PyLrmGreeks {
+    pub(crate) inner: LrmGreeks,
+}
+
+impl PyLrmGreeks {
+    pub(super) fn from_inner(inner: LrmGreeks) -> Self {
+        Self { inner }
+    }
+}
+
+#[pymethods]
+impl PyLrmGreeks {
+    /// Discounted price estimate in the payoff currency.
+    #[getter]
+    fn price(&self) -> PyMoneyEstimate {
+        PyMoneyEstimate::from_inner(self.inner.price.clone())
+    }
+
+    /// Delta: change in price per unit change in the initial spot.
+    #[getter]
+    fn delta(&self) -> PyEstimate {
+        PyEstimate::from_inner(self.inner.delta.clone())
+    }
+
+    /// Vega: change in price per one volatility point (``0.01`` of annualized
+    /// volatility).
+    #[getter]
+    fn vega(&self) -> PyEstimate {
+        PyEstimate::from_inner(self.inner.vega.clone())
+    }
+
+    /// Tabulate the three estimates as a pandas ``DataFrame``.
+    ///
+    /// One row per quantity, indexed ``["price", "delta", "vega"]``, with
+    /// float64 columns ``mean``, ``stderr``, ``ci_lower`` and ``ci_upper``
+    /// (the 95% confidence interval). The price row is in units of the price
+    /// currency.
+    fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let greeks = &self.inner;
+        let price = &greeks.price;
+        let rows = [
+            (
+                price.mean.amount(),
+                price.stderr,
+                price.ci_95.0.amount(),
+                price.ci_95.1.amount(),
+            ),
+            (
+                greeks.delta.mean,
+                greeks.delta.stderr,
+                greeks.delta.ci_95.0,
+                greeks.delta.ci_95.1,
+            ),
+            (
+                greeks.vega.mean,
+                greeks.vega.stderr,
+                greeks.vega.ci_95.0,
+                greeks.vega.ci_95.1,
+            ),
+        ];
+        let data = PyDict::new(py);
+        data.set_item("mean", rows.map(|row| row.0).to_vec())?;
+        data.set_item("stderr", rows.map(|row| row.1).to_vec())?;
+        data.set_item("ci_lower", rows.map(|row| row.2).to_vec())?;
+        data.set_item("ci_upper", rows.map(|row| row.3).to_vec())?;
+        let index = pyo3::types::PyList::new(py, ["price", "delta", "vega"])?;
+        dict_to_dataframe(py, &data, Some(index.into_any()))
+    }
+
+    fn __repr__(&self) -> String {
+        format!(
+            "LrmGreeks(price={}, delta={:.6}, vega={:.6}, n={})",
+            self.inner.price.mean,
+            self.inner.delta.mean,
+            self.inner.vega.mean,
+            self.inner.price.num_paths,
+        )
+    }
+}
+
+wire_methods!(PyLrmGreeks, LrmGreeks, "LrmGreeks");
+impl_repr_html_via_dataframe!(PyLrmGreeks);
+
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PyPathSummary>()?;
+    m.add_class::<PyLrmGreeks>()?;
     m.add_class::<PyMoneyEstimate>()?;
     m.add_class::<PyEstimate>()?;
     Ok(())

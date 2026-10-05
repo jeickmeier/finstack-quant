@@ -115,6 +115,7 @@ RESULT_CLASSES: list[tuple[str, str]] = [
     ("finstack_quant.analytics", "LookbackReturns"),
     ("finstack_quant.analytics", "DatedSeries"),
     ("finstack_quant.models.monte_carlo", "Estimate"),
+    ("finstack_quant.models.monte_carlo", "LrmGreeks"),
     ("finstack_quant.models.monte_carlo", "MoneyEstimate"),
     ("finstack_quant.models.monte_carlo", "PathSummary"),
     ("finstack_quant.margin", "XvaResult"),

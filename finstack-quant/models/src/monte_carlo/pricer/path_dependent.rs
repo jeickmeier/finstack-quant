@@ -47,7 +47,7 @@ const SOBOL_QMC_REPLICATES: usize = 16;
 /// Upper bound on captured path points (`num_paths x (num_steps + 1)`) in
 /// [`PathDependentPricer::price_with_lrm_greeks`], which keeps every path in
 /// memory to rebuild its shocks. Checked before any path is simulated.
-const MAX_LRM_CAPTURED_POINTS: usize = 4_000_000;
+pub(crate) const MAX_LRM_CAPTURED_POINTS: usize = 4_000_000;
 
 /// Configuration for path-dependent option pricing.
 #[derive(Debug, Clone)]
@@ -769,6 +769,8 @@ impl PathDependentPricer {
         currency: Currency,
     ) -> Result<LrmGreeks> {
         crate::monte_carlo::require_positive_vol(vol)?;
+        // Before the fixing schedule, which holds one entry per step.
+        self.require_lrm_capture_fits(num_steps)?;
         let process = GbmProcess::with_params(rate, div_yield, vol)?;
         let discount_factor = flat_discount_factor(rate, expiry)?;
         let fixing_steps = default_fixing_steps(num_steps);
@@ -1063,17 +1065,7 @@ impl PathDependentPricer {
                 )));
             }
         }
-        if num_steps
-            .checked_add(1)
-            .and_then(|points| points.checked_mul(self.config.num_paths))
-            .is_none_or(|points| points > MAX_LRM_CAPTURED_POINTS)
-        {
-            return Err(Error::Validation(format!(
-                "price_with_lrm_greeks captures every path: num_paths x (num_steps + 1) must \
-                 not exceed {MAX_LRM_CAPTURED_POINTS}, got {} paths and {num_steps} steps",
-                self.config.num_paths
-            )));
-        }
+        self.require_lrm_capture_fits(num_steps)?;
         // Force path capture to get every spot and the final discounted payoff value
         let time_grid = TimeGrid::uniform(time_to_maturity, num_steps)?;
         let mut engine_config = self.config.engine_config(time_grid);
@@ -1166,6 +1158,24 @@ impl PathDependentPricer {
             delta,
             vega,
         })
+    }
+
+    /// Reject a likelihood-ratio run whose captured paths would exceed
+    /// [`MAX_LRM_CAPTURED_POINTS`], before any schedule or path is allocated.
+    fn require_lrm_capture_fits(&self, num_steps: usize) -> Result<()> {
+        if num_steps
+            .checked_add(1)
+            .and_then(|points| points.checked_mul(self.config.num_paths))
+            .is_none_or(|points| points > MAX_LRM_CAPTURED_POINTS)
+        {
+            return Err(Error::Validation(format!(
+                "price_with_lrm_greeks captures every path: num_paths x (num_steps + 1) must \
+                 not exceed {MAX_LRM_CAPTURED_POINTS}, got {} paths and {num_steps} steps; \
+                 use fewer paths or fewer steps",
+                self.config.num_paths
+            )));
+        }
+        Ok(())
     }
 
     /// Get configuration.
@@ -1632,6 +1642,134 @@ mod tests {
             (vega - vega_true).abs() < 0.05,
             "LRM vega {vega} should match closed form {vega_true}"
         );
+    }
+
+    #[test]
+    fn lrm_greeks_reject_degenerate_inputs_and_oversized_capture() {
+        let pricer = PathDependentPricer::new(
+            PathDependentPricerConfig::new(1_000)
+                .with_seed(42)
+                .with_parallel(false),
+        );
+        let price = |spot: f64, vol: f64, expiry: f64, num_steps: usize| {
+            pricer.price_gbm_asian_with_lrm_greeks(
+                crate::OptionType::Call,
+                spot,
+                100.0,
+                0.03,
+                0.01,
+                vol,
+                expiry,
+                num_steps,
+                Currency::USD,
+            )
+        };
+        price(100.0, 0.2, 1.0, 12).expect("valid inputs price");
+        for (label, result) in [
+            ("zero spot", price(0.0, 0.2, 1.0, 12)),
+            ("negative spot", price(-100.0, 0.2, 1.0, 12)),
+            ("non-finite spot", price(f64::NAN, 0.2, 1.0, 12)),
+            ("zero vol", price(100.0, 0.0, 1.0, 12)),
+            ("zero expiry", price(100.0, 0.2, 0.0, 12)),
+            ("zero steps", price(100.0, 0.2, 1.0, 0)),
+        ] {
+            assert!(result.is_err(), "{label} must be rejected");
+        }
+
+        // 1,000 paths x 4,000 points is exactly the cap; one more step exceeds it.
+        let at_cap = super::MAX_LRM_CAPTURED_POINTS / 1_000 - 1;
+        let error = price(100.0, 0.2, 1.0, at_cap + 1)
+            .expect_err("capture above the cap must be rejected before simulating");
+        assert!(
+            error.to_string().contains("must not exceed 4000000"),
+            "{error}"
+        );
+        // A step count that overflows `num_steps + 1` is rejected the same way.
+        assert!(price(100.0, 0.2, 1.0, usize::MAX).is_err());
+    }
+
+    /// Likelihood-ratio Asian Greeks against central common-random-number
+    /// bumps of the plain Asian pricer on the same seed. The bump estimates
+    /// reuse every shock, so their own sampling error is far below the
+    /// likelihood-ratio standard error that sets the tolerance.
+    #[test]
+    fn lrm_asian_greeks_match_common_random_number_bumps() {
+        let (spot, strike, rate, div_yield, vol, expiry) = (100.0, 100.0, 0.04, 0.01, 0.25, 1.0);
+        let num_steps = 12;
+        let pricer = PathDependentPricer::new(
+            PathDependentPricerConfig::new(100_000)
+                .with_seed(7)
+                .with_parallel(false),
+        );
+        for option_type in [crate::OptionType::Call, crate::OptionType::Put] {
+            let plain = |spot: f64, vol: f64| -> f64 {
+                match option_type {
+                    crate::OptionType::Call => pricer.price_gbm_asian_call(
+                        spot,
+                        strike,
+                        rate,
+                        div_yield,
+                        vol,
+                        expiry,
+                        num_steps,
+                        Currency::USD,
+                    ),
+                    crate::OptionType::Put => pricer.price_gbm_asian_put(
+                        spot,
+                        strike,
+                        rate,
+                        div_yield,
+                        vol,
+                        expiry,
+                        num_steps,
+                        Currency::USD,
+                    ),
+                }
+                .expect("plain Asian price")
+                .mean
+                .amount()
+            };
+            let greeks = pricer
+                .price_gbm_asian_with_lrm_greeks(
+                    option_type,
+                    spot,
+                    strike,
+                    rate,
+                    div_yield,
+                    vol,
+                    expiry,
+                    num_steps,
+                    Currency::USD,
+                )
+                .expect("LRM Asian price");
+
+            // Capturing paths must not change the price estimate.
+            assert_eq!(
+                greeks.price.mean.amount().to_bits(),
+                plain(spot, vol).to_bits(),
+                "{option_type:?} price"
+            );
+
+            let spot_bump = 0.5;
+            let bump_delta =
+                (plain(spot + spot_bump, vol) - plain(spot - spot_bump, vol)) / (2.0 * spot_bump);
+            // Per volatility point: a 0.01 bump each way, divided by two points.
+            let bump_vega = (plain(spot, vol + 0.01) - plain(spot, vol - 0.01)) / 2.0;
+
+            assert!(greeks.delta.stderr > 0.0 && greeks.vega.stderr > 0.0);
+            assert!(
+                (greeks.delta.mean - bump_delta).abs() < 5.0 * greeks.delta.stderr,
+                "{option_type:?} delta: LRM {} +/- {}, bump {bump_delta}",
+                greeks.delta.mean,
+                greeks.delta.stderr
+            );
+            assert!(
+                (greeks.vega.mean - bump_vega).abs() < 5.0 * greeks.vega.stderr,
+                "{option_type:?} vega: LRM {} +/- {}, bump {bump_vega}",
+                greeks.vega.mean,
+                greeks.vega.stderr
+            );
+        }
     }
 
     /// Randomized-QMC error estimate: the stderr across independently
