@@ -12,28 +12,18 @@
 //! # Unified Implementation
 //!
 //! This module provides a unified [`Lookback`] struct that handles both call and put
-//! lookback options via the [`LookbackDirection`] enum.
+//! lookback options via the crate [`OptionType`] enum.
 
 use super::barrier::BarrierMonitoring;
 use crate::monte_carlo::traits::PathState;
 use crate::monte_carlo::traits::Payoff;
+use crate::types::OptionType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::money::Money;
 
-/// Direction of a fixed-strike lookback option.
-///
-/// Determines whether the option tracks the maximum (call) or minimum (put) spot price.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum LookbackDirection {
-    /// Call option: payoff = max(S_max - K, 0)
-    Call,
-    /// Put option: payoff = max(K - S_min, 0)
-    Put,
-}
-
 /// Unified fixed-strike lookback option.
 ///
-/// Supports both call and put lookback options through the [`LookbackDirection`] parameter.
+/// Supports both call and put lookback options through the [`OptionType`] parameter.
 ///
 /// # Payoffs
 ///
@@ -50,21 +40,22 @@ pub enum LookbackDirection {
 /// # Examples
 ///
 /// ```text
-/// use finstack_quant_models::monte_carlo::payoff::lookback::{Lookback, LookbackDirection};
+/// use finstack_quant_models::monte_carlo::payoff::lookback::Lookback;
+/// use finstack_quant_models::types::OptionType;
 ///
 /// // Create a lookback call
-/// let call = Lookback::new(LookbackDirection::Call, 100.0, 1.0, 10);
+/// let call = Lookback::new(OptionType::Call, 100.0, 1.0, 10);
 ///
 /// // Create a lookback put
-/// let put = Lookback::new(LookbackDirection::Put, 100.0, 1.0, 10);
+/// let put = Lookback::new(OptionType::Put, 100.0, 1.0, 10);
 ///
 /// // Seasoned: observed max so far is 120
-/// let seasoned_call = Lookback::with_initial_extremum(LookbackDirection::Call, 100.0, 1.0, 10, 120.0);
+/// let seasoned_call = Lookback::with_initial_extremum(OptionType::Call, 100.0, 1.0, 10, 120.0);
 /// ```
 #[derive(Debug, Clone)]
 pub struct Lookback {
     /// Direction (call or put)
-    pub direction: LookbackDirection,
+    pub option_type: OptionType,
     /// Strike price
     pub strike: f64,
     /// Notional amount
@@ -86,19 +77,14 @@ impl Lookback {
     /// The `extreme_spot` is initialized to:
     /// - `NEG_INFINITY` for calls (to track maximum)
     /// - `INFINITY` for puts (to track minimum)
-    pub fn new(
-        direction: LookbackDirection,
-        strike: f64,
-        notional: f64,
-        maturity_step: usize,
-    ) -> Self {
-        let extreme_spot = match direction {
-            LookbackDirection::Call => f64::NEG_INFINITY,
-            LookbackDirection::Put => f64::INFINITY,
+    pub fn new(option_type: OptionType, strike: f64, notional: f64, maturity_step: usize) -> Self {
+        let extreme_spot = match option_type {
+            OptionType::Call => f64::NEG_INFINITY,
+            OptionType::Put => f64::INFINITY,
         };
 
         Self {
-            direction,
+            option_type,
             strike,
             notional,
             maturity_step,
@@ -118,20 +104,20 @@ impl Lookback {
     ///
     /// # Arguments
     ///
-    /// * `direction` - Payoff direction selecting call/upside or put/downside behavior.
+    /// * `option_type` - Payoff direction selecting call/upside or put/downside behavior.
     /// * `strike` - Option strike in the surface's quote units (absolute or relative)
     /// * `notional` - Trade notional amount in the instrument currency's major units
     /// * `maturity_step` - Zero-based simulation step at which the payoff matures.
     /// * `initial_extremum` - Observed pre-simulation extremum in underlying price units.
     pub fn with_initial_extremum(
-        direction: LookbackDirection,
+        option_type: OptionType,
         strike: f64,
         notional: f64,
         maturity_step: usize,
         initial_extremum: f64,
     ) -> Self {
         Self {
-            direction,
+            option_type,
             strike,
             notional,
             maturity_step,
@@ -173,18 +159,18 @@ impl Payoff for Lookback {
     fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
         if state.step <= self.maturity_step && self.monitoring.observes(state.step) {
             let spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
-            self.extreme_spot = match self.direction {
-                LookbackDirection::Call => self.extreme_spot.max(spot),
-                LookbackDirection::Put => self.extreme_spot.min(spot),
+            self.extreme_spot = match self.option_type {
+                OptionType::Call => self.extreme_spot.max(spot),
+                OptionType::Put => self.extreme_spot.min(spot),
             };
         }
         Ok(())
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        let intrinsic = match self.direction {
-            LookbackDirection::Call => (self.extreme_spot - self.strike).max(0.0),
-            LookbackDirection::Put => (self.strike - self.extreme_spot).max(0.0),
+        let intrinsic = match self.option_type {
+            OptionType::Call => (self.extreme_spot - self.strike).max(0.0),
+            OptionType::Put => (self.strike - self.extreme_spot).max(0.0),
         };
         Money::new(intrinsic * self.notional, currency)
     }
@@ -198,16 +184,18 @@ impl Payoff for Lookback {
     }
 }
 
-/// Floating strike lookback call.
+/// Floating-strike lookback call or put.
 ///
-/// Payoff: (S_T - S_min) × N
+/// - **Call**: (S_T - S_min) × N, the strike floats to the minimum observed price
+/// - **Put**: (S_max - S_T) × N, the strike floats to the maximum observed price
 ///
-/// The strike "floats" to the minimum observed price.
-///
-/// For seasoned options, use [`with_initial_min`](FloatingStrikeLookbackCall::with_initial_min)
-/// to seed the historical minimum.
+/// For seasoned options, use
+/// [`with_initial_extremum`](FloatingStrikeLookback::with_initial_extremum)
+/// to seed the historical minimum (call) or maximum (put).
 #[derive(Debug, Clone)]
-pub struct FloatingStrikeLookbackCall {
+pub struct FloatingStrikeLookback {
+    /// Direction (call or put)
+    pub option_type: OptionType,
     /// Notional amount
     pub notional: f64,
     /// Time step index for maturity
@@ -216,42 +204,53 @@ pub struct FloatingStrikeLookbackCall {
     /// Steps at which the extremum is observed (every step by default).
     monitoring: BarrierMonitoring,
     terminal_spot: f64,
-    min_spot: f64,
-    /// Initial minimum for reset (preserves seasoning across MC paths)
-    initial_min: f64,
+    /// Extreme spot price observed (min for Call, max for Put)
+    extreme_spot: f64,
+    /// Initial extremum for reset (preserves seasoning across MC paths)
+    initial_extreme: f64,
 }
 
-impl FloatingStrikeLookbackCall {
-    /// Create a new floating strike lookback call.
-    pub fn new(notional: f64, maturity_step: usize) -> Self {
-        Self {
-            notional,
-            maturity_step,
-            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
-            terminal_spot: 0.0,
-            min_spot: f64::INFINITY,
-            initial_min: f64::INFINITY,
-        }
+impl FloatingStrikeLookback {
+    /// Create a new floating-strike lookback option.
+    ///
+    /// The `extreme_spot` is initialized to:
+    /// - `INFINITY` for calls (to track minimum)
+    /// - `NEG_INFINITY` for puts (to track maximum)
+    pub fn new(option_type: OptionType, notional: f64, maturity_step: usize) -> Self {
+        let initial_extremum = match option_type {
+            OptionType::Call => f64::INFINITY,
+            OptionType::Put => f64::NEG_INFINITY,
+        };
+        Self::with_initial_extremum(option_type, notional, maturity_step, initial_extremum)
     }
 
-    /// Create a floating strike lookback call with a known historical minimum.
+    /// Create a floating-strike lookback option with a known historical extremum.
     ///
-    /// Use this for seasoned options where the observed minimum is below the current spot.
-    /// The `initial_min` is preserved across MC path resets.
+    /// Use this for seasoned options where some monitoring has already occurred.
+    /// The `initial_extremum` is preserved across MC path resets.
     ///
     /// # Arguments
     ///
+    /// * `option_type` - Call (strike floats to the minimum) or put (strike
+    ///   floats to the maximum).
     /// * `notional` - Trade notional amount in the instrument currency's major units
     /// * `maturity_step` - Zero-based simulation step at which the payoff matures.
-    /// * `initial_min` - Observed pre-simulation minimum in underlying price units.
-    pub fn with_initial_min(notional: f64, maturity_step: usize, initial_min: f64) -> Self {
+    /// * `initial_extremum` - Observed pre-simulation minimum (call) or
+    ///   maximum (put) in underlying price units.
+    pub fn with_initial_extremum(
+        option_type: OptionType,
+        notional: f64,
+        maturity_step: usize,
+        initial_extremum: f64,
+    ) -> Self {
         Self {
+            option_type,
             notional,
             maturity_step,
             monitoring: BarrierMonitoring::Continuous { start_step: 0 },
             terminal_spot: 0.0,
-            min_spot: initial_min,
-            initial_min,
+            extreme_spot: initial_extremum,
+            initial_extreme: initial_extremum,
         }
     }
 
@@ -269,12 +268,12 @@ impl FloatingStrikeLookbackCall {
     }
 }
 
-impl Payoff for FloatingStrikeLookbackCall {
+impl Payoff for FloatingStrikeLookback {
     fn supports_lrm_greeks(&self) -> bool {
         self.maturity_step > 0 && !self.monitoring.observes(0)
     }
 
-    /// Update the tracked minimum and capture terminal spot at maturity.
+    /// Update the tracked extremum and capture terminal spot at maturity.
     ///
     /// # Arguments
     ///
@@ -288,7 +287,10 @@ impl Payoff for FloatingStrikeLookbackCall {
         if state.step <= self.maturity_step {
             let spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
             if self.monitoring.observes(state.step) {
-                self.min_spot = self.min_spot.min(spot);
+                self.extreme_spot = match self.option_type {
+                    OptionType::Call => self.extreme_spot.min(spot),
+                    OptionType::Put => self.extreme_spot.max(spot),
+                };
             }
             if state.step == self.maturity_step {
                 self.terminal_spot = spot;
@@ -298,132 +300,19 @@ impl Payoff for FloatingStrikeLookbackCall {
     }
 
     fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        // Floor at zero for defensive coding: while mathematically S_T >= S_min,
-        // floating-point edge cases (e.g., pathological reset states) could produce
-        // negative values without this guard.
-        let payoff = (self.terminal_spot - self.min_spot).max(0.0);
+        // Floor at zero for defensive coding: while mathematically
+        // S_min <= S_T <= S_max, floating-point edge cases (e.g., pathological
+        // reset states) could produce negative values without this guard.
+        let payoff = match self.option_type {
+            OptionType::Call => (self.terminal_spot - self.extreme_spot).max(0.0),
+            OptionType::Put => (self.extreme_spot - self.terminal_spot).max(0.0),
+        };
         Money::new(payoff * self.notional, currency)
     }
 
     fn reset(&mut self) {
         self.terminal_spot = 0.0;
-        self.min_spot = self.initial_min;
-    }
-
-    fn max_event_step(&self) -> Option<usize> {
-        Some(self.maturity_step)
-    }
-}
-
-/// Floating strike lookback put.
-///
-/// Payoff: (S_max - S_T) × N
-///
-/// The strike "floats" to the maximum observed price.
-///
-/// For seasoned options, use [`with_initial_max`](FloatingStrikeLookbackPut::with_initial_max)
-/// to seed the historical maximum.
-#[derive(Debug, Clone)]
-pub struct FloatingStrikeLookbackPut {
-    /// Notional amount
-    pub notional: f64,
-    /// Time step index for maturity
-    pub maturity_step: usize,
-
-    /// Steps at which the extremum is observed (every step by default).
-    monitoring: BarrierMonitoring,
-    terminal_spot: f64,
-    max_spot: f64,
-    /// Initial maximum for reset (preserves seasoning across MC paths)
-    initial_max: f64,
-}
-
-impl FloatingStrikeLookbackPut {
-    /// Create a new floating strike lookback put.
-    pub fn new(notional: f64, maturity_step: usize) -> Self {
-        Self {
-            notional,
-            maturity_step,
-            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
-            terminal_spot: 0.0,
-            max_spot: f64::NEG_INFINITY,
-            initial_max: f64::NEG_INFINITY,
-        }
-    }
-
-    /// Create a floating strike lookback put with a known historical maximum.
-    ///
-    /// Use this for seasoned options where the observed maximum is above the current spot.
-    /// The `initial_max` is preserved across MC path resets.
-    ///
-    /// # Arguments
-    ///
-    /// * `notional` - Trade notional amount in the instrument currency's major units
-    /// * `maturity_step` - Zero-based simulation step at which the payoff matures.
-    /// * `initial_max` - Observed pre-simulation maximum in underlying price units.
-    pub fn with_initial_max(notional: f64, maturity_step: usize, initial_max: f64) -> Self {
-        Self {
-            notional,
-            maturity_step,
-            monitoring: BarrierMonitoring::Continuous { start_step: 0 },
-            terminal_spot: 0.0,
-            max_spot: initial_max,
-            initial_max,
-        }
-    }
-
-    /// Restrict extremum tracking to the given monitoring steps.
-    ///
-    /// # Arguments
-    ///
-    /// * `monitoring` - `Continuous { start_step }` observes every event step
-    ///   from `start_step`; `Discrete { observation_steps }` observes only the
-    ///   listed (strictly increasing) contractual observation steps.
-    #[must_use]
-    pub fn with_monitoring(mut self, monitoring: BarrierMonitoring) -> Self {
-        self.monitoring = monitoring;
-        self
-    }
-}
-
-impl Payoff for FloatingStrikeLookbackPut {
-    fn supports_lrm_greeks(&self) -> bool {
-        self.maturity_step > 0 && !self.monitoring.observes(0)
-    }
-
-    /// Update the tracked maximum and capture terminal spot at maturity.
-    ///
-    /// # Arguments
-    ///
-    /// * `state` - Path state at the current engine event date. Must contain a
-    ///   finite `SPOT` when `state.step <= maturity_step`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if `SPOT` is missing or non-finite at an in-window event.
-    fn on_event(&mut self, state: &mut PathState) -> finstack_quant_core::Result<()> {
-        if state.step <= self.maturity_step {
-            let spot = super::require_finite_state(state.spot(), "SPOT", state.step)?;
-            if self.monitoring.observes(state.step) {
-                self.max_spot = self.max_spot.max(spot);
-            }
-            if state.step == self.maturity_step {
-                self.terminal_spot = spot;
-            }
-        }
-        Ok(())
-    }
-
-    fn value(&self, currency: Currency) -> finstack_quant_core::Result<Money> {
-        // Floor at zero for defensive coding: while mathematically S_max >= S_T,
-        // floating-point edge cases could produce negative values without this guard.
-        let payoff = (self.max_spot - self.terminal_spot).max(0.0);
-        Money::new(payoff * self.notional, currency)
-    }
-
-    fn reset(&mut self) {
-        self.terminal_spot = 0.0;
-        self.max_spot = self.initial_max;
+        self.extreme_spot = self.initial_extreme;
     }
 
     fn max_event_step(&self) -> Option<usize> {
@@ -444,7 +333,7 @@ mod tests {
 
     #[test]
     fn test_lookback_errors_without_spot() {
-        let mut lookback = Lookback::new(LookbackDirection::Call, 100.0, 1.0, 10);
+        let mut lookback = Lookback::new(OptionType::Call, 100.0, 1.0, 10);
         let mut state = PathState::new(0, 0.0);
         let error = lookback
             .on_event(&mut state)
@@ -454,7 +343,7 @@ mod tests {
 
     #[test]
     fn test_lookback_call_unified() {
-        let mut lookback = Lookback::new(LookbackDirection::Call, 100.0, 1.0, 10);
+        let mut lookback = Lookback::new(OptionType::Call, 100.0, 1.0, 10);
 
         // Simulate path: max = 120
         lookback
@@ -475,7 +364,7 @@ mod tests {
 
     #[test]
     fn test_lookback_put_unified() {
-        let mut lookback = Lookback::new(LookbackDirection::Put, 100.0, 1.0, 10);
+        let mut lookback = Lookback::new(OptionType::Put, 100.0, 1.0, 10);
 
         // Simulate path: min = 80
         lookback
@@ -496,7 +385,7 @@ mod tests {
 
     #[test]
     fn test_lookback_call_out_of_money() {
-        let mut lookback = Lookback::new(LookbackDirection::Call, 150.0, 1.0, 10);
+        let mut lookback = Lookback::new(OptionType::Call, 150.0, 1.0, 10);
 
         // Path never exceeds strike
         lookback
@@ -516,7 +405,7 @@ mod tests {
 
     #[test]
     fn test_lookback_put_out_of_money() {
-        let mut lookback = Lookback::new(LookbackDirection::Put, 50.0, 1.0, 10);
+        let mut lookback = Lookback::new(OptionType::Put, 50.0, 1.0, 10);
 
         // Path never goes below strike
         lookback
@@ -536,7 +425,7 @@ mod tests {
 
     #[test]
     fn test_lookback_call_reset() {
-        let mut lookback = Lookback::new(LookbackDirection::Call, 100.0, 1.0, 10);
+        let mut lookback = Lookback::new(OptionType::Call, 100.0, 1.0, 10);
 
         lookback
             .on_event(&mut create_state(0, 100.0))
@@ -552,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_lookback_put_reset() {
-        let mut lookback = Lookback::new(LookbackDirection::Put, 100.0, 1.0, 10);
+        let mut lookback = Lookback::new(OptionType::Put, 100.0, 1.0, 10);
 
         lookback
             .on_event(&mut create_state(0, 100.0))
@@ -568,8 +457,8 @@ mod tests {
 
     #[test]
     fn test_lookback_with_notional() {
-        let mut call = Lookback::new(LookbackDirection::Call, 100.0, 2.5, 10);
-        let mut put = Lookback::new(LookbackDirection::Put, 100.0, 2.5, 10);
+        let mut call = Lookback::new(OptionType::Call, 100.0, 2.5, 10);
+        let mut put = Lookback::new(OptionType::Put, 100.0, 2.5, 10);
 
         // Call path: max = 120
         call.on_event(&mut create_state(0, 100.0))
@@ -598,7 +487,7 @@ mod tests {
 
     #[test]
     fn test_floating_strike_lookback() {
-        let mut lookback = FloatingStrikeLookbackCall::new(1.0, 10);
+        let mut lookback = FloatingStrikeLookback::new(OptionType::Call, 1.0, 10);
 
         // Path: starts 100, min 90, ends 110
         lookback
@@ -618,7 +507,7 @@ mod tests {
 
     #[test]
     fn test_floating_strike_lookback_put() {
-        let mut lookback = FloatingStrikeLookbackPut::new(1.0, 10);
+        let mut lookback = FloatingStrikeLookback::new(OptionType::Put, 1.0, 10);
 
         // Path: starts 100, max 120, ends 105
         lookback
@@ -638,7 +527,7 @@ mod tests {
 
     #[test]
     fn test_floating_strike_lookback_put_with_notional() {
-        let mut lookback = FloatingStrikeLookbackPut::new(2.5, 10);
+        let mut lookback = FloatingStrikeLookback::new(OptionType::Put, 2.5, 10);
 
         // Path: starts 100, max 130, ends 110
         lookback
@@ -658,7 +547,7 @@ mod tests {
 
     #[test]
     fn test_floating_strike_lookback_put_reset() {
-        let mut lookback = FloatingStrikeLookbackPut::new(1.0, 10);
+        let mut lookback = FloatingStrikeLookback::new(OptionType::Put, 1.0, 10);
 
         lookback
             .on_event(&mut create_state(0, 100.0))
@@ -666,17 +555,18 @@ mod tests {
         lookback
             .on_event(&mut create_state(5, 120.0))
             .expect("valid payoff event");
-        assert_eq!(lookback.max_spot, 120.0);
+        assert_eq!(lookback.extreme_spot, 120.0);
 
         lookback.reset();
-        assert_eq!(lookback.max_spot, f64::NEG_INFINITY);
+        assert_eq!(lookback.extreme_spot, f64::NEG_INFINITY);
         assert_eq!(lookback.terminal_spot, 0.0);
     }
 
     #[test]
     fn test_floating_strike_lookback_call_with_initial_min() {
         // Seasoned: historical min = 80, current spot starts at 100
-        let mut lookback = FloatingStrikeLookbackCall::with_initial_min(1.0, 10, 80.0);
+        let mut lookback =
+            FloatingStrikeLookback::with_initial_extremum(OptionType::Call, 1.0, 10, 80.0);
 
         // Path never goes below 90, but historical min was 80
         lookback
@@ -695,13 +585,14 @@ mod tests {
 
         // Reset preserves historical min
         lookback.reset();
-        assert_eq!(lookback.min_spot, 80.0);
+        assert_eq!(lookback.extreme_spot, 80.0);
     }
 
     #[test]
     fn test_floating_strike_lookback_put_with_initial_max() {
         // Seasoned: historical max = 150, current spot starts at 100
-        let mut lookback = FloatingStrikeLookbackPut::with_initial_max(1.0, 10, 150.0);
+        let mut lookback =
+            FloatingStrikeLookback::with_initial_extremum(OptionType::Put, 1.0, 10, 150.0);
 
         // Path max is 110, but historical max was 150
         lookback
@@ -720,14 +611,13 @@ mod tests {
 
         // Reset preserves historical max
         lookback.reset();
-        assert_eq!(lookback.max_spot, 150.0);
+        assert_eq!(lookback.extreme_spot, 150.0);
     }
 
     #[test]
     fn test_fixed_strike_with_initial_extremum() {
         // Seasoned call: historical max = 130
-        let mut call =
-            Lookback::with_initial_extremum(LookbackDirection::Call, 100.0, 1.0, 10, 130.0);
+        let mut call = Lookback::with_initial_extremum(OptionType::Call, 100.0, 1.0, 10, 130.0);
         call.on_event(&mut create_state(0, 100.0))
             .expect("valid payoff event");
         call.on_event(&mut create_state(10, 110.0))
@@ -742,7 +632,7 @@ mod tests {
         assert_eq!(call.extreme_spot, 130.0);
 
         // Seasoned put: historical min = 70
-        let mut put = Lookback::with_initial_extremum(LookbackDirection::Put, 100.0, 1.0, 10, 70.0);
+        let mut put = Lookback::with_initial_extremum(OptionType::Put, 100.0, 1.0, 10, 70.0);
         put.on_event(&mut create_state(0, 100.0))
             .expect("valid payoff event");
         put.on_event(&mut create_state(10, 90.0))
@@ -764,11 +654,12 @@ mod tests {
             observation_steps: vec![2],
         };
 
-        let mut fixed = Lookback::new(LookbackDirection::Call, 100.0, 1.0, 2)
+        let mut fixed =
+            Lookback::new(OptionType::Call, 100.0, 1.0, 2).with_monitoring(monitoring.clone());
+        let mut floating_put = FloatingStrikeLookback::new(OptionType::Put, 1.0, 2)
             .with_monitoring(monitoring.clone());
-        let mut floating_put =
-            FloatingStrikeLookbackPut::new(1.0, 2).with_monitoring(monitoring.clone());
-        let mut floating_call = FloatingStrikeLookbackCall::new(1.0, 2).with_monitoring(monitoring);
+        let mut floating_call =
+            FloatingStrikeLookback::new(OptionType::Call, 1.0, 2).with_monitoring(monitoring);
         for (step, spot) in path {
             let mut state = create_state(step, spot);
             fixed.on_event(&mut state).expect("valid payoff event");
@@ -799,5 +690,77 @@ mod tests {
                 .amount(),
             0.0
         );
+    }
+
+    /// Fixed- and floating-strike payoffs on fixed paths, fresh and seasoned,
+    /// with continuous and discrete monitoring, across two resets.
+    #[test]
+    fn h2_pin_lookback_payoffs_on_fixed_paths() {
+        let path = [100.0, 112.5, 87.25, 131.0, 96.5, 104.75];
+        let discrete = BarrierMonitoring::Discrete {
+            observation_steps: vec![1, 2, 5],
+        };
+        let mut payoffs: Vec<Box<dyn FnMut(&mut PathState) -> f64>> = Vec::new();
+        macro_rules! track {
+            ($payoff:expr) => {{
+                let mut payoff = $payoff;
+                payoffs.push(Box::new(move |state: &mut PathState| {
+                    if state.step == 0 {
+                        payoff.reset();
+                    }
+                    payoff.on_event(state).expect("finite spot");
+                    payoff.value(Currency::USD).expect("payoff").amount()
+                }));
+            }};
+        }
+        track!(Lookback::new(OptionType::Call, 100.0, 2.0, 5));
+        track!(Lookback::new(OptionType::Put, 100.0, 2.0, 5));
+        track!(Lookback::with_initial_extremum(
+            OptionType::Call,
+            100.0,
+            2.0,
+            5,
+            140.0
+        ));
+        track!(Lookback::with_initial_extremum(
+            OptionType::Put,
+            100.0,
+            2.0,
+            5,
+            70.0
+        ));
+        track!(Lookback::new(OptionType::Call, 100.0, 2.0, 5).with_monitoring(discrete.clone()));
+        track!(FloatingStrikeLookback::new(OptionType::Call, 2.0, 5));
+        track!(FloatingStrikeLookback::new(OptionType::Put, 2.0, 5));
+        track!(FloatingStrikeLookback::with_initial_extremum(
+            OptionType::Call,
+            2.0,
+            5,
+            80.0
+        ));
+        track!(FloatingStrikeLookback::with_initial_extremum(
+            OptionType::Put,
+            2.0,
+            5,
+            150.0
+        ));
+        track!(
+            FloatingStrikeLookback::new(OptionType::Call, 2.0, 5).with_monitoring(discrete.clone())
+        );
+        track!(FloatingStrikeLookback::new(OptionType::Put, 2.0, 5).with_monitoring(discrete));
+
+        let expected = [
+            62.0, 25.5, 80.0, 60.0, 25.0, 35.0, 52.5, 49.5, 90.5, 35.0, 15.5,
+        ];
+        for _ in 0..2 {
+            let mut finals = vec![0.0; payoffs.len()];
+            for (step, &spot) in path.iter().enumerate() {
+                let mut state = create_state(step, spot);
+                for (value, payoff) in finals.iter_mut().zip(payoffs.iter_mut()) {
+                    *value = payoff(&mut state);
+                }
+            }
+            assert_eq!(finals, expected);
+        }
     }
 }

@@ -53,6 +53,7 @@ use crate::monte_carlo::rng::philox::PhiloxRng;
 use crate::monte_carlo::traits::{Discretization, RandomStream};
 use crate::monte_carlo::OnlineStats;
 use crate::monte_carlo::TimeGrid;
+use crate::types::OptionType;
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::Result;
 
@@ -162,78 +163,58 @@ impl PathMatrix {
     }
 }
 
-/// Immediate exercise payoff function.
-///
-/// Returns the payoff from exercising immediately at the given state.
-pub trait ImmediateExercise: Send + Sync + Clone {
-    /// Compute immediate exercise value.
-    fn exercise_value(&self, spot: f64) -> f64;
-}
-
-/// American put option immediate exercise.
+/// American call or put immediate-exercise payoff.
 #[derive(Debug, Clone)]
-pub struct AmericanPut {
-    /// Strike price for American put option
+pub struct AmericanExercise {
+    /// Payoff direction: call pays `max(spot - strike, 0)`, put pays
+    /// `max(strike - spot, 0)`
+    pub option_type: OptionType,
+    /// Strike price
     pub strike: f64,
 }
 
-impl AmericanPut {
-    /// Create a validated American put with a finite, strictly positive strike.
+impl AmericanExercise {
+    /// Create a validated American exercise payoff with a finite, strictly
+    /// positive strike.
     ///
-    /// The payoff is `max(strike - spot, 0)` in the same scalar unit as the
+    /// The payoff is `max(spot - strike, 0)` for a call and
+    /// `max(strike - spot, 0)` for a put, in the same scalar unit as the
     /// simulated spot. This constructor does not attach currency, discounting,
     /// or exercise-date conventions; the LSMC pricer supplies those context
     /// inputs.
     ///
+    /// # Arguments
+    ///
+    /// * `option_type` - Call or put exercise payoff.
+    /// * `strike` - Exercise price in the simulated spot's units; finite and
+    ///   strictly positive.
+    ///
     /// # Errors
     ///
     /// Returns an error if `strike` is non-finite or `strike <= 0`.
-    pub fn new(strike: f64) -> finstack_quant_core::Result<Self> {
+    pub fn new(option_type: OptionType, strike: f64) -> finstack_quant_core::Result<Self> {
         if !strike.is_finite() || strike <= 0.0 {
             return Err(finstack_quant_core::Error::Validation(
                 "strike must be finite and positive".to_string(),
             ));
         }
-        Ok(Self { strike })
+        Ok(Self {
+            option_type,
+            strike,
+        })
     }
-}
 
-impl ImmediateExercise for AmericanPut {
-    fn exercise_value(&self, spot: f64) -> f64 {
-        (self.strike - spot).max(0.0)
-    }
-}
-
-/// American call option immediate exercise.
-#[derive(Debug, Clone)]
-pub struct AmericanCall {
-    /// Strike price for American call option
-    pub strike: f64,
-}
-
-impl AmericanCall {
-    /// Create a validated American call with a finite, strictly positive strike.
+    /// Value of exercising immediately at `spot`.
     ///
-    /// The payoff is `max(spot - strike, 0)` in the same scalar unit as the
-    /// simulated spot. Currency, discounting, and exercise-date conventions
-    /// are provided by the LSMC pricer rather than this payoff object.
+    /// # Arguments
     ///
-    /// # Errors
-    ///
-    /// Returns an error if `strike` is non-finite or `strike <= 0`.
-    pub fn new(strike: f64) -> finstack_quant_core::Result<Self> {
-        if !strike.is_finite() || strike <= 0.0 {
-            return Err(finstack_quant_core::Error::Validation(
-                "strike must be finite and positive".to_string(),
-            ));
+    /// * `spot` - Simulated underlying level in the strike's units.
+    #[must_use]
+    pub fn exercise_value(&self, spot: f64) -> f64 {
+        match self.option_type {
+            OptionType::Call => (spot - self.strike).max(0.0),
+            OptionType::Put => (self.strike - spot).max(0.0),
         }
-        Ok(Self { strike })
-    }
-}
-
-impl ImmediateExercise for AmericanCall {
-    fn exercise_value(&self, spot: f64) -> f64 {
-        (spot - self.strike).max(0.0)
     }
 }
 
@@ -524,19 +505,18 @@ impl LsmcPricer {
     /// Statistical estimate of the Bermudan value, including immediate exercise
     /// only when index `0` belongs to the exercise schedule.
     #[allow(clippy::too_many_arguments)]
-    pub fn price<E, B>(
+    pub fn price<B>(
         &self,
         process: &GbmProcess,
         initial_spot: f64,
         time_to_maturity: f64,
         num_steps: usize,
-        exercise: &E,
+        exercise: &AmericanExercise,
         basis: &B,
         currency: Currency,
         discount_rate: f64,
     ) -> Result<MoneyEstimate>
     where
-        E: ImmediateExercise,
         B: BasisFunctions + ?Sized,
     {
         let paths = self.generate_paths(process, initial_spot, time_to_maturity, num_steps)?;
@@ -783,17 +763,16 @@ impl LsmcPricer {
     ///
     /// See `swaption_lsmc.rs` for the curve-based discounting approach.
     #[allow(clippy::too_many_arguments)]
-    fn backward_induction<E, B>(
+    fn backward_induction<B>(
         &self,
         paths: &PathMatrix,
-        exercise: &E,
+        exercise: &AmericanExercise,
         basis: &B,
         discount_rate: f64,
         time_to_maturity: f64,
         num_steps: usize,
     ) -> Result<Vec<f64>>
     where
-        E: ImmediateExercise,
         B: BasisFunctions + ?Sized,
     {
         let (values, _) = self.train_exercise_policy(
@@ -828,18 +807,17 @@ impl LsmcPricer {
     /// * `basis` - Regression basis used to approximate continuation values.
     /// * `discount_rate` - Continuously compounded annual discount rate in decimal units.
     #[allow(clippy::too_many_arguments)]
-    pub fn fit_exercise_policy<E, B>(
+    pub fn fit_exercise_policy<B>(
         &self,
         process: &GbmProcess,
         initial_spot: f64,
         time_to_maturity: f64,
         num_steps: usize,
-        exercise: &E,
+        exercise: &AmericanExercise,
         basis: &B,
         discount_rate: f64,
     ) -> Result<ExercisePolicy>
     where
-        E: ImmediateExercise,
         B: BasisFunctions + ?Sized,
     {
         let paths = self.generate_paths(process, initial_spot, time_to_maturity, num_steps)?;
@@ -883,13 +861,13 @@ impl LsmcPricer {
     /// * `discount_rate` - Continuously compounded annual discount rate in decimal units.
     /// * `pricing_seed` - Deterministic random seed used to reproduce Monte Carlo paths.
     #[allow(clippy::too_many_arguments)]
-    pub fn price_with_policy<E, B>(
+    pub fn price_with_policy<B>(
         &self,
         process: &GbmProcess,
         initial_spot: f64,
         time_to_maturity: f64,
         num_steps: usize,
-        exercise: &E,
+        exercise: &AmericanExercise,
         basis: &B,
         policy: &ExercisePolicy,
         currency: Currency,
@@ -897,7 +875,6 @@ impl LsmcPricer {
         pricing_seed: u64,
     ) -> Result<MoneyEstimate>
     where
-        E: ImmediateExercise,
         B: BasisFunctions + ?Sized,
     {
         if policy.num_steps != num_steps {
@@ -965,20 +942,19 @@ impl LsmcPricer {
     /// * `discount_rate` - Continuously compounded annual discount rate in decimal units.
     /// * `pricing_seed` - Deterministic random seed used to reproduce Monte Carlo paths.
     #[allow(clippy::too_many_arguments)]
-    pub fn price_unbiased<E, B>(
+    pub fn price_unbiased<B>(
         &self,
         process: &GbmProcess,
         initial_spot: f64,
         time_to_maturity: f64,
         num_steps: usize,
-        exercise: &E,
+        exercise: &AmericanExercise,
         basis: &B,
         currency: Currency,
         discount_rate: f64,
         pricing_seed: u64,
     ) -> Result<MoneyEstimate>
     where
-        E: ImmediateExercise,
         B: BasisFunctions + ?Sized,
     {
         if pricing_seed == self.config.seed {
@@ -1020,17 +996,16 @@ impl LsmcPricer {
     /// can be replayed against an independent path set. Insufficient ITM paths
     /// or singular regressions return an error. Insufficient ITM paths skip
     /// the date (no exercise) just like the in-sample variant.
-    fn fit_policy_from_paths<E, B>(
+    fn fit_policy_from_paths<B>(
         &self,
         paths: &PathMatrix,
-        exercise: &E,
+        exercise: &AmericanExercise,
         basis: &B,
         discount_rate: f64,
         time_to_maturity: f64,
         num_steps: usize,
     ) -> Result<ExercisePolicy>
     where
-        E: ImmediateExercise,
         B: BasisFunctions + ?Sized,
     {
         let (_, policy) = self.train_exercise_policy(
@@ -1045,17 +1020,16 @@ impl LsmcPricer {
     }
 
     /// Fit continuation coefficients and retain the training-path values.
-    fn train_exercise_policy<E, B>(
+    fn train_exercise_policy<B>(
         &self,
         paths: &PathMatrix,
-        exercise: &E,
+        exercise: &AmericanExercise,
         basis: &B,
         discount_rate: f64,
         time_to_maturity: f64,
         num_steps: usize,
     ) -> Result<(Vec<f64>, ExercisePolicy)>
     where
-        E: ImmediateExercise,
         B: BasisFunctions + ?Sized,
     {
         let num_paths = paths.num_paths();
@@ -1167,16 +1141,15 @@ impl LsmcPricer {
     /// receives the terminal European payoff. This forward sweep cannot reuse
     /// the path-set's own discounted cashflows (those would inject in-sample
     /// bias), which is the whole point of the two-pass scheme.
-    fn apply_policy_to_paths<E, B>(
+    fn apply_policy_to_paths<B>(
         &self,
         paths: &PathMatrix,
-        exercise: &E,
+        exercise: &AmericanExercise,
         basis: &B,
         policy: &ExercisePolicy,
         timing: PolicyTiming,
     ) -> Vec<f64>
     where
-        E: ImmediateExercise,
         B: BasisFunctions + ?Sized,
     {
         let dt = timing.time_to_maturity / timing.num_steps as f64;
@@ -1265,7 +1238,7 @@ impl LsmcPricer {
         basis: BasisKind,
         basis_degree: usize,
     ) -> Result<MoneyEstimate> {
-        let exercise = AmericanPut::new(strike)?;
+        let exercise = AmericanExercise::new(OptionType::Put, strike)?;
         self.price_gbm_american(
             spot,
             strike,
@@ -1317,7 +1290,7 @@ impl LsmcPricer {
         basis: BasisKind,
         basis_degree: usize,
     ) -> Result<MoneyEstimate> {
-        let exercise = AmericanCall::new(strike)?;
+        let exercise = AmericanExercise::new(OptionType::Call, strike)?;
         self.price_gbm_american(
             spot,
             strike,
@@ -1373,7 +1346,7 @@ impl LsmcPricer {
         basis_degree: usize,
         pricing_seed: u64,
     ) -> Result<MoneyEstimate> {
-        let exercise = AmericanPut::new(strike)?;
+        let exercise = AmericanExercise::new(OptionType::Put, strike)?;
         self.price_gbm_american_unbiased(
             spot,
             strike,
@@ -1429,7 +1402,7 @@ impl LsmcPricer {
         basis_degree: usize,
         pricing_seed: u64,
     ) -> Result<MoneyEstimate> {
-        let exercise = AmericanCall::new(strike)?;
+        let exercise = AmericanExercise::new(OptionType::Call, strike)?;
         self.price_gbm_american_unbiased(
             spot,
             strike,
@@ -1447,7 +1420,7 @@ impl LsmcPricer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn price_gbm_american<E: ImmediateExercise>(
+    fn price_gbm_american(
         &self,
         spot: f64,
         strike: f64,
@@ -1459,7 +1432,7 @@ impl LsmcPricer {
         currency: Currency,
         basis: BasisKind,
         basis_degree: usize,
-        exercise: &E,
+        exercise: &AmericanExercise,
     ) -> Result<MoneyEstimate> {
         crate::monte_carlo::require_positive_vol(vol)?;
         let process = GbmProcess::with_params(rate, div_yield, vol)?;
@@ -1470,7 +1443,7 @@ impl LsmcPricer {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn price_gbm_american_unbiased<E: ImmediateExercise>(
+    fn price_gbm_american_unbiased(
         &self,
         spot: f64,
         strike: f64,
@@ -1483,7 +1456,7 @@ impl LsmcPricer {
         basis: BasisKind,
         basis_degree: usize,
         pricing_seed: u64,
-        exercise: &E,
+        exercise: &AmericanExercise,
     ) -> Result<MoneyEstimate> {
         crate::monte_carlo::require_positive_vol(vol)?;
         let process = GbmProcess::with_params(rate, div_yield, vol)?;
@@ -1591,7 +1564,10 @@ mod tests {
 
     #[test]
     fn test_american_put_exercise() {
-        let put = AmericanPut { strike: 100.0 };
+        let put = AmericanExercise {
+            option_type: OptionType::Put,
+            strike: 100.0,
+        };
 
         assert_eq!(put.exercise_value(90.0), 10.0);
         assert_eq!(put.exercise_value(110.0), 0.0);
@@ -1599,7 +1575,10 @@ mod tests {
 
     #[test]
     fn test_american_call_exercise() {
-        let call = AmericanCall { strike: 100.0 };
+        let call = AmericanExercise {
+            option_type: OptionType::Call,
+            strike: 100.0,
+        };
 
         assert_eq!(call.exercise_value(110.0), 10.0);
         assert_eq!(call.exercise_value(90.0), 0.0);
@@ -1608,12 +1587,13 @@ mod tests {
     #[test]
     fn american_put_and_call_reject_non_finite_strike() {
         for strike in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0, -1.0] {
-            let put_err = AmericanPut::new(strike).expect_err("put strike");
+            let put_err = AmericanExercise::new(OptionType::Put, strike).expect_err("put strike");
             assert!(
                 put_err.to_string().contains("finite and positive"),
                 "unexpected put error for {strike}: {put_err}"
             );
-            let call_err = AmericanCall::new(strike).expect_err("call strike");
+            let call_err =
+                AmericanExercise::new(OptionType::Call, strike).expect_err("call strike");
             assert!(
                 call_err.to_string().contains("finite and positive"),
                 "unexpected call error for {strike}: {call_err}"
@@ -1630,7 +1610,10 @@ mod tests {
         let pricer = LsmcPricer::new(config);
 
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.3).unwrap());
-        let put = AmericanPut { strike: 100.0 };
+        let put = AmericanExercise {
+            option_type: OptionType::Put,
+            strike: 100.0,
+        };
         let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
         let result = pricer
@@ -1652,7 +1635,10 @@ mod tests {
         let pricer = LsmcPricer::new(config);
 
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.3).unwrap());
-        let put = AmericanPut { strike: 100.0 };
+        let put = AmericanExercise {
+            option_type: OptionType::Put,
+            strike: 100.0,
+        };
 
         let basis = PolynomialBasis::new(5).expect("valid regression basis");
 
@@ -1677,7 +1663,10 @@ mod tests {
         let pricer = LsmcPricer::new(config);
 
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 1.0).unwrap());
-        let put = AmericanPut { strike: 100.0 };
+        let put = AmericanExercise {
+            option_type: OptionType::Put,
+            strike: 100.0,
+        };
         let basis = PolynomialBasis::new(3).expect("valid regression basis");
 
         let result = pricer.price(&gbm, 100.0, 1.0, 100, &put, &basis, Currency::USD, 0.05);
@@ -1701,7 +1690,10 @@ mod tests {
         let pricer = LsmcPricer::new(config);
 
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.05).unwrap());
-        let put = AmericanPut { strike: 50.0 };
+        let put = AmericanExercise {
+            option_type: OptionType::Put,
+            strike: 50.0,
+        };
         let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
         let result = pricer.price(&gbm, 150.0, 0.5, 100, &put, &basis, Currency::USD, 0.05);
@@ -1719,7 +1711,10 @@ mod tests {
     fn test_lsmc_insufficient_itm_paths_preserves_continuation() {
         let config = LsmcConfig::new(2, vec![1], 2).unwrap();
         let pricer = LsmcPricer::new(config);
-        let exercise = AmericanCall { strike: 100.0 };
+        let exercise = AmericanExercise {
+            option_type: OptionType::Call,
+            strike: 100.0,
+        };
         let basis = PolynomialBasis::new(2).expect("valid regression basis");
         let paths = PathMatrix::from_rows(&[vec![100.0, 110.0, 130.0]]);
 
@@ -1765,7 +1760,7 @@ mod tests {
             .with_seed(42);
         let pricer = LsmcPricer::new(config);
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.3).unwrap());
-        let put = AmericanPut::new(100.0).unwrap();
+        let put = AmericanExercise::new(OptionType::Put, 100.0).unwrap();
         let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
         let unbiased = pricer
@@ -1792,7 +1787,7 @@ mod tests {
         let cfg = LsmcConfig::new(100, vec![10], 20).unwrap().with_seed(7);
         let pricer = LsmcPricer::new(cfg);
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.2).unwrap());
-        let put = AmericanPut::new(100.0).unwrap();
+        let put = AmericanExercise::new(OptionType::Put, 100.0).unwrap();
         let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
         let result = pricer.price_unbiased(
@@ -1815,7 +1810,7 @@ mod tests {
             .unwrap()
             .with_antithetic(false);
         let pricer = LsmcPricer::new(config);
-        let exercise = AmericanPut::new(100.0).unwrap();
+        let exercise = AmericanExercise::new(OptionType::Put, 100.0).unwrap();
         let basis = PolynomialBasis::new(1).expect("valid regression basis");
         let zero_continuation = PathMatrix::from_rows(&vec![vec![90.0, 100.0]; 2]);
         let high_continuation = PathMatrix::from_rows(&vec![vec![90.0, 50.0]; 2]);
@@ -1852,7 +1847,7 @@ mod tests {
         let cfg = LsmcConfig::new(500, vec![10], 20).unwrap().with_seed(1);
         let pricer = LsmcPricer::new(cfg);
         let gbm = GbmProcess::new(GbmParams::new(0.05, 0.0, 0.2).unwrap());
-        let put = AmericanPut::new(100.0).unwrap();
+        let put = AmericanExercise::new(OptionType::Put, 100.0).unwrap();
         let basis_train = PolynomialBasis::new(2).expect("valid regression basis");
         let basis_price = PolynomialBasis::new(3).expect("valid regression basis");
 
@@ -1881,7 +1876,10 @@ mod tests {
     fn test_lsmc_tiny_positive_intrinsic_values_are_treated_as_itm() {
         let config = LsmcConfig::new(16, vec![1], 2).unwrap();
         let pricer = LsmcPricer::new(config);
-        let exercise = AmericanCall { strike: 100.0 };
+        let exercise = AmericanExercise {
+            option_type: OptionType::Call,
+            strike: 100.0,
+        };
         let basis = PolynomialBasis::new(1).expect("valid regression basis");
         let paths = PathMatrix::from_rows(&vec![vec![100.0, 100.0 + 1.0e-8, 100.0]; 16]);
 
@@ -2071,5 +2069,83 @@ mod tests {
             "q=0 American call {price} vs European {european} (stderr={}, tol={tol})",
             estimate.stderr
         );
+    }
+
+    /// Seeded GBM American convenience prices (mean and standard error) are
+    /// pinned bit for bit for the in-sample and two-pass put and call.
+    #[test]
+    fn h2_pin_gbm_american_prices_are_bit_stable() {
+        const EXPECTED: &[u64] = &[
+            0x402829f6094ad2f8,
+            0x3fcf734a4ce21bbb,
+            0x40233f08bbaf83fd,
+            0x3fe096537727ca99,
+            0x402649ceac988d35,
+            0x3fcd1bc42e7f3b9a,
+            0x4020f4f4ccf63499,
+            0x3fdc7de115fa4ffb,
+        ];
+        let pricer = LsmcPricer::gbm_american(400, 10, 42, false, true).expect("pricer");
+        let (spot, strike, rate, div_yield, vol, expiry, num_steps, currency) =
+            (100.0, 105.0, 0.05, 0.03, 0.25, 1.0, 10, Currency::USD);
+        let estimates = [
+            pricer.price_gbm_american_put(
+                spot,
+                strike,
+                rate,
+                div_yield,
+                vol,
+                expiry,
+                num_steps,
+                currency,
+                BasisKind::Laguerre,
+                3,
+            ),
+            pricer.price_gbm_american_call(
+                spot,
+                strike,
+                rate,
+                div_yield,
+                vol,
+                expiry,
+                num_steps,
+                currency,
+                BasisKind::Polynomial,
+                2,
+            ),
+            pricer.price_gbm_american_put_unbiased(
+                spot,
+                strike,
+                rate,
+                div_yield,
+                vol,
+                expiry,
+                num_steps,
+                currency,
+                BasisKind::Laguerre,
+                3,
+                99,
+            ),
+            pricer.price_gbm_american_call_unbiased(
+                spot,
+                strike,
+                rate,
+                div_yield,
+                vol,
+                expiry,
+                num_steps,
+                currency,
+                BasisKind::Polynomial,
+                2,
+                99,
+            ),
+        ];
+        let mut actual = Vec::new();
+        for estimate in estimates {
+            let estimate = estimate.expect("price");
+            actual.push(estimate.mean.amount().to_bits());
+            actual.push(estimate.stderr.to_bits());
+        }
+        assert_eq!(actual, EXPECTED, "{actual:#x?}");
     }
 }

@@ -229,16 +229,17 @@ one path set and replays it on a second, independent set. It rejects a
 use finstack_quant_core::currency::Currency;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::pricer::lsmc::{
-    AmericanPut, LsmcConfig, LsmcPricer,
+    AmericanExercise, LsmcConfig, LsmcPricer,
 };
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
+use finstack_quant_models::types::OptionType;
 
 let cfg = LsmcConfig::new(50_000, vec![25, 50, 75, 100], 100)
     .expect("valid LSMC config")
     .with_seed(42);
 let pricer = LsmcPricer::new(cfg);
 let process = GbmProcess::with_params(0.05, 0.0, 0.3).expect("valid GBM parameters");
-let put = AmericanPut::new(100.0).expect("valid strike");
+let put = AmericanExercise::new(OptionType::Put, 100.0).expect("valid strike");
 let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
 let unbiased = pricer
@@ -488,7 +489,7 @@ via `max_event_step()` so grid mismatches are caught up front.
   [`exports/models/monteCarlo.js`](../../finstack-quant-wasm/exports/models/monteCarlo.js)
   exposes `simulatePaths` and the convenience pricers: `priceEuropeanCall/Put`,
   `priceHestonCall/Put`, `priceAsianCall/Put`, `priceAmericanCall/Put`,
-  `priceAmericanCallUnbiased` / `priceAmericanPutUnbiased`, and
+  `priceAmericanCallUnbiased` / `priceAmericanExerciseUnbiased`, and
   `blackScholesCall/Put`.
 
 Neither binding exposes the generic trait surface: `simulate_paths` selects among

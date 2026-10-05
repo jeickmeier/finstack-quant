@@ -23,7 +23,7 @@ use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
 use finstack_quant_models::monte_carlo::pricer::basis::PolynomialBasis;
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
-use finstack_quant_models::monte_carlo::pricer::lsmc::{AmericanPut, LsmcConfig, LsmcPricer};
+use finstack_quant_models::monte_carlo::pricer::lsmc::{AmericanExercise, LsmcConfig, LsmcPricer};
 use finstack_quant_models::monte_carlo::pricer::lsq::solve_least_squares;
 use finstack_quant_models::monte_carlo::process::gbm::GbmProcess;
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
@@ -33,6 +33,7 @@ use finstack_quant_models::monte_carlo::process::rough_heston::{
 };
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::Discretization;
+use finstack_quant_models::types::OptionType;
 use std::hint::black_box;
 
 // European pricer: GBM + ExactGbm at various path counts
@@ -65,7 +66,7 @@ fn bench_european_pricer(c: &mut Criterion) {
 fn bench_lsmc_pricer(c: &mut Criterion) {
     let mut group = c.benchmark_group("lsmc_pricer");
     let process = GbmProcess::with_params(0.05, 0.02, 0.20).unwrap();
-    let exercise = AmericanPut::new(100.0).expect("valid strike");
+    let exercise = AmericanExercise::new(OptionType::Put, 100.0).expect("valid strike");
     let basis = PolynomialBasis::new(2).expect("valid regression basis");
 
     // Monthly exercise dates over 1 year (12 steps, 12 exercise opportunities)

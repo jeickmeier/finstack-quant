@@ -16,7 +16,7 @@ use finstack_quant_core::money::Money;
 
 use finstack_quant_models::monte_carlo::discretization::qe_heston::QeHeston;
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
-use finstack_quant_models::monte_carlo::payoff::asian::{AsianCall, AsianPut};
+use finstack_quant_models::monte_carlo::payoff::asian::Asian;
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::seed;
@@ -168,60 +168,37 @@ impl AsianOptionHestonMcPricer {
 
         let ccy = inst.currency;
 
-        let (pv, mc_stderr) = match inst.option_type {
-            crate::instruments::OptionType::Call => {
-                let payoff = if hist_count > 0 {
-                    AsianCall::with_history(
-                        inst.strike,
-                        inst.quantity,
-                        averaging,
-                        fixing_steps,
-                        hist_sum,
-                        hist_prod_log,
-                        hist_count,
-                    )
-                } else {
-                    AsianCall::new(inst.strike, inst.quantity, averaging, fixing_steps)
-                }?
-                .with_fixing_multipliers(&fixing_multipliers)?;
-                let result = engine.price(
-                    &rng,
-                    &process,
-                    &discretization,
-                    &initial_state,
-                    &payoff,
-                    ccy,
-                    discount_factor,
-                )?;
-                (result.mean, result.stderr)
-            }
-            crate::instruments::OptionType::Put => {
-                let payoff = if hist_count > 0 {
-                    AsianPut::with_history(
-                        inst.strike,
-                        inst.quantity,
-                        averaging,
-                        fixing_steps,
-                        hist_sum,
-                        hist_prod_log,
-                        hist_count,
-                    )
-                } else {
-                    AsianPut::new(inst.strike, inst.quantity, averaging, fixing_steps)
-                }?
-                .with_fixing_multipliers(&fixing_multipliers)?;
-                let result = engine.price(
-                    &rng,
-                    &process,
-                    &discretization,
-                    &initial_state,
-                    &payoff,
-                    ccy,
-                    discount_factor,
-                )?;
-                (result.mean, result.stderr)
-            }
-        };
+        let payoff = if hist_count > 0 {
+            Asian::with_history(
+                inst.option_type,
+                inst.strike,
+                inst.quantity,
+                averaging,
+                fixing_steps,
+                hist_sum,
+                hist_prod_log,
+                hist_count,
+            )
+        } else {
+            Asian::new(
+                inst.option_type,
+                inst.strike,
+                inst.quantity,
+                averaging,
+                fixing_steps,
+            )
+        }?
+        .with_fixing_multipliers(&fixing_multipliers)?;
+        let result = engine.price(
+            &rng,
+            &process,
+            &discretization,
+            &initial_state,
+            &payoff,
+            ccy,
+            discount_factor,
+        )?;
+        let (pv, mc_stderr) = (result.mean, result.stderr);
 
         Ok((pv, mc_stderr))
     }

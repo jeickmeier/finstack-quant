@@ -18,12 +18,12 @@ use finstack_quant_models::monte_carlo::discretization::{
 };
 use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig, PathCaptureConfig};
 use finstack_quant_models::monte_carlo::payoff::asian::{
-    default_fixing_steps, AsianCall, AveragingMethod,
+    default_fixing_steps, Asian, AveragingMethod,
 };
 use finstack_quant_models::monte_carlo::payoff::barrier::{
     BarrierMonitoring, BarrierOptionPayoff, OptionKind,
 };
-use finstack_quant_models::monte_carlo::payoff::lookback::{Lookback, LookbackDirection};
+use finstack_quant_models::monte_carlo::payoff::lookback::Lookback;
 use finstack_quant_models::monte_carlo::payoff::vanilla::EuropeanCall;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
@@ -39,6 +39,7 @@ use finstack_quant_models::monte_carlo::process::schwartz_smith::{
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
 use finstack_quant_models::monte_carlo::traits::{PathState, Payoff};
 use finstack_quant_models::monte_carlo::TimeGrid;
+use finstack_quant_models::types::OptionType;
 
 pub const SPOT: f64 = 100.0;
 pub const STRIKE: f64 = 100.0;
@@ -75,8 +76,9 @@ pub fn european_call(num_steps: usize) -> EuropeanCall {
     EuropeanCall::new(STRIKE, 1.0, num_steps)
 }
 
-pub fn asian_call(num_steps: usize) -> AsianCall {
-    AsianCall::new(
+pub fn asian_call(num_steps: usize) -> Asian {
+    Asian::new(
+        OptionType::Call,
         STRIKE,
         1.0,
         AveragingMethod::Arithmetic,
@@ -86,7 +88,7 @@ pub fn asian_call(num_steps: usize) -> AsianCall {
 }
 
 pub fn lookback_call(num_steps: usize) -> Lookback {
-    Lookback::new(LookbackDirection::Call, STRIKE, 1.0, num_steps)
+    Lookback::new(OptionType::Call, STRIKE, 1.0, num_steps)
 }
 
 pub fn barrier_up_out(num_steps: usize) -> BarrierOptionPayoff {

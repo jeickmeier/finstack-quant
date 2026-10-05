@@ -13,7 +13,7 @@ use finstack_quant_core::money::Money;
 
 // MC-specific imports
 use finstack_quant_models::monte_carlo::engine::PathCaptureConfig;
-use finstack_quant_models::monte_carlo::payoff::asian::{AsianCall, AsianPut};
+use finstack_quant_models::monte_carlo::payoff::asian::Asian;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::{
     PathDependentPricer, PathDependentPricerConfig,
 };
@@ -399,97 +399,52 @@ impl AsianOptionMcPricer {
             inst.averaging_method,
             crate::instruments::exotics::asian_option::types::AveragingMethod::Arithmetic
         ) {
-            let (arith_full, geom_full) = match inst.option_type {
-                crate::instruments::OptionType::Call => {
-                    // Use path capture to get per-path discounted payoffs for covariance
-                    let mut cfg_cap = config;
-                    cfg_cap.path_capture = PathCaptureConfig::all();
-                    let pricer_cap = PathDependentPricer::new(cfg_cap);
+            // Use path capture to get per-path discounted payoffs for covariance
+            let mut cfg_cap = config;
+            cfg_cap.path_capture = PathCaptureConfig::all();
+            let pricer_cap = PathDependentPricer::new(cfg_cap);
 
-                    // Arithmetic payoff
-                    let arith_payoff = AsianCall::with_history(
-                    inst.strike,
-                    inst.quantity,
-                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic,
-                    fixing_steps.clone(),
-                    hist_sum,
-                    hist_prod_log,
-                    hist_count,
-                )?.with_fixing_multipliers(&fixing_multipliers)?;
-                    let arith_full = pricer_cap.price_with_paths_and_grid(
-                        &process,
-                        spot,
-                        time_grid.clone(),
-                        &arith_payoff,
-                        inst.currency,
-                        discount_factor,
-                    )?;
+            // Arithmetic payoff
+            let arith_payoff = Asian::with_history(
+                inst.option_type,
+                inst.strike,
+                inst.quantity,
+                finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic,
+                fixing_steps.clone(),
+                hist_sum,
+                hist_prod_log,
+                hist_count,
+            )?
+            .with_fixing_multipliers(&fixing_multipliers)?;
+            let arith_full = pricer_cap.price_with_paths_and_grid(
+                &process,
+                spot,
+                time_grid.clone(),
+                &arith_payoff,
+                inst.currency,
+                discount_factor,
+            )?;
 
-                    // Geometric payoff (same RNG via same seed)
-                    let geom_payoff = AsianCall::with_history(
-                    inst.strike,
-                    inst.quantity,
-                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric,
-                    fixing_steps,
-                    hist_sum,
-                    hist_prod_log,
-                    hist_count,
-                )?.with_fixing_multipliers(&fixing_multipliers)?;
-                    let geom_full = pricer_cap.price_with_paths_and_grid(
-                        &process,
-                        spot,
-                        time_grid,
-                        &geom_payoff,
-                        inst.currency,
-                        discount_factor,
-                    )?;
-
-                    (arith_full, geom_full)
-                }
-                crate::instruments::OptionType::Put => {
-                    let mut cfg_cap = config;
-                    cfg_cap.path_capture = PathCaptureConfig::all();
-                    let pricer_cap = PathDependentPricer::new(cfg_cap);
-
-                    let arith_payoff = AsianPut::with_history(
-                    inst.strike,
-                    inst.quantity,
-                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Arithmetic,
-                    fixing_steps.clone(),
-                    hist_sum,
-                    hist_prod_log,
-                    hist_count,
-                )?.with_fixing_multipliers(&fixing_multipliers)?;
-                    let arith_full = pricer_cap.price_with_paths_and_grid(
-                        &process,
-                        spot,
-                        time_grid.clone(),
-                        &arith_payoff,
-                        inst.currency,
-                        discount_factor,
-                    )?;
-
-                    let geom_payoff = AsianPut::with_history(
-                    inst.strike,
-                    inst.quantity,
-                    finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric,
-                    fixing_steps,
-                    hist_sum,
-                    hist_prod_log,
-                    hist_count,
-                )?.with_fixing_multipliers(&fixing_multipliers)?;
-                    let geom_full = pricer_cap.price_with_paths_and_grid(
-                        &process,
-                        spot,
-                        time_grid,
-                        &geom_payoff,
-                        inst.currency,
-                        discount_factor,
-                    )?;
-
-                    (arith_full, geom_full)
-                }
-            };
+            // Geometric payoff (same RNG via same seed)
+            let geom_payoff = Asian::with_history(
+                inst.option_type,
+                inst.strike,
+                inst.quantity,
+                finstack_quant_models::monte_carlo::payoff::asian::AveragingMethod::Geometric,
+                fixing_steps,
+                hist_sum,
+                hist_prod_log,
+                hist_count,
+            )?
+            .with_fixing_multipliers(&fixing_multipliers)?;
+            let geom_full = pricer_cap.price_with_paths_and_grid(
+                &process,
+                spot,
+                time_grid,
+                &geom_payoff,
+                inst.currency,
+                discount_factor,
+            )?;
             // Extract per-path discounted payoffs
             // paths should be Some when path_capture is enabled in price_with_paths
             let xs: Vec<f64> = arith_full
@@ -564,52 +519,27 @@ impl AsianOptionMcPricer {
             MoneyEstimate::from_estimate(adj, inst.currency)?.mean
         } else {
             let pricer = PathDependentPricer::new(config);
-            match inst.option_type {
-                crate::instruments::OptionType::Call => {
-                    let payoff = AsianCall::with_history(
-                        inst.strike,
-                        inst.quantity,
-                        averaging,
-                        fixing_steps,
-                        hist_sum,
-                        hist_prod_log,
-                        hist_count,
-                    )?
-                    .with_fixing_multipliers(&fixing_multipliers)?;
-                    pricer
-                        .price_with_grid(
-                            &process,
-                            spot,
-                            time_grid,
-                            &payoff,
-                            inst.currency,
-                            discount_factor,
-                        )?
-                        .mean
-                }
-                crate::instruments::OptionType::Put => {
-                    let payoff = AsianPut::with_history(
-                        inst.strike,
-                        inst.quantity,
-                        averaging,
-                        fixing_steps,
-                        hist_sum,
-                        hist_prod_log,
-                        hist_count,
-                    )?
-                    .with_fixing_multipliers(&fixing_multipliers)?;
-                    pricer
-                        .price_with_grid(
-                            &process,
-                            spot,
-                            time_grid,
-                            &payoff,
-                            inst.currency,
-                            discount_factor,
-                        )?
-                        .mean
-                }
-            }
+            let payoff = Asian::with_history(
+                inst.option_type,
+                inst.strike,
+                inst.quantity,
+                averaging,
+                fixing_steps,
+                hist_sum,
+                hist_prod_log,
+                hist_count,
+            )?
+            .with_fixing_multipliers(&fixing_multipliers)?;
+            pricer
+                .price_with_grid(
+                    &process,
+                    spot,
+                    time_grid,
+                    &payoff,
+                    inst.currency,
+                    discount_factor,
+                )?
+                .mean
         };
 
         Ok(result_money)
@@ -2191,7 +2121,8 @@ mod tests {
         );
         let process = GbmProcess::new(GbmParams::new(-df.ln() / t, 0.0, sigma).expect("GBM"))
             .with_drift_schedule(std::sync::Arc::new(drift));
-        let payoff = AsianCall::with_history(
+        let payoff = Asian::with_history(
+            crate::instruments::OptionType::Call,
             option.strike,
             1.0,
             AveragingMethod::Geometric,

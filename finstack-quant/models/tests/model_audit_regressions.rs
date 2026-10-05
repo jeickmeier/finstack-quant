@@ -6,7 +6,7 @@ use finstack_quant_models::fourier::cos::{bs_cos_price, BlackScholesCosParams};
 use finstack_quant_models::monte_carlo::{
     pricer::{
         basis::PolynomialBasis,
-        lsmc::{AmericanPut, LsmcConfig, LsmcPricer},
+        lsmc::{AmericanExercise, LsmcConfig, LsmcPricer},
     },
     process::gbm::GbmProcess,
 };
@@ -61,7 +61,7 @@ fn cos_requires_a_nonempty_expansion_and_reconciles_to_black_scholes() {
 #[test]
 fn lsmc_only_applies_immediate_exercise_when_scheduled_in_both_pricing_modes() {
     let process = GbmProcess::with_params(0.2, 0.0, 0.0).unwrap();
-    let payoff = AmericanPut::new(100.0).unwrap();
+    let payoff = AmericanExercise::new(OptionType::Put, 100.0).unwrap();
     let basis = PolynomialBasis::new(1).expect("valid regression basis");
     for (dates, expected) in [
         (vec![1], 100.0 * (-0.2_f64).exp() - 50.0),

@@ -150,6 +150,7 @@
 //!
 //! - Monte Carlo pricing for exact arithmetic average pricing
 
+use crate::types::OptionType;
 use finstack_quant_core::math::special_functions::norm_cdf;
 use finstack_quant_core::math::NeumaierAccumulator;
 use finstack_quant_core::Result;
@@ -207,29 +208,35 @@ pub fn geometric_asian_call(
     vol: f64,
     num_fixings: usize,
 ) -> f64 {
-    // `df` is derived from a finite `rate`, so it is always strictly positive;
-    // call the shared infallible core directly (no `df` validation needed).
-    let df = (-rate * time).exp();
-    geometric_asian_call_core(spot, strike, time, rate, df, div_yield, vol, num_fixings)
+    geometric_asian_core(
+        OptionType::Call,
+        spot,
+        strike,
+        time,
+        rate,
+        div_yield,
+        vol,
+        num_fixings,
+    )
 }
 
-/// Shared infallible core for the geometric Asian call.
-///
-/// `rate` and `df` are assumed consistent (`df = exp(-rate·time)`); callers
-/// derive them from each other, having already validated `df > 0`.
+/// Shared core for the geometric Asian call and put.
 #[allow(clippy::too_many_arguments)]
-fn geometric_asian_call_core(
+fn geometric_asian_core(
+    option_type: OptionType,
     spot: f64,
     strike: f64,
     time: f64,
     rate: f64,
-    df: f64,
     div_yield: f64,
     vol: f64,
     num_fixings: usize,
 ) -> f64 {
     if time <= 0.0 {
-        return (spot - strike).max(0.0);
+        return match option_type {
+            OptionType::Call => (spot - strike).max(0.0),
+            OptionType::Put => (strike - spot).max(0.0),
+        };
     }
 
     // Zero-vol degenerate case: the geometric average is deterministic, so the
@@ -237,9 +244,13 @@ fn geometric_asian_call_core(
     // routing a zero `vol_adj` through the BS pricer where downstream Greeks
     // could divide by sigma.
     if vol <= 0.0 {
+        let df = (-rate * time).exp();
+        let forward = deterministic_geometric_forward(spot, time, rate, div_yield, num_fixings);
         return df
-            * (deterministic_geometric_forward(spot, time, rate, div_yield, num_fixings) - strike)
-                .max(0.0);
+            * match option_type {
+                OptionType::Call => (forward - strike).max(0.0),
+                OptionType::Put => (strike - forward).max(0.0),
+            };
     }
 
     let n = num_fixings as f64;
@@ -274,7 +285,10 @@ fn geometric_asian_call_core(
         rate - (rate - div_yield - 0.5 * vol * vol) * drift_factor - var_half
     };
 
-    vanilla_call_bs(spot, strike, time, rate, div_yield_adj, vol_adj)
+    match option_type {
+        OptionType::Call => vanilla_call_bs(spot, strike, time, rate, div_yield_adj, vol_adj),
+        OptionType::Put => vanilla_put_bs(spot, strike, time, rate, div_yield_adj, vol_adj),
+    }
 }
 
 /// Price a geometric average Asian put option (closed-form).
@@ -301,53 +315,16 @@ pub fn geometric_asian_put(
     vol: f64,
     num_fixings: usize,
 ) -> f64 {
-    let df = (-rate * time).exp();
-    geometric_asian_put_core(spot, strike, time, rate, df, div_yield, vol, num_fixings)
-}
-
-/// Shared infallible core for the geometric Asian put. See
-/// [`geometric_asian_call_core`] for the `rate`/`df` consistency contract.
-#[allow(clippy::too_many_arguments)]
-fn geometric_asian_put_core(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    rate: f64,
-    df: f64,
-    div_yield: f64,
-    vol: f64,
-    num_fixings: usize,
-) -> f64 {
-    if time <= 0.0 {
-        return (strike - spot).max(0.0);
-    }
-
-    // Zero-vol degenerate: see `geometric_asian_call_core` for rationale.
-    if vol <= 0.0 {
-        return df
-            * (strike - deterministic_geometric_forward(spot, time, rate, div_yield, num_fixings))
-                .max(0.0);
-    }
-
-    let n = num_fixings as f64;
-
-    // Adjusted volatility and dividend yield (consistent with geometric_asian_call)
-    let vol_adj = if num_fixings == 0 {
-        vol / 3.0_f64.sqrt()
-    } else {
-        vol * ((n + 1.0) * (2.0 * n + 1.0) / (6.0 * n * n)).sqrt()
-    };
-
-    let div_yield_adj = if num_fixings == 0 {
-        // Continuous limit: q_adj = r - (r - q - σ²/2)/2 - σ²/6 = (r+q)/2 + σ²/12
-        rate - (rate - div_yield - 0.5 * vol * vol) / 2.0 - vol * vol / 6.0
-    } else {
-        let drift_factor = (n + 1.0) / (2.0 * n);
-        let var_half = vol * vol * (n + 1.0) * (2.0 * n + 1.0) / (12.0 * n * n);
-        rate - (rate - div_yield - 0.5 * vol * vol) * drift_factor - var_half
-    };
-
-    vanilla_put_bs(spot, strike, time, rate, div_yield_adj, vol_adj)
+    geometric_asian_core(
+        OptionType::Put,
+        spot,
+        strike,
+        time,
+        rate,
+        div_yield,
+        vol,
+        num_fixings,
+    )
 }
 
 /// Price an arithmetic average Asian call option using Turnbull-Wakeman approximation.
@@ -410,49 +387,68 @@ pub fn arithmetic_asian_call_tw(
     vol: f64,
     num_fixings: usize,
 ) -> f64 {
-    let df = (-rate * time).exp();
-    arithmetic_asian_call_tw_core(spot, strike, time, rate, df, div_yield, vol, num_fixings)
+    arithmetic_asian_tw_core(
+        OptionType::Call,
+        spot,
+        strike,
+        time,
+        rate,
+        div_yield,
+        vol,
+        num_fixings,
+    )
 }
 
-/// Shared infallible core for the Turnbull-Wakeman arithmetic Asian call. See
-/// [`geometric_asian_call_core`] for the `rate`/`df` consistency contract.
+/// Shared core for the Turnbull-Wakeman arithmetic Asian call and put.
 #[allow(clippy::too_many_arguments)]
-fn arithmetic_asian_call_tw_core(
+fn arithmetic_asian_tw_core(
+    option_type: OptionType,
     spot: f64,
     strike: f64,
     time: f64,
     rate: f64,
-    df: f64,
     div_yield: f64,
     vol: f64,
     num_fixings: usize,
 ) -> f64 {
     if time <= 0.0 {
-        return (spot - strike).max(0.0);
+        return match option_type {
+            OptionType::Call => (spot - strike).max(0.0),
+            OptionType::Put => (strike - spot).max(0.0),
+        };
     }
     if num_fixings == 0 {
         return 0.0; // Need at least one fixing
     }
 
+    let df = (-rate * time).exp();
+    let m1 = compute_arithmetic_mean_first_moment(spot, time, rate, div_yield, num_fixings);
+
+    // Discounted intrinsic on the expected average, and the no-arbitrage upper
+    // bound. A call cannot be worth more than the discounted expected average
+    // `df * m1` (a call struck at 0); a put pays at most `K` because the
+    // average is non-negative, so it is worth at most `df * K`. The
+    // Turnbull-Wakeman lognormal moment-matching is only an approximation and
+    // can overshoot these bounds for deep-ITM / high-vol inputs, so the return
+    // paths below are capped.
+    let (forward_intrinsic, upper_bound) = match option_type {
+        OptionType::Call => (df * (m1 - strike).max(0.0), df * m1),
+        OptionType::Put => (df * (strike - m1).max(0.0), df * strike),
+    };
+
     // Zero-vol degenerate: arithmetic average is deterministic, so the option
     // is the discounted forward intrinsic. The downstream `m2 <= m1*m1` guard
     // catches the same case via moment math, but explicit early-return makes
     // the contract obvious and shields against future modifications to the
-    // moment calculation.
+    // moment calculation. Only the put applies its cap on this path.
     if vol <= 0.0 {
-        let m1 = compute_arithmetic_mean_first_moment(spot, time, rate, div_yield, num_fixings);
-        return df * (m1 - strike).max(0.0);
+        return match option_type {
+            OptionType::Call => forward_intrinsic,
+            OptionType::Put => forward_intrinsic.min(upper_bound),
+        };
     }
 
-    let m1 = compute_arithmetic_mean_first_moment(spot, time, rate, div_yield, num_fixings);
     let m2 = compute_arithmetic_mean_second_moment(spot, time, rate, div_yield, vol, num_fixings);
-
-    // No-arbitrage upper bound: an arithmetic-average call cannot be worth more
-    // than the discounted expected average `df * m1` (a call struck at 0 — i.e.
-    // the forward-average claim paid with certainty). The Turnbull-Wakeman
-    // lognormal moment-matching is only an approximation and can overshoot this
-    // bound for deep-ITM / high-vol inputs, so every return path is capped.
-    let upper_bound = df * m1;
 
     // For X ~ LogNormal(μ*, σ*²):
     // - E[X] = m1 = exp(μ* + σ*²/2)
@@ -460,14 +456,14 @@ fn arithmetic_asian_call_tw_core(
     // Solving: σ*² = ln(m2/m1²), μ* = ln(m1) - σ*²/2
 
     if m2 <= m1 * m1 {
-        // Degenerate case (no variance): treat as forward, price = df * max(m1 - K, 0)
-        return (df * (m1 - strike).max(0.0)).min(upper_bound);
+        // Degenerate case (no variance): treat as forward.
+        return forward_intrinsic.min(upper_bound);
     }
 
     let var = (m2 / (m1 * m1)).ln();
     if var <= 0.0 {
         // Degenerate case (numerical issues): same treatment
-        return (df * (m1 - strike).max(0.0)).min(upper_bound);
+        return forward_intrinsic.min(upper_bound);
     }
 
     let sigma_star = var.sqrt();
@@ -482,10 +478,14 @@ fn arithmetic_asian_call_tw_core(
     let d1 = (mu_star - strike.ln() + var) / sigma_star;
     let d2 = d1 - sigma_star;
 
-    // Price = df * (m1 * N(d1) - K * N(d2)), floored at 0 and capped at df*m1.
-    let call_price = df * (m1 * norm_cdf(d1) - strike * norm_cdf(d2));
+    // Call = df * (m1 * N(d1) - K * N(d2)), put = df * (K * N(-d2) - m1 * N(-d1)),
+    // floored at 0 and capped at the upper bound.
+    let price = match option_type {
+        OptionType::Call => df * (m1 * norm_cdf(d1) - strike * norm_cdf(d2)),
+        OptionType::Put => df * (strike * norm_cdf(-d2) - m1 * norm_cdf(-d1)),
+    };
 
-    call_price.max(0.0).min(upper_bound)
+    price.max(0.0).min(upper_bound)
 }
 
 /// Price an arithmetic average Asian put option using Turnbull-Wakeman approximation.
@@ -512,66 +512,16 @@ pub fn arithmetic_asian_put_tw(
     vol: f64,
     num_fixings: usize,
 ) -> f64 {
-    let df = (-rate * time).exp();
-    arithmetic_asian_put_tw_core(spot, strike, time, rate, df, div_yield, vol, num_fixings)
-}
-
-/// Shared infallible core for the Turnbull-Wakeman arithmetic Asian put. See
-/// [`geometric_asian_call_core`] for the `rate`/`df` consistency contract.
-#[allow(clippy::too_many_arguments)]
-fn arithmetic_asian_put_tw_core(
-    spot: f64,
-    strike: f64,
-    time: f64,
-    rate: f64,
-    df: f64,
-    div_yield: f64,
-    vol: f64,
-    num_fixings: usize,
-) -> f64 {
-    if time <= 0.0 {
-        return (strike - spot).max(0.0);
-    }
-    if num_fixings == 0 {
-        return 0.0;
-    }
-
-    // No-arbitrage upper bound: an arithmetic-average put pays max(K - A, 0),
-    // which is at most K (the average A is non-negative), so the put is worth
-    // at most the discounted strike `df * K`. The Turnbull-Wakeman lognormal
-    // moment-matching is only an approximation and can overshoot this bound, so
-    // every return path is capped.
-    let upper_bound = df * strike;
-
-    // Zero-vol degenerate: see `arithmetic_asian_call_tw_core` for rationale.
-    if vol <= 0.0 {
-        let m1 = compute_arithmetic_mean_first_moment(spot, time, rate, div_yield, num_fixings);
-        return (df * (strike - m1).max(0.0)).min(upper_bound);
-    }
-
-    let m1 = compute_arithmetic_mean_first_moment(spot, time, rate, div_yield, num_fixings);
-    let m2 = compute_arithmetic_mean_second_moment(spot, time, rate, div_yield, vol, num_fixings);
-
-    if m2 <= m1 * m1 {
-        // Degenerate case: df * max(K - m1, 0)
-        return (df * (strike - m1).max(0.0)).min(upper_bound);
-    }
-
-    let var = (m2 / (m1 * m1)).ln();
-    if var <= 0.0 {
-        return (df * (strike - m1).max(0.0)).min(upper_bound);
-    }
-
-    let sigma_star = var.sqrt();
-    let mu_star = m1.ln() - 0.5 * var;
-
-    // Correct d-parameters: d1 = (μ* - ln(K) + σ*²) / σ*
-    let d1 = (mu_star - strike.ln() + var) / sigma_star;
-    let d2 = d1 - sigma_star;
-
-    let put_price = df * (strike * norm_cdf(-d2) - m1 * norm_cdf(-d1));
-
-    put_price.max(0.0).min(upper_bound)
+    arithmetic_asian_tw_core(
+        OptionType::Put,
+        spot,
+        strike,
+        time,
+        rate,
+        div_yield,
+        vol,
+        num_fixings,
+    )
 }
 
 // GENERAL FIXING-TIME VARIANTS
@@ -1494,5 +1444,38 @@ mod tests {
                 rel_err
             );
         }
+    }
+
+    /// Bit-level pin of the four equal-spacing entry points across the
+    /// expiry, zero-volatility, fixing-count and moneyness branches.
+    #[test]
+    fn h2_pin_equal_spacing_asian_prices_are_bit_stable() {
+        // FNV-1a style fold of the 128 price bit patterns.
+        const EXPECTED: u64 = 16_960_386_220_788_001_146;
+        let mut actual = 0xcbf2_9ce4_8422_2325_u64;
+        for &(spot, strike, time, rate, div_yield, vol) in &[
+            (100.0, 100.0, 1.0, 0.05, 0.02, 0.2),
+            (100.0, 80.0, 0.5, 0.03, 0.0, 0.35),
+            (100.0, 130.0, 2.0, 0.01, 0.04, 0.6),
+            (100.0, 95.0, 1.0, 0.05, 0.02, 0.0),
+            (100.0, 105.0, 1.0, 0.05, 0.02, 0.0),
+            (100.0, 90.0, 0.0, 0.05, 0.02, 0.2),
+            (100.0, 110.0, 0.0, 0.05, 0.02, 0.2),
+            (50.0, 1.0, 5.0, 0.08, 0.0, 1.5),
+        ] {
+            for num_fixings in [0, 1, 12, 252] {
+                for price in [
+                    geometric_asian_call,
+                    geometric_asian_put,
+                    arithmetic_asian_call_tw,
+                    arithmetic_asian_put_tw,
+                ] {
+                    let bits =
+                        price(spot, strike, time, rate, div_yield, vol, num_fixings).to_bits();
+                    actual = (actual ^ bits).wrapping_mul(0x0000_0100_0000_01b3);
+                }
+            }
+        }
+        assert_eq!(actual, EXPECTED, "{actual:#x}");
     }
 }
