@@ -1,14 +1,16 @@
 //! WASM bindings for the Monte Carlo engine in `finstack-quant-models`.
 //!
 //! Mirrors `finstack-quant-py/src/bindings/models/monte_carlo/`: Heston and
-//! GBM convenience pricers, GBM path simulation and finite-difference Greeks.
-//! Estimates cross the boundary as the canonical Rust `MoneyEstimate` /
-//! `Estimate` serde objects. Closed-form Black-Scholes references live in
-//! `models.bsPrice`; processes, discretizations and RNGs remain Rust-only.
+//! GBM convenience pricers, path simulation for the built-in Markov processes
+//! and finite-difference Greeks. Estimates cross the boundary as the canonical
+//! Rust `MoneyEstimate` / `Estimate` serde objects, and simulated paths as the
+//! `PathSummary` object. Closed-form Black-Scholes references live in
+//! `models.bsPrice`; `simulatePaths` selects a process and discretization by
+//! spec, while the process, discretization and RNG types remain Rust-only.
 
 use crate::utils::input::{
     from_js_json, js_bool, js_f64, js_opt_bool, js_opt_f64, js_opt_string, js_opt_u64, js_opt_uint,
-    js_u64, js_uint,
+    js_u64,
 };
 use std::str::FromStr;
 
@@ -22,6 +24,7 @@ use finstack_quant_models::monte_carlo::greeks::gbm_european::{
 use finstack_quant_models::monte_carlo::pricer::european::EuropeanPricer;
 use finstack_quant_models::monte_carlo::pricer::path_dependent::PathDependentPricer;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
+use finstack_quant_models::monte_carlo::simulate::PathSimulationSpec;
 use finstack_quant_models::OptionType;
 use wasm_bindgen::prelude::*;
 
@@ -265,47 +268,43 @@ pub fn heston_satisfies_feller(
     )
 }
 
-/// Simulate a compact set of GBM spot paths.
-/// @param spot - Spot level at time 0.
-/// @param rate - Continuously compounded risk-free rate (decimal, annualized).
-/// @param div_yield - Continuous dividend yield (decimal, annualized).
-/// @param vol - Annualized GBM volatility (decimal).
-/// @param expiry - Horizon in years; the grid is uniform from 0 to `expiry`.
-/// @param num_steps - Number of time-grid steps; a positive safe integer.
-/// @param num_paths - Number of captured paths; a positive safe integer.
-/// @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the Rust `GbmPathConfig` default.
-/// @returns The `GbmPathSummary` object (`num_paths`, `num_simulated_paths`, `times`, `paths`).
+/// Simulate paths of any built-in Markov process on a shared time grid.
+///
+/// Twin of the Rust and Python `simulate_paths`: the spec selects the process,
+/// the discretization scheme, the time grid and the random streams, and Rust
+/// validates every field.
+/// @param spec - `PathSimulationSpec` object or JSON: `process` (tagged by `type`, with annualized decimal rates and volatilities), optional `scheme` (`"default"` uses the process's canonical scheme), `initial_state` in the process's state layout, `time_grid` in years, `num_paths` in [1, 100000], `seed`, and optional `antithetic` (default `false`).
+/// @returns The `PathSummary` object: `num_paths`, `num_simulated_paths`, `dim`, `times`, `factor_names`, and `values` in row-major `[path][time][factor]` order, so factor `f` on path `p` at `times[s]` is `values[(p * times.length + s) * dim + f]`.
+///
+/// @example
+/// ```typescript
+/// import init, { models } from "finstack-quant-wasm";
+/// await init();
+/// const paths = models.monteCarlo.simulatePaths({
+///   process: { type: "gbm", r: 0.05, q: 0.0, sigma: 0.2 },
+///   initial_state: [100],
+///   time_grid: { type: "uniform", expiry: 1.0, num_steps: 2 },
+///   num_paths: 3,
+///   seed: 7,
+/// });
+/// console.log(paths.times); // [0, 0.5, 1]
+/// console.log(paths.factor_names); // ["spot"]
+/// console.log(paths.values.length); // 9 = 3 paths x 3 times x 1 factor
+/// ```
 ///
 /// # Errors
 ///
-/// Throws a `TypeError` if a count is not a safe integer, and a `validation`
-/// error if an input is non-finite or out of range.
-#[allow(clippy::too_many_arguments)]
-#[wasm_bindgen(js_name = simulateGbmPaths)]
-pub fn simulate_gbm_paths(
-    spot: JsValue,
-    rate: JsValue,
-    div_yield: JsValue,
-    vol: JsValue,
-    expiry: JsValue,
-    num_steps: JsValue,
-    num_paths: JsValue,
-    seed: Option<JsValue>,
-) -> Result<JsValue, JsValue> {
-    let mut config = finstack_quant_models::monte_carlo::GbmPathConfig::new(
-        js_f64(&spot, "spot")?,
-        js_f64(&rate, "rate")?,
-        js_f64(&div_yield, "divYield")?,
-        js_f64(&vol, "vol")?,
-        js_f64(&expiry, "expiry")?,
-        js_uint(&num_steps, "numSteps")?,
-        js_uint(&num_paths, "numPaths")?,
-    );
-    if let Some(seed) = js_opt_u64(seed.as_ref(), "seed")? {
-        config = config.with_seed(seed);
-    }
+/// Throws a `TypeError` if `spec` is neither an object nor JSON text, and a
+/// `validation` error if it does not match `PathSimulationSpec`, a process
+/// parameter is out of range, the scheme is not available for the process,
+/// `initial_state` has the wrong length or lies outside the process's domain,
+/// the time grid is invalid, `num_paths` is outside [1, 100000], the output
+/// would exceed 64 million stored values, or a simulated state is non-finite.
+#[wasm_bindgen(js_name = simulatePaths)]
+pub fn simulate_paths(spec: JsValue) -> Result<JsValue, JsValue> {
+    let spec: PathSimulationSpec = from_js_json(&spec, "spec")?;
     let summary =
-        finstack_quant_models::monte_carlo::simulate_gbm_paths(&config).map_err(to_js_err)?;
+        finstack_quant_models::monte_carlo::simulate::simulate_paths(&spec).map_err(to_js_err)?;
     to_js_value(&summary)
 }
 

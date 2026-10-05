@@ -4,7 +4,7 @@ title: "Monte Carlo I: Processes, Paths, and Honest Error Bars"
 description: "Price a European claim from simulated paths, audit uncertainty and path counts, and measure variance reduction before moving to stochastic volatility."
 desk_question: "There is no convenient formula for this payoff. How do we price it, and what does the error bar actually cover?"
 references: ["#glasserman-2004-monte-carlo", "#heston-1993", "#andersen-2008-heston-qe", "#lord-koekkoek-vandijk-2010", "#broadie-kaya-2006-exact-heston", "#salmon-2011-philox", "#box-muller-1958", "#joe-kuo-2008-sobol", "#kahan-1965", "#albrecher-2007-little-heston-trap"]
-api: ["finstack_quant.models.bs_price", "finstack_quant.models.bs_greeks", "finstack_quant.models.monte_carlo.EuropeanPricer", "finstack_quant.models.monte_carlo.LsmcPricer", "finstack_quant.models.monte_carlo.simulate_gbm_paths", "finstack_quant.models.monte_carlo.price_heston_call"]
+api: ["finstack_quant.models.bs_price", "finstack_quant.models.bs_greeks", "finstack_quant.models.monte_carlo.EuropeanPricer", "finstack_quant.models.monte_carlo.LsmcPricer", "finstack_quant.models.monte_carlo.simulate_paths", "finstack_quant.models.monte_carlo.price_heston_call"]
 status: "published"
 ---
 
@@ -121,7 +121,7 @@ The last column should be roughly stable because it estimates payoff standard de
 
 ### 2. Inspect paths and test the risk-neutral mean
 
-The captured path includes the initial state, so twelve steps produce thirteen entries. The terminal-mean tolerance below is four empirical standard errors, not an exact identity. The captured-path API rejects `antithetic=True` with `ValueError`; the rejection is tested visibly rather than assuming the flag works everywhere.
+The captured path includes the initial state, so twelve steps produce thirteen entries. The terminal-mean tolerance below is four empirical standard errors, not an exact identity. With `"antithetic": True` the path API stores each random stream followed by its mirrored partner, so `num_simulated_paths` is twice `num_paths`; the pairing is tested visibly rather than assumed.
 
 {/* notebook-block notebook="07_advanced_quant/monte_carlo/stochastic_processes.ipynb" cell="mc-process-inputs" role="build" */}
 ```python exec id=mc-process-inputs role=build
@@ -129,7 +129,7 @@ from finstack_quant.models import bs_price
 from finstack_quant.models.monte_carlo import (
     EuropeanPricer,
     heston_satisfies_feller,
-    simulate_gbm_paths,
+    simulate_paths,
 )
 
 gbm_params = dict(rate=0.05, div_yield=0.0, vol=0.20)
@@ -153,16 +153,21 @@ bs = bs_price(100.0, 100.0, 0.05, 0.0, 0.20, 1.0, True)
 print(f"EuropeanPricer ATM call: {mc_call.mean.amount:.6f} (stderr={mc_call.stderr:.6f})")
 print(f"Black–Scholes call:      {bs:.6f}")
 
-path_summary = simulate_gbm_paths(
-    spot=100.0,
-    expiry=1.0,
-    num_steps=12,
-    num_paths=3,
-    seed=42,
-    **gbm_params,
-)
-print("Captured GBM path shape:", len(path_summary.paths), "x", len(path_summary.times))
-print("Terminal spots:", [round(path[-1], 4) for path in path_summary.paths])
+path_summary = simulate_paths({
+    "process": {
+        "type": "gbm",
+        "r": gbm_params["rate"],
+        "q": gbm_params["div_yield"],
+        "sigma": gbm_params["vol"],
+    },
+    "initial_state": [100.0],
+    "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 12},
+    "num_paths": 3,
+    "seed": 42,
+})
+spot_by_path = path_summary.to_dataframe()["spot"].unstack("path")
+print("Captured GBM path shape:", path_summary.num_simulated_paths, "x", len(path_summary.times))
+print("Terminal spots:", spot_by_path.iloc[-1].round(4).tolist())
 ```
 {/* /notebook-block */}
 
@@ -173,15 +178,22 @@ print("Terminal spots:", [round(path[-1], 4) for path in path_summary.paths])
 import math
 import statistics
 
-antithetic_capture_error = None
-try:
-    simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 12, 16, seed=17, antithetic=True)
-except ValueError as error:
-    antithetic_capture_error = str(error)
-print("Antithetic capture rejected:", antithetic_capture_error)
+import numpy as np
 
-captured = simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 12, 4096, seed=17)
-terminal_spots = [path[-1] for path in captured.paths]
+gbm_spec = {
+    "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+    "initial_state": [100.0],
+    "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 12},
+    "num_paths": 16,
+    "seed": 17,
+}
+paired = simulate_paths({**gbm_spec, "antithetic": True})
+log_spots = np.log(np.asarray(paired.values).reshape(paired.num_simulated_paths, len(paired.times)))
+shocks = np.diff(log_spots, axis=1) - (0.05 - 0.5 * 0.2**2) / 12
+print("Antithetic capture: streams =", paired.num_paths, "| stored paths =", paired.num_simulated_paths)
+
+captured = simulate_paths({**gbm_spec, "num_paths": 4096})
+terminal_spots = captured.to_dataframe()["spot"].xs(1.0, level="time").tolist()
 forward = 100 * math.exp(0.05)
 mean_terminal = statistics.mean(terminal_spots)
 terminal_se = statistics.stdev(terminal_spots) / math.sqrt(captured.num_paths)
@@ -218,13 +230,19 @@ print("Serial = parallel = seeded replay:", signatures[0])
 ```python exec id=antithetic-pair-arithmetic role=build
 from finstack_quant.models.monte_carlo import LsmcPricer
 import statistics
-from finstack_quant.models.monte_carlo import simulate_gbm_paths
+from finstack_quant.models.monte_carlo import simulate_paths
 
 pairs = 2048
 seed = 17
 discount = math.exp(-0.05)
-captured = simulate_gbm_paths(100, 0.05, 0.0, 0.20, 1.0, 1, 2 * pairs, seed=seed)
-terminals = [path[-1] for path in captured.paths]
+captured = simulate_paths({
+    "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.20},
+    "initial_state": [100.0],
+    "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 1},
+    "num_paths": 2 * pairs,
+    "seed": seed,
+})
+terminals = captured.values[1::2]  # one step per path: [S_0, S_T, S_0, S_T, ...]
 plain_payoffs = [discount * max(100 - terminal, 0) for terminal in terminals]
 reflection_product = (100 * math.exp(0.05 - 0.5 * 0.20**2)) ** 2
 pair_payoffs = [
@@ -400,10 +418,16 @@ Because $g(Z)=g(-Z)$, the two payoffs are identical. Pairing 8,192 trajectories 
 {/* notebook-block notebook="07_advanced_quant/monte_carlo/discretization_schemes.ipynb" cell="antithetic-even-payoff" role="exercise" */}
 ```python exec id=antithetic-even-payoff role=exercise
 import numpy as np
-from finstack_quant.models.monte_carlo import simulate_gbm_paths
+from finstack_quant.models.monte_carlo import simulate_paths
 
-sample = simulate_gbm_paths(100, 0.05, 0, 0.2, 1, 1, 8192, seed=23)
-terminal = np.asarray(sample.paths)[:, -1]
+sample = simulate_paths({
+    "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+    "initial_state": [100.0],
+    "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 1},
+    "num_paths": 8192,
+    "seed": 23,
+})
+terminal = np.asarray(sample.values).reshape(sample.num_simulated_paths, len(sample.times))[:, -1]
 z = (np.log(terminal / 100) - (0.05 - 0.5 * 0.2**2)) / 0.2
 # g(z)=z^2 is unchanged under z -> -z. Two reflected trajectories yield only one observation.
 plain_payoffs = z**2

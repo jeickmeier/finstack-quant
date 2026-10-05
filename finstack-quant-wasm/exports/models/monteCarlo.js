@@ -7,7 +7,7 @@ export const monteCarlo = {
   priceHestonCall: wasm.priceHestonCall,
   priceHestonPut: wasm.priceHestonPut,
   hestonSatisfiesFeller: wasm.hestonSatisfiesFeller,
-  simulateGbmPaths: wasm.simulateGbmPaths,
+  simulatePaths: wasm.simulatePaths,
   finiteDiffDelta: wasm.finiteDiffDelta,
   finiteDiffDeltaCrn: wasm.finiteDiffDeltaCrn,
   finiteDiffGamma: wasm.finiteDiffGamma,

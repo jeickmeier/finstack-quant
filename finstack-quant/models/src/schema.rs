@@ -48,8 +48,8 @@ use crate::{
     monte_carlo::process::schwartz_smith::SchwartzSmithParams,
     monte_carlo::process::BrownianParams, monte_carlo::process::GbmParams,
     monte_carlo::process::MultiOuParams, monte_carlo::results::MonteCarloResult,
-    monte_carlo::GbmPathSummary, rates::dtsm::DieboldLi, rates::dtsm::YieldForecast,
-    rates::dtsm::YieldPanel, rates::dtsm::YieldPca, rates::dtsm::YieldPcaView,
+    rates::dtsm::DieboldLi, rates::dtsm::YieldForecast, rates::dtsm::YieldPanel,
+    rates::dtsm::YieldPca, rates::dtsm::YieldPcaView,
     rates::hull_white::HullWhiteCalibrationParams, rates::hull_white::HullWhiteParams,
     volatility::arbitrage::ArbitrageCheckConfig, volatility::arbitrage::ArbitrageReport,
     volatility::heston::HestonParams, volatility::rough_heston::RoughHestonFourierParams,
@@ -269,13 +269,6 @@ pub const ARTIFACTS: &[SchemaArtifact] = &[
         "gbm_params",
         Input,
         "Geometric Brownian Motion parameters."
-    ),
-    finstack_quant_core::schema_artifact!(
-        GbmPathSummary,
-        "models",
-        "gbm_path_summary",
-        Output,
-        "Compact captured GBM paths for plotting and diagnostics."
     ),
     finstack_quant_core::schema_artifact!(
         HestonParams,

@@ -66,7 +66,20 @@ from finstack_quant.models.monte_carlo import EuropeanPricer, PathDependentPrice
 import math
 import numpy as np
 from finstack_quant.models import asian_option_price
-from finstack_quant.models.monte_carlo import simulate_gbm_paths
+from finstack_quant.models.monte_carlo import simulate_paths
+
+
+def gbm_spot_paths(num_steps, num_paths, seed):
+    """Exact GBM spot paths (S0=100, r=5%, q=0, vol=20%, T=1) as a paths-by-times array."""
+    summary = simulate_paths({
+        "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.20},
+        "initial_state": [100.0],
+        "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": num_steps},
+        "num_paths": num_paths,
+        "seed": seed,
+    })
+    return np.asarray(summary.values).reshape(summary.num_simulated_paths, len(summary.times))
+
 
 args = (100.0, 100.0, 0.05, 0.0, 0.20, 1.0)
 vanilla = bs_price(*args, True)
@@ -76,7 +89,7 @@ asian_one = PathDependentPricer(4096, 17, False, False).price_asian_call(*args, 
 print(f"One-fixing analytical Asian={one_fixing:.8f}; BS={vanilla:.8f}")
 print(f"One-fixing MC Asian={asian_one.mean.amount:.8f}; European MC={eu_one.mean.amount:.8f}")
 
-paths = np.asarray(simulate_gbm_paths(100, 0.05, 0, 0.20, 1, 12, 8192, seed=17).paths)
+paths = gbm_spot_paths(12, 8192, seed=17)
 fixings = paths[:, 1:]
 arithmetic_payoffs = math.exp(-0.05) * np.maximum(fixings.mean(axis=1) - 100, 0)
 geometric_payoffs = math.exp(-0.05) * np.maximum(np.exp(np.log(fixings).mean(axis=1)) - 100, 0)
@@ -103,7 +116,7 @@ The experiment captures 252-step GBM paths once and selects nested quarterly, mo
 ```python exec id=nested-barrier-monitoring role=build
 from finstack_quant.models import barrier_call
 
-fine_paths = np.asarray(simulate_gbm_paths(100, 0.05, 0, 0.20, 1, 252, 4096, seed=17).paths)
+fine_paths = gbm_spot_paths(252, 4096, seed=17)
 terminal_payoffs = math.exp(-0.05) * np.maximum(fine_paths[:, -1] - 100, 0)
 continuous = barrier_call(100, 100, 120, 0.05, 0, 0.20, 1, "up", "out")
 previous_payoffs = terminal_payoffs
@@ -329,9 +342,16 @@ The running maximum includes the terminal observation, so $(\max_j S_{t_j}-K)^+\
 import math
 import numpy as np
 from finstack_quant.models import bs_price
-from finstack_quant.models.monte_carlo import simulate_gbm_paths
+from finstack_quant.models.monte_carlo import simulate_paths
 
-lookback_paths = np.asarray(simulate_gbm_paths(100, 0.05, 0, 0.2, 1, 252, 8192, seed=31).paths)
+lookback = simulate_paths({
+    "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+    "initial_state": [100.0],
+    "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 252},
+    "num_paths": 8192,
+    "seed": 31,
+})
+lookback_paths = np.asarray(lookback.values).reshape(lookback.num_simulated_paths, len(lookback.times))
 vanilla_path_value = math.exp(-0.05) * np.maximum(lookback_paths[:, -1] - 100, 0)
 lookback_path_value = math.exp(-0.05) * np.maximum(lookback_paths.max(axis=1) - 100, 0)
 vanilla_exact = bs_price(100, 100, 0.05, 0, 0.2, 1, True)

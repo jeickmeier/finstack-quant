@@ -1,11 +1,12 @@
 """
 Monte Carlo convenience bindings (``finstack-quant-models``).
 
-Exposes simulation primitives: time grids, engine configuration, pricers,
-closed-form Black-Scholes helpers, and selected non-GBM process wrappers.
-Advanced Rust process, discretization, RNG, payoff, and Greeks types are not
-surfaced as standalone Python types yet; their parameters are passed directly
-as numeric arguments to the exposed pricer constructors and methods.
+Exposes path simulation for the built-in Markov processes
+(:func:`simulate_paths`), GBM and Heston pricers, and finite-difference Greek
+estimators. Processes and discretization schemes are selected by the plain-data
+spec passed to :func:`simulate_paths`; the Rust process, discretization, RNG
+and payoff types are not surfaced as standalone Python types, and the pricers
+take their parameters directly as numeric arguments.
 
 Examples
 --------
@@ -17,6 +18,7 @@ True
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 
 import pandas as pd
 
@@ -25,10 +27,10 @@ from finstack_quant.core.money import Money
 __all__ = [
     "Estimate",
     "EuropeanPricer",
-    "GbmPathSummary",
     "LsmcPricer",
     "MoneyEstimate",
     "PathDependentPricer",
+    "PathSummary",
     "finite_diff_delta",
     "finite_diff_delta_crn",
     "finite_diff_gamma",
@@ -36,7 +38,7 @@ __all__ = [
     "heston_satisfies_feller",
     "price_heston_call",
     "price_heston_put",
-    "simulate_gbm_paths",
+    "simulate_paths",
 ]
 
 class MoneyEstimate:
@@ -612,22 +614,35 @@ class Estimate:
         """
         ...
 
-class GbmPathSummary:
+class PathSummary:
     """
-    Compact captured GBM spot paths.
+    Simulated paths of a Markov process on a shared time grid.
+
+    Returned by :func:`simulate_paths`. ``values`` holds every state in
+    row-major ``[path][time][factor]`` order; :meth:`to_dataframe` reshapes it
+    into one row per path and time.
 
     Examples
     --------
-    >>> from finstack_quant.models.monte_carlo import simulate_gbm_paths
-    >>> paths = simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 2, 3, seed=7)
-    >>> (paths.num_paths, paths.times)
-    (3, [0.0, 0.5, 1.0])
+    >>> from finstack_quant.models.monte_carlo import simulate_paths
+    >>> spec = {
+    ...     "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+    ...     "initial_state": [100.0],
+    ...     "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 2},
+    ...     "num_paths": 3,
+    ...     "seed": 7,
+    ... }
+    >>> paths = simulate_paths(spec)
+    >>> (paths.num_simulated_paths, paths.times, paths.factor_names)
+    (3, [0.0, 0.5, 1.0], ['spot'])
+    >>> paths.to_dataframe().shape
+    (9, 1)
     """
 
     @staticmethod
-    def from_json(json: str) -> GbmPathSummary:
+    def from_json(json: str) -> PathSummary:
         """
-        Deserialize a ``GbmPathSummary`` from JSON.
+        Deserialize a ``PathSummary`` from JSON.
 
         Parameters
         ----------
@@ -636,8 +651,8 @@ class GbmPathSummary:
 
         Returns
         -------
-        GbmPathSummary
-            Parsed ``GbmPathSummary`` instance.
+        PathSummary
+            Parsed ``PathSummary`` instance.
 
         Raises
         ------
@@ -646,10 +661,17 @@ class GbmPathSummary:
 
         Examples
         --------
-        >>> from finstack_quant.models.monte_carlo import GbmPathSummary, simulate_gbm_paths
-        >>> paths = simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 2, 3, seed=7)
-        >>> GbmPathSummary.from_json(paths.to_json()).times
-        [0.0, 0.5, 1.0]
+        >>> from finstack_quant.models.monte_carlo import PathSummary, simulate_paths
+        >>> spec = {
+        ...     "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+        ...     "initial_state": [100.0],
+        ...     "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 2},
+        ...     "num_paths": 3,
+        ...     "seed": 7,
+        ... }
+        >>> paths = simulate_paths(spec)
+        >>> PathSummary.from_json(paths.to_json()).values == paths.values
+        True
         """
         ...
 
@@ -672,12 +694,12 @@ class GbmPathSummary:
     @property
     def num_paths(self) -> int:
         """
-        Number of independent path estimators.
+        Number of independent random streams requested.
 
         Returns
         -------
         int
-            Count of independent estimators; half of simulated paths when antithetic.
+            The ``num_paths`` of the simulation spec.
 
         Notes
         -----
@@ -688,12 +710,30 @@ class GbmPathSummary:
     @property
     def num_simulated_paths(self) -> int:
         """
-        Total number of simulated sample paths.
+        Number of stored paths.
 
         Returns
         -------
         int
-            Raw simulated path count including antithetic partners when enabled.
+            ``num_paths``, or ``2 * num_paths`` with antithetic sampling, where
+            stored paths ``2k`` and ``2k + 1`` are stream ``k`` and its
+            antithetic partner.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def dim(self) -> int:
+        """
+        State dimension of the process.
+
+        Returns
+        -------
+        int
+            Number of state components; equals ``len(factor_names)``.
 
         Notes
         -----
@@ -704,12 +744,12 @@ class GbmPathSummary:
     @property
     def times(self) -> list[float]:
         """
-        Shared path times in year fractions, including time zero.
+        Simulation times in year fractions, starting at zero.
 
         Returns
         -------
         list[float]
-            Common time grid in years, including the origin at time zero.
+            Shared time grid in years; its length is the step count plus one.
 
         Notes
         -----
@@ -718,14 +758,34 @@ class GbmPathSummary:
         ...
 
     @property
-    def paths(self) -> list[list[float]]:
+    def factor_names(self) -> list[str]:
         """
-        Captured spot paths in deterministic path-id order.
+        Name of each state component, in state-vector order.
 
         Returns
         -------
-        list[list[float]]
-            One spot path per captured estimator, each aligned to ``times``.
+        list[str]
+            For example ``["spot"]`` for GBM, ``["spot", "variance"]`` for
+            Heston and ``["short_rate"]`` for the short-rate models.
+
+        Notes
+        -----
+        This accessor does not raise; it returns the stored value.
+        """
+        ...
+
+    @property
+    def values(self) -> list[float]:
+        """
+        Simulated states in row-major ``[path][time][factor]`` order.
+
+        Returns
+        -------
+        list[float]
+            Flat list of ``num_simulated_paths * len(times) * dim`` states: the
+            value of factor ``f`` on stored path ``p`` at ``times[s]`` is
+            ``values[(p * len(times) + s) * dim + f]``. Reshape with
+            ``numpy.asarray(values).reshape(num_simulated_paths, len(times), dim)``.
 
         Notes
         -----
@@ -735,93 +795,135 @@ class GbmPathSummary:
 
     def to_dataframe(self) -> pd.DataFrame:
         """
-        Export the captured paths as a pandas DataFrame indexed by time.
+        Export the paths as a long pandas DataFrame.
 
-        Columns: ``path_0``, ``path_1``, ... — one column per captured path,
-        in the deterministic path-id order Rust produced. The index is the
-        shared time grid in year fractions, including time zero.
-
-        Wide (time x path) rather than one row: it is the shape ``df.plot()``
-        and ``df.quantile(axis=1)`` expect for a path bundle, and every path
-        already shares the one time grid. There is always at least one column:
-        the engine rejects a zero-path simulation.
+        One row per stored path and time, indexed by a ``(path, time)``
+        ``MultiIndex`` in the order Rust produced (``path`` is the zero-based
+        stored-path number, ``time`` the year fraction), with one float64
+        column per entry of ``factor_names``. Use
+        ``frame["spot"].unstack("path")`` for the time-by-path table of one
+        factor.
 
         Returns
         -------
         pd.DataFrame
-            Time-indexed frame with one column per captured path.
+            ``num_simulated_paths * len(times)`` rows and ``dim`` columns.
 
         Raises
         ------
         ValueError
-            If a captured path's length differs from the time grid's, which
-            would silently misalign the index.
+            If ``values`` does not hold ``num_simulated_paths * len(times) *
+            len(factor_names)`` entries, which is only possible for a summary
+            rebuilt from inconsistent JSON.
         """
         ...
 
-def simulate_gbm_paths(
-    spot: float,
-    rate: float,
-    div_yield: float,
-    vol: float,
-    expiry: float,
-    num_steps: int,
-    num_paths: int,
-    seed: int | None = None,
-) -> GbmPathSummary:
+def simulate_paths(spec: dict[str, Any] | str) -> PathSummary:
     """
-    Simulate compact GBM spot paths with Rust's exact GBM transitions.
+    Simulate paths of any built-in Markov process on a shared time grid.
 
-    ``num_paths`` is the estimator and simulated-path count because captured
-    paths are independently simulated. The compact output and shared time grids must satisfy
-    ``(num_paths + 3) * (num_steps + 1) <= 64_000_000`` scalar values,
-    including time zero in every path.
+    Binds Rust ``monte_carlo::simulate::simulate_paths``. The spec is plain
+    data validated in Rust: it selects the process, the discretization scheme,
+    the time grid and the random streams. The same spec always reproduces the
+    same paths bit for bit, on any thread count.
 
     Parameters
     ----------
-    spot : float
-        Positive initial underlying price in the output path's price units.
-    rate : float
-        Continuously compounded annual risk-free rate as a decimal.
-    div_yield : float
-        Continuously compounded annual dividend or carry yield as a decimal.
-    vol : float
-        Strictly positive annualized GBM volatility as a decimal, such as ``0.20``.
-    expiry : float
-        Positive time to maturity in years.
-    num_steps : int
-        Positive number of equally spaced simulation steps over the expiry
-        horizon, subject to the aggregate storage limit above.
-    num_paths : int
-        Number of independently simulated paths retained in the summary,
-        in ``[1, 100_000]`` and subject to the aggregate storage limit above.
-    seed : int or None, default None
-        Optional deterministic Philox seed; ``None`` uses the Rust
-        ``GbmPathConfig`` default (``42``), so unseeded calls are repeatable.
+    spec : dict or str
+        ``PathSimulationSpec`` as a dict or its JSON text, with keys:
+
+        - ``process`` : dict tagged by ``"type"`` plus that process's
+          parameters. Rates, yields and volatilities are annualized decimals
+          (``0.05`` for 5%); times are in years.
+
+          - ``"gbm"`` : ``r``, ``q``, ``sigma``. State ``[spot]``.
+          - ``"gbm_with_dividends"`` : ``params`` (GBM parameters) and
+            ``dividends``, a list of ``[time, {"cash": amount}]`` or
+            ``[time, {"proportional": fraction}]``. State ``[spot]``.
+          - ``"multi_gbm"`` : ``assets`` (list of GBM parameters) and optional
+            ``correlation`` (row-major ``n x n``). State ``[spot_0, ...]``.
+          - ``"brownian"`` : ``mu``, ``sigma``. State ``[x]``.
+          - ``"multi_brownian"`` : ``mus``, ``sigmas``, optional
+            ``correlation``. State ``[x_0, ...]``.
+          - ``"multi_ou"`` : ``kappas``, ``thetas``, ``sigmas``, optional
+            ``correlation``. State ``[x_0, ...]``.
+          - ``"hull_white_1f"`` : ``kappa``, ``volatility``
+            (``{"times": [...], "values": [...]}``), ``theta_curve``,
+            ``theta_times``. State ``[short_rate]``.
+          - ``"cir"`` : ``kappa``, ``theta``, ``sigma``. State ``[short_rate]``.
+          - ``"cir_plus_plus"`` : ``params`` (CIR parameters),
+            ``shift_curve``, ``shift_times``. State ``[short_rate]``.
+          - ``"heston"`` : ``r``, ``q``, ``kappa``, ``theta``, ``sigma_v``,
+            ``rho``, ``v0``. State ``[spot, variance]``; the starting variance
+            must equal ``v0``.
+          - ``"schwartz_smith"`` : ``kappa``, ``sigma_x``, ``mu_y``,
+            ``sigma_y``, ``rho_xy``, optional ``lambda_x``. State ``[x, y]``.
+
+        - ``scheme`` : ``"default"`` (the process's canonical scheme — its
+          exact transition where one exists, quadratic-exponential for
+          square-root variance, Euler otherwise; used when omitted),
+          ``"euler"``, ``"log_euler"`` or ``"milstein"``. ``"log_euler"`` and
+          ``"milstein"`` apply to ``"gbm"`` and ``"multi_gbm"`` only.
+        - ``initial_state`` : list of float, the state at time zero in the
+          process's state layout.
+        - ``time_grid`` : ``{"type": "uniform", "expiry": years, "num_steps": n}``
+          or ``{"type": "times", "times": [0.0, ...]}`` with strictly
+          increasing year fractions.
+        - ``num_paths`` : int in ``[1, 100_000]``, the number of independent
+          random streams.
+        - ``seed`` : int, root seed of the Philox generator.
+        - ``antithetic`` : bool, default ``False``. When ``True`` each stream's
+          path is followed by its antithetic partner, driven by the negated
+          normal draws.
 
     Returns
     -------
-    GbmPathSummary
-        Captured time grid and simulated spot paths. ``num_paths`` is the
-        number of returned paths and ``num_simulated_paths`` records the same
-        count.
+    PathSummary
+        Every simulated state, including the initial state at time zero, in
+        stream order.
 
     Raises
     ------
     ValueError
-        If ``spot`` is non-finite or not strictly positive; ``rate`` or
-        ``div_yield`` is non-finite; ``vol`` is not strictly positive or is
-        non-finite; ``expiry`` is non-finite or not strictly positive; ``num_steps`` is
-        zero or cannot form a time grid; ``num_paths`` is zero or exceeds the
-        ``100_000``-path capture limit; the compact output and shared time grids
-        exceed ``64_000_000`` scalar values; or a simulated spot is non-finite.
+        If ``spec`` is not valid ``PathSimulationSpec`` data (unknown key or
+        tag, missing field, wrong type); a process parameter or correlation
+        matrix is out of range; the scheme is not available for the process;
+        ``initial_state`` has the wrong length or lies outside the process's
+        domain (for example a non-positive GBM spot); the time grid is
+        invalid; ``num_paths`` is outside ``[1, 100_000]``; the output would
+        exceed ``64_000_000`` stored values; or a simulated state is
+        non-finite.
 
     Examples
     --------
-    >>> from finstack_quant.models.monte_carlo import simulate_gbm_paths
-    >>> summary = simulate_gbm_paths(100, 0.05, 0.0, 0.2, 1.0, 2, 3, seed=7)
-    >>> (summary.num_paths, summary.times)
-    (3, [0.0, 0.5, 1.0])
+    >>> from finstack_quant.models.monte_carlo import simulate_paths
+    >>> spec = {
+    ...     "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+    ...     "initial_state": [100.0],
+    ...     "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 2},
+    ...     "num_paths": 3,
+    ...     "seed": 7,
+    ... }
+    >>> paths = simulate_paths(spec)
+    >>> (paths.num_paths, paths.times, paths.factor_names)
+    (3, [0.0, 0.5, 1.0], ['spot'])
+    >>> heston = simulate_paths({
+    ...     **spec,
+    ...     "process": {
+    ...         "type": "heston",
+    ...         "r": 0.04,
+    ...         "q": 0.01,
+    ...         "kappa": 2.0,
+    ...         "theta": 0.05,
+    ...         "sigma_v": 0.3,
+    ...         "rho": -0.7,
+    ...         "v0": 0.03,
+    ...     },
+    ...     "initial_state": [100.0, 0.03],
+    ...     "antithetic": True,
+    ... })
+    >>> (heston.num_simulated_paths, heston.factor_names)
+    (6, ['spot', 'variance'])
     """
     ...
 

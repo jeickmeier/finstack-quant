@@ -50,9 +50,8 @@ unconditional dependency. A few convenience entry points (`EuropeanPricer`,
 
 `monte_carlo::simulate::simulate_paths` returns compact simulated paths for any
 Markov process and discretization scheme selected by a serializable
-`PathSimulationSpec`, bypassing the payoff machinery. The Monte Carlo module
-also re-exports `simulate_gbm_paths`, `GbmPathConfig`, and `GbmPathSummary`, a
-GBM-only view of the same simulation used by the bindings.
+`PathSimulationSpec`, bypassing the payoff machinery. It is the one
+path-simulation entry point and is bound in Python and WASM.
 
 Antithetic pairing is **not** in `variance_reduction` — it is implemented inline
 in the engine loop and configured with `McEngineConfig::antithetic`.
@@ -481,17 +480,18 @@ via `max_event_step()` so grid mismatches are caught up front.
 
 - **Python** — `finstack_quant.models.monte_carlo` exposes `McEngine`, `TimeGrid`,
   `EuropeanPricer`, `PathDependentPricer`, `LsmcPricer`, `MoneyEstimate`,
-  `Estimate`, `GbmPathSummary`, `simulate_gbm_paths`, `price_heston_call` /
+  `Estimate`, `PathSummary`, `simulate_paths`, `price_heston_call` /
   `price_heston_put`, `heston_satisfies_feller`, `black_scholes_call` /
   `black_scholes_put`, and the four finite-difference Greek functions.
 - **WASM** — the `models.monteCarlo` namespace in
   [`exports/models/monteCarlo.js`](../../finstack-quant-wasm/exports/models/monteCarlo.js)
-  exposes the convenience pricers only: `priceEuropeanCall/Put`,
+  exposes `simulatePaths` and the convenience pricers: `priceEuropeanCall/Put`,
   `priceHestonCall/Put`, `priceAsianCall/Put`, `priceAmericanCall/Put`,
   `priceAmericanCallUnbiased` / `priceAmericanPutUnbiased`, and
   `blackScholesCall/Put`.
 
-Neither binding exposes the generic trait surface; custom processes, schemes, and
+Neither binding exposes the generic trait surface: `simulate_paths` selects among
+the built-in processes and schemes by spec, and custom processes, schemes, and
 payoffs are Rust-only.
 
 ## Verification

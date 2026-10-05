@@ -235,8 +235,8 @@ fn bit_hash(summary: &PathSummary) -> u64 {
     hash
 }
 
-/// The hashes and terminal spots were recorded from `simulate_gbm_paths`
-/// before it was routed through `simulate_paths`.
+/// The hashes and terminal spots were recorded from the GBM-only path
+/// simulator that `simulate_paths` replaced.
 #[test]
 fn gbm_default_scheme_is_pinned_bit_for_bit() {
     let pinned = |r, q, sigma, spot, expiry, num_steps, num_paths, seed| {
@@ -422,7 +422,14 @@ where
 }
 
 #[test]
-fn correlated_and_internally_correlated_arms_match_the_engine() {
+fn single_factor_correlated_and_internally_correlated_arms_match_the_engine() {
+    let mut s = spec(gbm(), &[100.0], 6);
+    s.num_paths = 8;
+    let process = GbmProcess::with_params(0.04, 0.01, 0.25).unwrap();
+    let out = simulate_paths(&s).unwrap();
+    assert_eq!(out.values, engine_states(&process, &ExactGbm, &[100.0], 8));
+    assert_eq!(out.num_simulated_paths, 8);
+
     let mut s = spec(multi_gbm(), &[100.0, 50.0], 6);
     s.num_paths = 8;
     let process = MultiGbmProcess::new(

@@ -4,100 +4,130 @@ use crate::bindings::core::money::PyMoney;
 use crate::bindings::macros::{impl_repr_html_via_dataframe, wire_methods};
 use crate::bindings::pandas_utils::dict_to_dataframe;
 use finstack_quant_models::monte_carlo::results::MoneyEstimate;
+use finstack_quant_models::monte_carlo::simulate::PathSummary;
+use numpy::PyArray1;
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
 
-/// Compact captured GBM paths for plotting and diagnostics.
+/// Simulated paths of a Markov process on a shared time grid.
 #[pyclass(
-    name = "GbmPathSummary",
+    name = "PathSummary",
     module = "finstack_quant.models.monte_carlo",
     frozen
 )]
-pub struct PyGbmPathSummary {
-    inner: finstack_quant_models::monte_carlo::GbmPathSummary,
+pub struct PyPathSummary {
+    pub(crate) inner: PathSummary,
 }
 
-impl PyGbmPathSummary {
-    pub(super) fn from_inner(inner: finstack_quant_models::monte_carlo::GbmPathSummary) -> Self {
+impl PyPathSummary {
+    pub(super) fn from_inner(inner: PathSummary) -> Self {
         Self { inner }
     }
 }
 
 #[pymethods]
-impl PyGbmPathSummary {
-    /// Number of independent path estimators.
+impl PyPathSummary {
+    /// Number of independent random streams requested.
     #[getter]
     fn num_paths(&self) -> usize {
         self.inner.num_paths
     }
 
-    /// Total number of simulated sample paths.
+    /// Number of stored paths: ``num_paths``, or ``2 * num_paths`` with
+    /// antithetic sampling.
     #[getter]
     fn num_simulated_paths(&self) -> usize {
         self.inner.num_simulated_paths
     }
 
-    /// Shared path times in year fractions, including time zero.
+    /// State dimension; equals ``len(factor_names)``.
+    #[getter]
+    fn dim(&self) -> usize {
+        self.inner.dim
+    }
+
+    /// Simulation times in years, starting at zero.
     #[getter]
     fn times(&self) -> Vec<f64> {
         self.inner.times.clone()
     }
 
-    /// Captured spot paths in deterministic path-id order.
+    /// Name of each state component, in state-vector order.
     #[getter]
-    fn paths(&self) -> Vec<Vec<f64>> {
-        self.inner.paths.clone()
+    fn factor_names(&self) -> Vec<String> {
+        self.inner.factor_names.clone()
     }
 
-    /// Export the captured paths as a pandas ``DataFrame`` indexed by time.
+    /// States in row-major ``[path][time][factor]`` order.
+    #[getter]
+    fn values(&self) -> Vec<f64> {
+        self.inner.values.clone()
+    }
+
+    /// Export the paths as a long pandas ``DataFrame``.
     ///
-    /// Columns: ``path_0``, ``path_1``, ... — one column per captured path,
-    /// in the deterministic path-id order Rust produced. The index is the
-    /// shared time grid in year fractions, including time zero.
-    ///
-    /// Wide (time × path) rather than one row: it is the shape
-    /// ``df.plot()`` and ``df.quantile(axis=1)`` expect for a path bundle, and
-    /// every path already shares the one time grid. There is always at least
-    /// one column: the engine rejects a zero-path simulation.
+    /// One row per stored path and time, indexed by a ``(path, time)``
+    /// ``MultiIndex`` in the order Rust produced, with one float64 column per
+    /// entry of ``factor_names``. ``frame["spot"].unstack("path")`` gives the
+    /// time-by-path table of one factor.
     ///
     /// Raises
     /// ------
     /// ValueError
-    ///     If a captured path's length differs from the time grid's, which
-    ///     would silently misalign the index.
+    ///     If ``values`` does not hold ``num_simulated_paths * len(times) *
+    ///     len(factor_names)`` entries, which is only possible for a summary
+    ///     rebuilt from inconsistent JSON.
     fn to_dataframe<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
-        let n_times = self.inner.times.len();
-        let data = PyDict::new(py);
-        for (path_id, path) in self.inner.paths.iter().enumerate() {
-            if path.len() != n_times {
-                return Err(crate::errors::value_error(format!(
-                    "path {} has {} points but the time grid has {}",
-                    path_id,
-                    path.len(),
-                    n_times
-                )));
-            }
-            data.set_item(format!("path_{path_id}"), path.clone())?;
+        let summary = &self.inner;
+        let dim = summary.factor_names.len();
+        let expected = summary
+            .num_simulated_paths
+            .saturating_mul(summary.times.len())
+            .saturating_mul(dim);
+        if dim == 0 || summary.values.len() != expected {
+            return Err(crate::errors::value_error(format!(
+                "PathSummary holds {} values but {} paths x {} times x {} factors need {}",
+                summary.values.len(),
+                summary.num_simulated_paths,
+                summary.times.len(),
+                dim,
+                expected
+            )));
         }
-        let index = self.inner.times.clone().into_pyobject(py)?.into_any();
+        let data = PyDict::new(py);
+        for (factor, name) in summary.factor_names.iter().enumerate() {
+            let column: Vec<f64> = summary
+                .values
+                .iter()
+                .skip(factor)
+                .step_by(dim)
+                .copied()
+                .collect();
+            data.set_item(name, PyArray1::from_vec(py, column))?;
+        }
+        let paths: Vec<usize> = (0..summary.num_simulated_paths).collect();
+        let kwargs = PyDict::new(py);
+        kwargs.set_item("names", ["path", "time"])?;
+        let index = py.import("pandas")?.getattr("MultiIndex")?.call_method(
+            "from_product",
+            ((paths, summary.times.clone()),),
+            Some(&kwargs),
+        )?;
         dict_to_dataframe(py, &data, Some(index))
     }
 
     fn __repr__(&self) -> String {
         format!(
-            "GbmPathSummary(paths={}, points={})",
-            self.inner.paths.len(),
-            self.inner.times.len()
+            "PathSummary(paths={}, points={}, factors={:?})",
+            self.inner.num_simulated_paths,
+            self.inner.times.len(),
+            self.inner.factor_names
         )
     }
 }
 
-wire_methods!(
-    PyGbmPathSummary,
-    finstack_quant_models::monte_carlo::GbmPathSummary,
-    "GbmPathSummary"
-);
-impl_repr_html_via_dataframe!(PyGbmPathSummary);
+wire_methods!(PyPathSummary, PathSummary, "PathSummary");
+impl_repr_html_via_dataframe!(PyPathSummary);
 
 /// Monte Carlo pricing result with discounted statistics.
 #[pyclass(
@@ -323,7 +353,7 @@ wire_methods!(
 );
 
 pub fn register(_py: Python<'_>, m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyGbmPathSummary>()?;
+    m.add_class::<PyPathSummary>()?;
     m.add_class::<PyMoneyEstimate>()?;
     m.add_class::<PyEstimate>()?;
     Ok(())

@@ -1,6 +1,6 @@
 """Tests for model-owned pandas ``DataFrame`` accessors.
 
-- ``models.monte_carlo``: ``GbmPathSummary.to_dataframe``.
+- ``models.monte_carlo``: ``PathSummary.to_dataframe``.
 - ``models.correlation``: ``PortfolioLossResult.to_distribution_dataframe``
   / ``to_summary_dataframe``, ``TrancheLossStatistics.to_dataframe``.
 
@@ -20,22 +20,71 @@ from finstack_quant.models.correlation import (
     PortfolioLossResult,
     simulate_portfolio_loss,
 )
-from finstack_quant.models.monte_carlo import simulate_gbm_paths
+from finstack_quant.models.monte_carlo import PathSummary, simulate_paths
 
 # monte_carlo
 
 
-def test_gbm_path_summary_to_dataframe_is_time_by_path() -> None:
-    summary = simulate_gbm_paths(100.0, 0.05, 0.0, 0.2, 1.0, 2, 3, seed=7)
+def _gbm_spec(seed: int) -> dict[str, object]:
+    return {
+        "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+        "initial_state": [100.0],
+        "time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 2},
+        "num_paths": 3,
+        "seed": seed,
+    }
+
+
+def test_path_summary_to_dataframe_is_path_and_time_by_factor() -> None:
+    summary = simulate_paths(_gbm_spec(7))
     df = summary.to_dataframe()
     assert isinstance(df, pd.DataFrame)
-    assert len(df) == len(summary.times)
-    assert list(df.columns) == [f"path_{i}" for i in range(len(summary.paths))]
-    assert list(df.index) == pytest.approx(summary.times)
-    assert list(df["path_0"]) == pytest.approx(summary.paths[0])
+    assert list(df.index.names) == ["path", "time"]
+    assert list(df.columns) == summary.factor_names == ["spot"]
+    assert len(df) == summary.num_simulated_paths * len(summary.times)
+    assert list(df["spot"]) == summary.values
+    # One factor unstacks to the time-by-path table.
+    wide = df["spot"].unstack("path")
+    assert list(wide.index) == summary.times
+    assert list(wide.columns) == [0, 1, 2]
+    assert list(wide[1]) == summary.values[3:6]
+    assert summary._repr_html_() == df._repr_html_()
 
 
-def test_gbm_path_summary_dataframe_is_reproducible_from_the_seed() -> None:
+def test_path_summary_to_dataframe_has_one_column_per_factor() -> None:
+    summary = simulate_paths({
+        **_gbm_spec(7),
+        "process": {
+            "type": "heston",
+            "r": 0.04,
+            "q": 0.01,
+            "kappa": 2.0,
+            "theta": 0.05,
+            "sigma_v": 0.3,
+            "rho": -0.7,
+            "v0": 0.03,
+        },
+        "initial_state": [100.0, 0.03],
+        "antithetic": True,
+    })
+    df = summary.to_dataframe()
+    assert list(df.columns) == ["spot", "variance"]
+    assert df.shape == (6 * 3, 2)
+    assert list(df["spot"]) == summary.values[0::2]
+    assert list(df["variance"]) == summary.values[1::2]
+    assert df.loc[(5, 0.0)].tolist() == [100.0, 0.03]
+
+
+def test_path_summary_to_dataframe_rejects_an_inconsistent_shape() -> None:
+    inconsistent = PathSummary.from_json(
+        '{"num_paths":1,"num_simulated_paths":1,"dim":1,"times":[0.0,1.0],"factor_names":["spot"],"values":[1.0]}'
+    )
+    with pytest.raises(ValueError, match="1 values"):
+        inconsistent.to_dataframe()
+    assert inconsistent._repr_html_() is None
+
+
+def test_path_summary_dataframe_is_reproducible_from_the_seed() -> None:
     """Two independent simulations on one seed export the identical frame.
 
     Re-exporting a single frozen summary — the previous assertion — proved
@@ -43,11 +92,11 @@ def test_gbm_path_summary_dataframe_is_reproducible_from_the_seed() -> None:
     determinism claim the seed argument exists for. A different seed must move
     the paths, otherwise the seed is being ignored.
     """
-    first = simulate_gbm_paths(100.0, 0.05, 0.0, 0.2, 1.0, 2, 3, seed=7).to_dataframe()
-    second = simulate_gbm_paths(100.0, 0.05, 0.0, 0.2, 1.0, 2, 3, seed=7).to_dataframe()
+    first = simulate_paths(_gbm_spec(7)).to_dataframe()
+    second = simulate_paths(_gbm_spec(7)).to_dataframe()
     pd.testing.assert_frame_equal(first, second)
 
-    other_seed = simulate_gbm_paths(100.0, 0.05, 0.0, 0.2, 1.0, 2, 3, seed=8).to_dataframe()
+    other_seed = simulate_paths(_gbm_spec(8)).to_dataframe()
     assert list(other_seed.columns) == list(first.columns)
     assert not first.equals(other_seed), "a different seed must produce different paths"
 

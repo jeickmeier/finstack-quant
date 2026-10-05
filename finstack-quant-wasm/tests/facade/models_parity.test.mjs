@@ -36,6 +36,71 @@ const factorRisk = models.factor.risk;
 const { dtsm, hullWhite } = models.rates;
 
 const MERTON = [100.0, 0.25, 80.0, 0.05];
+const PATH_GRID = {
+  time_grid: { type: 'uniform', expiry: 1.0, num_steps: 4 },
+  num_paths: 3,
+  seed: 42,
+};
+// One `PathSimulationSpec` per process family; the same objects are in
+// `test_models_wasm_parity.py`, and each case compares the whole `PathSummary`.
+const PATH_SPECS = {
+  gbm: {
+    process: { type: 'gbm', r: 0.05, q: 0.0, sigma: 0.2 },
+    initial_state: [100.0],
+    ...PATH_GRID,
+  },
+  heston: {
+    process: {
+      type: 'heston',
+      r: 0.04,
+      q: 0.01,
+      kappa: 2.0,
+      theta: 0.05,
+      sigma_v: 0.3,
+      rho: -0.7,
+      v0: 0.03,
+    },
+    initial_state: [100.0, 0.03],
+    antithetic: true,
+    ...PATH_GRID,
+  },
+  hull_white_1f: {
+    process: {
+      type: 'hull_white_1f',
+      kappa: 0.8,
+      volatility: { times: [0.0], values: [0.01] },
+      theta_curve: [0.05],
+      theta_times: [0.0],
+    },
+    initial_state: [0.02],
+    ...PATH_GRID,
+  },
+  multi_gbm: {
+    process: {
+      type: 'multi_gbm',
+      assets: [
+        { r: 0.04, q: 0.01, sigma: 0.25 },
+        { r: 0.04, q: 0.03, sigma: 0.15 },
+      ],
+      correlation: [1.0, 0.6, 0.6, 1.0],
+    },
+    scheme: 'milstein',
+    initial_state: [100.0, 50.0],
+    ...PATH_GRID,
+  },
+  cir_plus_plus: {
+    process: {
+      type: 'cir_plus_plus',
+      params: { kappa: 0.5, theta: 0.04, sigma: 0.1 },
+      shift_curve: [0.01, 0.02],
+      shift_times: [0.0, 0.5],
+    },
+    initial_state: [0.04],
+    time_grid: { type: 'times', times: [0.0, 0.25, 0.5, 1.0] },
+    num_paths: 3,
+    seed: 42,
+  },
+};
 const GBM = [100.0, 100.0, 0.05, 0.0, 0.2, 1.0];
 const STATE = {
   hazard_rate: 0.05,
@@ -520,8 +585,12 @@ const CASES = {
     monteCarlo.finiteDiffGamma(...GBM, false, 2000, 42).mean,
     monteCarlo.finiteDiffGammaCrn(...GBM, false, 2000, 42).mean,
   ],
-  'monte_carlo.simulate_gbm_paths': () =>
-    monteCarlo.simulateGbmPaths(100.0, 0.05, 0.0, 0.2, 1.0, 4, 3, 42).paths,
+  ...Object.fromEntries(
+    Object.entries(PATH_SPECS).map(([name, spec]) => [
+      `monte_carlo.simulate_paths.${name}`,
+      () => monteCarlo.simulatePaths(spec),
+    ])
+  ),
   'monte_carlo.heston_satisfies_feller': () => [
     monteCarlo.hestonSatisfiesFeller(2.0, 0.04, 0.3),
     monteCarlo.hestonSatisfiesFeller(0.5, 0.04, 0.5),

@@ -57,6 +57,64 @@ REL_TOL = 1e-9
 ABS_TOL = 1e-12
 
 MERTON = (100.0, 0.25, 80.0, 0.05)
+PATH_GRID = {"time_grid": {"type": "uniform", "expiry": 1.0, "num_steps": 4}, "num_paths": 3, "seed": 42}
+# One `PathSimulationSpec` per process family; the same objects are in
+# `models_parity.test.mjs`, and each case compares the whole `PathSummary`.
+PATH_SPECS = {
+    "gbm": {
+        "process": {"type": "gbm", "r": 0.05, "q": 0.0, "sigma": 0.2},
+        "initial_state": [100.0],
+        **PATH_GRID,
+    },
+    "heston": {
+        "process": {
+            "type": "heston",
+            "r": 0.04,
+            "q": 0.01,
+            "kappa": 2.0,
+            "theta": 0.05,
+            "sigma_v": 0.3,
+            "rho": -0.7,
+            "v0": 0.03,
+        },
+        "initial_state": [100.0, 0.03],
+        "antithetic": True,
+        **PATH_GRID,
+    },
+    "hull_white_1f": {
+        "process": {
+            "type": "hull_white_1f",
+            "kappa": 0.8,
+            "volatility": {"times": [0.0], "values": [0.01]},
+            "theta_curve": [0.05],
+            "theta_times": [0.0],
+        },
+        "initial_state": [0.02],
+        **PATH_GRID,
+    },
+    "multi_gbm": {
+        "process": {
+            "type": "multi_gbm",
+            "assets": [{"r": 0.04, "q": 0.01, "sigma": 0.25}, {"r": 0.04, "q": 0.03, "sigma": 0.15}],
+            "correlation": [1.0, 0.6, 0.6, 1.0],
+        },
+        "scheme": "milstein",
+        "initial_state": [100.0, 50.0],
+        **PATH_GRID,
+    },
+    "cir_plus_plus": {
+        "process": {
+            "type": "cir_plus_plus",
+            "params": {"kappa": 0.5, "theta": 0.04, "sigma": 0.1},
+            "shift_curve": [0.01, 0.02],
+            "shift_times": [0.0, 0.5],
+        },
+        "initial_state": [0.04],
+        "time_grid": {"type": "times", "times": [0.0, 0.25, 0.5, 1.0]},
+        "num_paths": 3,
+        "seed": 42,
+    },
+}
 GBM = (100.0, 100.0, 0.05, 0.0, 0.2, 1.0)
 STATE = {
     "hazard_rate": 0.05,
@@ -523,9 +581,12 @@ def _monte_carlo_cases() -> dict[str, Callable[[], Any]]:
             monte_carlo.finite_diff_gamma(*GBM, False, **fd).mean,
             monte_carlo.finite_diff_gamma_crn(*GBM, False, **fd).mean,
         ],
-        "monte_carlo.simulate_gbm_paths": lambda: (
-            monte_carlo.simulate_gbm_paths(100.0, 0.05, 0.0, 0.2, 1.0, 4, 3, 42).paths
-        ),
+        **{
+            f"monte_carlo.simulate_paths.{name}": (
+                lambda spec=spec: json.loads(monte_carlo.simulate_paths(spec).to_json())
+            )
+            for name, spec in PATH_SPECS.items()
+        },
         "monte_carlo.heston_satisfies_feller": lambda: [
             monte_carlo.heston_satisfies_feller(2.0, 0.04, 0.3),
             monte_carlo.heston_satisfies_feller(0.5, 0.04, 0.5),

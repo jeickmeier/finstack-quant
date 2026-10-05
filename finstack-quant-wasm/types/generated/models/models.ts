@@ -3465,28 +3465,6 @@ export interface GbmParams {
   sigma: number;
 }
 /**
- * Compact captured GBM paths for plotting and diagnostics.
- */
-export interface GbmPathSummary {
-  /**
-   * Number of independent estimators requested.
-   */
-  num_paths: number;
-  /**
-   * Total number of sample paths simulated.
-   */
-  num_simulated_paths: number;
-  /**
-   * Captured spot paths in deterministic path-id order.
-   */
-  paths: number[][];
-  /**
-   * Shared path times in year fractions, including time zero.
-   */
-  times: number[];
-  [k: string]: unknown;
-}
-/**
  * Continuous-time generator (intensity) matrix for a CTMC.
  *
  * Off-diagonal entry `q_ij` (i ≠ j) is the instantaneous rate of transitioning

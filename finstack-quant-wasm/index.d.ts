@@ -12439,28 +12439,35 @@ export interface MonteCarloNamespace {
    */
   relativeStderr(estimate: MoneyEstimate | string): number;
   /**
-   * Simulate a compact set of GBM spot paths.
-   * @param spot - Spot level at time 0.
-   * @param rate - Continuously compounded risk-free rate (decimal, annualized).
-   * @param divYield - Continuous dividend yield (decimal, annualized).
-   * @param vol - Annualized GBM volatility (decimal).
-   * @param expiry - Horizon in years; the grid is uniform from 0 to `expiry`.
-   * @param numSteps - Number of time-grid steps; a positive safe integer.
-   * @param numPaths - Number of captured paths; a positive safe integer.
-   * @param seed - Optional RNG seed as a safe integer or `bigint`; omitted uses the Rust `GbmPathConfig` default.
-   * @returns The `GbmPathSummary` object (`num_paths`, `num_simulated_paths`, `times`, `paths`).
-   * @throws Error - Throws a `TypeError` if a count is not a safe integer, and a `validation` error if an input is non-finite or out of range.
+   * Simulate paths of any built-in Markov process on a shared time grid.
+   *
+   * Twin of the Rust and Python `simulate_paths`: the spec selects the process,
+   * the discretization scheme, the time grid and the random streams, and Rust
+   * validates every field.
+   *
+   * @example
+   * ```typescript
+   * import init, { models } from "finstack-quant-wasm";
+   * await init();
+   * const paths = models.monteCarlo.simulatePaths({
+   *   process: { type: "gbm", r: 0.05, q: 0.0, sigma: 0.2 },
+   *   initial_state: [100],
+   *   time_grid: { type: "uniform", expiry: 1.0, num_steps: 2 },
+   *   num_paths: 3,
+   *   seed: 7,
+   * });
+   * console.log(paths.times); // [0, 0.5, 1]
+   * console.log(paths.factor_names); // ["spot"]
+   * console.log(paths.values.length); // 9 = 3 paths x 3 times x 1 factor
+   * ```
+   *
+   * @param spec - `PathSimulationSpec` object or JSON: `process` (tagged by `type`, with annualized decimal rates and volatilities), optional `scheme` (`"default"` uses the process's canonical scheme), `initial_state` in the process's state layout, `time_grid` in years, `num_paths` in [1, 100000], `seed`, and optional `antithetic` (default `false`).
+   * @returns The `PathSummary` object: `num_paths`, `num_simulated_paths`, `dim`, `times`, `factor_names`, and `values` in row-major `[path][time][factor]` order, so factor `f` on path `p` at `times[s]` is `values[(p * times.length + s) * dim + f]`.
+   * @throws Error - Throws a `TypeError` if `spec` is neither an object nor JSON text, and a `validation` error if it does not match `PathSimulationSpec`, a process parameter is out of range, the scheme is not available for the process, `initial_state` has the wrong length or lies outside the process's domain, the time grid is invalid, `num_paths` is outside [1, 100000], the output would exceed 64 million stored values, or a simulated state is non-finite.
    */
-  simulateGbmPaths(
-    spot: number,
-    rate: number,
-    divYield: number,
-    vol: number,
-    expiry: number,
-    numSteps: number,
-    numPaths: number,
-    seed?: number | bigint
-  ): generated.models.GbmPathSummary;
+  simulatePaths(
+    spec: generated.models.PathSimulationSpec | string
+  ): generated.models.PathSummary;
 }
 
 /**

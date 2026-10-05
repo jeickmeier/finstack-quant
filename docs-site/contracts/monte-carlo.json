@@ -27,28 +27,22 @@
       "finstack_quant.models.monte_carlo.heston_satisfies_feller",
       "finstack_quant.models.monte_carlo.price_heston_call",
       "finstack_quant.models.monte_carlo.price_heston_put",
-      "finstack_quant.models.monte_carlo.simulate_gbm_paths"
+      "finstack_quant.models.monte_carlo.simulate_paths"
     ],
     "models": [],
     "metrics": [],
     "returned_types": [
       "finstack_quant.models.monte_carlo.MoneyEstimate",
       "finstack_quant.models.monte_carlo.Estimate",
-      "finstack_quant.models.monte_carlo.GbmPathSummary",
+      "finstack_quant.models.monte_carlo.PathSummary",
       "finstack_quant.models.BsGreeks"
     ],
-    "expected_exceptions": [
-      {
-        "operation": "finstack_quant.models.monte_carlo.simulate_gbm_paths",
-        "type": "ValueError",
-        "condition": "antithetic=True is not supported by the captured-path API; the message identifies antithetic capture."
-      }
-    ],
+    "expected_exceptions": [],
     "support_notes": [
       "EuropeanPricer, PathDependentPricer and LsmcPricer are fixed-GBM helpers; their models field is empty because no registry model key is supplied.",
       "European serial and parallel estimates replay identically with the same seed, grid and inputs.",
       "For one-step LsmcPricer antithetics, num_paths=N counts independent pair means and num_simulated_paths=2N counts generated trajectories. Compare with 2N plain samples at the same raw-path budget.",
-      "The captured GBM helper includes the initial state; it does not expose engine or scheme injection.",
+      "simulate_paths includes the initial state and selects a built-in process and scheme by spec; with antithetic=True it stores each stream followed by its mirrored partner. It does not expose engine or custom-process injection.",
       "Four times as many independent samples halves the theoretical standard-error scale, not the realized absolute error of every seed.",
       "The source set also includes stochastic_processes, discretization_schemes and monte_carlo_simulation; the principal notebook identifies the replay proof."
     ],
@@ -135,7 +129,7 @@
       "finstack_quant.models.monte_carlo.EuropeanPricer",
       "finstack_quant.models.monte_carlo.LsmcPricer",
       "finstack_quant.models.monte_carlo.PathDependentPricer",
-      "finstack_quant.models.monte_carlo.simulate_gbm_paths",
+      "finstack_quant.models.monte_carlo.simulate_paths",
       "finstack_quant.models.quanto_option_price",
       "finstack_quant.valuations.instruments.Swaption",
       "finstack_quant.valuations.instruments.list_models_grouped",
@@ -154,7 +148,7 @@
     ],
     "returned_types": [
       "finstack_quant.models.monte_carlo.MoneyEstimate",
-      "finstack_quant.models.monte_carlo.GbmPathSummary",
+      "finstack_quant.models.monte_carlo.PathSummary",
       "finstack_quant.valuations.ValuationResult"
     ],
     "expected_exceptions": [

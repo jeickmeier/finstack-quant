@@ -571,16 +571,19 @@ python_package = "finstack_quant.models.monte_carlo"
 # engine/process/discretization/RNG/payoff
 # graph, `GbmEuropeanFdSpec` (flattened into kwargs), `PathDependentPricerConfig`
 # / `LsmcConfig` (flattened into constructor kwargs), captured-path datasets,
+# `PathSimulationSpec` / `ProcessSpec` / `SchemeSpec` / `TimeGridSpec` (plain
+# data: `simulate_paths` takes the spec as a dict or JSON text in Python and
+# as the schema-typed object in WASM, validated by the Rust deserializer),
 # the registry defaults module, and `monte_carlo::convenience` (the one place
 # that resolves an omitted pricer setting, step count or currency to its
 # registry default; both hosts build their pricers through it).
 public = [
     "Estimate",
     "EuropeanPricer",
-    "GbmPathSummary",
     "LsmcPricer",
     "MoneyEstimate",
     "PathDependentPricer",
+    "PathSummary",
     "finite_diff_delta",
     "finite_diff_delta_crn",
     "finite_diff_gamma",
@@ -588,7 +591,7 @@ public = [
     "heston_satisfies_feller",
     "price_heston_call",
     "price_heston_put",
-    "simulate_gbm_paths",
+    "simulate_paths",
 ]
 
 # Rust-only in `liquidity`: `LiquidityConfig` (tier thresholds are passed
@@ -2102,7 +2105,7 @@ types = { ExecutionTrajectory = "ExecutionTrajectory", ImpactEstimate = "ImpactE
 # `MoneyEstimate.relative_stderr` is the free function `relativeStderr`.
 [parity.modules."finstack_quant.models.monte_carlo"]
 js = "models.monteCarlo"
-types = { Estimate = "Estimate", GbmPathSummary = "GbmPathSummary", MoneyEstimate = "MoneyEstimate" }
+types = { Estimate = "Estimate", MoneyEstimate = "MoneyEstimate", PathSummary = "PathSummary" }
 
 [parity.modules."finstack_quant.models.rates.dtsm"]
 js = "models.rates.dtsm"

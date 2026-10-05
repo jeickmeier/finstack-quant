@@ -1,11 +1,13 @@
 //! Python bindings for the `finstack-quant-models` crate.
 //!
-//! Exposes canonical European, Asian, LSMC, Heston, and Greek workflows;
-//! closed-form Black-Scholes references live at `finstack_quant.models`. Advanced Rust process, discretization, RNG, and payoff types
-//! remain Rust-only.
+//! Exposes path simulation for the built-in Markov processes and canonical
+//! European, Asian, LSMC, Heston, and Greek workflows; closed-form
+//! Black-Scholes references live at `finstack_quant.models`. `simulate_paths`
+//! selects a process and discretization scheme by spec; the process,
+//! discretization, RNG, and payoff types themselves remain Rust-only.
 //!
-//! Compact GBM paths retain at most 100,000 paths and 64 million scalar values
-//! across paths and shared time grids. LSMC accepts at most 10 million independent
+//! Simulated paths retain at most 100,000 random streams and 64 million scalar
+//! values across paths and shared time grids. LSMC accepts at most 10 million independent
 //! paths and 100,000 steps; each pricing pass limits retained spots to 64 million
 //! values, including time zero and antithetic partners.
 
@@ -35,8 +37,8 @@ pub fn register(py: Python<'_>, parent: &Bound<'_, PyModule>) -> PyResult<()> {
         [
             "MoneyEstimate",
             "Estimate",
-            "GbmPathSummary",
-            "simulate_gbm_paths",
+            "PathSummary",
+            "simulate_paths",
             "heston_satisfies_feller",
             "EuropeanPricer",
             "PathDependentPricer",

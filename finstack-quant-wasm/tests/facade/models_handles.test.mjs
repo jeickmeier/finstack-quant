@@ -397,9 +397,31 @@ test('Monte Carlo pricers take their defaults from the Rust registry', () => {
     () => lsmc.priceAmericanPut(100, 100, 0.05, 0, 0.2, 1, undefined, undefined, 'nope'),
     kind('validation')
   );
-  const paths = monteCarlo.simulateGbmPaths(100, 0.05, 0, 0.2, 1, 4, 3);
-  assert.equal(paths.paths.length, 3);
+  const spec = {
+    process: { type: 'gbm', r: 0.05, q: 0, sigma: 0.2 },
+    initial_state: [100],
+    time_grid: { type: 'uniform', expiry: 1, num_steps: 4 },
+    num_paths: 3,
+    seed: 42,
+  };
+  const paths = monteCarlo.simulatePaths(spec);
+  assert.equal(paths.num_simulated_paths, 3);
   assert.equal(paths.times.length, 5);
+  assert.deepEqual(paths.factor_names, ['spot']);
+  assert.equal(paths.values.length, 15);
+  assert.deepEqual(monteCarlo.simulatePaths(JSON.stringify(spec)), paths);
+  assert.throws(() => monteCarlo.simulatePaths(42), invalidType);
+  assert.throws(() => monteCarlo.simulatePaths({ ...spec, paths: 3 }), kind('validation'));
+  assert.throws(
+    () =>
+      monteCarlo.simulatePaths({
+        ...spec,
+        scheme: 'milstein',
+        process: { type: 'cir', kappa: 0.5, theta: 0.04, sigma: 0.1 },
+        initial_state: [0.03],
+      }),
+    kind('validation')
+  );
   assert.throws(() => monteCarlo.finiteDiffDelta(100, 100, 0.05, 0, 0.2, 1, 'call'), invalidType);
   assert.equal(
     monteCarlo.relativeStderr({ ...call, mean: { ...call.mean, amount: '0' } }),

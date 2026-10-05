@@ -3193,7 +3193,7 @@
       "priceHestonCall",
       "priceHestonPut",
       "relativeStderr",
-      "simulateGbmPaths"
+      "simulatePaths"
     ]
   },
   "models.monteCarlo.EuropeanPricer": {
@@ -3229,7 +3229,7 @@
   "models.monteCarlo.hestonSatisfiesFeller": {
     "kind": "function"
   },
-  "models.monteCarlo.simulateGbmPaths": {
+  "models.monteCarlo.simulatePaths": {
     "kind": "function"
   },
   "models.monteCarlo.finiteDiffDelta": {

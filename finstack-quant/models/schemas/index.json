@@ -307,15 +307,6 @@
       "type_name": "GbmParams"
     },
     {
-      "$id": "https://finstack_quant.dev/schemas/models/1/gbm_path_summary.schema.json",
-      "bytes": 1179,
-      "kind": "output",
-      "path": "schemas/models/1/gbm_path_summary.schema.json",
-      "summary": "Compact captured GBM paths for plotting and diagnostics.",
-      "title": "GbmPathSummary",
-      "type_name": "GbmPathSummary"
-    },
-    {
       "$id": "https://finstack_quant.dev/schemas/models/1/heston_params.schema.json",
       "bytes": 967,
       "kind": "input",
