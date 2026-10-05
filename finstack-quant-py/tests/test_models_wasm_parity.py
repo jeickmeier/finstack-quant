@@ -265,6 +265,22 @@ def _money(estimate: Any) -> list[float]:
     return [estimate.mean.amount, estimate.stderr]
 
 
+def _numeric_amounts(value: Any) -> Any:
+    """Parse every ``Money`` wire amount (a decimal string) into a float.
+
+    The two hosts link different ``exp``/``ln`` implementations, so simulated
+    amounts can differ in the last digit; as numbers they are compared with
+    the same tolerance as every other value.
+    """
+    if isinstance(value, dict):
+        if set(value) == {"amount", "currency"}:
+            return {"amount": float(value["amount"]), "currency": value["currency"]}
+        return {key: _numeric_amounts(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_numeric_amounts(item) for item in value]
+    return value
+
+
 def _cube() -> VolCube:
     return VolCube(
         "CUBE",
@@ -613,8 +629,8 @@ def _monte_carlo_cases() -> dict[str, Callable[[], Any]]:
             _money(asian().price_asian_put(*GBM, 12)),
         ],
         "monte_carlo.lrm_greeks": lambda: [
-            json.loads(asian().price_with_lrm_greeks(*GBM, True, 12).to_json()),
-            json.loads(asian().price_with_lrm_greeks(*GBM, False, 12, "EUR").to_json()),
+            _numeric_amounts(json.loads(asian().price_with_lrm_greeks(*GBM, True, 12).to_json())),
+            _numeric_amounts(json.loads(asian().price_with_lrm_greeks(*GBM, False, 12, "EUR").to_json())),
         ],
         "monte_carlo.lsmc": lambda: [
             _money(lsmc().price_american_put(*GBM)),

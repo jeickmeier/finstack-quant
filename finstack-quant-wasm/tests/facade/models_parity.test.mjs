@@ -256,6 +256,21 @@ const generator = () => new credit.GeneratorMatrix(scale(), GENERATOR);
 const masterScale = () => new credit.MasterScale(GRADES);
 const panel = () => new dtsm.YieldPanel(TENORS, YIELDS);
 const money = (estimate) => [Number(estimate.mean.amount), estimate.stderr];
+/**
+ * Parse every `Money` wire amount (a decimal string) into a number. The two
+ * hosts link different `exp`/`ln` implementations, so simulated amounts can
+ * differ in the last digit; as numbers they get the shared tolerance.
+ */
+const numericAmounts = (value) => {
+  if (Array.isArray(value)) return value.map(numericAmounts);
+  if (value === null || typeof value !== 'object') return value;
+  const keys = Object.keys(value).sort();
+  if (keys.length === 2 && keys[0] === 'amount' && keys[1] === 'currency')
+    return { amount: Number(value.amount), currency: value.currency };
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, numericAmounts(item)])
+  );
+};
 const json = (handle) => JSON.parse(handle.toJson());
 const cube = () =>
   new core.VolCube(
@@ -618,8 +633,8 @@ const CASES = {
   'monte_carlo.lrm_greeks': () => {
     const asian = new monteCarlo.PathDependentPricer(2000, 42, false);
     return [
-      asian.priceWithLrmGreeks(...GBM, true, 12),
-      asian.priceWithLrmGreeks(...GBM, false, 12, 'EUR'),
+      numericAmounts(asian.priceWithLrmGreeks(...GBM, true, 12)),
+      numericAmounts(asian.priceWithLrmGreeks(...GBM, false, 12, 'EUR')),
     ];
   },
   'monte_carlo.lsmc': () => {
