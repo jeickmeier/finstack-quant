@@ -744,7 +744,7 @@ mod tests {
     /// met by the Rannacher solve but breached by an oscillating CN solve.
     #[test]
     fn w01_rannacher_knock_out_matches_analytical_continuous() {
-        use finstack_quant_models::closed_form::barrier::down_out_call;
+        use finstack_quant_models::closed_form::barrier::{barrier_price, BarrierParams};
 
         let as_of = date(2024, 1, 1);
         let expiry = date(2025, 1, 1);
@@ -776,7 +776,11 @@ mod tests {
                 finstack_quant_core::dates::DayCountContext::default(),
             )
             .expect("year fraction");
-        let analytical = down_out_call(spot, strike, barrier, t, rate, 0.0, vol);
+        let analytical = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, t, rate, 0.0, vol),
+            BarrierType::DownAndOut,
+            OptionType::Call,
+        );
 
         let rel_err = (pv - analytical).abs() / analytical;
         assert!(
@@ -880,7 +884,7 @@ mod tests {
     /// the leading-order error so the parity is tight.
     #[test]
     fn w08_knock_in_parity_consistent_with_shared_grid() {
-        use finstack_quant_models::closed_form::barrier::down_out_call;
+        use finstack_quant_models::closed_form::barrier::{barrier_price, BarrierParams};
 
         let as_of = date(2024, 1, 1);
         let expiry = date(2025, 1, 1);
@@ -930,7 +934,11 @@ mod tests {
         let d2 = d1 - vol * t.sqrt();
         let vanilla = spot * finstack_quant_core::math::norm_cdf(d1)
             - strike * df * finstack_quant_core::math::norm_cdf(d2);
-        let analytical_ko = down_out_call(spot, strike, barrier, t, rate, 0.0, vol);
+        let analytical_ko = barrier_price(
+            &BarrierParams::new(spot, strike, barrier, t, rate, 0.0, vol),
+            BarrierType::DownAndOut,
+            OptionType::Call,
+        );
         let analytical_ki = vanilla - analytical_ko;
 
         // KI + KO must reconstruct the vanilla price (in-out parity): both PDE

@@ -131,9 +131,7 @@ with `λ = (r - q + σ²/2) / σ²`.
 
 | Item | Notes |
 |------|-------|
-| `up_out_call`, `up_in_call`, `down_out_call`, `down_in_call` | `(spot, strike, barrier, time, rate, div_yield, vol) -> f64` |
-| `up_out_put`, `up_in_put`, `down_out_put`, `down_in_put` | same shape (module-level only; not re-exported at `closed_form` root) |
-| `barrier_call_continuous`, `barrier_put_continuous` | `(&BarrierParams, BarrierType) -> f64` |
+| `barrier_price` | `(&BarrierParams, BarrierType, OptionType) -> f64`; all eight up/down, in/out, call/put variants |
 | `barrier_touch_probability` | `(spot, barrier, time, rate, div_yield, vol, is_up) -> f64` |
 | `barrier_rebate` | explicit `PayoutTiming::{AtHit, AtExpiry}` |
 
@@ -324,9 +322,10 @@ Decimal/f64 split.
 ## Example
 
 ```rust
+use finstack_quant_core::types::BarrierType;
 use finstack_quant_models::OptionType;
 use finstack_quant_models::closed_form::{
-    barrier::down_out_call,
+    barrier::{barrier_price, BarrierParams},
     bs_greeks, bs_price,
     heston::{heston_call_price_fourier, HestonPricingParams},
     implied_vol::bs_implied_vol,
@@ -344,7 +343,8 @@ let iv = bs_implied_vol(spot, strike, r, q, t, price, OptionType::Call)?;
 assert!((iv - vol).abs() < 1e-8);
 
 // Knock-out barrier below spot: worth strictly less than the vanilla.
-let ko = down_out_call(spot, strike, 90.0, t, r, q, vol);
+let params = BarrierParams::new(spot, strike, 90.0, t, r, q, vol);
+let ko = barrier_price(&params, BarrierType::DownAndOut, OptionType::Call);
 assert!(ko < price);
 
 // Heston with adaptive quadrature settings.
