@@ -1046,7 +1046,7 @@ mod tests {
     /// explicit term counts), and of the error kind and message the host
     /// bindings report for rejected inputs and numerical failures.
     #[test]
-    fn h7_pin_cos_entry_points_are_bit_stable() {
+    fn cos_entry_points_are_bit_stable() {
         const EXPECTED: &[u64] = &[
             0x402667d6de59772a,
             0x40253784f95ea333,

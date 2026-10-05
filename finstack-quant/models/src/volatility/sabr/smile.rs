@@ -149,7 +149,8 @@ impl SabrSmile {
     /// Implied volatility at one strike on this smile.
     ///
     /// The quoting convention is β-dependent (normal vol in absolute rate
-    /// units when β ≈ 0, Black decimal vol otherwise); see [`Self::vol_type`].
+    /// units when β ≈ 0, Black decimal vol otherwise); see
+    /// [`SabrParameters::quote_convention`](super::SabrParameters::quote_convention).
     ///
     /// # Arguments
     ///
@@ -166,7 +167,8 @@ impl SabrSmile {
 
     /// Generate volatility smile for given strikes.
     ///
-    /// The output quoting convention is β-dependent; see [`Self::vol_type`].
+    /// The output quoting convention is β-dependent; see
+    /// [`SabrParameters::quote_convention`](super::SabrParameters::quote_convention).
     pub fn generate_smile(&self, strikes: &[f64]) -> Result<Vec<f64>> {
         strikes
             .iter()

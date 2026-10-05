@@ -159,6 +159,19 @@ impl PathDependentPricerConfig {
     }
 
     /// Build a time grid from the configuration's step density and required event times.
+    ///
+    /// # Arguments
+    ///
+    /// * `time_to_maturity` - Simulation horizon in years from the valuation
+    ///   date; must be positive and finite.
+    /// * `required_times` - Event times in years (fixings, observations,
+    ///   exercise dates) in `(0, time_to_maturity]` merged into the uniform
+    ///   grid as exact knots, so the result may be non-uniform.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the horizon is invalid or the merged grid fails
+    /// validation.
     pub fn build_time_grid(
         &self,
         time_to_maturity: f64,
@@ -2068,7 +2081,7 @@ mod tests {
     /// Seeded GBM Asian convenience prices (mean and standard error) are
     /// pinned bit for bit for calls and puts.
     #[test]
-    fn h2_pin_gbm_asian_call_and_put_are_bit_stable() {
+    fn gbm_asian_call_and_put_are_bit_stable() {
         const EXPECTED: &[u64] = &[
             0x40195cdbec2b01bf,
             0x3fdc249afb33387a,

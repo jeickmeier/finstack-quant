@@ -5,7 +5,8 @@
 //! the local variance is negative at any point, there exists an arbitrage.
 //!
 //! The formula, its coordinates and its finite differences live in
-//! [`crate::volatility::dupire`], shared with the local-volatility extractor.
+//! the crate-private `volatility::dupire` module, shared with the
+//! local-volatility extractor.
 //! Both numerator (dw/dT >= 0) and denominator (density condition) must be
 //! non-negative.
 

@@ -1449,7 +1449,7 @@ mod tests {
     /// Bit-level pin of the four equal-spacing entry points across the
     /// expiry, zero-volatility, fixing-count and moneyness branches.
     #[test]
-    fn h2_pin_equal_spacing_asian_prices_are_bit_stable() {
+    fn equal_spacing_asian_prices_are_bit_stable() {
         // FNV-1a style fold of the 128 price bit patterns.
         const EXPECTED: u64 = 16_960_386_220_788_001_146;
         let mut actual = 0xcbf2_9ce4_8422_2325_u64;

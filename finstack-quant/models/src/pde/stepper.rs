@@ -175,7 +175,8 @@ impl ThetaStepper {
     /// # Arguments
     ///
     /// * `problem` - PDE coefficients and boundary conditions.
-    /// * `grid` - Spatial grid.
+    /// * `grid` - Spatial grid in the problem's state coordinate whose interior
+    ///   nodes carry `u`; its spacing sets the finite-difference stencils.
     /// * `u` - Solution vector (interior points only, length
     ///   `grid.n_interior()`), updated in place.
     /// * `t_from` - Current time in years (closer to maturity).

@@ -303,7 +303,7 @@ mod tests {
     /// (captured from the paired implementation before it took the short
     /// names). A change here changes the Greeks every host reports for a seed.
     #[test]
-    fn f4_pin_paired_finite_diff_greeks() {
+    fn paired_finite_diff_greeks_are_bit_stable() {
         let bits = |estimate: Estimate| [estimate.mean.to_bits(), estimate.stderr.to_bits()];
         let put = || crn_spec(100.0, 110.0, OptionType::Put);
         assert_eq!(

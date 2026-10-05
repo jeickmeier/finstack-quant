@@ -695,12 +695,13 @@ mod tests {
     /// Fixed- and floating-strike payoffs on fixed paths, fresh and seasoned,
     /// with continuous and discrete monitoring, across two resets.
     #[test]
-    fn h2_pin_lookback_payoffs_on_fixed_paths() {
+    fn lookback_payoffs_on_fixed_paths_are_bit_stable() {
         let path = [100.0, 112.5, 87.25, 131.0, 96.5, 104.75];
         let discrete = BarrierMonitoring::Discrete {
             observation_steps: vec![1, 2, 5],
         };
-        let mut payoffs: Vec<Box<dyn FnMut(&mut PathState) -> f64>> = Vec::new();
+        type TrackedPayoff = Box<dyn FnMut(&mut PathState) -> f64>;
+        let mut payoffs: Vec<TrackedPayoff> = Vec::new();
         macro_rules! track {
             ($payoff:expr) => {{
                 let mut payoff = $payoff;

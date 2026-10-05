@@ -703,7 +703,7 @@ fn zero_vol_of_vol_cube_preserves_the_exact_black_limit() {
 /// their clamped forms, for lognormal, displaced and β = 0 cubes in both
 /// interpolation modes. `u64::MAX` marks a rejected lookup.
 #[test]
-fn h6_pin_cube_convention_and_vol_lookups_are_bit_stable() {
+fn cube_convention_and_vol_lookups_are_bit_stable() {
     use finstack_quant_models::volatility::{
         get_cube_normal_vol, get_cube_normal_vol_clamped, get_cube_vol, get_cube_vol_clamped,
         VolSource, VolatilityConvention,

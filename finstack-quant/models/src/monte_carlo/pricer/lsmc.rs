@@ -2074,7 +2074,7 @@ mod tests {
     /// Seeded GBM American convenience prices (mean and standard error) are
     /// pinned bit for bit for the in-sample and two-pass put and call.
     #[test]
-    fn h2_pin_gbm_american_prices_are_bit_stable() {
+    fn gbm_american_prices_are_bit_stable() {
         const EXPECTED: &[u64] = &[
             0x402829f6094ad2f8,
             0x3fcf734a4ce21bbb,

@@ -305,7 +305,7 @@ mod tests {
     /// normal draw order, antithetic pairing). A change here changes every
     /// host's simulated asset paths for a given seed.
     #[test]
-    fn f2_pin_merton_seed_to_stream_mapping() {
+    fn merton_seed_to_stream_mapping_is_bit_stable() {
         let gbm = MertonModel::new(100.0, 0.25, 80.0, 0.04).unwrap();
         let paths = gbm.simulate_paths(8, 12, 1.0, 7, true).unwrap();
         let plain = gbm.simulate_paths(5, 6, 2.0, 11, false).unwrap();

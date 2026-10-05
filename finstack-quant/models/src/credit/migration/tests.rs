@@ -665,7 +665,7 @@ mod simulation_tests {
     /// `seed_from_u64`, Gillespie draw order). A change here changes every
     /// host's simulated ratings for a given seed.
     #[test]
-    fn f2_pin_migration_seed_to_stream_mapping() {
+    fn migration_seed_to_stream_mapping_is_bit_stable() {
         let sim = MigrationSimulator::new(two_state_gen(), 20.0).unwrap();
         let paths = sim.simulate(0, 64, 7).unwrap();
         let events = fingerprint(paths.iter().flat_map(|path| {

@@ -1544,7 +1544,7 @@ fn arbitrage_validation_result_serializes_its_verdict() {
 /// general-β and β = 1 branches, with and without a displacement, at the
 /// money and in both wings. `u64::MAX` marks a rejected input.
 #[test]
-fn h6_pin_sabr_model_implied_volatility_is_bit_stable() {
+fn sabr_model_implied_volatility_is_bit_stable() {
     const EXPECTED: &[u64] = &[
         0x3f9ef474538ef34c,
         0x3f9ef4745295ab29,
