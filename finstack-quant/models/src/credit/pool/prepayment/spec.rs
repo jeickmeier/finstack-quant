@@ -36,8 +36,8 @@ pub enum StochasticPrepaySpec {
 
     /// Richard-Roll prepayment model for RMBS.
     ///
-    /// Full stochastic model with refinancing incentive, seasoning,
-    /// burnout, and optional seasonality.
+    /// Full stochastic model with refinancing incentive, seasoning and
+    /// burnout.
     RichardRoll {
         /// Base CPR at full seasoning
         base_cpr: f64,

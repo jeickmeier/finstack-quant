@@ -5778,7 +5778,7 @@
         },
         {
           "additionalProperties": false,
-          "description": "Richard-Roll prepayment model for RMBS.\n\nFull stochastic model with refinancing incentive, seasoning,\nburnout, and optional seasonality.",
+          "description": "Richard-Roll prepayment model for RMBS.\n\nFull stochastic model with refinancing incentive, seasoning and\nburnout.",
           "properties": {
             "base_cpr": {
               "description": "Base CPR at full seasoning",
