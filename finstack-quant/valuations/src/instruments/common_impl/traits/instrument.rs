@@ -790,20 +790,6 @@ pub trait Instrument: CashflowProvider + Send + Sync {
         None
     }
 
-    /// Dividend schedule ID for this instrument.
-    ///
-    /// Returns the dividend schedule ID if this instrument depends on dividends.
-    /// Used by dividend attribution.
-    ///
-    /// Default implementation returns `None`.
-    ///
-    /// # Returns
-    ///
-    /// `Some(schedule_id)` if dividend-sensitive, `None` otherwise
-    fn dividend_schedule_id(&self) -> Option<CurveId> {
-        None
-    }
-
     /// Repo (financing) discount curve ID for this instrument.
     ///
     /// Returns the funding or repo curve used to finance the position for

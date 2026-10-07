@@ -55,7 +55,6 @@ pub(crate) mod ir_convexity;
 pub(crate) mod par_rate;
 pub(crate) mod pv_fixed;
 pub(crate) mod pv_float;
-pub(crate) mod schedule_diagnostics;
 
 /// Registers all IRS metrics into a provided registry.
 pub(crate) fn register_irs_metrics(
@@ -87,14 +86,6 @@ pub(crate) fn register_irs_metrics(
             (PvFloat, pv_float::FloatLegPvCalculator),
             (IrConvexity, ir_convexity::IrConvexityCalculator),
             (IrCrossGamma, ir_convexity::CrossGammaCalculator),
-            (FixedLegPaymentCount, schedule_diagnostics::FixedLegPaymentCountCalculator),
-            (FloatingLegPaymentCount, schedule_diagnostics::FloatingLegPaymentCountCalculator),
-            (FixedFirstPaymentDate, schedule_diagnostics::FixedFirstPaymentDateCalculator),
-            (FixedLastPaymentDate, schedule_diagnostics::FixedLastPaymentDateCalculator),
-            (FloatingFirstPaymentDate, schedule_diagnostics::FloatingFirstPaymentDateCalculator),
-            (FloatingLastPaymentDate, schedule_diagnostics::FloatingLastPaymentDateCalculator),
-            (FixedFirstAccrualFactor, schedule_diagnostics::FixedFirstAccrualFactorCalculator),
-            (FloatingFirstAccrualFactor, schedule_diagnostics::FloatingFirstAccrualFactorCalculator),
         ]
     }
     Ok(())

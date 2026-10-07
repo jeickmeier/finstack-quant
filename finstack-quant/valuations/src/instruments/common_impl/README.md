@@ -55,7 +55,7 @@ canonical owner.
 
 | File | Visibility | Contents |
 |------|-----------|----------|
-| `swap_legs.rs` | `pub` (reachable as `instruments::pricing::swap_legs`) | `pv_fixed_leg`, `add_payment_delay`, `FixedLegParams`, `LegPeriod`, `ANNUITY_EPSILON` |
+| `swap_legs.rs` | `pub` (reachable as `instruments::pricing::swap_legs`) | `pv_fixed_leg`, `add_payment_delay`, `FixedLegParams`, `ANNUITY_EPSILON` |
 | `time.rs` | `pub` | Curve-consistent time mapping: `relative_df_discount_curve`, `relative_df_discounting`, `curve_time`, `rate_between_on_dates`, `rate_period_on_dates` |
 | `variance_replication.rs` | `pub` | `carr_madan_forward_variance` — shared by equity and FX variance swaps |
 | `generic.rs` | private module, `GenericInstrumentPricer` re-exported `#[doc(hidden)]` | Downcasts and calls `Instrument::base_value`; the registry applies scenario shocks around it |
@@ -146,7 +146,7 @@ Optional hooks with defaults worth knowing about:
 | `as_marginable()` | `None` | The type implements `finstack_quant_margin::Marginable` (impls live in `../marginable.rs`) |
 | `model_params_snapshot()` / `with_model_params()` | `ModelParamsSnapshot::None` (the variant, not `Option::None`) / clone-or-error | Attribution must revalue the instrument with isolated model parameters |
 | `scenario_spread_shock_supported()` | `false` | The pricer consumes `scenario_spread_shock_bp` exactly, with no silent no-op |
-| `fx_exposure()`, `expiry()`, `dividend_schedule_id()`, `repo_curve_id()`, `to_instrument_json()` | `None` | The instrument has the corresponding concept |
+| `fx_exposure()`, `expiry()`, `repo_curve_id()`, `to_instrument_json()` | `None` | The instrument has the corresponding concept |
 
 `Instrument` sits behind `Arc<dyn Instrument>` across portfolio, scenario and
 binding code, so it is a stability surface. New optional capabilities go in

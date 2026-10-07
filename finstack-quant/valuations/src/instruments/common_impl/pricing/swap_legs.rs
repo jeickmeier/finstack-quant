@@ -91,21 +91,6 @@ pub fn add_payment_delay(date: Date, delay_days: i32, calendar_id: Option<&str>)
     }
 }
 
-/// A period in a swap leg schedule.
-///
-/// This is a simpler view of cashflow data focused on what's needed for pricing.
-#[derive(Debug, Clone)]
-pub struct LegPeriod {
-    /// Start of the accrual period.
-    pub accrual_start: Date,
-    /// End of the accrual period (also the unadjusted payment date).
-    pub accrual_end: Date,
-    /// Rate reset/fixing date (for floating legs).
-    pub reset_date: Option<Date>,
-    /// Year fraction for the accrual period.
-    pub year_fraction: f64,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

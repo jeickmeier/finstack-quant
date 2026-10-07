@@ -36,7 +36,6 @@ irs/
     ├── pv_fixed.rs pv_float.rs # leg PVs
     ├── dv01.rs                 # IrsDv01Calculator
     ├── ir_convexity.rs         # IrConvexity, IrCrossGamma
-    └── schedule_diagnostics.rs # payment counts, first/last payment dates, first accrual factors
 ```
 
 ## Pricing

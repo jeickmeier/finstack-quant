@@ -356,75 +356,34 @@ fn tail_quantile_mean(sorted: &[f64], p: f64) -> f64 {
     integral / p
 }
 
-/// Calculate portfolio VaR using full revaluation of homogeneous instruments.
+/// Calculate historical portfolio VaR and expected shortfall.
 ///
-/// # Arguments
-///
-/// * `instruments` - References to instruments of one concrete type; each is
-///   repriced under every historical or simulated market scenario and their
-///   P&Ls are aggregated into one loss distribution.
-/// * `base_market` - Unshocked market context used for baseline valuations and
-///   as the source market that each scenario perturbs.
-/// * `history` - Ordered market scenarios or return history used to generate
-///   the VaR loss distribution.
-/// * `as_of` - Valuation date applied consistently to every baseline and
-///   scenario revaluation.
-/// * `config` - VaR method, confidence level, horizon, and scenario/pricing
-///   policy controlling the returned risk measures.
-///
-/// * `provider` - Quote recalibration service required for nonzero credit-spread
-///   scenarios and quote-based Taylor sensitivities. Other inputs accept `None`.
-///
-/// # Returns
-///
-/// VaR result including VaR, ES, and full P&L distribution
-///
-/// This function revalues every supplied instrument under every scenario in
-/// [`MarketHistory`]. An empty instrument list returns zero VaR/ES. A non-empty
-/// portfolio requires at least one scenario; missing history returns an error.
-pub fn calculate_var<I>(
-    instruments: &[&I],
-    base_market: &MarketContext,
-    history: &MarketHistory,
-    as_of: Date,
-    config: &VarConfig,
-    provider: Option<Arc<dyn crate::recalibration::RecalibrationProvider>>,
-) -> Result<VarResult>
-where
-    I: Instrument,
-{
-    let instrument_refs: Vec<&dyn Instrument> = instruments
-        .iter()
-        .map(|inst| *inst as &dyn Instrument)
-        .collect();
-    calculate_var_with_pricing(
-        &instrument_refs,
-        base_market,
-        history,
-        as_of,
-        config,
-        PricingDispatch::InstrumentDefault,
-        provider.clone(),
-    )
-}
-
-/// Variant of [`calculate_var`] that reuses a caller-selected pricing engine.
+/// Every supplied instrument is revalued under every scenario in
+/// [`MarketHistory`] and the P&Ls are aggregated into one loss distribution.
+/// An empty instrument list returns zero VaR/ES. A non-empty portfolio
+/// requires at least one scenario; missing history returns an error.
 ///
 /// # Arguments
 ///
 /// * `instruments` - Instrument references to reprice under every scenario.
-/// * `base_market` - Unshocked market context used to build scenario contexts.
+/// * `base_market` - Unshocked market context used for baseline valuations and
+///   as the source market that each scenario perturbs.
 /// * `history` - Ordered market scenarios or return history for the loss
 ///   distribution.
 /// * `as_of` - Valuation date applied consistently to baseline and scenarios.
-/// * `config` - VaR method, confidence level, horizon, and scenario policy.
+/// * `config` - VaR method, confidence level, horizon, and scenario policy
+///   controlling the returned risk measures.
 /// * `dispatch` - Pricing path reused for baseline, bumped, and scenario
 ///   valuations. [`PricingDispatch::InstrumentDefault`] uses each instrument's
 ///   canonical default; [`PricingDispatch::Registered`] preserves one explicit
 ///   model-registry pair throughout the calculation.
 /// * `provider` - Quote recalibration service forwarded to historical credit
 ///   shocks and nested quote sensitivities; required when those operations run.
-pub fn calculate_var_with_pricing(
+///
+/// # Returns
+///
+/// VaR result including VaR, ES, and the full P&L distribution.
+pub fn calculate_var(
     instruments: &[&dyn Instrument],
     base_market: &MarketContext,
     history: &MarketHistory,
@@ -1257,9 +1216,12 @@ mod tests {
         );
 
         for (positions, expected) in [
-            (vec![&a, &b], vec![-160.0, -100.0, 0.0]),
-            (vec![&b], vec![-160.0, 0.0, 0.0]),
-            (vec![&a, &second_a], vec![-130.0, 0.0, 0.0]),
+            (vec![&a as &dyn Instrument, &b], vec![-160.0, -100.0, 0.0]),
+            (vec![&b as &dyn Instrument], vec![-160.0, 0.0, 0.0]),
+            (
+                vec![&a as &dyn Instrument, &second_a],
+                vec![-130.0, 0.0, 0.0],
+            ),
         ] {
             for method in [VarMethod::FullRevaluation, VarMethod::TaylorApproximation] {
                 let actual = calculate_var(
@@ -1268,6 +1230,7 @@ mod tests {
                     &history,
                     as_of,
                     &VarConfig::var_95().with_method(method),
+                    PricingDispatch::InstrumentDefault,
                     None,
                 )?;
                 for (actual, expected) in actual.pnl_distribution.iter().zip(&expected) {
@@ -1304,11 +1267,12 @@ mod tests {
             )],
         );
         let result = calculate_var(
-            &[&equity],
+            &[&equity as &dyn Instrument],
             &market,
             &history,
             as_of,
             &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
+            PricingDispatch::InstrumentDefault,
             None,
         )?;
         assert_eq!(result.pnl_distribution, vec![0.0]);
@@ -1324,11 +1288,12 @@ mod tests {
             .insert_price("UST10Y-PRICE", MarketScalar::Unitless(100.0));
         let history = MarketHistory::new(as_of, 1, vec![MarketScenario::new(as_of, vec![])]);
         let error = calculate_var(
-            &[&basket],
+            &[&basket as &dyn Instrument],
             &market,
             &history,
             as_of,
             &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
+            PricingDispatch::InstrumentDefault,
             None,
         )
         .expect_err("multiple scalar exposures cannot use an aggregate delta");
@@ -1400,11 +1365,12 @@ mod tests {
             )],
         );
         let actual = calculate_var(
-            &[&option],
+            &[&option as &dyn Instrument],
             &market,
             &history,
             as_of,
             &VarConfig::var_95(),
+            PricingDispatch::InstrumentDefault,
             None,
         )?;
         assert!((actual.pnl_distribution[0] - expected_pnl).abs() < 1e-12);
@@ -1646,7 +1612,7 @@ mod tests {
         );
         let history = MarketHistory::new(as_of, 1, vec![scenario]);
 
-        let err = calculate_var_with_pricing(&[&usd as &dyn Instrument, &eur as &dyn Instrument], &base_market, &history, as_of, &VarConfig::var_95(), PricingDispatch::InstrumentDefault, None)
+        let err = calculate_var(&[&usd as &dyn Instrument, &eur as &dyn Instrument], &base_market, &history, as_of, &VarConfig::var_95(), PricingDispatch::InstrumentDefault, None)
         .expect_err(
             "mixed-currency VaR must not aggregate native-currency P&L without a reporting currency",
         );
@@ -1698,7 +1664,7 @@ mod tests {
         );
         let history = MarketHistory::new(as_of, 1, vec![scenario]);
 
-        let result = calculate_var_with_pricing(
+        let result = calculate_var(
             &[&usd as &dyn Instrument, &eur as &dyn Instrument],
             &base_market,
             &history,
@@ -1727,13 +1693,22 @@ mod tests {
         let full_config = VarConfig::var_95();
         let taylor_config = VarConfig::var_95().with_method(VarMethod::TaylorApproximation);
 
-        let full = calculate_var(&[&bond], &base_market, &history, as_of, &full_config, None)?;
+        let full = calculate_var(
+            &[&bond as &dyn Instrument],
+            &base_market,
+            &history,
+            as_of,
+            &full_config,
+            PricingDispatch::InstrumentDefault,
+            None,
+        )?;
         let taylor = calculate_var(
-            &[&bond],
+            &[&bond as &dyn Instrument],
             &base_market,
             &history,
             as_of,
             &taylor_config,
+            PricingDispatch::InstrumentDefault,
             None,
         )?;
 
@@ -1776,17 +1751,25 @@ mod tests {
 
         // Full revaluation: direct repricing under shifted curve
         let full_config = VarConfig::var_95();
-        let full_result =
-            calculate_var(&[&bond], &base_market, &history, as_of, &full_config, None)?;
+        let full_result = calculate_var(
+            &[&bond as &dyn Instrument],
+            &base_market,
+            &history,
+            as_of,
+            &full_config,
+            PricingDispatch::InstrumentDefault,
+            None,
+        )?;
 
         // Taylor approximation: P&L ≈ DV01 × shift_bp
         let taylor_config = VarConfig::var_95().with_method(VarMethod::TaylorApproximation);
         let taylor_result = calculate_var(
-            &[&bond],
+            &[&bond as &dyn Instrument],
             &base_market,
             &history,
             as_of,
             &taylor_config,
+            PricingDispatch::InstrumentDefault,
             None,
         )?;
 
@@ -2153,7 +2136,7 @@ mod tests {
         // The job must succeed (graceful degradation), not hard-fail. The vol
         // shock is the only risk factor and it is skipped, so the Taylor P&L
         // distribution is all-zero and VaR/ES come back as 0.
-        let result = calculate_var_with_pricing(
+        let result = calculate_var(
             &[&option as &dyn Instrument],
             &base_market,
             &history,
@@ -2337,11 +2320,12 @@ mod tests {
         let history = MarketHistory::new(as_of, 1, vec![scenario]);
 
         let taylor = calculate_var(
-            &[&bond],
+            &[&bond as &dyn Instrument],
             &base_market,
             &history,
             as_of,
             &VarConfig::var_95().with_method(VarMethod::TaylorApproximation),
+            PricingDispatch::InstrumentDefault,
             None,
         )?;
         assert!(
@@ -2351,11 +2335,12 @@ mod tests {
         assert!(!taylor.skipped_vol, "no vol factor was present");
 
         let full = calculate_var(
-            &[&bond],
+            &[&bond as &dyn Instrument],
             &base_market,
             &history,
             as_of,
             &VarConfig::var_95(),
+            PricingDispatch::InstrumentDefault,
             None,
         )?;
         assert!(
@@ -2591,7 +2576,15 @@ mod tests {
         let config = VarConfig::var_95();
 
         // Calculate VaR
-        let result = calculate_var(&[&bond], &base_market, &history, as_of, &config, None)?;
+        let result = calculate_var(
+            &[&bond as &dyn Instrument],
+            &base_market,
+            &history,
+            as_of,
+            &config,
+            PricingDispatch::InstrumentDefault,
+            None,
+        )?;
 
         // Verify results
         assert_eq!(result.num_scenarios, 3);
@@ -2626,8 +2619,16 @@ mod tests {
         let history = history_from_scenarios(as_of, 0, vec![]);
         let config = VarConfig::var_95();
 
-        let error = calculate_var(&[&bond], &base_market, &history, as_of, &config, None)
-            .expect_err("empty history must not report zero risk");
+        let error = calculate_var(
+            &[&bond as &dyn Instrument],
+            &base_market,
+            &history,
+            as_of,
+            &config,
+            PricingDispatch::InstrumentDefault,
+            None,
+        )
+        .expect_err("empty history must not report zero risk");
         assert!(error.to_string().contains("at least one market scenario"));
         Ok(())
     }
@@ -2637,7 +2638,7 @@ mod tests {
         let as_of = sample_as_of();
         let base_market = usd_ois_market(as_of)?;
         let history = history_from_scenarios(as_of, 0, vec![]);
-        let result = calculate_var_with_pricing(
+        let result = calculate_var(
             &[],
             &base_market,
             &history,
@@ -2673,13 +2674,29 @@ mod tests {
         let config = VarConfig::var_95();
 
         // Calculate individual VaRs
-        let var1 = calculate_var(&[&bond1], market.as_ref(), &history, as_of, &config, None)?;
-        let var2 = calculate_var(&[&bond2], market.as_ref(), &history, as_of, &config, None)?;
+        let var1 = calculate_var(
+            &[&bond1 as &dyn Instrument],
+            market.as_ref(),
+            &history,
+            as_of,
+            &config,
+            PricingDispatch::InstrumentDefault,
+            None,
+        )?;
+        let var2 = calculate_var(
+            &[&bond2 as &dyn Instrument],
+            market.as_ref(),
+            &history,
+            as_of,
+            &config,
+            PricingDispatch::InstrumentDefault,
+            None,
+        )?;
         let sum_individual_vars = var1.var.abs() + var2.var.abs();
 
         // Calculate portfolio VaR
         let instruments: Vec<&dyn Instrument> = vec![&bond1, &bond2];
-        let portfolio_var = calculate_var_with_pricing(
+        let portfolio_var = calculate_var(
             &instruments,
             market.as_ref(),
             &history,
