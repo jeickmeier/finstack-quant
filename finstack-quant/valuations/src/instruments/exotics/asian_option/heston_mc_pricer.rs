@@ -17,7 +17,6 @@ use finstack_quant_models::monte_carlo::engine::{McEngine, McEngineConfig};
 use finstack_quant_models::monte_carlo::payoff::asian::{AsianCall, AsianPut};
 use finstack_quant_models::monte_carlo::process::heston::HestonProcess;
 use finstack_quant_models::monte_carlo::rng::philox::PhiloxRng;
-use finstack_quant_models::monte_carlo::seed;
 
 /// Asian option Heston Monte Carlo pricer.
 ///
@@ -147,15 +146,10 @@ impl AsianOptionHestonMcPricer {
             .unwrap_or(self.num_paths);
 
         // Derive deterministic seed
-        let seed_val = if let Some(ref scenario) = inst
+        let seed_val = inst
             .instrument_pricing_overrides
             .model_config
-            .mc_seed_scenario
-        {
-            seed::derive_seed(&inst.id, scenario)
-        } else {
-            seed::derive_seed(&inst.id, "base")
-        };
+            .mc_seed(&inst.id);
 
         let engine = McEngine::new(McEngineConfig::new(num_paths, time_grid));
 

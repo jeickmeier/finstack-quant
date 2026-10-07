@@ -8,7 +8,6 @@ use crate::instruments::rates::hw1f::{
     ExerciseBoundaryPayoff, Hw1fParamFamily, Hw1fTermForward, PeriodForwardCoeffs,
     RateExoticHw1fLsmcPricer, RateExoticHw1fMcPricer, RateExoticMcConfig,
 };
-use crate::metrics::MetricId;
 use crate::pricer::{
     InstrumentType, ModelKey, Pricer, PricerKey, PricingError, PricingErrorContext,
 };
@@ -492,20 +491,7 @@ impl Pricer for CallableRangeAccrualPricer {
         })?;
 
         let mut result = ValuationResult::stamped(callable.id.as_str(), as_of, estimate.mean);
-        result.measures.insert(
-            MetricId::custom("mc_num_paths"),
-            estimate.num_simulated_paths as f64,
-        );
-        result
-            .measures
-            .insert(MetricId::custom("mc_stderr"), estimate.stderr);
-        let (ci_low, ci_high) = estimate.ci_95;
-        result
-            .measures
-            .insert(MetricId::custom("mc_ci95_low"), ci_low.amount());
-        result
-            .measures
-            .insert(MetricId::custom("mc_ci95_high"), ci_high.amount());
+        crate::instruments::common_impl::helpers::attach_mc_diagnostics(&mut result, &estimate);
         Ok(result)
     }
 
@@ -1163,6 +1149,6 @@ mod tests {
         assert!(result.value.amount() > 0.0);
         assert!(result
             .measures
-            .contains_key(&MetricId::custom("mc_num_paths")));
+            .contains_key(&crate::metrics::MetricId::custom("mc_num_paths")));
     }
 }

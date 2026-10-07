@@ -640,10 +640,7 @@ impl RevolvingCreditMcRun {
                 model_config.mc_paths,
                 defaults.num_paths,
             )?,
-            seed: finstack_quant_models::monte_carlo::seed::derive_seed(
-                facility_id,
-                model_config.mc_seed_scenario.as_deref().unwrap_or("base"),
-            ),
+            seed: model_config.mc_seed(facility_id),
             antithetic: model_config.mc_antithetic.unwrap_or(defaults.antithetic),
         })
     }

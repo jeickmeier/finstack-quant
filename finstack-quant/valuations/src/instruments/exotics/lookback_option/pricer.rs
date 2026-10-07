@@ -139,17 +139,10 @@ impl LookbackOptionMcPricer {
 
         // Derive deterministic seed from instrument ID and scenario
 
-        use finstack_quant_models::monte_carlo::seed;
-
-        let seed = if let Some(ref scenario) = inst
+        let seed = inst
             .instrument_pricing_overrides
             .model_config
-            .mc_seed_scenario
-        {
-            seed::derive_seed(&inst.id, scenario)
-        } else {
-            seed::derive_seed(&inst.id, "base")
-        };
+            .mc_seed(&inst.id);
 
         let mut config = base_cfg;
         config.seed = seed;

@@ -660,6 +660,23 @@ impl ModelConfig {
         self == &Self::default()
     }
 
+    /// Monte Carlo seed for `instrument_id` under this configuration.
+    ///
+    /// Derives `derive_seed(instrument_id, mc_seed_scenario)`, with the
+    /// `"base"` label when no scenario is set, so every Monte Carlo pricer
+    /// replays the same streams for the same instrument and label.
+    ///
+    /// # Arguments
+    ///
+    /// * `instrument_id` - Identifier of the instrument being priced; part of
+    ///   the seed so distinct instruments never share random streams.
+    pub fn mc_seed(&self, instrument_id: &finstack_quant_core::types::InstrumentId) -> u64 {
+        finstack_quant_models::monte_carlo::seed::derive_seed(
+            instrument_id,
+            self.mc_seed_scenario.as_deref().unwrap_or("base"),
+        )
+    }
+
     /// Validate model config (tree steps > 0, non-negative vol/friction).
     pub fn validate(&self) -> finstack_quant_core::Result<()> {
         use finstack_quant_core::InputError;
