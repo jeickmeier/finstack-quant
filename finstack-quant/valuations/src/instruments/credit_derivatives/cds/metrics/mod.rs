@@ -137,9 +137,7 @@ pub(crate) fn register_cds_metrics(
             (JumpToDefault, jump_to_default::JumpToDefaultCalculator),
             (DefaultExposure, jump_to_default::DefaultExposureCalculator),
             (Dv01, dv01::CdsDv01Calculator),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::CreditDefaultSwap,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())

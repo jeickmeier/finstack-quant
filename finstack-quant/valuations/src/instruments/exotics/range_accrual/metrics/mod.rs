@@ -47,13 +47,9 @@ pub(crate) fn register_range_accrual_metrics(
             metrics: [
                 (Vega, crate::metrics::GenericFdVega::<crate::instruments::RangeAccrual>::default()),
                 (Rho, rho::RhoCalculator),
-                (Dv01, crate::metrics::UnifiedDv01Calculator::<
-                    crate::instruments::exotics::range_accrual::RangeAccrual,
-                >::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
+                (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_combined())),
                 // Theta is now registered universally in metrics::standard_registry()
-                (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                    crate::instruments::RangeAccrual,
-                >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+                (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
             ]
         }
     }

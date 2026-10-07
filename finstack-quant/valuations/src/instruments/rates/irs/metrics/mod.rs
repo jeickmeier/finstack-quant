@@ -73,14 +73,10 @@ pub(crate) fn register_irs_metrics(
             (Dv01, dv01::IrsDv01Calculator),
 
             // PV01 per-curve: bump each rate curve individually, store as pv01::{curve}
-            (Pv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::InterestRateSwap,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_per_curve()
+            (Pv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_per_curve()
                 .with_series_id(crate::metrics::MetricId::Pv01))),
 
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::InterestRateSwap,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
 
             (PvFixed, pv_fixed::FixedLegPvCalculator),
             (PvFloat, pv_float::FloatLegPvCalculator),

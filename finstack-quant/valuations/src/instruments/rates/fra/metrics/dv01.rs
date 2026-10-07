@@ -93,7 +93,7 @@ impl MetricCalculator for FraRateCurveDv01Calculator {
 }
 
 fn generic_fallback(context: &mut MetricContext) -> Result<f64> {
-    crate::metrics::UnifiedDv01Calculator::<ForwardRateAgreement>::new(
+    crate::metrics::UnifiedDv01Calculator::new(
         crate::metrics::Dv01CalculatorConfig::parallel_combined(),
     )
     .calculate(context)

@@ -56,18 +56,14 @@ pub(crate) fn register_equity_trs_metrics(
     // DV01 for financing leg sensitivity
     registry.register_metric(
         MetricId::Dv01,
-        Arc::new(crate::metrics::UnifiedDv01Calculator::<
-            crate::instruments::equity::equity_trs::EquityTotalReturnSwap,
-        >::new(
-            crate::metrics::Dv01CalculatorConfig::parallel_combined()
+        Arc::new(crate::metrics::UnifiedDv01Calculator::new(
+            crate::metrics::Dv01CalculatorConfig::parallel_combined(),
         )),
         &instruments,
     )?;
     registry.register_metric(
         MetricId::BucketedDv01,
-        Arc::new(crate::metrics::UnifiedDv01Calculator::<
-            crate::instruments::equity::equity_trs::EquityTotalReturnSwap,
-        >::new(
+        Arc::new(crate::metrics::UnifiedDv01Calculator::new(
             crate::metrics::Dv01CalculatorConfig::triangular_key_rate(),
         )),
         &instruments,

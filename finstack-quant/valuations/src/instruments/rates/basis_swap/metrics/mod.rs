@@ -51,13 +51,11 @@ pub(crate) fn register_basis_swap_metrics(
         registry: registry,
         instrument: InstrumentType::BasisSwap,
         metrics: [
-            (Dv01, crate::metrics::UnifiedDv01Calculator::<crate::instruments::BasisSwap>::new(crate::metrics::Dv01CalculatorConfig::parallel_per_curve())),
+            (Dv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_per_curve())),
             (BasisParSpread, ParSpreadCalculator),
             (IncrementalParSpread, IncrementalParSpreadCalculator),
             // Theta is now registered universally in metrics::standard_registry()
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::BasisSwap,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())

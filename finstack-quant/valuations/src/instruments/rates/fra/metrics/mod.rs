@@ -31,16 +31,10 @@ pub(crate) fn register_fra_metrics(
         instrument: InstrumentType::Fra,
         metrics: [
             (Dv01, FraRateCurveDv01Calculator),
-            (Pv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::ForwardRateAgreement,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_forward_only())),
-            (ForwardPv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::ForwardRateAgreement,
-            >::new(crate::metrics::Dv01CalculatorConfig::parallel_forward_only())),
+            (Pv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_forward_only())),
+            (ForwardPv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::parallel_forward_only())),
             (ParRate, FraParRateCalculator),
-            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::<
-                crate::instruments::ForwardRateAgreement,
-            >::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
+            (BucketedDv01, crate::metrics::UnifiedDv01Calculator::new(crate::metrics::Dv01CalculatorConfig::triangular_key_rate())),
         ]
     }
     Ok(())

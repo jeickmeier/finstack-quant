@@ -330,7 +330,7 @@ where
 
         if self.delegate_to_hazard_when_credit_curve && has_credit_curve(instrument)? {
             return if hazard_is_replayable(instrument, context)? {
-                GenericParallelCs01::<I>::default().calculate(context)
+                GenericParallelCs01.calculate(context)
             } else {
                 DirectHazardParallelCs01::<I>::default().calculate(context)
             };
@@ -417,7 +417,7 @@ where
 
         if self.delegate_to_hazard_when_credit_curve && has_credit_curve(instrument)? {
             return if hazard_is_replayable(instrument, context)? {
-                GenericBucketedCs01::<I>::default().calculate(context)
+                GenericBucketedCs01.calculate(context)
             } else {
                 DirectHazardBucketedCs01::<I>::default().calculate(context)
             };
