@@ -1,12 +1,9 @@
 //! Stochastic pricing engine for structured credit.
 //!
-//! This module provides tree-based and Monte Carlo pricing for structured credit
-//! instruments with stochastic prepayment and default models.
-//!
-//! # Pricing Modes
-//!
-//! - **Tree-based**: Exact pricing using the recombining scenario lattice
-//! - **Monte Carlo**: Statistical re-sampling of the tree distribution (with optional variance reduction)
+//! This module provides Monte Carlo pricing for structured credit instruments
+//! with stochastic prepayment and default models: each scenario path draws
+//! monthly systematic factors from a seeded Philox substream, optionally
+//! paired antithetically, and runs the full deal waterfall.
 //!
 //! # Features
 //!

@@ -85,7 +85,11 @@ fn stochastic_pricing_zero_notional_returns_validation_error() {
     market = market.insert(discount_curve(closing_date()));
 
     let err = sc
-        .price_stochastic_with_mode(&market, closing_date(), StructuredCreditPricingMode::Tree)
+        .price_stochastic_with_mode(
+            &market,
+            closing_date(),
+            StructuredCreditPricingMode::default(),
+        )
         .expect_err("zero-notional stochastic pricing should be rejected");
 
     assert!(err.to_string().contains("positive pool notional"));
@@ -721,43 +725,14 @@ fn philox_rng_discipline_determinism_and_stream_sanity() {
     );
 }
 
-/// All three pricing modes (Tree / MonteCarlo / Hybrid) must successfully
-/// price the same instrument and produce finite NPVs. This locks Tree as a
-/// first-class supported mode alongside MC, preventing CI drift where
-/// the non-default modes go untested at the high-level
-/// `price_stochastic_with_mode` entry point.
-///
-/// Tree mode's combinatorial path explosion (b^n terminal paths for n
-/// payment periods × b branches) limits it to short-horizon deals — we use
-/// a monthly-pay deal whose period count keeps `2^n` well under the 100K
-/// `max_tree_paths` cap.
+/// An explicit Monte Carlo mode prices the canonical deal end-to-end through
+/// `price_stochastic_with_mode`, produces a finite NPV and echoes the mode it
+/// was run with on the result.
 #[test]
-fn all_pricing_modes_succeed_on_canonical_deal() {
-    // The standard build_sc fixture is too long-horizon for Tree (72
-    // monthly periods → 2^72 paths). We reuse the same pool+tranche
-    // structure but override the maturity to 1 year so Tree's path
-    // explosion stays under the 100K cap.
+fn explicit_monte_carlo_mode_prices_canonical_deal() {
     let sc = build_sc("ABS-MODE-PARITY", 1_000_000.0);
     let close = closing_date();
     let market = MarketContext::new().insert(discount_curve(close));
-
-    let tree = sc.price_stochastic_with_mode(&market, close, StructuredCreditPricingMode::Tree);
-    // Tree mode may legitimately reject this fixture if the deal's payment
-    // schedule exceeds tree_steps capacity — that's the documented safety
-    // guard. Skip the comparison in that case but still verify MC + Hybrid
-    // succeed end-to-end.
-    let tree_priced = match tree {
-        Ok(r) => Some(r),
-        Err(e) => {
-            // Acceptable failure modes: oversized tree path count.
-            assert!(
-                e.to_string().contains("max_tree_paths")
-                    || e.to_string().contains("terminal paths"),
-                "Tree mode failure must be the documented path-count guard, got: {e}"
-            );
-            None
-        }
-    };
 
     let mc = sc
         .price_stochastic_with_mode(
@@ -769,25 +744,7 @@ fn all_pricing_modes_succeed_on_canonical_deal() {
             },
         )
         .expect("MonteCarlo mode must price");
-    let hybrid = sc
-        .price_stochastic_with_mode(
-            &market,
-            close,
-            StructuredCreditPricingMode::Hybrid {
-                tree_periods: 6,
-                num_paths: 16,
-            },
-        )
-        .expect("Hybrid mode must price");
 
-    let mut entries: Vec<(
-        &str,
-        &finstack_quant_valuations::instruments::fixed_income::structured_credit::StochasticPricingResult,
-    )> = Vec::new();
-    if let Some(t) = tree_priced.as_ref() {
-        assert_eq!(t.pricing_mode, StructuredCreditPricingMode::Tree);
-        entries.push(("Tree", t));
-    }
     assert_eq!(
         mc.pricing_mode,
         StructuredCreditPricingMode::MonteCarlo {
@@ -795,33 +752,17 @@ fn all_pricing_modes_succeed_on_canonical_deal() {
             antithetic: true,
         }
     );
-    assert_eq!(
-        hybrid.pricing_mode,
-        StructuredCreditPricingMode::Hybrid {
-            tree_periods: 6,
-            num_paths: 16,
-        }
+    assert_eq!(mc.num_paths, 16, "antithetic pairs double the path count");
+    assert!(
+        mc.npv.amount().is_finite(),
+        "NPV must be finite, got {}",
+        mc.npv.amount()
     );
-    entries.push(("MonteCarlo", &mc));
-    entries.push(("Hybrid", &hybrid));
-
-    let reference_tranche_count = entries[0].1.tranche_results.len();
-    for (label, result) in &entries {
-        assert!(
-            result.npv.amount().is_finite(),
-            "{label} NPV must be finite, got {}",
-            result.npv.amount()
-        );
-        assert!(
-            !result.tranche_results.is_empty(),
-            "{label} must produce tranche results"
-        );
-        assert_eq!(
-            result.tranche_results.len(),
-            reference_tranche_count,
-            "{label} tranche count must match reference"
-        );
-    }
+    assert_eq!(
+        mc.tranche_results.len(),
+        sc.tranches.tranches.len(),
+        "one result per tranche"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -920,17 +861,6 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
                 antithetic: false,
             },
         },
-        // A pure-Tree case is omitted: exact-tree mode rejects fixtures
-        // beyond a few periods (documented path-count guard). The Hybrid
-        // case still exercises the tree shock path on its leading periods.
-        Case {
-            label: "abs_hybrid",
-            stochastic: false,
-            mode: StructuredCreditPricingMode::Hybrid {
-                tree_periods: 6,
-                num_paths: 100,
-            },
-        },
         Case {
             label: "factor_correlated_mc",
             stochastic: false,
@@ -942,8 +872,6 @@ fn stochastic_pricing_result_is_reproducible_across_configurations() {
     ];
 
     for case in &cases {
-        // Exact-tree expansion over the standard 6-year schedule exceeds the
-        // path cap; tree/hybrid cases price the one-year-horizon deal.
         let mut sc = build_sc(case.label, 1_000_000.0);
         // Preserve the original economic inputs of this bit-level benchmark:
         // a contractual long first period and 18% annual CPR. Constructor
@@ -1072,21 +1000,16 @@ fn stochastic_waterfall_matches_independent_cashflow_vectors() {
             let senior_loss = (loss - 20_000_000.0).max(0.0);
             let senior_value = 80_000_000.0 - senior_loss + interest;
             let equity_value = (20_000_000.0 - loss).max(0.0);
-            let mut modes = vec![
+            let modes = [
                 StructuredCreditPricingMode::MonteCarlo {
                     num_paths: 4,
                     antithetic: true,
                 },
-                StructuredCreditPricingMode::Hybrid {
-                    tree_periods: 2,
+                StructuredCreditPricingMode::MonteCarlo {
                     num_paths: 8,
+                    antithetic: false,
                 },
             ];
-            // Exact trees branch monthly and intentionally cap terminal paths.
-            // The one-quarter vector verifies that engine within its supported size.
-            if periods == 1 {
-                modes.push(StructuredCreditPricingMode::Tree);
-            }
             for mode in modes {
                 let result = sc
                     .price_stochastic_with_mode(&market, start, mode.clone())
