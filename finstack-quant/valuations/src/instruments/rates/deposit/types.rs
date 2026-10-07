@@ -15,9 +15,7 @@
 
 use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::calendar_by_id;
-use finstack_quant_core::dates::{
-    adjust, BusinessDayConvention, Date, DateExt, DayCount, HolidayCalendar,
-};
+use finstack_quant_core::dates::{adjust, BusinessDayConvention, Date, DayCount, HolidayCalendar};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::money::Money;
 use finstack_quant_core::types::{CalendarId, CurveId, InstrumentId};
@@ -28,8 +26,6 @@ use crate::instruments::common_impl::numeric::decimal_to_f64;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 use crate::instruments::common_impl::traits::Attributes;
 use crate::instruments::common_impl::validation;
-use crate::market::conventions::ConventionRegistry;
-use finstack_quant_core::types::IndexId;
 
 /// Simple deposit instrument with optional quoted rate.
 ///
@@ -45,9 +41,9 @@ use finstack_quant_core::types::IndexId;
 /// - `calendar_id`: Holiday calendar identifier for business day logic (e.g., "nyse", "target")
 ///
 /// `start_date` is always the accrual start (spot) date. Callers holding a
-/// trade date compute the spot date before building (see
-/// [`Deposit::from_conventions`]). When `calendar_id` is set, `start_date` and
-/// `maturity` are adjusted by the business day convention.
+/// trade date compute the spot date before building. When `calendar_id` is
+/// set, `start_date` and `maturity` are adjusted by the business day
+/// convention.
 #[derive(
     Clone,
     Debug,
@@ -132,27 +128,6 @@ pub struct Deposit {
     pub calendar_id: Option<CalendarId>,
 }
 
-/// Parameters for building a deposit from registered rate-index conventions.
-#[derive(Debug, Clone)]
-pub struct ConventionDepositParams<'a> {
-    /// Unique deposit identifier.
-    pub id: InstrumentId,
-    /// Deposit notional.
-    pub notional: Money,
-    /// Trade date used as the raw start date before spot-lag adjustment.
-    pub trade_date: Date,
-    /// Deposit maturity date.
-    pub maturity: Date,
-    /// Contractual simple annualized rate in decimal form (0.045 = 4.5%).
-    pub fixed_rate: f64,
-    /// Rate index used to resolve market conventions.
-    pub index_id: &'a str,
-    /// Discount curve used for valuation and par extraction.
-    pub discount_curve_id: &'a str,
-    /// Scenario-selection and tagging attributes.
-    pub attributes: Attributes,
-}
-
 impl Deposit {
     /// Create a canonical example deposit for testing and documentation.
     ///
@@ -171,68 +146,6 @@ impl Deposit {
             .attributes(Attributes::new())
             .business_day_convention(BusinessDayConvention::ModifiedFollowing)
             .build()
-    }
-
-    /// Create a deposit using market conventions resolved from `ConventionRegistry`.
-    ///
-    /// This constructor is the preferred shortcut for standard money-market
-    /// deposits when the caller knows the trade date, maturity, and quoted rate.
-    /// The accrual start date is the spot date: `trade_date` plus the index's
-    /// `market_settlement_days` business days on its market calendar.
-    ///
-    /// # Arguments
-    ///
-    /// * `params` - Deposit identity, notional, trade date, maturity, decimal
-    ///   simple rate (0.045 = 4.5%), rate index id used to resolve conventions,
-    ///   discount curve id and attributes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the global `ConventionRegistry` is unavailable or if
-    /// the requested `index_id` is not present in the registry.
-    pub fn from_conventions(
-        params: ConventionDepositParams<'_>,
-    ) -> finstack_quant_core::Result<Self> {
-        let ConventionDepositParams {
-            id,
-            notional,
-            trade_date,
-            maturity,
-            fixed_rate,
-            index_id,
-            discount_curve_id,
-            attributes,
-        } = params;
-
-        let registry = ConventionRegistry::try_global().map_err(|_| {
-            finstack_quant_core::Error::Validation("ConventionRegistry not initialized.".into())
-        })?;
-        let conv = registry.require_rate_index(&IndexId::new(index_id))?;
-        let calendar = calendar_by_id(&conv.market_calendar_id).ok_or_else(|| {
-            finstack_quant_core::Error::Validation(format!(
-                "rate index '{index_id}' references unknown market_calendar_id '{}'",
-                conv.market_calendar_id
-            ))
-        })?;
-        let spot_date = trade_date.add_business_days(conv.market_settlement_days, calendar)?;
-
-        let deposit = Self::builder()
-            .id(id)
-            .notional(notional)
-            .start_date(spot_date)
-            .maturity(maturity)
-            .day_count(conv.day_count)
-            .fixed_rate_opt(Some(finstack_quant_core::decimal::f64_to_decimal(
-                fixed_rate,
-            )?))
-            .discount_curve_id(CurveId::new(discount_curve_id))
-            .attributes(attributes)
-            .business_day_convention(conv.market_business_day_convention)
-            .calendar_id_opt(Some(conv.market_calendar_id.clone().into()))
-            .build()?;
-
-        deposit.validate()?;
-        Ok(deposit)
     }
 
     /// Calculate the raw (unrounded) trade NPV of this deposit.
@@ -533,43 +446,7 @@ mod tests {
     use crate::instruments::common_impl::traits::Attributes;
     use finstack_quant_core::cashflow::CFKind;
     use finstack_quant_core::currency::Currency;
-    use rust_decimal::prelude::ToPrimitive;
     use time::macros::date;
-
-    #[test]
-    fn from_conventions_applies_rate_index_defaults() {
-        let deposit = Deposit::from_conventions(ConventionDepositParams {
-            id: InstrumentId::new("DEP-USD-SOFR-6M"),
-            notional: Money::from((1_000_000_i64, Currency::USD)),
-            trade_date: date!(2025 - 01 - 02),
-            maturity: date!(2025 - 07 - 02),
-            fixed_rate: 0.045,
-            index_id: "USD-SOFR-OIS",
-            discount_curve_id: "USD-OIS",
-            attributes: Attributes::new(),
-        })
-        .expect("deposit conventions constructor should succeed");
-
-        assert_eq!(deposit.id, InstrumentId::new("DEP-USD-SOFR-6M"));
-        assert_eq!(
-            deposit.notional,
-            Money::from((1_000_000_i64, Currency::USD))
-        );
-        // Spot date: 2025-01-02 (Thu) + 2 USNY business days = 2025-01-06 (Mon).
-        assert_eq!(deposit.start_date, date!(2025 - 01 - 06));
-        assert_eq!(deposit.maturity, date!(2025 - 07 - 02));
-        assert_eq!(deposit.day_count, DayCount::Act360);
-        assert_eq!(
-            deposit.fixed_rate.and_then(|rate| rate.to_f64()),
-            Some(0.045)
-        );
-        assert_eq!(deposit.discount_curve_id, CurveId::new("USD-OIS"));
-        assert_eq!(
-            deposit.business_day_convention,
-            BusinessDayConvention::ModifiedFollowing
-        );
-        assert_eq!(deposit.calendar_id.as_deref(), Some("usny"));
-    }
 
     #[test]
     fn cashflow_schedule_marks_initial_exchange_as_notional() {

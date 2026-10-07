@@ -621,10 +621,7 @@ impl PyConvertibleBond {
     ) -> PyResult<Bound<'py, PyAny>> {
         let market = extract_market(py, market)?;
         let as_of = py_to_date(as_of)?;
-        let greeks = self
-            .inner
-            .greeks(&market, None, as_of)
-            .map_err(core_to_py)?;
+        let greeks = self.inner.greeks(&market, as_of).map_err(core_to_py)?;
         serde_to_py(py, &greeks)
     }
 

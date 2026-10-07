@@ -14,9 +14,7 @@ use finstack_quant_core::currency::Currency;
 use finstack_quant_core::dates::Date;
 use finstack_quant_core::market_data::scalars::MarketScalar;
 use finstack_quant_core::money::Money;
-use finstack_quant_valuations::instruments::fixed_income::convertible::{
-    price_convertible_bond, ConvertibleTreeType,
-};
+use finstack_quant_valuations::instruments::fixed_income::convertible::price_convertible_bond;
 use time::Month;
 
 #[test]
@@ -45,12 +43,7 @@ fn test_currency_safety_mismatch() {
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
     // Should detect currency mismatch and fail
-    let result = price_convertible_bond(
-        &with_tree_steps(&bond, 20),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    );
+    let result = price_convertible_bond(&with_tree_steps(&bond, 20), &market, dates::base_date());
     assert!(
         result.is_err(),
         "Should fail on currency mismatch between bond and equity"
@@ -62,13 +55,8 @@ fn test_currency_consistency_with_unitless_spot() {
     let bond = create_standard_convertible();
     let market = create_market_context(); // Uses unitless spot
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     // Should work with unitless spot and return bond's currency
     assert_eq!(
@@ -84,13 +72,8 @@ fn test_floating_coupon_with_reset_events() {
     let market = create_market_context();
 
     // Should handle floating coupons with reset events properly
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 20),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 20), &market, dates::base_date()).unwrap();
 
     assert!(
         price.amount().is_finite(),
@@ -127,13 +110,8 @@ fn test_day_count_propagation_for_call_put() {
     let market = create_market_context();
 
     // Should use schedule day_count for mapping (not hardcoded)
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 10),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 10), &market, dates::base_date()).unwrap();
     assert!(
         price.amount().is_finite(),
         "Day count propagation should work"
@@ -145,13 +123,8 @@ fn test_short_maturity_bond() {
     let bond = create_floating_convertible(); // 1 year maturity
     let market = create_market_context();
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 20),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 20), &market, dates::base_date()).unwrap();
 
     assert!(
         price.amount() > 0.0 && price.amount().is_finite(),
@@ -166,13 +139,8 @@ fn test_very_few_tree_steps() {
     let market = create_market_context();
 
     // Test with minimum reasonable steps
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 3),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 3), &market, dates::base_date()).unwrap();
 
     assert!(
         price.amount() > 0.0 && price.amount().is_finite(),
@@ -248,13 +216,8 @@ fn test_time_mapping_with_quarterly_coupons() {
     };
 
     let market = create_market_context();
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 10),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 10), &market, dates::base_date()).unwrap();
 
     assert!(
         price.amount() > 0.0,
@@ -278,13 +241,8 @@ fn test_narrow_conversion_window_with_few_steps() {
     let market = create_market_context();
 
     // With few steps, window might map to single step
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 10),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 10), &market, dates::base_date()).unwrap();
 
     assert!(
         price.amount() > bond_params::NOTIONAL * 0.5,
@@ -321,13 +279,8 @@ fn test_call_put_on_same_date() {
     let market = create_market_context();
 
     // Should handle call and put on same date
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
     assert!(price.amount().is_finite(), "Same date call/put should work");
 }
 
@@ -351,13 +304,8 @@ fn test_call_put_at_maturity() {
     let market = create_market_context();
 
     // Call at maturity should work
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
     assert!(price.amount().is_finite(), "Call at maturity should work");
 }
 
@@ -384,13 +332,8 @@ fn test_call_put_before_issue() {
 
     let market = create_market_context();
 
-    let error = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .expect_err("pre-issue call must be rejected");
+    let error = price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date())
+        .expect_err("pre-issue call must be rejected");
     assert!(error.to_string().contains("outside instrument life"));
 }
 
@@ -417,13 +360,8 @@ fn test_call_put_after_maturity() {
 
     let market = create_market_context();
 
-    let error = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .expect_err("post-maturity call must be rejected");
+    let error = price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date())
+        .expect_err("post-maturity call must be rejected");
     assert!(error.to_string().contains("outside instrument life"));
 }
 
@@ -447,13 +385,8 @@ fn test_zero_conversion_ratio() {
 
     let market = create_market_context();
 
-    let error = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .expect_err("zero conversion ratio must be rejected");
+    let error = price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date())
+        .expect_err("zero conversion ratio must be rejected");
     assert!(error.to_string().contains("conversion ratio"));
 }
 
@@ -478,13 +411,8 @@ fn test_very_high_conversion_ratio() {
     let market = create_market_context();
 
     // Should handle high conversion ratio
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
     assert!(
         price.amount().is_finite() && price.amount() > 0.0,
         "Very high conversion ratio should work: {}",
@@ -500,12 +428,7 @@ fn test_missing_underlying_equity() {
     let market = create_market_context();
 
     // Should fail gracefully
-    let result = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    );
+    let result = price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date());
     assert!(result.is_err(), "Should fail with an empty spot_id");
 }
 
@@ -532,12 +455,7 @@ fn test_missing_volatility_data() {
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
     // Should fail due to missing volatility
-    let result = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    );
+    let result = price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date());
     assert!(result.is_err(), "Should fail with missing volatility data");
 }
 
@@ -552,12 +470,7 @@ fn test_missing_discount_curve() {
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
     // Should fail due to missing discount curve
-    let result = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    );
+    let result = price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date());
     assert!(result.is_err(), "Should fail with missing discount curve");
 }
 
@@ -572,13 +485,8 @@ fn test_numerical_stability_extreme_parameters() {
         0.10,   // High dividend yield
     );
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
 
     assert!(
         price.amount().is_finite() && !price.amount().is_nan(),
@@ -600,12 +508,7 @@ fn test_empty_call_put_schedule() {
     let market = create_market_context();
 
     // Should work with empty call/put schedule
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        dates::base_date(),
-    )
-    .unwrap();
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, dates::base_date()).unwrap();
     assert!(price.amount() > 0.0, "Empty call/put schedule should work");
 }

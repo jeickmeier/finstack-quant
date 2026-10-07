@@ -25,7 +25,6 @@ use finstack_quant_models::SabrParameters;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
-use super::super::parameters::SwaptionParams;
 use super::definitions::CashSettlementMethod;
 use crate::instruments::{SettlementType, VolatilityModel};
 
@@ -319,65 +318,6 @@ impl Swaption {
             sabr_params: None,
             attributes: Attributes::new(),
         })
-    }
-
-    /// Create a European swaption from a [`SwaptionParams`] specification.
-    ///
-    /// The payer/receiver side comes from `params.side`
-    /// ([`PayReceive::Pay`] → payer, [`OptionType::Call`]; [`PayReceive::Receive`]
-    /// → receiver, [`OptionType::Put`]). Leg conventions default to the USD
-    /// market standard (semi-annual 30/360 fixed versus quarterly ACT/360
-    /// floating) unless overridden on `params`.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Instrument identifier.
-    /// * `params` - Notional, strike, dates, side and optional leg/vol-model overrides.
-    /// * `discount_curve_id` - Discount curve for both legs.
-    /// * `forward_curve_id` - Projection curve for the floating leg; overnight
-    ///   index ids select compounded-in-arrears accrual.
-    /// * `vol_surface_id` - Swaption volatility cube used for pricing.
-    pub fn new(
-        id: impl Into<InstrumentId>,
-        params: &SwaptionParams,
-        discount_curve_id: impl Into<CurveId>,
-        forward_curve_id: impl Into<CurveId>,
-        vol_surface_id: impl Into<CurveId>,
-    ) -> Self {
-        let (underlying_fixed_leg, underlying_float_leg) =
-            vanilla_underlier(VanillaSwaptionUnderlier {
-                fixed_frequency: params.fixed_frequency.unwrap_or_else(Tenor::semi_annual),
-                float_frequency: params.float_frequency.unwrap_or_else(Tenor::quarterly),
-                fixed_day_count: params.fixed_day_count.unwrap_or(DayCount::Thirty360),
-                float_day_count: params.float_day_count.unwrap_or(DayCount::Act360),
-                ..VanillaSwaptionUnderlier::standard(
-                    params.strike,
-                    params.underlying_start_date,
-                    params.underlying_maturity,
-                    discount_curve_id.into(),
-                    forward_curve_id.into(),
-                )
-            });
-        Self {
-            id: id.into(),
-            option_type: match params.side {
-                PayReceive::Pay => OptionType::Call,
-                PayReceive::Receive => OptionType::Put,
-            },
-            notional: params.notional,
-            expiry: params.expiry,
-            settlement: SettlementType::Physical,
-            cash_settlement_method: CashSettlementMethod::default(),
-            vol_surface_id: vol_surface_id.into(),
-            underlying_fixed_leg,
-            underlying_float_leg,
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            sabr_params: None,
-            attributes: Attributes::default(),
-            vol_model: params.vol_model.unwrap_or_default(),
-        }
     }
 
     /// Attach SABR parameters to enable SABR-implied volatility pricing.

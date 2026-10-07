@@ -96,8 +96,6 @@
 
 mod indexation;
 pub(crate) mod metrics;
-pub(crate) mod parameters;
 mod types;
 
-pub use parameters::InflationLinkedBondParams;
 pub use types::{DeflationProtection, IndexationMethod, InflationLinkedBond};

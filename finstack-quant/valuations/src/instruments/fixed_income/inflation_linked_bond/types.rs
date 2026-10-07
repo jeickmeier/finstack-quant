@@ -17,7 +17,6 @@ use finstack_quant_core::Result;
 use rust_decimal::prelude::ToPrimitive;
 use rust_decimal::Decimal;
 
-use super::parameters::InflationLinkedBondParams;
 use crate::instruments::common_impl::traits::impl_instrument_base;
 
 /// Indexation method for inflation adjustment
@@ -82,8 +81,9 @@ impl IndexationMethod {
     /// # Production Recommendation
     ///
     /// When pricing UK Index-Linked Gilts, verify the bond's issue date:
-    /// - Use [`new_uk_linker`](InflationLinkedBond::new_uk_linker) for legacy (8-month lag)
-    /// - Build modern (3-month lag) gilts with [`InflationLinkedBond::builder`]
+    /// - Build legacy gilts with `lag = InflationLag::Months(8)` and modern
+    ///   gilts with `lag = InflationLag::Months(3)` via
+    ///   [`InflationLinkedBond::builder`]
     pub fn standard_lag(&self) -> InflationLag {
         match self {
             IndexationMethod::Uk => InflationLag::Months(8), // Legacy UK Gilts (pre-Sep 2005)
@@ -353,131 +353,6 @@ impl InflationLinkedBond {
             scenario_pricing_overrides: Default::default(),
             attributes: Attributes::new(),
         })
-    }
-
-    /// Create a new US TIPS bond using parameter structs
-    pub fn new_tips(
-        id: impl Into<InstrumentId>,
-        bond_params: &InflationLinkedBondParams,
-        discount_curve_id: impl Into<CurveId>,
-        inflation_index_id: impl Into<CurveId>,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            notional: bond_params.notional,
-            real_coupon: bond_params.real_coupon,
-            frequency: bond_params.frequency,
-            day_count: bond_params.day_count,
-            issue_date: bond_params.issue_date,
-            maturity: bond_params.maturity,
-            base_cpi: bond_params.base_cpi,
-            base_date: bond_params.issue_date,
-            indexation_method: IndexationMethod::Tips,
-            lag: IndexationMethod::Tips.standard_lag(),
-            deflation_protection: DeflationProtection::MaturityOnly,
-            business_day_convention: BusinessDayConvention::Following,
-            stub: StubKind::None,
-            calendar_id: None,
-            discount_curve_id: discount_curve_id.into(),
-            inflation_index_id: inflation_index_id.into(),
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            attributes: Attributes::new(),
-        }
-    }
-
-    /// Create a **legacy** UK Index-Linked Gilt (pre-September 2005) using parameter structs.
-    ///
-    /// # ⚠️ Important: Legacy vs Modern UK Gilts
-    ///
-    /// This constructor creates a linker with the **8-month lag** convention used for
-    /// UK Index-Linked Gilts issued **before September 2005**. For gilts issued on or
-    /// after September 2005, build with a 3-month lag via [`Self::builder`].
-    ///
-    /// # Market Conventions (Legacy UK Index-Linked Gilt)
-    ///
-    /// - **Day Count**: User-specified (typically ACT/ACT ICMA)
-    /// - **Frequency**: User-specified (typically semi-annual)
-    /// - **Indexation Lag**: 8 months
-    /// - **Interpolation**: Step (monthly, no daily interpolation)
-    /// - **Deflation Protection**: None (no floor)
-    /// - **Index**: UK RPI (Retail Price Index)
-    ///
-    /// # Example Legacy Gilts
-    ///
-    /// - 2.5% IL Treasury Gilt 2020 (ISIN: GB0009081828)
-    /// - 4.125% IL Treasury Gilt 2030 (ISIN: GB0031790826)
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use finstack_quant_valuations::instruments::fixed_income::inflation_linked_bond::{
-    ///     InflationLinkedBond, InflationLinkedBondParams,
-    /// };
-    /// use finstack_quant_core::currency::Currency;
-    /// use finstack_quant_core::dates::{DayCount, Tenor};
-    /// use finstack_quant_core::money::Money;
-    /// use rust_decimal::Decimal;
-    /// use time::macros::date;
-    ///
-    /// let params = InflationLinkedBondParams {
-    ///     notional: Money::from((1_000_000_i64, Currency::GBP)),
-    ///     real_coupon: Decimal::try_from(0.025).unwrap(),
-    ///     frequency: Tenor::semi_annual(),
-    ///     day_count: DayCount::ActActIsma,
-    ///     issue_date: date!(1999-07-26),  // Pre-2005 issue
-    ///     maturity: date!(2020-07-26),
-    ///     base_cpi: 162.9,
-    /// };
-    ///
-    /// let gilt = InflationLinkedBond::new_uk_linker(
-    ///     "UKTI-2020",
-    ///     &params,
-    ///     date!(1999-07-26),
-    ///     "GBP-NOMINAL",
-    ///     "UK-RPI",
-    /// );
-    /// ```
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - Trade identifier stored on the gilt and used in results and serialization.
-    /// * `bond_params` - UK linker economics: notional, real coupon, frequency, day count,
-    ///   issue, maturity, and base RPI.
-    /// * `base_date` - Curve or model anchor date from which times are measured.
-    /// * `discount_curve_id` - Identifier of the discount curve used for present-value calculations.
-    /// * `inflation_index_id` - Identifier of the inflation index used for fixing lookup.
-    pub fn new_uk_linker(
-        id: impl Into<InstrumentId>,
-        bond_params: &InflationLinkedBondParams,
-        base_date: Date,
-        discount_curve_id: impl Into<CurveId>,
-        inflation_index_id: impl Into<CurveId>,
-    ) -> Self {
-        Self {
-            id: id.into(),
-            notional: bond_params.notional,
-            real_coupon: bond_params.real_coupon,
-            frequency: bond_params.frequency,
-            day_count: bond_params.day_count,
-            issue_date: bond_params.issue_date,
-            maturity: bond_params.maturity,
-            base_cpi: bond_params.base_cpi,
-            base_date,
-            indexation_method: IndexationMethod::Uk,
-            lag: IndexationMethod::Uk.standard_lag(), // 8-month lag for legacy gilts
-            deflation_protection: DeflationProtection::None,
-            business_day_convention: BusinessDayConvention::Following,
-            stub: StubKind::None,
-            calendar_id: None,
-            discount_curve_id: discount_curve_id.into(),
-            inflation_index_id: inflation_index_id.into(),
-            instrument_pricing_overrides: Default::default(),
-            metric_pricing_overrides: Default::default(),
-            scenario_pricing_overrides: Default::default(),
-            attributes: Attributes::new(),
-        }
     }
 
     /// Holiday calendar for schedule adjustment; weekends-only when unset.

@@ -731,11 +731,6 @@ impl InstrumentPricingOverrides {
         self == &Self::default()
     }
 
-    /// Create empty instrument-owned pricing inputs.
-    pub fn none() -> Self {
-        Self::default()
-    }
-
     /// Set the quoted clean price in percent of par.
     ///
     /// # Arguments
@@ -822,7 +817,7 @@ impl InstrumentPricingOverrides {
     ///
     /// * `vol` - option-implied volatility as a decimal (e.g. `0.35`); this
     ///   is an option-quote channel, not a short-rate σ — the bond lattices
-    ///   read [`Self::with_hw1f_sigma`] or [`Self::with_bdt_sigma`] instead
+    ///   read [`Self::with_hw1f_sigma`] or `model_config.bdt_sigma` instead
     pub fn with_implied_volatility(mut self, vol: f64) -> Self {
         self.market_quotes.implied_volatility = Some(vol);
         self
@@ -856,19 +851,6 @@ impl InstrumentPricingOverrides {
         self
     }
 
-    /// Set the Black-Derman-Toy lognormal short-rate volatility σ.
-    ///
-    /// Read only by the rates-only bond tree when `tree_model = black_derman_toy`.
-    ///
-    /// # Arguments
-    ///
-    /// * `sigma` - lognormal short-rate volatility as a decimal proportion
-    ///   (e.g. `0.20` is 20%)
-    pub fn with_bdt_sigma(mut self, sigma: f64) -> Self {
-        self.model_config.bdt_sigma = Some(sigma);
-        self
-    }
-
     /// Set the hazard-rate volatility σ_λ for the rates-credit callable
     /// lattice (annualised, absolute decimal hazard points per √year).
     ///
@@ -881,21 +863,9 @@ impl InstrumentPricingOverrides {
         self
     }
 
-    /// Set the CDS par-spread quote in basis points.
-    pub fn with_cds_quote_bp(mut self, spread_bp: f64) -> Self {
-        self.market_quotes.cds_quote_bp = Some(spread_bp);
-        self
-    }
-
     /// Set the volatility-surface extrapolation policy.
     pub fn with_vol_surface_extrapolation(mut self, policy: VolSurfaceExtrapolation) -> Self {
         self.model_config.vol_surface_extrapolation = policy;
-        self
-    }
-
-    /// Use linear-in-variance extrapolation for volatility surfaces.
-    pub fn with_linear_in_variance_extrapolation(mut self) -> Self {
-        self.model_config.vol_surface_extrapolation = VolSurfaceExtrapolation::LinearInVariance;
         self
     }
 
@@ -966,20 +936,6 @@ impl InstrumentPricingOverrides {
     #[must_use]
     pub fn with_mc_seed_scenario(mut self, scenario: impl Into<String>) -> Self {
         self.model_config.mc_seed_scenario = Some(scenario.into());
-        self
-    }
-
-    /// Set an absolute Monte Carlo confidence-interval half-width target.
-    ///
-    /// Rates-credit bond pricing evaluates this requirement only after consuming
-    /// the configured fixed estimator budget.
-    ///
-    /// # Arguments
-    ///
-    /// * `target` - Positive finite target in the instrument's reporting currency.
-    #[must_use]
-    pub fn with_mc_target_ci_half_width(mut self, target: f64) -> Self {
-        self.model_config.mc_target_ci_half_width = Some(target);
         self
     }
 
@@ -1264,12 +1220,6 @@ impl MetricPricingOverrides {
         self
     }
 
-    /// Enable or disable adaptive bump sizes for Greek calculations.
-    pub fn with_adaptive_bumps(mut self, enable: bool) -> Self {
-        self.bump_config.adaptive_bumps = enable;
-        self
-    }
-
     /// Set the theta / carry horizon.
     ///
     /// # Arguments
@@ -1290,22 +1240,6 @@ impl MetricPricingOverrides {
     /// Set bond risk basis for duration, convexity, and DV01-style metrics.
     pub fn with_bond_risk_basis(mut self, basis: BondRiskBasis) -> Self {
         self.bond_risk_basis = Some(basis);
-        self
-    }
-
-    /// Set the day basis for per-day analytic option theta.
-    ///
-    /// # Arguments
-    ///
-    /// * `basis` - `Calendar365` divides annual theta by 365, `Trading252` by 252.
-    pub fn with_theta_day_basis(mut self, basis: ThetaDayBasis) -> Self {
-        self.theta_day_basis = Some(basis);
-        self
-    }
-
-    /// Set Historical VaR / Expected Shortfall configuration.
-    pub fn with_var_config(mut self, config: crate::metrics::risk::VarConfig) -> Self {
-        self.var_config = Some(config);
         self
     }
 }
@@ -1361,17 +1295,6 @@ impl ScenarioPricingOverrides {
     pub fn with_scenario_spread_shock_bp(mut self, shock_bp: f64) -> Self {
         self.scenario_spread_shock_bp = Some(shock_bp);
         self
-    }
-
-    /// Clear all scenario shocks.
-    pub fn clear_scenario_shocks(&mut self) {
-        self.scenario_price_shock_decimal = None;
-        self.scenario_spread_shock_bp = None;
-    }
-
-    /// Return whether any scenario shock is configured.
-    pub fn has_scenario_shock(&self) -> bool {
-        self.scenario_price_shock_decimal.is_some() || self.scenario_spread_shock_bp.is_some()
     }
 
     /// Validate scenario shocks for finiteness.
@@ -1614,13 +1537,6 @@ mod tests {
                 serde_json::from_str(&json).expect("deserialize");
             assert_eq!(roundtrip.model_config.vol_surface_extrapolation, policy);
         }
-
-        let overrides =
-            InstrumentPricingOverrides::default().with_linear_in_variance_extrapolation();
-        assert_eq!(
-            overrides.model_config.vol_surface_extrapolation,
-            VolSurfaceExtrapolation::LinearInVariance
-        );
     }
 
     #[test]
@@ -1680,19 +1596,18 @@ mod tests {
 
     #[test]
     fn monte_carlo_accuracy_controls_validate() {
-        let controls = InstrumentPricingOverrides::default()
+        let mut controls = InstrumentPricingOverrides::default()
             .with_mc_paths(10_000)
-            .with_mc_antithetic(false)
-            .with_mc_target_ci_half_width(1.25);
+            .with_mc_antithetic(false);
+        controls.model_config.mc_target_ci_half_width = Some(1.25);
         assert!(controls.validate().is_ok());
         assert_eq!(controls.model_config.mc_antithetic, Some(false));
         assert_eq!(controls.model_config.mc_target_ci_half_width, Some(1.25));
 
         for target in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-            assert!(InstrumentPricingOverrides::default()
-                .with_mc_target_ci_half_width(target)
-                .validate()
-                .is_err());
+            let mut invalid = InstrumentPricingOverrides::default();
+            invalid.model_config.mc_target_ci_half_width = Some(target);
+            assert!(invalid.validate().is_err());
         }
     }
 

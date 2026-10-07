@@ -1,16 +1,21 @@
 //! Common test utilities and fixtures for swaption tests.
 
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_test_utils::assert::approx_eq;
 use finstack_quant_valuations::instruments::pricing_overrides::VolSurfaceExtrapolation;
-use finstack_quant_valuations::instruments::rates::irs::{InterestRateSwap, PayReceive};
-use finstack_quant_valuations::instruments::rates::swaption::{Swaption, SwaptionParams};
-use finstack_quant_valuations::instruments::{Instrument, InstrumentPricingOverrides, OptionType};
+use finstack_quant_valuations::instruments::rates::irs::{
+    FixedLegSpec, FloatLegSpec, FloatingLegCompounding, InterestRateSwap, PayReceive,
+};
+use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
+use finstack_quant_valuations::instruments::{
+    Instrument, InstrumentPricingOverrides, OptionType, SettlementType, VolatilityModel,
+};
 use rust_decimal::Decimal;
 use time::macros::date;
 
@@ -64,32 +69,59 @@ pub fn build_smile_vol_surface(_base_date: Date, vol_surface_id: &str) -> VolSur
         .unwrap()
 }
 
-/// Create a standard ATM payer swaption for testing
+/// Create a standard ATM payer swaption for testing: physically settled,
+/// Black vol, semi-annual 30/360 fixed versus quarterly ACT/360 floating on
+/// `USD_OIS` / `USD_LIBOR_3M`.
 pub fn create_standard_payer_swaption(
     expiry: Date,
     swap_start: Date,
     swap_end: Date,
     strike: f64,
 ) -> Swaption {
-    let params = SwaptionParams::payer(
-        Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"),
-        strike,
-        expiry,
-        swap_start,
-        swap_end,
-    )
-    .expect("valid swaption params")
-    .with_fixed_frequency(Tenor::semi_annual())
-    .with_float_frequency(Tenor::quarterly())
-    .with_fixed_day_count(DayCount::Thirty360)
-    .with_float_day_count(DayCount::Act360);
-    let mut swaption = Swaption::new(
-        "SWAPTION_TEST",
-        &params,
-        "USD_OIS",
-        "USD_LIBOR_3M",
-        "USD_SWAPTION_VOL",
-    );
+    let fixed = FixedLegSpec {
+        discount_curve_id: CurveId::new("USD_OIS"),
+        rate: Decimal::try_from(strike).expect("valid strike"),
+        frequency: Tenor::semi_annual(),
+        day_count: DayCount::Thirty360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: None,
+        stub: StubKind::None,
+        start: swap_start,
+        end: swap_end,
+        par_method: None,
+        payment_lag_days: 0,
+        end_of_month: false,
+    };
+    let float = FloatLegSpec {
+        discount_curve_id: CurveId::new("USD_OIS"),
+        forward_curve_id: CurveId::new("USD_LIBOR_3M"),
+        spread_bp: Decimal::ZERO,
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: None,
+        stub: StubKind::None,
+        reset_lag_days: 0,
+        fixing_calendar_id: None,
+        start: swap_start,
+        end: swap_end,
+        compounding: FloatingLegCompounding::Simple,
+        payment_lag_days: 0,
+        end_of_month: false,
+    };
+    let mut swaption = Swaption::builder()
+        .id(InstrumentId::new("SWAPTION_TEST"))
+        .option_type(OptionType::Call)
+        .notional(Money::new(1_000_000.0, Currency::USD).expect("valid money fixture"))
+        .expiry(expiry)
+        .settlement(SettlementType::Physical)
+        .cash_settlement_method(CashSettlementMethod::default())
+        .vol_model(VolatilityModel::Black)
+        .vol_surface_id(CurveId::new("USD_SWAPTION_VOL"))
+        .underlying_fixed_leg(fixed)
+        .underlying_float_leg(float)
+        .build()
+        .expect("valid swaption");
     // Tests intentionally exercise OTM/ITM strikes; opt in to flat extrapolation
     // to avoid making results depend on the surface strike grid.
     swaption.instrument_pricing_overrides = InstrumentPricingOverrides::default()

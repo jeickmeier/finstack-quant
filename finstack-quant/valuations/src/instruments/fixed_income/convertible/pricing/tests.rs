@@ -1,7 +1,7 @@
 use super::{
     calculate_accrued_interest, calculate_convertible_greeks, calculate_parity,
     compute_conversion_value, prepare_for_pricing, price_convertible_bond, settlement_date,
-    ConvertibleBondValuator, ConvertibleTreeType, DEFAULT_CONVERTIBLE_TREE_STEPS,
+    ConvertibleBondValuator, DEFAULT_CONVERTIBLE_TREE_STEPS,
 };
 use crate::cashflow::builder::specs::{CouponType, FixedCouponSpec};
 use crate::instruments::fixed_income::convertible::ConvertibleBond;
@@ -168,20 +168,15 @@ fn deep_itm_convertible_matches_parity_on_non_flat_curve() {
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.0));
 
     let expected = 10.0 * 5000.0;
-    for tree in [
-        ConvertibleTreeType::Binomial,
-        ConvertibleTreeType::Trinomial,
-    ] {
-        let price = price_convertible_bond(&bond, &market, tree, issue)
-            .expect("should price")
-            .amount();
-        let rel_err = (price - expected).abs() / expected;
-        assert!(
-            rel_err < 1e-7,
-            "deep-ITM convertible must equal parity {expected} on a non-flat curve \
-             (martingale property); got {price} with {tree:?} (rel err {rel_err:.3e})"
-        );
-    }
+    let price = price_convertible_bond(&bond, &market, issue)
+        .expect("should price")
+        .amount();
+    let rel_err = (price - expected).abs() / expected;
+    assert!(
+        rel_err < 1e-7,
+        "deep-ITM convertible must equal parity {expected} on a non-flat curve \
+         (martingale property); got {price} (rel err {rel_err:.3e})"
+    );
 }
 
 /// Dividend-protection pin test (martingale identity).
@@ -236,21 +231,16 @@ fn dividend_protection_restores_parity_independent_of_yield() {
         for q in [0.0, 0.06] {
             bond.conversion.dividend_adjustment = adjustment.clone();
             let market = market_with_yield(q);
-            for tree in [
-                ConvertibleTreeType::Binomial,
-                ConvertibleTreeType::Trinomial,
-            ] {
-                let price = price_convertible_bond(&bond, &market, tree, issue)
-                    .expect("should price")
-                    .amount();
-                let rel_err = (price - expected).abs() / expected;
-                assert!(
-                    rel_err < 1e-7,
-                    "fully protected deep-ITM convertible must equal parity {expected} \
-                     independent of q={q} ({adjustment:?}, {tree:?}); got {price} \
-                     (rel err {rel_err:.3e})"
-                );
-            }
+            let price = price_convertible_bond(&bond, &market, issue)
+                .expect("should price")
+                .amount();
+            let rel_err = (price - expected).abs() / expected;
+            assert!(
+                rel_err < 1e-7,
+                "fully protected deep-ITM convertible must equal parity {expected} \
+                 independent of q={q} ({adjustment:?}); got {price} \
+                 (rel err {rel_err:.3e})"
+            );
         }
     }
 
@@ -258,7 +248,7 @@ fn dividend_protection_restores_parity_independent_of_yield() {
     // price must fall to ~parity * e^{-qT} (materially below parity).
     bond.conversion.dividend_adjustment = DividendAdjustment::None;
     let market = market_with_yield(0.06);
-    let unprotected = price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial, issue)
+    let unprotected = price_convertible_bond(&bond, &market, issue)
         .expect("should price")
         .amount();
     let ttm = DayCount::Act365F
@@ -291,12 +281,7 @@ fn test_convertible_bond_pricing() {
     let market_context = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market_context,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    );
+    let price = price_convertible_bond(&with_tree_steps(&bond, 50), &market_context, as_of);
 
     assert!(price.is_ok());
     let price = price.expect("should succeed");
@@ -312,13 +297,8 @@ fn test_convertible_pricing_at_maturity_uses_payoff() {
     let market_context = create_test_market_context();
     let as_of = bond.maturity;
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 10),
-        &market_context,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    )
-    .expect("should price");
+    let price = price_convertible_bond(&with_tree_steps(&bond, 10), &market_context, as_of)
+        .expect("should price");
 
     let conversion_value = 150.0 * 10.0;
     let entitled_coupon = 50.0 * 184.0 / 365.0;
@@ -334,7 +314,6 @@ fn test_convertible_greeks_calculation() {
     let greeks = calculate_convertible_greeks(
         &with_tree_steps(&bond, 50),
         &market_context,
-        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         as_of,
     );
@@ -380,15 +359,14 @@ fn theta_rolls_the_discount_curve() {
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
     let bond = with_tree_steps(&bond, 80);
-    let tree = ConvertibleTreeType::Binomial;
-    let greeks = calculate_convertible_greeks(&bond, &market, tree, GreekBumps::default(), as_of)
-        .expect("greeks");
+    let greeks =
+        calculate_convertible_greeks(&bond, &market, GreekBumps::default(), as_of).expect("greeks");
     assert!(greeks.theta.is_finite(), "theta must be finite");
 
     let next_day = as_of.next_day().expect("next day");
     let base_price = greeks.price;
     let rolled_market = market.roll_forward(1).expect("market roll");
-    let rolled_price = price_convertible_bond(&bond, &rolled_market, tree, next_day)
+    let rolled_price = price_convertible_bond(&bond, &rolled_market, next_day)
         .expect("rolled price")
         .amount();
     let expected_theta = rolled_price - base_price;
@@ -464,13 +442,8 @@ fn test_mandatory_conversion_forced_at_loss() {
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
     // At maturity: forced conversion at loss
-    let price_at_mat = price_convertible_bond(
-        &with_tree_steps(&bond, 10),
-        &market,
-        ConvertibleTreeType::Binomial,
-        maturity,
-    )
-    .expect("should price");
+    let price_at_mat = price_convertible_bond(&with_tree_steps(&bond, 10), &market, maturity)
+        .expect("should price");
 
     // Forced equity delivery plus the separately entitled final coupon.
     let entitled_coupon = 50.0 * 184.0 / 365.0;
@@ -481,13 +454,8 @@ fn test_mandatory_conversion_forced_at_loss() {
     );
 
     // Before maturity: should be below straight bond floor due to forced conversion risk
-    let price_before = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        issue,
-    )
-    .expect("should price");
+    let price_before =
+        price_convertible_bond(&with_tree_steps(&bond, 50), &market, issue).expect("should price");
 
     assert!(
         price_before.amount() < 1000.0,
@@ -554,13 +522,8 @@ fn call_branch_does_not_force_disallowed_conversion() {
         .insert_price("AAPL-VOL", MarketScalar::Unitless(0.25))
         .insert_price("AAPL-DIVYIELD", MarketScalar::Unitless(0.02));
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 60),
-        &market,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    )
-    .expect("should price");
+    let price =
+        price_convertible_bond(&with_tree_steps(&bond, 60), &market, as_of).expect("should price");
 
     let conversion_value = 10.0 * 5000.0; // ratio × spot = 50,000
     let call_price = 1000.0 * 1.02; // 102% of par = 1,020
@@ -641,13 +604,8 @@ fn test_thirty_360_day_count_corporate_convention() {
     let market = create_test_market_context();
     let as_of = issue;
 
-    let price = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    )
-    .expect("30/360 should price successfully");
+    let price = price_convertible_bond(&with_tree_steps(&bond, 50), &market, as_of)
+        .expect("30/360 should price successfully");
 
     // Same economics as Act365F, should be in similar range
     let conversion_value = 150.0 * 10.0;
@@ -669,48 +627,6 @@ fn test_thirty_360_day_count_corporate_convention() {
     );
 }
 
-/// Item 11 regression: the trinomial node-spot grid must be built with the
-/// proper middle factor, `S₀ · up^net · middle^(step − net)`.
-///
-/// For a recombining trinomial the recombination identity is
-/// `up·down = middle²`. The previous `up^max(net,0)·down^max(-net,0)` form
-/// dropped the middle factor and is only valid when `up·down = 1`. With
-/// the corrected formula the trinomial spot grid is well-formed, so a
-/// trinomial price must converge to the binomial price for the same bond
-/// (both are consistent lattice discretizations of the same process).
-#[test]
-fn trinomial_spot_grid_well_formed_matches_binomial() {
-    let bond = create_test_bond();
-    let market = create_test_market_context();
-    let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-
-    let binomial = price_convertible_bond(
-        &with_tree_steps(&bond, 400),
-        &market,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    )
-    .expect("binomial price")
-    .amount();
-    let trinomial = price_convertible_bond(
-        &with_tree_steps(&bond, 400),
-        &market,
-        ConvertibleTreeType::Trinomial,
-        as_of,
-    )
-    .expect("trinomial price")
-    .amount();
-
-    // Both lattices discretize the same process; with 400 steps they must
-    // agree closely. A malformed trinomial grid would diverge sharply.
-    let rel_diff = (binomial - trinomial).abs() / binomial.max(1.0);
-    assert!(
-        rel_diff < 0.01,
-        "trinomial price {trinomial} should match binomial {binomial} \
-         within 1% (rel diff {rel_diff:.4}); a malformed spot grid would diverge"
-    );
-}
-
 #[test]
 fn mandatory_variable_inverted_bounds_rejected_at_pricing() {
     // Data-entry inversion: lower > upper. Without the new guard, the
@@ -728,13 +644,8 @@ fn mandatory_variable_inverted_bounds_rejected_at_pricing() {
     let market = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
 
-    let err = price_convertible_bond(
-        &with_tree_steps(&bond, 50),
-        &market,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    )
-    .expect_err("inverted bounds must be rejected");
+    let err = price_convertible_bond(&with_tree_steps(&bond, 50), &market, as_of)
+        .expect_err("inverted bounds must be rejected");
     let msg = format!("{err}");
     assert!(
         msg.contains("inverted") && msg.contains("120") && msg.contains("80"),
@@ -766,11 +677,10 @@ fn convertible_recovery_rate_out_of_bounds_errors() {
     let mut bond = create_test_bond();
     let market = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::June, 1).expect("valid date");
-    let tree_type = ConvertibleTreeType::Binomial;
 
     // Above 1.0 — previously clamped to 1.0, now rejected.
     bond.recovery_rate = Some(1.5);
-    let err = price_convertible_bond(&bond, &market, tree_type, as_of)
+    let err = price_convertible_bond(&bond, &market, as_of)
         .expect_err("recovery_rate=1.5 must be rejected");
     let msg = format!("{err}");
     assert!(
@@ -780,21 +690,21 @@ fn convertible_recovery_rate_out_of_bounds_errors() {
 
     // Negative — previously clamped to 0.0, now rejected.
     bond.recovery_rate = Some(-0.1);
-    let _ = price_convertible_bond(&bond, &market, tree_type, as_of)
+    let _ = price_convertible_bond(&bond, &market, as_of)
         .expect_err("negative recovery_rate must be rejected");
 
     // NaN — previously clamped to 0.0, now rejected.
     bond.recovery_rate = Some(f64::NAN);
-    let _ = price_convertible_bond(&bond, &market, tree_type, as_of)
+    let _ = price_convertible_bond(&bond, &market, as_of)
         .expect_err("NaN recovery_rate must be rejected");
 
     // None is valid when no credit adjustment is requested.
     bond.recovery_rate = None;
-    let _ = price_convertible_bond(&bond, &market, tree_type, as_of)
+    let _ = price_convertible_bond(&bond, &market, as_of)
         .expect("None recovery_rate is valid without a credit curve");
 
     bond.credit_curve_id = Some("USD-CREDIT".into());
-    let err = price_convertible_bond(&bond, &market, tree_type, as_of)
+    let err = price_convertible_bond(&bond, &market, as_of)
         .expect_err("a credit curve requires explicit recovery");
     assert!(format!("{err}").contains("explicit recovery_rate"));
 }
@@ -810,14 +720,13 @@ fn put_at_maturity_floors_terminal_payoff() {
 
     let as_of = Date::from_calendar_date(2025, Month::June, 1).expect("valid date");
     let market = create_test_market_context();
-    let tree_type = ConvertibleTreeType::Binomial;
 
     // Deep OTM equity so conversion never binds: conversion value = 5 * 10 = 50
     // against a 1000 face. The bond is a pure debt instrument here.
     let market = market.insert_price("AAPL", MarketScalar::Unitless(5.0));
 
     let plain_bond = create_test_bond();
-    let pv_plain = price_convertible_bond(&plain_bond, &market, tree_type, as_of)
+    let pv_plain = price_convertible_bond(&plain_bond, &market, as_of)
         .expect("plain bond prices")
         .amount();
 
@@ -834,7 +743,7 @@ fn put_at_maturity_floors_terminal_payoff() {
         .market_quotes
         .implied_volatility = Some(0.01);
     puttable_bond.call_put = Some(schedule);
-    let pv_puttable = price_convertible_bond(&puttable_bond, &market, tree_type, as_of)
+    let pv_puttable = price_convertible_bond(&puttable_bond, &market, as_of)
         .expect("puttable bond prices")
         .amount();
 
@@ -866,7 +775,6 @@ fn theta_propagates_market_roll_failure() {
     let result = calculate_convertible_greeks(
         &with_tree_steps(&bond, 50),
         &market,
-        ConvertibleTreeType::Binomial,
         GreekBumps::default(),
         as_of,
     );
@@ -883,7 +791,7 @@ fn registry_greeks_match_single_greeks_run() {
     let bond = create_test_bond();
     let market = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let direct = bond.greeks(&market, None, as_of).expect("greeks");
+    let direct = bond.greeks(&market, as_of).expect("greeks");
     let result = bond
         .price_with_metrics(
             &market,
@@ -917,13 +825,12 @@ fn tree_steps_come_from_model_config() {
     let market = create_test_market_context();
     let as_of = Date::from_calendar_date(2025, Month::June, 1).expect("valid date");
 
-    let default_pv = price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial, as_of)
+    let default_pv = price_convertible_bond(&bond, &market, as_of)
         .expect("default tree prices")
         .amount();
     let explicit_200 = price_convertible_bond(
         &with_tree_steps(&bond, DEFAULT_CONVERTIBLE_TREE_STEPS),
         &market,
-        ConvertibleTreeType::Binomial,
         as_of,
     )
     .expect("200-step tree prices")
@@ -931,7 +838,7 @@ fn tree_steps_come_from_model_config() {
     assert_eq!(default_pv.to_bits(), explicit_200.to_bits());
 
     let coarse = with_tree_steps(&bond, 25);
-    let coarse_pv = price_convertible_bond(&coarse, &market, ConvertibleTreeType::Binomial, as_of)
+    let coarse_pv = price_convertible_bond(&coarse, &market, as_of)
         .expect("25-step tree prices")
         .amount();
     assert_ne!(coarse_pv.to_bits(), default_pv.to_bits());
@@ -942,13 +849,7 @@ fn tree_steps_come_from_model_config() {
         .amount();
     assert_eq!(registry_pv.to_bits(), coarse_pv.to_bits());
 
-    assert!(price_convertible_bond(
-        &with_tree_steps(&bond, 0),
-        &market,
-        ConvertibleTreeType::Binomial,
-        as_of,
-    )
-    .is_err());
+    assert!(price_convertible_bond(&with_tree_steps(&bond, 0), &market, as_of,).is_err());
 }
 
 /// At-the-money convertible with a credit spread: ratio 10, face 1,000
@@ -989,10 +890,9 @@ fn atm_credit_risky_case(spot: f64) -> (ConvertibleBond, MarketContext) {
 #[test]
 fn pv_is_continuous_and_delta_bounded_at_conversion_price() {
     let as_of = Date::from_calendar_date(2025, Month::January, 1).expect("valid date");
-    let tree = ConvertibleTreeType::default();
     let price_at = |spot: f64| {
         let (bond, market) = atm_credit_risky_case(spot);
-        price_convertible_bond(&bond, &market, tree, as_of)
+        price_convertible_bond(&bond, &market, as_of)
             .expect("price")
             .amount()
     };
@@ -1007,8 +907,8 @@ fn pv_is_continuous_and_delta_bounded_at_conversion_price() {
     );
 
     let (bond, market) = atm_credit_risky_case(100.0);
-    let greeks = calculate_convertible_greeks(&bond, &market, tree, GreekBumps::default(), as_of)
-        .expect("greeks");
+    let greeks =
+        calculate_convertible_greeks(&bond, &market, GreekBumps::default(), as_of).expect("greeks");
     assert!(
         greeks.delta > 0.0 && greeks.delta < 10.0,
         "delta must lie inside (0, conversion ratio 10); got {}",
@@ -1017,7 +917,7 @@ fn pv_is_continuous_and_delta_bounded_at_conversion_price() {
 
     // Even and odd step counts should now agree closely.
     let (bond, market) = atm_credit_risky_case(100.0);
-    let odd = price_convertible_bond(&with_tree_steps(&bond, 201), &market, tree, as_of)
+    let odd = price_convertible_bond(&with_tree_steps(&bond, 201), &market, as_of)
         .expect("price")
         .amount();
     assert!(
@@ -1066,24 +966,17 @@ fn convertible_seasoned_window_preserves_exercise_dates() {
                 "as_of={as_of}, date={date}"
             );
         }
-        for tree in [
-            ConvertibleTreeType::Binomial,
-            ConvertibleTreeType::Trinomial,
-        ] {
-            assert!(
-                price_convertible_bond(&with_tree_steps(&bond, steps), &market, tree, as_of)
-                    .expect("window price")
-                    .amount()
-                    .is_finite()
-            );
-        }
+        assert!(
+            price_convertible_bond(&with_tree_steps(&bond, steps), &market, as_of)
+                .expect("window price")
+                .amount()
+                .is_finite()
+        );
     }
     // Unlike a voluntary interval, a past mandatory event must not become a
     // new present-day choice: the untransformed contract remains unsupported.
     bond.conversion.policy = ConversionPolicy::MandatoryOn(opening);
-    assert!(
-        price_convertible_bond(&bond, &market, ConvertibleTreeType::Binomial, closing).is_err()
-    );
+    assert!(price_convertible_bond(&bond, &market, closing).is_err());
 }
 
 fn lifecycle_bond() -> ConvertibleBond {
@@ -1167,27 +1060,19 @@ fn convertible_forced_delivery_overrides_put_and_retains_risky_coupon() {
                     time_to_maturity: inputs.time_to_maturity,
                 };
                 let expected_cash = 25.0 * (-hazard * 181.0 / 365.0).exp();
-                for tree in [
-                    ConvertibleTreeType::Binomial,
-                    ConvertibleTreeType::Trinomial,
-                ] {
-                    let (total, cash) = engine
-                        .price(
-                            TzMarketInputs {
-                                spot: 50.0,
-                                volatility: 0.01,
-                                risk_free_rate: 0.0,
-                                dividend_yield: 0.0,
-                            },
-                            tree,
-                        )
-                        .expect("forced price");
-                    assert!((cash - expected_cash).abs() < 1e-8, "{tree:?}: cash={cash}");
-                    assert!(
-                        (total - 500.0 - expected_cash).abs() < 1e-7,
-                        "{tree:?}: total={total}"
-                    );
-                }
+                let (total, cash) = engine
+                    .price(TzMarketInputs {
+                        spot: 50.0,
+                        volatility: 0.01,
+                        risk_free_rate: 0.0,
+                        dividend_yield: 0.0,
+                    })
+                    .expect("forced price");
+                assert!((cash - expected_cash).abs() < 1e-8, "cash={cash}");
+                assert!(
+                    (total - 500.0 - expected_cash).abs() < 1e-7,
+                    "total={total}"
+                );
             }
         }
     }
@@ -1244,24 +1129,18 @@ fn convertible_exact_maturity_matches_terminal_coupon_and_exercise_policy() {
                 }],
             });
             let expected = ex_coupon + if pays_coupon { 25.0 } else { 0.0 };
-            for tree in [
-                ConvertibleTreeType::Binomial,
-                ConvertibleTreeType::Trinomial,
-            ] {
-                for as_of in [maturity - time::Duration::days(1), maturity] {
-                    let price = price_convertible_bond(
-                        &with_tree_steps(&bond, 20),
-                        &lifecycle_market(as_of, spot),
-                        tree,
-                        as_of,
-                    )
-                    .expect("terminal payoff")
-                    .amount();
-                    assert!(
-                        (price - expected).abs() < 1e-7,
-                        "{tree:?}, as_of={as_of}, policy={policy:?}: {price} vs {expected}"
-                    );
-                }
+            for as_of in [maturity - time::Duration::days(1), maturity] {
+                let price = price_convertible_bond(
+                    &with_tree_steps(&bond, 20),
+                    &lifecycle_market(as_of, spot),
+                    as_of,
+                )
+                .expect("terminal payoff")
+                .amount();
+                assert!(
+                    (price - expected).abs() < 1e-7,
+                    "as_of={as_of}, policy={policy:?}: {price} vs {expected}"
+                );
             }
         }
     }

@@ -310,9 +310,9 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
     use finstack_quant_core::market_data::term_structures::{NelsonSiegelModel, ParametricCurve};
     use finstack_quant_core::market_data::traits::Discounting;
     use finstack_quant_core::money::Money;
-    use finstack_quant_valuations::instruments::rates::deposit::{
-        ConventionDepositParams, Deposit,
-    };
+    use finstack_quant_core::types::CurveId;
+    use finstack_quant_valuations::instruments::rates::deposit::Deposit;
+    use finstack_quant_valuations::market::conventions::ConventionRegistry;
 
     let base = Date::from_calendar_date(2025, Month::January, 2).expect("date");
     let models = [
@@ -352,18 +352,24 @@ fn parametric_delivered_models_reprice_short_end_deposits_analytically() {
                 pillar: Pillar::Tenor(Tenor::parse(tenor).expect("tenor")),
                 rate: 0.0,
             };
-            let (_, maturity) = contractual_quote_dates(base, "USD-Deposit", tenor);
-            let deposit = Deposit::from_conventions(ConventionDepositParams {
-                id: tenor.into(),
-                notional: Money::from((1_000_000_i64, Currency::USD)),
-                trade_date: base,
-                maturity,
-                fixed_rate: 0.0,
-                index_id: "USD-Deposit",
-                discount_curve_id: "USD-NS",
-                attributes: Default::default(),
-            })
-            .expect("deposit");
+            let (spot, maturity) = contractual_quote_dates(base, "USD-Deposit", tenor);
+            let registry = ConventionRegistry::try_global().expect("conventions");
+            let convention = registry
+                .require_rate_index(&IndexId::new("USD-Deposit"))
+                .expect("index conventions");
+            let deposit = Deposit::builder()
+                .id(tenor.into())
+                .notional(Money::from((1_000_000_i64, Currency::USD)))
+                .start_date(spot)
+                .maturity(maturity)
+                .day_count(convention.day_count)
+                .fixed_rate(rust_decimal::Decimal::ZERO)
+                .discount_curve_id(CurveId::new("USD-NS"))
+                .attributes(Default::default())
+                .business_day_convention(convention.market_business_day_convention)
+                .calendar_id(convention.market_calendar_id.clone().into())
+                .build()
+                .expect("deposit");
             let start_time = DayCount::Act365F
                 .year_fraction(base, deposit.start_date, DayCountContext::default())
                 .expect("start time");

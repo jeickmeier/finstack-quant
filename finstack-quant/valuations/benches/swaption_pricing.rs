@@ -10,17 +10,21 @@
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use finstack_quant_core::currency::Currency;
-use finstack_quant_core::dates::{Date, DayCount, Tenor};
+use finstack_quant_core::dates::{BusinessDayConvention, Date, DayCount, StubKind, Tenor};
 use finstack_quant_core::market_data::context::MarketContext;
 use finstack_quant_core::market_data::surfaces::VolSurface;
 use finstack_quant_core::market_data::term_structures::{DiscountCurve, ForwardCurve};
 use finstack_quant_core::math::interp::InterpStyle;
 use finstack_quant_core::money::Money;
+use finstack_quant_core::types::{CurveId, InstrumentId};
 use finstack_quant_models::volatility::SabrParameters;
-use finstack_quant_valuations::instruments::rates::irs::PayReceive;
-use finstack_quant_valuations::instruments::rates::swaption::Swaption;
-use finstack_quant_valuations::instruments::rates::swaption::SwaptionParams;
-use finstack_quant_valuations::instruments::Instrument;
+use finstack_quant_valuations::instruments::rates::irs::{
+    FixedLegSpec, FloatLegSpec, FloatingLegCompounding,
+};
+use finstack_quant_valuations::instruments::rates::swaption::{CashSettlementMethod, Swaption};
+use finstack_quant_valuations::instruments::{
+    Instrument, OptionType, SettlementType, VolatilityModel,
+};
 use finstack_quant_valuations::metrics::MetricId;
 use rust_decimal::Decimal;
 use std::hint::black_box;
@@ -32,27 +36,53 @@ fn create_swaption(expiry_months: i64, swap_tenor_years: i32) -> Swaption {
     let swap_start = expiry;
     let swap_end = Date::from_calendar_date(2025 + swap_tenor_years, Month::January, 1).unwrap();
 
-    let params = SwaptionParams {
-        notional: Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"),
-        strike: Decimal::try_from(0.04).expect("valid literal"), // 4% strike
-        expiry,
-        underlying_start_date: swap_start,
-        underlying_maturity: swap_end,
-        side: PayReceive::Pay,
-        fixed_frequency: Some(Tenor::semi_annual()),
-        float_frequency: Some(Tenor::quarterly()),
-        fixed_day_count: Some(DayCount::Thirty360),
-        float_day_count: Some(DayCount::Act360),
-        vol_model: None,
+    let fixed = FixedLegSpec {
+        discount_curve_id: CurveId::new("USD-OIS"),
+        rate: Decimal::try_from(0.04).expect("valid literal"),
+        frequency: Tenor::semi_annual(),
+        day_count: DayCount::Thirty360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: None,
+        stub: StubKind::None,
+        start: swap_start,
+        end: swap_end,
+        par_method: None,
+        payment_lag_days: 0,
+        end_of_month: false,
     };
-
-    Swaption::new(
-        format!("SWAPTION-{}Mx{}Y", expiry_months, swap_tenor_years),
-        &params,
-        "USD-OIS",
-        "USD-SOFR-3M",
-        "SWAPTION-VOL",
-    )
+    let float = FloatLegSpec {
+        discount_curve_id: CurveId::new("USD-OIS"),
+        forward_curve_id: CurveId::new("USD-SOFR-3M"),
+        spread_bp: Decimal::ZERO,
+        frequency: Tenor::quarterly(),
+        day_count: DayCount::Act360,
+        business_day_convention: BusinessDayConvention::ModifiedFollowing,
+        calendar_id: None,
+        stub: StubKind::None,
+        reset_lag_days: 0,
+        fixing_calendar_id: None,
+        start: swap_start,
+        end: swap_end,
+        compounding: FloatingLegCompounding::Simple,
+        payment_lag_days: 0,
+        end_of_month: false,
+    };
+    Swaption::builder()
+        .id(InstrumentId::new(format!(
+            "SWAPTION-{}Mx{}Y",
+            expiry_months, swap_tenor_years
+        )))
+        .option_type(OptionType::Call)
+        .notional(Money::new(10_000_000.0, Currency::USD).expect("valid money fixture"))
+        .expiry(expiry)
+        .settlement(SettlementType::Physical)
+        .cash_settlement_method(CashSettlementMethod::default())
+        .vol_model(VolatilityModel::Black)
+        .vol_surface_id(CurveId::new("SWAPTION-VOL"))
+        .underlying_fixed_leg(fixed)
+        .underlying_float_leg(float)
+        .build()
+        .expect("valid benchmark swaption")
 }
 
 fn create_swaption_with_sabr(expiry_months: i64, swap_tenor_years: i32) -> Swaption {

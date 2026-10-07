@@ -77,7 +77,7 @@ impl MetricCalculator for ImpliedVolCalculator {
             Ok(residual)
         };
 
-        // CRR and trinomial grids have a positive minimum admissible volatility
+        // The CRR grid has a positive minimum admissible volatility
         // when drift is nonzero. Find that boundary before invoking Brent, so
         // its entire bracket consists of valid lattice evaluations.
         let upper = 3.0;
@@ -310,7 +310,6 @@ mod tests {
     fn implied_vol_forward_values_to_settlement_date() {
         use crate::instruments::fixed_income::convertible::pricing::{
             calculate_accrued_interest, price_convertible_bond, settlement_date,
-            ConvertibleTreeType,
         };
 
         let notional = 1_000.0;
@@ -346,8 +345,7 @@ mod tests {
         let target_dirty = quoted_clean_pct * notional / 100.0 + accrued;
 
         let repriced = market.insert_price("AAPL-VOL", MarketScalar::Unitless(ivol));
-        let pv = price_convertible_bond(&bond, &repriced, ConvertibleTreeType::default(), as_of)
-            .expect("reprice at solved vol");
+        let pv = price_convertible_bond(&bond, &repriced, as_of).expect("reprice at solved vol");
         let recovered = pv.amount() / settle_df;
         assert!(
             (recovered - target_dirty).abs() < 1e-3,

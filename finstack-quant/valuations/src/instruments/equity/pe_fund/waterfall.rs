@@ -152,7 +152,7 @@ impl PeFundWaterfallSpec {
     /// Create a new waterfall specification builder.
     #[must_use]
     pub fn builder() -> WaterfallSpecBuilder {
-        WaterfallSpecBuilder::new()
+        WaterfallSpecBuilder::default()
     }
 
     /// Validate the waterfall specification.
@@ -249,11 +249,6 @@ impl Default for WaterfallSpecBuilder {
 }
 
 impl WaterfallSpecBuilder {
-    /// new.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// style.
     pub fn style(mut self, style: WaterfallStyle) -> Self {
         self.style = style;
@@ -522,44 +517,6 @@ impl AllocationLedger {
         Ok(flows)
     }
 
-    /// Export allocation ledger as structured data for DataFrame creation.
-    /// Returns column names and data vectors suitable for external DataFrame libraries.
-    pub fn to_tabular_data(&self) -> (Vec<&'static str>, Vec<Vec<String>>) {
-        let column_names = vec![
-            "date",
-            "period_key",
-            "deal_id",
-            "tranche",
-            "to_lp",
-            "to_gp",
-            "lp_unreturned",
-            "gp_carry_cum",
-            "lp_irr_to_date",
-            "note",
-        ];
-
-        let mut rows = Vec::new();
-        for row in &self.rows {
-            let mut row_data = Vec::new();
-            row_data.push(row.date.to_string());
-            row_data.push(row.period_key.as_deref().unwrap_or("").to_string());
-            row_data.push(row.deal_id.as_deref().unwrap_or("").to_string());
-            row_data.push(row.tranche.to_string());
-            row_data.push(row.to_lp.amount().to_string());
-            row_data.push(row.to_gp.amount().to_string());
-            row_data.push(row.lp_unreturned.amount().to_string());
-            row_data.push(row.gp_carry_cum.amount().to_string());
-            row_data.push(
-                row.lp_irr_to_date
-                    .map_or("".to_string(), |irr| format!("{:.6}", irr)),
-            );
-            row_data.push(row.note.as_deref().unwrap_or("").to_string());
-            rows.push(row_data);
-        }
-
-        (column_names, rows)
-    }
-
     /// Export as JSON string for external analysis.
     pub fn to_json(&self) -> finstack_quant_core::Result<String> {
         serde_json::to_string(self).map_err(|_| {
@@ -597,12 +554,6 @@ impl<'a> EquityWaterfallEngine<'a> {
             spec,
             periods: None,
         }
-    }
-
-    /// Add period support for tagging allocation rows with period keys.
-    pub fn with_periods(mut self, periods: Vec<finstack_quant_core::dates::Period>) -> Self {
-        self.periods = Some(periods);
-        self
     }
 
     /// Add period support using a range expression like "2024Q4..2025Q2".
@@ -1656,35 +1607,6 @@ mod tests {
         events.reverse();
         let ledger_b = engine.run(&events).expect("runs");
         assert_eq!(ledger_a.rows, ledger_b.rows);
-    }
-
-    #[test]
-    fn ledger_to_tabular_conversion() {
-        let spec = PeFundWaterfallSpec::builder()
-            .return_of_capital()
-            .build()
-            .expect("Operation succeeded");
-
-        let events = vec![
-            FundEvent::contribution(
-                test_date(2020, 1, 1),
-                Money::from((1000000_i64, test_currency())),
-            ),
-            FundEvent::distribution(
-                test_date(2025, 1, 1),
-                Money::from((1000000_i64, test_currency())),
-            ),
-        ];
-
-        let engine = EquityWaterfallEngine::new(&spec);
-        let ledger = engine.run(&events).expect("Operation succeeded");
-        let (columns, _rows) = ledger.to_tabular_data();
-
-        // Check tabular structure
-        assert!(columns.contains(&"date"));
-        assert!(columns.contains(&"tranche"));
-        assert!(columns.contains(&"to_lp"));
-        assert!(columns.contains(&"to_gp"));
     }
 
     #[test]

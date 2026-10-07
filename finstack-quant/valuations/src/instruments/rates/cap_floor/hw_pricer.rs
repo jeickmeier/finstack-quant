@@ -80,24 +80,7 @@ pub(crate) struct CompoundedRfrMomentMatch {
     pub observation_loadings: Vec<Hw1fObservationLoading>,
 }
 
-#[cfg(test)]
-fn hw1f_ou_covariance(kappa: f64, sigma: f64, left_time: f64, right_time: f64) -> f64 {
-    let min_time = left_time.min(right_time).max(0.0);
-    if sigma <= 0.0 || min_time <= 0.0 {
-        return 0.0;
-    }
-    if kappa.abs() < 1.0e-8 {
-        sigma * sigma * min_time
-    } else {
-        sigma
-            * sigma
-            * (-kappa * (left_time - right_time).abs()).exp()
-            * (-(-2.0 * kappa * min_time).exp_m1())
-            / (2.0 * kappa)
-    }
-}
-
-fn hw1f_ou_covariance_with_model(
+fn hw1f_ou_covariance(
     params: &HullWhiteParams,
     left_time: f64,
     right_time: f64,
@@ -125,74 +108,8 @@ fn hw1f_ou_covariance_with_model(
 /// This linearizes the compounded product and affine forward mapping at today's
 /// curve. It omits higher-order product terms and convexity/measure corrections,
 /// so it is an approximation rather than the exact term-caplet bond option.
-/// `B` and OU covariance use continuous limits as `kappa -> 0`.
-#[cfg(test)]
+/// The OU covariance is the exact piecewise-volatility integral of `params`.
 pub(crate) fn hw1f_compounded_rfr_moment_match(
-    as_of: Date,
-    kappa: f64,
-    sigma: f64,
-    projection: &OptionedCouponProjection,
-) -> finstack_quant_core::Result<CompoundedRfrMomentMatch> {
-    let context = DayCountContext::default();
-    let option_time = DayCount::Act365F.year_fraction(as_of, projection.fixing_date, context)?;
-    let mut observation_loadings = Vec::with_capacity(projection.observation_exposures.len());
-    for exposure in &projection.observation_exposures {
-        let fixing_time = if exposure.observation_start <= as_of {
-            0.0
-        } else {
-            DayCount::Act365F.year_fraction(as_of, exposure.observation_start, context)?
-        };
-        let interval_time = DayCount::Act365F.year_fraction(
-            exposure.observation_start,
-            exposure.observation_end,
-            context,
-        )?;
-        let bond_state_loading = hw_b(kappa, 0.0, interval_time);
-        let forward_state_loading = (1.0
-            + exposure.projected_rate * exposure.rate_accrual_year_fraction)
-            * bond_state_loading
-            / exposure.rate_accrual_year_fraction;
-        observation_loadings.push(Hw1fObservationLoading {
-            fixing_time,
-            projected_rate: exposure.projected_rate,
-            rate_accrual_year_fraction: exposure.rate_accrual_year_fraction,
-            bond_state_loading,
-            forward_state_loading,
-            coupon_state_loading: exposure.coupon_forward_derivative * forward_state_loading,
-        });
-    }
-    let variance = observation_loadings
-        .iter()
-        .map(|left| {
-            observation_loadings
-                .iter()
-                .map(|right| {
-                    left.coupon_state_loading
-                        * right.coupon_state_loading
-                        * hw1f_ou_covariance(kappa, sigma, left.fixing_time, right.fixing_time)
-                })
-                .sum::<f64>()
-        })
-        .sum::<f64>()
-        .max(0.0);
-    let normal_vol = if option_time > 0.0 {
-        (variance / option_time).sqrt()
-    } else {
-        0.0
-    };
-    Ok(CompoundedRfrMomentMatch {
-        normal_vol,
-        variance,
-        option_time: option_time.max(0.0),
-        observation_loadings,
-    })
-}
-
-/// Scheduled-volatility variant of [`hw1f_compounded_rfr_moment_match`].
-///
-/// It retains the same product-rule coupon loadings while evaluating the OU
-/// covariance with the exact piecewise volatility integral.
-pub(crate) fn hw1f_compounded_rfr_moment_match_with_model(
     as_of: Date,
     params: &HullWhiteParams,
     projection: &OptionedCouponProjection,
@@ -234,11 +151,7 @@ pub(crate) fn hw1f_compounded_rfr_moment_match_with_model(
                     Ok::<f64, finstack_quant_core::Error>(
                         left.coupon_state_loading
                             * right.coupon_state_loading
-                            * hw1f_ou_covariance_with_model(
-                                params,
-                                left.fixing_time,
-                                right.fixing_time,
-                            )?,
+                            * hw1f_ou_covariance(params, left.fixing_time, right.fixing_time)?,
                     )
                 })
                 .sum::<finstack_quant_core::Result<f64>>()
@@ -380,14 +293,13 @@ impl CapFloorHullWhitePricer {
             let t_fix = resolved_inputs.time_to_fixing;
 
             let caplet_pv = if projection.is_compounded_overnight {
-                let moment_match =
-                    hw1f_compounded_rfr_moment_match_with_model(as_of, &hw_model, projection)
-                        .map_err(|e| {
-                            PricingError::model_failure_with_context(
-                                e.to_string(),
-                                PricingErrorContext::default(),
-                            )
-                        })?;
+                let moment_match = hw1f_compounded_rfr_moment_match(as_of, &hw_model, projection)
+                    .map_err(|e| {
+                    PricingError::model_failure_with_context(
+                        e.to_string(),
+                        PricingErrorContext::default(),
+                    )
+                })?;
                 crate::instruments::rates::cap_floor::pricing::normal::price_caplet_floorlet(
                     CapletFloorletInputs {
                         is_cap,
@@ -1204,8 +1116,9 @@ mod tests {
             resolve_optioned_coupon(&caplet, &period, &market, as_of).expect("projection");
         let kappa = 0.05;
         let sigma = 0.012;
-        let matched = hw1f_compounded_rfr_moment_match(as_of, kappa, sigma, &projection)
-            .expect("moment match");
+        let model = HullWhiteParams::constant(kappa, sigma).expect("constant model");
+        let matched =
+            hw1f_compounded_rfr_moment_match(as_of, &model, &projection).expect("moment match");
 
         assert!(
             matched.observation_loadings.len() > 2,
@@ -1262,25 +1175,12 @@ mod tests {
                     .sum::<f64>()
             })
             .sum();
-        assert!((matched.variance - expected_variance).abs() < 1.0e-16);
+        assert!((matched.variance - expected_variance).abs() < 1.0e-15);
         assert!(
             (matched.normal_vol * matched.normal_vol * matched.option_time - matched.variance)
                 .abs()
                 < 1.0e-16
         );
-
-        let zero_kappa =
-            hw1f_compounded_rfr_moment_match(as_of, 0.0, sigma, &projection).expect("zero kappa");
-        let tiny_kappa = hw1f_compounded_rfr_moment_match(as_of, 1.0e-12, sigma, &projection)
-            .expect("tiny kappa");
-        assert!(zero_kappa.normal_vol.is_finite());
-        assert!((zero_kappa.normal_vol - tiny_kappa.normal_vol).abs() < 1.0e-14);
-
-        let model = HullWhiteParams::constant(kappa, sigma).expect("constant model");
-        let scheduled = hw1f_compounded_rfr_moment_match_with_model(as_of, &model, &projection)
-            .expect("scheduled moment match");
-        assert!((scheduled.variance - matched.variance).abs() < 1.0e-15);
-        assert!((scheduled.normal_vol - matched.normal_vol).abs() < 1.0e-15);
     }
 
     #[test]
@@ -1315,8 +1215,9 @@ mod tests {
             resolve_optioned_coupon(&caplet, &period, &market, as_of).expect("projection");
         let kappa = 0.05;
         let sigma = 0.012;
-        let matched = hw1f_compounded_rfr_moment_match(as_of, kappa, sigma, &projection)
-            .expect("moment match");
+        let model = HullWhiteParams::constant(kappa, sigma).expect("constant model");
+        let matched =
+            hw1f_compounded_rfr_moment_match(as_of, &model, &projection).expect("moment match");
         let directions: Vec<f64> = (0..matched.observation_loadings.len())
             .map(|index| 0.5 + index as f64 / matched.observation_loadings.len() as f64)
             .collect();

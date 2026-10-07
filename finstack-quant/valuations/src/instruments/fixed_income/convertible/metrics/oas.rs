@@ -26,7 +26,7 @@
 use std::cell::Cell;
 
 use crate::instruments::fixed_income::convertible::pricing::{
-    calculate_accrued_interest, price_convertible_bond, ConvertibleTreeType,
+    calculate_accrued_interest, price_convertible_bond,
 };
 use crate::instruments::fixed_income::convertible::ConvertibleBond;
 use crate::metrics::{bump_discount_curve_parallel, MetricCalculator, MetricContext};
@@ -65,7 +65,6 @@ impl MetricCalculator for OasCalculator {
         // Use the same tree discretization as the registry pricer and every
         // other convertible metric so the solved OAS reprices to the quote
         // on the production tree (no discretization basis baked into the spread).
-        let tree_type = ConvertibleTreeType::default();
         let base_market = context.curves.as_ref();
 
         // The quoted clean price is a *settlement-date* price, so the model PV
@@ -86,7 +85,7 @@ impl MetricCalculator for OasCalculator {
         // surfaces missing curves / vol surfaces / equity IDs with their real
         // error messages instead of letting the solver report opaque "did not
         // converge" failures driven by NaN objective values.
-        let _ = price_convertible_bond(bond, base_market, tree_type, as_of)?;
+        let _ = price_convertible_bond(bond, base_market, as_of)?;
 
         // Capture the first pricing error from inside the closure so that if the
         // solver bails we can report the underlying cause rather than a generic
@@ -133,7 +132,7 @@ impl MetricCalculator for OasCalculator {
                     return f64::NAN;
                 }
             };
-            match price_convertible_bond(bond, &bumped, tree_type, as_of) {
+            match price_convertible_bond(bond, &bumped, as_of) {
                 Ok(pv) => pv.amount() / settle_df - target_dirty,
                 Err(e) => {
                     record_err(e);
@@ -340,13 +339,7 @@ mod tests {
             oas * 10_000.0,
         )
         .unwrap();
-        let repriced = super::price_convertible_bond(
-            bond,
-            &bumped,
-            super::ConvertibleTreeType::default(),
-            as_of,
-        )
-        .unwrap();
+        let repriced = super::price_convertible_bond(bond, &bumped, as_of).unwrap();
         assert!((repriced.amount() - notional * quoted_clean_pct / 100.0).abs() < 1.0);
     }
 
@@ -373,13 +366,7 @@ mod tests {
                 expected_spread * 10_000.0,
             )
             .unwrap();
-            let target = super::price_convertible_bond(
-                &bond,
-                &bumped,
-                super::ConvertibleTreeType::default(),
-                as_of,
-            )
-            .unwrap();
+            let target = super::price_convertible_bond(&bond, &bumped, as_of).unwrap();
             bond.instrument_pricing_overrides
                 .market_quotes
                 .quoted_clean_price_pct = Some(target.amount() / bond.notional.amount() * 100.0);
@@ -435,13 +422,7 @@ mod tests {
                     expected_spread * 10_000.0,
                 )
                 .unwrap();
-                let target = super::price_convertible_bond(
-                    &bond,
-                    &bumped,
-                    super::ConvertibleTreeType::default(),
-                    as_of,
-                )
-                .unwrap();
+                let target = super::price_convertible_bond(&bond, &bumped, as_of).unwrap();
                 bond.instrument_pricing_overrides
                     .market_quotes
                     .quoted_clean_price_pct =
@@ -510,13 +491,7 @@ mod tests {
                     .with_parallel_hazard_rate_bump_bp(expected_spread * 10_000.0)
                     .unwrap(),
             );
-            let target = super::price_convertible_bond(
-                &bond,
-                &shifted,
-                super::ConvertibleTreeType::default(),
-                as_of,
-            )
-            .unwrap();
+            let target = super::price_convertible_bond(&bond, &shifted, as_of).unwrap();
             bond.instrument_pricing_overrides
                 .market_quotes
                 .quoted_clean_price_pct = Some(target.amount() / bond.notional.amount() * 100.0);

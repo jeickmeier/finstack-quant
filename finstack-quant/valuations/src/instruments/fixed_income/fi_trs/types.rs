@@ -241,50 +241,6 @@ impl FiIndexTotalReturnSwap {
             .build()
     }
 
-    /// Creates an FI TRS that replicates a bond ETF.
-    ///
-    /// This is a convenience constructor for creating TRS positions that synthetically
-    /// replicate bond ETF exposure.
-    ///
-    /// # Arguments
-    /// * `etf_ticker` — ETF ticker symbol (e.g., "LQD", "AGG", "HYG")
-    /// * `notional` — Notional amount in the ETF's currency
-    /// * `financing` — Financing leg specification
-    /// * `schedule` — Payment schedule specification
-    /// * `yield_id` — Optional index yield market data identifier
-    /// * `duration_id` — Optional index duration market data identifier
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the builder fails validation.
-    pub fn replicate_etf(
-        etf_ticker: &str,
-        notional: Money,
-        financing: FinancingLegSpec,
-        schedule: TrsScheduleSpec,
-        yield_id: Option<&str>,
-        duration_id: Option<&str>,
-    ) -> Result<Self> {
-        let mut underlying = IndexUnderlyingParams::new(etf_ticker, notional.currency());
-        if let Some(y) = yield_id {
-            underlying = underlying.with_yield_id(y);
-        }
-        if let Some(d) = duration_id {
-            underlying = underlying.with_duration_id(d);
-        }
-
-        Self::builder()
-            .id(InstrumentId::new(format!("TRS-{}", etf_ticker)))
-            .notional(notional)
-            .underlying(underlying)
-            .financing_leg(financing)
-            .schedule(schedule)
-            .side(PayReceive::Receive)
-            .initial_level_opt(None)
-            .attributes(Attributes::new())
-            .build()
-    }
-
     /// Calculates the present value of the total return leg.
     ///
     /// # Arguments

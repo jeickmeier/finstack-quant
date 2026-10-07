@@ -21,7 +21,7 @@
 //!
 //! # Pricing Models
 //!
-//! - **Tree methods**: Trinomial trees with credit and equity factors
+//! - **Tree methods**: Binomial trees with credit and equity factors
 //! - **Partial differential equations**: Finite difference methods
 //! - **Monte Carlo**: For complex features and path dependency
 //!
@@ -58,5 +58,5 @@ pub use types::{
 
 pub use pricing::{
     calculate_accrued_interest, calculate_convertible_greeks, calculate_parity,
-    price_convertible_bond, settlement_date, ConvertibleTreeType, DEFAULT_CONVERTIBLE_TREE_STEPS,
+    price_convertible_bond, settlement_date, DEFAULT_CONVERTIBLE_TREE_STEPS,
 };
